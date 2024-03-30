@@ -4,6 +4,8 @@
 
 #include <string>
 
+#define INDENT " "
+
 struct Constant;
 
 struct Expression
@@ -17,23 +19,27 @@ struct Expression
 struct Constant : public Expression
 {
   Constant(i64 value) : m_value(value) {}
-
   ~Constant(){};
 
   i64
-  evaluate() const
+  evaluate() const override
   {
     return m_value;
   }
 
   std::string
-  to_ast_string([[maybe_unused]] usize layer = 0) const
+  to_ast_string(usize layer = 0) const override
   {
-    return "[constant " + to_string() + "]";
+    std::string s;
+    std::string pad;
+    for (usize i = 0; i < layer; i++)
+      pad += INDENT;
+    s += pad + "[constant " + to_string() + "]";
+    return s;
   }
 
   std::string
-  to_string() const
+  to_string() const override
   {
     return std::to_string(m_value);
   }
@@ -42,114 +48,151 @@ protected:
   const i64 m_value;
 };
 
-struct Operator : public Expression
+struct UnaryExpression : public Expression
 {
-  Operator(Expression *lhs, Expression *rhs) : m_lhs(lhs), m_rhs(rhs) {}
+  UnaryExpression(const Expression *rhs) : m_rhs(rhs) {}
+  virtual ~UnaryExpression() { delete m_rhs; };
 
   std::string
-  to_ast_string(usize layer = 0) const
+  to_ast_string(usize layer = 0) const override
   {
     std::string s;
     std::string pad;
     for (usize i = 0; i < layer; i++)
-      pad += " ";
-    s += pad + "[operator " + to_string() + "] -- " +
-         m_lhs->to_ast_string(layer + 1) + "\n" + pad + "  \\\n" +
-         m_rhs->to_ast_string(layer + 1);
+      pad += INDENT;
+    s += pad + "[unary " + to_string() + "]\n";
+    s += pad + INDENT + m_rhs->to_ast_string(layer + 1);
     return s;
   }
 
-  virtual ~Operator()
+protected:
+  const Expression *m_rhs{};
+};
+
+struct Negate : public UnaryExpression
+{
+  Negate(const Expression *rhs) : UnaryExpression(rhs) {}
+
+  std::string
+  to_string() const override
+  {
+    return "-";
+  }
+
+  i64
+  evaluate() const override
+  {
+    return -this->m_rhs->evaluate();
+  }
+};
+
+struct BinaryExpression : public Expression
+{
+  BinaryExpression(const Expression *lhs, const Expression *rhs) : m_lhs(lhs), m_rhs(rhs) {}
+  virtual ~BinaryExpression()
   {
     delete m_lhs;
     delete m_rhs;
   };
+
+  std::string
+  to_ast_string(usize layer = 0) const override
+  {
+    std::string s;
+    std::string pad;
+    for (usize i = 0; i < layer; i++)
+      pad += INDENT;
+    s += pad + "[binary " + to_string() + "]\n";
+    s += pad + INDENT + m_lhs->to_ast_string(layer + 1) + "\n";
+    s += pad + INDENT + m_rhs->to_ast_string(layer + 1);
+    return s;
+  }
 
 protected:
   const Expression *m_lhs{};
   const Expression *m_rhs{};
 };
 
-struct Add : public Operator
+struct Add : public BinaryExpression
 {
-  Add(Expression *lhs, Expression *rhs) : Operator(lhs, rhs) {}
+  Add(const Expression *lhs, const Expression *rhs) : BinaryExpression(lhs, rhs) {}
 
   std::string
-  to_string() const
+  to_string() const override
   {
     return "+";
   }
 
   i64
-  evaluate() const
+  evaluate() const override
   {
     return this->m_lhs->evaluate() + this->m_rhs->evaluate();
   }
 };
 
-struct Subtract : public Operator
+struct Subtract : public BinaryExpression
 {
-  Subtract(Expression *lhs, Expression *rhs) : Operator(lhs, rhs) {}
+  Subtract(const Expression *lhs, const Expression *rhs) : BinaryExpression(lhs, rhs) {}
 
   std::string
-  to_string() const
+  to_string() const override
   {
     return "-";
   }
 
   i64
-  evaluate() const
+  evaluate() const override
   {
     return this->m_lhs->evaluate() - this->m_rhs->evaluate();
   }
 };
 
-struct Multiply : public Operator
+struct Multiply : public BinaryExpression
 {
-  Multiply(Expression *lhs, Expression *rhs) : Operator(lhs, rhs) {}
+  Multiply(const Expression *lhs, const Expression *rhs) : BinaryExpression(lhs, rhs) {}
 
   std::string
-  to_string() const
+  to_string() const override
   {
     return "*";
   }
 
   i64
-  evaluate() const
+  evaluate() const override
   {
     return this->m_lhs->evaluate() * this->m_rhs->evaluate();
   }
 };
 
-struct Divide : public Operator
+struct Divide : public BinaryExpression
 {
-  Divide(Expression *lhs, Expression *rhs) : Operator(lhs, rhs) {}
+  Divide(const Expression *lhs, const Expression *rhs) : BinaryExpression(lhs, rhs) {}
 
   std::string
-  to_string() const
+  to_string() const override
   {
     return "/";
   }
 
   i64
-  evaluate() const
+  evaluate() const override
   {
     return this->m_lhs->evaluate() / this->m_rhs->evaluate();
   }
 };
 
-struct Module : public Operator
+struct Module : public BinaryExpression
 {
-  Module(Expression *lhs, Expression *rhs) : Operator(lhs, rhs) {}
+  Module(const Expression *lhs, const Expression *rhs) : BinaryExpression(lhs, rhs) {}
 
   std::string
-  to_string() const
+  to_string() const override
   {
     return "%";
   }
 
   i64
-  evaluate() const
+  evaluate() const override
   {
     return this->m_lhs->evaluate() % this->m_rhs->evaluate();
   }

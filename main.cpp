@@ -26,16 +26,15 @@ main(int argc, char **argv)
     input += ' ';
     input += argv[i];
   }
-  
+
   try {
-    Parser *p = new Parser{new Lexer{input}};
-    Expression *ast = p->construct_ast();
-    std::cout << "AST:\n" << ast->to_ast_string() << std::endl;
-    std::cout << "Result:\n" <<ast->evaluate() << std::endl;
-    delete p;
-    delete ast;
-  } catch (Error &e) {
-    std::cout << e.msg() << std::endl;
+    std::unique_ptr<Parser> p = std::make_unique<Parser>(new Lexer{input});
+    std::unique_ptr<Expression> ast = p->construct_ast();
+    std::cout << ast->to_ast_string() << std::endl;
+    std::cout << ast->evaluate() << std::endl;
+  } catch (Error *e) {
+    std::cout << e->msg() << std::endl;
+    delete e;
   }
 
   return 0;

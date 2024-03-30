@@ -8,6 +8,7 @@
 struct Error
 {
   virtual std::string msg() = 0;
+  virtual ~Error() {}
 
 protected:
   std::tuple<usize, usize>
@@ -34,7 +35,7 @@ struct LexerError : public Error
 
     m_message = std::to_string(line) + ":" +
                 std::to_string(location - last_newline) + ": " +
-                "Lexer error: " + m_message;
+                "lexer error: " + m_message;
   }
 
   std::string
@@ -56,7 +57,7 @@ struct ParserError : public Error
 
     m_message = std::to_string(line) + ":" +
                 std::to_string(location - last_newline) + ": " +
-                "Parser error: " + m_message;
+                "parser error: " + m_message;
   }
 
   std::string
