@@ -3,7 +3,10 @@
 #include "types.hpp"
 
 #include <string>
+#include <iostream>
 #include <tuple>
+
+#define CONTEXT_SIZE 16
 
 struct Error
 {
@@ -24,28 +27,27 @@ protected:
     }
     return {line_number, last_newline_location};
   }
-};
-
-struct LexerError : public Error
-{
-  LexerError(usize location, std::string_view source, std::string message)
-      : m_message(message)
-  {
-    auto [line, last_newline] = precise_position(location, source);
-
-    m_message = std::to_string(line) + ":" +
-                std::to_string(location - last_newline) + ": " +
-                "lexer error: " + m_message;
-  }
 
   std::string
-  msg()
+  get_context(usize location, usize line_location, std::string_view source)
   {
-    return m_message;
-  }
+    usize start_offset = 0;
+    usize size = 0;
 
-private:
-  std::string m_message;
+    while (line_location - start_offset > 0 && start_offset <= CONTEXT_SIZE)
+      start_offset++;
+    while (line_location + size < source.length() &&
+           source[line_location + size] != '\n' && size <= CONTEXT_SIZE)
+      size++;
+
+    std::string msg;
+    msg += source.substr(location - start_offset, size).data();
+    msg += "\n";
+    for (usize i = 0; i < start_offset; i++)
+      msg += ' ';
+    msg += "^ Error happened here.";
+    return msg;
+  }
 };
 
 struct ParserError : public Error
@@ -56,8 +58,8 @@ struct ParserError : public Error
     auto [line, last_newline] = precise_position(location, source);
 
     m_message = std::to_string(line) + ":" +
-                std::to_string(location - last_newline) + ": " +
-                "parser error: " + m_message;
+                std::to_string(location - last_newline) + ": " + m_message +
+                ".\n" + get_context(location, location - last_newline, source);
   }
 
   std::string

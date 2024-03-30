@@ -2,7 +2,6 @@
 #include "expr.hpp"
 #include "lex.hpp"
 #include "parse.hpp"
-#include "trace.hpp"
 #include "types.hpp"
 
 #include <iostream>

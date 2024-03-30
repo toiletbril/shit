@@ -1,12 +1,10 @@
 #pragma once
 
-#include "expr.hpp"
 #include "types.hpp"
+#include "expr.hpp"
 
+#include <memory>
 #include <string>
-
-struct Token;
-static std::string token_to_str(const Token *t);
 
 enum class TokenType
 {
@@ -21,6 +19,18 @@ enum class TokenType
   Percent,
   RightParen,
   LeftParen,
+  Tilde,
+  Ampersand,
+  DoubleAmpersand,
+  Greater,
+  DoubleGreater,
+  GreaterEquals,
+  Less,
+  DoubleLess,
+  LessEquals,
+  Pipe,
+  DoublePipe,
+  Cap,
 };
 
 typedef u8 OperatorFlags;
@@ -49,7 +59,7 @@ struct Token
   std::string
   to_ast_string() const
   {
-    return token_to_str(this);
+    return value();
   }
 
   usize
@@ -105,7 +115,7 @@ protected:
 struct TokenOperator : public Token
 {
   TokenOperator(usize source_position) : Token(source_position) {}
-  virtual ~TokenOperator() {};
+  virtual ~TokenOperator(){};
 
   virtual u8
   left_precedence() const
@@ -117,6 +127,21 @@ struct TokenOperator : public Token
   unary_precedence() const
   {
     return 0;
+  }
+
+  virtual std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs, const Expression *rhs) const
+  {
+    (void) lhs;
+    (void) rhs;
+    __builtin_unreachable();
+  }
+
+  virtual std::unique_ptr<Expression>
+  construct_unary_expression(const Expression *rhs) const
+  {
+    (void) rhs;
+    __builtin_unreachable();
   }
 };
 
@@ -133,7 +158,7 @@ struct Plus : public TokenOperator
   OperatorFlags
   operator_flags() const override
   {
-    return OperatorFlag::Binary;
+    return OperatorFlag::Binary | OperatorFlag::Unary;
   }
 
   std::string
@@ -146,6 +171,25 @@ struct Plus : public TokenOperator
   left_precedence() const override
   {
     return 2;
+  }
+
+  u8
+  unary_precedence() const override
+  {
+    return 4;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<Add>(lhs, rhs);
+  }
+
+  std::unique_ptr<Expression>
+  construct_unary_expression(const Expression *rhs) const override
+  {
+    return std::make_unique<Unnegate>(rhs);
   }
 };
 
@@ -180,7 +224,20 @@ struct Minus : public TokenOperator
   u8
   unary_precedence() const override
   {
-    return 5;
+    return 4;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<Subtract>(lhs, rhs);
+  }
+
+  std::unique_ptr<Expression>
+  construct_unary_expression(const Expression *rhs) const override
+  {
+    return std::make_unique<Negate>(rhs);
   }
 };
 
@@ -211,6 +268,13 @@ struct Slash : public TokenOperator
   {
     return 3;
   }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<Divide>(lhs, rhs);
+  }
 };
 
 struct Asterisk : public TokenOperator
@@ -239,6 +303,13 @@ struct Asterisk : public TokenOperator
   left_precedence() const override
   {
     return 3;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<Multiply>(lhs, rhs);
   }
 };
 
@@ -269,11 +340,18 @@ struct Percent : public TokenOperator
   {
     return 1;
   }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<Module>(lhs, rhs);
+  }
 };
 
-struct LeftParen : public TokenOperator
+struct LeftParen : public Token
 {
-  LeftParen(usize source_position) : TokenOperator(source_position) {}
+  LeftParen(usize source_position) : Token(source_position) {}
 
   TokenType
   type() const override
@@ -290,24 +368,41 @@ struct LeftParen : public TokenOperator
   OperatorFlags
   operator_flags() const override
   {
-    return OperatorFlag::Unary;
-  }
-
-  u8
-  unary_precedence() const override
-  {
-    return 5;
+    return OperatorFlag::NotAnOperator;
   }
 };
 
-struct RightParen : public TokenOperator
+struct RightParen : public Token
 {
-  RightParen(usize source_position) : TokenOperator(source_position) {}
+  RightParen(usize source_position) : Token(source_position) {}
 
   TokenType
   type() const override
   {
     return TokenType::RightParen;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::NotAnOperator;
+  }
+
+  std::string
+  value() const override
+  {
+    return ")";
+  }
+};
+
+struct Tilde : public TokenOperator
+{
+  Tilde(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::Tilde;
   }
 
   OperatorFlags
@@ -319,44 +414,414 @@ struct RightParen : public TokenOperator
   std::string
   value() const override
   {
-    return ")";
+    return "~";
   }
 
   u8
   unary_precedence() const override
   {
-    return 5;
+    return 2;
+  }
+
+  std::unique_ptr<Expression>
+  construct_unary_expression(const Expression *rhs) const override
+  {
+    return std::make_unique<BinaryComplement>(rhs);
   }
 };
 
-static std::string
-token_to_str(const Token *t)
+struct Ampersand : public TokenOperator
 {
-  switch (t->type()) {
-  case TokenType::Invalid:
-    return "invalid";
-  case TokenType::EndOfFile:
-    return "end of file";
-  case TokenType::Number: {
-    std::string s = "number ";
-    s += static_cast<const Number *>(t)->value();
-    return s;
+  Ampersand(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::Ampersand;
   }
-  case TokenType::Plus:
-    return "plus";
-  case TokenType::Minus:
-    return "minus";
-  case TokenType::Asterisk:
-    return "asterisk";
-  case TokenType::Slash:
-    return "slash";
-  case TokenType::Percent:
-    return "percent";
-  case TokenType::RightParen:
-    return "right paren";
-  case TokenType::LeftParen:
-    return "left paren";
-  default:
-    __builtin_unreachable();
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
   }
-}
+
+  std::string
+  value() const override
+  {
+    return "&";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 2;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<BinaryAnd>(lhs, rhs);
+  }
+};
+
+struct DoubleAmpersand : public TokenOperator
+{
+  DoubleAmpersand(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::DoubleAmpersand;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "&&";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 11;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<LogicalAnd>(lhs, rhs);
+  }
+};
+
+struct Greater : public TokenOperator
+{
+  Greater(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::Greater;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return ")";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 6;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<GreaterThan>(lhs, rhs);
+  }
+};
+
+struct DoubleGreater : public TokenOperator
+{
+  DoubleGreater(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::DoubleGreater;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return ">>";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 5;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<RightShift>(lhs, rhs);
+  }
+};
+
+struct GreaterEquals : public TokenOperator
+{
+  GreaterEquals(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::GreaterEquals;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return ">=";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 6;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<GreaterOrEqualTo>(lhs, rhs);
+  }
+};
+
+struct Less : public TokenOperator
+{
+  Less(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::Less;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "<";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 6;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<LessThan>(lhs, rhs);
+  }
+};
+
+struct DoubleLess : public TokenOperator
+{
+  DoubleLess(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::DoubleLess;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "<<";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 5;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<LeftShift>(lhs, rhs);
+  }
+};
+
+struct LessEquals : public TokenOperator
+{
+  LessEquals(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::LessEquals;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "<=";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 6;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<LessOrEqualTo>(lhs, rhs);
+  }
+};
+
+struct Pipe : public TokenOperator
+{
+  Pipe(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::Pipe;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "|";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 10;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<BinaryOr>(lhs, rhs);
+  }
+};
+
+struct DoublePipe : public TokenOperator
+{
+  DoublePipe(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::DoublePipe;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "||";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 12;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<LogicalOr>(lhs, rhs);
+  }
+};
+
+struct Cap : public TokenOperator
+{
+  Cap(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::Cap;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "^";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 9;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<Xor>(lhs, rhs);
+  }
+};

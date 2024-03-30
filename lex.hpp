@@ -37,8 +37,27 @@ is_number(uchar ch)
 static forceinline bool
 is_operator(uchar ch)
 {
-  return ch >= '%' && ch <= '/';
+  switch (ch) {
+  case '+':
+  case '-':
+  case '*':
+  case '/':
+  case '%':
+  case ')':
+  case '(':
+  case '~':
+  case '&':
+  case '|':
+  case '>':
+  case '<':
+  case '^':
+  case '=':
+    return true;
+  default:
+    return false;
+  };
 }
+
 struct Lexer
 {
   Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
@@ -114,7 +133,7 @@ protected:
         s += "Unknown symbol '";
         s += static_cast<char>(ch);
         s += "'";
-        m_error = new LexerError{token_start, m_source, s};
+        m_error = new ParserError{token_start, m_source, s};
         return {nullptr, 0};
       }
     }
@@ -138,32 +157,69 @@ protected:
   std::tuple<Token *, usize>
   lex_operator(usize token_start)
   {
-    usize token_end = token_start;
-
-    while (token_end < m_source.length() && is_operator(m_source[token_end]))
-      token_end++;
-
-    std::string buffer = m_source.substr(token_start, token_end - token_start);
+    usize token_end = token_start + 1;
+    uchar ch        = m_source[token_start];
 
     Token *t{};
-    if (buffer == "+")
+
+    if (ch == '+')
       t = new Plus{token_start};
-    else if (buffer == "-")
+    else if (ch == '-')
       t = new Minus{token_start};
-    else if (buffer == "*")
+    else if (ch == '*')
       t = new Asterisk{token_start};
-    else if (buffer == "/")
+    else if (ch == '/')
       t = new Slash{token_start};
-    else if (buffer == "%")
+    else if (ch == '%')
       t = new Percent{token_start};
-    else if (buffer == ")")
+    else if (ch == ')')
       t = new RightParen{token_start};
-    else if (buffer == "(")
+    else if (ch == '(')
       t = new LeftParen{token_start};
-    else {
-      delete t;
-      m_error = new LexerError{token_start, m_source,
-                               "Unknown operator '" + buffer + "'"};
+    else if (ch == '~')
+      t = new Tilde{token_start};
+    else if (ch == '^')
+      t = new Cap{token_start};
+    else if (ch == '&') {
+      if (token_end < m_source.length() && m_source[token_end] == '&') {
+        t = new DoubleAmpersand{token_start};
+        token_end++;
+      } else {
+        t = new Ampersand{token_start};
+      }
+    } else if (ch == '>') {
+      if (token_end < m_source.length() && m_source[token_end] == '>') {
+        t = new DoubleGreater{token_start};
+        token_end++;
+      } else if (token_end < m_source.length() && m_source[token_end] == '=') {
+        t = new GreaterEquals{token_start};
+        token_end++;
+      } else {
+        t = new Greater{token_start};
+      }
+    } else if (ch == '<') {
+      if (token_end < m_source.length() && m_source[token_end] == '<') {
+        t = new DoubleLess{token_start};
+        token_end++;
+      } else if (token_end < m_source.length() && m_source[token_end] == '=') {
+        t = new LessEquals{token_start};
+        token_end++;
+      } else {
+        t = new Less{token_start};
+      }
+    } else if (ch == '|') {
+      if (token_end < m_source.length() && m_source[token_end] == '|') {
+        t = new DoublePipe{token_start};
+        token_end++;
+      } else {
+        t = new Pipe{token_start};
+      }
+    } else {
+      std::string s;
+      s += "Unknown operator '";
+      s += static_cast<char>(ch);
+      s += "'";
+      m_error = new ParserError{token_start, m_source, s};
       return {nullptr, 0};
     }
 
