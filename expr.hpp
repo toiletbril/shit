@@ -467,3 +467,23 @@ struct Xor : public BinaryExpression
     return this->m_lhs->evaluate() ^ this->m_rhs->evaluate();
   }
 };
+
+struct Equality : public BinaryExpression
+{
+  Equality(const Expression *lhs, const Expression *rhs)
+      : BinaryExpression(lhs, rhs)
+  {
+  }
+
+  std::string
+  to_string() const override
+  {
+    return "==";
+  }
+
+  i64
+  evaluate() const override
+  {
+    return this->m_lhs->evaluate() == this->m_rhs->evaluate();
+  }
+};

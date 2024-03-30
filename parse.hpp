@@ -61,8 +61,8 @@ private:
         lhs = op->construct_unary_expression(rhs.release());
       } else {
         m_error = new ParserError{t->location(), m_lexer->source(),
-                                  "Expected a leaf type, found " +
-                                      t->to_ast_string()};
+                                  "Expected a leaf type, found '" +
+                                      t->to_ast_string() + "'"};
         return nullptr;
       }
       break;
@@ -84,8 +84,8 @@ private:
       }
       if (!(maybe_op->operator_flags() & OperatorFlag::Binary)) {
         m_error = new ParserError{maybe_op->location(), m_lexer->source(),
-                                  "Expected a binary operator, found " +
-                                  maybe_op->to_ast_string()};
+                                  "Expected a binary operator, found '" +
+                                      maybe_op->to_ast_string() + "'"};
         return nullptr;
       }
       const TokenOperator *op =
@@ -93,7 +93,8 @@ private:
       if (op->left_precedence() < min_precedence)
         break;
       m_lexer->next_token();
-      std::unique_ptr<Expression> rhs = parse(op->left_precedence() + 1);
+      std::unique_ptr<Expression> rhs = parse(
+          op->left_precedence() + (op->binary_left_associative() ? 1 : -1));
       if (rhs == nullptr)
         return nullptr;
       lhs = op->construct_binary_expression(lhs.release(), rhs.release());

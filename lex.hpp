@@ -214,6 +214,13 @@ protected:
       } else {
         t = new Pipe{token_start};
       }
+    } else if (ch == '=') {
+      if (token_end < m_source.length() && m_source[token_end] == '=') {
+        t = new DoubleEquals{token_start};
+        token_end++;
+      } else {
+        t = new Equals{token_start};
+      }
     } else {
       std::string s;
       s += "Unknown operator '";

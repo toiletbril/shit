@@ -1,7 +1,7 @@
 #pragma once
 
-#include "types.hpp"
 #include "expr.hpp"
+#include "types.hpp"
 
 #include <memory>
 #include <string>
@@ -31,6 +31,8 @@ enum class TokenType
   Pipe,
   DoublePipe,
   Cap,
+  Equals,
+  DoubleEquals,
 };
 
 typedef u8 OperatorFlags;
@@ -129,8 +131,15 @@ struct TokenOperator : public Token
     return 0;
   }
 
+  virtual bool
+  binary_left_associative() const
+  {
+    return true;
+  }
+
   virtual std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs, const Expression *rhs) const
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const
   {
     (void) lhs;
     (void) rhs;
@@ -170,13 +179,13 @@ struct Plus : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 2;
+    return 11;
   }
 
   u8
   unary_precedence() const override
   {
-    return 4;
+    return 13;
   }
 
   std::unique_ptr<Expression>
@@ -218,13 +227,13 @@ struct Minus : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 2;
+    return 11;
   }
 
   u8
   unary_precedence() const override
   {
-    return 4;
+    return 13;
   }
 
   std::unique_ptr<Expression>
@@ -266,7 +275,7 @@ struct Slash : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 3;
+    return 12;
   }
 
   std::unique_ptr<Expression>
@@ -302,7 +311,7 @@ struct Asterisk : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 3;
+    return 12;
   }
 
   std::unique_ptr<Expression>
@@ -338,7 +347,7 @@ struct Percent : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 1;
+    return 12;
   }
 
   std::unique_ptr<Expression>
@@ -420,7 +429,7 @@ struct Tilde : public TokenOperator
   u8
   unary_precedence() const override
   {
-    return 2;
+    return 13;
   }
 
   std::unique_ptr<Expression>
@@ -455,7 +464,7 @@ struct Ampersand : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 2;
+    return 7;
   }
 
   std::unique_ptr<Expression>
@@ -491,7 +500,7 @@ struct DoubleAmpersand : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 11;
+    return 4;
   }
 
   std::unique_ptr<Expression>
@@ -527,7 +536,7 @@ struct Greater : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 6;
+    return 9;
   }
 
   std::unique_ptr<Expression>
@@ -563,7 +572,7 @@ struct DoubleGreater : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 5;
+    return 10;
   }
 
   std::unique_ptr<Expression>
@@ -599,7 +608,7 @@ struct GreaterEquals : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 6;
+    return 9;
   }
 
   std::unique_ptr<Expression>
@@ -635,7 +644,7 @@ struct Less : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 6;
+    return 9;
   }
 
   std::unique_ptr<Expression>
@@ -671,7 +680,7 @@ struct DoubleLess : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 5;
+    return 10;
   }
 
   std::unique_ptr<Expression>
@@ -707,7 +716,7 @@ struct LessEquals : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 6;
+    return 9;
   }
 
   std::unique_ptr<Expression>
@@ -743,7 +752,7 @@ struct Pipe : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 10;
+    return 5;
   }
 
   std::unique_ptr<Expression>
@@ -779,7 +788,7 @@ struct DoublePipe : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 12;
+    return 3;
   }
 
   std::unique_ptr<Expression>
@@ -815,7 +824,7 @@ struct Cap : public TokenOperator
   u8
   left_precedence() const override
   {
-    return 9;
+    return 6;
   }
 
   std::unique_ptr<Expression>
@@ -823,5 +832,58 @@ struct Cap : public TokenOperator
                               const Expression *rhs) const override
   {
     return std::make_unique<Xor>(lhs, rhs);
+  }
+};
+
+struct Equals : public Token
+{
+  Equals(usize source_position) : Token(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::Equals;
+  }
+
+  std::string
+  value() const override
+  {
+    return "=";
+  }
+};
+
+struct DoubleEquals : public TokenOperator
+{
+  DoubleEquals(usize source_position) : TokenOperator(source_position) {}
+
+  TokenType
+  type() const override
+  {
+    return TokenType::DoubleEquals;
+  }
+
+  OperatorFlags
+  operator_flags() const override
+  {
+    return OperatorFlag::Binary;
+  }
+
+  std::string
+  value() const override
+  {
+    return "==";
+  }
+
+  u8
+  left_precedence() const override
+  {
+    return 8;
+  }
+
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override
+  {
+    return std::make_unique<Equality>(lhs, rhs);
   }
 };

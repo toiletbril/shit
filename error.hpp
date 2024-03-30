@@ -2,8 +2,8 @@
 
 #include "types.hpp"
 
-#include <string>
 #include <iostream>
+#include <string>
 #include <tuple>
 
 #define CONTEXT_SIZE 16
@@ -32,7 +32,7 @@ protected:
   get_context(usize location, usize line_location, std::string_view source)
   {
     usize start_offset = 0;
-    usize size = 0;
+    usize size         = 0;
 
     while (line_location - start_offset > 0 && start_offset <= CONTEXT_SIZE)
       start_offset++;
