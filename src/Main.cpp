@@ -1,8 +1,7 @@
-#include "common.hpp"
-#include "expr.hpp"
-#include "lex.hpp"
-#include "parse.hpp"
-#include "types.hpp"
+#include "Common.hpp"
+#include "Expressions.hpp"
+#include "Lexer.hpp"
+#include "Parser.hpp"
 
 #include <iostream>
 
@@ -19,7 +18,6 @@ main(int argc, char **argv)
   if (argc <= 1)
     show_help();
 
-  /* Merge CLI args. */
   std::string input = argv[1];
   for (int i = 2; i < argc; ++i) {
     input += ' ';
@@ -31,7 +29,7 @@ main(int argc, char **argv)
     std::unique_ptr<Expression> ast = p->construct_ast();
     std::cout << ast->to_ast_string() << std::endl;
     std::cout << ast->evaluate() << std::endl;
-  } catch (Error *e) {
+  } catch (ErrorBase *e) {
     std::cout << e->msg() << std::endl;
     delete e;
   }

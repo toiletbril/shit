@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.hpp"
+#include "Common.hpp"
 
 #include <iostream>
 #include <string>
@@ -8,10 +8,11 @@
 
 #define CONTEXT_SIZE 16
 
-struct Error
+struct ErrorBase
 {
+  virtual ~ErrorBase() {}
+
   virtual std::string msg() = 0;
-  virtual ~Error() {}
 
 protected:
   std::tuple<usize, usize>
@@ -50,9 +51,9 @@ protected:
   }
 };
 
-struct ParserError : public Error
+struct Error : public ErrorBase
 {
-  ParserError(usize location, std::string_view source, std::string message)
+  Error(usize location, std::string_view source, std::string message)
       : m_message(message)
   {
     auto [line, last_newline] = precise_position(location, source);
