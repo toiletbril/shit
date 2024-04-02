@@ -19,11 +19,8 @@ typedef int64_t i64;
 typedef u8 uchar;
 typedef i8 ichar;
 
-/* The maximum size of a theoretically possible object of any type. */
-typedef size_t usize;
-/* The result of subtracting two pointers. */
+typedef size_t    usize;
 typedef ptrdiff_t isize;
-
 typedef uintptr_t uintptr;
 
 #if defined __GNUC__ || defined __clang__ || defined __COSMOCC__

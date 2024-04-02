@@ -1,17 +1,20 @@
 #include "Parser.hpp"
 
+#include "Expressions.hpp"
+
 Parser::Parser(Lexer *lexer) : m_lexer(lexer) {}
 Parser::~Parser() { delete m_lexer; }
 
 std::unique_ptr<Expression>
 Parser::construct_ast()
 {
-  std::unique_ptr<Expression> e = parse_expression(0);
+  std::unique_ptr<Expression> e = parse_expression();
   if (e == nullptr)
     throw m_error;
   return e;
 }
 
+/* A standard pratt-parser for expressions. */
 std::unique_ptr<Expression>
 Parser::parse_expression(u8 min_precedence)
 {
@@ -20,19 +23,29 @@ Parser::parse_expression(u8 min_precedence)
   if ((m_error = m_lexer->error()))
     return nullptr;
 
+  /* Handle leaf type. We expect either a value, or an unary operator. */
   switch (t->type()) {
   case TokenType::Number:
-    lhs = parse_number(static_cast<const Number *>(t.get()));
+    lhs = parse_number(static_cast<const TokenNumber *>(t.get()));
     break;
+
+  case TokenType::String:
+    lhs = parse_string(static_cast<const TokenString *>(t.get()));
+    break;
+
+  case TokenType::Identifier:
+    lhs = parse_identifier(static_cast<const TokenIdentifier *>(t.get()));
+    break;
+
   case TokenType::LeftParen: {
     if (m_parentheses_depth >= 256) {
-      m_error =
-          Error{t->location(), "Bracket nesting level exceeded maximum of 256"};
+      m_error = ErrorWithLocation{
+          t->location(), "Bracket nesting level exceeded maximum of 256"};
       return nullptr;
     }
 
     m_parentheses_depth++;
-    if ((lhs = parse_expression(0)) == nullptr)
+    if ((lhs = parse_expression()) == nullptr)
       return nullptr;
 
     std::unique_ptr<Token> rp = std::unique_ptr<Token>{m_lexer->next_token()};
@@ -40,14 +53,15 @@ Parser::parse_expression(u8 min_precedence)
       return nullptr;
 
     if (rp->type() != TokenType::RightParen) {
-      m_error = Error{t->location(), "Unterminated parenthesis"};
+      m_error = ErrorWithLocation{t->location(), "Unterminated parenthesis"};
       return nullptr;
     }
     m_parentheses_depth--;
     break;
   }
+
   default:
-    if (t->operator_flags() & OperatorFlag::Unary) {
+    if (t->flags() & TokenFlag::UnaryOperator) {
       const TokenOperator *op = static_cast<const TokenOperator *>(t.get());
 
       std::unique_ptr<Expression> rhs =
@@ -57,13 +71,17 @@ Parser::parse_expression(u8 min_precedence)
 
       lhs = op->construct_unary_expression(rhs.release());
     } else {
-      m_error = Error{t->location(),
-                      "Expected a value, found '" + t->to_ast_string() + "'"};
+      m_error = ErrorWithLocation{t->location(), "Expected a value, found '" +
+                                                     t->value() + "'"};
       return nullptr;
     }
     break;
   }
 
+  /* Next goes the precedence parsing. Need to find an operator and decide
+   * whether we should go into recursion with more precedence, continue
+   * in a loop with the same precedence, or break, if found operator has higher
+   * precedence. */
   for (;;) {
     std::unique_ptr<Token> maybe_op{m_lexer->peek_token()};
     if ((m_error = m_lexer->error()))
@@ -73,16 +91,17 @@ Parser::parse_expression(u8 min_precedence)
 
     if (maybe_op->type() == TokenType::RightParen) {
       if (m_parentheses_depth == 0) {
-        m_error = Error{maybe_op->location(), "Unexpected closing parenthesis"};
+        m_error = ErrorWithLocation{maybe_op->location(),
+                                    "Unexpected closing parenthesis"};
         return nullptr;
       }
       return lhs;
     }
 
-    if (!(maybe_op->operator_flags() & OperatorFlag::Binary)) {
-      m_error =
-          Error{maybe_op->location(), "Expected an operator, found '" +
-                                          maybe_op->to_ast_string() + "'"};
+    if (!(maybe_op->flags() & TokenFlag::BinaryOperator)) {
+      m_error = ErrorWithLocation{maybe_op->location(),
+                                  "Expected a binary operator, found '" +
+                                      maybe_op->value() + "'"};
       return nullptr;
     }
 
@@ -104,8 +123,21 @@ Parser::parse_expression(u8 min_precedence)
 }
 
 std::unique_ptr<Expression>
-Parser::parse_number(const Number *n)
+Parser::parse_identifier(const TokenIdentifier *n)
+{
+  UNUSED(n);
+  return std::make_unique<DummyExpression>();
+}
+
+std::unique_ptr<Expression>
+Parser::parse_string(const TokenString *s)
+{
+  return std::make_unique<ConstantString>(s->location(), s->value());
+}
+
+std::unique_ptr<Expression>
+Parser::parse_number(const TokenNumber *n)
 {
   i64 value = std::atoll(n->value().data());
-  return std::make_unique<Constant>(n->location(), value);
+  return std::make_unique<ConstantNumber>(n->location(), value);
 }

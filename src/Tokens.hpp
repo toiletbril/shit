@@ -7,13 +7,16 @@
 #include <string>
 #include <string_view>
 
-typedef u8 OperatorFlags;
+typedef u8 TokenFlags;
 
-enum OperatorFlag
+enum TokenFlag
 {
-  NotAnOperator = 0,
-  Unary = 1 << 0,
-  Binary = 1 << 1,
+  /* clang-format off */
+  Sentinel       = 0,
+  Value          = 1,
+  UnaryOperator  = 1 << 1,
+  BinaryOperator = 1 << 2,
+  /* clang-format on */
 };
 
 enum class TokenType
@@ -22,6 +25,8 @@ enum class TokenType
   EndOfFile,
 
   Number,
+  String,
+  Identifier,
   Plus,
   Minus,
   Asterisk,
@@ -47,17 +52,16 @@ enum class TokenType
   ExclamationEquals,
 };
 
-/*
- * Base classes
+/**
+ * Simple tokens
  */
-
 struct Token
 {
-  virtual ~Token() = default;
+  virtual ~Token();
 
-  virtual TokenType     type() const = 0;
-  virtual OperatorFlags operator_flags() const = 0;
-  virtual std::string   value() const = 0;
+  virtual TokenType   type() const = 0;
+  virtual TokenFlags  flags() const = 0;
+  virtual std::string value() const = 0;
 
   virtual std::string to_ast_string() const;
 
@@ -70,6 +74,73 @@ private:
   usize m_location;
 };
 
+struct TokenEndOfFile : public Token
+{
+  TokenEndOfFile(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenLeftParen : public Token
+{
+  TokenLeftParen(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenRightParen : public Token
+{
+  TokenRightParen(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+/**
+ * Tokens with important values
+ */
+struct TokenValue : public Token
+{
+  TokenValue(usize location, std::string_view sv);
+
+  std::string value() const override;
+
+protected:
+  std::string m_value;
+};
+
+struct TokenNumber : public TokenValue
+{
+  TokenNumber(usize location, std::string_view sv);
+
+  TokenType  type() const override;
+  TokenFlags flags() const override;
+};
+
+struct TokenString : public TokenValue
+{
+  TokenString(usize location, std::string_view sv);
+
+  TokenType  type() const override;
+  TokenFlags flags() const override;
+};
+
+struct TokenIdentifier : public TokenValue
+{
+  TokenIdentifier(usize location, std::string_view sv);
+
+  TokenType  type() const override;
+  TokenFlags flags() const override;
+};
+
+/**
+ * Operators
+ */
 struct TokenOperator : public Token
 {
   TokenOperator(usize location);
@@ -86,41 +157,13 @@ struct TokenOperator : public Token
   construct_unary_expression(const Expression *rhs) const;
 };
 
-/*
- * Specific token types
- */
-
-struct Number : public Token
+struct TokenPlus : public TokenOperator
 {
-  Number(usize location, std::string_view sv);
+  TokenPlus(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
-
-private:
-  std::string m_value;
-};
-
-struct EndOfFile : public Token
-{
-  EndOfFile(usize location);
-
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
-
-private:
-  std::string m_value;
-};
-
-struct Plus : public TokenOperator
-{
-  Plus(usize location);
-
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -132,13 +175,13 @@ struct Plus : public TokenOperator
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct Minus : public TokenOperator
+struct TokenMinus : public TokenOperator
 {
-  Minus(usize location);
+  TokenMinus(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -150,13 +193,13 @@ struct Minus : public TokenOperator
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct Slash : public TokenOperator
+struct TokenSlash : public TokenOperator
 {
-  Slash(usize location);
+  TokenSlash(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -164,13 +207,13 @@ struct Slash : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct Asterisk : public TokenOperator
+struct TokenAsterisk : public TokenOperator
 {
-  Asterisk(usize location);
+  TokenAsterisk(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -178,13 +221,13 @@ struct Asterisk : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct Percent : public TokenOperator
+struct TokenPercent : public TokenOperator
 {
-  Percent(usize location);
+  TokenPercent(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -192,57 +235,39 @@ struct Percent : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct LeftParen : public Token
+struct TokenTilde : public TokenOperator
 {
-  LeftParen(usize location);
+  TokenTilde(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
-};
-
-struct RightParen : public Token
-{
-  RightParen(usize location);
-
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
-};
-
-struct Tilde : public TokenOperator
-{
-  Tilde(usize location);
-
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 unary_precedence() const override;
   std::unique_ptr<Expression>
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct ExclamationMark : public TokenOperator
+struct TokenExclamationMark : public TokenOperator
 {
-  ExclamationMark(usize location);
+  TokenExclamationMark(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 unary_precedence() const override;
   std::unique_ptr<Expression>
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct Ampersand : public TokenOperator
+struct TokenAmpersand : public TokenOperator
 {
-  Ampersand(usize location);
+  TokenAmpersand(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -250,13 +275,13 @@ struct Ampersand : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct DoubleAmpersand : public TokenOperator
+struct TokenDoubleAmpersand : public TokenOperator
 {
-  DoubleAmpersand(usize location);
+  TokenDoubleAmpersand(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -264,13 +289,13 @@ struct DoubleAmpersand : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct Greater : public TokenOperator
+struct TokenGreater : public TokenOperator
 {
-  Greater(usize location);
+  TokenGreater(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -278,13 +303,13 @@ struct Greater : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct DoubleGreater : public TokenOperator
+struct TokenDoubleGreater : public TokenOperator
 {
-  DoubleGreater(usize location);
+  TokenDoubleGreater(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -292,13 +317,13 @@ struct DoubleGreater : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct GreaterEquals : public TokenOperator
+struct TokenGreaterEquals : public TokenOperator
 {
-  GreaterEquals(usize location);
+  TokenGreaterEquals(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -306,13 +331,13 @@ struct GreaterEquals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct Less : public TokenOperator
+struct TokenLess : public TokenOperator
 {
-  Less(usize location);
+  TokenLess(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -320,13 +345,13 @@ struct Less : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct DoubleLess : public TokenOperator
+struct TokenDoubleLess : public TokenOperator
 {
-  DoubleLess(usize location);
+  TokenDoubleLess(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -334,13 +359,13 @@ struct DoubleLess : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct LessEquals : public TokenOperator
+struct TokenLessEquals : public TokenOperator
 {
-  LessEquals(usize location);
+  TokenLessEquals(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -348,13 +373,13 @@ struct LessEquals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct Pipe : public TokenOperator
+struct TokenPipe : public TokenOperator
 {
-  Pipe(usize location);
+  TokenPipe(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -362,13 +387,13 @@ struct Pipe : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct DoublePipe : public TokenOperator
+struct TokenDoublePipe : public TokenOperator
 {
-  DoublePipe(usize location);
+  TokenDoublePipe(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -376,13 +401,13 @@ struct DoublePipe : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct Cap : public TokenOperator
+struct TokenCap : public TokenOperator
 {
-  Cap(usize location);
+  TokenCap(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -390,13 +415,13 @@ struct Cap : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct Equals : public TokenOperator
+struct TokenEquals : public TokenOperator
 {
-  Equals(usize location);
+  TokenEquals(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -404,13 +429,13 @@ struct Equals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct DoubleEquals : public TokenOperator
+struct TokenDoubleEquals : public TokenOperator
 {
-  DoubleEquals(usize location);
+  TokenDoubleEquals(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -418,13 +443,13 @@ struct DoubleEquals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct ExclamationEquals : public TokenOperator
+struct TokenExclamationEquals : public TokenOperator
 {
-  ExclamationEquals(usize location);
+  TokenExclamationEquals(usize location);
 
-  TokenType     type() const override;
-  OperatorFlags operator_flags() const override;
-  std::string   value() const override;
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>

@@ -1,6 +1,6 @@
 [Binary /]
-  [Const 1]
-  [Const 0]
-0:2: Division by 0.
-1/0
-  ^~ Error happened here.
+  [Number 1]
+  [Number 0]
+1:3: Division by 0.
+     1 |  1/0
+            ^~ Error happened here.

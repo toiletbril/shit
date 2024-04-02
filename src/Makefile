@@ -2,8 +2,8 @@
 
 include ../Common.mk
 
-MODULES := Main Errors Expressions Lexer Parser Tokens
-HEADERS := Errors Expressions Lexer Parser Tokens Debug Common
+MODULES := Main Errors Flags Expressions Lexer Parser Tokens
+HEADERS := Errors Flags Expressions Lexer Parser Tokens Debug Common
 SOURCE_FILES := $(addsuffix .cpp, $(MODULES))
 HEADER_FILES := $(addsuffix .hpp, $(HEADERS))
 OBJECTS := $(addprefix o/, $(addsuffix .o, $(MODULES)))

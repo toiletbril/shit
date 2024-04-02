@@ -13,10 +13,13 @@ struct Parser
   std::unique_ptr<Expression> construct_ast();
 
 private:
-  Lexer *m_lexer;
-  Error  m_error{};
-  usize  m_parentheses_depth{0};
+  Lexer            *m_lexer;
+  ErrorWithLocation m_error{};
+  usize             m_parentheses_depth{0};
 
-  std::unique_ptr<Expression> parse_expression(u8 min_precedence);
-  std::unique_ptr<Expression> parse_number(const Number *n);
+  std::unique_ptr<Expression> parse_expression(u8 min_precedence = 0);
+
+  std::unique_ptr<Expression> parse_identifier(const TokenIdentifier *n);
+  std::unique_ptr<Expression> parse_number(const TokenNumber *n);
+  std::unique_ptr<Expression> parse_string(const TokenString *n);
 };

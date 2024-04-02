@@ -2,7 +2,7 @@ BIN := ../shit
 FAILED := failed.diff
 
 %: expected/%.out
-	@cat input/$@ | $(BIN) -i | diff -wu $< - >> $(FAILED) && echo "\t[$@\t\t] ok." || echo "\t[$@\t\t] FAILED."
+	@cat input/$@.shit | $(BIN) -A - | diff -wu $< - >> $(FAILED) && echo "\t[$@\t\t] ok." || echo "\t[$@\t\t] FAILED."
 
 test: $(BIN)
 	@rm -f $(FAILED)
@@ -11,4 +11,4 @@ test: $(BIN)
 clean:
 	rm -f $(FAILED)
 
-batch1: regress long parens zero_division
+batch1: expression parens_limit zero_division

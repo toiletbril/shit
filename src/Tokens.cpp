@@ -4,8 +4,12 @@
 
 /* Implementations for specific token types */
 
-/* class: Token */
+/**
+ * class: Token
+ */
 Token::Token(usize location) : m_location(location) {}
+
+Token::~Token() = default;
 
 usize
 Token::location() const
@@ -19,52 +23,106 @@ Token::to_ast_string() const
   return value();
 }
 
-/* class: EndOfFile */
-EndOfFile::EndOfFile(usize location) : Token(location) {}
+/**
+ * class: TokenEndOfFile
+ */
+TokenEndOfFile::TokenEndOfFile(usize location) : Token(location) {}
 
 TokenType
-EndOfFile::type() const
+TokenEndOfFile::type() const
 {
   return TokenType::EndOfFile;
 }
 
-OperatorFlags
-EndOfFile::operator_flags() const
+TokenFlags
+TokenEndOfFile::flags() const
 {
-  return OperatorFlag::NotAnOperator;
+  return TokenFlag::Sentinel;
 }
 
 std::string
-EndOfFile::value() const
+TokenEndOfFile::value() const
 {
   return "EOF";
 }
 
-/* class: Number */
-Number::Number(usize location, std::string_view sv)
+/**
+ * class: TokenValue
+ */
+TokenValue::TokenValue(usize location, std::string_view sv)
     : Token(location), m_value(sv)
 {
 }
 
-TokenType
-Number::type() const
-{
-  return TokenType::Number;
-}
-
-OperatorFlags
-Number::operator_flags() const
-{
-  return OperatorFlag::NotAnOperator;
-}
-
 std::string
-Number::value() const
+TokenValue::value() const
 {
   return m_value;
 }
 
-/* class: TokenOperator */
+/**
+ * class: TokenNumber
+ */
+TokenNumber::TokenNumber(usize location, std::string_view sv)
+    : TokenValue(location, sv)
+{
+}
+
+TokenType
+TokenNumber::type() const
+{
+  return TokenType::Number;
+}
+
+TokenFlags
+TokenNumber::flags() const
+{
+  return TokenFlag::Value;
+}
+
+/**
+ * class: TokenString
+ */
+TokenString::TokenString(usize location, std::string_view sv)
+    : TokenValue(location, sv)
+{
+}
+
+TokenType
+TokenString::type() const
+{
+  return TokenType::String;
+}
+
+TokenFlags
+TokenString::flags() const
+{
+  return TokenFlag::Value;
+}
+
+/**
+ * class: TokenIdentifier
+ */
+TokenIdentifier::TokenIdentifier(usize location, std::string_view sv)
+    : TokenValue(location, sv)
+{
+}
+
+TokenType
+TokenIdentifier::type() const
+{
+  return TokenType::Identifier;
+}
+
+TokenFlags
+TokenIdentifier::flags() const
+{
+  return TokenFlag::Value;
+}
+
+/**
+ * class: TokenTokenOperator
+ */
 TokenOperator::TokenOperator(usize location) : Token(location) {}
 
 u8
@@ -101,784 +159,843 @@ TokenOperator::construct_unary_expression(const Expression *rhs) const
   UNREACHABLE();
 }
 
-/* class: Plus */
-Plus::Plus(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenPlus
+ */
+TokenPlus::TokenPlus(usize location) : TokenOperator(location) {}
 
 TokenType
-Plus::type() const
+TokenPlus::type() const
 {
   return TokenType::Plus;
 }
 
-OperatorFlags
-Plus::operator_flags() const
+TokenFlags
+TokenPlus::flags() const
 {
-  return OperatorFlag::Binary | OperatorFlag::Unary;
+  return TokenFlag::BinaryOperator | TokenFlag::UnaryOperator;
 }
 
 std::string
-Plus::value() const
+TokenPlus::value() const
 {
   return "+";
 }
 
 u8
-Plus::left_precedence() const
+TokenPlus::left_precedence() const
 {
   return 11;
 }
 
 u8
-Plus::unary_precedence() const
+TokenPlus::unary_precedence() const
 {
   return 13;
 }
 
 std::unique_ptr<Expression>
-Plus::construct_binary_expression(const Expression *lhs,
-                                  const Expression *rhs) const
+TokenPlus::construct_binary_expression(const Expression *lhs,
+                                       const Expression *rhs) const
 {
   return std::make_unique<Add>(location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
-Plus::construct_unary_expression(const Expression *rhs) const
+TokenPlus::construct_unary_expression(const Expression *rhs) const
 {
   return std::make_unique<Unnegate>(location(), rhs);
 }
 
-/* class: Minus */
-Minus::Minus(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenMinus
+ */
+TokenMinus::TokenMinus(usize location) : TokenOperator(location) {}
 
 TokenType
-Minus::type() const
+TokenMinus::type() const
 {
   return TokenType::Minus;
 }
 
-OperatorFlags
-Minus::operator_flags() const
+TokenFlags
+TokenMinus::flags() const
 {
-  return OperatorFlag::Binary | OperatorFlag::Unary;
+  return TokenFlag::BinaryOperator | TokenFlag::UnaryOperator;
 }
 
 std::string
-Minus::value() const
+TokenMinus::value() const
 {
   return "-";
 }
 
 u8
-Minus::left_precedence() const
+TokenMinus::left_precedence() const
 {
   return 11;
 }
 
 u8
-Minus::unary_precedence() const
+TokenMinus::unary_precedence() const
 {
   return 13;
 }
 
 std::unique_ptr<Expression>
-Minus::construct_binary_expression(const Expression *lhs,
-                                   const Expression *rhs) const
+TokenMinus::construct_binary_expression(const Expression *lhs,
+                                        const Expression *rhs) const
 {
   return std::make_unique<Subtract>(location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
-Minus::construct_unary_expression(const Expression *rhs) const
+TokenMinus::construct_unary_expression(const Expression *rhs) const
 {
   return std::make_unique<Negate>(location(), rhs);
 }
 
-/* class: Slash */
-Slash::Slash(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenSlash
+ */
+TokenSlash::TokenSlash(usize location) : TokenOperator(location) {}
 
 TokenType
-Slash::type() const
+TokenSlash::type() const
 {
   return TokenType::Slash;
 }
 
-OperatorFlags
-Slash::operator_flags() const
+TokenFlags
+TokenSlash::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Slash::value() const
+TokenSlash::value() const
 {
   return "/";
 }
 
 u8
-Slash::left_precedence() const
+TokenSlash::left_precedence() const
 {
   return 12;
 }
 
 std::unique_ptr<Expression>
-Slash::construct_binary_expression(const Expression *lhs,
-                                   const Expression *rhs) const
+TokenSlash::construct_binary_expression(const Expression *lhs,
+                                        const Expression *rhs) const
 {
   return std::make_unique<Divide>(location(), lhs, rhs);
 }
 
-/* class: Asterisk */
-Asterisk::Asterisk(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenAsterisk
+ */
+TokenAsterisk::TokenAsterisk(usize location) : TokenOperator(location) {}
 
 TokenType
-Asterisk::type() const
+TokenAsterisk::type() const
 {
   return TokenType::Asterisk;
 }
 
-OperatorFlags
-Asterisk::operator_flags() const
+TokenFlags
+TokenAsterisk::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Asterisk::value() const
+TokenAsterisk::value() const
 {
   return "*";
 }
 
 u8
-Asterisk::left_precedence() const
+TokenAsterisk::left_precedence() const
 {
   return 12;
 }
 
 std::unique_ptr<Expression>
-Asterisk::construct_binary_expression(const Expression *lhs,
-                                      const Expression *rhs) const
+TokenAsterisk::construct_binary_expression(const Expression *lhs,
+                                           const Expression *rhs) const
 {
   return std::make_unique<Multiply>(location(), lhs, rhs);
 }
 
-/* class: Percent */
-Percent::Percent(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenPercent
+ */
+TokenPercent::TokenPercent(usize location) : TokenOperator(location) {}
 
 TokenType
-Percent::type() const
+TokenPercent::type() const
 {
   return TokenType::Percent;
 }
 
-OperatorFlags
-Percent::operator_flags() const
+TokenFlags
+TokenPercent::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Percent::value() const
+TokenPercent::value() const
 {
   return "%";
 }
 
 u8
-Percent::left_precedence() const
+TokenPercent::left_precedence() const
 {
   return 12;
 }
 
 std::unique_ptr<Expression>
-Percent::construct_binary_expression(const Expression *lhs,
-                                     const Expression *rhs) const
+TokenPercent::construct_binary_expression(const Expression *lhs,
+                                          const Expression *rhs) const
 {
   return std::make_unique<Module>(location(), lhs, rhs);
 }
 
-/* class: LeftParen */
-LeftParen::LeftParen(usize location) : Token(location) {}
+/**
+ * class: TokenLeftParen
+ */
+TokenLeftParen::TokenLeftParen(usize location) : Token(location) {}
 
 TokenType
-LeftParen::type() const
+TokenLeftParen::type() const
 {
   return TokenType::LeftParen;
 }
 
 std::string
-LeftParen::value() const
+TokenLeftParen::value() const
 {
   return "(";
 }
 
-OperatorFlags
-LeftParen::operator_flags() const
+TokenFlags
+TokenLeftParen::flags() const
 {
-  return OperatorFlag::NotAnOperator;
+  return TokenFlag::Value;
 }
 
-/* class: RightParen */
-RightParen::RightParen(usize location) : Token(location) {}
+/**
+ * class: TokenRightParen
+ */
+TokenRightParen::TokenRightParen(usize location) : Token(location) {}
 
 TokenType
-RightParen::type() const
+TokenRightParen::type() const
 {
   return TokenType::RightParen;
 }
 
 std::string
-RightParen::value() const
+TokenRightParen::value() const
 {
   return ")";
 }
 
-OperatorFlags
-RightParen::operator_flags() const
+TokenFlags
+TokenRightParen::flags() const
 {
-  return OperatorFlag::NotAnOperator;
+  return TokenFlag::Value;
 }
 
-/* class: ExclamationMark */
-ExclamationMark::ExclamationMark(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenExclamationMark
+ */
+TokenExclamationMark::TokenExclamationMark(usize location)
+    : TokenOperator(location)
+{
+}
 
 TokenType
-ExclamationMark::type() const
+TokenExclamationMark::type() const
 {
   return TokenType::Tilde;
 }
 
-OperatorFlags
-ExclamationMark::operator_flags() const
+TokenFlags
+TokenExclamationMark::flags() const
 {
-  return OperatorFlag::Unary;
+  return TokenFlag::UnaryOperator;
 }
 
 std::string
-ExclamationMark::value() const
+TokenExclamationMark::value() const
 {
   return "!";
 }
 
 u8
-ExclamationMark::unary_precedence() const
+TokenExclamationMark::unary_precedence() const
 {
   return 13;
 }
 
 std::unique_ptr<Expression>
-ExclamationMark::construct_unary_expression(const Expression *rhs) const
+TokenExclamationMark::construct_unary_expression(const Expression *rhs) const
 {
   return std::make_unique<LogicalNot>(location(), rhs);
 }
 
-/* class: Tilde */
-Tilde::Tilde(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenTilde
+ */
+TokenTilde::TokenTilde(usize location) : TokenOperator(location) {}
 
 TokenType
-Tilde::type() const
+TokenTilde::type() const
 {
   return TokenType::Tilde;
 }
 
-OperatorFlags
-Tilde::operator_flags() const
+TokenFlags
+TokenTilde::flags() const
 {
-  return OperatorFlag::Unary;
+  return TokenFlag::UnaryOperator;
 }
 
 std::string
-Tilde::value() const
+TokenTilde::value() const
 {
   return "~";
 }
 
 u8
-Tilde::unary_precedence() const
+TokenTilde::unary_precedence() const
 {
   return 13;
 }
 
 std::unique_ptr<Expression>
-Tilde::construct_unary_expression(const Expression *rhs) const
+TokenTilde::construct_unary_expression(const Expression *rhs) const
 {
   return std::make_unique<BinaryComplement>(location(), rhs);
 }
 
-/* class: Ampersand */
-Ampersand::Ampersand(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenAmpersand
+ */
+TokenAmpersand::TokenAmpersand(usize location) : TokenOperator(location) {}
 
 TokenType
-Ampersand::type() const
+TokenAmpersand::type() const
 {
   return TokenType::Ampersand;
 }
 
-OperatorFlags
-Ampersand::operator_flags() const
+TokenFlags
+TokenAmpersand::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Ampersand::value() const
+TokenAmpersand::value() const
 {
   return "&";
 }
 
 u8
-Ampersand::left_precedence() const
+TokenAmpersand::left_precedence() const
 {
   return 7;
 }
 
 std::unique_ptr<Expression>
-Ampersand::construct_binary_expression(const Expression *lhs,
-                                       const Expression *rhs) const
+TokenAmpersand::construct_binary_expression(const Expression *lhs,
+                                            const Expression *rhs) const
 {
   return std::make_unique<BinaryAnd>(location(), lhs, rhs);
 }
 
-/* class: DoubleAmpersand */
-DoubleAmpersand::DoubleAmpersand(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenDoubleAmpersand
+ */
+TokenDoubleAmpersand::TokenDoubleAmpersand(usize location)
+    : TokenOperator(location)
+{
+}
 
 TokenType
-DoubleAmpersand::type() const
+TokenDoubleAmpersand::type() const
 {
   return TokenType::DoubleAmpersand;
 }
 
-OperatorFlags
-DoubleAmpersand::operator_flags() const
+TokenFlags
+TokenDoubleAmpersand::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-DoubleAmpersand::value() const
+TokenDoubleAmpersand::value() const
 {
   return "&&";
 }
 
 u8
-DoubleAmpersand::left_precedence() const
+TokenDoubleAmpersand::left_precedence() const
 {
   return 4;
 }
 
 std::unique_ptr<Expression>
-DoubleAmpersand::construct_binary_expression(const Expression *lhs,
-                                             const Expression *rhs) const
+TokenDoubleAmpersand::construct_binary_expression(const Expression *lhs,
+                                                  const Expression *rhs) const
 {
   return std::make_unique<LogicalAnd>(location(), lhs, rhs);
 }
 
-/* class: Greater */
-Greater::Greater(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenGreater
+ */
+TokenGreater::TokenGreater(usize location) : TokenOperator(location) {}
 
 TokenType
-Greater::type() const
+TokenGreater::type() const
 {
   return TokenType::Greater;
 }
 
-OperatorFlags
-Greater::operator_flags() const
+TokenFlags
+TokenGreater::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Greater::value() const
+TokenGreater::value() const
 {
   return ">";
 }
 
 u8
-Greater::left_precedence() const
+TokenGreater::left_precedence() const
 {
   return 8;
 }
 
 std::unique_ptr<Expression>
-Greater::construct_binary_expression(const Expression *lhs,
-                                     const Expression *rhs) const
+TokenGreater::construct_binary_expression(const Expression *lhs,
+                                          const Expression *rhs) const
 {
   return std::make_unique<GreaterThan>(location(), lhs, rhs);
 }
 
-/* class: DoubleGreater */
-DoubleGreater::DoubleGreater(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenDoubleGreater
+ */
+TokenDoubleGreater::TokenDoubleGreater(usize location) : TokenOperator(location)
+{
+}
 
 TokenType
-DoubleGreater::type() const
+TokenDoubleGreater::type() const
 {
   return TokenType::DoubleGreater;
 }
 
-OperatorFlags
-DoubleGreater::operator_flags() const
+TokenFlags
+TokenDoubleGreater::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-DoubleGreater::value() const
+TokenDoubleGreater::value() const
 {
   return ">>";
 }
 
 u8
-DoubleGreater::left_precedence() const
+TokenDoubleGreater::left_precedence() const
 {
   return 8;
 }
 
 std::unique_ptr<Expression>
-DoubleGreater::construct_binary_expression(const Expression *lhs,
-                                           const Expression *rhs) const
+TokenDoubleGreater::construct_binary_expression(const Expression *lhs,
+                                                const Expression *rhs) const
 {
   return std::make_unique<RightShift>(location(), lhs, rhs);
 }
 
-/* class: GreaterEquals */
-GreaterEquals::GreaterEquals(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenGreaterEquals
+ */
+TokenGreaterEquals::TokenGreaterEquals(usize location) : TokenOperator(location)
+{
+}
 
 TokenType
-GreaterEquals::type() const
+TokenGreaterEquals::type() const
 {
   return TokenType::GreaterEquals;
 }
 
-OperatorFlags
-GreaterEquals::operator_flags() const
+TokenFlags
+TokenGreaterEquals::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-GreaterEquals::value() const
+TokenGreaterEquals::value() const
 {
   return ">=";
 }
 
 u8
-GreaterEquals::left_precedence() const
+TokenGreaterEquals::left_precedence() const
 {
   return 8;
 }
 
 std::unique_ptr<Expression>
-GreaterEquals::construct_binary_expression(const Expression *lhs,
-                                           const Expression *rhs) const
+TokenGreaterEquals::construct_binary_expression(const Expression *lhs,
+                                                const Expression *rhs) const
 {
   return std::make_unique<GreaterOrEqual>(location(), lhs, rhs);
 }
 
-/* class: Less */
-Less::Less(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenLess
+ */
+TokenLess::TokenLess(usize location) : TokenOperator(location) {}
 
 TokenType
-Less::type() const
+TokenLess::type() const
 {
   return TokenType::Less;
 }
 
-OperatorFlags
-Less::operator_flags() const
+TokenFlags
+TokenLess::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Less::value() const
+TokenLess::value() const
 {
   return "<";
 }
 
 u8
-Less::left_precedence() const
+TokenLess::left_precedence() const
 {
   return 8;
 }
 
 std::unique_ptr<Expression>
-Less::construct_binary_expression(const Expression *lhs,
-                                  const Expression *rhs) const
+TokenLess::construct_binary_expression(const Expression *lhs,
+                                       const Expression *rhs) const
 {
   return std::make_unique<LessThan>(location(), lhs, rhs);
 }
 
-/* class: DoubleLess */
-DoubleLess::DoubleLess(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenDoubleLess
+ */
+TokenDoubleLess::TokenDoubleLess(usize location) : TokenOperator(location) {}
 
 TokenType
-DoubleLess::type() const
+TokenDoubleLess::type() const
 {
   return TokenType::DoubleLess;
 }
 
-OperatorFlags
-DoubleLess::operator_flags() const
+TokenFlags
+TokenDoubleLess::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-DoubleLess::value() const
+TokenDoubleLess::value() const
 {
   return "<<";
 }
 
 u8
-DoubleLess::left_precedence() const
+TokenDoubleLess::left_precedence() const
 {
   return 8;
 }
 
 std::unique_ptr<Expression>
-DoubleLess::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
+TokenDoubleLess::construct_binary_expression(const Expression *lhs,
+                                             const Expression *rhs) const
 {
   return std::make_unique<LeftShift>(location(), lhs, rhs);
 }
 
-/* class: LessEquals */
-LessEquals::LessEquals(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenLessEquals
+ */
+TokenLessEquals::TokenLessEquals(usize location) : TokenOperator(location) {}
 
 TokenType
-LessEquals::type() const
+TokenLessEquals::type() const
 {
   return TokenType::LessEquals;
 }
 
-OperatorFlags
-LessEquals::operator_flags() const
+TokenFlags
+TokenLessEquals::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-LessEquals::value() const
+TokenLessEquals::value() const
 {
   return "<=";
 }
 
 u8
-LessEquals::left_precedence() const
+TokenLessEquals::left_precedence() const
 {
   return 8;
 }
 
 std::unique_ptr<Expression>
-LessEquals::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
+TokenLessEquals::construct_binary_expression(const Expression *lhs,
+                                             const Expression *rhs) const
 {
   return std::make_unique<LessOrEqual>(location(), lhs, rhs);
 }
 
-/* class: Pipe */
-Pipe::Pipe(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenPipe
+ */
+TokenPipe::TokenPipe(usize location) : TokenOperator(location) {}
 
 TokenType
-Pipe::type() const
+TokenPipe::type() const
 {
   return TokenType::Pipe;
 }
 
-OperatorFlags
-Pipe::operator_flags() const
+TokenFlags
+TokenPipe::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Pipe::value() const
+TokenPipe::value() const
 {
   return "|";
 }
 
 u8
-Pipe::left_precedence() const
+TokenPipe::left_precedence() const
 {
   return 5;
 }
 
 std::unique_ptr<Expression>
-Pipe::construct_binary_expression(const Expression *lhs,
-                                  const Expression *rhs) const
+TokenPipe::construct_binary_expression(const Expression *lhs,
+                                       const Expression *rhs) const
 {
   return std::make_unique<BinaryOr>(location(), lhs, rhs);
 }
 
-/* class: DoublePipe */
-DoublePipe::DoublePipe(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenDoublePipe
+ */
+TokenDoublePipe::TokenDoublePipe(usize location) : TokenOperator(location) {}
 
 TokenType
-DoublePipe::type() const
+TokenDoublePipe::type() const
 {
   return TokenType::DoublePipe;
 }
 
-OperatorFlags
-DoublePipe::operator_flags() const
+TokenFlags
+TokenDoublePipe::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-DoublePipe::value() const
+TokenDoublePipe::value() const
 {
   return "||";
 }
 
 u8
-DoublePipe::left_precedence() const
+TokenDoublePipe::left_precedence() const
 {
   return 4;
 }
 
 std::unique_ptr<Expression>
-DoublePipe::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
+TokenDoublePipe::construct_binary_expression(const Expression *lhs,
+                                             const Expression *rhs) const
 {
   return std::make_unique<LogicalOr>(location(), lhs, rhs);
 }
 
-/* class: Cap */
-Cap::Cap(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenCap
+ */
+TokenCap::TokenCap(usize location) : TokenOperator(location) {}
 
 TokenType
-Cap::type() const
+TokenCap::type() const
 {
   return TokenType::Cap;
 }
 
-OperatorFlags
-Cap::operator_flags() const
+TokenFlags
+TokenCap::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Cap::value() const
+TokenCap::value() const
 {
   return "^";
 }
 
 u8
-Cap::left_precedence() const
+TokenCap::left_precedence() const
 {
   return 9;
 }
 
 std::unique_ptr<Expression>
-Cap::construct_binary_expression(const Expression *lhs,
-                                 const Expression *rhs) const
+TokenCap::construct_binary_expression(const Expression *lhs,
+                                      const Expression *rhs) const
 {
   return std::make_unique<Xor>(location(), lhs, rhs);
 }
 
-/* class: Equals */
-Equals::Equals(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenEquals
+ */
+TokenEquals::TokenEquals(usize location) : TokenOperator(location) {}
 
 TokenType
-Equals::type() const
+TokenEquals::type() const
 {
   return TokenType::Equals;
 }
 
-OperatorFlags
-Equals::operator_flags() const
+TokenFlags
+TokenEquals::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-Equals::value() const
+TokenEquals::value() const
 {
   return "=";
 }
 
 u8
-Equals::left_precedence() const
+TokenEquals::left_precedence() const
 {
   return 3;
 }
 
 std::unique_ptr<Expression>
-Equals::construct_binary_expression(const Expression *lhs,
-                                    const Expression *rhs) const
+TokenEquals::construct_binary_expression(const Expression *lhs,
+                                         const Expression *rhs) const
 {
   UNUSED(lhs);
   UNUSED(rhs);
   INSIST(false, "todo");
 }
 
-/* class: DoubleEquals */
-DoubleEquals::DoubleEquals(usize location) : TokenOperator(location) {}
+/**
+ * class: TokenDoubleEquals
+ */
+TokenDoubleEquals::TokenDoubleEquals(usize location) : TokenOperator(location)
+{
+}
 
 TokenType
-DoubleEquals::type() const
+TokenDoubleEquals::type() const
 {
   return TokenType::DoubleEquals;
 }
 
-OperatorFlags
-DoubleEquals::operator_flags() const
+TokenFlags
+TokenDoubleEquals::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-DoubleEquals::value() const
+TokenDoubleEquals::value() const
 {
   return "==";
 }
 
 u8
-DoubleEquals::left_precedence() const
+TokenDoubleEquals::left_precedence() const
 {
   return 3;
 }
 
 std::unique_ptr<Expression>
-DoubleEquals::construct_binary_expression(const Expression *lhs,
-                                          const Expression *rhs) const
+TokenDoubleEquals::construct_binary_expression(const Expression *lhs,
+                                               const Expression *rhs) const
 {
   return std::make_unique<Equal>(location(), lhs, rhs);
 }
 
-/* class: ExclamationEquals */
-ExclamationEquals::ExclamationEquals(usize location) : TokenOperator(location)
+/**
+ * class: TokenExclamationEquals
+ */
+TokenExclamationEquals::TokenExclamationEquals(usize location)
+    : TokenOperator(location)
 {
 }
 
 TokenType
-ExclamationEquals::type() const
+TokenExclamationEquals::type() const
 {
   return TokenType::DoubleEquals;
 }
 
-OperatorFlags
-ExclamationEquals::operator_flags() const
+TokenFlags
+TokenExclamationEquals::flags() const
 {
-  return OperatorFlag::Binary;
+  return TokenFlag::BinaryOperator;
 }
 
 std::string
-ExclamationEquals::value() const
+TokenExclamationEquals::value() const
 {
   return "!=";
 }
 
 u8
-ExclamationEquals::left_precedence() const
+TokenExclamationEquals::left_precedence() const
 {
   return 3;
 }
 
 std::unique_ptr<Expression>
-ExclamationEquals::construct_binary_expression(const Expression *lhs,
-                                               const Expression *rhs) const
+TokenExclamationEquals::construct_binary_expression(const Expression *lhs,
+                                                    const Expression *rhs) const
 {
   return std::make_unique<NotEqual>(location(), lhs, rhs);
 }

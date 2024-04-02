@@ -22,6 +22,15 @@ protected:
   usize m_location;
 };
 
+struct DummyExpression : public Expression
+{
+  DummyExpression();
+
+  i64         evaluate() const override;
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+};
+
 struct UnaryExpression : public Expression
 {
   UnaryExpression(usize location, const Expression *rhs);
@@ -46,10 +55,10 @@ protected:
   const Expression *m_rhs;
 };
 
-struct Constant : public Expression
+struct ConstantNumber : public Expression
 {
-  Constant(usize location, i64 value);
-  ~Constant();
+  ConstantNumber(usize location, i64 value);
+  ~ConstantNumber();
 
   i64         evaluate() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -57,6 +66,19 @@ struct Constant : public Expression
 
 protected:
   const i64 m_value;
+};
+
+struct ConstantString : public Expression
+{
+  ConstantString(usize location, std::string value);
+  ~ConstantString();
+
+  i64         evaluate() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  std::string to_string() const override;
+
+protected:
+  const std::string m_value;
 };
 
 struct Negate : public UnaryExpression

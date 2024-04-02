@@ -54,6 +54,26 @@ is_operator(uchar ch)
   };
 }
 
+static FORCEINLINE bool
+is_string_quote(uchar ch)
+{
+  switch (ch) {
+  case '"':
+  case '\'':
+  case '`':
+    return true;
+  default:
+    return false;
+  }
+}
+
+static FORCEINLINE bool
+is_idetifier_char(uchar ch)
+{
+  return !is_whitespace(ch) && !is_operator(ch) &&
+         ((ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122));
+}
+
 Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
 
 Lexer::~Lexer() = default;
@@ -92,7 +112,7 @@ Lexer::source() const
   return m_source;
 }
 
-Error
+ErrorWithLocation
 Lexer::error()
 {
   return m_error;
@@ -114,17 +134,22 @@ Lexer::lex_next()
       return lex_number(token_start);
     else if (is_operator(ch))
       return lex_operator(token_start);
+    else if (is_string_quote(ch))
+      return lex_string(token_start + 1, ch);
+    else if (is_idetifier_char(ch))
+      return lex_identifier(token_start);
     else {
       std::string s;
       s += "Unexpected character";
-      m_error = Error{token_start, s};
+      m_error = ErrorWithLocation{token_start, s};
       m_cached_offset = 0;
       return nullptr;
     }
   }
 
   m_cached_offset = 0;
-  return new EndOfFile{token_start};
+
+  return new TokenEndOfFile{token_start};
 }
 
 Token *
@@ -135,11 +160,48 @@ Lexer::lex_number(usize token_start)
   while (token_end < m_source.length() && is_number(m_source[token_end]))
     token_end++;
 
-  Number *num = new Number{
+  Token *num = new TokenNumber{
       token_start, m_source.substr(token_start, token_end - token_start)};
   m_cached_offset = token_end - m_cursor_position;
 
   return num;
+}
+
+Token *
+Lexer::lex_identifier(usize token_start)
+{
+  usize token_end = token_start;
+
+  while (token_end < m_source.length() &&
+         is_idetifier_char(m_source[token_end]))
+    token_end++;
+
+  Token *ident = new TokenIdentifier{
+      token_start, m_source.substr(token_start, token_end - token_start)};
+  m_cached_offset = token_end - m_cursor_position;
+
+  return ident;
+}
+
+Token *
+Lexer::lex_string(usize token_start, uchar quote_char)
+{
+  usize token_end = token_start;
+
+  while (m_source[token_end] != quote_char) {
+    token_end++;
+    if (token_end >= m_source.length()) {
+      m_error =
+          ErrorWithLocation{token_start - 1, "Unterminated string literal"};
+      return nullptr;
+    }
+  }
+
+  Token *str = new TokenString{
+      token_start, m_source.substr(token_start, token_end - token_start)};
+  m_cached_offset = token_end - m_cursor_position;
+
+  return str;
 }
 
 Token *
@@ -151,80 +213,81 @@ Lexer::lex_operator(usize token_start)
   Token *t{};
 
   if (ch == '+')
-    t = new Plus{token_start};
+    t = new TokenPlus{token_start};
   else if (ch == '-')
-    t = new Minus{token_start};
+    t = new TokenMinus{token_start};
   else if (ch == '*')
-    t = new Asterisk{token_start};
+    t = new TokenAsterisk{token_start};
   else if (ch == '/')
-    t = new Slash{token_start};
+    t = new TokenSlash{token_start};
   else if (ch == '%')
-    t = new Percent{token_start};
+    t = new TokenPercent{token_start};
   else if (ch == ')')
-    t = new RightParen{token_start};
+    t = new TokenRightParen{token_start};
   else if (ch == '(')
-    t = new LeftParen{token_start};
+    t = new TokenLeftParen{token_start};
   else if (ch == '~')
-    t = new Tilde{token_start};
+    t = new TokenTilde{token_start};
   else if (ch == '^')
-    t = new Cap{token_start};
+    t = new TokenCap{token_start};
   else if (ch == '!') {
     if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new ExclamationEquals{token_start};
+      t = new TokenExclamationEquals{token_start};
       token_end++;
     } else {
-      t = new ExclamationMark{token_start};
+      t = new TokenExclamationMark{token_start};
     }
   } else if (ch == '&') {
     if (token_end < m_source.length() && m_source[token_end] == '&') {
-      t = new DoubleAmpersand{token_start};
+      t = new TokenDoubleAmpersand{token_start};
       token_end++;
     } else {
-      t = new Ampersand{token_start};
+      t = new TokenAmpersand{token_start};
     }
   } else if (ch == '>') {
     if (token_end < m_source.length() && m_source[token_end] == '>') {
-      t = new DoubleGreater{token_start};
+      t = new TokenDoubleGreater{token_start};
       token_end++;
     } else if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new GreaterEquals{token_start};
+      t = new TokenGreaterEquals{token_start};
       token_end++;
     } else {
-      t = new Greater{token_start};
+      t = new TokenGreater{token_start};
     }
   } else if (ch == '<') {
     if (token_end < m_source.length() && m_source[token_end] == '<') {
-      t = new DoubleLess{token_start};
+      t = new TokenDoubleLess{token_start};
       token_end++;
     } else if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new LessEquals{token_start};
+      t = new TokenLessEquals{token_start};
       token_end++;
     } else {
-      t = new Less{token_start};
+      t = new TokenLess{token_start};
     }
   } else if (ch == '|') {
     if (token_end < m_source.length() && m_source[token_end] == '|') {
-      t = new DoublePipe{token_start};
+      t = new TokenDoublePipe{token_start};
       token_end++;
     } else {
-      t = new Pipe{token_start};
+      t = new TokenPipe{token_start};
     }
   } else if (ch == '=') {
     if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new DoubleEquals{token_start};
+      t = new TokenDoubleEquals{token_start};
       token_end++;
     } else {
-      t = new Equals{token_start};
+      t = new TokenEquals{token_start};
     }
   } else {
     std::string s;
     s += "Unknown operator '";
     s += static_cast<char>(ch);
     s += "'";
-    m_error = Error{token_start, s};
+    m_error = ErrorWithLocation{token_start, s};
     t = nullptr;
   }
 
   m_cached_offset = token_end - m_cursor_position;
+
   return t;
 }

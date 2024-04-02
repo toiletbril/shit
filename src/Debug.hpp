@@ -4,12 +4,12 @@
 
 #if !defined NDEBUG
 #include <cstdio>
-#define t__trace_lf() (void) fputc('\n', stderr)
+#define t__trace_lf() UNUSED(fputc('\n', stderr))
 /* fprintf(stderr, ...) */
 #define TRACE(...)                                                             \
   do {                                                                         \
-    (void) fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__);             \
-    (void) fprintf(stderr, __VA_ARGS__);                                       \
+    UNUSED(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
+    UNUSED(std::fprintf(stderr, __VA_ARGS__));                                 \
   } while (0)
 /* fprintf(stderr, ... + "\n") */
 #define TRACELN(...)                                                           \
@@ -58,7 +58,7 @@
 #define t__unique_name() concat_literal(t__var, __LINE__)
 #define NONNULL(ptr)                                                           \
   ({                                                                           \
-    void *t__unique_name() = ptr;                                              \
+    typeof(ptr) t__unique_name() = ptr;                                        \
     INSIST(t__unique_name() != NULL);                                          \
     t__unique_name();                                                          \
   })

@@ -18,15 +18,17 @@ struct Lexer
   usize                advance_past_peek();
   [[nodiscard]] Token *next_token();
   std::string_view     source() const;
-  Error                error();
+  ErrorWithLocation    error();
 
 protected:
-  std::string m_source{};
-  usize       m_cursor_position{0};
-  usize       m_cached_offset{0};
-  Error       m_error{};
+  std::string       m_source{};
+  usize             m_cursor_position{0};
+  usize             m_cached_offset{0};
+  ErrorWithLocation m_error{};
 
   Token *lex_next();
   Token *lex_number(usize token_start);
+  Token *lex_identifier(usize token_start);
+  Token *lex_string(usize token_start, uchar quote_char);
   Token *lex_operator(usize token_start);
 };
