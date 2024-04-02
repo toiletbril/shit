@@ -1,7 +1,22 @@
 #include "Expressions.hpp"
 
-/* UnaryExpression */
-UnaryExpression::UnaryExpression(const Expression *rhs) : m_rhs(rhs) {}
+/* class: Expression */
+
+Expression::Expression(usize location) : m_location(location) {}
+
+Expression::~Expression() = default;
+
+usize
+Expression::location() const
+{
+  return m_location;
+}
+
+/* class: UnaryExpression */
+UnaryExpression::UnaryExpression(usize location, const Expression *rhs)
+    : Expression(location), m_rhs(rhs)
+{
+}
 
 UnaryExpression::~UnaryExpression() { delete m_rhs; }
 
@@ -17,9 +32,10 @@ UnaryExpression::to_ast_string(usize layer) const
   return s;
 }
 
-/* BinaryExpression */
-BinaryExpression::BinaryExpression(const Expression *lhs, const Expression *rhs)
-    : m_lhs(lhs), m_rhs(rhs)
+/* class: BinaryExpression */
+BinaryExpression::BinaryExpression(usize location, const Expression *lhs,
+                                   const Expression *rhs)
+    : Expression(location), m_lhs(lhs), m_rhs(rhs)
 {
 }
 
@@ -42,10 +58,13 @@ BinaryExpression::to_ast_string(usize layer) const
   return s;
 }
 
-/* Constant */
-Constant::Constant(i64 value) : m_value(value) {}
+/* class: Constant */
+Constant::Constant(usize location, i64 value)
+    : Expression(location), m_value(value)
+{
+}
 
-Constant::~Constant() {}
+Constant::~Constant() = default;
 
 i64
 Constant::evaluate() const
@@ -70,8 +89,11 @@ Constant::to_string() const
   return std::to_string(m_value);
 }
 
-/* Negate */
-Negate::Negate(const Expression *rhs) : UnaryExpression(rhs) {}
+/* class: Negate */
+Negate::Negate(usize location, const Expression *rhs)
+    : UnaryExpression(location, rhs)
+{
+}
 
 std::string
 Negate::to_string() const
@@ -85,8 +107,11 @@ Negate::evaluate() const
   return -m_rhs->evaluate();
 }
 
-/* Unnegate */
-Unnegate::Unnegate(const Expression *rhs) : UnaryExpression(rhs) {}
+/* class: Unnegate */
+Unnegate::Unnegate(usize location, const Expression *rhs)
+    : UnaryExpression(location, rhs)
+{
+}
 
 std::string
 Unnegate::to_string() const
@@ -100,8 +125,27 @@ Unnegate::evaluate() const
   return +m_rhs->evaluate();
 }
 
-/* BinaryComplement */
-BinaryComplement::BinaryComplement(const Expression *rhs) : UnaryExpression(rhs)
+/* class: LogicalNot */
+LogicalNot::LogicalNot(usize location, const Expression *rhs)
+    : UnaryExpression(location, rhs)
+{
+}
+
+std::string
+LogicalNot::to_string() const
+{
+  return "!";
+}
+
+i64
+LogicalNot::evaluate() const
+{
+  return !m_rhs->evaluate();
+}
+
+/* class: BinaryComplement */
+BinaryComplement::BinaryComplement(usize location, const Expression *rhs)
+    : UnaryExpression(location, rhs)
 {
 }
 
@@ -117,9 +161,9 @@ BinaryComplement::evaluate() const
   return ~m_rhs->evaluate();
 }
 
-/* Add */
-Add::Add(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: Add */
+Add::Add(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -135,9 +179,9 @@ Add::evaluate() const
   return m_lhs->evaluate() + m_rhs->evaluate();
 }
 
-/* Subtract */
-Subtract::Subtract(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: Subtract */
+Subtract::Subtract(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -153,9 +197,9 @@ Subtract::evaluate() const
   return m_lhs->evaluate() - m_rhs->evaluate();
 }
 
-/* Multiply */
-Multiply::Multiply(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: Multiply */
+Multiply::Multiply(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -171,9 +215,9 @@ Multiply::evaluate() const
   return m_lhs->evaluate() * m_rhs->evaluate();
 }
 
-/* Divide */
-Divide::Divide(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: Divide */
+Divide::Divide(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -188,13 +232,13 @@ Divide::evaluate() const
 {
   i64 denom = m_rhs->evaluate();
   if (denom == 0)
-    throw std::runtime_error("division by 0");
+    throw Error{m_rhs->location(), "Division by 0"};
   return m_lhs->evaluate() / denom;
 }
 
-/* Module */
-Module::Module(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: Module */
+Module::Module(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -210,9 +254,10 @@ Module::evaluate() const
   return m_lhs->evaluate() % m_rhs->evaluate();
 }
 
-/* BinaryAnd */
-BinaryAnd::BinaryAnd(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: BinaryAnd */
+BinaryAnd::BinaryAnd(usize location, const Expression *lhs,
+                     const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -228,9 +273,10 @@ BinaryAnd::evaluate() const
   return m_lhs->evaluate() & m_rhs->evaluate();
 }
 
-/* LogicalAnd */
-LogicalAnd::LogicalAnd(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: LogicalAnd */
+LogicalAnd::LogicalAnd(usize location, const Expression *lhs,
+                       const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -246,9 +292,10 @@ LogicalAnd::evaluate() const
   return m_lhs->evaluate() && m_rhs->evaluate();
 }
 
-/* GreaterThan */
-GreaterThan::GreaterThan(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: GreaterThan */
+GreaterThan::GreaterThan(usize location, const Expression *lhs,
+                         const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -264,9 +311,10 @@ GreaterThan::evaluate() const
   return m_lhs->evaluate() > m_rhs->evaluate();
 }
 
-/* GreaterOrEqual */
-GreaterOrEqual::GreaterOrEqual(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: GreaterOrEqual */
+GreaterOrEqual::GreaterOrEqual(usize location, const Expression *lhs,
+                               const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -282,9 +330,10 @@ GreaterOrEqual::evaluate() const
   return m_lhs->evaluate() >= m_rhs->evaluate();
 }
 
-/* RightShift */
-RightShift::RightShift(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: RightShift */
+RightShift::RightShift(usize location, const Expression *lhs,
+                       const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -300,9 +349,9 @@ RightShift::evaluate() const
   return m_lhs->evaluate() >> m_rhs->evaluate();
 }
 
-/* LessThan */
-LessThan::LessThan(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: LessThan */
+LessThan::LessThan(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -318,9 +367,10 @@ LessThan::evaluate() const
   return m_lhs->evaluate() < m_rhs->evaluate();
 }
 
-/* LessOrEqual */
-LessOrEqual::LessOrEqual(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: LessOrEqual */
+LessOrEqual::LessOrEqual(usize location, const Expression *lhs,
+                         const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -336,9 +386,10 @@ LessOrEqual::evaluate() const
   return m_lhs->evaluate() <= m_rhs->evaluate();
 }
 
-/* LeftShift */
-LeftShift::LeftShift(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: LeftShift */
+LeftShift::LeftShift(usize location, const Expression *lhs,
+                     const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -354,9 +405,9 @@ LeftShift::evaluate() const
   return m_lhs->evaluate() << m_rhs->evaluate();
 }
 
-/* BinaryOr */
-BinaryOr::BinaryOr(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: BinaryOr */
+BinaryOr::BinaryOr(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -372,9 +423,10 @@ BinaryOr::evaluate() const
   return m_lhs->evaluate() | m_rhs->evaluate();
 }
 
-/* LogicalOr */
-LogicalOr::LogicalOr(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: LogicalOr */
+LogicalOr::LogicalOr(usize location, const Expression *lhs,
+                     const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -390,9 +442,9 @@ LogicalOr::evaluate() const
   return m_lhs->evaluate() || m_rhs->evaluate();
 }
 
-/* Xor */
-Xor::Xor(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: Xor */
+Xor::Xor(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -408,9 +460,9 @@ Xor::evaluate() const
   return m_lhs->evaluate() ^ m_rhs->evaluate();
 }
 
-/* Equality */
-Equality::Equality(const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(lhs, rhs)
+/* class: Equality */
+Equality::Equality(usize location, const Expression *lhs, const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
 {
 }
 
@@ -424,4 +476,23 @@ i64
 Equality::evaluate() const
 {
   return m_lhs->evaluate() == m_rhs->evaluate();
+}
+
+/* class: Inequality */
+Inequality::Inequality(usize location, const Expression *lhs,
+                       const Expression *rhs)
+    : BinaryExpression(location, lhs, rhs)
+{
+}
+
+std::string
+Inequality::to_string() const
+{
+  return "!=";
+}
+
+i64
+Inequality::evaluate() const
+{
+  return m_lhs->evaluate() != m_rhs->evaluate();
 }

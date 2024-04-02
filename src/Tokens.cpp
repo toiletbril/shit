@@ -1,5 +1,6 @@
-#include "Debug.hpp"
 #include "Tokens.hpp"
+
+#include "Debug.hpp"
 
 /* Implementations for specific token types */
 
@@ -137,13 +138,13 @@ std::unique_ptr<Expression>
 Plus::construct_binary_expression(const Expression *lhs,
                                   const Expression *rhs) const
 {
-  return std::make_unique<Add>(lhs, rhs);
+  return std::make_unique<Add>(location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
 Plus::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<Unnegate>(rhs);
+  return std::make_unique<Unnegate>(location(), rhs);
 }
 
 /* class: Minus */
@@ -183,13 +184,13 @@ std::unique_ptr<Expression>
 Minus::construct_binary_expression(const Expression *lhs,
                                    const Expression *rhs) const
 {
-  return std::make_unique<Subtract>(lhs, rhs);
+  return std::make_unique<Subtract>(location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
 Minus::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<Negate>(rhs);
+  return std::make_unique<Negate>(location(), rhs);
 }
 
 /* class: Slash */
@@ -223,7 +224,7 @@ std::unique_ptr<Expression>
 Slash::construct_binary_expression(const Expression *lhs,
                                    const Expression *rhs) const
 {
-  return std::make_unique<Divide>(lhs, rhs);
+  return std::make_unique<Divide>(location(), lhs, rhs);
 }
 
 /* class: Asterisk */
@@ -257,7 +258,7 @@ std::unique_ptr<Expression>
 Asterisk::construct_binary_expression(const Expression *lhs,
                                       const Expression *rhs) const
 {
-  return std::make_unique<Multiply>(lhs, rhs);
+  return std::make_unique<Multiply>(location(), lhs, rhs);
 }
 
 /* class: Percent */
@@ -291,7 +292,7 @@ std::unique_ptr<Expression>
 Percent::construct_binary_expression(const Expression *lhs,
                                      const Expression *rhs) const
 {
-  return std::make_unique<Module>(lhs, rhs);
+  return std::make_unique<Module>(location(), lhs, rhs);
 }
 
 /* class: LeftParen */
@@ -336,6 +337,39 @@ RightParen::operator_flags() const
   return OperatorFlag::NotAnOperator;
 }
 
+/* class: ExclamationMark */
+ExclamationMark::ExclamationMark(usize location) : TokenOperator(location) {}
+
+TokenType
+ExclamationMark::type() const
+{
+  return TokenType::Tilde;
+}
+
+OperatorFlags
+ExclamationMark::operator_flags() const
+{
+  return OperatorFlag::Unary;
+}
+
+std::string
+ExclamationMark::value() const
+{
+  return "!";
+}
+
+u8
+ExclamationMark::unary_precedence() const
+{
+  return 13;
+}
+
+std::unique_ptr<Expression>
+ExclamationMark::construct_unary_expression(const Expression *rhs) const
+{
+  return std::make_unique<LogicalNot>(location(), rhs);
+}
+
 /* class: Tilde */
 Tilde::Tilde(usize location) : TokenOperator(location) {}
 
@@ -366,7 +400,7 @@ Tilde::unary_precedence() const
 std::unique_ptr<Expression>
 Tilde::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<BinaryComplement>(rhs);
+  return std::make_unique<BinaryComplement>(location(), rhs);
 }
 
 /* class: Ampersand */
@@ -400,7 +434,7 @@ std::unique_ptr<Expression>
 Ampersand::construct_binary_expression(const Expression *lhs,
                                        const Expression *rhs) const
 {
-  return std::make_unique<BinaryAnd>(lhs, rhs);
+  return std::make_unique<BinaryAnd>(location(), lhs, rhs);
 }
 
 /* class: DoubleAmpersand */
@@ -434,7 +468,7 @@ std::unique_ptr<Expression>
 DoubleAmpersand::construct_binary_expression(const Expression *lhs,
                                              const Expression *rhs) const
 {
-  return std::make_unique<LogicalAnd>(lhs, rhs);
+  return std::make_unique<LogicalAnd>(location(), lhs, rhs);
 }
 
 /* class: Greater */
@@ -468,7 +502,7 @@ std::unique_ptr<Expression>
 Greater::construct_binary_expression(const Expression *lhs,
                                      const Expression *rhs) const
 {
-  return std::make_unique<GreaterThan>(lhs, rhs);
+  return std::make_unique<GreaterThan>(location(), lhs, rhs);
 }
 
 /* class: DoubleGreater */
@@ -502,7 +536,7 @@ std::unique_ptr<Expression>
 DoubleGreater::construct_binary_expression(const Expression *lhs,
                                            const Expression *rhs) const
 {
-  return std::make_unique<RightShift>(lhs, rhs);
+  return std::make_unique<RightShift>(location(), lhs, rhs);
 }
 
 /* class: GreaterEquals */
@@ -536,7 +570,7 @@ std::unique_ptr<Expression>
 GreaterEquals::construct_binary_expression(const Expression *lhs,
                                            const Expression *rhs) const
 {
-  return std::make_unique<GreaterOrEqual>(lhs, rhs);
+  return std::make_unique<GreaterOrEqual>(location(), lhs, rhs);
 }
 
 /* class: Less */
@@ -570,7 +604,7 @@ std::unique_ptr<Expression>
 Less::construct_binary_expression(const Expression *lhs,
                                   const Expression *rhs) const
 {
-  return std::make_unique<LessThan>(lhs, rhs);
+  return std::make_unique<LessThan>(location(), lhs, rhs);
 }
 
 /* class: DoubleLess */
@@ -604,7 +638,7 @@ std::unique_ptr<Expression>
 DoubleLess::construct_binary_expression(const Expression *lhs,
                                         const Expression *rhs) const
 {
-  return std::make_unique<LeftShift>(lhs, rhs);
+  return std::make_unique<LeftShift>(location(), lhs, rhs);
 }
 
 /* class: LessEquals */
@@ -638,7 +672,7 @@ std::unique_ptr<Expression>
 LessEquals::construct_binary_expression(const Expression *lhs,
                                         const Expression *rhs) const
 {
-  return std::make_unique<LessOrEqual>(lhs, rhs);
+  return std::make_unique<LessOrEqual>(location(), lhs, rhs);
 }
 
 /* class: Pipe */
@@ -672,7 +706,7 @@ std::unique_ptr<Expression>
 Pipe::construct_binary_expression(const Expression *lhs,
                                   const Expression *rhs) const
 {
-  return std::make_unique<BinaryOr>(lhs, rhs);
+  return std::make_unique<BinaryOr>(location(), lhs, rhs);
 }
 
 /* class: DoublePipe */
@@ -706,7 +740,7 @@ std::unique_ptr<Expression>
 DoublePipe::construct_binary_expression(const Expression *lhs,
                                         const Expression *rhs) const
 {
-  return std::make_unique<LogicalOr>(lhs, rhs);
+  return std::make_unique<LogicalOr>(location(), lhs, rhs);
 }
 
 /* class: Cap */
@@ -740,7 +774,7 @@ std::unique_ptr<Expression>
 Cap::construct_binary_expression(const Expression *lhs,
                                  const Expression *rhs) const
 {
-  return std::make_unique<Xor>(lhs, rhs);
+  return std::make_unique<Xor>(location(), lhs, rhs);
 }
 
 /* class: Equals */
@@ -810,5 +844,41 @@ std::unique_ptr<Expression>
 DoubleEquals::construct_binary_expression(const Expression *lhs,
                                           const Expression *rhs) const
 {
-  return std::make_unique<Equality>(lhs, rhs);
+  return std::make_unique<Equality>(location(), lhs, rhs);
+}
+
+/* class: ExclamationEquals */
+ExclamationEquals::ExclamationEquals(usize location) : TokenOperator(location)
+{
+}
+
+TokenType
+ExclamationEquals::type() const
+{
+  return TokenType::DoubleEquals;
+}
+
+OperatorFlags
+ExclamationEquals::operator_flags() const
+{
+  return OperatorFlag::Binary;
+}
+
+std::string
+ExclamationEquals::value() const
+{
+  return "!=";
+}
+
+u8
+ExclamationEquals::left_precedence() const
+{
+  return 3;
+}
+
+std::unique_ptr<Expression>
+ExclamationEquals::construct_binary_expression(const Expression *lhs,
+                                               const Expression *rhs) const
+{
+  return std::make_unique<Inequality>(location(), lhs, rhs);
 }

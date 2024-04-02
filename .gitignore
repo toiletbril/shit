@@ -1,2 +1,8 @@
+*.exe
+*.o
+*.diff
+
+src/o
+test/failed.diff
+
 shit
-.clangd

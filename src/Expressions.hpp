@@ -9,15 +9,22 @@
 
 struct Expression
 {
-  virtual ~Expression() {}
-  virtual i64         evaluate() const                     = 0;
-  virtual std::string to_string() const                    = 0;
+  Expression(usize location);
+  virtual ~Expression();
+
+  virtual usize location() const;
+
+  virtual i64         evaluate() const = 0;
+  virtual std::string to_string() const = 0;
   virtual std::string to_ast_string(usize layer = 0) const = 0;
+
+protected:
+  usize m_location;
 };
 
 struct UnaryExpression : public Expression
 {
-  UnaryExpression(const Expression *rhs);
+  UnaryExpression(usize location, const Expression *rhs);
   virtual ~UnaryExpression();
 
   std::string to_ast_string(usize layer = 0) const override;
@@ -28,7 +35,8 @@ protected:
 
 struct BinaryExpression : public Expression
 {
-  BinaryExpression(const Expression *lhs, const Expression *rhs);
+  BinaryExpression(usize location, const Expression *lhs,
+                   const Expression *rhs);
   virtual ~BinaryExpression();
 
   std::string to_ast_string(usize layer = 0) const override;
@@ -40,7 +48,7 @@ protected:
 
 struct Constant : public Expression
 {
-  Constant(i64 value);
+  Constant(usize location, i64 value);
   ~Constant();
 
   i64         evaluate() const override;
@@ -53,7 +61,7 @@ protected:
 
 struct Negate : public UnaryExpression
 {
-  Negate(const Expression *rhs);
+  Negate(usize location, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -61,7 +69,15 @@ struct Negate : public UnaryExpression
 
 struct Unnegate : public UnaryExpression
 {
-  Unnegate(const Expression *rhs);
+  Unnegate(usize location, const Expression *rhs);
+
+  std::string to_string() const override;
+  i64         evaluate() const override;
+};
+
+struct LogicalNot : public UnaryExpression
+{
+  LogicalNot(usize location, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -69,7 +85,7 @@ struct Unnegate : public UnaryExpression
 
 struct BinaryComplement : public UnaryExpression
 {
-  BinaryComplement(const Expression *rhs);
+  BinaryComplement(usize location, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -77,7 +93,7 @@ struct BinaryComplement : public UnaryExpression
 
 struct Add : public BinaryExpression
 {
-  Add(const Expression *lhs, const Expression *rhs);
+  Add(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -85,7 +101,7 @@ struct Add : public BinaryExpression
 
 struct Subtract : public BinaryExpression
 {
-  Subtract(const Expression *lhs, const Expression *rhs);
+  Subtract(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -93,7 +109,7 @@ struct Subtract : public BinaryExpression
 
 struct Multiply : public BinaryExpression
 {
-  Multiply(const Expression *lhs, const Expression *rhs);
+  Multiply(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -101,7 +117,7 @@ struct Multiply : public BinaryExpression
 
 struct Divide : public BinaryExpression
 {
-  Divide(const Expression *lhs, const Expression *rhs);
+  Divide(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -109,7 +125,7 @@ struct Divide : public BinaryExpression
 
 struct Module : public BinaryExpression
 {
-  Module(const Expression *lhs, const Expression *rhs);
+  Module(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -117,7 +133,7 @@ struct Module : public BinaryExpression
 
 struct BinaryAnd : public BinaryExpression
 {
-  BinaryAnd(const Expression *lhs, const Expression *rhs);
+  BinaryAnd(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -125,7 +141,7 @@ struct BinaryAnd : public BinaryExpression
 
 struct LogicalAnd : public BinaryExpression
 {
-  LogicalAnd(const Expression *lhs, const Expression *rhs);
+  LogicalAnd(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -133,7 +149,7 @@ struct LogicalAnd : public BinaryExpression
 
 struct GreaterThan : public BinaryExpression
 {
-  GreaterThan(const Expression *lhs, const Expression *rhs);
+  GreaterThan(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -141,7 +157,7 @@ struct GreaterThan : public BinaryExpression
 
 struct GreaterOrEqual : public BinaryExpression
 {
-  GreaterOrEqual(const Expression *lhs, const Expression *rhs);
+  GreaterOrEqual(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -149,7 +165,7 @@ struct GreaterOrEqual : public BinaryExpression
 
 struct RightShift : public BinaryExpression
 {
-  RightShift(const Expression *lhs, const Expression *rhs);
+  RightShift(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -157,7 +173,7 @@ struct RightShift : public BinaryExpression
 
 struct LessThan : public BinaryExpression
 {
-  LessThan(const Expression *lhs, const Expression *rhs);
+  LessThan(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -165,7 +181,7 @@ struct LessThan : public BinaryExpression
 
 struct LessOrEqual : public BinaryExpression
 {
-  LessOrEqual(const Expression *lhs, const Expression *rhs);
+  LessOrEqual(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -173,7 +189,7 @@ struct LessOrEqual : public BinaryExpression
 
 struct LeftShift : public BinaryExpression
 {
-  LeftShift(const Expression *lhs, const Expression *rhs);
+  LeftShift(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -181,7 +197,7 @@ struct LeftShift : public BinaryExpression
 
 struct BinaryOr : public BinaryExpression
 {
-  BinaryOr(const Expression *lhs, const Expression *rhs);
+  BinaryOr(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -189,7 +205,7 @@ struct BinaryOr : public BinaryExpression
 
 struct LogicalOr : public BinaryExpression
 {
-  LogicalOr(const Expression *lhs, const Expression *rhs);
+  LogicalOr(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -197,7 +213,7 @@ struct LogicalOr : public BinaryExpression
 
 struct Xor : public BinaryExpression
 {
-  Xor(const Expression *lhs, const Expression *rhs);
+  Xor(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
@@ -205,7 +221,15 @@ struct Xor : public BinaryExpression
 
 struct Equality : public BinaryExpression
 {
-  Equality(const Expression *lhs, const Expression *rhs);
+  Equality(usize location, const Expression *lhs, const Expression *rhs);
+
+  std::string to_string() const override;
+  i64         evaluate() const override;
+};
+
+struct Inequality : public BinaryExpression
+{
+  Inequality(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;

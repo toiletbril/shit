@@ -12,8 +12,8 @@ typedef u8 OperatorFlags;
 enum OperatorFlag
 {
   NotAnOperator = 0,
-  Unary         = 1 << 0,
-  Binary        = 1 << 1,
+  Unary = 1 << 0,
+  Binary = 1 << 1,
 };
 
 enum class TokenType
@@ -43,6 +43,8 @@ enum class TokenType
   Cap,
   Equals,
   DoubleEquals,
+  ExclamationMark,
+  ExclamationEquals,
 };
 
 /*
@@ -53,9 +55,9 @@ struct Token
 {
   virtual ~Token() = default;
 
-  virtual TokenType     type() const           = 0;
+  virtual TokenType     type() const = 0;
   virtual OperatorFlags operator_flags() const = 0;
-  virtual std::string   value() const          = 0;
+  virtual std::string   value() const = 0;
 
   virtual std::string to_ast_string() const;
 
@@ -211,6 +213,19 @@ struct RightParen : public Token
 struct Tilde : public TokenOperator
 {
   Tilde(usize location);
+
+  TokenType     type() const override;
+  OperatorFlags operator_flags() const override;
+  std::string   value() const override;
+
+  u8 unary_precedence() const override;
+  std::unique_ptr<Expression>
+  construct_unary_expression(const Expression *rhs) const override;
+};
+
+struct ExclamationMark : public TokenOperator
+{
+  ExclamationMark(usize location);
 
   TokenType     type() const override;
   OperatorFlags operator_flags() const override;
@@ -392,6 +407,20 @@ struct Equals : public TokenOperator
 struct DoubleEquals : public TokenOperator
 {
   DoubleEquals(usize location);
+
+  TokenType     type() const override;
+  OperatorFlags operator_flags() const override;
+  std::string   value() const override;
+
+  u8 left_precedence() const override;
+  std::unique_ptr<Expression>
+  construct_binary_expression(const Expression *lhs,
+                              const Expression *rhs) const override;
+};
+
+struct ExclamationEquals : public TokenOperator
+{
+  ExclamationEquals(usize location);
 
   TokenType     type() const override;
   OperatorFlags operator_flags() const override;

@@ -2,8 +2,8 @@ ifeq ($(OS),Windows_NT)
 CXX := clang++
 endif
 
-CXXFLAGS := -I$(PWD)/include -O2 -std=c++17
-OBJFLAGS := -c
+CXXFLAGS := -g3 -std=c++17 -fsanitize=address
 
-%.o : %.cpp
-	$(CXX) $(CXXFLAGS) $(OBJFLAGS) $< -o $@
+o/%.o : %.cpp
+	@echo "\tCXX $< \t-o $(CWD)$@"
+	$(CXX) $(CXXFLAGS) -c $< -o $@

@@ -1,10 +1,12 @@
-#include "Common.hpp"
 #include "Lexer.hpp"
 
+#include "Common.hpp"
+#include "Tokens.hpp"
+
+#include <cstring>
 #include <memory>
 #include <string>
 #include <string_view>
-#include <tuple>
 
 static FORCEINLINE bool
 is_whitespace(uchar ch)
@@ -45,6 +47,7 @@ is_operator(uchar ch)
   case '<':
   case '^':
   case '=':
+  case '!':
     return true;
   default:
     return false;
@@ -53,36 +56,34 @@ is_operator(uchar ch)
 
 Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
 
-Lexer::~Lexer() { delete m_error; }
+Lexer::~Lexer() = default;
 
-std::unique_ptr<Token>
+Token *
 Lexer::peek_token()
 {
-  auto [t, offset] = lex_next();
+  Token *t = lex_next();
   if (m_error)
     return nullptr;
-  m_cached_token  = t;
-  m_cached_offset = offset;
-  return std::unique_ptr<Token>{t};
+  return t;
 }
 
-std::unique_ptr<Token>
+usize
+Lexer::advance_past_peek()
+{
+  usize r = m_cached_offset;
+  m_cursor_position += r;
+  m_cached_offset = 0;
+  return r;
+}
+
+Token *
 Lexer::next_token()
 {
-  if (false && m_cached_token) {
-    Token *t = m_cached_token;
-    m_cursor_position += m_cached_offset;
-
-    m_cached_token  = nullptr;
-    m_cached_offset = 0;
-
-    return std::unique_ptr<Token>{t};
-  }
-  auto [t, offset] = lex_next();
+  Token *t = lex_next();
   if (m_error)
     return nullptr;
-  m_cursor_position += offset;
-  return std::unique_ptr<Token>{t};
+  advance_past_peek();
+  return t;
 }
 
 std::string_view
@@ -91,22 +92,24 @@ Lexer::source() const
   return m_source;
 }
 
-ErrorBase *
+Error
 Lexer::error()
 {
   return m_error;
 }
 
-std::tuple<Token *, usize>
+Token *
 Lexer::lex_next()
 {
   usize token_start = m_cursor_position;
+
   while (token_start < m_source.length()) {
     uchar ch = m_source[token_start];
     if (is_whitespace(ch)) {
       token_start++;
       continue;
     }
+
     if (is_number(ch))
       return lex_number(token_start);
     else if (is_operator(ch))
@@ -116,15 +119,17 @@ Lexer::lex_next()
       s += "Unknown symbol '";
       s += static_cast<char>(ch);
       s += "'";
-      m_error = new Error{token_start, m_source, s};
-      return {nullptr, 0};
+      m_error = Error{token_start, s};
+      m_cached_offset = 0;
+      return nullptr;
     }
   }
-  EndOfFile *eof = new EndOfFile{token_start};
-  return {eof, token_start};
+
+  m_cached_offset = 0;
+  return new EndOfFile{token_start};
 }
 
-std::tuple<Token *, usize>
+Token *
 Lexer::lex_number(usize token_start)
 {
   usize token_end = token_start;
@@ -134,14 +139,16 @@ Lexer::lex_number(usize token_start)
 
   Number *num = new Number{
       token_start, m_source.substr(token_start, token_end - token_start)};
-  return {num, token_end - m_cursor_position};
+  m_cached_offset = token_end - m_cursor_position;
+
+  return num;
 }
 
-std::tuple<Token *, usize>
+Token *
 Lexer::lex_operator(usize token_start)
 {
   usize token_end = token_start + 1;
-  uchar ch        = m_source[token_start];
+  uchar ch = m_source[token_start];
 
   Token *t{};
 
@@ -163,7 +170,14 @@ Lexer::lex_operator(usize token_start)
     t = new Tilde{token_start};
   else if (ch == '^')
     t = new Cap{token_start};
-  else if (ch == '&') {
+  else if (ch == '!') {
+    if (token_end < m_source.length() && m_source[token_end] == '=') {
+      t = new ExclamationEquals{token_start};
+      token_end++;
+    } else {
+      t = new ExclamationMark{token_start};
+    }
+  } else if (ch == '&') {
     if (token_end < m_source.length() && m_source[token_end] == '&') {
       t = new DoubleAmpersand{token_start};
       token_end++;
@@ -209,9 +223,10 @@ Lexer::lex_operator(usize token_start)
     s += "Unknown operator '";
     s += static_cast<char>(ch);
     s += "'";
-    m_error = new Error{token_start, m_source, s};
-    return {nullptr, 0};
+    m_error = Error{token_start, s};
+    t = nullptr;
   }
 
-  return {t, token_end - m_cursor_position};
+  m_cached_offset = token_end - m_cursor_position;
+  return t;
 }

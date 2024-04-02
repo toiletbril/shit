@@ -1,17 +1,17 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 
 /* Crablang types */
 
-typedef uint8_t u8;
+typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-typedef int8_t i8;
+typedef int8_t  i8;
 typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
@@ -28,19 +28,19 @@ typedef uintptr_t uintptr;
 
 #if defined __GNUC__ || defined __clang__ || defined __COSMOCC__
 #define T__HAS_GCC_EXTENSIONS 1
-#define t__used          __attribute__((used))
-#define t__forceinline   inline __attribute__((always_inline))
-#define t__unreachable() __builtin_unreachable()
-#define t__debugtrap()   __builtin_trap()
+#define t__used               __attribute__((used))
+#define t__forceinline        inline __attribute__((always_inline))
+#define t__unreachable()      __builtin_unreachable()
+#define t__debugtrap()        __builtin_trap()
 #else /* __GNUC__ || __clang__ || __COSMOCC__ */
 #error Oh no! Segmentation fault. Please download a better compiler that \
        supports GNU extensions!
 #define T__HAS_GCC_EXTENSIONS 0
-#define t__used          /* nothing */
-#define t__threadlocal   /* nothing */
-#define t__forceinline   /* nothing */
-#define t__unreachable() abort()
-#define t__debugtrap()   abort()
+#define t__used               /* nothing */
+#define t__threadlocal        /* nothing */
+#define t__forceinline        /* nothing */
+#define t__unreachable()      abort()
+#define t__debugtrap()        abort()
 #endif
 
 /* Do not remove the symbol, even if it's not used. */
@@ -62,7 +62,7 @@ struct t__exit_scope
   t__exit_scope(const t__exit_scope &);
 
 private:
-  T m_lambda;
+  T              m_lambda;
   t__exit_scope &operator=(const t__exit_scope &);
 };
 

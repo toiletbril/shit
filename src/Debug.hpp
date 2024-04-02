@@ -58,7 +58,7 @@
 
 #if T__HAS_GCC_EXTENSIONS
 #define t__unique_name() concat_literal(t__var, __LINE__)
-#define NONNULL(PTR)                                                           \
+#define NONNULL(ptr)                                                           \
   ({                                                                           \
     void *t__unique_name() = ptr;                                              \
     INSIST(t__unique_name() != NULL);                                          \

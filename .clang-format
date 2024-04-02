@@ -1,0 +1,13 @@
+# As readable as I will allow
+---
+BasedOnStyle: LLVM
+BreakBeforeBraces: Mozilla
+AlignArrayOfStructures: Left
+AlignConsecutiveMacros: true
+AlignConsecutiveDeclarations: true
+AllowShortBlocksOnASingleLine: Empty
+AlwaysBreakAfterReturnType: AllDefinitions
+AlwaysBreakTemplateDeclarations: true
+IncludeBlocks: Regroup
+IndentGotoLabels: false
+SpaceAfterCStyleCast: true
