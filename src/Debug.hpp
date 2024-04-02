@@ -26,7 +26,7 @@
 /* Cause the debugger to break on this call. */
 #define DEBUGTRAP()                                                            \
   do {                                                                         \
-    TRACE("Encountered a debug trap");                                         \
+    TRACELN("Encountered a debug trap");                                       \
     t__debugtrap();                                                            \
   } while (0)
 
@@ -47,11 +47,9 @@
 #define INSIST(x, ...)                                                         \
   do {                                                                         \
     if (!(x)) [[unlikely]] {                                                   \
-      TRACE("'INSIST(" #x ")' fail in %s().", __func__);                       \
+      TRACELN("'INSIST(" #x ")' fail in %s().", __func__);                     \
       if (!t__va_is_empty(__VA_ARGS__))                                        \
         TRACELN("Details: " __VA_ARGS__);                                      \
-      else                                                                     \
-        t__trace_lf();                                                         \
       DEBUGTRAP();                                                             \
     }                                                                          \
   } while (0)

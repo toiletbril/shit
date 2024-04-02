@@ -461,38 +461,37 @@ Xor::evaluate() const
 }
 
 /* class: Equality */
-Equality::Equality(usize location, const Expression *lhs, const Expression *rhs)
+Equal::Equal(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
 {
 }
 
 std::string
-Equality::to_string() const
+Equal::to_string() const
 {
   return "==";
 }
 
 i64
-Equality::evaluate() const
+Equal::evaluate() const
 {
   return m_lhs->evaluate() == m_rhs->evaluate();
 }
 
 /* class: Inequality */
-Inequality::Inequality(usize location, const Expression *lhs,
-                       const Expression *rhs)
+NotEqual::NotEqual(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
 {
 }
 
 std::string
-Inequality::to_string() const
+NotEqual::to_string() const
 {
   return "!=";
 }
 
 i64
-Inequality::evaluate() const
+NotEqual::evaluate() const
 {
   return m_lhs->evaluate() != m_rhs->evaluate();
 }

@@ -116,9 +116,7 @@ Lexer::lex_next()
       return lex_operator(token_start);
     else {
       std::string s;
-      s += "Unknown symbol '";
-      s += static_cast<char>(ch);
-      s += "'";
+      s += "Unexpected character";
       m_error = Error{token_start, s};
       m_cached_offset = 0;
       return nullptr;

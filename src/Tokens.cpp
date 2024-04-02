@@ -844,7 +844,7 @@ std::unique_ptr<Expression>
 DoubleEquals::construct_binary_expression(const Expression *lhs,
                                           const Expression *rhs) const
 {
-  return std::make_unique<Equality>(location(), lhs, rhs);
+  return std::make_unique<Equal>(location(), lhs, rhs);
 }
 
 /* class: ExclamationEquals */
@@ -880,5 +880,5 @@ std::unique_ptr<Expression>
 ExclamationEquals::construct_binary_expression(const Expression *lhs,
                                                const Expression *rhs) const
 {
-  return std::make_unique<Inequality>(location(), lhs, rhs);
+  return std::make_unique<NotEqual>(location(), lhs, rhs);
 }

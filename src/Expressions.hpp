@@ -219,17 +219,17 @@ struct Xor : public BinaryExpression
   i64         evaluate() const override;
 };
 
-struct Equality : public BinaryExpression
+struct Equal : public BinaryExpression
 {
-  Equality(usize location, const Expression *lhs, const Expression *rhs);
+  Equal(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;
 };
 
-struct Inequality : public BinaryExpression
+struct NotEqual : public BinaryExpression
 {
-  Inequality(usize location, const Expression *lhs, const Expression *rhs);
+  NotEqual(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
   i64         evaluate() const override;

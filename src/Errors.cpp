@@ -48,7 +48,10 @@ ErrorBase::get_context(std::string_view source)
          size <= ERROR_CONTEXT_SIZE)
     size++;
 
-  INSIST(offset_from_last_newline - start_offset + size < source.length());
+  INSIST(offset_from_last_newline + size <= source.length());
+  INSIST(offset_from_last_newline - start_offset >= 0);
+  INSIST(offset_from_last_newline - start_offset <
+         offset_from_last_newline + size);
 
   std::string msg;
   msg += source.substr(offset_from_last_newline - start_offset,
