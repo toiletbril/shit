@@ -96,7 +96,7 @@ ErrorWithLocation::get_context(std::string_view source) const
 
   INSIST(offset_from_last_newline + size <= source.length());
   INSIST(offset_from_last_newline - start_offset >= 0);
-  INSIST(offset_from_last_newline - start_offset <
+  INSIST(offset_from_last_newline - start_offset <=
          offset_from_last_newline + size);
 
   usize line_number_length = 0;

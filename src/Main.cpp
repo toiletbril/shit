@@ -4,6 +4,9 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 
+#define TOILETLINE_IMPLEMENTATION
+#include "toiletline/toiletline.h"
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -29,6 +32,7 @@ show_help(std::string_view program_name)
   s += program_name;
   s += " [-options]";
   s += " [args...]\n";
+  s += "  ";
   s += "Shit, command-line interpreter or shell";
   s += "\n\n";
 
@@ -72,7 +76,7 @@ main(int argc, char **argv)
   std::string program_path = file_names[0];
   file_names.erase(file_names.begin());
 
-  if (file_names.size() == 0 && flag_command.get().empty()) {
+  if (flag_help.get()) {
     show_help(program_path);
     return 1;
   }
@@ -89,40 +93,56 @@ main(int argc, char **argv)
 
   usize arg_index = 0;
   bool  should_break = false;
+  bool  error_happened = false;
+  bool  tl_initialized = false;
 
   for (;;) {
     std::string contents;
-
-    if (flag_command.get().empty()) {
+    if (file_names.empty()) {
+      if (!tl_initialized) {
+        tl_initialized = true;
+        tl_init();
+      }
+      char buffer[1024];
+      int  code = tl_readline(buffer, sizeof(buffer), "shit> ");
+      if (code == TL_PRESSED_EOF || code == TL_PRESSED_INTERRUPT) {
+        tl_exit();
+        std::cout << "^C" << std::endl;
+        break;
+      }
+      contents = buffer;
+      std::cout << "\n";
+    } else {
       if (arg_index + 1 == file_names.size())
         should_break = true;
-
-      if (file_names[arg_index] != "-") {
-        std::fstream f{file_names[arg_index], f.in | f.binary};
-        if (!f.is_open()) {
-          std::cout << "Error: could not open '" + file_names[arg_index] + "'"
-                    << std::endl;
-          return 1;
-        }
-
-        for (;;) {
-          uchar ch = f.get();
-          if (f.eof())
-            break;
-          contents += ch;
-        }
-      } else {
+      if (file_names[arg_index] == "-") {
         for (;;) {
           uchar ch = std::cin.get();
           if (std::cin.eof())
             break;
           contents += ch;
         }
+      } else if (flag_command.get().empty()) {
+        if (file_names[arg_index] == "-") {
+          std::fstream f{file_names[arg_index], f.in | f.binary};
+          if (!f.is_open()) {
+            std::cout << "Error: could not open '" + file_names[arg_index] + "'"
+                      << std::endl;
+            return 1;
+          }
+
+          for (;;) {
+            uchar ch = f.get();
+            if (f.eof())
+              break;
+            contents += ch;
+          }
+        }
+        arg_index++;
+      } else {
+        contents = flag_command.get();
+        should_break = true;
       }
-      arg_index++;
-    } else {
-      contents = flag_command.get();
-      should_break = true;
     }
 
     try {
@@ -131,14 +151,15 @@ main(int argc, char **argv)
       if (flag_dump_ast.get())
         std::cout << ast->to_ast_string() << std::endl;
       std::cout << ast->evaluate() << std::endl;
+      error_happened = false;
     } catch (ErrorWithLocation &e) {
       std::cout << e.to_string(contents) << std::endl;
-      return 1;
+      error_happened = true;
     }
 
     if (should_break)
       break;
   }
 
-  return 0;
+  return error_happened;
 }
