@@ -51,8 +51,7 @@ TokenEndOfFile::value() const
  */
 TokenValue::TokenValue(usize location, std::string_view sv)
     : Token(location), m_value(sv)
-{
-}
+{}
 
 std::string
 TokenValue::value() const
@@ -65,8 +64,7 @@ TokenValue::value() const
  */
 TokenNumber::TokenNumber(usize location, std::string_view sv)
     : TokenValue(location, sv)
-{
-}
+{}
 
 TokenType
 TokenNumber::type() const
@@ -85,8 +83,7 @@ TokenNumber::flags() const
  */
 TokenString::TokenString(usize location, std::string_view sv)
     : TokenValue(location, sv)
-{
-}
+{}
 
 TokenType
 TokenString::type() const
@@ -105,8 +102,7 @@ TokenString::flags() const
  */
 TokenIdentifier::TokenIdentifier(usize location, std::string_view sv)
     : TokenValue(location, sv)
-{
-}
+{}
 
 TokenType
 TokenIdentifier::type() const
@@ -414,8 +410,7 @@ TokenRightParen::flags() const
  */
 TokenExclamationMark::TokenExclamationMark(usize location)
     : TokenOperator(location)
-{
-}
+{}
 
 TokenType
 TokenExclamationMark::type() const
@@ -523,8 +518,7 @@ TokenAmpersand::construct_binary_expression(const Expression *lhs,
  */
 TokenDoubleAmpersand::TokenDoubleAmpersand(usize location)
     : TokenOperator(location)
-{
-}
+{}
 
 TokenType
 TokenDoubleAmpersand::type() const
@@ -597,8 +591,7 @@ TokenGreater::construct_binary_expression(const Expression *lhs,
  * class: TokenDoubleGreater
  */
 TokenDoubleGreater::TokenDoubleGreater(usize location) : TokenOperator(location)
-{
-}
+{}
 
 TokenType
 TokenDoubleGreater::type() const
@@ -635,8 +628,7 @@ TokenDoubleGreater::construct_binary_expression(const Expression *lhs,
  * class: TokenGreaterEquals
  */
 TokenGreaterEquals::TokenGreaterEquals(usize location) : TokenOperator(location)
-{
-}
+{}
 
 TokenType
 TokenGreaterEquals::type() const
@@ -927,8 +919,7 @@ TokenEquals::construct_binary_expression(const Expression *lhs,
  * class: TokenDoubleEquals
  */
 TokenDoubleEquals::TokenDoubleEquals(usize location) : TokenOperator(location)
-{
-}
+{}
 
 TokenType
 TokenDoubleEquals::type() const
@@ -966,8 +957,7 @@ TokenDoubleEquals::construct_binary_expression(const Expression *lhs,
  */
 TokenExclamationEquals::TokenExclamationEquals(usize location)
     : TokenOperator(location)
-{
-}
+{}
 
 TokenType
 TokenExclamationEquals::type() const

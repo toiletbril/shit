@@ -46,8 +46,7 @@ DummyExpression::to_ast_string(usize layer) const
  */
 UnaryExpression::UnaryExpression(usize location, const Expression *rhs)
     : Expression(location), m_rhs(rhs)
-{
-}
+{}
 
 UnaryExpression::~UnaryExpression() { delete m_rhs; }
 
@@ -69,8 +68,7 @@ UnaryExpression::to_ast_string(usize layer) const
 BinaryExpression::BinaryExpression(usize location, const Expression *lhs,
                                    const Expression *rhs)
     : Expression(location), m_lhs(lhs), m_rhs(rhs)
-{
-}
+{}
 
 BinaryExpression::~BinaryExpression()
 {
@@ -96,8 +94,7 @@ BinaryExpression::to_ast_string(usize layer) const
  */
 ConstantNumber::ConstantNumber(usize location, i64 value)
     : Expression(location), m_value(value)
-{
-}
+{}
 
 ConstantNumber::~ConstantNumber() = default;
 
@@ -129,8 +126,7 @@ ConstantNumber::to_string() const
  */
 ConstantString::ConstantString(usize location, std::string value)
     : Expression(location), m_value(value)
-{
-}
+{}
 
 ConstantString::~ConstantString() = default;
 
@@ -162,8 +158,7 @@ ConstantString::to_string() const
  */
 Negate::Negate(usize location, const Expression *rhs)
     : UnaryExpression(location, rhs)
-{
-}
+{}
 
 std::string
 Negate::to_string() const
@@ -182,8 +177,7 @@ Negate::evaluate() const
  */
 Unnegate::Unnegate(usize location, const Expression *rhs)
     : UnaryExpression(location, rhs)
-{
-}
+{}
 
 std::string
 Unnegate::to_string() const
@@ -202,8 +196,7 @@ Unnegate::evaluate() const
  */
 LogicalNot::LogicalNot(usize location, const Expression *rhs)
     : UnaryExpression(location, rhs)
-{
-}
+{}
 
 std::string
 LogicalNot::to_string() const
@@ -222,8 +215,7 @@ LogicalNot::evaluate() const
  */
 BinaryComplement::BinaryComplement(usize location, const Expression *rhs)
     : UnaryExpression(location, rhs)
-{
-}
+{}
 
 std::string
 BinaryComplement::to_string() const
@@ -242,8 +234,7 @@ BinaryComplement::evaluate() const
  */
 Add::Add(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 Add::to_string() const
@@ -262,8 +253,7 @@ Add::evaluate() const
  */
 Subtract::Subtract(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 Subtract::to_string() const
@@ -282,8 +272,7 @@ Subtract::evaluate() const
  */
 Multiply::Multiply(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 Multiply::to_string() const
@@ -302,8 +291,7 @@ Multiply::evaluate() const
  */
 Divide::Divide(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 Divide::to_string() const
@@ -325,8 +313,7 @@ Divide::evaluate() const
  */
 Module::Module(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 Module::to_string() const
@@ -346,8 +333,7 @@ Module::evaluate() const
 BinaryAnd::BinaryAnd(usize location, const Expression *lhs,
                      const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 BinaryAnd::to_string() const
@@ -367,8 +353,7 @@ BinaryAnd::evaluate() const
 LogicalAnd::LogicalAnd(usize location, const Expression *lhs,
                        const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 LogicalAnd::to_string() const
@@ -388,8 +373,7 @@ LogicalAnd::evaluate() const
 GreaterThan::GreaterThan(usize location, const Expression *lhs,
                          const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 GreaterThan::to_string() const
@@ -409,8 +393,7 @@ GreaterThan::evaluate() const
 GreaterOrEqual::GreaterOrEqual(usize location, const Expression *lhs,
                                const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 GreaterOrEqual::to_string() const
@@ -430,8 +413,7 @@ GreaterOrEqual::evaluate() const
 RightShift::RightShift(usize location, const Expression *lhs,
                        const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 RightShift::to_string() const
@@ -450,8 +432,7 @@ RightShift::evaluate() const
  */
 LessThan::LessThan(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 LessThan::to_string() const
@@ -471,8 +452,7 @@ LessThan::evaluate() const
 LessOrEqual::LessOrEqual(usize location, const Expression *lhs,
                          const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 LessOrEqual::to_string() const
@@ -492,8 +472,7 @@ LessOrEqual::evaluate() const
 LeftShift::LeftShift(usize location, const Expression *lhs,
                      const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 LeftShift::to_string() const
@@ -512,8 +491,7 @@ LeftShift::evaluate() const
  */
 BinaryOr::BinaryOr(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 BinaryOr::to_string() const
@@ -533,8 +511,7 @@ BinaryOr::evaluate() const
 LogicalOr::LogicalOr(usize location, const Expression *lhs,
                      const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 LogicalOr::to_string() const
@@ -553,8 +530,7 @@ LogicalOr::evaluate() const
  */
 Xor::Xor(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 Xor::to_string() const
@@ -573,8 +549,7 @@ Xor::evaluate() const
  */
 Equal::Equal(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 Equal::to_string() const
@@ -593,8 +568,7 @@ Equal::evaluate() const
  */
 NotEqual::NotEqual(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
-{
-}
+{}
 
 std::string
 NotEqual::to_string() const

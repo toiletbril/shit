@@ -7,8 +7,7 @@ ErrorBase::ErrorBase() : m_is_active(false) {}
 
 ErrorBase::ErrorBase(std::string message)
     : m_is_active(true), m_message(message)
-{
-}
+{}
 
 ErrorBase::~ErrorBase() = default;
 
@@ -35,8 +34,7 @@ ErrorWithLocation::ErrorWithLocation() : ErrorBase() {}
 
 ErrorWithLocation::ErrorWithLocation(usize location, std::string message)
     : ErrorBase(message), m_location(location)
-{
-}
+{}
 
 std::string
 ErrorWithLocation::to_string(std::string_view source)
@@ -82,17 +80,18 @@ ErrorWithLocation::get_context(std::string_view source) const
 
   usize start_offset = 0;
   while (offset_from_last_newline - start_offset > 0 &&
-         start_offset <= ERROR_CONTEXT_SIZE) {
-    if (source[m_location - start_offset - 1] == '\n')
-      break;
+         source[m_location - start_offset] != '\n' &&
+         start_offset <= ERROR_CONTEXT_SIZE)
+  {
     start_offset++;
   }
 
   usize size = 0;
-  while (offset_from_last_newline + size + 1 < source.length() &&
-         source[m_last_newline_location + size + 1] != '\n' &&
-         size <= ERROR_CONTEXT_SIZE)
+  while (offset_from_last_newline + size < source.length() &&
+         source[m_location + size] != '\n' && size <= ERROR_CONTEXT_SIZE)
+  {
     size++;
+  }
 
   INSIST(offset_from_last_newline + size <= source.length());
   INSIST(offset_from_last_newline - start_offset >= 0);

@@ -16,10 +16,8 @@ is_whitespace(uchar ch)
   case '\v':
   case '\n':
   case '\r':
-  case '\t':
-    return true;
-  default:
-    return false;
+  case '\t': return true;
+  default: return false;
   }
 }
 
@@ -47,10 +45,8 @@ is_operator(uchar ch)
   case '<':
   case '^':
   case '=':
-  case '!':
-    return true;
-  default:
-    return false;
+  case '!': return true;
+  default: return false;
   };
 }
 
@@ -60,10 +56,8 @@ is_string_quote(uchar ch)
   switch (ch) {
   case '"':
   case '\'':
-  case '`':
-    return true;
-  default:
-    return false;
+  case '`': return true;
+  default: return false;
   }
 }
 
@@ -190,7 +184,7 @@ Lexer::lex_string(usize token_start, uchar quote_char)
 
   while (m_source[token_end] != quote_char) {
     token_end++;
-    if (token_end >= m_source.length()) {
+    if (token_end > m_source.length()) {
       m_error =
           ErrorWithLocation{token_start - 1, "Unterminated string literal"};
       return nullptr;
@@ -199,7 +193,7 @@ Lexer::lex_string(usize token_start, uchar quote_char)
 
   Token *str = new TokenString{
       token_start, m_source.substr(token_start, token_end - token_start)};
-  m_cached_offset = token_end - m_cursor_position;
+  m_cached_offset = token_end - m_cursor_position + 1;
 
   return str;
 }

@@ -1,13 +1,26 @@
 # As readable as I will allow
 ---
 BasedOnStyle: LLVM
-BreakBeforeBraces: Mozilla
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterUnion: true
+  AfterControlStatement: MultiLine
+  AfterFunction: true
+  AfterEnum: true
+  AfterExternBlock: true
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
 AlignArrayOfStructures: Left
-AlignConsecutiveMacros: true
 AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true
 AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
 AlwaysBreakAfterReturnType: AllDefinitions
 AlwaysBreakTemplateDeclarations: true
 IncludeBlocks: Regroup
+IndentExternBlock: NoIndent
 IndentGotoLabels: false
 SpaceAfterCStyleCast: true

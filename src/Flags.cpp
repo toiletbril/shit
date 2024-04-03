@@ -16,8 +16,7 @@ Flag::Flag(FlagType type, uchar short_name, std::string long_name,
            std::string description)
     : m_type(type), m_short_name(short_name), m_long_name(long_name),
       m_description(description)
-{
-}
+{}
 
 FlagType
 Flag::type() const
@@ -49,8 +48,7 @@ Flag::description() const
 FlagBool::FlagBool(uchar short_name, std::string long_name,
                    std::string description)
     : Flag(FlagType::Bool, short_name, long_name, description)
-{
-}
+{}
 
 void
 FlagBool::toggle()
@@ -59,7 +57,7 @@ FlagBool::toggle()
 }
 
 bool
-FlagBool::get() const
+FlagBool::enabled() const
 {
   return m_value;
 }
@@ -70,8 +68,7 @@ FlagBool::get() const
 FlagString::FlagString(uchar short_name, std::string long_name,
                        std::string description)
     : Flag(FlagType::String, short_name, long_name, description)
-{
-}
+{}
 
 void
 FlagString::set(std::string_view v)
@@ -80,7 +77,7 @@ FlagString::set(std::string_view v)
 }
 
 std::string_view
-FlagString::get() const
+FlagString::contents() const
 {
   return m_value;
 }
@@ -111,7 +108,8 @@ find_flag(std::vector<Flag *> &flags, const char *flag_start, bool is_long,
         if (flag_length > longest_length &&
             /* Yay let's add starts_with in C++20. */
             std::memcmp(flags[i]->long_name().data(), flag_start,
-                        flag_length) == 0) {
+                        flag_length) == 0)
+        {
           *result_flag = flags[i];
           *value_start = flag_start + flag_length;
           longest_length = flag_length;
@@ -133,6 +131,7 @@ flag_parse(std::vector<Flag *> &flags, int argc, char **argv)
 
   Flag *prev_flag{};
   bool  next_arg_is_value = false;
+  bool  prev_is_long = false;
   bool  ignore_rest = false;
 
   for (int i = 0; i < argc; i++) {
@@ -211,21 +210,34 @@ flag_parse(std::vector<Flag *> &flags, int argc, char **argv)
         } break;
         }
       }
-
       if (!found) {
-        std::string s;
-        s += "Unknown flag '-";
-        s += is_long ? "-" + std::string{flag_start} : std::string{*flag_start};
-        s += "'";
-        throw Error{s};
+        if (*flag_start == '-')
+          throw Error{"Missing space between '-' of the options."};
+        else {
+          std::string s;
+          s += "Unknown flag '-";
+          s += is_long ? "-" + std::string{flag_start}
+                       : std::string{*flag_start};
+          s += "'";
+          throw Error{s};
+        }
       }
     }
 
     prev_flag = flag;
+    prev_is_long = flag;
   }
 
-  if (next_arg_is_value)
-    throw Error{"No value provided for " + std::string{prev_flag->long_name()}};
+  if (next_arg_is_value) {
+    std::string s;
+    s += "Unknown flag '-";
+    if (prev_is_long)
+      s += "-" + std::string{prev_flag->long_name()};
+    else
+      s += static_cast<char>(prev_flag->short_name());
+    s += "'";
+    throw Error{s};
+  }
 
   return args;
 }

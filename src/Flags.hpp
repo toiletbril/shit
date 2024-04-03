@@ -34,7 +34,7 @@ struct FlagBool : public Flag
   FlagBool(uchar short_name, std::string long_name, std::string description);
 
   void toggle();
-  bool get() const;
+  bool enabled() const;
 
 private:
   bool m_value{};
@@ -45,7 +45,7 @@ struct FlagString : public Flag
   FlagString(uchar short_name, std::string long_name, std::string description);
 
   void             set(std::string_view v);
-  std::string_view get() const;
+  std::string_view contents() const;
 
 private:
   std::string m_value{};
