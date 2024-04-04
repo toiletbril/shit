@@ -1,3 +1,4 @@
 [submodule "src/toiletline"]
 	path = src/toiletline
 	url = https://github.com/toiletbril/toiletline
+	branch = staging
