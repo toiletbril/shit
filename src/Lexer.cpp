@@ -62,10 +62,15 @@ is_string_quote(uchar ch)
 }
 
 static FORCEINLINE bool
-is_idetifier_char(uchar ch)
+is_char(uchar ch)
 {
-  return !is_whitespace(ch) && !is_operator(ch) &&
-         ((ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122));
+  return (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122);
+}
+
+static FORCEINLINE bool
+is_identifier_char(uchar ch)
+{
+  return is_char(ch) || is_number(ch);
 }
 
 Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
@@ -130,7 +135,7 @@ Lexer::lex_next()
       return lex_operator(token_start);
     else if (is_string_quote(ch))
       return lex_string(token_start + 1, ch);
-    else if (is_idetifier_char(ch))
+    else if (is_char(ch)) /* Identifier can't start with a number. */
       return lex_identifier(token_start);
     else {
       std::string s;
@@ -167,7 +172,7 @@ Lexer::lex_identifier(usize token_start)
   usize token_end = token_start;
 
   while (token_end < m_source.length() &&
-         is_idetifier_char(m_source[token_end]))
+         is_identifier_char(m_source[token_end]))
     token_end++;
 
   Token *ident = new TokenIdentifier{

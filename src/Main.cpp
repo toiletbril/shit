@@ -69,6 +69,12 @@ show_help(std::string_view program_name)
   std::cout << s << std::endl;
 }
 
+static void
+show_error(std::string_view err)
+{
+  std::cout << "shit: " << err << std::endl;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -77,10 +83,11 @@ main(int argc, char **argv)
   try {
     file_names = flag_parse(flags, argc, argv);
   } catch (Error &e) {
-    std::cout << "shit: " << e.to_string() << std::endl;
+    show_error(e.to_string());
     return 1;
   }
 
+  /* Program path is the first argument. Pull it out and get rid of it. */
   std::string program_path = file_names[0];
   file_names.erase(file_names.begin());
 
@@ -89,36 +96,24 @@ main(int argc, char **argv)
     return 1;
   }
 
-  std::string input;
-
-  bool first_arg = true;
-  for (std::string_view s : file_names) {
-    if (!first_arg)
-      input += ' ';
-    input += s;
-    first_arg = false;
-  }
-
   bool should_break = false;
   bool error_happened = false;
-  bool tl_initialized = false;
+  bool toiletline_initialized = false;
 
   usize arg_index = 0;
   for (;;) {
     std::string contents;
 
+    /* If we weren't given any arguments or -c=..., fire up the toiletline. */
     if (file_names.empty() && flag_command.contents().empty()) {
-      /* should use the shell? */
-      if (!tl_initialized) {
+      if (!toiletline_initialized) {
         if (tl_init() != TL_SUCCESS) {
-          std::cout
-              << "shit: Could initialize toiletline. If you meant use stdin, "
-                 "provide '-' as an argument."
-              << std::endl;
+          show_error("Could not initialize toiletline. If you meant use stdin, "
+                     "provide '-' as an argument.");
           error_happened = true;
           break;
         }
-        tl_initialized = true;
+        toiletline_initialized = true;
       }
 
       char buffer[1024];
@@ -134,15 +129,14 @@ main(int argc, char **argv)
       std::cout << "\n";
       if (contents.empty())
         continue;
-    } else if (!flag_command.contents().empty()) {
-      /* should use the -c flag? */
+    } else if (!flag_command.contents().empty()) { /* Were we given -c flag? */
       contents = flag_command.contents();
       should_break = true;
     } else {
       if (arg_index + 1 == file_names.size())
         should_break = true;
 
-      /* use stdin if file is - */
+      /* When file name is "-", use stdin. */
       if (file_names[arg_index] == "-") {
         for (;;) {
           uchar ch = std::cin.get();
@@ -150,12 +144,10 @@ main(int argc, char **argv)
             break;
           contents += ch;
         }
-      } else {
-        /* or we were given actual file names */
+      } else { /* Otherwise, process the actual file name. */
         std::fstream f{file_names[arg_index], f.in | f.binary};
         if (!f.is_open()) {
-          std::cout << "shit: Could not open '" + file_names[arg_index] + "'"
-                    << std::endl;
+          show_error("Could not open '" + file_names[arg_index] + "'");
           return 1;
         }
 
@@ -177,7 +169,7 @@ main(int argc, char **argv)
       std::cout << ast->evaluate() << std::endl;
       error_happened = false;
     } catch (ErrorWithLocation &e) {
-      std::cout << "shit: " << e.to_string(contents) << std::endl;
+      show_error(e.to_string(contents));
       error_happened = true;
     }
 
