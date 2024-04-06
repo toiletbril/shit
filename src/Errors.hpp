@@ -12,9 +12,7 @@
 struct ErrorBase
 {
   ErrorBase();
-
   ErrorBase(std::string message);
-
   virtual ~ErrorBase();
 
   operator bool &();
@@ -50,14 +48,23 @@ struct ErrorWithLocation : public ErrorBase
 
   ErrorWithLocation(usize location, std::string message);
 
-  std::string to_string(std::string_view source);
+  virtual std::string to_string(std::string_view source);
 
 protected:
-  /* Everything here starts from 0. */
   usize m_location{0};
-  usize m_line_number{0};
-  usize m_last_newline_location{0};
+};
 
-  void        calc_precise_position(std::string_view source);
-  std::string get_context(std::string_view source) const;
+struct ErrorWithLocationAndDetails : public ErrorWithLocation
+{
+  ErrorWithLocationAndDetails();
+
+  ErrorWithLocationAndDetails(usize location, std::string message,
+                              usize       details_location,
+                              std::string details_message);
+
+  std::string details_to_string(std::string_view source);
+
+protected:
+  usize       m_details_location{0};
+  std::string m_details_message;
 };

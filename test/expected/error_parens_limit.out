@@ -1,3 +1,3 @@
-shit: 1:513: Bracket nesting level exceeded maximum of 256.
+shit: 1:513: Error: Bracket nesting level exceeded maximum of 256.
      1 |  ..!(!(!(!(!(!(!(!(!(!(!(!(!(!1))))))))))))))))))))))..
                                      ^~ Error happened here.

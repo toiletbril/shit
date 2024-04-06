@@ -5,6 +5,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #define EXPRESSION_AST_INDENT " "
 
@@ -47,6 +48,26 @@ struct DummyExpression : public Expression
   i64         evaluate() const override;
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
+};
+
+struct Exec : public Expression
+{
+  Exec(usize location);
+
+  virtual i64         evaluate() const override;
+  virtual std::string to_string() const override;
+  std::string         to_ast_string(usize layer = 0) const override;
+
+protected:
+  std::vector<std::string> m_args;
+};
+
+struct ExecBuiltin : public Exec
+{
+  ExecBuiltin(usize location);
+
+  i64         evaluate() const override;
+  std::string to_string() const override;
 };
 
 struct UnaryExpression : public Expression

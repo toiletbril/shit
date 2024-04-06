@@ -168,6 +168,10 @@ main(int argc, char **argv)
         std::cout << ast->to_ast_string() << std::endl;
       std::cout << ast->evaluate() << std::endl;
       error_happened = false;
+    } catch (ErrorWithLocationAndDetails &e) {
+      show_error(e.to_string(contents));
+      show_error(e.details_to_string(contents));
+      error_happened = true;
     } catch (ErrorWithLocation &e) {
       show_error(e.to_string(contents));
       error_happened = true;

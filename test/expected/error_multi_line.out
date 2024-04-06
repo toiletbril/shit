@@ -1,3 +1,3 @@
-shit: 7:1: Expected a binary operator, found 'happiness'.
+shit: 7:1: Error: Expected a binary operator, found 'happiness'.
      7 |  happiness
           ^~ Error happened here.

@@ -57,16 +57,17 @@ If::to_ast_string(usize layer) const
   std::string pad;
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  s += pad + "[" + to_string() + "]\n";
+
+  s += pad + "[If]\n";
   s += pad + EXPRESSION_AST_INDENT + m_condition->to_ast_string(layer + 1) +
        "\n";
-  s += pad + EXPRESSION_AST_INDENT + m_then->to_ast_string(layer + 1) + "\n";
+  s += pad + EXPRESSION_AST_INDENT + m_then->to_ast_string(layer + 1);
   if (m_otherwise != nullptr) {
-    for (usize i = 0; i < layer; i++)
-      pad += EXPRESSION_AST_INDENT;
-    s += pad + "[Else]\n";
+    s += '\n';
+    s += pad + pad + "[Else]\n";
     s += pad + EXPRESSION_AST_INDENT + m_otherwise->to_ast_string(layer + 1);
   }
+
   return s;
 }
 
@@ -95,6 +96,60 @@ DummyExpression::to_ast_string(usize layer) const
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad + "[" + to_string() + "]";
+}
+
+/**
+ * class: Exec
+ */
+Exec::Exec(usize location) : Expression(location) {}
+
+i64
+Exec::evaluate() const
+{
+  return 0;
+}
+
+std::string
+Exec::to_string() const
+{
+  std::string args;
+  for (std::string_view arg : m_args) {
+    args += " ";
+    args += arg;
+  }
+  return "Exec" + args;
+}
+
+std::string
+Exec::to_ast_string(usize layer) const
+{
+  UNUSED(layer);
+  std::string pad;
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+  return pad + "[" + to_string() + "]";
+}
+
+/**
+ * class: ExecBuiltin
+ */
+ExecBuiltin::ExecBuiltin(usize location) : Exec(location) {}
+
+i64
+ExecBuiltin::evaluate() const
+{
+  return 0;
+}
+
+std::string
+ExecBuiltin::to_string() const
+{
+  std::string args;
+  for (std::string_view arg : m_args) {
+    args += " ";
+    args += arg;
+  }
+  return "ExecBuiltin" + args;
 }
 
 /**

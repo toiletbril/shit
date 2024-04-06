@@ -12,5 +12,5 @@ clean:
 	rm -f $(FAILED)
 
 test_list: \
-expression parens_limit error_zero_division error_two_line error_multi_line \
-if_single_line
+expression error_parens_limit error_zero_division error_two_line \
+error_multi_line if_single_line error_unterminated_if_with_note

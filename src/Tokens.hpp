@@ -67,15 +67,6 @@ enum class TokenType
   Exit,
 };
 
-const std::unordered_map<std::string, TokenType> keywords = {
-    {"if",   TokenType::If  },
-    {"then", TokenType::Then},
-    {"else", TokenType::Else},
-    {"fi",   TokenType::Fi  },
-    {"echo", TokenType::Echo},
-    {"exit", TokenType::Exit},
-};
-
 /**
  * Simple tokens
  */
@@ -128,24 +119,6 @@ struct TokenElse : public Token
 struct TokenThen : public Token
 {
   TokenThen(usize location);
-
-  TokenType   type() const override;
-  TokenFlags  flags() const override;
-  std::string value() const override;
-};
-
-struct TokenEcho : public Token
-{
-  TokenEcho(usize location);
-
-  TokenType   type() const override;
-  TokenFlags  flags() const override;
-  std::string value() const override;
-};
-
-struct TokenExit : public Token
-{
-  TokenExit(usize location);
 
   TokenType   type() const override;
   TokenFlags  flags() const override;

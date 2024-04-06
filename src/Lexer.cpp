@@ -28,7 +28,7 @@ is_number(uchar ch)
 }
 
 static FORCEINLINE bool
-is_operator(uchar ch)
+is_significant_sentinel(uchar ch)
 {
   switch (ch) {
   case '+':
@@ -38,6 +38,7 @@ is_operator(uchar ch)
   case '%':
   case ')':
   case '(':
+  case ';':
   case '~':
   case '&':
   case '|':
@@ -80,10 +81,7 @@ Lexer::~Lexer() = default;
 Token *
 Lexer::peek_token()
 {
-  Token *t = lex_next();
-  if (m_error)
-    return nullptr;
-  return t;
+  return lex_next();
 }
 
 usize
@@ -99,8 +97,6 @@ Token *
 Lexer::next_token()
 {
   Token *t = lex_next();
-  if (m_error)
-    return nullptr;
   advance_past_peek();
   return t;
 }
@@ -109,12 +105,6 @@ std::string_view
 Lexer::source() const
 {
   return m_source;
-}
-
-ErrorWithLocation
-Lexer::error()
-{
-  return m_error;
 }
 
 Token *
@@ -131,8 +121,8 @@ Lexer::lex_next()
 
     if (is_number(ch))
       return lex_number(token_start);
-    else if (is_operator(ch))
-      return lex_operator(token_start);
+    else if (is_significant_sentinel(ch))
+      return lex_operator_or_sentinel(token_start);
     else if (is_string_quote(ch))
       return lex_string(token_start + 1, ch);
     else if (is_char(ch)) /* Identifier can't start with a number. */
@@ -140,9 +130,7 @@ Lexer::lex_next()
     else {
       std::string s;
       s += "Unexpected character";
-      m_error = ErrorWithLocation{token_start, s};
-      m_cached_offset = 0;
-      return nullptr;
+      throw ErrorWithLocation{token_start, s};
     }
   }
 
@@ -165,6 +153,13 @@ Lexer::lex_number(usize token_start)
 
   return num;
 }
+
+static const std::unordered_map<std::string, TokenType> keywords = {
+    {"if",   TokenType::If  },
+    {"then", TokenType::Then},
+    {"else", TokenType::Else},
+    {"fi",   TokenType::Fi  },
+};
 
 Token *
 Lexer::lex_identifier(usize token_start)
@@ -191,8 +186,6 @@ Lexer::lex_identifier(usize token_start)
     case TokenType::Then: t = new TokenThen{token_start}; break;
     case TokenType::Else: t = new TokenElse{token_start}; break;
     case TokenType::Fi: t = new TokenFi{token_start}; break;
-    case TokenType::Echo: t = new TokenEcho{token_start}; break;
-    case TokenType::Exit: t = new TokenExit{token_start}; break;
     default: TRACELN("Unhandled keyword type: %d", kw->second); UNREACHABLE();
     }
   } else {
@@ -212,9 +205,8 @@ Lexer::lex_string(usize token_start, uchar quote_char)
   while (m_source[token_end] != quote_char) {
     token_end++;
     if (token_end > m_source.length()) {
-      m_error =
-          ErrorWithLocation{token_start - 1, "Unterminated string literal"};
-      return nullptr;
+      throw new ErrorWithLocation{token_start - 1,
+                                  "Unterminated string literal"};
     }
   }
 
@@ -226,7 +218,7 @@ Lexer::lex_string(usize token_start, uchar quote_char)
 }
 
 Token *
-Lexer::lex_operator(usize token_start)
+Lexer::lex_operator_or_sentinel(usize token_start)
 {
   usize token_end = token_start + 1;
   uchar ch = static_cast<uchar>(m_source[token_start]);
@@ -247,6 +239,8 @@ Lexer::lex_operator(usize token_start)
     t = new TokenRightParen{token_start};
   else if (ch == '(')
     t = new TokenLeftParen{token_start};
+  else if (ch == ';')
+    t = new TokenSemicolon{token_start};
   else if (ch == '~')
     t = new TokenTilde{token_start};
   else if (ch == '^')
@@ -304,8 +298,7 @@ Lexer::lex_operator(usize token_start)
     s += "Unknown operator '";
     s += static_cast<char>(ch);
     s += "'";
-    m_error = ErrorWithLocation{token_start, s};
-    t = nullptr;
+    throw ErrorWithLocation{token_start, s};
   }
 
   m_cached_offset = token_end - m_cursor_position;

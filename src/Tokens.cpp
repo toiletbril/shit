@@ -70,52 +70,6 @@ TokenElse::value() const
 }
 
 /**
- * class: TokenEcho
- */
-TokenEcho::TokenEcho(usize location) : Token(location) {}
-
-TokenType
-TokenEcho::type() const
-{
-  return TokenType::Echo;
-}
-
-TokenFlags
-TokenEcho::flags() const
-{
-  return TokenFlag::Sentinel;
-}
-
-std::string
-TokenEcho::value() const
-{
-  return "Echo";
-}
-
-/**
- * class: TokenExit
- */
-TokenExit::TokenExit(usize location) : Token(location) {}
-
-TokenType
-TokenExit::type() const
-{
-  return TokenType::Exit;
-}
-
-TokenFlags
-TokenExit::flags() const
-{
-  return TokenFlag::Sentinel;
-}
-
-std::string
-TokenExit::value() const
-{
-  return "Exit";
-}
-
-/**
  * class: TokenThen
  */
 TokenThen::TokenThen(usize location) : Token(location) {}
