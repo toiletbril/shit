@@ -40,9 +40,15 @@ std::string
 ErrorWithLocation::to_string(std::string_view source)
 {
   calc_precise_position(source);
+  /* Our count starts from 0. If there's only a single line, we need to use the
+   * raw location for the correct offset. Otherwise, newline counts as an extra
+   * character. */
+  usize line_location = (m_last_newline_location > 0)
+                            ? m_location - m_last_newline_location
+                            : m_location + 1;
   m_message = std::to_string(m_line_number + 1) + ":" +
-              std::to_string(m_location - m_last_newline_location + 1) + ": " +
-              m_message + ".\n" + get_context(source);
+              std::to_string(line_location) + ": " + m_message + ".\n" +
+              get_context(source);
   return m_message;
 }
 
@@ -76,27 +82,29 @@ ErrorWithLocation::get_context(std::string_view source) const
 {
   INSIST(m_is_active);
 
-  const usize offset_from_last_newline = m_location - m_last_newline_location;
-
   usize start_offset = 0;
-  while (offset_from_last_newline - start_offset > 0 &&
-         source[m_location - start_offset] != '\n' &&
+  while (m_location - start_offset > m_last_newline_location &&
          start_offset <= ERROR_CONTEXT_SIZE)
   {
     start_offset++;
   }
 
   usize size = 0;
-  while (offset_from_last_newline + size < source.length() &&
+  while (m_location + size < source.length() &&
          source[m_location + size] != '\n' && size <= ERROR_CONTEXT_SIZE)
   {
     size++;
   }
 
-  INSIST(offset_from_last_newline + size <= source.length());
-  INSIST(offset_from_last_newline - start_offset >= 0);
-  INSIST(offset_from_last_newline - start_offset <=
-         offset_from_last_newline + size);
+  if (source[m_location - start_offset] == '\n')
+    start_offset--;
+
+  INSIST(m_location + size <= source.length(), "end: %zu, length: %zu",
+         m_location + size, source.length());
+  INSIST(m_location - start_offset >= 0);
+  INSIST(m_location - start_offset <= m_location + size,
+         "location: %zu, start: %zu, size: %zu, ", m_location, start_offset,
+         size);
 
   usize line_number_length = 0;
   usize line_number_copy = m_line_number + 1;
@@ -113,12 +121,22 @@ ErrorWithLocation::get_context(std::string_view source) const
   usize added_symbols = 10;
 
   msg += std::to_string(m_line_number + 1) + " |  ";
+
   /* did we cut the start? */
-  if (m_location - start_offset != m_last_newline_location) {
+  if (m_location - start_offset != m_last_newline_location + 1 &&
+      m_location - start_offset != 0)
+  {
     msg += "..";
     added_symbols += 2;
   }
-  msg += source.substr(m_location - start_offset, start_offset + size);
+
+  std::string_view context =
+      source.substr(m_location - start_offset, start_offset + size);
+  /* we don't need accidental newlines in the middle of the context.
+   * *pulls hair out* */
+  INSIST(context.find('\n') == std::string::npos, "'%s'", context.data());
+  msg += context;
+
   /* did we cut the end? */
   if (size > ERROR_CONTEXT_SIZE)
     msg += "..";

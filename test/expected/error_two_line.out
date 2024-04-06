@@ -1,0 +1,3 @@
+shit: 2:1: Expected a binary operator, found '2'.
+     2 |  2
+          ^~ Error happened here.

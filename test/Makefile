@@ -11,4 +11,4 @@ test: $(BIN)
 clean:
 	rm -f $(FAILED)
 
-batch1: expression parens_limit zero_division
+batch1: expression parens_limit error_zero_division error_two_line error_multi_line

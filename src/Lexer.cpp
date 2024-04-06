@@ -207,7 +207,7 @@ Token *
 Lexer::lex_operator(usize token_start)
 {
   usize token_end = token_start + 1;
-  uchar ch = m_source[token_start];
+  uchar ch = static_cast<uchar>(m_source[token_start]);
 
   Token *t{};
 
