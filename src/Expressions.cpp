@@ -15,6 +15,62 @@ Expression::location() const
 }
 
 /**
+ * class: If
+ */
+If::If(usize location, const Expression *condition, const Expression *then,
+       const Expression *otherwise)
+    : Expression(location), m_condition(condition), m_then(then),
+      m_otherwise(otherwise)
+{}
+
+If::~If()
+{
+  delete m_condition;
+  delete m_then;
+  if (m_otherwise != nullptr)
+    delete m_otherwise;
+}
+
+i64
+If::evaluate() const
+{
+  bool condition_value = m_condition->evaluate();
+
+  if (condition_value)
+    return m_then->evaluate();
+  else if (m_otherwise != nullptr)
+    return m_otherwise->evaluate();
+
+  return 0;
+}
+
+std::string
+If::to_string() const
+{
+  return "If";
+}
+
+std::string
+If::to_ast_string(usize layer) const
+{
+  std::string s;
+  std::string pad;
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+  s += pad + "[" + to_string() + "]\n";
+  s += pad + EXPRESSION_AST_INDENT + m_condition->to_ast_string(layer + 1) +
+       "\n";
+  s += pad + EXPRESSION_AST_INDENT + m_then->to_ast_string(layer + 1) + "\n";
+  if (m_otherwise != nullptr) {
+    for (usize i = 0; i < layer; i++)
+      pad += EXPRESSION_AST_INDENT;
+    s += pad + "[Else]\n";
+    s += pad + EXPRESSION_AST_INDENT + m_otherwise->to_ast_string(layer + 1);
+  }
+  return s;
+}
+
+/**
  * class: DummyExpression
  */
 DummyExpression::DummyExpression() : Expression(0) {}

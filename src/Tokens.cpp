@@ -24,6 +24,144 @@ Token::to_ast_string() const
 }
 
 /**
+ * class: TokenIf
+ */
+TokenIf::TokenIf(usize location) : Token(location) {}
+
+TokenType
+TokenIf::type() const
+{
+  return TokenType::If;
+}
+
+TokenFlags
+TokenIf::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenIf::value() const
+{
+  return "If";
+}
+
+/**
+ * class: TokenElse
+ */
+TokenElse::TokenElse(usize location) : Token(location) {}
+
+TokenType
+TokenElse::type() const
+{
+  return TokenType::Else;
+}
+
+TokenFlags
+TokenElse::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenElse::value() const
+{
+  return "Else";
+}
+
+/**
+ * class: TokenEcho
+ */
+TokenEcho::TokenEcho(usize location) : Token(location) {}
+
+TokenType
+TokenEcho::type() const
+{
+  return TokenType::Echo;
+}
+
+TokenFlags
+TokenEcho::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenEcho::value() const
+{
+  return "Echo";
+}
+
+/**
+ * class: TokenExit
+ */
+TokenExit::TokenExit(usize location) : Token(location) {}
+
+TokenType
+TokenExit::type() const
+{
+  return TokenType::Exit;
+}
+
+TokenFlags
+TokenExit::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenExit::value() const
+{
+  return "Exit";
+}
+
+/**
+ * class: TokenThen
+ */
+TokenThen::TokenThen(usize location) : Token(location) {}
+
+TokenType
+TokenThen::type() const
+{
+  return TokenType::Then;
+}
+
+TokenFlags
+TokenThen::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenThen::value() const
+{
+  return "Then";
+}
+
+/**
+ * class: TokenFi
+ */
+TokenFi::TokenFi(usize location) : Token(location) {}
+
+TokenType
+TokenFi::type() const
+{
+  return TokenType::Fi;
+}
+
+TokenFlags
+TokenFi::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenFi::value() const
+{
+  return "Fi";
+}
+
+/**
  * class: TokenEndOfFile
  */
 TokenEndOfFile::TokenEndOfFile(usize location) : Token(location) {}
@@ -44,6 +182,29 @@ std::string
 TokenEndOfFile::value() const
 {
   return "EOF";
+}
+
+/**
+ * class: TokenSemicolon
+ */
+TokenSemicolon::TokenSemicolon(usize location) : Token(location) {}
+
+TokenType
+TokenSemicolon::type() const
+{
+  return TokenType::Semicolon;
+}
+
+TokenFlags
+TokenSemicolon::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenSemicolon::value() const
+{
+  return ";";
 }
 
 /**
@@ -145,6 +306,7 @@ TokenOperator::construct_binary_expression(const Expression *lhs,
 {
   UNUSED(lhs);
   UNUSED(rhs);
+  TRACELN("Invalid binary operator construction of type %d", type());
   UNREACHABLE();
 }
 
@@ -152,6 +314,7 @@ std::unique_ptr<Expression>
 TokenOperator::construct_unary_expression(const Expression *rhs) const
 {
   UNUSED(rhs);
+  TRACELN("Invalid unary operator construction of type %d", type());
   UNREACHABLE();
 }
 

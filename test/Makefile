@@ -6,9 +6,11 @@ FAILED := failed.diff
 
 test: $(BIN)
 	@rm -f $(FAILED)
-	@$(MAKE) -B batch1
+	@$(MAKE) -B test_list
 
 clean:
 	rm -f $(FAILED)
 
-batch1: expression parens_limit error_zero_division error_two_line error_multi_line
+test_list: \
+expression parens_limit error_zero_division error_two_line error_multi_line \
+if_single_line

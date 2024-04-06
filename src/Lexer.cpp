@@ -175,11 +175,33 @@ Lexer::lex_identifier(usize token_start)
          is_identifier_char(m_source[token_end]))
     token_end++;
 
-  Token *ident = new TokenIdentifier{
-      token_start, m_source.substr(token_start, token_end - token_start)};
+  std::string ident_string =
+      m_source.substr(token_start, token_end - token_start);
+
+  std::string lower_ident_string;
+  for (const uchar c : ident_string)
+    lower_ident_string += std::tolower(c);
+
+  Token *t;
+
+  /* An identifier may be a keyword. */
+  if (auto kw = keywords.find(lower_ident_string); kw != keywords.end()) {
+    switch (kw->second) {
+    case TokenType::If: t = new TokenIf{token_start}; break;
+    case TokenType::Then: t = new TokenThen{token_start}; break;
+    case TokenType::Else: t = new TokenElse{token_start}; break;
+    case TokenType::Fi: t = new TokenFi{token_start}; break;
+    case TokenType::Echo: t = new TokenEcho{token_start}; break;
+    case TokenType::Exit: t = new TokenExit{token_start}; break;
+    default: TRACELN("Unhandled keyword type: %d", kw->second); UNREACHABLE();
+    }
+  } else {
+    t = new TokenIdentifier{token_start, ident_string};
+  }
+
   m_cached_offset = token_end - m_cursor_position;
 
-  return ident;
+  return t;
 }
 
 Token *

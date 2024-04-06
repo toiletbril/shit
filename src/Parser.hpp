@@ -15,7 +15,10 @@ struct Parser
 private:
   Lexer            *m_lexer;
   ErrorWithLocation m_error{};
-  usize             m_parentheses_depth{0};
+
+  usize m_parentheses_depth{0};
+  usize m_condition_depth{0};
+  usize m_if_depth{0};
 
   std::unique_ptr<Expression> parse_expression(u8 min_precedence = 0);
 

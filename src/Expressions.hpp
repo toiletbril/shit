@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "Errors.hpp"
 
+#include <optional>
 #include <string>
 
 #define EXPRESSION_AST_INDENT " "
@@ -20,6 +21,23 @@ struct Expression
 
 protected:
   usize m_location;
+};
+
+struct If : public Expression
+{
+  If(usize location, const Expression *condition, const Expression *then,
+     const Expression *otherwise);
+
+  virtual ~If();
+
+  i64         evaluate() const override;
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+
+protected:
+  const Expression *m_condition;
+  const Expression *m_then;
+  const Expression *m_otherwise;
 };
 
 struct DummyExpression : public Expression

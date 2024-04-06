@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 typedef u8 TokenFlags;
 
@@ -22,18 +23,24 @@ enum TokenFlag
 enum class TokenType
 {
   Invalid,
-  EndOfFile,
 
+  /* Significant symbols */
+  EndOfFile,
+  RightParen,
+  LeftParen,
+  Semicolon,
+
+  /* Values */
   Number,
   String,
   Identifier,
+
+  /* Operators */
   Plus,
   Minus,
   Asterisk,
   Slash,
   Percent,
-  RightParen,
-  LeftParen,
   Tilde,
   Ampersand,
   DoubleAmpersand,
@@ -50,6 +57,23 @@ enum class TokenType
   DoubleEquals,
   ExclamationMark,
   ExclamationEquals,
+
+  /* Keywords */
+  If,
+  Then,
+  Else,
+  Fi,
+  Echo,
+  Exit,
+};
+
+const std::unordered_map<std::string, TokenType> keywords = {
+    {"if",   TokenType::If  },
+    {"then", TokenType::Then},
+    {"else", TokenType::Else},
+    {"fi",   TokenType::Fi  },
+    {"echo", TokenType::Echo},
+    {"exit", TokenType::Exit},
 };
 
 /**
@@ -74,9 +98,72 @@ private:
   usize m_location;
 };
 
+struct TokenIf : public Token
+{
+  TokenIf(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenFi : public Token
+{
+  TokenFi(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenElse : public Token
+{
+  TokenElse(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenThen : public Token
+{
+  TokenThen(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenEcho : public Token
+{
+  TokenEcho(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenExit : public Token
+{
+  TokenExit(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
 struct TokenEndOfFile : public Token
 {
   TokenEndOfFile(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenSemicolon : public Token
+{
+  TokenSemicolon(usize location);
 
   TokenType   type() const override;
   TokenFlags  flags() const override;

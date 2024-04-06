@@ -1,6 +1,9 @@
 #include "Parser.hpp"
 
 #include "Expressions.hpp"
+#include "Tokens.hpp"
+
+#include <optional>
 
 Parser::Parser(Lexer *lexer) : m_lexer(lexer) {}
 Parser::~Parser() { delete m_lexer; }
@@ -25,6 +28,7 @@ Parser::parse_expression(u8 min_precedence)
 
   /* Handle leaf type. We expect either a value, or an unary operator. */
   switch (t->type()) {
+  /* Values */
   case TokenType::Number:
     lhs = parse_number(static_cast<const TokenNumber *>(t.get()));
     break;
@@ -37,6 +41,76 @@ Parser::parse_expression(u8 min_precedence)
     lhs = parse_identifier(static_cast<const TokenIdentifier *>(t.get()));
     break;
 
+  /* Keywords */
+  case TokenType::If: {
+    m_if_depth++;
+    /* if expr[;] then [...] [else then ...] fi */
+
+    /* the condition */
+    m_condition_depth++;
+    std::unique_ptr<Expression> condition;
+    if ((condition = parse_expression()) == nullptr)
+      return nullptr;
+    m_condition_depth--;
+
+    /* [;] then */
+    std::unique_ptr<Token> after{m_lexer->next_token()};
+    if ((m_error = m_lexer->error()))
+      return nullptr;
+
+    if (after->type() == TokenType::Semicolon) {
+      after.reset(m_lexer->next_token());
+      if ((m_error = m_lexer->error()))
+        return nullptr;
+    }
+
+    if (after->type() != TokenType::Then) {
+      m_error =
+          ErrorWithLocation{t->location(), "Expected Then, found '" +
+                                               after->to_ast_string() + "'"};
+      return nullptr;
+    }
+
+    /* the expression */
+    std::unique_ptr<Expression> then;
+    if ((then = parse_expression()) == nullptr)
+      return nullptr;
+
+    std::unique_ptr<Expression> otherwise{};
+    after.reset(m_lexer->next_token());
+    if ((m_error = m_lexer->error()))
+      return nullptr;
+
+    if (after->type() == TokenType::Else) {
+      after.reset(m_lexer->peek_token());
+      if ((m_error = m_lexer->error()))
+        return nullptr;
+
+      if (after->type() == TokenType::Then)
+        m_lexer->advance_past_peek();
+
+      m_condition_depth++;
+      if ((otherwise = parse_expression()) == nullptr)
+        return nullptr;
+      m_condition_depth--;
+
+      after.reset(m_lexer->next_token());
+      if ((m_error = m_lexer->error()))
+        return nullptr;
+    }
+
+    if (after->type() != TokenType::Fi) {
+      m_error = ErrorWithLocation{t->location(), "Unterminated if condition"};
+      return nullptr;
+    }
+
+    lhs = std::make_unique<If>(t->location(), condition.release(),
+                               then.release(), otherwise.release());
+
+    m_if_depth--;
+  } break;
+
+  /* Blocks */
   case TokenType::LeftParen: {
     if (m_parentheses_depth >= 256) {
       m_error = ErrorWithLocation{
@@ -48,7 +122,8 @@ Parser::parse_expression(u8 min_precedence)
     if ((lhs = parse_expression()) == nullptr)
       return nullptr;
 
-    std::unique_ptr<Token> rp = std::unique_ptr<Token>{m_lexer->next_token()};
+    /* Do we have a corresponding closing parenthesis? */
+    std::unique_ptr<Token> rp{m_lexer->next_token()};
     if ((m_error = m_lexer->error()))
       return nullptr;
 
@@ -57,9 +132,9 @@ Parser::parse_expression(u8 min_precedence)
       return nullptr;
     }
     m_parentheses_depth--;
-    break;
-  }
+  } break;
 
+  /* Now it's either a unary operator or something odd */
   default:
     if (t->flags() & TokenFlag::UnaryOperator) {
       const TokenOperator *op = static_cast<const TokenOperator *>(t.get());
@@ -86,16 +161,41 @@ Parser::parse_expression(u8 min_precedence)
     std::unique_ptr<Token> maybe_op{m_lexer->peek_token()};
     if ((m_error = m_lexer->error()))
       return nullptr;
-    if (maybe_op->type() == TokenType::EndOfFile)
-      return lhs;
 
-    if (maybe_op->type() == TokenType::RightParen) {
+    /* Check for terminating tokens */
+    switch (maybe_op->type()) {
+    case TokenType::EndOfFile: return lhs;
+
+    case TokenType::RightParen: {
       if (m_parentheses_depth == 0) {
         m_error = ErrorWithLocation{maybe_op->location(),
                                     "Unexpected closing parenthesis"};
         return nullptr;
       }
       return lhs;
+    }
+
+    case TokenType::Else:
+    case TokenType::Fi: {
+      if (m_if_depth == 0) {
+        m_error = ErrorWithLocation{maybe_op->location(),
+                                    "Unexpected " + maybe_op->value()};
+        return nullptr;
+      }
+      return lhs;
+    }
+
+    case TokenType::Then:
+    case TokenType::Semicolon: {
+      if (m_condition_depth == 0) {
+        m_error = ErrorWithLocation{maybe_op->location(),
+                                    "Unexpected " + maybe_op->value()};
+        return nullptr;
+      }
+      return lhs;
+    }
+
+    default: break;
     }
 
     if (!(maybe_op->flags() & TokenFlag::BinaryOperator)) {
