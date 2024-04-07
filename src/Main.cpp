@@ -15,6 +15,7 @@
 #include <type_traits>
 
 static FlagBool flag_help{'\0', "help", "Display help message."};
+static FlagBool flag_version{'\0', "version", "Display program version."};
 static FlagBool flag_dump_ast{'A', "dump-ast",
                               "Dump AST for debugging purposes."};
 
@@ -25,7 +26,21 @@ static std::vector<Flag *> flags = {
     &flag_command,
     &flag_dump_ast,
     &flag_help,
+    &flag_version,
 };
+
+static void
+show_version()
+{
+  std::cout
+      << "Shit " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
+      << SHIT_VER_PATCH << "\n"
+      << "(c) toiletbril <https://github.com/toiletbril>\n\n"
+         "License GPLv3: GNU GPL version 3.\n"
+         "This is free software: you are free to change and redistribute it.\n"
+         "There is NO WARRANTY, to the extent permitted by law."
+      << std::endl;
+}
 
 static void
 show_help(std::string_view program_name)
@@ -38,7 +53,7 @@ show_help(std::string_view program_name)
   s += " [-options]";
   s += " [file1, ...]\n";
   s += "  ";
-  s += "Shit, command-line interpreter or shell.";
+  s += "Command-line interpreter or shell.";
   s += "\n\n";
 
   s += "Options:";
@@ -96,6 +111,11 @@ main(int argc, char **argv)
   if (flag_help.enabled()) {
     show_help(program_path);
     return 1;
+  }
+
+  if (flag_version.enabled()) {
+    show_version();
+    return 0;
   }
 
   bool should_break = false;
@@ -164,6 +184,7 @@ main(int argc, char **argv)
       arg_index++;
     }
 
+    error_happened = true;
     try {
       std::unique_ptr<Parser> p = std::make_unique<Parser>(new Lexer{contents});
       std::unique_ptr<Expression> ast = p->construct_ast();
@@ -174,12 +195,12 @@ main(int argc, char **argv)
     } catch (ErrorWithLocationAndDetails &e) {
       show_error(e.to_string(contents));
       show_error(e.details_to_string(contents));
-      error_happened = true;
     } catch (ErrorWithLocation &e) {
       show_error(e.to_string(contents));
-      error_happened = true;
     }
 
+    /* We can get here from child process if they didn't platform_exec()
+     * properly to print error. */
     if (should_break || platform_we_are_child())
       break;
   }
