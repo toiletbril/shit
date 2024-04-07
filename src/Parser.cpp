@@ -25,16 +25,55 @@ Parser::parse_expression(u8 min_precedence)
   switch (t->type()) {
   /* Values */
   case TokenType::Number:
-    lhs = parse_number(static_cast<const TokenNumber *>(t.get()));
+    lhs = std::make_unique<ConstantNumber>(t->location(),
+                                           std::atoll(t->value().data()));
     break;
 
   case TokenType::String:
-    lhs = parse_string(static_cast<const TokenString *>(t.get()));
+    lhs = std::make_unique<ConstantString>(t->location(), t->value());
     break;
 
-  case TokenType::Identifier:
-    lhs = parse_identifier(static_cast<const TokenIdentifier *>(t.get()));
-    break;
+  case TokenType::Dot:
+  case TokenType::Slash:
+  case TokenType::Identifier: {
+    /* t's value contains a program/path to execute. Parse arguments until we
+     * encounter a pipe or an redirection. */
+    std::vector<std::string> args;
+    std::string              program;
+
+    /* Is this the path of a program? */
+    if (t->type() == TokenType::Identifier)
+      program = t->value();
+    else { /* Or it's a dot or a slash? */
+      std::unique_ptr<Token> p{m_lexer->next_identifier()};
+      /* Concatenate the first char with the rest of the path. */
+      program = t->value() + p->value();
+    }
+
+    bool should_break = false;
+
+    for (;;) {
+      std::unique_ptr<Token> maybe_arg{m_lexer->peek_token()};
+
+      switch (maybe_arg->type()) {
+      /* Sentinels. */
+      case TokenType::EndOfFile:
+      case TokenType::RightParen:
+      /* These actually mean something. */
+      case TokenType::Pipe:
+      case TokenType::Greater: should_break = true; break;
+      default:;
+      }
+      if (should_break)
+        break;
+
+      /* no need to separate anything by tokens, only by whitespace. */
+      maybe_arg.reset(m_lexer->next_identifier());
+      args.push_back(maybe_arg->value());
+    }
+
+    lhs = std::make_unique<Exec>(t->location(), program, args);
+  } break;
 
   /* Keywords */
   case TokenType::If: {
@@ -67,7 +106,6 @@ Parser::parse_expression(u8 min_precedence)
     /* [else [then]] */
     if (after->type() == TokenType::Else) {
       after.reset(m_lexer->peek_token());
-
       if (after->type() == TokenType::Then)
         m_lexer->advance_past_peek();
 
@@ -104,7 +142,7 @@ Parser::parse_expression(u8 min_precedence)
     /* Do we have a corresponding closing parenthesis? */
     std::unique_ptr<Token> rp{m_lexer->next_token()};
     if (rp->type() != TokenType::RightParen) {
-      throw new ErrorWithLocationAndDetails{
+      throw ErrorWithLocationAndDetails{
           t->location(), "Unterminated parenthesis", rp->location(),
           "Expected a closing parenthesis here"};
     }
@@ -138,7 +176,6 @@ Parser::parse_expression(u8 min_precedence)
     /* Check for tokens that terminate the parser. */
     switch (maybe_op->type()) {
     case TokenType::EndOfFile: return lhs;
-
     case TokenType::RightParen: {
       if (m_parentheses_depth == 0) {
         throw ErrorWithLocation{maybe_op->location(),
@@ -146,7 +183,6 @@ Parser::parse_expression(u8 min_precedence)
       }
       return lhs;
     }
-
     case TokenType::Else:
     case TokenType::Fi: {
       if (m_if_depth == 0) {
@@ -156,7 +192,6 @@ Parser::parse_expression(u8 min_precedence)
       }
       return lhs;
     }
-
     case TokenType::Then:
     case TokenType::Semicolon: {
       if (m_if_condition_depth == 0) {
@@ -188,24 +223,4 @@ Parser::parse_expression(u8 min_precedence)
   }
 
   return lhs;
-}
-
-std::unique_ptr<Expression>
-Parser::parse_identifier(const TokenIdentifier *n)
-{
-  UNUSED(n);
-  return std::make_unique<DummyExpression>();
-}
-
-std::unique_ptr<Expression>
-Parser::parse_string(const TokenString *s)
-{
-  return std::make_unique<ConstantString>(s->location(), s->value());
-}
-
-std::unique_ptr<Expression>
-Parser::parse_number(const TokenNumber *n)
-{
-  i64 value = std::atoll(n->value().data());
-  return std::make_unique<ConstantNumber>(n->location(), value);
 }

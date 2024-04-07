@@ -21,9 +21,4 @@ private:
 
   [[nodiscard]] std::unique_ptr<Expression>
   parse_expression(u8 min_precedence = 0);
-
-  [[nodiscard]] std::unique_ptr<Expression>
-  parse_identifier(const TokenIdentifier *n);
-  [[nodiscard]] std::unique_ptr<Expression> parse_number(const TokenNumber *n);
-  [[nodiscard]] std::unique_ptr<Expression> parse_string(const TokenString *n);
 };

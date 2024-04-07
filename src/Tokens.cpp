@@ -162,6 +162,29 @@ TokenSemicolon::value() const
 }
 
 /**
+ * class: TokenDot
+ */
+TokenDot::TokenDot(usize location) : Token(location) {}
+
+TokenType
+TokenDot::type() const
+{
+  return TokenType::Dot;
+}
+
+TokenFlags
+TokenDot::flags() const
+{
+  return TokenFlag::Sentinel;
+}
+
+std::string
+TokenDot::value() const
+{
+  return ".";
+}
+
+/**
  * class: TokenValue
  */
 TokenValue::TokenValue(usize location, std::string_view sv)

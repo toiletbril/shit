@@ -52,19 +52,20 @@ struct DummyExpression : public Expression
 
 struct Exec : public Expression
 {
-  Exec(usize location);
+  Exec(usize location, std::string path, std::vector<std::string> args);
 
   virtual i64         evaluate() const override;
   virtual std::string to_string() const override;
   std::string         to_ast_string(usize layer = 0) const override;
 
 protected:
+  std::string              m_path;
   std::vector<std::string> m_args;
 };
 
 struct ExecBuiltin : public Exec
 {
-  ExecBuiltin(usize location);
+  ExecBuiltin(usize location, std::string path, std::vector<std::string> args);
 
   i64         evaluate() const override;
   std::string to_string() const override;

@@ -29,6 +29,7 @@ enum class TokenType
   RightParen,
   LeftParen,
   Semicolon,
+  Dot,
 
   /* Values */
   Number,
@@ -137,6 +138,15 @@ struct TokenEndOfFile : public Token
 struct TokenSemicolon : public Token
 {
   TokenSemicolon(usize location);
+
+  TokenType   type() const override;
+  TokenFlags  flags() const override;
+  std::string value() const override;
+};
+
+struct TokenDot : public Token
+{
+  TokenDot(usize location);
 
   TokenType   type() const override;
   TokenFlags  flags() const override;

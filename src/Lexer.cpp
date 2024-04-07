@@ -46,6 +46,7 @@ is_significant_sentinel(uchar ch)
   case '<':
   case '^':
   case '=':
+  case '.':
   case '!': return true;
   default: return false;
   };
@@ -71,7 +72,17 @@ is_char(uchar ch)
 static FORCEINLINE bool
 is_identifier_char(uchar ch)
 {
-  return is_char(ch) || is_number(ch);
+  if (is_char(ch) || is_number(ch))
+    return true;
+  switch (ch) {
+  case '/':
+  case '.':
+  case '~':
+  case '-':
+  case '+':
+  case '_': return true;
+  default: return false;
+  }
 }
 
 Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
@@ -81,7 +92,7 @@ Lexer::~Lexer() = default;
 Token *
 Lexer::peek_token()
 {
-  return lex_next();
+  return lex_token();
 }
 
 usize
@@ -96,7 +107,16 @@ Lexer::advance_past_peek()
 Token *
 Lexer::next_token()
 {
-  Token *t = lex_next();
+  Token *t = lex_token();
+  advance_past_peek();
+  return t;
+}
+
+Token *
+Lexer::next_identifier()
+{
+  skip_whitespace();
+  Token *t = lex_identifier(m_cursor_position);
   advance_past_peek();
   return t;
 }
@@ -107,18 +127,24 @@ Lexer::source() const
   return m_source;
 }
 
-Token *
-Lexer::lex_next()
+void
+Lexer::skip_whitespace()
 {
+  while (m_cursor_position < m_source.length()) {
+    if (!is_whitespace(m_source[m_cursor_position]))
+      return;
+    m_cursor_position++;
+  }
+}
+
+Token *
+Lexer::lex_token()
+{
+  skip_whitespace();
   usize token_start = m_cursor_position;
 
-  while (token_start < m_source.length()) {
-    uchar ch = m_source[token_start];
-    if (is_whitespace(ch)) {
-      token_start++;
-      continue;
-    }
-
+  if (m_cursor_position < m_source.length()) {
+    uchar ch = m_source[m_cursor_position];
     if (is_number(ch))
       return lex_number(token_start);
     else if (is_significant_sentinel(ch))
@@ -133,8 +159,6 @@ Lexer::lex_next()
       throw ErrorWithLocation{token_start, s};
     }
   }
-
-  m_cached_offset = 0;
 
   return new TokenEndOfFile{token_start};
 }
@@ -198,6 +222,12 @@ Lexer::lex_identifier(usize token_start)
 }
 
 Token *
+Lexer::lex_identifier_until_whitespace(usize token_start)
+{
+  return lex_identifier(token_start);
+}
+
+Token *
 Lexer::lex_string(usize token_start, uchar quote_char)
 {
   usize token_end = token_start;
@@ -205,8 +235,7 @@ Lexer::lex_string(usize token_start, uchar quote_char)
   while (m_source[token_end] != quote_char) {
     token_end++;
     if (token_end > m_source.length()) {
-      throw new ErrorWithLocation{token_start - 1,
-                                  "Unterminated string literal"};
+      throw ErrorWithLocation{token_start - 1, "Unterminated string literal"};
     }
   }
 
@@ -245,6 +274,8 @@ Lexer::lex_operator_or_sentinel(usize token_start)
     t = new TokenTilde{token_start};
   else if (ch == '^')
     t = new TokenCap{token_start};
+  else if (ch == '.')
+    t = new TokenDot{token_start};
   else if (ch == '!') {
     if (token_end < m_source.length() && m_source[token_end] == '=') {
       t = new TokenExclamationEquals{token_start};

@@ -3,7 +3,9 @@
 #include "Flags.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Platform.hpp"
 
+#define TL_ASSERT INSIST
 #define TOILETLINE_IMPLEMENTATION
 #include "toiletline/toiletline.h"
 
@@ -116,8 +118,9 @@ main(int argc, char **argv)
         toiletline_initialized = true;
       }
 
-      char buffer[1024];
+      char buffer[2048];
       int  code = tl_readline(buffer, sizeof(buffer), "tl> ");
+      INSIST(!platform_we_are_child());
 
       if (code == TL_PRESSED_EOF || code == TL_PRESSED_INTERRUPT) {
         tl_exit();
@@ -136,28 +139,28 @@ main(int argc, char **argv)
       if (arg_index + 1 == file_names.size())
         should_break = true;
 
+      std::fstream  f{};
+      std::istream *file{};
+
       /* When file name is "-", use stdin. */
       if (file_names[arg_index] == "-") {
-        for (;;) {
-          uchar ch = std::cin.get();
-          if (std::cin.eof())
-            break;
-          contents += ch;
-        }
+        file = &std::cin;
       } else { /* Otherwise, process the actual file name. */
-        std::fstream f{file_names[arg_index], f.in | f.binary};
+        f = std::fstream{file_names[arg_index], f.in | f.binary};
         if (!f.is_open()) {
           show_error("Could not open '" + file_names[arg_index] + "'");
           return 1;
         }
-
-        for (;;) {
-          uchar ch = f.get();
-          if (f.eof())
-            break;
-          contents += ch;
-        }
+        file = &f;
       }
+
+      for (;;) {
+        uchar ch = file->get();
+        if (file->eof())
+          break;
+        contents += ch;
+      }
+
       arg_index++;
     }
 
@@ -177,7 +180,7 @@ main(int argc, char **argv)
       error_happened = true;
     }
 
-    if (should_break)
+    if (should_break || platform_we_are_child())
       break;
   }
 

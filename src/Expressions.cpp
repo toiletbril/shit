@@ -1,5 +1,7 @@
 #include "Expressions.hpp"
 
+#include "Platform.hpp"
+
 /**
  * class: Expression
  */
@@ -101,23 +103,31 @@ DummyExpression::to_ast_string(usize layer) const
 /**
  * class: Exec
  */
-Exec::Exec(usize location) : Expression(location) {}
+Exec::Exec(usize location, std::string path, std::vector<std::string> args)
+    : Expression(location), m_path(path), m_args(args)
+{}
 
 i64
 Exec::evaluate() const
 {
-  return 0;
+  i32 ret = platform_exec(location(), m_path, m_args);
+  return (ret == 0) ? 1 : ret;
 }
 
 std::string
 Exec::to_string() const
 {
   std::string args;
-  for (std::string_view arg : m_args) {
-    args += " ";
-    args += arg;
+  std::string s = "Exec \"" + m_path;
+  if (!m_args.empty()) {
+    for (std::string_view arg : m_args) {
+      args += " ";
+      args += arg;
+    }
+    s += args;
   }
-  return "Exec" + args;
+  s += "\"";
+  return s;
 }
 
 std::string
@@ -133,7 +143,10 @@ Exec::to_ast_string(usize layer) const
 /**
  * class: ExecBuiltin
  */
-ExecBuiltin::ExecBuiltin(usize location) : Exec(location) {}
+ExecBuiltin::ExecBuiltin(usize location, std::string path,
+                         std::vector<std::string> args)
+    : Exec(location, path, args)
+{}
 
 i64
 ExecBuiltin::evaluate() const
