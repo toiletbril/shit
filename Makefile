@@ -1,4 +1,4 @@
-.PHONY: all shit test clean
+.PHONY: all shit fmt test clean
 
 all: shit test
 

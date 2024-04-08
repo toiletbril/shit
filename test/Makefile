@@ -1,3 +1,5 @@
+.PHONY: test clean test_list
+
 BIN := ../shit
 FAILED := failed.diff
 
