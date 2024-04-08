@@ -24,16 +24,20 @@
 #endif
 
 /* Cause the debugger to break on this call. */
-#define DEBUGTRAP()                                                            \
+#define DEBUGTRAP(...)                                                         \
   do {                                                                         \
     TRACELN("Encountered a debug trap");                                       \
+    if (!t__va_is_empty(__VA_ARGS__))                                          \
+      TRACELN("Details: " __VA_ARGS__);                                        \
     t__debugtrap();                                                            \
   } while (0)
 
 /* This code path is unreachable. */
-#define UNREACHABLE()                                                          \
+#define UNREACHABLE(...)                                                       \
   do {                                                                         \
     TRACELN("Reached an unreachable statement");                               \
+    if (!t__va_is_empty(__VA_ARGS__))                                          \
+      TRACELN("Details: " __VA_ARGS__);                                        \
     t__unreachable();                                                          \
   } while (0)
 
