@@ -1,6 +1,5 @@
-#include "Lexer.hpp"
-
 #include "Common.hpp"
+#include "Lexer.hpp"
 #include "Tokens.hpp"
 
 #include <cstring>
@@ -46,7 +45,6 @@ is_significant_sentinel(uchar ch)
   case '<':
   case '^':
   case '=':
-  case '.':
   case '!': return true;
   default: return false;
   };
@@ -92,6 +90,7 @@ Lexer::~Lexer() = default;
 Token *
 Lexer::peek_token()
 {
+  skip_whitespace();
   return lex_token();
 }
 
@@ -107,6 +106,7 @@ Lexer::advance_past_peek()
 Token *
 Lexer::next_token()
 {
+  skip_whitespace();
   Token *t = lex_token();
   advance_past_peek();
   return t;
@@ -140,7 +140,6 @@ Lexer::skip_whitespace()
 Token *
 Lexer::lex_token()
 {
-  skip_whitespace();
   usize token_start = m_cursor_position;
 
   if (m_cursor_position < m_source.length()) {
@@ -151,7 +150,7 @@ Lexer::lex_token()
       return lex_operator_or_sentinel(token_start);
     else if (is_string_quote(ch))
       return lex_string(token_start + 1, ch);
-    else if (is_char(ch)) /* Identifier can't start with a number. */
+    else if (is_char(ch))
       return lex_identifier(token_start);
     else {
       std::string s;
@@ -178,13 +177,6 @@ Lexer::lex_number(usize token_start)
   return num;
 }
 
-static const std::unordered_map<std::string, TokenType> keywords = {
-    {"if",   TokenType::If  },
-    {"then", TokenType::Then},
-    {"else", TokenType::Else},
-    {"fi",   TokenType::Fi  },
-};
-
 Token *
 Lexer::lex_identifier(usize token_start)
 {
@@ -202,6 +194,12 @@ Lexer::lex_identifier(usize token_start)
     lower_ident_string += std::tolower(c);
 
   Token *t;
+  static const std::unordered_map<std::string, TokenType> keywords = {
+      {"if",   TokenType::If  },
+      {"then", TokenType::Then},
+      {"else", TokenType::Else},
+      {"fi",   TokenType::Fi  },
+  };
 
   /* An identifier may be a keyword. */
   if (auto kw = keywords.find(lower_ident_string); kw != keywords.end()) {
@@ -210,7 +208,9 @@ Lexer::lex_identifier(usize token_start)
     case TokenType::Then: t = new TokenThen{token_start}; break;
     case TokenType::Else: t = new TokenElse{token_start}; break;
     case TokenType::Fi: t = new TokenFi{token_start}; break;
-    default: TRACELN("Unhandled keyword type: %d", kw->second); UNREACHABLE();
+    default: {
+      UNREACHABLE("Unhandled keyword type: %d", kw->second);
+    }
     }
   } else {
     t = new TokenIdentifier{token_start, ident_string};

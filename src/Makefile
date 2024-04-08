@@ -1,4 +1,4 @@
-.PHONY: all shit clean
+.PHONY: shit compile fmt clean
 
 include ../Common.mk
 

@@ -283,16 +283,14 @@ TokenOperator::construct_binary_expression(const Expression *lhs,
 {
   UNUSED(lhs);
   UNUSED(rhs);
-  TRACELN("Invalid binary operator construction of type %d", type());
-  UNREACHABLE();
+  UNREACHABLE("Invalid binary operator construction of type %d", type());
 }
 
 std::unique_ptr<Expression>
 TokenOperator::construct_unary_expression(const Expression *rhs) const
 {
   UNUSED(rhs);
-  TRACELN("Invalid unary operator construction of type %d", type());
-  UNREACHABLE();
+  UNREACHABLE("Invalid unary operator construction of type %d", type());
 }
 
 /**

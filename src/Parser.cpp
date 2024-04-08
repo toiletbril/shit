@@ -62,13 +62,15 @@ Parser::parse_expression(u8 min_precedence)
       /* These actually mean something. */
       case TokenType::Pipe:
       case TokenType::Greater: should_break = true; break;
-      default:;
+      case TokenType::LeftParen:
+        DEBUGTRAP("TODO");
+      default:
+        /* no need to separate anything by tokens, only by whitespace. */
+        maybe_arg.reset(m_lexer->next_identifier());
       }
       if (should_break)
         break;
 
-      /* no need to separate anything by tokens, only by whitespace. */
-      maybe_arg.reset(m_lexer->next_identifier());
       args.push_back(maybe_arg->value());
     }
 
