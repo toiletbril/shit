@@ -7,8 +7,6 @@
 #include <string>
 #include <vector>
 
-#define EXPRESSION_AST_INDENT " "
-
 struct Expression
 {
   Expression(usize location);
@@ -61,14 +59,6 @@ struct Exec : public Expression
 protected:
   std::string              m_path;
   std::vector<std::string> m_args;
-};
-
-struct ExecBuiltin : public Exec
-{
-  ExecBuiltin(usize location, std::string path, std::vector<std::string> args);
-
-  i64         evaluate() const override;
-  std::string to_string() const override;
 };
 
 struct UnaryExpression : public Expression

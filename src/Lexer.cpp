@@ -1,5 +1,6 @@
-#include "Common.hpp"
 #include "Lexer.hpp"
+
+#include "Common.hpp"
 #include "Tokens.hpp"
 
 #include <cstring>
@@ -45,6 +46,7 @@ is_significant_sentinel(uchar ch)
   case '<':
   case '^':
   case '=':
+  case '.':
   case '!': return true;
   default: return false;
   };
@@ -193,24 +195,16 @@ Lexer::lex_identifier(usize token_start)
   for (const uchar c : ident_string)
     lower_ident_string += std::tolower(c);
 
-  Token *t;
-  static const std::unordered_map<std::string, TokenType> keywords = {
-      {"if",   TokenType::If  },
-      {"then", TokenType::Then},
-      {"else", TokenType::Else},
-      {"fi",   TokenType::Fi  },
-  };
+  Token *t{};
 
   /* An identifier may be a keyword. */
-  if (auto kw = keywords.find(lower_ident_string); kw != keywords.end()) {
+  if (auto kw = KEYWORDS.find(lower_ident_string); kw != KEYWORDS.end()) {
     switch (kw->second) {
-    case TokenType::If: t = new TokenIf{token_start}; break;
-    case TokenType::Then: t = new TokenThen{token_start}; break;
-    case TokenType::Else: t = new TokenElse{token_start}; break;
-    case TokenType::Fi: t = new TokenFi{token_start}; break;
-    default: {
-      UNREACHABLE("Unhandled keyword type: %d", kw->second);
-    }
+    case Token::Kind::If: t = new TokenIf{token_start}; break;
+    case Token::Kind::Then: t = new TokenThen{token_start}; break;
+    case Token::Kind::Else: t = new TokenElse{token_start}; break;
+    case Token::Kind::Fi: t = new TokenFi{token_start}; break;
+    default: UNREACHABLE("Unhandled keyword of type %d", kw->second);
     }
   } else {
     t = new TokenIdentifier{token_start, ident_string};
@@ -252,77 +246,112 @@ Lexer::lex_operator_or_sentinel(usize token_start)
   usize token_end = token_start + 1;
   uchar ch = static_cast<uchar>(m_source[token_start]);
 
+  static const std::unordered_map<uchar, Token::Kind> operators = {
+  /* Sentinels */
+      {')', Token::Kind::RightParen     },
+      {'(', Token::Kind::LeftParen      },
+      {';', Token::Kind::Semicolon      },
+      {'.', Token::Kind::Dot            },
+
+ /* Operators */
+      {'+', Token::Kind::Plus           },
+      {'-', Token::Kind::Minus          },
+      {'*', Token::Kind::Asterisk       },
+      {'/', Token::Kind::Slash          },
+      {'%', Token::Kind::Percent        },
+      {'~', Token::Kind::Tilde          },
+      {'^', Token::Kind::Cap            },
+      {'!', Token::Kind::ExclamationMark},
+      {'&', Token::Kind::Ampersand      },
+      {'>', Token::Kind::Greater        },
+      {'<', Token::Kind::Less           },
+      {'|', Token::Kind::Pipe           },
+      {'=', Token::Kind::Equals         },
+  };
+
   Token *t{};
 
-  if (ch == '+')
-    t = new TokenPlus{token_start};
-  else if (ch == '-')
-    t = new TokenMinus{token_start};
-  else if (ch == '*')
-    t = new TokenAsterisk{token_start};
-  else if (ch == '/')
-    t = new TokenSlash{token_start};
-  else if (ch == '%')
-    t = new TokenPercent{token_start};
-  else if (ch == ')')
-    t = new TokenRightParen{token_start};
-  else if (ch == '(')
-    t = new TokenLeftParen{token_start};
-  else if (ch == ';')
-    t = new TokenSemicolon{token_start};
-  else if (ch == '~')
-    t = new TokenTilde{token_start};
-  else if (ch == '^')
-    t = new TokenCap{token_start};
-  else if (ch == '.')
-    t = new TokenDot{token_start};
-  else if (ch == '!') {
-    if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new TokenExclamationEquals{token_start};
-      token_end++;
-    } else {
-      t = new TokenExclamationMark{token_start};
-    }
-  } else if (ch == '&') {
-    if (token_end < m_source.length() && m_source[token_end] == '&') {
-      t = new TokenDoubleAmpersand{token_start};
-      token_end++;
-    } else {
-      t = new TokenAmpersand{token_start};
-    }
-  } else if (ch == '>') {
-    if (token_end < m_source.length() && m_source[token_end] == '>') {
-      t = new TokenDoubleGreater{token_start};
-      token_end++;
-    } else if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new TokenGreaterEquals{token_start};
-      token_end++;
-    } else {
-      t = new TokenGreater{token_start};
-    }
-  } else if (ch == '<') {
-    if (token_end < m_source.length() && m_source[token_end] == '<') {
-      t = new TokenDoubleLess{token_start};
-      token_end++;
-    } else if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new TokenLessEquals{token_start};
-      token_end++;
-    } else {
-      t = new TokenLess{token_start};
-    }
-  } else if (ch == '|') {
-    if (token_end < m_source.length() && m_source[token_end] == '|') {
-      t = new TokenDoublePipe{token_start};
-      token_end++;
-    } else {
-      t = new TokenPipe{token_start};
-    }
-  } else if (ch == '=') {
-    if (token_end < m_source.length() && m_source[token_end] == '=') {
-      t = new TokenDoubleEquals{token_start};
-      token_end++;
-    } else {
-      t = new TokenEquals{token_start};
+  if (auto op = operators.find(ch); op != operators.end()) {
+    switch (op->second) {
+      /* clang-format off */
+
+      /* Sentinels */
+    case Token::Kind::RightParen: t = new TokenRightParen{token_start}; break;
+    case Token::Kind::LeftParen:  t = new TokenLeftParen{token_start}; break;
+    case Token::Kind::Semicolon:  t = new TokenSemicolon{token_start}; break;
+    case Token::Kind::Dot:        t = new TokenDot{token_start}; break;
+
+      /* Operators */
+    case Token::Kind::Plus:       t = new TokenPlus{token_start}; break;
+    case Token::Kind::Minus:      t = new TokenMinus{token_start}; break;
+    case Token::Kind::Asterisk:   t = new TokenAsterisk{token_start}; break;
+    case Token::Kind::Slash:      t = new TokenSlash{token_start}; break;
+    case Token::Kind::Percent:    t = new TokenPercent{token_start}; break;
+    case Token::Kind::Tilde:      t = new TokenTilde{token_start}; break;
+    case Token::Kind::Cap:        t = new TokenCap{token_start}; break;
+      /* clang-format on */
+
+    case Token::Kind::ExclamationMark: {
+      if (token_end < m_source.length() && m_source[token_end] == '=') {
+        t = new TokenExclamationEquals{token_start};
+        token_end++;
+      } else {
+        t = new TokenExclamationMark{token_start};
+      }
+    } break;
+
+    case Token::Kind::Ampersand: {
+      if (token_end < m_source.length() && m_source[token_end] == '&') {
+        t = new TokenDoubleAmpersand{token_start};
+        token_end++;
+      } else {
+        t = new TokenAmpersand{token_start};
+      }
+    } break;
+
+    case Token::Kind::Greater: {
+      if (token_end < m_source.length() && m_source[token_end] == '>') {
+        t = new TokenDoubleGreater{token_start};
+        token_end++;
+      } else if (token_end < m_source.length() && m_source[token_end] == '=') {
+        t = new TokenGreaterEquals{token_start};
+        token_end++;
+      } else {
+        t = new TokenGreater{token_start};
+      }
+    } break;
+
+    case Token::Kind::Less: {
+      if (token_end < m_source.length() && m_source[token_end] == '<') {
+        t = new TokenDoubleLess{token_start};
+        token_end++;
+      } else if (token_end < m_source.length() && m_source[token_end] == '=') {
+        t = new TokenLessEquals{token_start};
+        token_end++;
+      } else {
+        t = new TokenLess{token_start};
+      }
+    } break;
+
+    case Token::Kind::Pipe: {
+      if (token_end < m_source.length() && m_source[token_end] == '|') {
+        t = new TokenDoublePipe{token_start};
+        token_end++;
+      } else {
+        t = new TokenPipe{token_start};
+      }
+    } break;
+
+    case Token::Kind::Equals: {
+      if (token_end < m_source.length() && m_source[token_end] == '=') {
+        t = new TokenDoubleEquals{token_start};
+        token_end++;
+      } else {
+        t = new TokenEquals{token_start};
+      }
+    } break;
+
+    default: UNREACHABLE("Unhandled operator of type %d", op->second);
     }
   } else {
     std::string s;

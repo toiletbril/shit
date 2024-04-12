@@ -24,25 +24,25 @@ Parser::parse_expression(u8 min_precedence)
   /* Handle leaf type. We expect either a value, or an unary operator. */
   switch (t->type()) {
   /* Values */
-  case TokenType::Number:
+  case Token::Kind::Number:
     lhs = std::make_unique<ConstantNumber>(t->location(),
                                            std::atoll(t->value().data()));
     break;
 
-  case TokenType::String:
+  case Token::Kind::String:
     lhs = std::make_unique<ConstantString>(t->location(), t->value());
     break;
 
-  case TokenType::Dot:
-  case TokenType::Slash:
-  case TokenType::Identifier: {
+  case Token::Kind::Dot:
+  case Token::Kind::Slash:
+  case Token::Kind::Identifier: {
     /* t's value contains a program/path to execute. Parse arguments until we
      * encounter a pipe or an redirection. */
     std::vector<std::string> args;
     std::string              program;
 
     /* Is this the path of a program? */
-    if (t->type() == TokenType::Identifier)
+    if (t->type() == Token::Kind::Identifier)
       program = t->value();
     else { /* Or it's a dot or a slash? */
       std::unique_ptr<Token> p{m_lexer->next_identifier()};
@@ -57,17 +57,21 @@ Parser::parse_expression(u8 min_precedence)
 
       switch (maybe_arg->type()) {
       /* Sentinels. */
-      case TokenType::EndOfFile:
-      case TokenType::RightParen:
+      case Token::Kind::EndOfFile:
+      case Token::Kind::RightParen: should_break = true; break;
+
       /* These actually mean something. */
-      case TokenType::Pipe:
-      case TokenType::Greater: should_break = true; break;
-      case TokenType::LeftParen:
-        DEBUGTRAP("TODO");
+      case Token::Kind::Pipe:
+      case Token::Kind::Greater:
+      case Token::Kind::LeftParen: DEBUGTRAP("TODO");
+
       default:
-        /* no need to separate anything by tokens, only by whitespace. */
+        /* There were no special operators. We are getting arguments to execute
+         * a program, so no need to separate anything by other tokens, only by
+         * whitespace. */
         maybe_arg.reset(m_lexer->next_identifier());
       }
+
       if (should_break)
         break;
 
@@ -78,7 +82,7 @@ Parser::parse_expression(u8 min_precedence)
   } break;
 
   /* Keywords */
-  case TokenType::If: {
+  case Token::Kind::If: {
     m_if_depth++;
     /* if expr[;] then [...] [else [then] ...] fi */
 
@@ -89,10 +93,10 @@ Parser::parse_expression(u8 min_precedence)
 
     /* [;] then */
     std::unique_ptr<Token> after{m_lexer->next_token()};
-    if (after->type() == TokenType::Semicolon) {
+    if (after->type() == Token::Kind::Semicolon) {
       after.reset(m_lexer->next_token());
     }
-    if (after->type() != TokenType::Then) {
+    if (after->type() != Token::Kind::Then) {
       throw ErrorWithLocation{after->location(),
                               "Expected 'Then' after the condition, found '" +
                                   after->to_ast_string() + "'"};
@@ -106,9 +110,9 @@ Parser::parse_expression(u8 min_precedence)
     after.reset(m_lexer->next_token());
 
     /* [else [then]] */
-    if (after->type() == TokenType::Else) {
+    if (after->type() == Token::Kind::Else) {
       after.reset(m_lexer->peek_token());
-      if (after->type() == TokenType::Then)
+      if (after->type() == Token::Kind::Then)
         m_lexer->advance_past_peek();
 
       m_if_condition_depth++;
@@ -119,7 +123,7 @@ Parser::parse_expression(u8 min_precedence)
     }
 
     /* fi */
-    if (after->type() != TokenType::Fi) {
+    if (after->type() != Token::Kind::Fi) {
       throw ErrorWithLocationAndDetails{
           t->location(), "Unterminated If condition", after->location(),
           "Expected 'Fi' here"};
@@ -132,7 +136,7 @@ Parser::parse_expression(u8 min_precedence)
   } break;
 
   /* Blocks */
-  case TokenType::LeftParen: {
+  case Token::Kind::LeftParen: {
     if (m_parentheses_depth >= 256) {
       throw ErrorWithLocation{t->location(),
                               "Bracket nesting level exceeded maximum of 256"};
@@ -143,7 +147,7 @@ Parser::parse_expression(u8 min_precedence)
 
     /* Do we have a corresponding closing parenthesis? */
     std::unique_ptr<Token> rp{m_lexer->next_token()};
-    if (rp->type() != TokenType::RightParen) {
+    if (rp->type() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
           t->location(), "Unterminated parenthesis", rp->location(),
           "Expected a closing parenthesis here"};
@@ -153,7 +157,7 @@ Parser::parse_expression(u8 min_precedence)
 
   /* Now it's either a unary operator or something odd */
   default:
-    if (t->flags() & TokenFlag::UnaryOperator) {
+    if (t->flags() & Token::Flag::UnaryOperator) {
       const TokenOperator *op = static_cast<const TokenOperator *>(t.get());
 
       std::unique_ptr<Expression> rhs =
@@ -177,16 +181,16 @@ Parser::parse_expression(u8 min_precedence)
 
     /* Check for tokens that terminate the parser. */
     switch (maybe_op->type()) {
-    case TokenType::EndOfFile: return lhs;
-    case TokenType::RightParen: {
+    case Token::Kind::EndOfFile: return lhs;
+    case Token::Kind::RightParen: {
       if (m_parentheses_depth == 0) {
         throw ErrorWithLocation{maybe_op->location(),
                                 "Unexpected closing parenthesis"};
       }
       return lhs;
     }
-    case TokenType::Else:
-    case TokenType::Fi: {
+    case Token::Kind::Else:
+    case Token::Kind::Fi: {
       if (m_if_depth == 0) {
         throw ErrorWithLocation{maybe_op->location(),
                                 "Unexpected '" + maybe_op->value() +
@@ -194,8 +198,8 @@ Parser::parse_expression(u8 min_precedence)
       }
       return lhs;
     }
-    case TokenType::Then:
-    case TokenType::Semicolon: {
+    case Token::Kind::Then:
+    case Token::Kind::Semicolon: {
       if (m_if_condition_depth == 0) {
         throw ErrorWithLocation{maybe_op->location(),
                                 "Unexpected '" + maybe_op->value() +
@@ -207,7 +211,7 @@ Parser::parse_expression(u8 min_precedence)
     default: break;
     }
 
-    if (!(maybe_op->flags() & TokenFlag::BinaryOperator)) {
+    if (!(maybe_op->flags() & Token::Flag::BinaryOperator)) {
       throw ErrorWithLocation{maybe_op->location(),
                               "Expected a binary operator, found '" +
                                   maybe_op->value() + "'"};

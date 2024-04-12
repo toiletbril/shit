@@ -3,7 +3,7 @@
 #include "Flags.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "Platform.hpp"
+#include "Utils.hpp"
 
 #define TL_ASSERT INSIST
 #define TOILETLINE_IMPLEMENTATION
@@ -18,15 +18,14 @@ static FlagBool flag_help{'\0', "help", "Display help message."};
 static FlagBool flag_version{'\0', "version", "Display program version."};
 static FlagBool flag_dump_ast{'A', "dump-ast",
                               "Dump AST for debugging purposes."};
+static FlagBool flag_exit_code{'e', "exit-code",
+                               "Print exit code after each expression."};
 
 static FlagString flag_command{'c', "command",
                                "Execute specified command and exit."};
 
 static std::vector<Flag *> flags = {
-    &flag_command,
-    &flag_dump_ast,
-    &flag_help,
-    &flag_version,
+    &flag_command, &flag_dump_ast, &flag_exit_code, &flag_help, &flag_version,
 };
 
 static void
@@ -111,9 +110,7 @@ main(int argc, char **argv)
   if (flag_help.enabled()) {
     show_help(program_path);
     return 1;
-  }
-
-  if (flag_version.enabled()) {
+  } else if (flag_version.enabled()) {
     show_version();
     return 0;
   }
@@ -138,9 +135,19 @@ main(int argc, char **argv)
         toiletline_initialized = true;
       }
 
+      static constexpr usize PWD_LENGTH = 24;
+
+      std::string prompt;
+      std::string pwd = shit_current_directory();
+      if (pwd.length() > PWD_LENGTH) {
+        pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
+      }
+      prompt += pwd;
+      prompt += " shit> ";
+
       char buffer[2048];
-      int  code = tl_readline(buffer, sizeof(buffer), "tl> ");
-      INSIST(!platform_we_are_child());
+      int  code = tl_readline(buffer, sizeof(buffer), prompt.c_str());
+      INSIST(!shit_process_is_child());
 
       if (code == TL_PRESSED_EOF || code == TL_PRESSED_INTERRUPT) {
         tl_exit();
@@ -188,9 +195,14 @@ main(int argc, char **argv)
     try {
       std::unique_ptr<Parser> p = std::make_unique<Parser>(new Lexer{contents});
       std::unique_ptr<Expression> ast = p->construct_ast();
+
       if (flag_dump_ast.enabled())
         std::cout << ast->to_ast_string() << std::endl;
-      std::cout << ast->evaluate() << std::endl;
+
+      i32 exit_code = ast->evaluate();
+      if (flag_exit_code.enabled())
+        std::cout << exit_code << std::endl;
+
       error_happened = false;
     } catch (ErrorWithLocationAndDetails &e) {
       show_error(e.to_string(contents));
@@ -201,7 +213,7 @@ main(int argc, char **argv)
 
     /* We can get here from child process if they didn't platform_exec()
      * properly to print error. */
-    if (should_break || platform_we_are_child())
+    if (should_break || shit_process_is_child())
       break;
   }
 

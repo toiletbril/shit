@@ -1,11 +1,16 @@
 #include "Expressions.hpp"
 
-#include "Platform.hpp"
+#include "Builtin.hpp"
+#include "Errors.hpp"
+#include "Utils.hpp"
+
+#include <cstring>
+
+static constexpr const char *EXPRESSION_AST_INDENT = " ";
 
 /**
  * class: Expression
  */
-
 Expression::Expression(usize location) : m_location(location) {}
 
 Expression::~Expression() = default;
@@ -110,8 +115,24 @@ Exec::Exec(usize location, std::string path, std::vector<std::string> args)
 i64
 Exec::evaluate() const
 {
-  i32 ret = platform_exec(location(), m_path, m_args);
-  return (ret == 0) ? 1 : ret;
+  std::optional<std::filesystem::path> program_path;
+
+  if (m_path.rfind("./") == 0)
+    program_path = m_path;
+  else if (m_path.find_last_of('/') == std::string::npos)
+    program_path = shit_search_path_env(m_path);
+
+  i32 ret = 256;
+  if (program_path)
+    ret = shit_exec(location(), program_path.value(), m_args);
+  else {
+    Builtin::Kind bk = shit_search_builtin(m_path);
+    if (bk == Builtin::Kind::Invalid)
+      throw ErrorWithLocation{m_location, "Unknown program '" + m_path + "'"};
+    ret = shit_exec_builtin(location(), bk, m_args);
+  }
+
+  return ret;
 }
 
 std::string
@@ -138,31 +159,6 @@ Exec::to_ast_string(usize layer) const
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad + "[" + to_string() + "]";
-}
-
-/**
- * class: ExecBuiltin
- */
-ExecBuiltin::ExecBuiltin(usize location, std::string path,
-                         std::vector<std::string> args)
-    : Exec(location, path, args)
-{}
-
-i64
-ExecBuiltin::evaluate() const
-{
-  return 0;
-}
-
-std::string
-ExecBuiltin::to_string() const
-{
-  std::string args;
-  for (std::string_view arg : m_args) {
-    args += " ";
-    args += arg;
-  }
-  return "ExecBuiltin" + args;
 }
 
 /**

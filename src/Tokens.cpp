@@ -28,16 +28,16 @@ Token::to_ast_string() const
  */
 TokenIf::TokenIf(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenIf::type() const
 {
-  return TokenType::If;
+  return Token::Kind::If;
 }
 
-TokenFlags
+Token::Flags
 TokenIf::flags() const
 {
-  return TokenFlag::Sentinel;
+  return Token::Flag::Sentinel;
 }
 
 std::string
@@ -51,16 +51,16 @@ TokenIf::value() const
  */
 TokenElse::TokenElse(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenElse::type() const
 {
-  return TokenType::Else;
+  return Token::Kind::Else;
 }
 
-TokenFlags
+Token::Flags
 TokenElse::flags() const
 {
-  return TokenFlag::Sentinel;
+  return Token::Flag::Sentinel;
 }
 
 std::string
@@ -74,16 +74,16 @@ TokenElse::value() const
  */
 TokenThen::TokenThen(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenThen::type() const
 {
-  return TokenType::Then;
+  return Token::Kind::Then;
 }
 
-TokenFlags
+Token::Flags
 TokenThen::flags() const
 {
-  return TokenFlag::Sentinel;
+  return Token::Flag::Sentinel;
 }
 
 std::string
@@ -97,16 +97,16 @@ TokenThen::value() const
  */
 TokenFi::TokenFi(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenFi::type() const
 {
-  return TokenType::Fi;
+  return Token::Kind::Fi;
 }
 
-TokenFlags
+Token::Flags
 TokenFi::flags() const
 {
-  return TokenFlag::Sentinel;
+  return Token::Flag::Sentinel;
 }
 
 std::string
@@ -120,16 +120,16 @@ TokenFi::value() const
  */
 TokenEndOfFile::TokenEndOfFile(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenEndOfFile::type() const
 {
-  return TokenType::EndOfFile;
+  return Token::Kind::EndOfFile;
 }
 
-TokenFlags
+Token::Flags
 TokenEndOfFile::flags() const
 {
-  return TokenFlag::Sentinel;
+  return Token::Flag::Sentinel;
 }
 
 std::string
@@ -143,16 +143,16 @@ TokenEndOfFile::value() const
  */
 TokenSemicolon::TokenSemicolon(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenSemicolon::type() const
 {
-  return TokenType::Semicolon;
+  return Token::Kind::Semicolon;
 }
 
-TokenFlags
+Token::Flags
 TokenSemicolon::flags() const
 {
-  return TokenFlag::Sentinel;
+  return Token::Flag::Sentinel;
 }
 
 std::string
@@ -166,16 +166,16 @@ TokenSemicolon::value() const
  */
 TokenDot::TokenDot(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenDot::type() const
 {
-  return TokenType::Dot;
+  return Token::Kind::Dot;
 }
 
-TokenFlags
+Token::Flags
 TokenDot::flags() const
 {
-  return TokenFlag::Sentinel;
+  return Token::Flag::Sentinel;
 }
 
 std::string
@@ -204,16 +204,16 @@ TokenNumber::TokenNumber(usize location, std::string_view sv)
     : TokenValue(location, sv)
 {}
 
-TokenType
+Token::Kind
 TokenNumber::type() const
 {
-  return TokenType::Number;
+  return Token::Kind::Number;
 }
 
-TokenFlags
+Token::Flags
 TokenNumber::flags() const
 {
-  return TokenFlag::Value;
+  return Token::Flag::Value;
 }
 
 /**
@@ -223,16 +223,16 @@ TokenString::TokenString(usize location, std::string_view sv)
     : TokenValue(location, sv)
 {}
 
-TokenType
+Token::Kind
 TokenString::type() const
 {
-  return TokenType::String;
+  return Token::Kind::String;
 }
 
-TokenFlags
+Token::Flags
 TokenString::flags() const
 {
-  return TokenFlag::Value;
+  return Token::Flag::Value;
 }
 
 /**
@@ -242,16 +242,16 @@ TokenIdentifier::TokenIdentifier(usize location, std::string_view sv)
     : TokenValue(location, sv)
 {}
 
-TokenType
+Token::Kind
 TokenIdentifier::type() const
 {
-  return TokenType::Identifier;
+  return Token::Kind::Identifier;
 }
 
-TokenFlags
+Token::Flags
 TokenIdentifier::flags() const
 {
-  return TokenFlag::Value;
+  return Token::Flag::Value;
 }
 
 /**
@@ -298,16 +298,16 @@ TokenOperator::construct_unary_expression(const Expression *rhs) const
  */
 TokenPlus::TokenPlus(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenPlus::type() const
 {
-  return TokenType::Plus;
+  return Token::Kind::Plus;
 }
 
-TokenFlags
+Token::Flags
 TokenPlus::flags() const
 {
-  return TokenFlag::BinaryOperator | TokenFlag::UnaryOperator;
+  return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;
 }
 
 std::string
@@ -346,16 +346,16 @@ TokenPlus::construct_unary_expression(const Expression *rhs) const
  */
 TokenMinus::TokenMinus(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenMinus::type() const
 {
-  return TokenType::Minus;
+  return Token::Kind::Minus;
 }
 
-TokenFlags
+Token::Flags
 TokenMinus::flags() const
 {
-  return TokenFlag::BinaryOperator | TokenFlag::UnaryOperator;
+  return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;
 }
 
 std::string
@@ -394,16 +394,16 @@ TokenMinus::construct_unary_expression(const Expression *rhs) const
  */
 TokenSlash::TokenSlash(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenSlash::type() const
 {
-  return TokenType::Slash;
+  return Token::Kind::Slash;
 }
 
-TokenFlags
+Token::Flags
 TokenSlash::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -430,16 +430,16 @@ TokenSlash::construct_binary_expression(const Expression *lhs,
  */
 TokenAsterisk::TokenAsterisk(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenAsterisk::type() const
 {
-  return TokenType::Asterisk;
+  return Token::Kind::Asterisk;
 }
 
-TokenFlags
+Token::Flags
 TokenAsterisk::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -466,16 +466,16 @@ TokenAsterisk::construct_binary_expression(const Expression *lhs,
  */
 TokenPercent::TokenPercent(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenPercent::type() const
 {
-  return TokenType::Percent;
+  return Token::Kind::Percent;
 }
 
-TokenFlags
+Token::Flags
 TokenPercent::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -502,10 +502,10 @@ TokenPercent::construct_binary_expression(const Expression *lhs,
  */
 TokenLeftParen::TokenLeftParen(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenLeftParen::type() const
 {
-  return TokenType::LeftParen;
+  return Token::Kind::LeftParen;
 }
 
 std::string
@@ -514,10 +514,10 @@ TokenLeftParen::value() const
   return "(";
 }
 
-TokenFlags
+Token::Flags
 TokenLeftParen::flags() const
 {
-  return TokenFlag::Value;
+  return Token::Flag::Value;
 }
 
 /**
@@ -525,10 +525,10 @@ TokenLeftParen::flags() const
  */
 TokenRightParen::TokenRightParen(usize location) : Token(location) {}
 
-TokenType
+Token::Kind
 TokenRightParen::type() const
 {
-  return TokenType::RightParen;
+  return Token::Kind::RightParen;
 }
 
 std::string
@@ -537,10 +537,10 @@ TokenRightParen::value() const
   return ")";
 }
 
-TokenFlags
+Token::Flags
 TokenRightParen::flags() const
 {
-  return TokenFlag::Value;
+  return Token::Flag::Value;
 }
 
 /**
@@ -550,16 +550,16 @@ TokenExclamationMark::TokenExclamationMark(usize location)
     : TokenOperator(location)
 {}
 
-TokenType
+Token::Kind
 TokenExclamationMark::type() const
 {
-  return TokenType::Tilde;
+  return Token::Kind::Tilde;
 }
 
-TokenFlags
+Token::Flags
 TokenExclamationMark::flags() const
 {
-  return TokenFlag::UnaryOperator;
+  return Token::Flag::UnaryOperator;
 }
 
 std::string
@@ -585,16 +585,16 @@ TokenExclamationMark::construct_unary_expression(const Expression *rhs) const
  */
 TokenTilde::TokenTilde(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenTilde::type() const
 {
-  return TokenType::Tilde;
+  return Token::Kind::Tilde;
 }
 
-TokenFlags
+Token::Flags
 TokenTilde::flags() const
 {
-  return TokenFlag::UnaryOperator;
+  return Token::Flag::UnaryOperator;
 }
 
 std::string
@@ -620,16 +620,16 @@ TokenTilde::construct_unary_expression(const Expression *rhs) const
  */
 TokenAmpersand::TokenAmpersand(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenAmpersand::type() const
 {
-  return TokenType::Ampersand;
+  return Token::Kind::Ampersand;
 }
 
-TokenFlags
+Token::Flags
 TokenAmpersand::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -658,16 +658,16 @@ TokenDoubleAmpersand::TokenDoubleAmpersand(usize location)
     : TokenOperator(location)
 {}
 
-TokenType
+Token::Kind
 TokenDoubleAmpersand::type() const
 {
-  return TokenType::DoubleAmpersand;
+  return Token::Kind::DoubleAmpersand;
 }
 
-TokenFlags
+Token::Flags
 TokenDoubleAmpersand::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -694,16 +694,16 @@ TokenDoubleAmpersand::construct_binary_expression(const Expression *lhs,
  */
 TokenGreater::TokenGreater(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenGreater::type() const
 {
-  return TokenType::Greater;
+  return Token::Kind::Greater;
 }
 
-TokenFlags
+Token::Flags
 TokenGreater::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -731,16 +731,16 @@ TokenGreater::construct_binary_expression(const Expression *lhs,
 TokenDoubleGreater::TokenDoubleGreater(usize location) : TokenOperator(location)
 {}
 
-TokenType
+Token::Kind
 TokenDoubleGreater::type() const
 {
-  return TokenType::DoubleGreater;
+  return Token::Kind::DoubleGreater;
 }
 
-TokenFlags
+Token::Flags
 TokenDoubleGreater::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -768,16 +768,16 @@ TokenDoubleGreater::construct_binary_expression(const Expression *lhs,
 TokenGreaterEquals::TokenGreaterEquals(usize location) : TokenOperator(location)
 {}
 
-TokenType
+Token::Kind
 TokenGreaterEquals::type() const
 {
-  return TokenType::GreaterEquals;
+  return Token::Kind::GreaterEquals;
 }
 
-TokenFlags
+Token::Flags
 TokenGreaterEquals::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -804,16 +804,16 @@ TokenGreaterEquals::construct_binary_expression(const Expression *lhs,
  */
 TokenLess::TokenLess(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenLess::type() const
 {
-  return TokenType::Less;
+  return Token::Kind::Less;
 }
 
-TokenFlags
+Token::Flags
 TokenLess::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -840,16 +840,16 @@ TokenLess::construct_binary_expression(const Expression *lhs,
  */
 TokenDoubleLess::TokenDoubleLess(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenDoubleLess::type() const
 {
-  return TokenType::DoubleLess;
+  return Token::Kind::DoubleLess;
 }
 
-TokenFlags
+Token::Flags
 TokenDoubleLess::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -876,16 +876,16 @@ TokenDoubleLess::construct_binary_expression(const Expression *lhs,
  */
 TokenLessEquals::TokenLessEquals(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenLessEquals::type() const
 {
-  return TokenType::LessEquals;
+  return Token::Kind::LessEquals;
 }
 
-TokenFlags
+Token::Flags
 TokenLessEquals::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -912,16 +912,16 @@ TokenLessEquals::construct_binary_expression(const Expression *lhs,
  */
 TokenPipe::TokenPipe(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenPipe::type() const
 {
-  return TokenType::Pipe;
+  return Token::Kind::Pipe;
 }
 
-TokenFlags
+Token::Flags
 TokenPipe::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -948,16 +948,16 @@ TokenPipe::construct_binary_expression(const Expression *lhs,
  */
 TokenDoublePipe::TokenDoublePipe(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenDoublePipe::type() const
 {
-  return TokenType::DoublePipe;
+  return Token::Kind::DoublePipe;
 }
 
-TokenFlags
+Token::Flags
 TokenDoublePipe::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -984,16 +984,16 @@ TokenDoublePipe::construct_binary_expression(const Expression *lhs,
  */
 TokenCap::TokenCap(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenCap::type() const
 {
-  return TokenType::Cap;
+  return Token::Kind::Cap;
 }
 
-TokenFlags
+Token::Flags
 TokenCap::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -1020,16 +1020,16 @@ TokenCap::construct_binary_expression(const Expression *lhs,
  */
 TokenEquals::TokenEquals(usize location) : TokenOperator(location) {}
 
-TokenType
+Token::Kind
 TokenEquals::type() const
 {
-  return TokenType::Equals;
+  return Token::Kind::Equals;
 }
 
-TokenFlags
+Token::Flags
 TokenEquals::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -1059,16 +1059,16 @@ TokenEquals::construct_binary_expression(const Expression *lhs,
 TokenDoubleEquals::TokenDoubleEquals(usize location) : TokenOperator(location)
 {}
 
-TokenType
+Token::Kind
 TokenDoubleEquals::type() const
 {
-  return TokenType::DoubleEquals;
+  return Token::Kind::DoubleEquals;
 }
 
-TokenFlags
+Token::Flags
 TokenDoubleEquals::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
@@ -1097,16 +1097,16 @@ TokenExclamationEquals::TokenExclamationEquals(usize location)
     : TokenOperator(location)
 {}
 
-TokenType
+Token::Kind
 TokenExclamationEquals::type() const
 {
-  return TokenType::DoubleEquals;
+  return Token::Kind::DoubleEquals;
 }
 
-TokenFlags
+Token::Flags
 TokenExclamationEquals::flags() const
 {
-  return TokenFlag::BinaryOperator;
+  return Token::Flag::BinaryOperator;
 }
 
 std::string
