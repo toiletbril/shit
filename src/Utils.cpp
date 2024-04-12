@@ -7,6 +7,7 @@
 #include <optional>
 
 #if defined __linux__ || defined BSD || defined __APPLE__
+#include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -45,7 +46,7 @@ shit_exec(usize location, const std::filesystem::path &path,
     throw ErrorWithLocation(location,
                             "fork() failed: " + std::string{strerror(errno)});
   } else if (pid == 0) {
-    if (execvp(path.c_str(), const_cast<char *const *>(real_args.data())) != 0)
+    if (execv(path.c_str(), const_cast<char *const *>(real_args.data())) != 0)
       throw ErrorWithLocation(location, std::string{strerror(errno)});
   } else {
     if (waitpid(pid, &status, 0) == -1) {
@@ -68,6 +69,22 @@ std::string_view
 shit_sanitize_program_name(std::string_view program_name)
 {
   return program_name;
+}
+
+std::optional<std::string>
+shit_get_current_user()
+{
+  struct passwd *pw = getpwuid(getuid());
+  if (pw != nullptr)
+    return std::string(pw->pw_name);
+  else
+    return std::nullopt;
+}
+
+std::optional<std::filesystem::path>
+shit_get_home_dir()
+{
+  return shit_get_env("HOME");
 }
 
 #elif defined _WIN32 /* __linux__ || BSD || __APPLE__ */
@@ -175,9 +192,58 @@ shit_sanitize_program_name(std::string_view program_name)
     return program_name;
   return program_name.substr(0, extension_pos);
 }
+
+std::optional<std::string>
+shit_get_current_user()
+{
+  DWORD size = 0;
+  GetUserName(NULL, &size);
+  if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+    std::vector<char> buffer{size};
+    if (GetUserName(buffer.data(), &size)) {
+      return std::string{buffer.data(), size - 1};
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path>
+shit_get_home_dir()
+{
+  return shit_get_env("USERPROFILE");
+}
+
 #endif /* _WIN32 */
 
-/* Thank got C++17 exists. */
+/* Thank god C++17 exists. */
+std::optional<std::filesystem::path>
+shit_canonicalize_path(const std::string_view &path)
+{
+  std::string expanded_path{path};
+
+  /* Expand tilde. */
+  usize pos{std::string::npos};
+  while ((pos = expanded_path.find('~')) != std::string::npos) {
+    if (expanded_path.length() < pos + 1 ||
+        expanded_path[pos + 1] != std::filesystem::path::preferred_separator)
+    {
+      break;
+    }
+    expanded_path.erase(pos, 1);
+    /* TODO: expand different users */
+    std::optional<std::string> u = shit_get_home_dir();
+    if (!u)
+      return std::nullopt;
+    expanded_path.insert(pos, u.value());
+  }
+
+  std::filesystem::path actual_path{expanded_path};
+  if (actual_path.is_relative() && expanded_path.find('/') != std::string::npos)
+    actual_path = std::filesystem::absolute(actual_path);
+
+  return actual_path.lexically_normal().make_preferred();
+}
+
 void
 shit_current_directory_set(const std::filesystem::path &path)
 {
@@ -197,7 +263,7 @@ shit_exit(i32 code)
 }
 
 std::optional<std::filesystem::path>
-shit_search_path_env(std::string_view program_name)
+shit_search_for_program(std::string_view program_name)
 {
   std::optional<std::string> maybe_path = shit_get_env("PATH");
   INSIST(maybe_path, "PATH environment variable must exist");

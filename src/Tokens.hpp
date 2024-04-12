@@ -75,7 +75,7 @@ struct Token
 
   virtual ~Token();
 
-  virtual Kind        type() const = 0;
+  virtual Kind        kind() const = 0;
   virtual Flags       flags() const = 0;
   virtual std::string value() const = 0;
 
@@ -101,7 +101,7 @@ struct TokenIf : public Token
 {
   TokenIf(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -110,7 +110,7 @@ struct TokenFi : public Token
 {
   TokenFi(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -119,7 +119,7 @@ struct TokenElse : public Token
 {
   TokenElse(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -128,7 +128,7 @@ struct TokenThen : public Token
 {
   TokenThen(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -137,7 +137,7 @@ struct TokenEndOfFile : public Token
 {
   TokenEndOfFile(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -146,7 +146,7 @@ struct TokenSemicolon : public Token
 {
   TokenSemicolon(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -155,7 +155,7 @@ struct TokenDot : public Token
 {
   TokenDot(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -164,7 +164,7 @@ struct TokenLeftParen : public Token
 {
   TokenLeftParen(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -173,7 +173,7 @@ struct TokenRightParen : public Token
 {
   TokenRightParen(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
@@ -195,7 +195,7 @@ struct TokenNumber : public TokenValue
 {
   TokenNumber(usize location, std::string_view sv);
 
-  Kind  type() const override;
+  Kind  kind() const override;
   Flags flags() const override;
 };
 
@@ -203,7 +203,7 @@ struct TokenString : public TokenValue
 {
   TokenString(usize location, std::string_view sv);
 
-  Kind  type() const override;
+  Kind  kind() const override;
   Flags flags() const override;
 };
 
@@ -211,7 +211,7 @@ struct TokenIdentifier : public TokenValue
 {
   TokenIdentifier(usize location, std::string_view sv);
 
-  Kind  type() const override;
+  Kind  kind() const override;
   Flags flags() const override;
 };
 
@@ -238,7 +238,7 @@ struct TokenPlus : public TokenOperator
 {
   TokenPlus(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -256,7 +256,7 @@ struct TokenMinus : public TokenOperator
 {
   TokenMinus(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -274,7 +274,7 @@ struct TokenSlash : public TokenOperator
 {
   TokenSlash(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -288,7 +288,7 @@ struct TokenAsterisk : public TokenOperator
 {
   TokenAsterisk(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -302,7 +302,7 @@ struct TokenPercent : public TokenOperator
 {
   TokenPercent(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -316,7 +316,7 @@ struct TokenTilde : public TokenOperator
 {
   TokenTilde(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -329,7 +329,7 @@ struct TokenExclamationMark : public TokenOperator
 {
   TokenExclamationMark(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -342,7 +342,7 @@ struct TokenAmpersand : public TokenOperator
 {
   TokenAmpersand(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -356,7 +356,7 @@ struct TokenDoubleAmpersand : public TokenOperator
 {
   TokenDoubleAmpersand(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -370,7 +370,7 @@ struct TokenGreater : public TokenOperator
 {
   TokenGreater(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -384,7 +384,7 @@ struct TokenDoubleGreater : public TokenOperator
 {
   TokenDoubleGreater(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -398,7 +398,7 @@ struct TokenGreaterEquals : public TokenOperator
 {
   TokenGreaterEquals(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -412,7 +412,7 @@ struct TokenLess : public TokenOperator
 {
   TokenLess(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -426,7 +426,7 @@ struct TokenDoubleLess : public TokenOperator
 {
   TokenDoubleLess(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -440,7 +440,7 @@ struct TokenLessEquals : public TokenOperator
 {
   TokenLessEquals(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -454,7 +454,7 @@ struct TokenPipe : public TokenOperator
 {
   TokenPipe(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -468,7 +468,7 @@ struct TokenDoublePipe : public TokenOperator
 {
   TokenDoublePipe(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -482,7 +482,7 @@ struct TokenCap : public TokenOperator
 {
   TokenCap(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -496,7 +496,7 @@ struct TokenEquals : public TokenOperator
 {
   TokenEquals(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -510,7 +510,7 @@ struct TokenDoubleEquals : public TokenOperator
 {
   TokenDoubleEquals(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 
@@ -524,7 +524,7 @@ struct TokenExclamationEquals : public TokenOperator
 {
   TokenExclamationEquals(usize location);
 
-  Kind        type() const override;
+  Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 

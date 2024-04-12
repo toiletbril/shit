@@ -15,6 +15,7 @@ Parser::construct_ast()
   return parse_expression();
 }
 
+/* TODO: refactor */
 /* A standard pratt-parser for expressions. */
 std::unique_ptr<Expression>
 Parser::parse_expression(u8 min_precedence)
@@ -22,20 +23,26 @@ Parser::parse_expression(u8 min_precedence)
   std::unique_ptr<Expression> lhs{};
   std::unique_ptr<Token>      t{m_lexer->next_token()};
 
-  /* Handle leaf type. We expect either a value, or an unary operator. */
-  switch (t->type()) {
-  /* Values */
-  case Token::Kind::Number:
-    lhs = std::make_unique<ConstantNumber>(t->location(),
-                                           std::atoll(t->value().data()));
-    break;
+  bool should_skip_leaf_type = false;
 
-  case Token::Kind::String:
-    lhs = std::make_unique<ConstantString>(t->location(), t->value());
-    break;
+  /* Try to parse a program first. */
+  switch (t->kind()) {
+  /* Tilde expands to home path. In some cases we don't want to expand it. */
+  case Token::Kind::Tilde: {
+    bool                   should_break = true;
+    std::unique_ptr<Token> n{m_lexer->peek_token()};
 
-  case Token::Kind::Dot:
-  case Token::Kind::Slash:
+    switch (n->kind()) {
+    case Token::Kind::Slash:
+    case Token::Kind::Identifier: should_break = false;
+    default:;
+    }
+
+    if (should_break) {
+      break;
+    }
+    /* fallthrough */
+  }
   case Token::Kind::Identifier: {
     /* t's value contains a program/path to execute. Parse arguments until we
      * encounter a pipe or an redirection. */
@@ -43,7 +50,7 @@ Parser::parse_expression(u8 min_precedence)
     std::string              program;
 
     /* Is this the path of a program? */
-    if (t->type() == Token::Kind::Identifier)
+    if (t->kind() == Token::Kind::Identifier)
       program = t->value();
     else { /* Or it's a dot or a slash? */
       std::unique_ptr<Token> p{m_lexer->next_identifier()};
@@ -56,7 +63,7 @@ Parser::parse_expression(u8 min_precedence)
     for (;;) {
       std::unique_ptr<Token> maybe_arg{m_lexer->peek_token()};
 
-      switch (maybe_arg->type()) {
+      switch (maybe_arg->kind()) {
       /* Sentinels. */
       case Token::Kind::EndOfFile:
       case Token::Kind::RightParen: should_break = true; break;
@@ -73,105 +80,125 @@ Parser::parse_expression(u8 min_precedence)
         maybe_arg.reset(m_lexer->next_identifier());
       }
 
-      if (should_break)
+      if (should_break) {
         break;
+      }
 
       args.push_back(maybe_arg->value());
     }
 
     lhs = std::make_unique<Exec>(t->location(), program, args);
+
+    should_skip_leaf_type = true;
   } break;
 
-  /* Keywords */
-  case Token::Kind::If: {
-    m_if_depth++;
-    /* if expr[;] then [...] [else [then] ...] fi */
+  default: break;
+  }
 
-    /* condition */
-    m_if_condition_depth++;
-    std::unique_ptr<Expression> condition = parse_expression();
-    m_if_condition_depth--;
+  /* Handle leaf type. We expect either a value, or an unary operator. */
+  if (!should_skip_leaf_type) {
+    switch (t->kind()) {
+    /* Values */
+    case Token::Kind::Number:
+      lhs = std::make_unique<ConstantNumber>(t->location(),
+                                             std::atoll(t->value().data()));
+      break;
 
-    /* [;] then */
-    std::unique_ptr<Token> after{m_lexer->next_token()};
-    if (after->type() == Token::Kind::Semicolon) {
-      after.reset(m_lexer->next_token());
-    }
-    if (after->type() != Token::Kind::Then) {
-      throw ErrorWithLocation{after->location(),
-                              "Expected 'Then' after the condition, found '" +
-                                  after->to_ast_string() + "'"};
-    }
+    case Token::Kind::String:
+      lhs = std::make_unique<ConstantString>(t->location(), t->value());
+      break;
 
-    /* expression */
-    std::unique_ptr<Expression> then;
-    then = parse_expression();
+    /* Keywords */
+    case Token::Kind::If: {
+      m_if_depth++;
+      /* if expr[;] then [...] [else [then] ...] fi */
 
-    std::unique_ptr<Expression> otherwise{};
-    after.reset(m_lexer->next_token());
-
-    /* [else [then]] */
-    if (after->type() == Token::Kind::Else) {
-      after.reset(m_lexer->peek_token());
-      if (after->type() == Token::Kind::Then)
-        m_lexer->advance_past_peek();
-
+      /* condition */
       m_if_condition_depth++;
-      otherwise = parse_expression();
+      std::unique_ptr<Expression> condition = parse_expression();
       m_if_condition_depth--;
 
+      /* [;] then */
+      std::unique_ptr<Token> after{m_lexer->next_token()};
+      if (after->kind() == Token::Kind::Semicolon) {
+        after.reset(m_lexer->next_token());
+      }
+      if (after->kind() != Token::Kind::Then) {
+        throw ErrorWithLocation{after->location(),
+                                "Expected 'Then' after the condition, found '" +
+                                    after->to_ast_string() + "'"};
+      }
+
+      /* expression */
+      std::unique_ptr<Expression> then;
+      then = parse_expression();
+
+      std::unique_ptr<Expression> otherwise{};
       after.reset(m_lexer->next_token());
+
+      /* [else [then]] */
+      if (after->kind() == Token::Kind::Else) {
+        after.reset(m_lexer->peek_token());
+        if (after->kind() == Token::Kind::Then)
+          m_lexer->advance_past_peek();
+
+        m_if_condition_depth++;
+        otherwise = parse_expression();
+        m_if_condition_depth--;
+
+        after.reset(m_lexer->next_token());
+      }
+
+      /* fi */
+      if (after->kind() != Token::Kind::Fi) {
+        throw ErrorWithLocationAndDetails{
+            t->location(), "Unterminated If condition", after->location(),
+            "Expected 'Fi' here"};
+      }
+
+      lhs = std::make_unique<If>(t->location(), condition.release(),
+                                 then.release(), otherwise.release());
+
+      m_if_depth--;
+    } break;
+
+    /* Blocks */
+    case Token::Kind::LeftParen: {
+      if (m_parentheses_depth >= SHIT_MAX_PARENTHESES_DEPTH) {
+        throw ErrorWithLocation{t->location(),
+                                "Bracket nesting level exceeded maximum of " +
+                                    std::to_string(SHIT_MAX_PARENTHESES_DEPTH)};
+      }
+      m_parentheses_depth++;
+
+      lhs = parse_expression();
+
+      /* Do we have a corresponding closing parenthesis? */
+      std::unique_ptr<Token> rp{m_lexer->next_token()};
+      if (rp->kind() != Token::Kind::RightParen) {
+        throw ErrorWithLocationAndDetails{
+            t->location(), "Unterminated parenthesis", rp->location(),
+            "Expected a closing parenthesis here"};
+      }
+      m_parentheses_depth--;
+    } break;
+
+    /* Now it's either a unary operator or something odd */
+    default:
+      if (t->flags() & Token::Flag::UnaryOperator) {
+        const TokenOperator *op = static_cast<const TokenOperator *>(t.get());
+
+        std::unique_ptr<Expression> rhs =
+            parse_expression(op->unary_precedence());
+
+        lhs = op->construct_unary_expression(rhs.release());
+      } else {
+        throw ErrorWithLocation{t->location(),
+                                "Expected a value or an expression, found '" +
+                                    t->value() + "'"};
+      }
+      break;
     }
-
-    /* fi */
-    if (after->type() != Token::Kind::Fi) {
-      throw ErrorWithLocationAndDetails{
-          t->location(), "Unterminated If condition", after->location(),
-          "Expected 'Fi' here"};
-    }
-
-    lhs = std::make_unique<If>(t->location(), condition.release(),
-                               then.release(), otherwise.release());
-
-    m_if_depth--;
-  } break;
-
-  /* Blocks */
-  case Token::Kind::LeftParen: {
-    if (m_parentheses_depth >= SHIT_MAX_PARENTHESES_DEPTH) {
-      throw ErrorWithLocation{t->location(),
-                              "Bracket nesting level exceeded maximum of " +
-                                  std::to_string(SHIT_MAX_PARENTHESES_DEPTH)};
-    }
-    m_parentheses_depth++;
-
-    lhs = parse_expression();
-
-    /* Do we have a corresponding closing parenthesis? */
-    std::unique_ptr<Token> rp{m_lexer->next_token()};
-    if (rp->type() != Token::Kind::RightParen) {
-      throw ErrorWithLocationAndDetails{
-          t->location(), "Unterminated parenthesis", rp->location(),
-          "Expected a closing parenthesis here"};
-    }
-    m_parentheses_depth--;
-  } break;
-
-  /* Now it's either a unary operator or something odd */
-  default:
-    if (t->flags() & Token::Flag::UnaryOperator) {
-      const TokenOperator *op = static_cast<const TokenOperator *>(t.get());
-
-      std::unique_ptr<Expression> rhs =
-          parse_expression(op->unary_precedence());
-
-      lhs = op->construct_unary_expression(rhs.release());
-    } else {
-      throw ErrorWithLocation{t->location(),
-                              "Expected a value or an expression, found '" +
-                                  t->value() + "'"};
-    }
-    break;
   }
 
   /* Next goes the precedence parsing. Need to find an operator and decide
@@ -182,7 +209,7 @@ Parser::parse_expression(u8 min_precedence)
     std::unique_ptr<Token> maybe_op{m_lexer->peek_token()};
 
     /* Check for tokens that terminate the parser. */
-    switch (maybe_op->type()) {
+    switch (maybe_op->kind()) {
     case Token::Kind::EndOfFile: return lhs;
     case Token::Kind::RightParen: {
       if (m_parentheses_depth == 0) {

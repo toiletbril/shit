@@ -115,22 +115,26 @@ Exec::Exec(usize location, std::string path, std::vector<std::string> args)
 i64
 Exec::evaluate() const
 {
-  std::optional<std::filesystem::path> program_path = m_path;
+  std::optional<std::filesystem::path> program_path;
 
-  if (m_path.rfind("./") == 0)
-    program_path = m_path;
-  else if (m_path.find_last_of('/') == std::string::npos)
-    program_path = shit_search_path_env(m_path);
-
-  i32 ret = 256;
-  if (program_path)
-    ret = shit_exec(location(), program_path.value(), m_args);
-  else {
+  /* This isn't a path? */
+  if (m_path.find('/') == std::string::npos) {
+    /* Is this a builtin? */
     Builtin::Kind bk = shit_search_builtin(m_path);
-    if (bk == Builtin::Kind::Invalid)
-      throw ErrorWithLocation{m_location, "Unknown program '" + m_path + "'"};
-    ret = shit_exec_builtin(location(), bk, m_args);
+    if (bk != Builtin::Kind::Invalid) {
+      return shit_exec_builtin(location(), bk, m_args);
+    }
+    /* Not a builtin, try to search PATH. */
+    program_path = shit_search_for_program(m_path);
+  } else {
+    /* This is a path. */
+    program_path = shit_canonicalize_path(m_path);
   }
+
+  if (!program_path)
+    throw ErrorWithLocation{location(), "Command not found"};
+
+  i32 ret = shit_exec(location(), program_path.value(), m_args);
 
   return ret;
 }
