@@ -115,7 +115,7 @@ Exec::Exec(usize location, std::string path, std::vector<std::string> args)
 i64
 Exec::evaluate() const
 {
-  std::optional<std::filesystem::path> program_path;
+  std::optional<std::filesystem::path> program_path = m_path;
 
   if (m_path.rfind("./") == 0)
     program_path = m_path;

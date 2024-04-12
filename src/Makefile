@@ -9,7 +9,11 @@ SOURCE_FILES := $(addsuffix .cpp, $(MODULES))
 HEADER_FILES := $(addsuffix .hpp, $(HEADERS))
 OBJECTS := $(addprefix o/, $(addsuffix .o, $(MODULES)))
 
+ifeq ($(OS), Windows_NT)
+OUT := ../shit.exe
+else
 OUT := ../shit
+endif
 
 shit:
 	mkdir -p ./o
@@ -27,3 +31,6 @@ fmt:
 
 clean:
 	rm -rf ./o $(OUT)
+ifeq ($(OS), Windows_NT)
+	rm -rf ../*.ilk ../*.pdb ../*.lib
+endif

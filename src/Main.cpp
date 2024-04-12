@@ -138,7 +138,7 @@ main(int argc, char **argv)
       static constexpr usize PWD_LENGTH = 24;
 
       std::string prompt;
-      std::string pwd = shit_current_directory();
+      std::string pwd = shit_current_directory().string();
       if (pwd.length() > PWD_LENGTH) {
         pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
       }

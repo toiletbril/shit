@@ -2,6 +2,17 @@
 *.o
 *.diff
 
+*.exp
+*.ilk
+*.pdb
+*.lib
+
+*.swp
+
+.vs
+.vscode
+CppProperties.json
+
 src/o
 test/failed.diff
 

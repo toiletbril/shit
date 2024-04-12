@@ -1,6 +1,12 @@
 .PHONY: test clean test_list
 
+ifeq ($(OS), Windows_NT)
+BIN := ../shit.exe
+else
 BIN := ../shit
+endif
+
+
 FAILED := failed.diff
 
 %: expected/%.out

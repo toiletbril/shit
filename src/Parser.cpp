@@ -2,6 +2,7 @@
 
 #include "Expressions.hpp"
 #include "Tokens.hpp"
+#include "Utils.hpp"
 
 #include <optional>
 
@@ -137,9 +138,10 @@ Parser::parse_expression(u8 min_precedence)
 
   /* Blocks */
   case Token::Kind::LeftParen: {
-    if (m_parentheses_depth >= 256) {
+    if (m_parentheses_depth >= SHIT_MAX_PARENTHESES_DEPTH) {
       throw ErrorWithLocation{t->location(),
-                              "Bracket nesting level exceeded maximum of 256"};
+                              "Bracket nesting level exceeded maximum of " +
+                                  std::to_string(SHIT_MAX_PARENTHESES_DEPTH)};
     }
     m_parentheses_depth++;
 
