@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace shit {
+
 struct Expression
 {
   Expression(usize location);
@@ -286,3 +288,5 @@ struct NotEqual : public BinaryExpression
   std::string to_string() const override;
   i64         evaluate() const override;
 };
+
+} /* namespace shit */

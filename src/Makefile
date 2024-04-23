@@ -1,9 +1,7 @@
 .PHONY: shit compile fmt clean
 
-include ../Common.mk
-
-MODULES := Main Errors Builtin Flags Expressions Utils Lexer Parser Tokens
-HEADERS := Errors Builtin Flags Expressions Utils Lexer Parser Tokens Debug Common
+MODULES := Main Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens
+HEADERS := Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens Debug Common
 
 SOURCE_FILES := $(addsuffix .cpp, $(MODULES))
 HEADER_FILES := $(addsuffix .hpp, $(HEADERS))
@@ -14,6 +12,24 @@ OUT := ../shit.exe
 else
 OUT := ../shit
 endif
+
+ifeq ($(OS),Windows_NT)
+CXX := clang++
+endif
+
+# RELEASE=1 make
+ifeq ($(RELEASE), 1)
+CXXFLAGS := -g -O2 -std=c++17
+else
+ifneq ($(OS), Windows_NT)
+	CXXFLAGS += -fsanitize=address
+endif
+CXXFLAGS := -g3 -O0 -std=c++17
+endif
+
+o/%.o : %.cpp
+	@echo "\tCXX $< \t-o $(CWD)$@"
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 shit:
 	mkdir -p ./o
@@ -26,7 +42,8 @@ compile: $(OBJECTS)
 CLANG_FORMAT ?= clang-format
 
 fmt:
-	@echo "CLANG_FORMAT -i $(SOURCE_FILES) $(HEADER_FILES)"
+	@echo "\tCLANG_FORMAT -i $(SOURCE_FILES)"
+	@echo "\tCLANG_FORMAT -i $(HEADER_FILES)"
 	$(CLANG_FORMAT) -i $(SOURCE_FILES) $(HEADER_FILES)
 
 clean:

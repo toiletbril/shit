@@ -1,14 +1,14 @@
 #include "Lexer.hpp"
 
 #include "Common.hpp"
+#include "Errors.hpp"
 #include "Tokens.hpp"
 
-#include <cstring>
-#include <memory>
 #include <string>
-#include <string_view>
 
-static FORCEINLINE bool
+namespace shit {
+
+static SHIT_FORCEINLINE bool
 is_whitespace(uchar ch)
 {
   switch (ch) {
@@ -21,14 +21,14 @@ is_whitespace(uchar ch)
   }
 }
 
-static FORCEINLINE bool
+static SHIT_FORCEINLINE bool
 is_number(uchar ch)
 {
   return ch >= '0' && ch <= '9';
 }
 
-static FORCEINLINE bool
-is_significant_sentinel(uchar ch)
+static SHIT_FORCEINLINE bool
+is_expression_sentinel(uchar ch)
 {
   switch (ch) {
   case '+':
@@ -52,7 +52,24 @@ is_significant_sentinel(uchar ch)
   };
 }
 
-static FORCEINLINE bool
+static SHIT_FORCEINLINE bool
+is_shell_sentinel(uchar ch)
+{
+  switch (ch) {
+  case '|':
+  case ';':
+  case '>': return true;
+  default: return false;
+  };
+}
+
+static SHIT_FORCEINLINE bool
+is_part_of_identifier(uchar ch)
+{
+  return !is_shell_sentinel(ch) && !is_whitespace(ch);
+}
+
+static SHIT_FORCEINLINE bool
 is_string_quote(uchar ch)
 {
   switch (ch) {
@@ -63,26 +80,10 @@ is_string_quote(uchar ch)
   }
 }
 
-static FORCEINLINE bool
-is_char(uchar ch)
+static SHIT_FORCEINLINE bool
+is_ascii_char(uchar ch)
 {
   return (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122);
-}
-
-static FORCEINLINE bool
-is_identifier_char(uchar ch)
-{
-  if (is_char(ch) || is_number(ch))
-    return true;
-  switch (ch) {
-  case '/':
-  case '.':
-  case '~':
-  case '-':
-  case '+':
-  case '_': return true;
-  default: return false;
-  }
 }
 
 Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
@@ -90,14 +91,21 @@ Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
 Lexer::~Lexer() = default;
 
 Token *
-Lexer::peek_token()
+Lexer::peek_expression_token()
 {
   skip_whitespace();
-  return lex_token();
+  return lex_expression_token();
+}
+
+Token *
+Lexer::peek_shell_token()
+{
+  skip_whitespace();
+  return lex_shell_token();
 }
 
 usize
-Lexer::advance_past_peek()
+Lexer::advance_past_last_peek()
 {
   usize r = m_cached_offset;
   m_cursor_position += r;
@@ -106,20 +114,20 @@ Lexer::advance_past_peek()
 }
 
 Token *
-Lexer::next_token()
+Lexer::next_expression_token()
 {
   skip_whitespace();
-  Token *t = lex_token();
-  advance_past_peek();
+  Token *t = lex_expression_token();
+  advance_past_last_peek();
   return t;
 }
 
 Token *
-Lexer::next_identifier()
+Lexer::next_shell_token()
 {
   skip_whitespace();
-  Token *t = lex_identifier(m_cursor_position);
-  advance_past_peek();
+  Token *t = lex_shell_token();
+  advance_past_last_peek();
   return t;
 }
 
@@ -140,20 +148,20 @@ Lexer::skip_whitespace()
 }
 
 Token *
-Lexer::lex_token()
+Lexer::lex_expression_token()
 {
   usize token_start = m_cursor_position;
 
   if (m_cursor_position < m_source.length()) {
     uchar ch = m_source[m_cursor_position];
     if (is_number(ch))
-      return lex_number(token_start);
-    else if (is_significant_sentinel(ch))
-      return lex_operator_or_sentinel(token_start);
+      return chop_number(token_start);
+    else if (is_expression_sentinel(ch))
+      return chop_expression_sentinel(token_start);
     else if (is_string_quote(ch))
-      return lex_string(token_start + 1, ch);
-    else if (is_char(ch))
-      return lex_identifier(token_start);
+      return chop_string(token_start + 1, ch);
+    else if (is_ascii_char(ch))
+      return chop_identifier(token_start);
     else {
       std::string s;
       s += "Unexpected character";
@@ -165,7 +173,7 @@ Lexer::lex_token()
 }
 
 Token *
-Lexer::lex_number(usize token_start)
+Lexer::chop_number(usize token_start)
 {
   usize token_end = token_start;
 
@@ -180,12 +188,12 @@ Lexer::lex_number(usize token_start)
 }
 
 Token *
-Lexer::lex_identifier(usize token_start)
+Lexer::chop_identifier(usize token_start)
 {
   usize token_end = token_start;
 
   while (token_end < m_source.length() &&
-         is_identifier_char(m_source[token_end]))
+         is_part_of_identifier(m_source[token_end]))
     token_end++;
 
   std::string ident_string =
@@ -204,7 +212,7 @@ Lexer::lex_identifier(usize token_start)
     case Token::Kind::Then: t = new TokenThen{token_start}; break;
     case Token::Kind::Else: t = new TokenElse{token_start}; break;
     case Token::Kind::Fi: t = new TokenFi{token_start}; break;
-    default: UNREACHABLE("Unhandled keyword of type %d", kw->second);
+    default: SHIT_UNREACHABLE("Unhandled keyword of type %d", kw->second);
     }
   } else {
     t = new TokenIdentifier{token_start, ident_string};
@@ -216,13 +224,36 @@ Lexer::lex_identifier(usize token_start)
 }
 
 Token *
-Lexer::lex_identifier_until_whitespace(usize token_start)
+Lexer::lex_shell_token()
 {
-  return lex_identifier(token_start);
+  usize token_start = m_cursor_position;
+  uchar ch = m_source[m_cursor_position];
+
+  if (m_cursor_position < m_source.length()) {
+    if (is_string_quote(ch))
+      return chop_string(token_start + 1, ch);
+    else if (is_shell_sentinel(ch))
+      return chop_shell_sentinel(ch);
+    else if (is_part_of_identifier(ch))
+      return chop_identifier(token_start);
+    else {
+      std::string s;
+      s += "Unexpected character";
+      throw ErrorWithLocation{token_start, s};
+    }
+  }
+
+  return new TokenEndOfFile{token_start};
 }
 
 Token *
-Lexer::lex_string(usize token_start, uchar quote_char)
+Lexer::chop_shell_sentinel(usize token_start)
+{
+  throw ErrorWithLocation{token_start, "Not implemented"};
+}
+
+Token *
+Lexer::chop_string(usize token_start, uchar quote_char)
 {
   usize token_end = token_start;
 
@@ -233,55 +264,52 @@ Lexer::lex_string(usize token_start, uchar quote_char)
     }
   }
 
-  Token *str = new TokenString{
+  TokenString *str = new TokenString{
       token_start, m_source.substr(token_start, token_end - token_start)};
   m_cached_offset = token_end - m_cursor_position + 1;
 
   return str;
 }
 
+static const std::unordered_map<uchar, Token::Kind> OPERATORS = {
+  /* Sentinels */
+    {')', Token::Kind::RightParen     },
+    {'(', Token::Kind::LeftParen      },
+    {';', Token::Kind::Semicolon      },
+    {'.', Token::Kind::Dot            },
+
+ /* Operators */
+    {'+', Token::Kind::Plus           },
+    {'-', Token::Kind::Minus          },
+    {'*', Token::Kind::Asterisk       },
+    {'/', Token::Kind::Slash          },
+    {'%', Token::Kind::Percent        },
+    {'~', Token::Kind::Tilde          },
+    {'^', Token::Kind::Cap            },
+    {'!', Token::Kind::ExclamationMark},
+    {'&', Token::Kind::Ampersand      },
+    {'>', Token::Kind::Greater        },
+    {'<', Token::Kind::Less           },
+    {'|', Token::Kind::Pipe           },
+    {'=', Token::Kind::Equals         },
+};
+
 Token *
-Lexer::lex_operator_or_sentinel(usize token_start)
+Lexer::chop_expression_sentinel(usize token_start)
 {
   usize token_end = token_start + 1;
   uchar ch = static_cast<uchar>(m_source[token_start]);
 
-  static const std::unordered_map<uchar, Token::Kind> operators = {
-  /* Sentinels */
-      {')', Token::Kind::RightParen     },
-      {'(', Token::Kind::LeftParen      },
-      {';', Token::Kind::Semicolon      },
-      {'.', Token::Kind::Dot            },
-
- /* Operators */
-      {'+', Token::Kind::Plus           },
-      {'-', Token::Kind::Minus          },
-      {'*', Token::Kind::Asterisk       },
-      {'/', Token::Kind::Slash          },
-      {'%', Token::Kind::Percent        },
-      {'~', Token::Kind::Tilde          },
-      {'^', Token::Kind::Cap            },
-      {'!', Token::Kind::ExclamationMark},
-      {'&', Token::Kind::Ampersand      },
-      {'>', Token::Kind::Greater        },
-      {'<', Token::Kind::Less           },
-      {'|', Token::Kind::Pipe           },
-      {'=', Token::Kind::Equals         },
-  };
-
   Token *t{};
 
-  if (auto op = operators.find(ch); op != operators.end()) {
+  if (auto op = OPERATORS.find(ch); op != OPERATORS.end()) {
     switch (op->second) {
       /* clang-format off */
-
-      /* Sentinels */
     case Token::Kind::RightParen: t = new TokenRightParen{token_start}; break;
     case Token::Kind::LeftParen:  t = new TokenLeftParen{token_start}; break;
     case Token::Kind::Semicolon:  t = new TokenSemicolon{token_start}; break;
     case Token::Kind::Dot:        t = new TokenDot{token_start}; break;
 
-      /* Operators */
     case Token::Kind::Plus:       t = new TokenPlus{token_start}; break;
     case Token::Kind::Minus:      t = new TokenMinus{token_start}; break;
     case Token::Kind::Asterisk:   t = new TokenAsterisk{token_start}; break;
@@ -351,7 +379,7 @@ Lexer::lex_operator_or_sentinel(usize token_start)
       }
     } break;
 
-    default: UNREACHABLE("Unhandled operator of type %d", op->second);
+    default: SHIT_UNREACHABLE("Unhandled operator of type %d", op->second);
     }
   } else {
     std::string s;
@@ -365,3 +393,5 @@ Lexer::lex_operator_or_sentinel(usize token_start)
 
   return t;
 }
+
+} /* namespace shit */

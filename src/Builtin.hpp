@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace shit {
+
 struct Builtin
 {
   enum class Kind
@@ -17,14 +19,12 @@ struct Builtin
   };
 
   virtual Kind kind() const = 0;
-  virtual i32  execute() const = 0;
-  usize        location() const;
+  virtual i32  execute(const std::vector<std::string> &args) const = 0;
+
+  virtual ~Builtin() = default;
 
 protected:
-  Builtin(usize location, std::vector<std::string> args);
-
-  usize                    m_location;
-  std::vector<std::string> m_args;
+  Builtin();
 };
 
 const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
@@ -35,29 +35,30 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
 
 struct Echo : public Builtin
 {
-  Echo(usize location, std::vector<std::string> args);
+  Echo();
 
   Kind kind() const override;
-  i32  execute() const override;
+  i32  execute(const std::vector<std::string> &args) const override;
 };
 
 struct Cd : public Builtin
 {
-  Cd(usize location, std::vector<std::string> args);
+  Cd();
 
   Kind kind() const override;
-  i32  execute() const override;
+  i32  execute(const std::vector<std::string> &args) const override;
 };
 
 struct Exit : public Builtin
 {
-  Exit(usize location, std::vector<std::string> args);
+  Exit();
 
-  Kind kind() const override;
-  i32  execute() const override;
+  Kind             kind() const override;
+  [[noreturn]] i32 execute(const std::vector<std::string> &args) const override;
 };
 
-Builtin::Kind shit_search_builtin(std::string_view builtin_name);
+Builtin::Kind search_builtin(std::string_view builtin_name);
 
-i32 shit_exec_builtin(usize location, Builtin::Kind kind,
-                      const std::vector<std::string> &args);
+i32 execute_builtin(Builtin::Kind kind, const std::vector<std::string> &args);
+
+} /* namespace shit */

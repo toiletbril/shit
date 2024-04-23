@@ -1,10 +1,13 @@
 #include "Expressions.hpp"
 
 #include "Builtin.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Utils.hpp"
 
 #include <cstring>
+
+namespace shit {
 
 static constexpr const char *EXPRESSION_AST_INDENT = " ";
 
@@ -98,7 +101,7 @@ DummyExpression::to_string() const
 std::string
 DummyExpression::to_ast_string(usize layer) const
 {
-  UNUSED(layer);
+  SHIT_UNUSED(layer);
   std::string pad;
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
@@ -120,21 +123,30 @@ Exec::evaluate() const
   /* This isn't a path? */
   if (m_path.find('/') == std::string::npos) {
     /* Is this a builtin? */
-    Builtin::Kind bk = shit_search_builtin(m_path);
+    Builtin::Kind bk = search_builtin(m_path);
     if (bk != Builtin::Kind::Invalid) {
-      return shit_exec_builtin(location(), bk, m_args);
+      try {
+        return execute_builtin(bk, m_args);
+      } catch (Error &err) {
+        throw ErrorWithLocation{location(), err.message()};
+      }
     }
     /* Not a builtin, try to search PATH. */
-    program_path = shit_search_for_program(m_path);
+    program_path = utils::search_program_path(m_path);
   } else {
     /* This is a path. */
-    program_path = shit_canonicalize_path(m_path);
+    program_path = utils::canonicalize_path(m_path);
   }
 
   if (!program_path)
     throw ErrorWithLocation{location(), "Command not found"};
 
-  i32 ret = shit_exec(location(), program_path.value(), m_args);
+  i32 ret = 256;
+  try {
+    ret = utils::execute_program_by_path(program_path.value(), m_args);
+  } catch (Error &err) {
+    throw ErrorWithLocation{location(), err.message()};
+  }
 
   return ret;
 }
@@ -158,7 +170,7 @@ Exec::to_string() const
 std::string
 Exec::to_ast_string(usize layer) const
 {
-  UNUSED(layer);
+  SHIT_UNUSED(layer);
   std::string pad;
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
@@ -705,3 +717,5 @@ NotEqual::evaluate() const
 {
   return m_lhs->evaluate() != m_rhs->evaluate();
 }
+
+} /* namespace shit */

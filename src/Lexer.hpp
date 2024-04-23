@@ -9,15 +9,18 @@
 #include <string>
 #include <string_view>
 
+namespace shit {
+
 struct Lexer
 {
   Lexer(std::string source);
   ~Lexer();
 
-  [[nodiscard]] Token *peek_token();
-  usize                advance_past_peek();
-  [[nodiscard]] Token *next_token();
-  [[nodiscard]] Token *next_identifier();
+  [[nodiscard]] Token *peek_expression_token();
+  [[nodiscard]] Token *peek_shell_token();
+  usize                advance_past_last_peek();
+  [[nodiscard]] Token *next_expression_token();
+  [[nodiscard]] Token *next_shell_token();
   std::string_view     source() const;
 
 protected:
@@ -27,10 +30,14 @@ protected:
 
   void skip_whitespace();
 
-  Token *lex_token();
-  Token *lex_number(usize token_start);
-  Token *lex_identifier(usize token_start);
-  Token *lex_identifier_until_whitespace(usize token_start);
-  Token *lex_string(usize token_start, uchar quote_char);
-  Token *lex_operator_or_sentinel(usize token_start);
+  Token *lex_expression_token();
+  Token *lex_shell_token();
+
+  Token *chop_number(usize token_start);
+  Token *chop_identifier(usize token_start);
+  Token *chop_string(usize token_start, uchar quote_char);
+  Token *chop_expression_sentinel(usize token_start);
+  Token *chop_shell_sentinel(usize token_start);
 };
+
+} /* namespace shit */

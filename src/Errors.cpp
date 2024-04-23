@@ -2,11 +2,13 @@
 
 #include <tuple>
 
+namespace shit {
+
 static std::tuple<usize, usize>
 calc_precise_position(std::string_view source, usize location)
 {
-  INSIST(location <= source.length(), "location: %zu, length: %zu", location,
-         source.length());
+  SHIT_ASSERT(location <= source.length(), "location: %zu, length: %zu",
+              location, source.length());
 
   usize line_number = 0;
   usize last_newline_location = 0;
@@ -43,12 +45,12 @@ get_context_pointing_to(std::string_view source, usize location,
   if (source[location - start_offset] == '\n')
     start_offset--;
 
-  INSIST(location + size <= source.length(), "end: %zu, length: %zu",
-         location + size, source.length());
-  INSIST(location - start_offset >= 0);
-  INSIST(location - start_offset <= location + size,
-         "location: %zu, start: %zu, size: %zu, ", location, start_offset,
-         size);
+  SHIT_ASSERT(location + size <= source.length(), "end: %zu, length: %zu",
+              location + size, source.length());
+  SHIT_ASSERT(location - start_offset >= 0);
+  SHIT_ASSERT(location - start_offset <= location + size,
+              "location: %zu, start: %zu, size: %zu, ", location, start_offset,
+              size);
 
   usize line_number_length = 0;
   usize line_number_copy = line_number + 1;
@@ -78,7 +80,7 @@ get_context_pointing_to(std::string_view source, usize location,
       source.substr(location - start_offset, start_offset + size);
   /* we don't need accidental newlines in the middle of the context.
    * *pulls hair out* */
-  INSIST(context.find('\n') == std::string::npos, "'%s'", context.data());
+  SHIT_ASSERT(context.find('\n') == std::string::npos, "'%s'", context.data());
   msg += context;
 
   /* did we cut the end? */
@@ -108,10 +110,15 @@ ErrorBase::~ErrorBase() = default;
 
 ErrorBase::operator bool &() { return m_is_active; }
 
+std::string
+ErrorBase::message() const
+{
+  return m_message;
+}
+
 /**
  * class: Error
  */
-
 Error::Error() : ErrorBase() {}
 
 Error::Error(std::string message) : ErrorBase(message) {}
@@ -119,7 +126,7 @@ Error::Error(std::string message) : ErrorBase(message) {}
 std::string
 Error::to_string()
 {
-  return m_message;
+  return "Error: " + message();
 }
 
 /**
@@ -181,3 +188,5 @@ ErrorWithLocationAndDetails::details_to_string(std::string_view source)
                               details_last_newline_location, m_details_message);
   return m_message;
 }
+
+} /* namespace shit */

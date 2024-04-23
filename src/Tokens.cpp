@@ -2,6 +2,8 @@
 
 #include "Debug.hpp"
 
+namespace shit {
+
 /* Implementations for specific token types */
 
 /**
@@ -281,16 +283,16 @@ std::unique_ptr<Expression>
 TokenOperator::construct_binary_expression(const Expression *lhs,
                                            const Expression *rhs) const
 {
-  UNUSED(lhs);
-  UNUSED(rhs);
-  UNREACHABLE("Invalid binary operator construction of type %d", kind());
+  SHIT_UNUSED(lhs);
+  SHIT_UNUSED(rhs);
+  SHIT_UNREACHABLE("Invalid binary operator construction of type %d", kind());
 }
 
 std::unique_ptr<Expression>
 TokenOperator::construct_unary_expression(const Expression *rhs) const
 {
-  UNUSED(rhs);
-  UNREACHABLE("Invalid unary operator construction of type %d", kind());
+  SHIT_UNUSED(rhs);
+  SHIT_UNREACHABLE("Invalid unary operator construction of type %d", kind());
 }
 
 /**
@@ -1048,9 +1050,9 @@ std::unique_ptr<Expression>
 TokenEquals::construct_binary_expression(const Expression *lhs,
                                          const Expression *rhs) const
 {
-  UNUSED(lhs);
-  UNUSED(rhs);
-  INSIST(false, "todo");
+  SHIT_UNUSED(lhs);
+  SHIT_UNUSED(rhs);
+  SHIT_ASSERT(false, "todo");
 }
 
 /**
@@ -1127,3 +1129,5 @@ TokenExclamationEquals::construct_binary_expression(const Expression *lhs,
 {
   return std::make_unique<NotEqual>(location(), lhs, rhs);
 }
+
+} /* namespace shit */

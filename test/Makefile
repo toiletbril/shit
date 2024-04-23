@@ -6,7 +6,6 @@ else
 BIN := ../shit
 endif
 
-
 FAILED := failed.diff
 
 %: expected/%.out

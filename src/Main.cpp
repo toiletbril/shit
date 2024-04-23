@@ -1,95 +1,25 @@
+#include "Cli.hpp"
 #include "Common.hpp"
 #include "Expressions.hpp"
-#include "Flags.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Toiletline.hpp"
 #include "Utils.hpp"
-
-#define TL_ASSERT INSIST
-#define TOILETLINE_IMPLEMENTATION
-#include "toiletline/toiletline.h"
 
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <type_traits>
 
-static FlagBool flag_help{'\0', "help", "Display help message."};
-static FlagBool flag_version{'\0', "version", "Display program version."};
-static FlagBool flag_dump_ast{'A', "dump-ast",
-                              "Dump AST for debugging purposes."};
-static FlagBool flag_exit_code{'e', "exit-code",
-                               "Print exit code after each expression."};
+static std::vector<shit::Flag *> FLAG_LIST{};
 
-static FlagString flag_command{'c', "command",
-                               "Execute specified command and exit."};
+#define FLAG(...) ADD_FLAG(FLAG_LIST, __VA_ARGS__)
 
-static std::vector<Flag *> flags = {
-    &flag_command, &flag_dump_ast, &flag_exit_code, &flag_help, &flag_version,
-};
-
-static void
-show_version()
-{
-  std::cout
-      << "Shit " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
-      << SHIT_VER_PATCH << "\n"
-      << "(c) toiletbril <https://github.com/toiletbril>\n\n"
-         "License GPLv3: GNU GPL version 3.\n"
-         "This is free software: you are free to change and redistribute it.\n"
-         "There is NO WARRANTY, to the extent permitted by law."
-      << std::endl;
-}
-
-static void
-show_help(std::string_view program_name)
-{
-  std::string s;
-
-  s += "Usage:\n";
-  s += "  ";
-  s += program_name;
-  s += " [-options]";
-  s += " [file1, ...]\n";
-  s += "  ";
-  s += "Command-line interpreter or shell.";
-  s += "\n\n";
-
-  s += "Options:";
-  for (const Flag *f : flags) {
-    s += "\n";
-    bool has_short = false;
-    bool long_is_string = false;
-    if (f->short_name() != '\0') {
-      s += "  -";
-      s += f->short_name();
-      has_short = true;
-    }
-    if (!f->long_name().empty()) {
-      if (has_short)
-        s += ", ";
-      else
-        s += "      ";
-      s += "--";
-      s += f->long_name();
-      if (f->type() == FlagType::String) {
-        s += "=<...>";
-        long_is_string = true;
-      }
-    }
-    usize padding = 24 - f->long_name().length() - (long_is_string ? 6 : 0);
-    for (usize i = 0; i < padding; i++)
-      s += ' ';
-    s += f->description();
-  }
-  std::cout << s << std::endl;
-}
-
-static void
-show_error(std::string_view err)
-{
-  std::cout << "shit: " << err << std::endl;
-}
+FLAG(HELP, Bool, '\0', "help", "Display help message.");
+FLAG(VERSION, Bool, '\0', "version", "Display program version.");
+FLAG(DUMP_AST, Bool, 'A', "dump-ast", "Dump AST for debugging purposes.");
+FLAG(EXIT_CODE, Bool, 'e', "exit-code", "Print exit code after each command.");
+FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 
 int
 main(int argc, char **argv)
@@ -97,125 +27,154 @@ main(int argc, char **argv)
   std::vector<std::string> file_names;
 
   try {
-    file_names = flag_parse(flags, argc, argv);
-  } catch (Error &e) {
-    show_error(e.to_string());
-    return 1;
+    file_names = shit::parse_flags(FLAG_LIST, argc, argv);
+  } catch (shit::Error &e) {
+    shit::show_error(e.to_string());
+    return EXIT_SUCCESS;
   }
 
   /* Program path is the first argument. Pull it out and get rid of it. */
   std::string program_path = file_names[0];
   file_names.erase(file_names.begin());
 
-  if (flag_help.enabled()) {
-    show_help(program_path);
-    return 1;
-  } else if (flag_version.enabled()) {
-    show_version();
-    return 0;
+  if (FLAG_HELP.enabled()) {
+    shit::show_help(program_path, FLAG_LIST);
+    return EXIT_SUCCESS;
+  } else if (FLAG_VERSION.enabled()) {
+    shit::show_version();
+    return EXIT_SUCCESS;
   }
 
-  bool should_break = false;
-  bool error_happened = false;
-  bool toiletline_initialized = false;
+  bool should_quit = false;
 
   usize arg_index = 0;
+  int   ret_code = EXIT_SUCCESS;
+
   for (;;) {
+    SHIT_ASSERT(!shit::utils::is_child_process());
+
     std::string contents;
 
-    /* If we weren't given any arguments or -c=..., fire up the toiletline. */
-    if (file_names.empty() && flag_command.contents().empty()) {
-      if (!toiletline_initialized) {
-        if (tl_init() != TL_SUCCESS) {
-          show_error("Could not initialize toiletline. If you meant use stdin, "
-                     "provide '-' as an argument.");
-          error_happened = true;
-          break;
+    try {
+      /* If we weren't given any arguments or -c=..., fire up the toiletline. */
+      if (file_names.empty() && FLAG_COMMAND.contents().empty()) {
+        if (!toiletline::is_active()) {
+          toiletline::initialize();
+        } else {
+          toiletline::enter_raw_mode();
         }
-        toiletline_initialized = true;
-      }
 
-      static constexpr usize PWD_LENGTH = 24;
+        static constexpr usize PWD_LENGTH = 24;
 
-      std::string prompt;
-      std::string pwd = shit_current_directory().string();
-      if (pwd.length() > PWD_LENGTH) {
-        pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
-      }
-      prompt += pwd;
-      prompt += " shit> ";
-
-      char buffer[2048];
-      int  code = tl_readline(buffer, sizeof(buffer), prompt.c_str());
-      INSIST(!shit_process_is_child());
-
-      if (code == TL_PRESSED_EOF || code == TL_PRESSED_INTERRUPT) {
-        tl_exit();
-        std::cout << "exit" << std::endl;
-        break;
-      }
-
-      contents = buffer;
-      std::cout << "\n";
-      if (contents.empty())
-        continue;
-    } else if (!flag_command.contents().empty()) { /* Were we given -c flag? */
-      contents = flag_command.contents();
-      should_break = true;
-    } else {
-      if (arg_index + 1 == file_names.size())
-        should_break = true;
-
-      std::fstream  f{};
-      std::istream *file{};
-
-      /* When file name is "-", use stdin. */
-      if (file_names[arg_index] == "-") {
-        file = &std::cin;
-      } else { /* Otherwise, process the actual file name. */
-        f = std::fstream{file_names[arg_index], f.in | f.binary};
-        if (!f.is_open()) {
-          show_error("Could not open '" + file_names[arg_index] + "'");
-          return 1;
+        /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
+        std::string prompt = "shit % ";
+        std::string pwd = shit::utils::current_directory().string();
+        if (pwd.length() > PWD_LENGTH) {
+          pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
         }
-        file = &f;
-      }
+        prompt += pwd;
+        prompt += " $ ";
 
-      for (;;) {
-        uchar ch = file->get();
-        if (file->eof())
-          break;
-        contents += ch;
-      }
+        static constexpr usize TOILETLINE_BUFFER_SIZE = 2048;
 
-      arg_index++;
+        auto [code, input] =
+            toiletline::readline(TOILETLINE_BUFFER_SIZE, prompt);
+
+        if (code == TL_PRESSED_EOF) {
+          /* Exit on CTRL-D. */
+          toiletline::exit();
+          std::cout << "^D" << std::endl;
+          return ret_code;
+        } else if (code == TL_PRESSED_INTERRUPT) {
+          /* Ignore CTRL-C. */
+          std::cout << "^C" << std::endl;
+          continue;
+        } else if (input.empty()) {
+          /* Do nothing on empty input. */
+          std::cout << std::endl;
+          continue;
+        }
+
+        std::cout << std::endl;
+        contents = input;
+
+        /* Execute the command without raw mode. */
+        toiletline::exit_raw_mode();
+      } else if (!FLAG_COMMAND.contents().empty()) {
+        /* Were we given -c flag? */
+        contents = FLAG_COMMAND.contents();
+        should_quit = true;
+      } else {
+        if (arg_index + 1 == file_names.size())
+          should_quit = true;
+
+        std::fstream  f{};
+        std::istream *file{};
+
+        /* When file name is "-", use stdin. */
+        if (file_names[arg_index] == "-") {
+          file = &std::cin;
+        } else { /* Otherwise, process the actual file name. */
+          f = std::fstream{file_names[arg_index], f.in | f.binary};
+          if (!f.is_open()) {
+            throw shit::Error{"While opening '" + file_names[arg_index] +
+                              "': " + shit::utils::last_system_error_message()};
+          }
+          file = &f;
+        }
+
+        for (;;) {
+          uchar ch = file->get();
+          if (file->bad()) {
+            throw shit::Error{"While reading '" + file_names[arg_index] +
+                              "': " + shit::utils::last_system_error_message()};
+          }
+          if (file->eof())
+            break;
+          contents += ch;
+        }
+
+        arg_index++;
+      }
+    } catch (shit::Error &e) {
+      shit::show_error(e.to_string());
+      return EXIT_FAILURE;
+    } catch (...) {
+      shit::show_error("Fatal internal error. Last system message: " +
+                       shit::utils::last_system_error_message());
+      return EXIT_FAILURE;
     }
 
-    error_happened = true;
-    try {
-      std::unique_ptr<Parser> p = std::make_unique<Parser>(new Lexer{contents});
-      std::unique_ptr<Expression> ast = p->construct_ast();
+    i32 exit_code;
 
-      if (flag_dump_ast.enabled())
+    try {
+      std::unique_ptr<shit::Parser> p =
+          std::make_unique<shit::Parser>(new shit::Lexer{contents});
+
+      std::unique_ptr<shit::Expression> ast = p->construct_ast();
+      if (FLAG_DUMP_AST.enabled())
         std::cout << ast->to_ast_string() << std::endl;
 
-      i32 exit_code = ast->evaluate();
-      if (flag_exit_code.enabled())
+      exit_code = ast->evaluate();
+      if (FLAG_EXIT_CODE.enabled())
         std::cout << exit_code << std::endl;
 
-      error_happened = false;
-    } catch (ErrorWithLocationAndDetails &e) {
-      show_error(e.to_string(contents));
-      show_error(e.details_to_string(contents));
-    } catch (ErrorWithLocation &e) {
-      show_error(e.to_string(contents));
+    } catch (shit::ErrorWithLocationAndDetails &e) {
+      shit::show_error(e.to_string(contents));
+      shit::show_error(e.details_to_string(contents));
+    } catch (shit::ErrorWithLocation &e) {
+      shit::show_error(e.to_string(contents));
+    } catch (...) {
+      shit::show_error("Fatal internal error. Last system message: " +
+                       shit::utils::last_system_error_message());
+      return EXIT_FAILURE;
     }
 
     /* We can get here from child process if they didn't platform_exec()
      * properly to print error. */
-    if (should_break || shit_process_is_child())
-      break;
+    if (should_quit || shit::utils::is_child_process())
+      return exit_code;
   }
 
-  return error_happened;
+  SHIT_UNREACHABLE();
 }

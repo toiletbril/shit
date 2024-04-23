@@ -8,6 +8,8 @@
 #include <string_view>
 #include <unordered_map>
 
+namespace shit {
+
 /**
  * Simple tokens
  */
@@ -533,3 +535,5 @@ struct TokenExclamationEquals : public TokenOperator
   construct_binary_expression(const Expression *lhs,
                               const Expression *rhs) const override;
 };
+
+} /* namespace shit */

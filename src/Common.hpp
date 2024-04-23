@@ -45,11 +45,11 @@ typedef uintptr_t uintptr;
 #endif
 
 /* Do not remove the symbol, even if it's not used. */
-#define USED t__used
+#define SHIT_USED t__used
 /* The return value must be used. */
-#define FORCEINLINE t__forceinline
+#define SHIT_FORCEINLINE t__forceinline
 /* The value is unused. Suppress the compiler warning. */
-#define UNUSED(x) ((void) (x))
+#define SHIT_UNUSED(x) ((void) (x))
 
 #define t__concat_literal(x, y) x##y
 /* Concatenate two identifiers without quoting them. */
@@ -78,7 +78,7 @@ struct t__exit_scope_help
 };
 
 /* Defer a block until the end of the scope. */
-#define defer                                                                  \
+#define SHIT_DEFER                                                             \
   const auto &concat_literal(defer__, __LINE__) = t__exit_scope_help() + [&]()
 
 /* The length of statically allocated array. */

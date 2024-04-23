@@ -7,7 +7,9 @@
 #include <string>
 #include <tuple>
 
-#define ERROR_CONTEXT_SIZE 24
+namespace shit {
+
+static constexpr usize ERROR_CONTEXT_SIZE = 24;
 
 struct ErrorBase
 {
@@ -16,6 +18,8 @@ struct ErrorBase
   virtual ~ErrorBase();
 
   operator bool &();
+
+  std::string message() const;
 
 protected:
   bool        m_is_active{false};
@@ -68,3 +72,5 @@ protected:
   usize       m_details_location{0};
   std::string m_details_message;
 };
+
+} /* namespace shit */
