@@ -27,6 +27,11 @@ endif
 CXXFLAGS := -g3 -O0 -std=c++17
 endif
 
+# Additional libraries
+ifeq ($(OS), Windows_NT)
+	CXXFLAGS += -luserenv -ladvapi32
+endif
+
 o/%.o : %.cpp
 	@echo "\tCXX $< \t-o $(CWD)$@"
 	$(CXX) $(CXXFLAGS) -c $< -o $@

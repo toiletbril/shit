@@ -8,7 +8,7 @@ namespace {
 #define TOILETLINE_IMPLEMENTATION
 #include "toiletline/toiletline.h"
 
-} // namespace
+} /* namespace */
 
 namespace toiletline {
 

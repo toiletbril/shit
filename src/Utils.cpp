@@ -130,7 +130,7 @@ last_system_error_message()
 constexpr usize WIN32_MAX_ENV_SIZE = 32767;
 
 std::optional<std::string>
-get_env(std::string_view key)
+get_environment_variable(std::string_view key)
 {
   char  buffer[WIN32_MAX_ENV_SIZE];
   DWORD result = GetEnvironmentVariableA(key.data(), buffer, sizeof(buffer));
@@ -142,7 +142,7 @@ get_env(std::string_view key)
 
 /* TODO: pass non-absolute path, if it wasn't absolute. */
 i32
-exec(const std::filesystem::path &path, const std::vector<std::string> &args)
+execute_program_by_path(const std::filesystem::path &path, const std::vector<std::string> &args)
 {
   std::string command_line;
 
@@ -188,7 +188,7 @@ exec(const std::filesystem::path &path, const std::vector<std::string> &args)
 }
 
 bool
-process_is_child()
+is_child_process()
 {
   return GetCurrentProcessId() != PARENT_SHELL_PID;
 }
@@ -196,7 +196,7 @@ process_is_child()
 std::string_view
 sanitize_program_name(std::string_view program_name)
 {
-  usize extension_pos = program_name.find_last_of('.exe');
+  usize extension_pos = program_name.rfind(".exe");
   if (extension_pos == std::string::npos)
     return program_name;
   return program_name.substr(0, extension_pos);
@@ -206,11 +206,11 @@ std::optional<std::string>
 get_current_user()
 {
   DWORD size = 0;
-  GetUserName(NULL, &size);
+  GetUserNameA(NULL, &size);
   if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
     std::vector<char> buffer;
     buffer.reserve(size);
-    if (GetUserName(buffer.data(), &size)) {
+    if (GetUserNameA(buffer.data(), &size)) {
       return std::string{buffer.data(), size - 1};
     }
   }
@@ -220,7 +220,7 @@ get_current_user()
 std::optional<std::filesystem::path>
 get_home_directory()
 {
-  return get_env("USERPROFILE");
+  return get_environment_variable("USERPROFILE");
 }
 
 #endif /* _WIN32 */
