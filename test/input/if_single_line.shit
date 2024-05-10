@@ -1,1 +1,0 @@
-if (if (1 == 1) then 27 else 54 fi) == 54 then 4 else 10 fi

@@ -15,13 +15,15 @@ constexpr usize MAX_PARENTHESES_DEPTH = 64;
 
 std::string last_system_error_message();
 
+/* Path is the program path to execute, expanded from program. Program is
+ * non-altered first arg. */
 i32 execute_program_by_path(const std::filesystem::path    &path,
                             std::string_view                program,
                             const std::vector<std::string> &args);
 
 std::optional<std::string> get_environment_variable(std::string_view key);
 
-/* Removes .exe and other garbage to search path. */
+/* Make launching programs more convenient, e.g strip out .exe for Windows. */
 std::string_view sanitize_program_name(std::string_view program_name);
 
 std::optional<std::string> expand_path(const std::string_view &path);
@@ -38,8 +40,9 @@ bool is_child_process();
 
 void set_current_directory(const std::filesystem::path &path);
 
-std::filesystem::path current_directory();
+std::filesystem::path get_current_directory();
 
+/* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] void quit(i32 code);
 
 std::optional<std::string> get_current_user();

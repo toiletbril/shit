@@ -55,6 +55,7 @@ main(int argc, char **argv)
 
     std::string contents;
 
+    /* Figure out what to do and retrieve the code. */
     try {
       /* If we weren't given any arguments or -c=..., fire up the toiletline. */
       if (file_names.empty() && FLAG_COMMAND.contents().empty()) {
@@ -68,7 +69,7 @@ main(int argc, char **argv)
 
         /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
         std::string prompt = "shit % ";
-        std::string pwd = shit::utils::current_directory().string();
+        std::string pwd = shit::utils::get_current_directory().string();
         if (pwd.length() > PWD_LENGTH) {
           pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
         }
@@ -117,16 +118,16 @@ main(int argc, char **argv)
         } else { /* Otherwise, process the actual file name. */
           f = std::fstream{file_names[arg_index], f.in | f.binary};
           if (!f.is_open()) {
-            throw shit::Error{"While opening '" + file_names[arg_index] +
+            throw shit::Error{"Could not open '" + file_names[arg_index] +
                               "': " + shit::utils::last_system_error_message()};
           }
           file = &f;
         }
 
         for (;;) {
-          uchar ch = file->get();
+          char ch = file->get();
           if (file->bad()) {
-            throw shit::Error{"While reading '" + file_names[arg_index] +
+            throw shit::Error{"Could not read '" + file_names[arg_index] +
                               "': " + shit::utils::last_system_error_message()};
           }
           if (file->eof())
@@ -140,13 +141,15 @@ main(int argc, char **argv)
       shit::show_error(e.to_string());
       return EXIT_FAILURE;
     } catch (...) {
-      shit::show_error("Fatal internal error. Last system message: " +
+      shit::show_error("Could not figure out what to do due to an unexpected "
+                       "explosion! Last system message: " +
                        shit::utils::last_system_error_message());
       return EXIT_FAILURE;
     }
 
-    i32 exit_code;
+    i32 exit_code = EXIT_SUCCESS;
 
+    /* Execute the contents. */
     try {
       std::unique_ptr<shit::Parser> p =
           std::make_unique<shit::Parser>(new shit::Lexer{contents});
@@ -157,15 +160,15 @@ main(int argc, char **argv)
 
       exit_code = ast->evaluate();
       if (FLAG_EXIT_CODE.enabled())
-        std::cout << exit_code << std::endl;
-
+        std::cout << "[Code " << exit_code << "]" << std::endl;
     } catch (shit::ErrorWithLocationAndDetails &e) {
       shit::show_error(e.to_string(contents));
       shit::show_error(e.details_to_string(contents));
     } catch (shit::ErrorWithLocation &e) {
       shit::show_error(e.to_string(contents));
     } catch (...) {
-      shit::show_error("Fatal internal error. Last system message: " +
+      shit::show_error("Could not execute the code due to an unexpected "
+                       "explosion! Last system message: " +
                        shit::utils::last_system_error_message());
       return EXIT_FAILURE;
     }
@@ -173,7 +176,7 @@ main(int argc, char **argv)
     /* We can get here from child process if they didn't platform_exec()
      * properly to print error. */
     if (should_quit || shit::utils::is_child_process())
-      return exit_code;
+      shit::utils::quit(exit_code);
   }
 
   SHIT_UNREACHABLE();

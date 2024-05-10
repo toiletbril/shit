@@ -34,25 +34,25 @@ endif
 
 o/%.o : %.cpp
 	@echo "\tCXX $< \t-o $(CWD)$@"
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
 shit:
 	mkdir -p ./o
-	$(MAKE) compile
+	@$(MAKE) compile
 
 compile: $(OBJECTS)
 	@echo "\tCXX $(OBJECTS) -o $(OUT)"
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
+	@$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
 
 CLANG_FORMAT ?= clang-format
 
 fmt:
 	@echo "\tCLANG_FORMAT -i $(SOURCE_FILES)"
 	@echo "\tCLANG_FORMAT -i $(HEADER_FILES)"
-	$(CLANG_FORMAT) -i $(SOURCE_FILES) $(HEADER_FILES)
+	@$(CLANG_FORMAT) -i $(SOURCE_FILES) $(HEADER_FILES)
 
 clean:
-	rm -rf ./o $(OUT)
+	@rm -rf ./o $(OUT)
 ifeq ($(OS), Windows_NT)
-	rm -rf ../*.ilk ../*.pdb ../*.lib
+	@rm -rf ../*.ilk ../*.pdb ../*.lib
 endif

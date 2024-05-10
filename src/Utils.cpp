@@ -144,7 +144,6 @@ get_environment_variable(std::string_view key)
   return std::string(buffer);
 }
 
-/* TODO: pass non-absolute path, if it wasn't absolute. */
 i32
 execute_program_by_path(const std::filesystem::path    &path,
                         std::string_view                program,
@@ -273,7 +272,7 @@ set_current_directory(const std::filesystem::path &path)
 }
 
 std::filesystem::path
-current_directory()
+get_current_directory()
 {
   return std::filesystem::current_path();
 }
@@ -281,8 +280,11 @@ current_directory()
 [[noreturn]] void
 quit(i32 code)
 {
-  if (toiletline::is_active())
-    toiletline::exit();
+  /* Cleanup for main proccess. */
+  if (!is_child_process()) {
+    if (toiletline::is_active())
+      toiletline::exit();
+  }
 
   std::exit(code);
 }

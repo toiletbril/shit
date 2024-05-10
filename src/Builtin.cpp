@@ -129,9 +129,6 @@ Exit::kind() const
 i32
 Exit::execute(const std::vector<std::string> &args) const
 {
-  if (toiletline::is_active())
-    toiletline::exit();
-
   utils::quit(args.size() > 0 ? std::atoi(args[0].c_str()) : 0);
 }
 

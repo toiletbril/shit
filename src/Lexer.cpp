@@ -9,7 +9,7 @@
 namespace shit {
 
 static SHIT_FORCEINLINE bool
-is_whitespace(uchar ch)
+is_whitespace(char ch)
 {
   switch (ch) {
   case ' ':
@@ -22,13 +22,13 @@ is_whitespace(uchar ch)
 }
 
 static SHIT_FORCEINLINE bool
-is_number(uchar ch)
+is_number(char ch)
 {
   return ch >= '0' && ch <= '9';
 }
 
 static SHIT_FORCEINLINE bool
-is_expression_sentinel(uchar ch)
+is_expression_sentinel(char ch)
 {
   switch (ch) {
   case '+':
@@ -53,7 +53,7 @@ is_expression_sentinel(uchar ch)
 }
 
 static SHIT_FORCEINLINE bool
-is_shell_sentinel(uchar ch)
+is_shell_sentinel(char ch)
 {
   switch (ch) {
   case '|':
@@ -64,13 +64,13 @@ is_shell_sentinel(uchar ch)
 }
 
 static SHIT_FORCEINLINE bool
-is_part_of_identifier(uchar ch)
+is_part_of_identifier(char ch)
 {
   return !is_shell_sentinel(ch) && !is_whitespace(ch);
 }
 
 static SHIT_FORCEINLINE bool
-is_string_quote(uchar ch)
+is_string_quote(char ch)
 {
   switch (ch) {
   case '"':
@@ -81,7 +81,7 @@ is_string_quote(uchar ch)
 }
 
 static SHIT_FORCEINLINE bool
-is_ascii_char(uchar ch)
+is_ascii_char(char ch)
 {
   return (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122);
 }
@@ -153,7 +153,8 @@ Lexer::lex_expression_token()
   usize token_start = m_cursor_position;
 
   if (m_cursor_position < m_source.length()) {
-    uchar ch = m_source[m_cursor_position];
+    char ch = m_source[m_cursor_position];
+
     if (is_number(ch))
       return chop_number(token_start);
     else if (is_expression_sentinel(ch))
@@ -200,7 +201,7 @@ Lexer::chop_identifier(usize token_start)
       m_source.substr(token_start, token_end - token_start);
 
   std::string lower_ident_string;
-  for (const uchar c : ident_string)
+  for (const char c : ident_string)
     lower_ident_string += std::tolower(c);
 
   Token *t{};
@@ -227,13 +228,14 @@ Token *
 Lexer::lex_shell_token()
 {
   usize token_start = m_cursor_position;
-  uchar ch = m_source[m_cursor_position];
 
   if (m_cursor_position < m_source.length()) {
+    char ch = m_source[m_cursor_position];
+
     if (is_string_quote(ch))
       return chop_string(token_start + 1, ch);
     else if (is_shell_sentinel(ch))
-      return chop_shell_sentinel(ch);
+      return chop_shell_sentinel(token_start);
     else if (is_part_of_identifier(ch))
       return chop_identifier(token_start);
     else {
@@ -253,7 +255,7 @@ Lexer::chop_shell_sentinel(usize token_start)
 }
 
 Token *
-Lexer::chop_string(usize token_start, uchar quote_char)
+Lexer::chop_string(usize token_start, char quote_char)
 {
   usize token_end = token_start;
 

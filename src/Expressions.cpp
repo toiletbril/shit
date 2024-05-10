@@ -141,7 +141,8 @@ Exec::evaluate() const
   if (!program_path)
     throw ErrorWithLocation{location(), "Command not found"};
 
-  i32 ret = 256;
+  i32 ret = 1;
+
   try {
     ret = utils::execute_program_by_path(program_path.value(), m_path, m_args);
   } catch (Error &err) {
