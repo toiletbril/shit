@@ -39,16 +39,19 @@ get_environment_variable(std::string_view key)
 
 i32
 execute_program_by_path(const std::filesystem::path    &path,
+                        std::string_view                program,
                         const std::vector<std::string> &args)
 {
   std::vector<const char *> real_args;
 
-  /* argv[0] is the program path itself. */
-  real_args.push_back(path.c_str());
+  /* argv[0] is the program itself. */
+  real_args.push_back(program.data());
+
   /* Then actual arguments. */
   for (const std::string &arg : args) {
     real_args.push_back(arg.c_str());
   }
+
   /* And then NULL at the end. */
   real_args.push_back(nullptr);
 
@@ -61,9 +64,10 @@ execute_program_by_path(const std::filesystem::path    &path,
     if (execv(path.c_str(), const_cast<char *const *>(real_args.data())) == -1)
       throw shit::Error{last_system_error_message()};
   } else {
-    if (waitpid(pid, &status, 0) == -1)
+    if (waitpid(pid, &status, 0) == -1 || !WIFEXITED(status))
       throw shit::Error{"waitpid() failed: " + last_system_error_message()};
-    return status;
+
+    return WEXITSTATUS(status);
   }
 
   SHIT_UNREACHABLE();
@@ -142,14 +146,17 @@ get_environment_variable(std::string_view key)
 
 /* TODO: pass non-absolute path, if it wasn't absolute. */
 i32
-execute_program_by_path(const std::filesystem::path &path, const std::vector<std::string> &args)
+execute_program_by_path(const std::filesystem::path    &path,
+                        std::string_view                program,
+                        const std::vector<std::string> &args)
 {
   std::string command_line;
 
   /* TODO: remove CVE */
   command_line += '"';
-  command_line += path.string();
+  command_line += program;
   command_line += '"';
+
   if (args.size() > 0) {
     for (usize i = 0; i < args.size(); i++) {
       command_line += ' ';
@@ -164,14 +171,12 @@ execute_program_by_path(const std::filesystem::path &path, const std::vector<std
   si.cb = sizeof(si);
   ZeroMemory(&pi, sizeof(pi));
 
-  /* Here we throw the literal error, since the program may not exist. */
   if (CreateProcessA(path.string().c_str(), command_line.data(), NULL, NULL,
                      FALSE, 0, NULL, NULL, &si, &pi) == 0)
   {
     throw Error{last_system_error_message()};
   }
 
-  /* These things should not fail at all, so we include the function name. */
   if (WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
     throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
   }
@@ -292,7 +297,7 @@ search_program_path(std::string_view program_name)
   std::string path_var = maybe_path.value();
 
   std::string dir_path;
-  for (const uchar ch : path_var) {
+  for (const char &ch : path_var) {
     if (ch != PATH_DELIMITER)
       dir_path += ch;
     else {

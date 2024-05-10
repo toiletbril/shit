@@ -143,7 +143,7 @@ Exec::evaluate() const
 
   i32 ret = 256;
   try {
-    ret = utils::execute_program_by_path(program_path.value(), m_args);
+    ret = utils::execute_program_by_path(program_path.value(), m_path, m_args);
   } catch (Error &err) {
     throw ErrorWithLocation{location(), err.message()};
   }

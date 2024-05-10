@@ -1052,7 +1052,7 @@ TokenEquals::construct_binary_expression(const Expression *lhs,
 {
   SHIT_UNUSED(lhs);
   SHIT_UNUSED(rhs);
-  SHIT_ASSERT(false, "todo");
+  SHIT_UNREACHABLE("Invalid call");
 }
 
 /**

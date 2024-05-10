@@ -16,6 +16,7 @@ constexpr usize MAX_PARENTHESES_DEPTH = 64;
 std::string last_system_error_message();
 
 i32 execute_program_by_path(const std::filesystem::path    &path,
+                            std::string_view                program,
                             const std::vector<std::string> &args);
 
 std::optional<std::string> get_environment_variable(std::string_view key);
