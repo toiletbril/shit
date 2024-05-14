@@ -6,6 +6,7 @@
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -48,8 +49,10 @@ main(int argc, char **argv)
   bool should_quit = false;
 
   usize arg_index = 0;
-  int   ret_code = EXIT_SUCCESS;
+  int   exit_code = EXIT_SUCCESS;
 
+  /* A simple return cannot be used after this point, since we need a special
+   * cleanup for toiletline. utils::quit() should be used instead. */
   for (;;) {
     SHIT_ASSERT(!shit::utils::is_child_process());
 
@@ -86,7 +89,7 @@ main(int argc, char **argv)
           std::cout << "^D" << std::flush;
           toiletline::exit();
           toiletline::emit_newlines(input);
-          return ret_code;
+          shit::utils::quit(exit_code);
         } else if (code == TL_PRESSED_INTERRUPT) {
           /* Ignore CTRL-C. */
           std::cout << "^C" << std::flush;
@@ -141,15 +144,13 @@ main(int argc, char **argv)
       }
     } catch (shit::Error &e) {
       shit::show_error(e.to_string());
-      return EXIT_FAILURE;
+      shit::utils::quit(EXIT_FAILURE);
     } catch (...) {
       shit::show_error("Could not figure out what to do due to an unexpected "
                        "explosion! Last system message: " +
                        shit::utils::last_system_error_message());
-      return EXIT_FAILURE;
+      shit::utils::quit(EXIT_FAILURE);
     }
-
-    i32 exit_code = EXIT_SUCCESS;
 
     /* Execute the contents. */
     try {
@@ -166,13 +167,15 @@ main(int argc, char **argv)
     } catch (shit::ErrorWithLocationAndDetails &e) {
       shit::show_error(e.to_string(contents));
       shit::show_error(e.details_to_string(contents));
+      exit_code = EXIT_FAILURE;
     } catch (shit::ErrorWithLocation &e) {
       shit::show_error(e.to_string(contents));
+      exit_code = EXIT_FAILURE;
     } catch (...) {
       shit::show_error("Could not execute the code due to an unexpected "
                        "explosion! Last system message: " +
                        shit::utils::last_system_error_message());
-      return EXIT_FAILURE;
+      shit::utils::quit(EXIT_FAILURE);
     }
 
     /* We can get here from child process if they didn't platform_exec()
