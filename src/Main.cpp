@@ -83,23 +83,25 @@ main(int argc, char **argv)
 
         if (code == TL_PRESSED_EOF) {
           /* Exit on CTRL-D. */
+          std::cout << "^D" << std::flush;
           toiletline::exit();
-          std::cout << "^D" << std::endl;
+          toiletline::emit_newlines(input);
           return ret_code;
         } else if (code == TL_PRESSED_INTERRUPT) {
           /* Ignore CTRL-C. */
-          std::cout << "^C" << std::endl;
-          continue;
+          std::cout << "^C" << std::flush;
         } else if (input.empty()) {
           /* Do nothing on empty input. */
-          std::cout << std::endl;
+        }
+
+        toiletline::emit_newlines(input);
+
+        if (code != TL_PRESSED_ENTER) {
           continue;
         }
 
-        std::cout << std::endl;
-        contents = input;
-
         /* Execute the command without raw mode. */
+        contents = input;
         toiletline::exit_raw_mode();
       } else if (!FLAG_COMMAND.contents().empty()) {
         /* Were we given -c flag? */

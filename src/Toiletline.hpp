@@ -26,4 +26,6 @@ void enter_raw_mode();
 
 void exit_raw_mode();
 
+void emit_newlines(std::string_view buffer);
+
 } /* namespace toiletline */
