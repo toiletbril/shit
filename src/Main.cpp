@@ -93,13 +93,11 @@ main(int argc, char **argv)
         } else if (code == TL_PRESSED_INTERRUPT) {
           /* Ignore CTRL-C. */
           std::cout << "^C" << std::flush;
-        } else if (input.empty()) {
-          /* Do nothing on empty input. */
         }
 
         toiletline::emit_newlines(input);
 
-        if (code != TL_PRESSED_ENTER) {
+        if (input.empty() || code != TL_PRESSED_ENTER) {
           continue;
         }
 
@@ -111,6 +109,7 @@ main(int argc, char **argv)
         contents = FLAG_COMMAND.contents();
         should_quit = true;
       } else {
+        /* Were we given a list of files? */
         if (arg_index + 1 == file_names.size())
           should_quit = true;
 
