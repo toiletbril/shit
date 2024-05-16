@@ -9,7 +9,7 @@ endif
 FAILED := failed.diff
 
 %: expected/%.out
-	@cat input/$@.shit | $(BIN) -Ae - | diff -wu $< - >> $(FAILED) && echo "\t[$@\t\t] ok." || echo "\t[$@\t\t] FAILED."
+	@cat input/$@.shit | $(BIN) -Ae - | diff -wu $< - >> $(FAILED) && echo "	[$@		] ok." || echo "	[$@		] FAILED."
 
 test: $(BIN)
 	@rm -f $(FAILED)

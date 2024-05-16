@@ -1,7 +1,9 @@
 .PHONY: shit compile fmt clean
 
-MODULES := Main Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens
-HEADERS := Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens Debug Common
+MODULES := \
+Main Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens
+HEADERS := \
+Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens Debug Common
 
 SOURCE_FILES := $(addsuffix .cpp, $(MODULES))
 HEADER_FILES := $(addsuffix .hpp, $(HEADERS))
@@ -22,18 +24,23 @@ ifeq ($(RELEASE), 1)
 CXXFLAGS := -g -O2 -std=c++17
 else
 ifneq ($(OS), Windows_NT)
+	# Windows' Asan is broken
 	CXXFLAGS += -fsanitize=address
 endif
 CXXFLAGS := -g3 -O0 -std=c++17
 endif
 
-# Additional libraries
+# Additional flags
 ifeq ($(OS), Windows_NT)
+	# Disable dumb errors
+	CXXFLAGS += -Wno-format -Wno-unused-command-line-argument
+	CXXFLAGS += -Wno-deprecated-declarations
+	# Libraries we depend on
 	CXXFLAGS += -luserenv -ladvapi32
 endif
 
 o/%.o : %.cpp
-	@echo "\tCXX $< \t-o $(CWD)$@"
+	@echo "	CXX $< 	-o $(CWD)$@"
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
 
 shit:
@@ -41,18 +48,16 @@ shit:
 	@$(MAKE) compile
 
 compile: $(OBJECTS)
-	@echo "\tCXX $(OBJECTS) -o $(OUT)"
+	@echo "	CXX $(OBJECTS)	-o $(OUT)"
 	@$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
 
 CLANG_FORMAT ?= clang-format
 
 fmt:
-	@echo "\tCLANG_FORMAT -i $(SOURCE_FILES)"
-	@echo "\tCLANG_FORMAT -i $(HEADER_FILES)"
+	@echo "	CLANG_FORMAT -i $(SOURCE_FILES)"
+	@echo "	CLANG_FORMAT -i $(HEADER_FILES)"
 	@$(CLANG_FORMAT) -i $(SOURCE_FILES) $(HEADER_FILES)
 
 clean:
 	@rm -rf ./o $(OUT)
-ifeq ($(OS), Windows_NT)
 	@rm -rf ../*.ilk ../*.pdb ../*.lib
-endif
