@@ -1,6 +1,7 @@
 #include "Lexer.hpp"
 
 #include "Common.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Tokens.hpp"
 

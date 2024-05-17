@@ -1,11 +1,8 @@
 #pragma once
 
 #include "Common.hpp"
-#include "Debug.hpp"
 
-#include <iostream>
 #include <string>
-#include <tuple>
 
 namespace shit {
 
@@ -27,10 +24,6 @@ protected:
 };
 
 /**
- * A standard error. Made to be used without dynamic allocations: note that it
- * has bool conversion defined, which is supposed to tell whether is error is an
- * actual one, or just an empty sentinel.
- *
  * Empty ctor creates an instance that converts to false, other ctors convert to
  * true.
  */

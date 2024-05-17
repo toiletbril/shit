@@ -1,3 +1,4 @@
+#include "Debug.hpp"
 #include "Errors.hpp"
 
 #include <vector>
@@ -68,4 +69,4 @@ emit_newlines(std::string_view buffer)
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
 }
 
-} // namespace toiletline
+} /* namespace toiletline */

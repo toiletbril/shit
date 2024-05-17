@@ -1,5 +1,7 @@
 #include "Errors.hpp"
 
+#include "Debug.hpp"
+
 #include <tuple>
 
 namespace shit {

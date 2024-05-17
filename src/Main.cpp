@@ -1,5 +1,6 @@
 #include "Cli.hpp"
 #include "Common.hpp"
+#include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
@@ -10,7 +11,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <type_traits>
 
 static std::vector<shit::Flag *> FLAG_LIST{};
 

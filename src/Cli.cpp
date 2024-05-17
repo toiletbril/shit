@@ -3,9 +3,8 @@
 #include "Common.hpp"
 #include "Errors.hpp"
 
-#include <array>
 #include <cstring>
-#include <span>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -96,7 +95,8 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
   for (size_t i = 0; i < flags.size(); ++i) {
     if (!is_long) {
       if (flags[i]->short_name() != '\0' &&
-          flags[i]->short_name() == *flag_start) {
+          flags[i]->short_name() == *flag_start)
+      {
         *result_flag = flags[i];
         *value_start = flag_start + 1;
         return true;

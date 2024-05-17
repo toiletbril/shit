@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 #include "Debug.hpp"
+#include "Errors.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 
