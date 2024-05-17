@@ -1,0 +1,8 @@
+CompileFlags:
+  Add: [
+    -std=c++17,
+    -Wextra,
+    -Werror,
+    -Wno-deprecated-declarations,
+    -Wno-format,
+  ]
