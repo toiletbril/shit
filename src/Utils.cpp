@@ -1,12 +1,13 @@
 #include "Utils.hpp"
 
+#include "Errors.hpp"
 #include "Toiletline.hpp"
 
-#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <optional>
+#include <set>
 
 namespace shit {
 
@@ -90,7 +91,7 @@ get_current_user()
 {
   struct passwd *pw = getpwuid(getuid());
   if (pw != nullptr)
-    return std::string(pw->pw_name);
+    return std::string{pw->pw_name};
   else
     return std::nullopt;
 }
@@ -113,13 +114,13 @@ static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 std::string
 last_system_error_message()
 {
+  LPVOID lp_msg{};
   DWORD  code = GetLastError();
-  LPVOID lp_msg;
   DWORD  dw = FormatMessage(
-       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-           FORMAT_MESSAGE_IGNORE_INSERTS,
-       NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lp_msg,
-       0, NULL);
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+      NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lp_msg,
+      0, NULL);
 
   if (dw == 0) {
     return "(Error message couldn't be proccessed due to FormatMessage() fail)";
@@ -151,7 +152,7 @@ execute_program_by_path(const std::filesystem::path    &path,
 {
   std::string command_line;
 
-  /* TODO: remove CVE */
+  /* TODO: remove CVE and escape quotes */
   command_line += '"';
   command_line += program;
   command_line += '"';
@@ -163,12 +164,8 @@ execute_program_by_path(const std::filesystem::path    &path,
     }
   }
 
-  STARTUPINFOA        si;
-  PROCESS_INFORMATION pi;
-
-  ZeroMemory(&si, sizeof(si));
-  si.cb = sizeof(si);
-  ZeroMemory(&pi, sizeof(pi));
+  PROCESS_INFORMATION pi{};
+  STARTUPINFOA        si{.cb = sizeof(si)};
 
   if (CreateProcessA(path.string().c_str(), command_line.data(), NULL, NULL,
                      FALSE, 0, NULL, NULL, &si, &pi) == 0)
@@ -197,13 +194,28 @@ is_child_process()
   return GetCurrentProcessId() != PARENT_SHELL_PID;
 }
 
+const static std::set<std::string> OMITTED_EXTENSIONS = {
+    "exe",
+    "com",
+    "scr",
+    "bat",
+};
+
 std::string_view
 sanitize_program_name(std::string_view program_name)
 {
-  usize extension_pos = program_name.rfind(".exe");
-  if (extension_pos == std::string::npos)
-    return program_name;
-  return program_name.substr(0, extension_pos);
+  usize extension_pos = program_name.rfind(".");
+
+  if (extension_pos != std::string::npos &&
+      extension_pos + 3 < program_name.length())
+  {
+    std::string_view extension = program_name.substr(extension_pos + 1);
+    if (OMITTED_EXTENSIONS.find(extension.data()) != OMITTED_EXTENSIONS.end()) {
+      return program_name.substr(0, extension_pos);
+    }
+  }
+
+  return program_name;
 }
 
 std::optional<std::string>
@@ -259,9 +271,13 @@ std::optional<std::filesystem::path>
 canonicalize_path(const std::string_view &path)
 {
   std::filesystem::path actual_path{path};
+
   if (actual_path.is_relative() &&
       actual_path.string().find('/') != std::string::npos)
+  {
     actual_path = std::filesystem::absolute(actual_path);
+  }
+
   return actual_path.lexically_normal().make_preferred();
 }
 
@@ -289,6 +305,9 @@ quit(i32 code)
   std::exit(code);
 }
 
+#define SANITIZED_EQUAL(s1, s2)                                                \
+  sanitize_program_name(s1) == sanitize_program_name(s2)
+
 /* TODO: cache this. */
 std::optional<std::filesystem::path>
 search_program_path(std::string_view program_name)
@@ -310,9 +329,7 @@ search_program_path(std::string_view program_name)
 
         /* Search every file in the directory. */
         for (const std::filesystem::directory_entry &f : dir) {
-          if (sanitize_program_name(f.path().filename().string()) ==
-              sanitize_program_name(program_name))
-          {
+          if (SANITIZED_EQUAL(f.path().filename().string(), program_name)) {
             return f.path();
           }
         }
