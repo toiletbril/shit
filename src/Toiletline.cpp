@@ -1,11 +1,18 @@
+/* Toiletline.hpp is not included to define toiletline configuration macros here
+ * rather than in the header. */
+
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Utils.hpp"
 
+#include <tuple>
 #include <vector>
 
 namespace {
 
+#define TL_NO_SUSPEND
 #define TL_ASSERT SHIT_ASSERT
+
 #define TOILETLINE_IMPLEMENTATION
 #include "toiletline/toiletline.h"
 
@@ -16,7 +23,7 @@ namespace toiletline {
 bool
 is_active()
 {
-  return itl_is_active;
+  return ::itl_is_active;
 }
 
 void
@@ -65,7 +72,7 @@ exit_raw_mode()
 void
 emit_newlines(std::string_view buffer)
 {
-  if (tl_emit_newlines(buffer.data()) != TL_SUCCESS)
+  if (::tl_emit_newlines(buffer.data()) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
 }
 

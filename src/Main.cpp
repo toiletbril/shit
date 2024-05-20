@@ -87,8 +87,10 @@ main(int argc, char **argv)
         if (code == TL_PRESSED_EOF) {
           /* Exit on CTRL-D. */
           std::cout << "^D" << std::flush;
+
           toiletline::exit();
           toiletline::emit_newlines(input);
+
           shit::utils::quit(exit_code);
         } else if (code == TL_PRESSED_INTERRUPT) {
           /* Ignore CTRL-C. */

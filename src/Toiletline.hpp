@@ -6,10 +6,9 @@
 
 namespace {
 
-#define TL_ASSERT SHIT_ASSERT
 #include "toiletline/toiletline.h"
 
-} // namespace
+} /* namespace */
 
 namespace toiletline {
 

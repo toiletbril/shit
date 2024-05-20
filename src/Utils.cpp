@@ -117,10 +117,10 @@ last_system_error_message()
   LPVOID lp_msg{};
   DWORD  code = GetLastError();
   DWORD  dw = FormatMessage(
-      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-          FORMAT_MESSAGE_IGNORE_INSERTS,
-      NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lp_msg,
-      0, NULL);
+       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+           FORMAT_MESSAGE_IGNORE_INSERTS,
+       NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lp_msg,
+       0, NULL);
 
   if (dw == 0) {
     return "(Error message couldn't be proccessed due to FormatMessage() fail)";
