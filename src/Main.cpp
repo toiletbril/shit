@@ -25,6 +25,8 @@ FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 int
 main(int argc, char **argv)
 {
+  shit::utils::set_default_signal_handlers();
+
   std::vector<std::string> file_names;
 
   try {
@@ -65,6 +67,8 @@ main(int argc, char **argv)
         if (!toiletline::is_active()) {
           toiletline::initialize();
         } else {
+          /* NOTE: don't go into this branch if exit_raw_mode() wasn't called
+           * previosly! */
           toiletline::enter_raw_mode();
         }
 
@@ -81,30 +85,30 @@ main(int argc, char **argv)
 
         static constexpr usize TOILETLINE_BUFFER_SIZE = 2048;
 
-        auto [code, input] =
-            toiletline::readline(TOILETLINE_BUFFER_SIZE, prompt);
+        /* Ask for input until we get one. */
+        for (;;) {
+          auto [code, input] =
+              toiletline::readline(TOILETLINE_BUFFER_SIZE, prompt);
 
-        if (code == TL_PRESSED_EOF) {
-          /* Exit on CTRL-D. */
-          std::cout << "^D" << std::flush;
+          if (code == TL_PRESSED_EOF) {
+            /* Exit on CTRL-D. */
+            std::cout << "^D" << std::flush;
+            toiletline::emit_newlines(input);
+            shit::utils::quit(exit_code);
+          } else if (code == TL_PRESSED_INTERRUPT) {
+            /* Ignore CTRL-C. */
+            std::cout << "^C" << std::flush;
+          }
 
-          toiletline::exit();
           toiletline::emit_newlines(input);
 
-          shit::utils::quit(exit_code);
-        } else if (code == TL_PRESSED_INTERRUPT) {
-          /* Ignore CTRL-C. */
-          std::cout << "^C" << std::flush;
+          /* Execute the command without raw mode. */
+          if (code == TL_PRESSED_ENTER && !input.empty()) {
+            contents = input;
+            break;
+          }
         }
 
-        toiletline::emit_newlines(input);
-
-        if (input.empty() || code != TL_PRESSED_ENTER) {
-          continue;
-        }
-
-        /* Execute the command without raw mode. */
-        contents = input;
         toiletline::exit_raw_mode();
       } else if (!FLAG_COMMAND.contents().empty()) {
         /* Were we given -c flag? */

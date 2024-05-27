@@ -3,9 +3,11 @@
 #include "Errors.hpp"
 #include "Toiletline.hpp"
 
+#include <cstdarg>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <iostream>
 #include <optional>
 #include <set>
 
@@ -16,6 +18,7 @@ namespace utils {
 #if defined __linux__ || defined BSD || defined __APPLE__
 #include <errno.h>
 #include <pwd.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -24,6 +27,46 @@ constexpr const uchar PATH_DELIMITER = ':';
 
 /* Only parent can execute some operations. */
 static const pid_t PARENT_SHELL_PID = getpid();
+
+static sigset_t
+make_sigset_impl(int first, ...)
+{
+  va_list va;
+
+  sigset_t sm;
+  sigemptyset(&sm);
+
+  va_start(va, first);
+  for (int sig = first; sig != -1; sig = va_arg(va, int)) {
+    sigaddset(&sm, sig);
+  }
+  va_end(va);
+
+  return sm;
+}
+
+#define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
+
+static sigset_t
+default_signals()
+{
+  return make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP);
+}
+
+static void
+reset_signal_handlers()
+{
+  sigset_t sm;
+  sigfillset(&sm);
+  sigprocmask(SIG_UNBLOCK, &sm, NULL);
+}
+
+void
+set_default_signal_handlers()
+{
+  sigset_t sm = default_signals();
+  sigprocmask(SIG_BLOCK, &sm, NULL);
+}
 
 std::string
 last_system_error_message()
@@ -56,22 +99,51 @@ execute_program_by_path(const std::filesystem::path    &path,
   /* And then NULL at the end. */
   real_args.push_back(nullptr);
 
-  i32   status = 256;
-  pid_t pid = fork();
+  pid_t child_pid = fork();
 
-  if (pid == -1) {
-    throw Error("fork() failed: " + last_system_error_message());
-  } else if (pid == 0) {
+  if (child_pid == 0) {
+    reset_signal_handlers();
     if (execv(path.c_str(), const_cast<char *const *>(real_args.data())) == -1)
       throw shit::Error{last_system_error_message()};
-  } else {
-    if (waitpid(pid, &status, 0) == -1 || !WIFEXITED(status))
-      throw shit::Error{"waitpid() failed: " + last_system_error_message()};
-
-    return WEXITSTATUS(status);
   }
 
-  SHIT_UNREACHABLE();
+  if (child_pid == -1)
+    throw Error("fork() failed: " + last_system_error_message());
+
+  i32 status{};
+  i32 retcode = 255;
+
+  if (waitpid(child_pid, &status, WUNTRACED) == -1)
+    throw shit::Error{"waitpid() failed: " + last_system_error_message()};
+
+  if (WIFSIGNALED(status)) {
+    i32 sig = WTERMSIG(status);
+
+    /* Ignore Ctrl-C. */
+    if (sig & ~(SIGINT)) {
+      std::cout << "[process " << child_pid
+                << " was terminated by signal " + std::to_string(sig) + "]"
+                << std::endl;
+    }
+
+    retcode = status;
+  } else if (WIFSTOPPED(status)) {
+    i32 sig = WSTOPSIG(status);
+    std::cout << "[process " << child_pid
+              << " was stopped by signal " + std::to_string(sig) +
+                     " and terminated]"
+              << std::endl;
+
+    /* TODO: support background processes. */
+    if (kill(child_pid, SIGKILL) == -1)
+      throw shit::Error{"kill() failed: " + last_system_error_message()};
+  } else if (!WIFEXITED(status)) {
+    throw shit::Error{"waitpid() failed: " + last_system_error_message()};
+  } else {
+    retcode = WEXITSTATUS(status);
+  }
+
+  return retcode;
 }
 
 bool
@@ -106,7 +178,7 @@ get_home_directory()
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-constexpr const uchar PATH_DELIMITER = ';';
+constexpr static const uchar PATH_DELIMITER = ';';
 
 /* Only parent can execute some operations. */
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
@@ -114,25 +186,24 @@ static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 std::string
 last_system_error_message()
 {
-  LPVOID lp_msg{};
-  DWORD  code = GetLastError();
-  DWORD  dw = FormatMessage(
-       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-           FORMAT_MESSAGE_IGNORE_INSERTS,
-       NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &lp_msg,
-       0, NULL);
+  LPTSTR error_message{};
+  DWORD  ret = FormatMessage(
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+      NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+      &error_message, 0, NULL);
 
-  if (dw == 0) {
+  if (ret == 0) {
     return "(Error message couldn't be proccessed due to FormatMessage() fail)";
   }
 
-  std::string m{static_cast<char *>(lp_msg)};
-  LocalFree(lp_msg);
+  std::string m{static_cast<char *>(error_message)};
+  LocalFree(error_message);
 
   return m;
 }
 
-constexpr usize WIN32_MAX_ENV_SIZE = 32767;
+constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
 
 std::optional<std::string>
 get_environment_variable(std::string_view key)
@@ -298,8 +369,9 @@ quit(i32 code)
 {
   /* Cleanup for main proccess. */
   if (!is_child_process()) {
-    if (toiletline::is_active())
+    if (toiletline::is_active()) {
       toiletline::exit();
+    }
   }
 
   std::exit(code);

@@ -10,8 +10,6 @@ namespace shit {
 
 namespace utils {
 
-constexpr usize MAX_PARENTHESES_DEPTH = 64;
-
 std::string last_system_error_message();
 
 /* Path is the program path to execute, expanded from program. Program is
@@ -47,6 +45,8 @@ std::filesystem::path get_current_directory();
 std::optional<std::string> get_current_user();
 
 std::optional<std::filesystem::path> get_home_directory();
+
+void set_default_signal_handlers();
 
 } /* namespace utils */
 
