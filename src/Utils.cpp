@@ -48,9 +48,9 @@ make_sigset_impl(int first, ...)
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
 static sigset_t
-default_signals()
+ignored_signals()
 {
-  return make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP);
+  return make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
 }
 
 static void
@@ -64,7 +64,7 @@ reset_signal_handlers()
 void
 set_default_signal_handlers()
 {
-  sigset_t sm = default_signals();
+  sigset_t sm = ignored_signals();
   sigprocmask(SIG_BLOCK, &sm, NULL);
 }
 
@@ -208,9 +208,8 @@ constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
 std::optional<std::string>
 get_environment_variable(std::string_view key)
 {
-  char  buffer[WIN32_MAX_ENV_SIZE];
-  DWORD result = GetEnvironmentVariableA(key.data(), buffer, sizeof(buffer));
-  if (result == 0) {
+  char buffer[WIN32_MAX_ENV_SIZE] = {0};
+  if (GetEnvironmentVariableA(key.data(), buffer, sizeof(buffer)) == 0) {
     return std::nullopt;
   }
   return std::string(buffer);
@@ -313,7 +312,7 @@ get_home_directory()
 #endif /* _WIN32 */
 
 std::optional<std::string>
-expand_path(const std::string_view &path)
+expand_path(std::string_view path)
 {
   std::string expanded_path{path};
 
@@ -328,8 +327,9 @@ expand_path(const std::string_view &path)
     expanded_path.erase(pos, 1);
     /* TODO: expand different users */
     std::optional<std::filesystem::path> u = get_home_directory();
-    if (!u)
+    if (!u) {
       return std::nullopt;
+    }
     expanded_path.insert(pos, u.value().string());
   }
 
@@ -339,7 +339,7 @@ expand_path(const std::string_view &path)
 }
 
 std::optional<std::filesystem::path>
-canonicalize_path(const std::string_view &path)
+canonicalize_path(std::string_view path)
 {
   std::filesystem::path actual_path{path};
 

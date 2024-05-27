@@ -23,11 +23,10 @@ std::optional<std::string> get_environment_variable(std::string_view key);
 /* Make launching programs more convenient, e.g strip out .exe for Windows. */
 std::string_view sanitize_program_name(std::string_view program_name);
 
-std::optional<std::string> expand_path(const std::string_view &path);
+std::optional<std::string> expand_path(std::string_view path);
 
 /* Normalizes the path. */
-std::optional<std::filesystem::path>
-canonicalize_path(const std::string_view &path);
+std::optional<std::filesystem::path> canonicalize_path(std::string_view path);
 
 /* Searches PATH for program binary. Returns absolute path to the program. */
 std::optional<std::filesystem::path>

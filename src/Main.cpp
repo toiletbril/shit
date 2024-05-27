@@ -96,8 +96,11 @@ main(int argc, char **argv)
             toiletline::emit_newlines(input);
             shit::utils::quit(exit_code);
           } else if (code == TL_PRESSED_INTERRUPT) {
-            /* Ignore CTRL-C. */
+            /* Ignore Ctrl-C. */
             std::cout << "^C" << std::flush;
+          } else if (code == TL_PRESSED_SUSPEND) {
+            /* Ignore Ctrl-Z. */
+            std::cout << "^Z" << std::flush;
           }
 
           toiletline::emit_newlines(input);
