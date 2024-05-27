@@ -1,9 +1,29 @@
 .PHONY: shit compile fmt clean
 
 MODULES := \
-Main Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens
+	Main \
+	Errors \
+	Builtin \
+	Cli \
+	Toiletline \
+	Expressions \
+	Utils \
+	Lexer \
+	Parser \
+	Tokens
+
 HEADERS := \
-Errors Builtin Cli Toiletline Expressions Utils Lexer Parser Tokens Debug Common
+	Errors \
+	Builtin \
+	Cli \
+	Toiletline \
+	Expressions \
+	Utils \
+	Lexer \
+	Parser \
+	Tokens \
+	Debug \
+	Common
 
 SOURCE_FILES := $(addsuffix .cpp, $(MODULES))
 HEADER_FILES := $(addsuffix .hpp, $(HEADERS))
@@ -19,24 +39,39 @@ ifeq ($(OS),Windows_NT)
 CXX := clang++
 endif
 
+CXXFLAGS := \
+	-Wall \
+	-Wextra \
+	-Wdouble-promotion \
+	-Wno-format \
+	-Werror \
+	-std=c++17
+
 # RELEASE=1 make
 ifeq ($(RELEASE), 1)
-CXXFLAGS := -g -O2 -std=c++17
+CXXFLAGS += \
+	-DNDEBUG \
+	-O2
 else
 ifneq ($(OS), Windows_NT)
 	# Windows' Asan is broken
 	CXXFLAGS += -fsanitize=address
 endif
-CXXFLAGS := -g3 -O0 -std=c++17
+CXXFLAGS += \
+	-g3 \
+	-O0
 endif
 
-# Additional flags
+# Additional flags for Windows
 ifeq ($(OS), Windows_NT)
 	# Disable dumb errors
-	CXXFLAGS += -Wno-format -Wno-unused-command-line-argument
-	CXXFLAGS += -Wno-deprecated-declarations
+	CXXFLAGS += \
+		-Wno-unused-command-line-argument \
+		-Wno-deprecated-declarations
 	# Libraries we depend on
-	CXXFLAGS += -luserenv -ladvapi32
+	CXXFLAGS += \
+		-luserenv \
+		-ladvapi32
 endif
 
 o/%.o : %.cpp
@@ -60,4 +95,7 @@ fmt:
 
 clean:
 	@rm -rf ./o $(OUT)
+	# Cosmo
+	@rm -rf $(OUT).com.dbg $(OUT).aarch64.elf
+	# Windows
 	@rm -rf ../*.ilk ../*.pdb ../*.lib

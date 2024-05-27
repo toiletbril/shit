@@ -29,8 +29,9 @@
 #define SHIT_TRAP(...)                                                         \
   do {                                                                         \
     SHIT_TRACELN("Encountered a debug trap");                                  \
-    if (!t__va_is_empty(__VA_ARGS__))                                          \
+    if (!t__va_is_empty(__VA_ARGS__)) {                                        \
       SHIT_TRACELN("Details: " __VA_ARGS__);                                   \
+    }                                                                          \
     t__debugtrap();                                                            \
   } while (0)
 
@@ -38,8 +39,9 @@
 #define SHIT_UNREACHABLE(...)                                                  \
   do {                                                                         \
     SHIT_TRACELN("Reached an unreachable statement");                          \
-    if (!t__va_is_empty(__VA_ARGS__))                                          \
+    if (!t__va_is_empty(__VA_ARGS__)) {                                        \
       SHIT_TRACELN("Details: " __VA_ARGS__);                                   \
+    }                                                                          \
     t__unreachable();                                                          \
   } while (0)
 
@@ -54,8 +56,9 @@
   do {                                                                         \
     if (!(x)) [[unlikely]] {                                                   \
       SHIT_TRACELN("'SHIT_ASSERT(" #x ")' fail in %s().", __func__);           \
-      if (!t__va_is_empty(__VA_ARGS__))                                        \
+      if (!t__va_is_empty(__VA_ARGS__)) {                                      \
         SHIT_TRACELN("Details: " __VA_ARGS__);                                 \
+      }                                                                        \
       SHIT_TRAP();                                                             \
     }                                                                          \
   } while (0)

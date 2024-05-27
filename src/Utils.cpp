@@ -15,7 +15,12 @@ namespace shit {
 
 namespace utils {
 
-#if defined __linux__ || defined BSD || defined __APPLE__
+#if defined __linux__ || defined BSD || defined __APPLE__ || __COSMOPOLITAN__
+
+#if defined __COSMOPOLITAN__
+#include <cosmo.h>
+#endif
+
 #include <errno.h>
 #include <pwd.h>
 #include <signal.h>
@@ -121,7 +126,7 @@ execute_program_by_path(const std::filesystem::path    &path,
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      std::cout << "[process " << child_pid
+      std::cout << "[Process " << child_pid
                 << " was terminated by signal " + std::to_string(sig) + "]"
                 << std::endl;
     }
@@ -129,7 +134,7 @@ execute_program_by_path(const std::filesystem::path    &path,
     retcode = status;
   } else if (WIFSTOPPED(status)) {
     i32 sig = WSTOPSIG(status);
-    std::cout << "[process " << child_pid
+    std::cout << "[Process " << child_pid
               << " was stopped by signal " + std::to_string(sig) +
                      " and terminated]"
               << std::endl;
@@ -152,11 +157,13 @@ is_child_process()
   return getpid() != PARENT_SHELL_PID;
 }
 
+#if !defined __COSMOPOLITAN__
 std::string_view
 sanitize_program_name(std::string_view program_name)
 {
   return program_name;
 }
+#endif /* __COSMOPOLITAN__ */
 
 std::optional<std::string>
 get_current_user()
@@ -264,30 +271,6 @@ is_child_process()
   return GetCurrentProcessId() != PARENT_SHELL_PID;
 }
 
-const static std::set<std::string> OMITTED_EXTENSIONS = {
-    "exe",
-    "com",
-    "scr",
-    "bat",
-};
-
-std::string_view
-sanitize_program_name(std::string_view program_name)
-{
-  usize extension_pos = program_name.rfind(".");
-
-  if (extension_pos != std::string::npos &&
-      extension_pos + 3 < program_name.length())
-  {
-    std::string_view extension = program_name.substr(extension_pos + 1);
-    if (OMITTED_EXTENSIONS.find(extension.data()) != OMITTED_EXTENSIONS.end()) {
-      return program_name.substr(0, extension_pos);
-    }
-  }
-
-  return program_name;
-}
-
 std::optional<std::string>
 get_current_user()
 {
@@ -310,6 +293,40 @@ get_home_directory()
 }
 
 #endif /* _WIN32 */
+
+#if defined _WIN32 || defined __COSMOPOLITAN__
+
+const static std::set<std::string> OMITTED_EXTENSIONS = {
+    "exe",
+    "com",
+    "scr",
+    "bat",
+};
+
+std::string_view
+sanitize_program_name(std::string_view program_name)
+{
+#if defined __COSMOPOLITAN__
+  if (IsWindows())
+#endif
+  {
+    usize extension_pos = program_name.rfind(".");
+
+    if (extension_pos != std::string::npos &&
+        extension_pos + 3 < program_name.length())
+    {
+      std::string_view extension = program_name.substr(extension_pos + 1);
+      if (OMITTED_EXTENSIONS.find(extension.data()) != OMITTED_EXTENSIONS.end())
+      {
+        return program_name.substr(0, extension_pos);
+      }
+    }
+  }
+
+  return program_name;
+}
+
+#endif /* _WIN32 || __COSMOPOLITAN__ */
 
 std::optional<std::string>
 expand_path(std::string_view path)

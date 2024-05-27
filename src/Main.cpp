@@ -16,11 +16,11 @@ static std::vector<shit::Flag *> FLAG_LIST{};
 
 #define FLAG(...) ADD_FLAG(FLAG_LIST, __VA_ARGS__)
 
-FLAG(HELP, Bool, '\0', "help", "Display help message.");
-FLAG(VERSION, Bool, '\0', "version", "Display program version.");
 FLAG(DUMP_AST, Bool, 'A', "dump-ast", "Dump AST for debugging purposes.");
 FLAG(EXIT_CODE, Bool, 'e', "exit-code", "Print exit code after each command.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
+FLAG(HELP, Bool, '\0', "help", "Display help message.");
+FLAG(VERSION, Bool, '\0', "version", "Display program version.");
 
 int
 main(int argc, char **argv)

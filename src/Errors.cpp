@@ -49,7 +49,7 @@ get_context_pointing_to(std::string_view source, usize location,
 
   SHIT_ASSERT(location + size <= source.length(), "end: %zu, length: %zu",
               location + size, source.length());
-  SHIT_ASSERT(location - start_offset >= 0);
+  SHIT_ASSERT(location >= start_offset);
   SHIT_ASSERT(location - start_offset <= location + size,
               "location: %zu, start: %zu, size: %zu, ", location, start_offset,
               size);
