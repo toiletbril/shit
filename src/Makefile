@@ -95,7 +95,5 @@ fmt:
 
 clean:
 	@rm -rf ./o $(OUT)
-	# Cosmo
-	@rm -rf $(OUT).com.dbg $(OUT).aarch64.elf
-	# Windows
-	@rm -rf ../*.ilk ../*.pdb ../*.lib
+	@rm -rf $(OUT).com.dbg $(OUT).aarch64.elf # Cosmopolitan
+	@rm -rf ../*.ilk ../*.pdb ../*.lib # Windows

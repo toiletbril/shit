@@ -1,6 +1,7 @@
 #include "Expressions.hpp"
 
 #include "Builtin.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Utils.hpp"
 
@@ -119,8 +120,9 @@ Exec::evaluate() const
 
   /* This isn't a path? */
   if (m_path.find('/') == std::string::npos) {
-    /* Is this a builtin? */
     Builtin::Kind bk = search_builtin(m_path);
+
+    /* Is this a builtin? */
     if (bk != Builtin::Kind::Invalid) {
       try {
         return execute_builtin(bk, m_args);
@@ -128,6 +130,7 @@ Exec::evaluate() const
         throw ErrorWithLocation{location(), err.message()};
       }
     }
+
     /* Not a builtin, try to search PATH. */
     program_path = utils::search_program_path(m_path);
   } else {
@@ -138,15 +141,21 @@ Exec::evaluate() const
   if (!program_path)
     throw ErrorWithLocation{location(), "Command not found"};
 
-  i32 ret = 1;
-
   try {
-    ret = utils::execute_program_by_path(program_path.value(), m_path, m_args);
+    /* Perform a simple shell expansion for arguments. */
+    std::vector<std::string> expanded_args;
+    for (std::string_view arg : m_args) {
+      expanded_args.push_back(
+          utils::simple_shell_expand(arg).value_or(std::string{arg}));
+    }
+
+    return utils::execute_program_by_path(program_path.value(), m_path,
+                                          expanded_args);
   } catch (Error &err) {
     throw ErrorWithLocation{location(), err.message()};
   }
 
-  return ret;
+  SHIT_UNREACHABLE();
 }
 
 std::string

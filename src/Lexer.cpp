@@ -9,7 +9,9 @@
 
 namespace shit {
 
-static SHIT_FORCEINLINE bool
+namespace lexer {
+
+bool
 is_whitespace(char ch)
 {
   switch (ch) {
@@ -22,13 +24,13 @@ is_whitespace(char ch)
   }
 }
 
-static SHIT_FORCEINLINE bool
+bool
 is_number(char ch)
 {
   return ch >= '0' && ch <= '9';
 }
 
-static SHIT_FORCEINLINE bool
+bool
 is_expression_sentinel(char ch)
 {
   switch (ch) {
@@ -53,7 +55,7 @@ is_expression_sentinel(char ch)
   };
 }
 
-static SHIT_FORCEINLINE bool
+bool
 is_shell_sentinel(char ch)
 {
   switch (ch) {
@@ -64,13 +66,13 @@ is_shell_sentinel(char ch)
   };
 }
 
-static SHIT_FORCEINLINE bool
+bool
 is_part_of_identifier(char ch)
 {
   return !is_shell_sentinel(ch) && !is_whitespace(ch);
 }
 
-static SHIT_FORCEINLINE bool
+bool
 is_string_quote(char ch)
 {
   switch (ch) {
@@ -81,11 +83,13 @@ is_string_quote(char ch)
   }
 }
 
-static SHIT_FORCEINLINE bool
+bool
 is_ascii_char(char ch)
 {
   return (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122);
 }
+
+} /* namespace lexer */
 
 Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
 
@@ -142,7 +146,7 @@ void
 Lexer::skip_whitespace()
 {
   while (m_cursor_position < m_source.length()) {
-    if (!is_whitespace(m_source[m_cursor_position]))
+    if (!lexer::is_whitespace(m_source[m_cursor_position]))
       return;
     m_cursor_position++;
   }
@@ -156,13 +160,13 @@ Lexer::lex_expression_token()
   if (m_cursor_position < m_source.length()) {
     char ch = m_source[m_cursor_position];
 
-    if (is_number(ch))
+    if (lexer::is_number(ch))
       return chop_number(token_start);
-    else if (is_expression_sentinel(ch))
+    else if (lexer::is_expression_sentinel(ch))
       return chop_expression_sentinel(token_start);
-    else if (is_string_quote(ch))
+    else if (lexer::is_string_quote(ch))
       return chop_string(token_start + 1, ch);
-    else if (is_ascii_char(ch))
+    else if (lexer::is_ascii_char(ch))
       return chop_identifier(token_start);
     else {
       std::string s;
@@ -179,7 +183,7 @@ Lexer::chop_number(usize token_start)
 {
   usize token_end = token_start;
 
-  while (token_end < m_source.length() && is_number(m_source[token_end]))
+  while (token_end < m_source.length() && lexer::is_number(m_source[token_end]))
     token_end++;
 
   Token *num = new TokenNumber{
@@ -195,7 +199,7 @@ Lexer::chop_identifier(usize token_start)
   usize token_end = token_start;
 
   while (token_end < m_source.length() &&
-         is_part_of_identifier(m_source[token_end]))
+         lexer::is_part_of_identifier(m_source[token_end]))
     token_end++;
 
   std::string ident_string =
@@ -233,11 +237,11 @@ Lexer::lex_shell_token()
   if (m_cursor_position < m_source.length()) {
     char ch = m_source[m_cursor_position];
 
-    if (is_string_quote(ch))
+    if (lexer::is_string_quote(ch))
       return chop_string(token_start + 1, ch);
-    else if (is_shell_sentinel(ch))
+    else if (lexer::is_shell_sentinel(ch))
       return chop_shell_sentinel(token_start);
-    else if (is_part_of_identifier(ch))
+    else if (lexer::is_part_of_identifier(ch))
       return chop_identifier(token_start);
     else {
       std::string s;

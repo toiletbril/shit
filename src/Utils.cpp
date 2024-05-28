@@ -1,6 +1,7 @@
 #include "Utils.hpp"
 
 #include "Errors.hpp"
+#include "Lexer.hpp"
 #include "Toiletline.hpp"
 
 #include <cstdarg>
@@ -157,13 +158,15 @@ is_child_process()
   return getpid() != PARENT_SHELL_PID;
 }
 
+/* Cosmopolitan binaries can be run on both Linux and Windows. This will be
+ * replaced by a runtime check. */
 #if !defined __COSMOPOLITAN__
 std::string_view
 sanitize_program_name(std::string_view program_name)
 {
   return program_name;
 }
-#endif /* __COSMOPOLITAN__ */
+#endif /* !__COSMOPOLITAN__ */
 
 std::optional<std::string>
 get_current_user()
@@ -329,28 +332,36 @@ sanitize_program_name(std::string_view program_name)
 #endif /* _WIN32 || __COSMOPOLITAN__ */
 
 std::optional<std::string>
-expand_path(std::string_view path)
+simple_shell_expand(std::string_view path)
 {
+  usize       pos = std::string::npos;
   std::string expanded_path{path};
 
   /* Expand tilde. */
-  usize pos{std::string::npos};
   while ((pos = expanded_path.find('~')) != std::string::npos) {
-    if (expanded_path.length() < pos + 1 ||
-        expanded_path[pos + 1] != std::filesystem::path::preferred_separator)
-    {
+    if (pos > 0 && !lexer::is_whitespace(expanded_path[pos - 1])) {
       break;
     }
+
+    if (expanded_path.length() > pos + 1 &&
+        expanded_path[pos + 1] != std::filesystem::path::preferred_separator)
+    {
+      /* TODO: Expand different users. */
+      break;
+    }
+
+    /* Remove the tilde. */
     expanded_path.erase(pos, 1);
-    /* TODO: expand different users */
+
     std::optional<std::filesystem::path> u = get_home_directory();
     if (!u) {
       return std::nullopt;
     }
+
     expanded_path.insert(pos, u.value().string());
   }
 
-  /* TODO: expand asterisk and etc */
+  /* TODO: Expand asterisk, exclamation mark. */
 
   return expanded_path;
 }
@@ -397,20 +408,21 @@ quit(i32 code)
 #define SANITIZED_EQUAL(s1, s2)                                                \
   sanitize_program_name(s1) == sanitize_program_name(s2)
 
-/* TODO: cache this. */
+/* TODO: Cache this. */
 std::optional<std::filesystem::path>
 search_program_path(std::string_view program_name)
 {
   std::optional<std::string> maybe_path = get_environment_variable("PATH");
-  SHIT_ASSERT(maybe_path, "PATH environment variable must exist");
-
-  std::string path_var = maybe_path.value();
+  if (!maybe_path)
+    return std::nullopt;
 
   std::string dir_path;
+  std::string path_var = maybe_path.value();
+
   for (const char &ch : path_var) {
-    if (ch != PATH_DELIMITER)
+    if (ch != PATH_DELIMITER) {
       dir_path += ch;
-    else {
+    } else {
       /* What the heck? A path in PATH that does not exist? Are you a Windows
        * user? */
       if (std::filesystem::exists(dir_path)) {

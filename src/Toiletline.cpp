@@ -23,7 +23,7 @@ namespace toiletline {
 bool
 is_active()
 {
-  return ::itl_is_active;
+  return ::itl_global_is_active;
 }
 
 void

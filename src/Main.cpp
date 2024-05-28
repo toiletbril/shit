@@ -25,8 +25,6 @@ FLAG(VERSION, Bool, '\0', "version", "Display program version.");
 int
 main(int argc, char **argv)
 {
-  shit::utils::set_default_signal_handlers();
-
   std::vector<std::string> file_names;
 
   try {
@@ -65,9 +63,10 @@ main(int argc, char **argv)
       /* If we weren't given any arguments or -c=..., fire up the toiletline. */
       if (file_names.empty() && FLAG_COMMAND.contents().empty()) {
         if (!toiletline::is_active()) {
+          shit::utils::set_default_signal_handlers();
           toiletline::initialize();
         } else {
-          /* NOTE: don't go into this branch if exit_raw_mode() wasn't called
+          /* NOTE: avoid this branch if exit_raw_mode() wasn't called
            * previosly! */
           toiletline::enter_raw_mode();
         }

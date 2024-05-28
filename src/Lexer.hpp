@@ -8,6 +8,22 @@
 
 namespace shit {
 
+namespace lexer {
+
+bool is_whitespace(char ch);
+
+bool is_number(char ch);
+
+bool is_expression_sentinel(char ch);
+
+bool is_shell_sentinel(char ch);
+
+bool is_part_of_identifier(char ch);
+
+bool is_string_quote(char ch);
+
+} /* namespace lexer */
+
 struct Lexer
 {
   Lexer(std::string source);
