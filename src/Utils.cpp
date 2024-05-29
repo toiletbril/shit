@@ -122,23 +122,28 @@ execute_program_by_path(const std::filesystem::path    &path,
   if (waitpid(child_pid, &status, WUNTRACED) == -1)
     throw shit::Error{"waitpid() failed: " + last_system_error_message()};
 
+  /* Print appropriate message if the process was sent a signal. */
   if (WIFSIGNALED(status)) {
-    i32 sig = WTERMSIG(status);
+    i32         sig = WTERMSIG(status);
+    const char *sig_str = strsignal(sig);
+    std::string sig_desc =
+        (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      std::cout << "[Process " << child_pid
-                << " was terminated by signal " + std::to_string(sig) + "]"
-                << std::endl;
+      std::cout << "[Process " << child_pid << ": " << sig_desc << ", signal "
+                << std::to_string(sig) << "]" << std::endl;
     }
 
     retcode = status;
   } else if (WIFSTOPPED(status)) {
-    i32 sig = WSTOPSIG(status);
-    std::cout << "[Process " << child_pid
-              << " was stopped by signal " + std::to_string(sig) +
-                     " and terminated]"
-              << std::endl;
+    i32         sig = WSTOPSIG(status);
+    const char *sig_str = strsignal(sig);
+    std::string sig_desc =
+        (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
+
+    std::cout << "[Process " << child_pid << ": " << sig_desc << ", signal "
+              << std::to_string(sig) << " and killed]" << std::endl;
 
     /* TODO: support background processes. */
     if (kill(child_pid, SIGKILL) == -1)
