@@ -13,14 +13,18 @@ There will be more information soon™ (when I feel like it).
 Is it usable?
 - [x] Run programs.
 - [x] Work on Linux and Windows.
-
-Is it good?
 - [ ] Shell expansion. (`*`, `~`, `!`)
-- [ ] Redirections. (`>`/`<`)
 - [ ] Environment variables.
+- [ ] Numeric expressions.
 - [ ] Background jobs.
+- [ ] Redirections. (`>`/`<`)
 - [ ] Pipes.
 
+Is it good?
+- [ ] Scripting capabilities. (flow control keywords)
+- [ ] Complex scripting capabilites.
+
 Is is exceptional? 
+- [ ] Arbitrary precision numeric expressions.
 - [ ] Cross-platform replacement for most common Unix programs which Windows
       does not have.
