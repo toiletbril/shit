@@ -159,6 +159,8 @@ main(int argc, char **argv)
       shit::utils::quit(EXIT_FAILURE);
     }
 
+    exit_code = EXIT_FAILURE;
+
     /* Execute the contents. */
     try {
       std::unique_ptr<shit::Parser> p =
@@ -174,10 +176,8 @@ main(int argc, char **argv)
     } catch (shit::ErrorWithLocationAndDetails &e) {
       shit::show_error(e.to_string(contents));
       shit::show_error(e.details_to_string(contents));
-      exit_code = EXIT_FAILURE;
     } catch (shit::ErrorWithLocation &e) {
       shit::show_error(e.to_string(contents));
-      exit_code = EXIT_FAILURE;
     } catch (...) {
       shit::show_error("Could not execute the code due to an unexpected "
                        "explosion! Last system message: " +
@@ -185,7 +185,7 @@ main(int argc, char **argv)
       shit::utils::quit(EXIT_FAILURE);
     }
 
-    /* We can get here from child process if they didn't platform_exec()
+    /* We can get here from child process if they didn't exec()
      * properly to print error. */
     if (should_quit || shit::utils::is_child_process())
       shit::utils::quit(exit_code);

@@ -118,6 +118,18 @@ Exec::evaluate() const
 {
   std::optional<std::filesystem::path> program_path;
 
+  auto shell_expand_args =
+      [](const std::vector<std::string> &args) -> std::vector<std::string> {
+    std::vector<std::string> expanded_args;
+
+    for (std::string_view arg : args) {
+      expanded_args.push_back(
+          utils::simple_shell_expand(arg).value_or(std::string{arg}));
+    }
+
+    return expanded_args;
+  };
+
   /* This isn't a path? */
   if (m_path.find('/') == std::string::npos) {
     Builtin::Kind bk = search_builtin(m_path);
@@ -125,7 +137,8 @@ Exec::evaluate() const
     /* Is this a builtin? */
     if (bk != Builtin::Kind::Invalid) {
       try {
-        return execute_builtin(bk, m_args);
+
+        return execute_builtin(bk, shell_expand_args(m_args));
       } catch (Error &err) {
         throw ErrorWithLocation{location(), err.message()};
       }
@@ -142,15 +155,8 @@ Exec::evaluate() const
     throw ErrorWithLocation{location(), "Command not found"};
 
   try {
-    /* Perform a simple shell expansion for arguments. */
-    std::vector<std::string> expanded_args;
-    for (std::string_view arg : m_args) {
-      expanded_args.push_back(
-          utils::simple_shell_expand(arg).value_or(std::string{arg}));
-    }
-
     return utils::execute_program_by_path(program_path.value(), m_path,
-                                          expanded_args);
+                                          shell_expand_args(m_args));
   } catch (Error &err) {
     throw ErrorWithLocation{location(), err.message()};
   }
