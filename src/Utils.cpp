@@ -198,24 +198,38 @@ constexpr static const uchar PATH_DELIMITER = ';';
 /* Only parent can execute some operations. */
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
+void
+set_default_signal_handlers()
+{
+  /* TODO */
+}
+
 std::string
 last_system_error_message()
 {
-  LPTSTR error_message{};
-  DWORD  ret = FormatMessage(
+  LPSTR errno_str{};
+  DWORD win_errno = GetLastError();
+
+  DWORD ret = FormatMessageA(
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
           FORMAT_MESSAGE_IGNORE_INSERTS,
-      NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      &error_message, 0, NULL);
+      NULL, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+      reinterpret_cast<LPSTR>(&errno_str), 0, NULL);
 
   if (ret == 0) {
-    return "(Error message couldn't be proccessed due to FormatMessage() fail)";
+    return std::to_string(win_errno) + " (Error message couldn't be proccessed "
+                                       "due to FormatMessage() fail)";
   }
 
-  std::string m{static_cast<char *>(error_message)};
-  LocalFree(error_message);
+  std::string_view view{static_cast<char *>(errno_str)};
+  /* I do not want the PERIOD. */
+  if (view.find_last_of(". \n") != std::string::npos) {
+    view.remove_suffix(3);
+  }
+  std::string err{view};
+  LocalFree(errno_str);
 
-  return m;
+  return err;
 }
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
