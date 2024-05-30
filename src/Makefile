@@ -1,33 +1,9 @@
-.PHONY: shit compile fmt clean
+# make MODE=dbg/rel/cosmo
+MODE := dbg
 
-MODULES := \
-	Main \
-	Errors \
-	Builtin \
-	Cli \
-	Toiletline \
-	Expressions \
-	Utils \
-	Lexer \
-	Parser \
-	Tokens
-
-HEADERS := \
-	Errors \
-	Builtin \
-	Cli \
-	Toiletline \
-	Expressions \
-	Utils \
-	Lexer \
-	Parser \
-	Tokens \
-	Debug \
-	Common
-
-SOURCE_FILES := $(addsuffix .cpp, $(MODULES))
-HEADER_FILES := $(addsuffix .hpp, $(HEADERS))
-OBJECTS := $(addprefix o/, $(addsuffix .o, $(MODULES)))
+SOURCES := $(wildcard *.cpp)
+HEADERS := $(wildcard *.hpp)
+OBJECTS := $(SOURCES:%.cpp=o/$(MODE)/%.o)
 
 ifeq ($(OS), Windows_NT)
 OUT := ../shit.exe
@@ -35,7 +11,9 @@ else
 OUT := ../shit
 endif
 
-ifeq ($(OS),Windows_NT)
+ifeq ($(MODE), cosmo)
+CXX := cosmoc++
+else ifeq ($(OS), Windows_NT)
 CXX := clang++
 endif
 
@@ -47,53 +25,56 @@ CXXFLAGS := \
 	-Werror \
 	-std=c++17
 
-# RELEASE=1 make
-ifeq ($(RELEASE), 1)
+ifeq ($(MODE), rel)
 CXXFLAGS += \
 	-DNDEBUG \
 	-O2
-else
-ifneq ($(OS), Windows_NT)
-	# Windows' Asan is broken
-	CXXFLAGS += -fsanitize=address
-endif
+else ifeq ($(MODE), dbg)
 CXXFLAGS += \
 	-g3 \
 	-O0
+ifneq ($(OS), Windows_NT)
+CXXFLAGS += -fsanitize=address # Windows' Asan is broken
+endif
+else ifeq ($(MODE), cosmo)
+CXXFLAGS += -fexceptions
+ifneq ($(CXX), cosmoc++)
+$(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
+endif
+else
+$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "cosmo")
 endif
 
-# Additional flags for Windows
 ifeq ($(OS), Windows_NT)
-	# Disable dumb errors
 	CXXFLAGS += \
 		-Wno-unused-command-line-argument \
 		-Wno-deprecated-declarations
-	# Libraries we depend on
 	CXXFLAGS += \
 		-luserenv \
 		-ladvapi32
 endif
 
-o/%.o : %.cpp
-	@echo "	CXX $< 	-o $(CWD)$@"
-	@$(CXX) $(CXXFLAGS) -c $< -o $@
+o/$(MODE)/%.o: %.cpp
+	echo "	CXX $< 	-o $@"
+	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
 shit:
-	mkdir -p ./o
-	@$(MAKE) compile
+	mkdir -p o/$(MODE)/
+	$(MAKE) compile
 
 compile: $(OBJECTS)
-	@echo "	CXX $(OBJECTS)	-o $(OUT)"
-	@$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
+	echo "	CXX $(OBJECTS)	-o $(OUT)"
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
 
 CLANG_FORMAT ?= clang-format
 
 fmt:
-	@echo "	CLANG_FORMAT -i $(SOURCE_FILES)"
-	@echo "	CLANG_FORMAT -i $(HEADER_FILES)"
-	@$(CLANG_FORMAT) -i $(SOURCE_FILES) $(HEADER_FILES)
+	echo "	CLANG-FORMAT -i $(SOURCES) $(HEADERS)"
+	$(CLANG_FORMAT) -i $(SOURCES) $(HEADERS)
 
 clean:
-	@rm -rf ./o $(OUT)
-	@rm -rf $(OUT).com.dbg $(OUT).aarch64.elf # Cosmopolitan
-	@rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
+	rm -rf ./o $(OUT)
+	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
+	rm -rf $(OUT).com.dbg $(OUT).aarch64.elf # Cosmopolitan
+
+.PHONY: sanity shit compile fmt clean

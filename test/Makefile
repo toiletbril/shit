@@ -1,29 +1,25 @@
-.PHONY: test clean test_list
-
 ifeq ($(OS), Windows_NT)
 BIN := ../shit.exe
 else
 BIN := ../shit
 endif
 
-FAILED := failed.diff
-
 %: expected/%.out
-	@ \
 	cat input/$@.shit | \
 	$(BIN) -Ae - | \
-	diff -wu $< - >> $(FAILED) && \
+	diff -wu $< - >> failed.diff && \
 	echo "	[$@		] ok." || \
 	echo "	[$@		] FAILED."
 
 test: $(BIN)
 	@rm -f $(FAILED)
-	@$(MAKE) -B test_list
+	@$(MAKE) -B run_tests
 
 clean:
 	@rm -f $(FAILED)
 
-TESTS := \
-	hello
+INPUT_FILES := $(wildcard input/*.shit)
 
-test_list: $(TESTS)
+run_tests: $(INPUT_FILES:input/%.shit=%)
+
+.PHONY: test clean test_list
