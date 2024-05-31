@@ -4,6 +4,8 @@
 #include "Lexer.hpp"
 #include "Toiletline.hpp"
 
+#include <array>
+#include <csignal>
 #include <cstdarg>
 #include <cstdlib>
 #include <cstring>
@@ -11,6 +13,9 @@
 #include <iostream>
 #include <optional>
 #include <set>
+
+/* TODO: support background processes. */
+/* TODO: support pipes. */
 
 namespace shit {
 
@@ -24,7 +29,6 @@ namespace utils {
 
 #include <errno.h>
 #include <pwd.h>
-#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -145,7 +149,6 @@ execute_program_by_path(const std::filesystem::path    &path,
     std::cout << "[Process " << child_pid << ": " << sig_desc << ", signal "
               << std::to_string(sig) << " and killed]" << std::endl;
 
-    /* TODO: support background processes. */
     if (kill(child_pid, SIGKILL) == -1)
       throw shit::Error{"kill() failed: " + last_system_error_message()};
   } else if (!WIFEXITED(status)) {
@@ -198,10 +201,21 @@ constexpr static const uchar PATH_DELIMITER = ';';
 /* Only parent can execute some operations. */
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
+template <typename... T>
+constexpr auto
+signal_list(T &&...t) -> std::array<int, sizeof...(T)>
+{
+  return {{std::forward<T>(t)...}};
+}
+
+const static auto win_ignored_signals = signal_list(SIGINT, SIGTERM);
+
 void
 set_default_signal_handlers()
 {
-  /* TODO */
+  for (const int &ignored : win_ignored_signals) {
+    signal(ignored, SIG_IGN);
+  }
 }
 
 std::string
@@ -241,7 +255,7 @@ get_environment_variable(std::string_view key)
   if (GetEnvironmentVariableA(key.data(), buffer, sizeof(buffer)) == 0) {
     return std::nullopt;
   }
-  return std::string(buffer);
+  return std::string{buffer};
 }
 
 i32
