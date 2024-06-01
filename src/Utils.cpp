@@ -169,10 +169,11 @@ is_child_process()
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
 #if !defined __COSMOPOLITAN__
-std::string_view
-sanitize_program_name(std::string_view program_name)
+bool
+sanitize_program_name(std::string_view &program_name)
 {
-  return program_name;
+  (void) program_name;
+  return false;
 }
 #endif /* !__COSMOPOLITAN__ */
 
@@ -339,8 +340,8 @@ const static std::set<std::string> OMITTED_EXTENSIONS = {
     "bat",
 };
 
-std::string_view
-sanitize_program_name(std::string_view program_name)
+bool
+sanitize_program_name(std::string_view &program_name)
 {
 #if defined __COSMOPOLITAN__
   if (IsWindows())
@@ -354,12 +355,13 @@ sanitize_program_name(std::string_view program_name)
       std::string_view extension = program_name.substr(extension_pos + 1);
       if (OMITTED_EXTENSIONS.find(extension.data()) != OMITTED_EXTENSIONS.end())
       {
-        return program_name.substr(0, extension_pos);
+        program_name.remove_suffix(program_name.length() - extension_pos);
+        return true;
       }
     }
   }
 
-  return program_name;
+  return false;
 }
 
 #endif /* _WIN32 || __COSMOPOLITAN__ */
@@ -438,38 +440,95 @@ quit(i32 code)
   std::exit(code);
 }
 
-#define SANITIZED_EQUAL(s1, s2)                                                \
-  sanitize_program_name(s1) == sanitize_program_name(s2)
+static std::vector<std::string>           PATH_EXTENSIONS{};
+static std::vector<std::filesystem::path> PATH_DIRS{};
 
-/* TODO: Cache this. */
-std::optional<std::filesystem::path>
-search_program_path(std::string_view program_name)
+/* Program name without extension maps into indexes i and j for
+ * PATH_DIRS and PATH_EXTENSIONS, so the path can be recreated as:
+ * `PATH_DIRS[i] / (program_name + PATH_EXTENSIONS[j])` */
+static std::unordered_map<std::filesystem::path, std::tuple<usize, usize>>
+    PATH_MAP{};
+
+template <class C>
+static usize
+cache_path_into(std::vector<C> &cache, std::string &&p)
 {
+  bool  found = false;
+  usize n = 0;
+  for (usize i = 0; i < cache.size(); i++) {
+    if (cache[i] == p) {
+      found = true;
+      n = i;
+      break;
+    }
+  }
+  if (!found) {
+    n = cache.size();
+    cache.push_back(p);
+  }
+  return n;
+}
+
+void
+initialize_path_map()
+{
+  PATH_MAP.clear();
+  PATH_DIRS.clear();
+
+  PATH_EXTENSIONS.clear();
+  /* First extension entry is empty. */
+  PATH_EXTENSIONS.push_back("");
+
   std::optional<std::string> maybe_path = get_environment_variable("PATH");
   if (!maybe_path)
-    return std::nullopt;
+    return;
 
-  std::string dir_path;
+  std::string dir_string;
   std::string path_var = maybe_path.value();
 
   for (const char &ch : path_var) {
     if (ch != PATH_DELIMITER) {
-      dir_path += ch;
+      dir_string += ch;
     } else {
       /* What the heck? A path in PATH that does not exist? Are you a Windows
        * user? */
-      if (std::filesystem::exists(dir_path)) {
+      if (std::filesystem::path dir_path{dir_string};
+          std::filesystem::exists(dir_path))
+      {
         std::filesystem::directory_iterator dir{dir_path};
 
-        /* Search every file in the directory. */
+        usize dir_index = cache_path_into(PATH_DIRS, dir_path.string());
+
+        /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : dir) {
-          if (SANITIZED_EQUAL(f.path().filename().string(), program_name)) {
-            return f.path();
-          }
+          std::string      fs = f.path().filename().string();
+          std::string_view fv = fs;
+
+          usize ext_index = (sanitize_program_name(fv))
+                                ? cache_path_into(PATH_EXTENSIONS,
+                                                  f.path().extension().string())
+                                : 0;
+
+          PATH_MAP[fv] = {dir_index, ext_index};
         }
       }
-      dir_path.clear();
+
+      dir_string.clear();
     }
+  }
+}
+
+/* Search program_name in folders from PATH. File extension is not required. */
+std::optional<std::filesystem::path>
+search_program_path(std::string_view program_name)
+{
+  sanitize_program_name(program_name);
+
+  if (auto p = PATH_MAP.find(program_name); p != PATH_MAP.end()) {
+    auto [dir, ext] = p->second;
+    std::filesystem::path file_name = p->first;
+    file_name += PATH_EXTENSIONS[ext];
+    return PATH_DIRS[dir] / file_name;
   }
 
   return std::nullopt;

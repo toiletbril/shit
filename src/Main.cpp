@@ -51,6 +51,8 @@ main(int argc, char **argv)
   usize arg_index = 0;
   int   exit_code = EXIT_SUCCESS;
 
+  shit::utils::initialize_path_map();
+
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
   for (;;) {
