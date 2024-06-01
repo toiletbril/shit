@@ -109,7 +109,8 @@ DummyExpression::to_ast_string(usize layer) const
 /**
  * class: Exec
  */
-Exec::Exec(usize location, std::string path, std::vector<std::string> args)
+Exec::Exec(usize location, const std::string &path,
+           const std::vector<std::string> &args)
     : Expression(location), m_path(path), m_args(args)
 {}
 
@@ -273,7 +274,7 @@ ConstantNumber::to_string() const
 /**
  * class: ConstantString
  */
-ConstantString::ConstantString(usize location, std::string value)
+ConstantString::ConstantString(usize location, const std::string &value)
     : Expression(location), m_value(value)
 {}
 

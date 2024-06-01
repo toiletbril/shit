@@ -50,7 +50,8 @@ struct DummyExpression : public Expression
 
 struct Exec : public Expression
 {
-  Exec(usize location, std::string path, std::vector<std::string> args);
+  Exec(usize location, const std::string &path,
+       const std::vector<std::string> &args);
 
   virtual i64         evaluate() const override;
   virtual std::string to_string() const override;
@@ -100,7 +101,7 @@ protected:
 
 struct ConstantString : public Expression
 {
-  ConstantString(usize location, std::string value);
+  ConstantString(usize location, const std::string &value);
   ~ConstantString();
 
   i64         evaluate() const override;

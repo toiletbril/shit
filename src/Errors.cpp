@@ -104,7 +104,7 @@ get_context_pointing_to(std::string_view source, usize location,
  */
 ErrorBase::ErrorBase() : m_is_active(false) {}
 
-ErrorBase::ErrorBase(std::string message)
+ErrorBase::ErrorBase(const std::string &message)
     : m_is_active(true), m_message(message)
 {}
 
@@ -123,7 +123,7 @@ ErrorBase::message() const
  */
 Error::Error() : ErrorBase() {}
 
-Error::Error(std::string message) : ErrorBase(message) {}
+Error::Error(const std::string &message) : ErrorBase(message) {}
 
 std::string
 Error::to_string()
@@ -136,7 +136,7 @@ Error::to_string()
  */
 ErrorWithLocation::ErrorWithLocation() : ErrorBase() {}
 
-ErrorWithLocation::ErrorWithLocation(usize location, std::string message)
+ErrorWithLocation::ErrorWithLocation(usize location, const std::string &message)
     : ErrorBase(message), m_location(location)
 {}
 
@@ -167,8 +167,8 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails() : ErrorWithLocation()
 {}
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
-    usize location, std::string message, usize details_location,
-    std::string details_message)
+    usize location, const std::string &message, usize details_location,
+    const std::string &details_message)
     : ErrorWithLocation(location, message),
       m_details_location(details_location), m_details_message(details_message)
 {}

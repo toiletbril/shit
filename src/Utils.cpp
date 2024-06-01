@@ -172,7 +172,7 @@ is_child_process()
 bool
 sanitize_program_name(std::string_view &program_name)
 {
-  (void) program_name;
+  SHIT_UNUSED(program_name);
   return false;
 }
 #endif /* !__COSMOPOLITAN__ */
@@ -518,7 +518,6 @@ initialize_path_map()
   }
 }
 
-/* Search program_name in folders from PATH. File extension is not required. */
 std::optional<std::filesystem::path>
 search_program_path(std::string_view program_name)
 {

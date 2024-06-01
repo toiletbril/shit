@@ -13,8 +13,8 @@ namespace shit {
 /**
  * class: Flag
  */
-Flag::Flag(Flag::Kind kind, uchar short_name, std::string long_name,
-           std::string description)
+Flag::Flag(Flag::Kind kind, uchar short_name, const std::string &long_name,
+           const std::string &description)
     : m_kind(kind), m_short_name(short_name), m_long_name(long_name),
       m_description(description)
 {}
@@ -46,8 +46,8 @@ Flag::description() const
 /**
  * class: FlagBool
  */
-FlagBool::FlagBool(uchar short_name, std::string long_name,
-                   std::string description)
+FlagBool::FlagBool(uchar short_name, const std::string &long_name,
+                   const std::string &description)
     : Flag(Flag::Kind::Bool, short_name, long_name, description)
 {}
 
@@ -66,8 +66,8 @@ FlagBool::enabled() const
 /**
  * class: FlagBool
  */
-FlagString::FlagString(uchar short_name, std::string long_name,
-                       std::string description)
+FlagString::FlagString(uchar short_name, const std::string &long_name,
+                       const std::string &description)
     : Flag(Flag::Kind::String, short_name, long_name, description)
 {}
 
@@ -95,8 +95,7 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
   for (size_t i = 0; i < flags.size(); ++i) {
     if (!is_long) {
       if (flags[i]->short_name() != '\0' &&
-          flags[i]->short_name() == *flag_start)
-      {
+          flags[i]->short_name() == *flag_start) {
         *result_flag = flags[i];
         *value_start = flag_start + 1;
         return true;
@@ -225,13 +224,13 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
           } else {
             s += "-";
 
-            std::string_view flag = flag_start;
-            usize            equals_pos = flag.find("=");
+            std::string_view flag_sv = flag_start;
+            usize            equals_pos = flag_sv.find("=");
 
             if (equals_pos != std::string::npos)
-              s += flag.substr(0, equals_pos);
+              s += flag_sv.substr(0, equals_pos);
             else
-              s += flag;
+              s += flag_sv;
           }
 
           s += "'";
@@ -272,7 +271,7 @@ show_version()
 }
 
 void
-show_help(std::string_view program_name, const std::vector<Flag *> flags)
+show_help(std::string_view program_name, const std::vector<Flag *> &flags)
 {
   std::string s;
 

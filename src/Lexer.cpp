@@ -266,7 +266,7 @@ Lexer::chop_string(usize token_start, char quote_char)
 
   while (m_source[token_end] != quote_char) {
     token_end++;
-    if (token_end > m_source.length()) {
+    if (token_end >= m_source.length()) {
       throw ErrorWithLocation{token_start - 1, "Unterminated string literal"};
     }
   }

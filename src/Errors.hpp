@@ -11,7 +11,7 @@ static constexpr usize ERROR_CONTEXT_SIZE = 24;
 struct ErrorBase
 {
   ErrorBase();
-  ErrorBase(std::string message);
+  ErrorBase(const std::string &message);
   virtual ~ErrorBase();
 
   operator bool &();
@@ -30,7 +30,7 @@ protected:
 struct Error : public ErrorBase
 {
   Error();
-  Error(std::string message);
+  Error(const std::string &message);
 
   std::string to_string();
 };
@@ -43,7 +43,7 @@ struct ErrorWithLocation : public ErrorBase
 {
   ErrorWithLocation();
 
-  ErrorWithLocation(usize location, std::string message);
+  ErrorWithLocation(usize location, const std::string &message);
 
   virtual std::string to_string(std::string_view source);
 
@@ -55,9 +55,9 @@ struct ErrorWithLocationAndDetails : public ErrorWithLocation
 {
   ErrorWithLocationAndDetails();
 
-  ErrorWithLocationAndDetails(usize location, std::string message,
-                              usize       details_location,
-                              std::string details_message);
+  ErrorWithLocationAndDetails(usize location, const std::string &message,
+                              usize              details_location,
+                              const std::string &details_message);
 
   std::string details_to_string(std::string_view source);
 

@@ -23,8 +23,8 @@ struct Flag
     String,
   };
 
-  Flag(Kind type, uchar short_name, std::string long_name,
-       std::string description);
+  Flag(Kind type, uchar short_name, const std::string &long_name,
+       const std::string &description);
 
   Kind             kind() const;
   uchar            short_name() const;
@@ -40,7 +40,8 @@ protected:
 
 struct FlagBool : public Flag
 {
-  FlagBool(uchar short_name, std::string long_name, std::string description);
+  FlagBool(uchar short_name, const std::string &long_name,
+           const std::string &description);
 
   void toggle();
   bool enabled() const;
@@ -51,7 +52,8 @@ private:
 
 struct FlagString : public Flag
 {
-  FlagString(uchar short_name, std::string long_name, std::string description);
+  FlagString(uchar short_name, const std::string &long_name,
+             const std::string &description);
 
   void             set(std::string_view v);
   std::string_view contents() const;
@@ -66,7 +68,7 @@ std::vector<std::string> parse_flags(const std::vector<Flag *> &flags, int argc,
 
 void show_version();
 
-void show_help(std::string_view program_name, const std::vector<Flag *> flags);
+void show_help(std::string_view program_name, const std::vector<Flag *> &flags);
 
 void show_error(std::string_view err);
 
