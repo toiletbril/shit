@@ -1,5 +1,6 @@
 #include "Utils.hpp"
 
+#include "Cli.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Toiletline.hpp"
@@ -115,10 +116,9 @@ execute_program_by_path(const std::filesystem::path    &path,
     reset_signal_handlers();
     if (execv(path.c_str(), const_cast<char *const *>(real_args.data())) == -1)
       throw shit::Error{last_system_error_message()};
-  }
-
-  if (child_pid == -1)
+  } else if (child_pid == -1) {
     throw Error("fork() failed: " + last_system_error_message());
+  }
 
   i32 status{};
   i32 retcode = 255;
@@ -433,7 +433,12 @@ quit(i32 code)
   /* Cleanup for main proccess. */
   if (!is_child_process()) {
     if (toiletline::is_active()) {
-      toiletline::exit();
+      try {
+        toiletline::exit();
+      } catch (Error &e) {
+        /* XXX A wild bug appeared! */
+        show_error(e.to_string());
+      }
     }
   }
 
@@ -518,6 +523,7 @@ initialize_path_map()
   }
 }
 
+/* TODO: Don't ignore newly added files. */
 std::optional<std::filesystem::path>
 search_program_path(std::string_view program_name)
 {
