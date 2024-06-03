@@ -436,7 +436,7 @@ quit(i32 code)
       try {
         toiletline::exit();
       } catch (Error &e) {
-        /* XXX A wild bug appeared! */
+        /* TODO: A wild bug appeared! */
         show_error(e.to_string());
       }
     }
@@ -474,8 +474,8 @@ cache_path_into(std::vector<C> &cache, std::string &&p)
   return n;
 }
 
-void
-initialize_path_map()
+static void
+clear_path_map()
 {
   PATH_MAP.clear();
   PATH_DIRS.clear();
@@ -483,13 +483,20 @@ initialize_path_map()
   PATH_EXTENSIONS.clear();
   /* First extension entry is empty. */
   PATH_EXTENSIONS.push_back("");
+}
 
-  std::optional<std::string> maybe_path = get_environment_variable("PATH");
-  if (!maybe_path)
+static std::optional<std::string> MAYBE_PATH = get_environment_variable("PATH");
+
+void
+initialize_path_map()
+{
+  clear_path_map();
+
+  if (!MAYBE_PATH)
     return;
 
   std::string dir_string;
-  std::string path_var = maybe_path.value();
+  std::string path_var = *MAYBE_PATH;
 
   for (const char &ch : path_var) {
     if (ch != PATH_DELIMITER) {
@@ -497,12 +504,11 @@ initialize_path_map()
     } else {
       /* What the heck? A path in PATH that does not exist? Are you a Windows
        * user? */
-      if (std::filesystem::path dir_path{dir_string};
-          std::filesystem::exists(dir_path))
-      {
+      if (std::filesystem::exists(dir_string)) {
+        std::filesystem::path               dir_path{dir_string};
         std::filesystem::directory_iterator dir{dir_path};
 
-        usize dir_index = cache_path_into(PATH_DIRS, dir_path.string());
+        usize dir_index = cache_path_into(PATH_DIRS, std::move(dir_string));
 
         /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : dir) {
@@ -523,7 +529,58 @@ initialize_path_map()
   }
 }
 
-/* TODO: Don't ignore newly added files. */
+std::optional<std::filesystem::path>
+search_and_cache(std::string_view program_name)
+{
+  MAYBE_PATH = get_environment_variable("PATH");
+  if (!MAYBE_PATH)
+    return std::nullopt;
+
+  std::string dir_string;
+  std::string path_var = *MAYBE_PATH;
+
+  for (const char &ch : path_var) {
+    if (ch != PATH_DELIMITER) {
+      dir_string += ch;
+    } else if (std::filesystem::exists(dir_string)) {
+      std::filesystem::path dir_path{dir_string};
+
+      /* Cache the directory if it was not present before. */
+      bool  found = false;
+      usize dir_index = 0;
+
+      for (usize dir_i = 0; dir_i < PATH_DIRS.size(); dir_i++) {
+        if (PATH_DIRS[dir_i] == dir_string) {
+          found = true;
+          dir_index = dir_i;
+          break;
+        }
+      }
+
+      if (!found) {
+        dir_index = cache_path_into(PATH_DIRS, std::move(dir_string));
+      }
+
+      /* Actually try to find the file. */
+      std::filesystem::path p = dir_path / program_name;
+      for (usize ext_index = 0; ext_index < PATH_EXTENSIONS.size(); ext_index++)
+      {
+        if (std::filesystem::path try_path =
+                p.concat(PATH_EXTENSIONS[ext_index]);
+            std::filesystem::exists(try_path))
+        {
+          PATH_MAP[program_name] = {dir_index, ext_index};
+          return try_path;
+        }
+      }
+
+      dir_string.clear();
+    }
+  }
+
+  return std::nullopt;
+}
+
 std::optional<std::filesystem::path>
 search_program_path(std::string_view program_name)
 {
@@ -534,6 +591,11 @@ search_program_path(std::string_view program_name)
     std::filesystem::path file_name = p->first;
     file_name += PATH_EXTENSIONS[ext];
     return PATH_DIRS[dir] / file_name;
+  } else if (std::optional<std::filesystem::path> p =
+                 search_and_cache(program_name);
+             p)
+  {
+    return *p;
   }
 
   return std::nullopt;
