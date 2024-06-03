@@ -137,6 +137,8 @@ execute_program_by_path(const std::filesystem::path    &path,
     if (sig & ~(SIGINT)) {
       std::cout << "[Process " << child_pid << ": " << sig_desc << ", signal "
                 << std::to_string(sig) << "]" << std::endl;
+    } else {
+      std::cout << std::endl;
     }
 
     retcode = status;
@@ -202,21 +204,19 @@ constexpr static const uchar PATH_DELIMITER = ';';
 /* Only parent can execute some operations. */
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
-template <typename... T>
-constexpr auto
-signal_list(T &&...t) -> std::array<int, sizeof...(T)>
+static void
+print_lf(int s)
 {
-  return {{std::forward<T>(t)...}};
+  SHIT_UNUSED(s);
+  std::cout << std::endl;
+  signal(SIGINT, print_lf);
 }
-
-const static auto win_ignored_signals = signal_list(SIGINT, SIGTERM);
 
 void
 set_default_signal_handlers()
 {
-  for (const int &ignored : win_ignored_signals) {
-    signal(ignored, SIG_IGN);
-  }
+  signal(SIGTERM, SIG_IGN);
+  signal(SIGINT, print_lf);
 }
 
 std::string
