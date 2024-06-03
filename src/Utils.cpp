@@ -586,16 +586,26 @@ search_program_path(std::string_view program_name)
 {
   sanitize_program_name(program_name);
 
+  /* Try to search the cache first. */
   if (auto p = PATH_MAP.find(program_name); p != PATH_MAP.end()) {
     auto [dir, ext] = p->second;
+
     std::filesystem::path file_name = p->first;
-    file_name += PATH_EXTENSIONS[ext];
-    return PATH_DIRS[dir] / file_name;
-  } else if (std::optional<std::filesystem::path> p =
-                 search_and_cache(program_name);
-             p)
-  {
-    return *p;
+    std::filesystem::path try_path =
+        PATH_DIRS[dir] / file_name.concat(PATH_EXTENSIONS[ext]);
+
+    /* Does this path still exist? */
+    if (std::filesystem::exists(try_path))
+      return try_path;
+    else
+      PATH_MAP.erase(program_name);
+  } else {
+    /* Newly added file? Try to search and cache it. */
+    if (std::optional<std::filesystem::path> p = search_and_cache(program_name);
+        p.has_value())
+    {
+      return *p;
+    }
   }
 
   return std::nullopt;
