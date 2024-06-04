@@ -445,15 +445,16 @@ quit(i32 code)
   std::exit(code);
 }
 
-static std::vector<std::string>           PATH_CACHE_EXTS{};
-static std::vector<std::filesystem::path> PATH_CACHE_DIRS{};
+static std::vector<std::string> PATH_CACHE_EXTS{};
+static std::vector<std::string> PATH_CACHE_DIRS{};
 
 /* Program name without extension maps into indexes i and j for
  * PATH_DIRS and PATH_EXTENSIONS, so the path can be recreated as:
  * `PATH_DIRS[i] / (program_name + PATH_EXTENSIONS[j])` */
-static std::unordered_map<std::filesystem::path, std::tuple<usize, usize>>
-    PATH_CACHE{};
+static std::unordered_map<std::string, std::tuple<usize, usize>> PATH_CACHE{};
 
+/* FIXME: Cosmopolitan sucks and does not support std::filesystem::path in
+ * unordered_map :c. This would be better off std::string. */
 static std::optional<std::string> MAYBE_PATH = get_environment_variable("PATH");
 
 template <class C>
@@ -521,7 +522,7 @@ initialize_path_map()
                                                   f.path().extension().string())
                                 : 0;
 
-          PATH_CACHE[fv] = {dir_index, ext_index};
+          PATH_CACHE[fv.data()] = {dir_index, ext_index};
         }
       }
 
@@ -570,7 +571,7 @@ search_and_cache(std::string_view program_name)
                 p.concat(PATH_CACHE_EXTS[ext_index]);
             std::filesystem::exists(try_path))
         {
-          PATH_CACHE[program_name] = {dir_index, ext_index};
+          PATH_CACHE[program_name.data()] = {dir_index, ext_index};
           return try_path;
         }
       }
@@ -587,7 +588,7 @@ search_program_path(std::string_view program_name)
 {
   sanitize_program_name(program_name);
 
-  if (auto p = PATH_CACHE.find(program_name); p != PATH_CACHE.end()) {
+  if (auto p = PATH_CACHE.find(program_name.data()); p != PATH_CACHE.end()) {
     auto [dir, ext] = p->second;
 
     std::filesystem::path file_name = p->first;
@@ -598,7 +599,7 @@ search_program_path(std::string_view program_name)
     if (std::filesystem::exists(try_path))
       return try_path;
     else
-      PATH_CACHE.erase(program_name);
+      PATH_CACHE.erase(program_name.data());
   } else {
     /* We don't have cache? Newly added file? Try to search and cache it. */
     if (std::optional<std::filesystem::path> p = search_and_cache(program_name);
