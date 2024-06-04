@@ -445,14 +445,16 @@ quit(i32 code)
   std::exit(code);
 }
 
-static std::vector<std::string>           PATH_EXTENSIONS{};
-static std::vector<std::filesystem::path> PATH_DIRS{};
+static std::vector<std::string>           PATH_CACHE_EXTS{};
+static std::vector<std::filesystem::path> PATH_CACHE_DIRS{};
 
 /* Program name without extension maps into indexes i and j for
  * PATH_DIRS and PATH_EXTENSIONS, so the path can be recreated as:
  * `PATH_DIRS[i] / (program_name + PATH_EXTENSIONS[j])` */
 static std::unordered_map<std::filesystem::path, std::tuple<usize, usize>>
-    PATH_MAP{};
+    PATH_CACHE{};
+
+static std::optional<std::string> MAYBE_PATH = get_environment_variable("PATH");
 
 template <class C>
 static usize
@@ -474,24 +476,22 @@ cache_path_into(std::vector<C> &cache, std::string &&p)
   return n;
 }
 
-static void
+void
 clear_path_map()
 {
-  PATH_MAP.clear();
-  PATH_DIRS.clear();
+  MAYBE_PATH = get_environment_variable("PATH");
 
-  PATH_EXTENSIONS.clear();
+  PATH_CACHE.clear();
+  PATH_CACHE_DIRS.clear();
+
+  PATH_CACHE_EXTS.clear();
   /* First extension entry is empty. */
-  PATH_EXTENSIONS.push_back("");
+  PATH_CACHE_EXTS.push_back("");
 }
-
-static std::optional<std::string> MAYBE_PATH = get_environment_variable("PATH");
 
 void
 initialize_path_map()
 {
-  clear_path_map();
-
   if (!MAYBE_PATH)
     return;
 
@@ -508,7 +508,8 @@ initialize_path_map()
         std::filesystem::path               dir_path{dir_string};
         std::filesystem::directory_iterator dir{dir_path};
 
-        usize dir_index = cache_path_into(PATH_DIRS, std::move(dir_string));
+        usize dir_index =
+            cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
 
         /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : dir) {
@@ -516,11 +517,11 @@ initialize_path_map()
           std::string_view fv = fs;
 
           usize ext_index = (sanitize_program_name(fv))
-                                ? cache_path_into(PATH_EXTENSIONS,
+                                ? cache_path_into(PATH_CACHE_EXTS,
                                                   f.path().extension().string())
                                 : 0;
 
-          PATH_MAP[fv] = {dir_index, ext_index};
+          PATH_CACHE[fv] = {dir_index, ext_index};
         }
       }
 
@@ -549,8 +550,8 @@ search_and_cache(std::string_view program_name)
       bool  found = false;
       usize dir_index = 0;
 
-      for (usize dir_i = 0; dir_i < PATH_DIRS.size(); dir_i++) {
-        if (PATH_DIRS[dir_i] == dir_string) {
+      for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
+        if (PATH_CACHE_DIRS[dir_i] == dir_string) {
           found = true;
           dir_index = dir_i;
           break;
@@ -558,18 +559,18 @@ search_and_cache(std::string_view program_name)
       }
 
       if (!found) {
-        dir_index = cache_path_into(PATH_DIRS, std::move(dir_string));
+        dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
       }
 
       /* Actually try to find the file. */
       std::filesystem::path p = dir_path / program_name;
-      for (usize ext_index = 0; ext_index < PATH_EXTENSIONS.size(); ext_index++)
+      for (usize ext_index = 0; ext_index < PATH_CACHE_EXTS.size(); ext_index++)
       {
         if (std::filesystem::path try_path =
-                p.concat(PATH_EXTENSIONS[ext_index]);
+                p.concat(PATH_CACHE_EXTS[ext_index]);
             std::filesystem::exists(try_path))
         {
-          PATH_MAP[program_name] = {dir_index, ext_index};
+          PATH_CACHE[program_name] = {dir_index, ext_index};
           return try_path;
         }
       }
@@ -586,21 +587,20 @@ search_program_path(std::string_view program_name)
 {
   sanitize_program_name(program_name);
 
-  /* Try to search the cache first. */
-  if (auto p = PATH_MAP.find(program_name); p != PATH_MAP.end()) {
+  if (auto p = PATH_CACHE.find(program_name); p != PATH_CACHE.end()) {
     auto [dir, ext] = p->second;
 
     std::filesystem::path file_name = p->first;
     std::filesystem::path try_path =
-        PATH_DIRS[dir] / file_name.concat(PATH_EXTENSIONS[ext]);
+        PATH_CACHE_DIRS[dir] / file_name.concat(PATH_CACHE_EXTS[ext]);
 
     /* Does this path still exist? */
     if (std::filesystem::exists(try_path))
       return try_path;
     else
-      PATH_MAP.erase(program_name);
+      PATH_CACHE.erase(program_name);
   } else {
-    /* Newly added file? Try to search and cache it. */
+    /* We don't have cache? Newly added file? Try to search and cache it. */
     if (std::optional<std::filesystem::path> p = search_and_cache(program_name);
         p.has_value())
     {

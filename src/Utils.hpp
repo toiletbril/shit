@@ -30,6 +30,8 @@ std::optional<std::filesystem::path> canonicalize_path(std::string_view path);
 
 void initialize_path_map();
 
+void clear_path_map();
+
 /* Searches PATH for program binary. Returns absolute path to the program. */
 std::optional<std::filesystem::path>
 search_program_path(std::string_view program_name);

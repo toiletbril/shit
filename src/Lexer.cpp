@@ -279,13 +279,13 @@ Lexer::chop_string(usize token_start, char quote_char)
 }
 
 static const std::unordered_map<uchar, Token::Kind> OPERATORS = {
-  /* Sentinels */
+    /* Sentinels */
     {')', Token::Kind::RightParen     },
     {'(', Token::Kind::LeftParen      },
     {';', Token::Kind::Semicolon      },
     {'.', Token::Kind::Dot            },
 
- /* Operators */
+    /* Operators */
     {'+', Token::Kind::Plus           },
     {'-', Token::Kind::Minus          },
     {'*', Token::Kind::Asterisk       },

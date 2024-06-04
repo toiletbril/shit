@@ -51,7 +51,10 @@ main(int argc, char **argv)
   usize arg_index = 0;
   int   exit_code = EXIT_SUCCESS;
 
-  shit::utils::initialize_path_map();
+  /* Clear and set up cache. Don't prematurely initialize the whole path map,
+   * since it's only really noticeable in interactive mode. This way,
+   * subsequent calls to the same program will still be cached in any mode. */
+  shit::utils::clear_path_map();
 
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
@@ -66,6 +69,7 @@ main(int argc, char **argv)
       if (file_names.empty() && FLAG_COMMAND.contents().empty()) {
         if (!toiletline::is_active()) {
           shit::utils::set_default_signal_handlers();
+          shit::utils::initialize_path_map();
           toiletline::initialize();
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
