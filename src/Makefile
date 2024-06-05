@@ -1,5 +1,5 @@
 # make MODE=dbg/rel/cosmo
-MODE := dbg
+MODE ?= dbg
 
 SOURCES := $(wildcard *.cpp)
 HEADERS := $(wildcard *.hpp)
@@ -28,13 +28,16 @@ CXXFLAGS := \
 ifeq ($(MODE), rel)
 CXXFLAGS += \
 	-DNDEBUG \
+	-g \
 	-O2
 else ifeq ($(MODE), dbg)
 CXXFLAGS += \
 	-g3 \
 	-O0
 ifneq ($(OS), Windows_NT)
+ifneq ($(MODE), cosmo)
 CXXFLAGS += -fsanitize=address # Windows' Asan is broken
+endif
 endif
 else ifeq ($(MODE), cosmo)
 CXXFLAGS += -fexceptions
