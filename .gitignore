@@ -11,7 +11,10 @@
 
 .vs
 .vscode
+.cache
 CppProperties.json
+compile_commands.json
+events.json
 
 garbage/
 src/o
