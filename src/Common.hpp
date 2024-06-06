@@ -10,22 +10,22 @@
 
 /* Crablang types */
 
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
 
-typedef int8_t  i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
+using i8 = int8_t;
+using i16 = int16_t;
+using i32 = int32_t;
+using i64 = int64_t;
 
-typedef u8 uchar;
-typedef i8 ichar;
+using uchar = u8;
+using ichar = i8;
 
-typedef size_t    usize;
-typedef ptrdiff_t isize;
-typedef uintptr_t uintptr;
+using usize = size_t;
+using isize = ptrdiff_t;
+using uintptr = uintptr_t;
 
 #if defined __GNUC__ || defined __clang__ || defined __COSMOCC__
 #define T__HAS_GCC_EXTENSIONS 1
@@ -75,6 +75,9 @@ struct t__exit_scope_help
     return t;
   }
 };
+
+/* Silence enum warnings. */
+#define E(e) static_cast<int>(e)
 
 /* Defer a block until the end of the scope. */
 #define SHIT_DEFER                                                             \

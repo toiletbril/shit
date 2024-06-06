@@ -38,7 +38,7 @@ execute_builtin(Builtin::Kind kind, const std::vector<std::string> &args)
   case Builtin::Kind::Cd: b.reset(new Cd); break;
   case Builtin::Kind::Exit: b.reset(new Exit); break;
 
-  default: SHIT_UNREACHABLE("Unhandled builtin of type %d", kind);
+  default: SHIT_UNREACHABLE("Unhandled builtin of type %d", E(kind));
   }
 
   return b->execute(args);
@@ -47,12 +47,12 @@ execute_builtin(Builtin::Kind kind, const std::vector<std::string> &args)
 /**
  * class: Builtin
  */
-Builtin::Builtin() {}
+Builtin::Builtin() = default;
 
 /**
  * class: Echo
  */
-Echo::Echo() {}
+Echo::Echo() = default;
 
 Builtin::Kind
 Echo::kind() const
@@ -81,7 +81,7 @@ Echo::execute(const std::vector<std::string> &args) const
 /**
  * class: Cd
  */
-Cd::Cd() {}
+Cd::Cd() = default;
 
 Builtin::Kind
 Cd::kind() const
@@ -119,7 +119,7 @@ Cd::execute(const std::vector<std::string> &args) const
 /**
  * class: Exit
  */
-Exit::Exit() {}
+Exit::Exit() = default;
 
 Builtin::Kind
 Exit::kind() const

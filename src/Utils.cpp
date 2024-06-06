@@ -28,7 +28,7 @@ namespace utils {
 #include <cosmo.h>
 #endif
 
-#include <errno.h>
+#include <cerrno>
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -58,25 +58,19 @@ make_sigset_impl(int first, ...)
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
-static sigset_t
-ignored_signals()
-{
-  return make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
-}
-
 static void
 reset_signal_handlers()
 {
   sigset_t sm;
   sigfillset(&sm);
-  sigprocmask(SIG_UNBLOCK, &sm, NULL);
+  sigprocmask(SIG_UNBLOCK, &sm, nullptr);
 }
 
 void
 set_default_signal_handlers()
 {
-  sigset_t sm = ignored_signals();
-  sigprocmask(SIG_BLOCK, &sm, NULL);
+  sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
+  sigprocmask(SIG_BLOCK, &sm, nullptr);
 }
 
 std::string
@@ -107,7 +101,7 @@ execute_program_by_path(const std::filesystem::path    &path,
     real_args.push_back(arg.c_str());
   }
 
-  /* And then NULL at the end. */
+  /* And then nullptr at the end. */
   real_args.push_back(nullptr);
 
   pid_t child_pid = fork();
@@ -229,8 +223,8 @@ last_system_error_message()
   DWORD ret = FormatMessageA(
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
           FORMAT_MESSAGE_IGNORE_INSERTS,
-      NULL, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      reinterpret_cast<LPSTR>(&errno_str), 0, NULL);
+      nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+      reinterpret_cast<LPSTR>(&errno_str), 0, );
 
   if (ret == 0) {
     return std::to_string(win_errno) + " (Error message couldn't be proccessed "
@@ -282,8 +276,8 @@ execute_program_by_path(const std::filesystem::path    &path,
   PROCESS_INFORMATION pi{};
   STARTUPINFOA        si{.cb = sizeof(si)};
 
-  if (CreateProcessA(path.string().c_str(), command_line.data(), NULL, NULL,
-                     FALSE, 0, NULL, NULL, &si, &pi) == 0)
+  if (CreateProcessA(path.string().c_str(), command_line.data(), nullptr,
+                     nullptr, FALSE, 0, nullptr, nullptr, &si, &pi) == 0)
   {
     throw Error{last_system_error_message()};
   }
@@ -313,7 +307,7 @@ std::optional<std::string>
 get_current_user()
 {
   DWORD size = 0;
-  GetUserNameA(NULL, &size);
+  GetUserNameA(nullptr, &size);
   if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
     std::vector<char> buffer;
     buffer.reserve(size);
@@ -586,6 +580,7 @@ search_and_cache(const std::string &program_name)
   return std::nullopt;
 }
 
+/* TODO: Some directories have precedence over the others. */
 std::optional<std::filesystem::path>
 search_program_path(const std::string &program_name)
 {

@@ -91,7 +91,7 @@ is_ascii_char(char ch)
 
 } /* namespace lexer */
 
-Lexer::Lexer(std::string source) : m_source(source), m_cursor_position(0) {}
+Lexer::Lexer(std::string source) : m_source(std::move(source)) {}
 
 Lexer::~Lexer() = default;
 
@@ -218,7 +218,7 @@ Lexer::chop_identifier(usize token_start)
     case Token::Kind::Then: t = new TokenThen{token_start}; break;
     case Token::Kind::Else: t = new TokenElse{token_start}; break;
     case Token::Kind::Fi: t = new TokenFi{token_start}; break;
-    default: SHIT_UNREACHABLE("Unhandled keyword of type %d", kw->second);
+    default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
     }
   } else {
     t = new TokenIdentifier{token_start, ident_string};
@@ -386,7 +386,7 @@ Lexer::chop_expression_sentinel(usize token_start)
       }
     } break;
 
-    default: SHIT_UNREACHABLE("Unhandled operator of type %d", op->second);
+    default: SHIT_UNREACHABLE("Unhandled operator of type %d", E(op->second));
     }
   } else {
     std::string s;

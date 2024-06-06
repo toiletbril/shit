@@ -89,8 +89,8 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
 {
   size_t longest_length = 0;
 
-  *value_start = NULL;
-  *result_flag = NULL;
+  *value_start = nullptr;
+  *result_flag = nullptr;
 
   for (size_t i = 0; i < flags.size(); ++i) {
     if (!is_long) {
@@ -126,7 +126,7 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
 std::vector<std::string>
 parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 {
-  if (argc <= 0 || argv == NULL)
+  if (argc <= 0 || argv == nullptr)
     throw Error{"Invalid arguments to flag_parse()"};
 
   std::vector<std::string> args{};
@@ -226,7 +226,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
             s += "-";
 
             std::string_view flag_sv = flag_start;
-            usize            equals_pos = flag_sv.find("=");
+            usize            equals_pos = flag_sv.find('=');
 
             if (equals_pos != std::string::npos)
               s += flag_sv.substr(0, equals_pos);

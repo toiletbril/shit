@@ -1,5 +1,6 @@
 #include "Cli.hpp"
 #include "Common.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
@@ -134,7 +135,8 @@ main(int argc, char **argv)
         if (file_names[arg_index] == "-") {
           file = &std::cin;
         } else { /* Otherwise, process the actual file name. */
-          f = std::fstream{file_names[arg_index], f.in | f.binary};
+          f = std::fstream{file_names[arg_index],
+                           std::fstream::in | std::fstream::binary};
           if (!f.is_open()) {
             throw shit::Error{"Could not open '" + file_names[arg_index] +
                               "': " + shit::utils::last_system_error_message()};

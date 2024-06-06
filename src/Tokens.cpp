@@ -292,7 +292,7 @@ std::unique_ptr<Expression>
 TokenOperator::construct_unary_expression(const Expression *rhs) const
 {
   SHIT_UNUSED(rhs);
-  SHIT_UNREACHABLE("Invalid unary operator construction of type %d", kind());
+  SHIT_UNREACHABLE("Invalid unary operator construction of type %d", E(kind()));
 }
 
 /**

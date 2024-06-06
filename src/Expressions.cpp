@@ -12,6 +12,8 @@ static constexpr const char *EXPRESSION_AST_INDENT = " ";
 /**
  * class: Expression
  */
+Expression::Expression() = default;
+
 Expression::Expression(usize location) : m_location(location) {}
 
 Expression::~Expression() = default;
@@ -82,7 +84,7 @@ If::to_ast_string(usize layer) const
 /**
  * class: DummyExpression
  */
-DummyExpression::DummyExpression() : Expression(0) {}
+DummyExpression::DummyExpression() = default;
 
 i64
 DummyExpression::evaluate() const
@@ -121,7 +123,8 @@ Exec::evaluate() const
 
   auto shell_expand_args =
       [](const std::vector<std::string> &args) -> std::vector<std::string> {
-    std::vector<std::string> expanded_args;
+    std::vector<std::string> expanded_args{};
+    expanded_args.reserve(args.size());
 
     for (const std::string &arg : args) {
       expanded_args.push_back(utils::simple_shell_expand(arg).value_or(arg));

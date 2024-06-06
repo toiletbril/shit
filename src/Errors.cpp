@@ -102,7 +102,7 @@ get_context_pointing_to(std::string_view source, usize location,
 /**
  * class: ErrorBase
  */
-ErrorBase::ErrorBase() : m_is_active(false) {}
+ErrorBase::ErrorBase() = default;
 
 ErrorBase::ErrorBase(const std::string &message)
     : m_is_active(true), m_message(message)

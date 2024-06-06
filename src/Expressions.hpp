@@ -9,7 +9,9 @@ namespace shit {
 
 struct Expression
 {
+  Expression();
   Expression(usize location);
+
   virtual ~Expression();
 
   virtual usize location() const;
@@ -19,7 +21,7 @@ struct Expression
   virtual std::string to_ast_string(usize layer = 0) const = 0;
 
 protected:
-  usize m_location;
+  usize m_location{std::string::npos};
 };
 
 struct If : public Expression
@@ -27,7 +29,7 @@ struct If : public Expression
   If(usize location, const Expression *condition, const Expression *then,
      const Expression *otherwise);
 
-  virtual ~If();
+  ~If() override;
 
   i64         evaluate() const override;
   std::string to_string() const override;
@@ -53,9 +55,9 @@ struct Exec : public Expression
   Exec(usize location, const std::string &path,
        const std::vector<std::string> &args);
 
-  virtual i64         evaluate() const override;
-  virtual std::string to_string() const override;
-  std::string         to_ast_string(usize layer = 0) const override;
+  i64         evaluate() const override;
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
 
 protected:
   std::string              m_path;
@@ -65,7 +67,7 @@ protected:
 struct UnaryExpression : public Expression
 {
   UnaryExpression(usize location, const Expression *rhs);
-  virtual ~UnaryExpression();
+  ~UnaryExpression() override;
 
   std::string to_ast_string(usize layer = 0) const override;
 
@@ -77,7 +79,7 @@ struct BinaryExpression : public Expression
 {
   BinaryExpression(usize location, const Expression *lhs,
                    const Expression *rhs);
-  virtual ~BinaryExpression();
+  ~BinaryExpression() override;
 
   std::string to_ast_string(usize layer = 0) const override;
 
@@ -89,7 +91,7 @@ protected:
 struct ConstantNumber : public Expression
 {
   ConstantNumber(usize location, i64 value);
-  ~ConstantNumber();
+  ~ConstantNumber() override;
 
   i64         evaluate() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -102,7 +104,7 @@ protected:
 struct ConstantString : public Expression
 {
   ConstantString(usize location, const std::string &value);
-  ~ConstantString();
+  ~ConstantString() override;
 
   i64         evaluate() const override;
   std::string to_ast_string(usize layer = 0) const override;
