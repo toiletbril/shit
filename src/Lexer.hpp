@@ -49,8 +49,7 @@ protected:
   Token *chop_number(usize token_start);
   Token *chop_identifier(usize token_start);
   Token *chop_string(usize token_start, char quote_char);
-  Token *chop_expression_sentinel(usize token_start);
-  Token *chop_shell_sentinel(usize token_start);
+  Token *chop_sentinel(usize token_start);
 };
 
 } /* namespace shit */

@@ -1,3 +1,5 @@
-[Exec "echo Hello World"]
+[Sequence]
+  [SimpleSequenceNode]
+    [Exec "echo Hello World"]
 Hello World
 [Code 0]

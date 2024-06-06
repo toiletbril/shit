@@ -94,7 +94,7 @@ If::to_ast_string(usize layer) const
 /**
  * class: DummyExpression
  */
-DummyExpression::DummyExpression() = default;
+DummyExpression::DummyExpression(usize location) : Expression(location) {}
 
 i64
 DummyExpression::evaluate() const
@@ -205,9 +205,17 @@ Exec::to_ast_string(usize layer) const
 /**
  * class: Sequence
  */
-Sequence::Sequence(usize location, std::vector<const SequenceNode *> &nodes)
+Sequence::Sequence(usize                                    location,
+                   const std::vector<const SequenceNode *> &nodes)
     : Expression(location), m_nodes(nodes)
 {}
+
+Sequence::~Sequence()
+{
+  for (const SequenceNode *e : m_nodes) {
+    delete e;
+  }
+}
 
 std::string
 Sequence::to_string() const
@@ -225,7 +233,8 @@ Sequence::to_ast_string(usize layer) const
 
   s += pad + "[Sequence]";
   for (const SequenceNode *n : m_nodes) {
-    s += pad + EXPRESSION_AST_INDENT + n->to_ast_string(layer + 1) + "\n";
+    s += "\n";
+    s += pad + EXPRESSION_AST_INDENT + n->to_ast_string(layer + 1);
   }
 
   return s;
@@ -261,7 +270,7 @@ Sequence::evaluate() const
   }
 
   /* There should be at least one expression executed. */
-  SHIT_ASSERT(ret != 1, "%ld", ret);
+  SHIT_ASSERT(ret != -1, "%ld", ret);
 
   return ret;
 }
@@ -273,6 +282,8 @@ SequenceNode::SequenceNode(usize location, Kind kind, const Expression *expr)
     : Expression(location), m_kind(kind), m_expr(expr)
 {}
 
+SequenceNode::~SequenceNode() { delete m_expr; }
+
 SequenceNode::Kind
 SequenceNode::kind() const
 {
@@ -282,16 +293,28 @@ SequenceNode::kind() const
 std::string
 SequenceNode::to_string() const
 {
-  return "SequenceNode: " + m_expr->to_string();
+  std::string k;
+  switch (kind()) {
+  case Kind::Simple: k = "Simple"; break;
+  case Kind::And: k = "And"; break;
+  case Kind::Or: k = "Or"; break;
+  default: SHIT_UNREACHABLE();
+  }
+  return k + "SequenceNode";
 }
 
 std::string
 SequenceNode::to_ast_string(usize layer) const
 {
+  std::string s;
   std::string pad;
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  return pad + "[" + to_string() + "]";
+
+  s += pad + "[" + to_string() + "]\n";
+  s += pad + EXPRESSION_AST_INDENT + m_expr->to_ast_string(layer + 1);
+
+  return s;
 }
 
 i64

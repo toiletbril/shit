@@ -74,11 +74,12 @@ set_default_signal_handlers()
   sigprocmask(SIG_BLOCK, &sm, nullptr);
 }
 
-i32
+static i32
 call_checked_impl(i32 ret, const std::string &&func)
 {
-  if (ret == -1)
-    throw shit::Error{func + "failed: " + last_system_error_message()};
+  if (ret == -1) {
+    throw shit::Error{func + " failed: " + last_system_error_message()};
+  }
 
   return ret;
 }
@@ -104,7 +105,7 @@ create_os_args(const std::string &program, const std::vector<std::string> &args)
   std::vector<const char *> os_args;
 
   /* argv[0] is the program itself. */
-  os_args.push_back(program.data());
+  os_args.push_back(program.c_str());
 
   /* Then actual arguments. */
   for (const std::string &arg : args) {
@@ -164,55 +165,61 @@ wait_for_process(pid_t pid)
   SHIT_UNREACHABLE();
 }
 
-i32
-execute_program(const ExecContext &&ec)
+[[noreturn]] static void
+do_exec(const ExecContext &ec)
 {
   std::vector<const char *> os_args = create_os_args(ec.m_program, ec.m_args);
 
-  pid_t child_pid = fork();
+  /* Cleanse the corruption of the holy child from evil signal spirits. */
+  reset_signal_handlers();
 
-  if (child_pid == -1) {
-    throw Error("fork() failed: " + last_system_error_message());
-  } else if (child_pid == 0) {
-    reset_signal_handlers();
-    if (execv(ec.m_path.c_str(), const_cast<char *const *>(os_args.data())) ==
-        -1)
-    {
-      throw shit::Error{last_system_error_message()};
-    }
+  if (execv(ec.m_path.c_str(), const_cast<char *const *>(os_args.data())) == -1)
+  {
+    throw shit::Error{last_system_error_message()};
+  }
+
+  SHIT_UNREACHABLE();
+}
+
+i32
+execute_program(const ExecContext &&ec)
+{
+  pid_t child_pid = call_checked(fork());
+
+  if (child_pid == 0) {
+    do_exec(ec);
   }
 
   return wait_for_process(child_pid);
 }
 
 i32
-execute_program_sequence_with_pipes(std::vector<ExecContext> &&ecs)
+execute_program_sequence_with_pipes(const std::vector<ExecContext> &&ecs)
 {
-  int   pipefds[2];
+  i32   pipefds[2];
   pid_t last_pid = -1;
   bool  first_producer = true;
 
   for (const ExecContext &ec : ecs) {
-    std::vector<const char *> os_args = create_os_args(ec.m_program, ec.m_args);
-
     /* Are we the last in sequence? */
     bool is_last_consumer = &ec != &ecs.back();
 
-    if (is_last_consumer)
+    if (is_last_consumer) {
       call_checked(pipe(pipefds));
+    }
 
-    pid_t child_pid = fork();
+    pid_t child_pid = call_checked(fork());
 
-    if (child_pid == -1) {
-      throw shit::Error{"fork() failed: " + last_system_error_message()};
-    } else if (child_pid == 0) {
+    if (child_pid == 0) {
       /* For the first producer, don't change stdin */
       if (!first_producer) {
         call_checked(dup2(pipefds[0], STDIN_FILENO));
       }
 
+      first_producer = false;
+
       /* Except for the last command, redirect stdout to the pipe */
-      if (is_last_consumer) {
+      if (!is_last_consumer) {
         call_checked(dup2(pipefds[1], STDOUT_FILENO));
       }
 
@@ -220,22 +227,14 @@ execute_program_sequence_with_pipes(std::vector<ExecContext> &&ecs)
       call_checked(close(pipefds[0]));
       call_checked(close(pipefds[1]));
 
-      first_producer = false;
-
-      reset_signal_handlers();
-
-      if (execv(ec.m_path.c_str(), const_cast<char *const *>(os_args.data())) ==
-          -1)
-      {
-        throw shit::Error{last_system_error_message()};
-      }
+      do_exec(ec);
     }
 
     last_pid = child_pid;
 
     /* Unused write end of the pipe in the parent. */
     if (is_last_consumer) {
-      close(pipefds[1]);
+      call_checked(close(pipefds[1]));
     }
   }
 
@@ -379,6 +378,12 @@ execute_program(const ExecContext &&ec)
   CloseHandle(pi.hThread);
 
   return code;
+}
+
+i32
+execute_program_sequence_with_pipes(std::vector<ExecContext> &&ecs)
+{
+  throw shit::Error{"Not implemented (Utils)"};
 }
 
 bool

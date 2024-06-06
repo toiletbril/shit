@@ -43,7 +43,7 @@ protected:
 
 struct DummyExpression : public Expression
 {
-  DummyExpression();
+  DummyExpression(usize location);
 
   i64         evaluate() const override;
   std::string to_string() const override;
@@ -62,6 +62,45 @@ struct Exec : public Expression
 protected:
   std::string              m_path;
   std::vector<std::string> m_args;
+};
+
+struct SequenceNode;
+
+struct Sequence : public Expression
+{
+  Sequence(usize location, const std::vector<const SequenceNode *> &nodes);
+  ~Sequence() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  i64         evaluate() const override;
+
+protected:
+  std::vector<const SequenceNode *> m_nodes;
+};
+
+struct SequenceNode : public Expression
+{
+  /* Does this sequence node need evaluation? */
+  enum class Kind
+  {
+    Simple,
+    And,
+    Or,
+  };
+
+  SequenceNode(usize location, Kind kind, const Expression *expr);
+  ~SequenceNode() override;
+
+  Kind kind() const;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  i64         evaluate() const override;
+
+protected:
+  Kind              m_kind;
+  const Expression *m_expr;
 };
 
 struct UnaryExpression : public Expression
@@ -288,43 +327,6 @@ struct NotEqual : public BinaryExpression
 
   std::string to_string() const override;
   i64         evaluate() const override;
-};
-
-struct SequenceNode;
-
-struct Sequence : public Expression
-{
-  Sequence(usize location, std::vector<const SequenceNode *> &nodes);
-
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
-  i64         evaluate() const override;
-
-protected:
-  std::vector<const SequenceNode *> m_nodes;
-};
-
-struct SequenceNode : public Expression
-{
-  /* Does this sequence node need evaluation? */
-  enum class Kind
-  {
-    Simple,
-    And,
-    Or,
-  };
-
-  SequenceNode(usize location, Kind kind, const Expression *expr);
-
-  Kind kind() const;
-
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
-  i64         evaluate() const override;
-
-protected:
-  Kind              m_kind;
-  const Expression *m_expr;
 };
 
 } /* namespace shit */

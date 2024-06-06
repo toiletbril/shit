@@ -163,7 +163,7 @@ Lexer::lex_expression_token()
     if (lexer::is_number(ch))
       return chop_number(token_start);
     else if (lexer::is_expression_sentinel(ch))
-      return chop_expression_sentinel(token_start);
+      return chop_sentinel(token_start);
     else if (lexer::is_string_quote(ch))
       return chop_string(token_start + 1, ch);
     else if (lexer::is_ascii_char(ch))
@@ -240,7 +240,7 @@ Lexer::lex_shell_token()
     if (lexer::is_string_quote(ch))
       return chop_string(token_start + 1, ch);
     else if (lexer::is_shell_sentinel(ch))
-      return chop_shell_sentinel(token_start);
+      return chop_sentinel(token_start);
     else if (lexer::is_part_of_identifier(ch))
       return chop_identifier(token_start);
     else {
@@ -251,12 +251,6 @@ Lexer::lex_shell_token()
   }
 
   return new TokenEndOfFile{token_start};
-}
-
-Token *
-Lexer::chop_shell_sentinel(usize token_start)
-{
-  throw ErrorWithLocation{token_start, "Not implemented"};
 }
 
 Token *
@@ -302,7 +296,7 @@ static const std::unordered_map<uchar, Token::Kind> OPERATORS = {
 };
 
 Token *
-Lexer::chop_expression_sentinel(usize token_start)
+Lexer::chop_sentinel(usize token_start)
 {
   usize token_end = token_start + 1;
   uchar ch = static_cast<uchar>(m_source[token_start]);

@@ -1,11 +1,24 @@
 #include "Parser.hpp"
 
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
 namespace shit {
+
+static SequenceNode::Kind
+get_sequence_kind(Token::Kind tk)
+{
+  switch (tk) {
+  case Token::Kind::EndOfFile:
+  case Token::Kind::Semicolon: return SequenceNode::Kind::Simple;
+  case Token::Kind::DoubleAmpersand: return SequenceNode::Kind::And;
+  case Token::Kind::DoublePipe: return SequenceNode::Kind::Or; break;
+  default: SHIT_UNREACHABLE();
+  }
+}
 
 Parser::Parser(Lexer *lexer) : m_lexer(lexer) {}
 Parser::~Parser() { delete m_lexer; }
@@ -19,54 +32,101 @@ Parser::construct_ast()
 std::unique_ptr<Expression>
 Parser::parse_command()
 {
-  std::unique_ptr<Expression> lhs{};
-  std::unique_ptr<Token>      t{m_lexer->peek_expression_token()};
+  std::unique_ptr<Token> token{};
 
-  bool should_break = false;
-
-  /* t's value contains a program/path to execute. Parse arguments until we
-   * encounter a pipe or an redirection. */
   std::vector<std::string> args;
-  std::string              program;
-  bool                     first = true;
+  std::string              program_name;
+
+  bool should_chop_program = true;
+  bool should_break = false;
+  bool is_expr_required = false;
+
+  std::vector<std::unique_ptr<SequenceNode>> nodes{};
+  SequenceNode::Kind next_sk = SequenceNode::Kind::Simple;
 
   for (;;) {
-    std::unique_ptr<Token> maybe_arg{m_lexer->peek_shell_token()};
+    token.reset(m_lexer->peek_shell_token());
 
-    switch (maybe_arg->kind()) {
-    /* Sentinels. */
-    case Token::Kind::EndOfFile: should_break = true; break;
+    switch (token->kind()) {
+    case Token::Kind::EndOfFile:
+      /* Nothing after the operator, error. */
+      if (!nodes.empty() && program_name.empty() && is_expr_required) {
+        throw shit::ErrorWithLocation{token->location(),
+                                      "Expected a value after an operator"};
+      }
+      should_break = true;
+      /* fallthrough */
+    case Token::Kind::DoublePipe:
+    case Token::Kind::DoubleAmpersand:
+      /* Two operators back to back, error */
+      if (is_expr_required) {
+        throw shit::ErrorWithLocation{
+            token->location(), "Expected a value after an operator, found an " +
+                                   token->to_ast_string()};
+      }
+      is_expr_required = true;
+      /* fallthrough */
+    case Token::Kind::Semicolon: {
+      m_lexer->advance_past_last_peek();
 
-    /* These actually mean something. */
+      if (!program_name.empty()) {
+        SequenceNode *sn = new SequenceNode{
+            token->location(), next_sk,
+            new Exec{token->location(), program_name, args}
+        };
+
+        nodes.emplace_back(sn);
+
+        program_name.clear();
+        args.clear();
+
+        should_chop_program = true;
+        next_sk = get_sequence_kind(token->kind());
+      }
+
+      if (!should_break) {
+        continue;
+      }
+    } break;
+
     case Token::Kind::Pipe:
     case Token::Kind::Greater:
-    case Token::Kind::Semicolon:
-      throw ErrorWithLocation{maybe_arg->location(), "Not implemented"};
+      throw ErrorWithLocation{token->location(), "Not implemented (Parser)"};
 
     case Token::Kind::Identifier:
     case Token::Kind::String:
-      maybe_arg.reset(m_lexer->next_shell_token());
+      m_lexer->advance_past_last_peek();
+
+      if (!should_chop_program) {
+        args.push_back(token->value());
+      } else {
+        program_name = token->value();
+        should_chop_program = false;
+      }
       break;
 
     default:
-      throw ErrorWithLocation{maybe_arg->location(), "Expected program name"};
+      throw ErrorWithLocation{token->location(), "Expected program name"};
     }
+
+    is_expr_required = false;
 
     if (should_break) {
       break;
     }
-
-    if (!first)
-      args.push_back(maybe_arg->value());
-    else {
-      program = maybe_arg->value();
-      first = false;
-    }
   }
 
   /* TODO: find a way to indroduce expressions and use parse_expression() */
-
-  return std::make_unique<Exec>(t->location(), program, args);
+  if (nodes.empty()) {
+    return std::make_unique<DummyExpression>(token->location());
+  } else {
+    std::vector<const SequenceNode *> sequence_nodes{};
+    sequence_nodes.reserve(nodes.size());
+    for (std::unique_ptr<SequenceNode> &e : nodes) {
+      sequence_nodes.emplace_back(e.release());
+    }
+    return std::make_unique<Sequence>(token->location(), sequence_nodes);
+  }
 }
 
 /* A standard pratt-parser for expressions. */
