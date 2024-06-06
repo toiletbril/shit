@@ -9,8 +9,15 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
 namespace shit {
+
+static const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
+    {"echo", Builtin::Kind::Echo},
+    {"exit", Builtin::Kind::Exit},
+    {"cd",   Builtin::Kind::Cd  },
+};
 
 Builtin::Kind
 search_builtin(std::string_view builtin_name)
@@ -34,14 +41,16 @@ execute_builtin(Builtin::Kind kind, const std::vector<std::string> &args)
   std::unique_ptr<Builtin> b{};
 
   switch (kind) {
-  case Builtin::Kind::Echo: b.reset(new Echo); break;
-  case Builtin::Kind::Cd: b.reset(new Cd); break;
-  case Builtin::Kind::Exit: b.reset(new Exit); break;
+    /* clang-format off */
+  case Builtin::Kind::Echo: return Echo{}.execute(args); break;
+  case Builtin::Kind::Cd:   return Cd{}.execute(args); break;
+  case Builtin::Kind::Exit: return Exit{}.execute(args); break;
+    /* clang-format on */
 
-  default: SHIT_UNREACHABLE("Unhandled builtin of type %d", E(kind));
+  default: break;
   }
 
-  return b->execute(args);
+  SHIT_UNREACHABLE("Unhandled builtin of type %d", E(kind));
 }
 
 /**

@@ -3,7 +3,6 @@
 #include "Common.hpp"
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace shit {
@@ -25,12 +24,6 @@ struct Builtin
 
 protected:
   Builtin();
-};
-
-const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
-    {"echo", Builtin::Kind::Echo},
-    {"exit", Builtin::Kind::Exit},
-    {"cd",   Builtin::Kind::Cd  },
 };
 
 struct Echo : public Builtin

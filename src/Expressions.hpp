@@ -18,7 +18,7 @@ struct Expression
 
   virtual i64         evaluate() const = 0;
   virtual std::string to_string() const = 0;
-  virtual std::string to_ast_string(usize layer = 0) const = 0;
+  virtual std::string to_ast_string(usize layer = 0) const;
 
 protected:
   usize m_location{std::string::npos};
@@ -288,6 +288,43 @@ struct NotEqual : public BinaryExpression
 
   std::string to_string() const override;
   i64         evaluate() const override;
+};
+
+struct SequenceNode;
+
+struct Sequence : public Expression
+{
+  Sequence(usize location, std::vector<const SequenceNode *> &nodes);
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  i64         evaluate() const override;
+
+protected:
+  std::vector<const SequenceNode *> m_nodes;
+};
+
+struct SequenceNode : public Expression
+{
+  /* Does this sequence node need evaluation? */
+  enum class Kind
+  {
+    Simple,
+    And,
+    Or,
+  };
+
+  SequenceNode(usize location, Kind kind, const Expression *expr);
+
+  Kind kind() const;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  i64         evaluate() const override;
+
+protected:
+  Kind              m_kind;
+  const Expression *m_expr;
 };
 
 } /* namespace shit */

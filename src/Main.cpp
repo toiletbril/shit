@@ -54,7 +54,9 @@ main(int argc, char **argv)
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,
    * since it's only really noticeable in interactive mode. This way,
-   * subsequent calls to the same program will still be cached in any mode. */
+   * subsequent calls to the same program will still be cached in any mode, but
+   * we won't waste any milliseconds traversing directories for very simple
+   * scripts! */
   shit::utils::clear_path_map();
 
   /* A simple return cannot be used after this point, since we need a special

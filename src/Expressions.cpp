@@ -24,6 +24,15 @@ Expression::location() const
   return m_location;
 }
 
+std::string
+Expression::to_ast_string(usize layer) const
+{
+  std::string pad;
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+  return pad + "[" + to_string() + "]";
+}
+
 /**
  * class: If
  */
@@ -72,6 +81,7 @@ If::to_ast_string(usize layer) const
   s += pad + EXPRESSION_AST_INDENT + m_condition->to_ast_string(layer + 1) +
        "\n";
   s += pad + EXPRESSION_AST_INDENT + m_then->to_ast_string(layer + 1);
+
   if (m_otherwise != nullptr) {
     s += '\n';
     s += pad + pad + "[Else]\n";
@@ -101,7 +111,6 @@ DummyExpression::to_string() const
 std::string
 DummyExpression::to_ast_string(usize layer) const
 {
-  SHIT_UNUSED(layer);
   std::string pad;
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
@@ -191,6 +200,98 @@ Exec::to_ast_string(usize layer) const
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad + "[" + to_string() + "]";
+}
+
+/**
+ * class: Sequence
+ */
+Sequence::Sequence(usize location, std::vector<const SequenceNode *> &nodes)
+    : Expression(location), m_nodes(nodes)
+{}
+
+std::string
+Sequence::to_string() const
+{
+  return "Sequence";
+}
+
+std::string
+Sequence::to_ast_string(usize layer) const
+{
+  std::string s;
+  std::string pad;
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+
+  s += pad + "[Sequence]";
+  for (const SequenceNode *n : m_nodes) {
+    s += pad + EXPRESSION_AST_INDENT + n->to_ast_string(layer + 1) + "\n";
+  }
+
+  return s;
+}
+
+i64
+Sequence::evaluate() const
+{
+  i64 ret = -1;
+
+  for (const SequenceNode *n : m_nodes) {
+    switch (n->kind()) {
+    case SequenceNode::Kind::Simple: {
+      ret = n->evaluate();
+    } break;
+
+    case SequenceNode::Kind::Or:
+      if (ret != 0) {
+        ret = n->evaluate();
+      } else {
+        continue;
+      }
+      break;
+
+    case SequenceNode::Kind::And:
+      if (ret == 0) {
+        ret = n->evaluate();
+      } else {
+        continue;
+      }
+      break;
+    }
+  }
+
+  /* There should be at least one expression executed. */
+  SHIT_ASSERT(ret != 1, "%ld", ret);
+
+  return ret;
+}
+
+/**
+ * class: SequenceNode
+ */
+SequenceNode::SequenceNode(usize location, Kind kind, const Expression *expr)
+    : Expression(location), m_kind(kind), m_expr(expr)
+{}
+
+std::string
+SequenceNode::to_string() const
+{
+  return "SequenceNode: " + m_expr->to_string();
+}
+
+std::string
+SequenceNode::to_ast_string(usize layer) const
+{
+  std::string pad;
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+  return pad + "[" + to_string() + "]";
+}
+
+i64
+SequenceNode::evaluate() const
+{
+  return m_expr->evaluate();
 }
 
 /**
@@ -716,7 +817,7 @@ Equal::evaluate() const
 }
 
 /**
- * class: Inequality
+ * class: NotEqual
  */
 NotEqual::NotEqual(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
