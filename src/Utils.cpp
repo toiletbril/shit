@@ -86,15 +86,15 @@ last_system_error_message()
 }
 
 std::optional<std::string>
-get_environment_variable(std::string_view key)
+get_environment_variable(const std::string &key)
 {
-  const char *e = std::getenv(key.data());
+  const char *e = std::getenv(key.c_str());
   return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
 }
 
 i32
 execute_program_by_path(const std::filesystem::path    &path,
-                        std::string_view                program,
+                        const std::string              &program,
                         const std::vector<std::string> &args)
 {
   std::vector<const char *> real_args;
@@ -172,8 +172,9 @@ is_child_process()
  * replaced by a runtime check. */
 #if !defined __COSMOPOLITAN__
 bool
-sanitize_program_name(std::string_view &program_name)
+sanitize_program_name(std::string &program_name)
 {
+  /* POSIX does not really make use of extensions for executable files. */
   SHIT_UNUSED(program_name);
   return false;
 }
@@ -250,10 +251,10 @@ last_system_error_message()
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
 
 std::optional<std::string>
-get_environment_variable(std::string_view key)
+get_environment_variable(const std::string &key)
 {
   char buffer[WIN32_MAX_ENV_SIZE] = {0};
-  if (GetEnvironmentVariableA(key.data(), buffer, sizeof(buffer)) == 0) {
+  if (GetEnvironmentVariableA(key.c_str(), buffer, sizeof(buffer)) == 0) {
     return std::nullopt;
   }
   return std::string{buffer};
@@ -261,7 +262,7 @@ get_environment_variable(std::string_view key)
 
 i32
 execute_program_by_path(const std::filesystem::path    &path,
-                        std::string_view                program,
+                        const std::string              &program,
                         const std::vector<std::string> &args)
 {
   std::string command_line;
@@ -341,7 +342,7 @@ const static std::set<std::string> OMITTED_EXTENSIONS = {
 };
 
 bool
-sanitize_program_name(std::string_view &program_name)
+sanitize_program_name(std::string &program_name)
 {
 #if defined __COSMOPOLITAN__
   if (IsWindows())
@@ -352,10 +353,13 @@ sanitize_program_name(std::string_view &program_name)
     if (extension_pos != std::string::npos &&
         extension_pos + 3 < program_name.length())
     {
-      std::string_view extension = program_name.substr(extension_pos + 1);
-      if (OMITTED_EXTENSIONS.find(extension.data()) != OMITTED_EXTENSIONS.end())
+      std::string extension = program_name.substr(extension_pos + 1);
+
+      if (auto e = OMITTED_EXTENSIONS.find(extension);
+          e != OMITTED_EXTENSIONS.end())
       {
-        program_name.remove_suffix(program_name.length() - extension_pos);
+        program_name.erase(program_name.begin() + extension_pos,
+                           program_name.end());
         return true;
       }
     }
@@ -367,7 +371,7 @@ sanitize_program_name(std::string_view &program_name)
 #endif /* _WIN32 || __COSMOPOLITAN__ */
 
 std::optional<std::string>
-simple_shell_expand(std::string_view path)
+simple_shell_expand(const std::string &path)
 {
   usize       pos = std::string::npos;
   std::string expanded_path{path};
@@ -402,7 +406,7 @@ simple_shell_expand(std::string_view path)
 }
 
 std::optional<std::filesystem::path>
-canonicalize_path(std::string_view path)
+canonicalize_path(const std::string &path)
 {
   std::filesystem::path actual_path{path};
 
@@ -514,15 +518,14 @@ initialize_path_map()
 
         /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : dir) {
-          std::string      fs = f.path().filename().string();
-          std::string_view fv = fs;
+          std::string fs = f.path().filename().string();
 
-          usize ext_index = (sanitize_program_name(fv))
+          usize ext_index = (sanitize_program_name(fs))
                                 ? cache_path_into(PATH_CACHE_EXTS,
                                                   f.path().extension().string())
                                 : 0;
 
-          PATH_CACHE[fv.data()] = {dir_index, ext_index};
+          PATH_CACHE[fs] = {dir_index, ext_index};
         }
       }
 
@@ -532,7 +535,7 @@ initialize_path_map()
 }
 
 std::optional<std::filesystem::path>
-search_and_cache(std::string_view program_name)
+search_and_cache(const std::string &program_name)
 {
   MAYBE_PATH = get_environment_variable("PATH");
   if (!MAYBE_PATH)
@@ -571,7 +574,7 @@ search_and_cache(std::string_view program_name)
                 p.concat(PATH_CACHE_EXTS[ext_index]);
             std::filesystem::exists(try_path))
         {
-          PATH_CACHE[program_name.data()] = {dir_index, ext_index};
+          PATH_CACHE[program_name] = {dir_index, ext_index};
           return try_path;
         }
       }
@@ -584,22 +587,28 @@ search_and_cache(std::string_view program_name)
 }
 
 std::optional<std::filesystem::path>
-search_program_path(std::string_view program_name)
+search_program_path(const std::string &program_name)
 {
-  sanitize_program_name(program_name);
+  std::string sp{program_name};
 
-  if (auto p = PATH_CACHE.find(program_name.data()); p != PATH_CACHE.end()) {
+  bool s = sanitize_program_name(sp);
+
+  if (auto p = PATH_CACHE.find(sp); p != PATH_CACHE.end()) {
     auto [dir, ext] = p->second;
+    std::filesystem::path try_path = PATH_CACHE_DIRS[dir];
 
-    std::filesystem::path file_name = p->first;
-    std::filesystem::path try_path =
-        PATH_CACHE_DIRS[dir] / file_name.concat(PATH_CACHE_EXTS[ext]);
+    if (s) {
+      try_path /= program_name;
+    } else {
+      std::filesystem::path file_name = p->first;
+      try_path /= file_name.concat(PATH_CACHE_EXTS[ext]);
+    }
 
     /* Does this path still exist? */
     if (std::filesystem::exists(try_path))
       return try_path;
     else
-      PATH_CACHE.erase(program_name.data());
+      PATH_CACHE.erase(program_name);
   } else {
     /* We don't have cache? Newly added file? Try to search and cache it. */
     if (std::optional<std::filesystem::path> p = search_and_cache(program_name);

@@ -15,18 +15,18 @@ std::string last_system_error_message();
 /* Path is the program path to execute, expanded from program. Program is
  * non-altered first arg. */
 i32 execute_program_by_path(const std::filesystem::path    &path,
-                            std::string_view                program,
+                            const std::string              &program,
                             const std::vector<std::string> &args);
 
-std::optional<std::string> get_environment_variable(std::string_view key);
+std::optional<std::string> get_environment_variable(const std::string &key);
 
 /* Make launching programs more convenient, e.g strip out .exe for Windows. */
-bool sanitize_program_name(std::string_view &program_name);
+bool sanitize_program_name(std::string &program_name);
 
-std::optional<std::string> simple_shell_expand(std::string_view path);
+std::optional<std::string> simple_shell_expand(const std::string &path);
 
 /* Normalizes the path. */
-std::optional<std::filesystem::path> canonicalize_path(std::string_view path);
+std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
 
 void initialize_path_map();
 
@@ -34,7 +34,7 @@ void clear_path_map();
 
 /* Searches PATH for program binary. Returns absolute path to the program. */
 std::optional<std::filesystem::path>
-search_program_path(std::string_view program_name);
+search_program_path(const std::string &program_name);
 
 bool is_child_process();
 

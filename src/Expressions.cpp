@@ -123,9 +123,8 @@ Exec::evaluate() const
       [](const std::vector<std::string> &args) -> std::vector<std::string> {
     std::vector<std::string> expanded_args;
 
-    for (std::string_view arg : args) {
-      expanded_args.push_back(
-          utils::simple_shell_expand(arg).value_or(std::string{arg}));
+    for (const std::string &arg : args) {
+      expanded_args.push_back(utils::simple_shell_expand(arg).value_or(arg));
     }
 
     return expanded_args;
@@ -138,7 +137,6 @@ Exec::evaluate() const
     /* Is this a builtin? */
     if (bk != Builtin::Kind::Invalid) {
       try {
-
         return execute_builtin(bk, shell_expand_args(m_args));
       } catch (Error &err) {
         throw ErrorWithLocation{location(), err.message()};
@@ -149,6 +147,7 @@ Exec::evaluate() const
     program_path = utils::search_program_path(m_path);
   } else {
     /* This is a path. */
+    /* TODO: Sanitize extensions here too. */
     program_path = utils::canonicalize_path(m_path);
   }
 
