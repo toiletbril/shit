@@ -13,9 +13,16 @@ std::string last_system_error_message();
 
 /* Path is the program path to execute, expanded from program. Program is
  * non-altered first arg. */
-i32 execute_program_by_path(const std::filesystem::path    &path,
-                            const std::string              &program,
-                            const std::vector<std::string> &args);
+struct ExecContext
+{
+  const std::filesystem::path    &m_path;
+  const std::string              &m_program;
+  const std::vector<std::string> &m_args;
+};
+
+i32 execute_program(ExecContext &&ec);
+
+i32 execute_program_sequence_with_pipes(std::vector<ExecContext> &&ecs);
 
 std::optional<std::string> get_environment_variable(const std::string &key);
 

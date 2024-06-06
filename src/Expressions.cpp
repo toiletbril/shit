@@ -167,8 +167,8 @@ Exec::evaluate() const
     throw ErrorWithLocation{location(), "Command not found"};
 
   try {
-    return utils::execute_program_by_path(program_path.value(), m_path,
-                                          shell_expand_args(m_args));
+    return utils::execute_program(
+        {program_path.value(), m_path, shell_expand_args(m_args)});
   } catch (Error &err) {
     throw ErrorWithLocation{location(), err.message()};
   }
@@ -272,6 +272,12 @@ Sequence::evaluate() const
 SequenceNode::SequenceNode(usize location, Kind kind, const Expression *expr)
     : Expression(location), m_kind(kind), m_expr(expr)
 {}
+
+SequenceNode::Kind
+SequenceNode::kind() const
+{
+  return m_kind;
+}
 
 std::string
 SequenceNode::to_string() const

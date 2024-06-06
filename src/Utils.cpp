@@ -1,6 +1,7 @@
 #include "Utils.hpp"
 
 #include "Cli.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Toiletline.hpp"
@@ -73,6 +74,17 @@ set_default_signal_handlers()
   sigprocmask(SIG_BLOCK, &sm, nullptr);
 }
 
+i32
+call_checked_impl(i32 ret, const std::string &&func)
+{
+  if (ret == -1)
+    throw shit::Error{func + "failed: " + last_system_error_message()};
+
+  return ret;
+}
+
+#define call_checked(f) call_checked_impl(f, std::string{#f})
+
 std::string
 last_system_error_message()
 {
@@ -86,39 +98,33 @@ get_environment_variable(const std::string &key)
   return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
 }
 
-i32
-execute_program_by_path(const std::filesystem::path    &path,
-                        const std::string              &program,
-                        const std::vector<std::string> &args)
+static std::vector<const char *>
+create_os_args(const std::string &program, const std::vector<std::string> &args)
 {
-  std::vector<const char *> real_args;
+  std::vector<const char *> os_args;
 
   /* argv[0] is the program itself. */
-  real_args.push_back(program.data());
+  os_args.push_back(program.data());
 
   /* Then actual arguments. */
   for (const std::string &arg : args) {
-    real_args.push_back(arg.c_str());
+    os_args.push_back(arg.c_str());
   }
 
   /* And then nullptr at the end. */
-  real_args.push_back(nullptr);
+  os_args.push_back(nullptr);
 
-  pid_t child_pid = fork();
+  return os_args;
+}
 
-  if (child_pid == 0) {
-    reset_signal_handlers();
-    if (execv(path.c_str(), const_cast<char *const *>(real_args.data())) == -1)
-      throw shit::Error{last_system_error_message()};
-  } else if (child_pid == -1) {
-    throw Error("fork() failed: " + last_system_error_message());
-  }
+static i32
+wait_for_process(pid_t pid)
+{
+  SHIT_ASSERT(pid >= 0);
 
   i32 status{};
-  i32 retcode = 255;
 
-  if (waitpid(child_pid, &status, WUNTRACED) == -1)
-    throw shit::Error{"waitpid() failed: " + last_system_error_message()};
+  call_checked(waitpid(pid, &status, WUNTRACED));
 
   /* Print appropriate message if the process was sent a signal. */
   if (WIFSIGNALED(status)) {
@@ -129,31 +135,111 @@ execute_program_by_path(const std::filesystem::path    &path,
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      std::cout << "[Process " << child_pid << ": " << sig_desc << ", signal "
+      std::cout << "[Process " << pid << ": " << sig_desc << ", signal "
                 << std::to_string(sig) << "]" << std::endl;
     } else {
       std::cout << std::endl;
     }
 
-    retcode = status;
+    return status;
   } else if (WIFSTOPPED(status)) {
     i32         sig = WSTOPSIG(status);
     const char *sig_str = strsignal(sig);
     std::string sig_desc =
         (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
 
-    std::cout << "[Process " << child_pid << ": " << sig_desc << ", signal "
+    std::cout << "[Process " << pid << ": " << sig_desc << ", signal "
               << std::to_string(sig) << " and killed]" << std::endl;
 
-    if (kill(child_pid, SIGKILL) == -1)
-      throw shit::Error{"kill() failed: " + last_system_error_message()};
+    /* We can't handle suspended processes yet, so goodbye. */
+    call_checked(kill(pid, SIGKILL) == -1);
   } else if (!WIFEXITED(status)) {
-    throw shit::Error{"waitpid() failed: " + last_system_error_message()};
+    /* Process was destroyed by otherworldly forces. */
+    throw shit::Error{"???: " + last_system_error_message()};
   } else {
-    retcode = WEXITSTATUS(status);
+    /* We exited normally. */
+    return WEXITSTATUS(status);
   }
 
-  return retcode;
+  SHIT_UNREACHABLE();
+}
+
+i32
+execute_program(const ExecContext &&ec)
+{
+  std::vector<const char *> os_args = create_os_args(ec.m_program, ec.m_args);
+
+  pid_t child_pid = fork();
+
+  if (child_pid == -1) {
+    throw Error("fork() failed: " + last_system_error_message());
+  } else if (child_pid == 0) {
+    reset_signal_handlers();
+    if (execv(ec.m_path.c_str(), const_cast<char *const *>(os_args.data())) ==
+        -1)
+    {
+      throw shit::Error{last_system_error_message()};
+    }
+  }
+
+  return wait_for_process(child_pid);
+}
+
+i32
+execute_program_sequence_with_pipes(std::vector<ExecContext> &&ecs)
+{
+  int   pipefds[2];
+  pid_t last_pid = -1;
+  bool  first_producer = true;
+
+  for (const ExecContext &ec : ecs) {
+    std::vector<const char *> os_args = create_os_args(ec.m_program, ec.m_args);
+
+    /* Are we the last in sequence? */
+    bool is_last_consumer = &ec != &ecs.back();
+
+    if (is_last_consumer)
+      call_checked(pipe(pipefds));
+
+    pid_t child_pid = fork();
+
+    if (child_pid == -1) {
+      throw shit::Error{"fork() failed: " + last_system_error_message()};
+    } else if (child_pid == 0) {
+      /* For the first producer, don't change stdin */
+      if (!first_producer) {
+        call_checked(dup2(pipefds[0], STDIN_FILENO));
+      }
+
+      /* Except for the last command, redirect stdout to the pipe */
+      if (is_last_consumer) {
+        call_checked(dup2(pipefds[1], STDOUT_FILENO));
+      }
+
+      /* Unused pipe ends. */
+      call_checked(close(pipefds[0]));
+      call_checked(close(pipefds[1]));
+
+      first_producer = false;
+
+      reset_signal_handlers();
+
+      if (execv(ec.m_path.c_str(), const_cast<char *const *>(os_args.data())) ==
+          -1)
+      {
+        throw shit::Error{last_system_error_message()};
+      }
+    }
+
+    last_pid = child_pid;
+
+    /* Unused write end of the pipe in the parent. */
+    if (is_last_consumer) {
+      close(pipefds[1]);
+    }
+  }
+
+  return wait_for_process(last_pid);
 }
 
 bool
@@ -255,21 +341,19 @@ get_environment_variable(const std::string &key)
 }
 
 i32
-execute_program_by_path(const std::filesystem::path    &path,
-                        const std::string              &program,
-                        const std::vector<std::string> &args)
+execute_program(const ExecContext &&ec)
 {
   std::string command_line;
 
   /* TODO: remove CVE and escape quotes */
   command_line += '"';
-  command_line += program;
+  command_line += ec.m_program;
   command_line += '"';
 
   if (args.size() > 0) {
-    for (usize i = 0; i < args.size(); i++) {
+    for (usize i = 0; i < ec.m_args.size(); i++) {
       command_line += ' ';
-      command_line += '"' + args[i] + '"';
+      command_line += '"' + ec.m_args[i] + '"';
     }
   }
 
