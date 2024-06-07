@@ -60,6 +60,7 @@ is_shell_sentinel(char ch)
 {
   switch (ch) {
   case '|':
+  case '&':
   case ';':
   case '>': return true;
   default: return false;
@@ -261,7 +262,9 @@ Lexer::chop_string(usize token_start, char quote_char)
   while (m_source[token_end] != quote_char) {
     token_end++;
     if (token_end >= m_source.length()) {
-      throw ErrorWithLocation{token_start - 1, "Unterminated string literal"};
+      throw ErrorWithLocationAndDetails{
+          token_start - 1, "Unterminated string literal", token_end,
+          "Expected " + std::string{quote_char} + " here"};
     }
   }
 

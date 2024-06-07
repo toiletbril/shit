@@ -29,13 +29,14 @@ Parser::construct_ast()
   return parse_command();
 }
 
+/* Generates a Sequence of Exec and PipeExec expressions. */
 std::unique_ptr<Expression>
 Parser::parse_command()
 {
   std::unique_ptr<Token> token{};
 
-  std::vector<std::string> args;
-  std::string              program_name;
+  std::vector<std::string>              args_accumulator;
+  std::optional<std::unique_ptr<Token>> program_accumulator{};
 
   bool should_chop_program = true;
   bool should_break = false;
@@ -50,7 +51,9 @@ Parser::parse_command()
     switch (token->kind()) {
     case Token::Kind::EndOfFile:
       /* Nothing after the operator, error. */
-      if (!nodes.empty() && program_name.empty() && is_expr_required) {
+      if (!nodes.empty() && !program_accumulator.has_value() &&
+          is_expr_required)
+      {
         throw shit::ErrorWithLocation{token->location(),
                                       "Expected a value after an operator"};
       }
@@ -69,16 +72,17 @@ Parser::parse_command()
     case Token::Kind::Semicolon: {
       m_lexer->advance_past_last_peek();
 
-      if (!program_name.empty()) {
+      if (program_accumulator) {
         SequenceNode *sn = new SequenceNode{
             token->location(), next_sk,
-            new Exec{token->location(), program_name, args}
+            new Exec{(*program_accumulator)->location(),
+                     (*program_accumulator)->value(), args_accumulator}
         };
 
         nodes.emplace_back(sn);
 
-        program_name.clear();
-        args.clear();
+        program_accumulator = std::nullopt;
+        args_accumulator.clear();
 
         should_chop_program = true;
         next_sk = get_sequence_kind(token->kind());
@@ -98,9 +102,9 @@ Parser::parse_command()
       m_lexer->advance_past_last_peek();
 
       if (!should_chop_program) {
-        args.push_back(token->value());
+        args_accumulator.emplace_back(token->value());
       } else {
-        program_name = token->value();
+        program_accumulator = std::move(token);
         should_chop_program = false;
       }
       break;
@@ -125,7 +129,7 @@ Parser::parse_command()
     for (std::unique_ptr<SequenceNode> &e : nodes) {
       sequence_nodes.emplace_back(e.release());
     }
-    return std::make_unique<Sequence>(token->location(), sequence_nodes);
+    return std::make_unique<Sequence>(0, sequence_nodes);
   }
 }
 
