@@ -93,7 +93,31 @@ Parser::parse_command()
       }
     } break;
 
-    case Token::Kind::Pipe:
+    case Token::Kind::Pipe: {
+      m_lexer->advance_past_last_peek();
+
+      std::unique_ptr<Expression> rhs{parse_command()};
+
+      /* At this point, we have the left-hand side stored in and the right-hand
+       * side. */
+      if (!program_accumulator) {
+        throw ErrorWithLocation{token->location(), "Nothing to pipe into"};
+      }
+
+      SequenceNode *pipe_node = new SequenceNode{
+          token->location(), SequenceNode::Kind::Simple,
+          new PipeExec{token->location(), std::move(program_accumulator),
+                       std::move(right_expr)}
+      };
+
+      nodes.emplace_back(pipe_node);
+
+      program_accumulator = std::nullopt;
+      args_accumulator.clear();
+
+      should_chop_program = true;
+    } break;
+
     case Token::Kind::Greater:
       throw ErrorWithLocation{token->location(), "Not implemented (Parser)"};
 
