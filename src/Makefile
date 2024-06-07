@@ -69,6 +69,14 @@ compile: $(OBJECTS)
 	echo "	CXX $(OBJECTS)	-o $(OUT)"
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
 
+install: shit
+ifneq ($(OS), Windows_NT)
+	install -m 755 $(OUT) /usr/local/bin/shit
+else
+	echo "Unable to figure out install directory for Windows."
+	echo "Please put $(PWD) in your PATH manually."
+endif
+
 CLANG_FORMAT ?= clang-format
 
 fmt:
@@ -80,4 +88,4 @@ clean:
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
 	rm -rf $(OUT).com.dbg $(OUT).aarch64.elf # Cosmopolitan
 
-.PHONY: sanity shit compile fmt clean
+.PHONY: sanity shit compile install fmt clean

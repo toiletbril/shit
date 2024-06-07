@@ -8,6 +8,9 @@ shit:
 	echo "Creating shit..."
 	$(MAKE) -C src shit
 
+install:
+	$(MAKE) -C src install
+
 fmt:
 	$(MAKE) -C src fmt
 
@@ -20,4 +23,4 @@ clean:
 	$(MAKE) -C src clean
 	$(MAKE) -C test clean
 
-.PHONY: all shit fmt test clean
+.PHONY: all shit install fmt test clean
