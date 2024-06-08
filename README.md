@@ -21,7 +21,7 @@ $ ./shit --help
 Is it usable?
 - [x] Run programs.
 - [x] Work on Linux and Windows.
-- [x] Logical sequences.
+- [x] Logical sequences. (`&&`, `||`, `;`)
 - [x] Pipes.
 - [ ] Shell expansion. (`*`, `~`, `!`)
 - [ ] Environment variables.
