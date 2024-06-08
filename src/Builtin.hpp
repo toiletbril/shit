@@ -9,7 +9,7 @@ namespace shit {
 
 struct Builtin
 {
-  enum class Kind
+  enum class Kind : uint8_t
   {
     Invalid,
     Echo,

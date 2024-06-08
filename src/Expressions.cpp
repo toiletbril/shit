@@ -388,8 +388,9 @@ ExecPipeSequence::evaluate() const
       program_path = utils::canonicalize_path(e->program());
     }
 
-    if (!program_path)
-      throw ErrorWithLocation{location(), "Command not found"};
+    if (!program_path) {
+      throw ErrorWithLocation{e->location(), "Command not found"};
+    }
 
     ecs.push_back({*program_path, e->program(), e->args()});
   }
@@ -413,8 +414,9 @@ UnaryExpression::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
   s += pad + "[Unary " + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_rhs->to_ast_string(layer + 1);
   return s;

@@ -484,7 +484,8 @@ sanitize_program_name(std::string &program_name)
       std::string extension = program_name.substr(extension_pos + 1);
 
       if (auto e = OMITTED_EXTENSIONS.find(extension);
-          e != OMITTED_EXTENSIONS.end()) {
+          e != OMITTED_EXTENSIONS.end())
+      {
         program_name.erase(program_name.begin() + extension_pos,
                            program_name.end());
         return true;

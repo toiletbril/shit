@@ -25,48 +25,9 @@ get_sequence_kind(Token::Kind tk)
 Parser::Parser(Lexer *lexer) : m_lexer(lexer) {}
 Parser::~Parser() { delete m_lexer; }
 
-std::unique_ptr<Expression>
-Parser::construct_ast()
-{
-  return parse_command();
-}
-
-std::optional<std::unique_ptr<Exec>>
-Parser::parse_exec()
-{
-  std::vector<std::string>              args_accumulator{};
-  std::optional<std::unique_ptr<Token>> program_token{};
-
-  for (;;) {
-    std::unique_ptr<Token> token{m_lexer->peek_shell_token()};
-
-    switch (token->kind()) {
-    case Token::Kind::Identifier:
-    case Token::Kind::String:
-      m_lexer->advance_past_last_peek();
-      if (!program_token) {
-        program_token = std::move(token);
-      } else {
-        args_accumulator.emplace_back(token->value());
-      }
-      break;
-
-    default:
-      if (!program_token) {
-        return std::nullopt;
-      }
-      const Token *pt = program_token.value().get();
-      return std::make_unique<Exec>(pt->location(), pt->value(),
-                                    args_accumulator);
-    }
-  }
-
-  SHIT_UNREACHABLE();
-}
-
 /* Generates a Sequence of Exec and PipeExec expressions. */
 std::unique_ptr<Expression>
-Parser::parse_command()
+Parser::construct_ast()
 {
   std::optional<std::unique_ptr<Expression>> lhs{};
   std::vector<std::unique_ptr<SequenceNode>> nodes{};
@@ -76,7 +37,7 @@ Parser::parse_command()
 
   for (;;) {
     if (should_parse_command) {
-      lhs = parse_exec();
+      lhs = parse_shell_command();
     } else {
       should_parse_command = true;
     }
@@ -90,8 +51,9 @@ Parser::parse_command()
       /* Two operators back to back, error */
       if (!lhs) {
         throw shit::ErrorWithLocation{
-            token->location(), "Expected a value after an operator, found an " +
-                                   token->to_ast_string()};
+            token->location(),
+            "Expected a command after an operator, found an " +
+                token->to_ast_string()};
       }
       /* fallthrough */
     case Token::Kind::EndOfFile:
@@ -101,20 +63,21 @@ Parser::parse_command()
       if (lhs) {
         SequenceNode *sn =
             new SequenceNode{token->location(), next_sk, lhs.value().release()};
-
         nodes.emplace_back(sn);
-
         next_sk = get_sequence_kind(token->kind());
       }
 
-      if (token->kind() != Token::Kind::EndOfFile && !nodes.empty() && !lhs) {
-        /* We have Nothing after the operator, error. */
-        throw shit::ErrorWithLocation{token->location(),
-                                      "Expected a value after an operator"};
-      }
-
       if (token->kind() == Token::Kind::EndOfFile) {
+        if (next_sk != SequenceNode::Kind::Simple) {
+          throw shit::ErrorWithLocation{token->location(),
+                                        "Expected a command after an operator"};
+        }
+
         if (nodes.empty()) {
+          if (!lhs) {
+            /* Empty input? */
+            return std::make_unique<DummyExpression>(token->location());
+          }
           /* This exec is the whole expression? */
           return std::unique_ptr<Expression>(std::move(lhs.value()));
         } else {
@@ -137,7 +100,7 @@ Parser::parse_command()
 
       /* Collect a pipe group. */
       for (;;) {
-        std::optional<std::unique_ptr<Exec>> rhs{parse_exec()};
+        std::optional<std::unique_ptr<Exec>> rhs{parse_shell_command()};
 
         if (rhs) {
           pipe_group.push_back(rhs->release());
@@ -173,6 +136,39 @@ Parser::parse_command()
   }
 
   /* TODO: find a way to indroduce expressions and use parse_expression() */
+  SHIT_UNREACHABLE();
+}
+
+std::optional<std::unique_ptr<Exec>>
+Parser::parse_shell_command()
+{
+  std::vector<std::string>              args_accumulator{};
+  std::optional<std::unique_ptr<Token>> program_token{};
+
+  for (;;) {
+    std::unique_ptr<Token> token{m_lexer->peek_shell_token()};
+
+    switch (token->kind()) {
+    case Token::Kind::Identifier:
+    case Token::Kind::String:
+      m_lexer->advance_past_last_peek();
+      if (!program_token) {
+        program_token = std::move(token);
+      } else {
+        args_accumulator.emplace_back(token->value());
+      }
+      break;
+
+    default:
+      if (!program_token) {
+        return std::nullopt;
+      }
+      const Token *pt = program_token.value().get();
+      return std::make_unique<Exec>(pt->location(), pt->value(),
+                                    args_accumulator);
+    }
+  }
+
   SHIT_UNREACHABLE();
 }
 
@@ -355,4 +351,4 @@ Parser::parse_expression(u8 min_precedence)
   return lhs;
 }
 
-} // namespace shit
+} /* namespace shit */

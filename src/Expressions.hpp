@@ -70,7 +70,7 @@ protected:
 struct SequenceNode : public Expression
 {
   /* Does this sequence node need evaluation? */
-  enum class Kind
+  enum class Kind : uint8_t
   {
     Simple,
     And,

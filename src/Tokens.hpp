@@ -15,7 +15,7 @@ namespace shit {
  */
 struct Token
 {
-  enum class Kind
+  enum class Kind : uint8_t
   {
     Invalid,
 
@@ -65,7 +65,7 @@ struct Token
 
   using Flags = u8;
 
-  enum Flag
+  enum Flag : uint8_t
   {
     /* clang-format off */
     Sentinel       = 0,
