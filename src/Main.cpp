@@ -102,7 +102,7 @@ main(int argc, char **argv)
             /* Exit on CTRL-D. */
             std::cout << "^D" << std::flush;
             toiletline::emit_newlines(input);
-            shit::utils::quit(exit_code);
+            shit::utils::quit(exit_code, true);
           } else if (code == TL_PRESSED_INTERRUPT) {
             /* Ignore Ctrl-C. */
             std::cout << "^C" << std::flush;

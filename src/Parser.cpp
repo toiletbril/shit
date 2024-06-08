@@ -101,7 +101,7 @@ Parser::construct_ast()
 
       m_lexer->advance_past_last_peek();
 
-      /* Don't prematurely release() the pointer, since we can still erro out
+      /* Don't prematurely release() the pointer, since we can still error out
        * before constructing the expression. */
       std::vector<const Exec *> pipe_group = {static_cast<Exec *>(lhs.get())};
       std::unique_ptr<Token>    last_pipe_token = std::move(token);

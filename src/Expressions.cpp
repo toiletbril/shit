@@ -243,6 +243,8 @@ Sequence::to_ast_string(usize layer) const
 i64
 Sequence::evaluate() const
 {
+  SHIT_ASSERT(m_nodes.size() > 0);
+
   i64 ret = -1;
 
   for (const SequenceNode *n : m_nodes) {
@@ -269,8 +271,7 @@ Sequence::evaluate() const
     }
   }
 
-  /* There should be at least one expression executed. */
-  SHIT_ASSERT(ret != -1, "%ld", ret);
+  SHIT_ASSERT(ret != -1, "There should be at least one expression executed.");
 
   return ret;
 }

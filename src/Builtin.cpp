@@ -1,5 +1,6 @@
 #include "Builtin.hpp"
 
+#include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -139,7 +140,7 @@ Exit::kind() const
 i32
 Exit::execute(const std::vector<std::string> &args) const
 {
-  utils::quit(args.size() > 0 ? std::atoi(args[0].c_str()) : 0);
+  utils::quit(args.size() > 0 ? std::atoi(args[0].c_str()) : 0, true);
 }
 
 } /* namespace shit */

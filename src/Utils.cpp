@@ -566,8 +566,12 @@ get_current_directory()
 }
 
 [[noreturn]] void
-quit(i32 code)
+quit(i32 code, bool should_goodbye)
 {
+  if (should_goodbye) {
+    show_error("Goodbye.");
+  }
+
   /* Cleanup for main proccess. */
   if (!is_child_process()) {
     if (toiletline::is_active()) {

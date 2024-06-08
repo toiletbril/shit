@@ -285,7 +285,8 @@ TokenOperator::construct_binary_expression(const Expression *lhs,
 {
   SHIT_UNUSED(lhs);
   SHIT_UNUSED(rhs);
-  SHIT_UNREACHABLE("Invalid binary operator construction of type %d", kind());
+  SHIT_UNREACHABLE("Invalid binary operator construction of type %d",
+                   E(kind()));
 }
 
 std::unique_ptr<Expression>
