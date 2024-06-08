@@ -29,7 +29,7 @@ Parser::~Parser() { delete m_lexer; }
 std::unique_ptr<Expression>
 Parser::construct_ast()
 {
-  std::optional<std::unique_ptr<Expression>> lhs{};
+  std::unique_ptr<Expression>                lhs{};
   std::vector<std::unique_ptr<SequenceNode>> nodes{};
 
   bool               should_parse_command = true;
@@ -37,9 +37,6 @@ Parser::construct_ast()
 
   for (;;) {
     if (should_parse_command) {
-      if (lhs) {
-        lhs->reset();
-      }
       lhs = parse_shell_command();
     } else {
       should_parse_command = true;
@@ -65,7 +62,7 @@ Parser::construct_ast()
 
       if (lhs) {
         SequenceNode *sn =
-            new SequenceNode{token->location(), next_sk, lhs.value().release()};
+            new SequenceNode{token->location(), next_sk, lhs.release()};
         nodes.emplace_back(sn);
         next_sk = get_sequence_kind(token->kind());
       }
@@ -82,7 +79,7 @@ Parser::construct_ast()
             return std::make_unique<DummyExpression>(token->location());
           }
           /* This exec is the whole expression? */
-          return std::unique_ptr<Expression>(std::move(lhs.value()));
+          return std::unique_ptr<Expression>(std::move(lhs));
         } else {
           /* Form a sequence. */
           std::vector<const SequenceNode *> sequence_nodes{};
@@ -96,34 +93,42 @@ Parser::construct_ast()
     } break;
 
     case Token::Kind::Pipe: {
+      if (!lhs) {
+        throw shit::ErrorWithLocation{token->location(),
+                                      "Expected a command, found an " +
+                                          token->to_ast_string()};
+      }
+
       m_lexer->advance_past_last_peek();
 
-      std::vector<const Exec *> pipe_group = {
-          static_cast<Exec *>(lhs->release())};
+      /* Don't prematurely release() the pointer, since we can still erro out
+       * before constructing the expression. */
+      std::vector<const Exec *> pipe_group = {static_cast<Exec *>(lhs.get())};
+      std::unique_ptr<Token>    last_pipe_token = std::move(token);
 
       /* Collect a pipe group. */
       for (;;) {
-        std::optional<std::unique_ptr<Exec>> rhs{parse_shell_command()};
+        std::unique_ptr<Exec> rhs{parse_shell_command()};
 
         if (rhs) {
-          pipe_group.push_back(rhs->release());
-          std::unique_ptr<Token> maybe_pipe{m_lexer->peek_shell_token()};
+          pipe_group.emplace_back(rhs.release());
+          last_pipe_token.reset(m_lexer->peek_shell_token());
 
-          if (maybe_pipe->kind() == Token::Kind::Pipe) {
+          if (last_pipe_token->kind() == Token::Kind::Pipe) {
             m_lexer->advance_past_last_peek();
             continue;
           }
+        } else {
+          throw shit::ErrorWithLocation{last_pipe_token->location(),
+                                        "Nowhere to pipe output to"};
         }
 
         break;
       }
 
-      if (pipe_group.size() < 2) {
-        throw shit::ErrorWithLocation{token->location(),
-                                      "Nowhere to pipe output to"};
-      }
-
-      lhs = std::make_unique<ExecPipeSequence>(token->location(), pipe_group);
+      std::ignore = lhs.release();
+      lhs = std::make_unique<ExecPipeSequence>(last_pipe_token->location(),
+                                               pipe_group);
 
       should_parse_command = false;
     } break;
@@ -142,11 +147,11 @@ Parser::construct_ast()
   SHIT_UNREACHABLE();
 }
 
-std::optional<std::unique_ptr<Exec>>
+std::unique_ptr<Exec>
 Parser::parse_shell_command()
 {
-  std::vector<std::string>              args_accumulator{};
-  std::optional<std::unique_ptr<Token>> program_token{};
+  std::unique_ptr<Token>   program_token{};
+  std::vector<std::string> args_accumulator{};
 
   for (;;) {
     std::unique_ptr<Token> token{m_lexer->peek_shell_token()};
@@ -164,9 +169,9 @@ Parser::parse_shell_command()
 
     default:
       if (!program_token) {
-        return std::nullopt;
+        return nullptr;
       }
-      const Token *pt = program_token.value().get();
+      const Token *pt = program_token.get();
       return std::make_unique<Exec>(pt->location(), pt->value(),
                                     args_accumulator);
     }
