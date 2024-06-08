@@ -11,7 +11,8 @@ There will be more information soon™ (when I feel like it).
 ## Building
 
 ```sh
-$ [MODE=rel/dbg/cosmo] make -j14
+$ export MODE=rel/dbg/cosmo
+$ make -j14
 $ ./shit --help
 ```
 
@@ -20,12 +21,13 @@ $ ./shit --help
 Is it usable?
 - [x] Run programs.
 - [x] Work on Linux and Windows.
+- [x] Logical sequences.
+- [x] Pipes.
 - [ ] Shell expansion. (`*`, `~`, `!`)
 - [ ] Environment variables.
 - [ ] Numeric expressions.
 - [ ] Background jobs.
 - [ ] Redirections. (`>`/`<`)
-- [ ] Pipes.
 
 Is it good?
 - [ ] Scripting capabilities. (flow control keywords)
