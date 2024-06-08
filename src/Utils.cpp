@@ -634,27 +634,27 @@ initialize_path_map()
   for (const char &ch : path_var) {
     if (ch != PATH_DELIMITER) {
       dir_string += ch;
-    } else {
-      /* What the heck? A path in PATH that does not exist? Are you a Windows
-       * user? */
-      if (std::filesystem::exists(dir_string)) {
-        std::filesystem::path               dir_path{dir_string};
-        std::filesystem::directory_iterator dir{dir_path};
+      continue;
+    }
 
-        usize dir_index =
-            cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
+    /* What the heck? A path in PATH that does not exist? Are you a Windows
+     * user? */
+    if (std::filesystem::exists(dir_string)) {
+      std::filesystem::path               dir_path{dir_string};
+      std::filesystem::directory_iterator dir{dir_path};
 
-        /* Initialize every file in the directory. */
-        for (const std::filesystem::directory_entry &f : dir) {
-          std::string fs = f.path().filename().string();
+      usize dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
 
-          usize ext_index = (sanitize_program_name(fs))
-                                ? cache_path_into(PATH_CACHE_EXTS,
-                                                  f.path().extension().string())
-                                : 0;
+      /* Initialize every file in the directory. */
+      for (const std::filesystem::directory_entry &f : dir) {
+        std::string fs = f.path().filename().string();
 
-          PATH_CACHE[fs] = {dir_index, ext_index};
-        }
+        usize ext_index = (sanitize_program_name(fs))
+                              ? cache_path_into(PATH_CACHE_EXTS,
+                                                f.path().extension().string())
+                              : 0;
+
+        PATH_CACHE[fs] = {dir_index, ext_index};
       }
 
       dir_string.clear();
@@ -675,7 +675,10 @@ search_and_cache(const std::string &program_name)
   for (const char &ch : path_var) {
     if (ch != PATH_DELIMITER) {
       dir_string += ch;
-    } else if (std::filesystem::exists(dir_string)) {
+      continue;
+    }
+
+    if (std::filesystem::exists(dir_string)) {
       std::filesystem::path dir_path{dir_string};
 
       /* Cache the directory if it was not present before. */
@@ -706,9 +709,9 @@ search_and_cache(const std::string &program_name)
           return try_path;
         }
       }
-
-      dir_string.clear();
     }
+
+    dir_string.clear();
   }
 
   return std::nullopt;
