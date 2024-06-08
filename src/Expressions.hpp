@@ -55,28 +55,16 @@ struct Exec : public Expression
   Exec(usize location, const std::string &path,
        const std::vector<std::string> &args);
 
+  std::string              program() const;
+  std::vector<std::string> args() const;
+
   i64         evaluate() const override;
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
 protected:
-  std::string              m_path;
+  std::string              m_program;
   std::vector<std::string> m_args;
-};
-
-struct SequenceNode;
-
-struct Sequence : public Expression
-{
-  Sequence(usize location, const std::vector<const SequenceNode *> &nodes);
-  ~Sequence() override;
-
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
-  i64         evaluate() const override;
-
-protected:
-  std::vector<const SequenceNode *> m_nodes;
 };
 
 struct SequenceNode : public Expression
@@ -101,6 +89,32 @@ struct SequenceNode : public Expression
 protected:
   Kind              m_kind;
   const Expression *m_expr;
+};
+
+struct Sequence : public Expression
+{
+  Sequence(usize location, const std::vector<const SequenceNode *> &nodes);
+  ~Sequence() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  i64         evaluate() const override;
+
+protected:
+  std::vector<const SequenceNode *> m_nodes;
+};
+
+struct ExecPipeSequence : public Expression
+{
+  ExecPipeSequence(usize location, const std::vector<const Exec *> &commands);
+  ~ExecPipeSequence() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  i64         evaluate() const override;
+
+protected:
+  std::vector<const Exec *> m_commands;
 };
 
 struct UnaryExpression : public Expression

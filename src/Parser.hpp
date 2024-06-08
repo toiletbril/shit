@@ -3,6 +3,8 @@
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 
+#include <optional>
+
 namespace shit {
 
 struct Parser
@@ -21,7 +23,8 @@ private:
   usize m_if_condition_depth{0};
   usize m_parentheses_depth{0};
 
-  [[nodiscard]] std::unique_ptr<Expression> parse_command();
+  [[nodiscard]] std::unique_ptr<Expression>          parse_command();
+  [[nodiscard]] std::optional<std::unique_ptr<Exec>> parse_exec();
   [[nodiscard]] std::unique_ptr<Expression>
   parse_expression(u8 min_precedence = 0);
 };

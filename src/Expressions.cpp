@@ -122,8 +122,20 @@ DummyExpression::to_ast_string(usize layer) const
  */
 Exec::Exec(usize location, const std::string &path,
            const std::vector<std::string> &args)
-    : Expression(location), m_path(path), m_args(args)
+    : Expression(location), m_program(path), m_args(args)
 {}
+
+std::string
+Exec::program() const
+{
+  return m_program;
+}
+
+std::vector<std::string>
+Exec::args() const
+{
+  return m_args;
+}
 
 i64
 Exec::evaluate() const
@@ -143,8 +155,8 @@ Exec::evaluate() const
   };
 
   /* This isn't a path? */
-  if (m_path.find('/') == std::string::npos) {
-    Builtin::Kind bk = search_builtin(m_path);
+  if (m_program.find('/') == std::string::npos) {
+    Builtin::Kind bk = search_builtin(m_program);
 
     /* Is this a builtin? */
     if (bk != Builtin::Kind::Invalid) {
@@ -156,11 +168,11 @@ Exec::evaluate() const
     }
 
     /* Not a builtin, try to search PATH. */
-    program_path = utils::search_program_path(m_path);
+    program_path = utils::search_program_path(m_program);
   } else {
     /* This is a path. */
     /* TODO: Sanitize extensions here too. */
-    program_path = utils::canonicalize_path(m_path);
+    program_path = utils::canonicalize_path(m_program);
   }
 
   if (!program_path)
@@ -168,7 +180,7 @@ Exec::evaluate() const
 
   try {
     return utils::execute_program(
-        {program_path.value(), m_path, shell_expand_args(m_args)});
+        {program_path.value(), m_program, shell_expand_args(m_args)});
   } catch (Error &err) {
     throw ErrorWithLocation{location(), err.message()};
   }
@@ -180,7 +192,7 @@ std::string
 Exec::to_string() const
 {
   std::string args;
-  std::string s = "Exec \"" + m_path;
+  std::string s = "Exec \"" + m_program;
   if (!m_args.empty()) {
     for (std::string_view arg : m_args) {
       args += " ";
@@ -233,7 +245,7 @@ Sequence::to_ast_string(usize layer) const
 
   s += pad + "[Sequence]";
   for (const SequenceNode *n : m_nodes) {
-    s += "\n";
+    s += '\n';
     s += pad + EXPRESSION_AST_INDENT + n->to_ast_string(layer + 1);
   }
 
@@ -321,6 +333,70 @@ i64
 SequenceNode::evaluate() const
 {
   return m_expr->evaluate();
+}
+
+ExecPipeSequence::ExecPipeSequence(usize                            location,
+                                   const std::vector<const Exec *> &commands)
+    : Expression(location), m_commands(commands)
+{}
+
+ExecPipeSequence::~ExecPipeSequence()
+{
+  for (const Exec *e : m_commands) {
+    delete e;
+  }
+}
+
+std::string
+ExecPipeSequence::to_string() const
+{
+  return "ExecPipeSequence";
+}
+
+std::string
+ExecPipeSequence::to_ast_string(usize layer) const
+{
+  std::string s;
+  std::string pad;
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+
+  s += pad + "[ExecPipeSequence]";
+  for (const Exec *e : m_commands) {
+    s += '\n';
+    s += pad + EXPRESSION_AST_INDENT + e->to_ast_string(layer + 1);
+  }
+
+  return s;
+}
+
+i64
+ExecPipeSequence::evaluate() const
+{
+  SHIT_ASSERT(m_commands.size() > 1);
+
+  std::vector<utils::ExecContext> ecs;
+
+  for (const Exec *e : m_commands) {
+    std::optional<std::filesystem::path> program_path = e->program();
+
+    /* TODO: Support builtins for pipes. */
+    if (e->program().find('/') == std::string::npos) {
+      program_path = utils::search_program_path(e->program());
+    } else {
+      /* TODO: Sanitize extensions here too. */
+      program_path = utils::canonicalize_path(e->program());
+    }
+
+    if (!program_path)
+      throw ErrorWithLocation{location(), "Command not found"};
+
+    ecs.push_back({*program_path, e->program(), e->args()});
+  }
+
+  i64 ret = utils::execute_program_sequence_with_pipes(ecs);
+
+  return ret;
 }
 
 /**

@@ -6,6 +6,8 @@
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
+#include <memory>
+
 namespace shit {
 
 static SequenceNode::Kind
@@ -16,7 +18,7 @@ get_sequence_kind(Token::Kind tk)
   case Token::Kind::Semicolon: return SequenceNode::Kind::Simple;
   case Token::Kind::DoubleAmpersand: return SequenceNode::Kind::And;
   case Token::Kind::DoublePipe: return SequenceNode::Kind::Or; break;
-  default: SHIT_UNREACHABLE();
+  default: SHIT_UNREACHABLE("Invalid shell sequence token: %d", E(tk));
   }
 }
 
@@ -29,132 +31,149 @@ Parser::construct_ast()
   return parse_command();
 }
 
+std::optional<std::unique_ptr<Exec>>
+Parser::parse_exec()
+{
+  std::vector<std::string>              args_accumulator{};
+  std::optional<std::unique_ptr<Token>> program_token{};
+
+  for (;;) {
+    std::unique_ptr<Token> token{m_lexer->peek_shell_token()};
+
+    switch (token->kind()) {
+    case Token::Kind::Identifier:
+    case Token::Kind::String:
+      m_lexer->advance_past_last_peek();
+      if (!program_token) {
+        program_token = std::move(token);
+      } else {
+        args_accumulator.emplace_back(token->value());
+      }
+      break;
+
+    default:
+      if (!program_token) {
+        return std::nullopt;
+      }
+      const Token *pt = program_token.value().get();
+      return std::make_unique<Exec>(pt->location(), pt->value(),
+                                    args_accumulator);
+    }
+  }
+
+  SHIT_UNREACHABLE();
+}
+
 /* Generates a Sequence of Exec and PipeExec expressions. */
 std::unique_ptr<Expression>
 Parser::parse_command()
 {
-  std::unique_ptr<Token> token{};
-
-  std::vector<std::string>              args_accumulator;
-  std::optional<std::unique_ptr<Token>> program_accumulator{};
-
-  bool should_chop_program = true;
-  bool should_break = false;
-  bool is_expr_required = false;
-
+  std::optional<std::unique_ptr<Expression>> lhs{};
   std::vector<std::unique_ptr<SequenceNode>> nodes{};
+
+  bool               should_parse_command = true;
   SequenceNode::Kind next_sk = SequenceNode::Kind::Simple;
 
   for (;;) {
-    token.reset(m_lexer->peek_shell_token());
+    if (should_parse_command) {
+      lhs = parse_exec();
+    } else {
+      should_parse_command = true;
+    }
+
+    /* Operator right after. */
+    std::unique_ptr<Token> token{m_lexer->peek_shell_token()};
 
     switch (token->kind()) {
-    case Token::Kind::EndOfFile:
-      /* Nothing after the operator, error. */
-      if (!nodes.empty() && !program_accumulator.has_value() &&
-          is_expr_required)
-      {
-        throw shit::ErrorWithLocation{token->location(),
-                                      "Expected a value after an operator"};
-      }
-      should_break = true;
-      /* fallthrough */
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       /* Two operators back to back, error */
-      if (is_expr_required) {
+      if (!lhs) {
         throw shit::ErrorWithLocation{
             token->location(), "Expected a value after an operator, found an " +
                                    token->to_ast_string()};
       }
-      is_expr_required = true;
       /* fallthrough */
+    case Token::Kind::EndOfFile:
     case Token::Kind::Semicolon: {
       m_lexer->advance_past_last_peek();
 
-      if (program_accumulator) {
-        SequenceNode *sn = new SequenceNode{
-            token->location(), next_sk,
-            new Exec{(*program_accumulator)->location(),
-                     (*program_accumulator)->value(), args_accumulator}
-        };
+      if (lhs) {
+        SequenceNode *sn =
+            new SequenceNode{token->location(), next_sk, lhs.value().release()};
 
         nodes.emplace_back(sn);
 
-        program_accumulator = std::nullopt;
-        args_accumulator.clear();
-
-        should_chop_program = true;
         next_sk = get_sequence_kind(token->kind());
       }
 
-      if (!should_break) {
-        continue;
+      if (token->kind() != Token::Kind::EndOfFile && !nodes.empty() && !lhs) {
+        /* We have Nothing after the operator, error. */
+        throw shit::ErrorWithLocation{token->location(),
+                                      "Expected a value after an operator"};
+      }
+
+      if (token->kind() == Token::Kind::EndOfFile) {
+        if (nodes.empty()) {
+          /* This exec is the whole expression? */
+          return std::unique_ptr<Expression>(std::move(lhs.value()));
+        } else {
+          /* Form a sequence. */
+          std::vector<const SequenceNode *> sequence_nodes{};
+          sequence_nodes.reserve(nodes.size());
+          for (std::unique_ptr<SequenceNode> &e : nodes) {
+            sequence_nodes.emplace_back(e.release());
+          }
+          return std::make_unique<Sequence>(0, sequence_nodes);
+        }
       }
     } break;
 
     case Token::Kind::Pipe: {
       m_lexer->advance_past_last_peek();
 
-      std::unique_ptr<Expression> rhs{parse_command()};
+      std::vector<const Exec *> pipe_group = {
+          static_cast<Exec *>(lhs->release())};
 
-      /* At this point, we have the left-hand side stored in and the right-hand
-       * side. */
-      if (!program_accumulator) {
-        throw ErrorWithLocation{token->location(), "Nothing to pipe into"};
+      /* Collect a pipe group. */
+      for (;;) {
+        std::optional<std::unique_ptr<Exec>> rhs{parse_exec()};
+
+        if (rhs) {
+          pipe_group.push_back(rhs->release());
+          std::unique_ptr<Token> maybe_pipe{m_lexer->peek_shell_token()};
+
+          if (maybe_pipe->kind() == Token::Kind::Pipe) {
+            m_lexer->advance_past_last_peek();
+            continue;
+          }
+        }
+
+        break;
       }
 
-      SequenceNode *pipe_node = new SequenceNode{
-          token->location(), SequenceNode::Kind::Simple,
-          new PipeExec{token->location(), std::move(program_accumulator),
-                       std::move(right_expr)}
-      };
+      if (pipe_group.size() < 2) {
+        throw shit::ErrorWithLocation{token->location(),
+                                      "Nowhere to pipe output to"};
+      }
 
-      nodes.emplace_back(pipe_node);
+      lhs = std::make_unique<ExecPipeSequence>(token->location(), pipe_group);
 
-      program_accumulator = std::nullopt;
-      args_accumulator.clear();
-
-      should_chop_program = true;
+      should_parse_command = false;
     } break;
 
     case Token::Kind::Greater:
       throw ErrorWithLocation{token->location(), "Not implemented (Parser)"};
 
-    case Token::Kind::Identifier:
-    case Token::Kind::String:
-      m_lexer->advance_past_last_peek();
-
-      if (!should_chop_program) {
-        args_accumulator.emplace_back(token->value());
-      } else {
-        program_accumulator = std::move(token);
-        should_chop_program = false;
-      }
-      break;
-
     default:
-      throw ErrorWithLocation{token->location(), "Expected program name"};
-    }
-
-    is_expr_required = false;
-
-    if (should_break) {
-      break;
+      throw ErrorWithLocation{token->location(),
+                              "Expected a shell operator, found '" +
+                                  token->to_ast_string() + "'"};
     }
   }
 
   /* TODO: find a way to indroduce expressions and use parse_expression() */
-  if (nodes.empty()) {
-    return std::make_unique<DummyExpression>(token->location());
-  } else {
-    std::vector<const SequenceNode *> sequence_nodes{};
-    sequence_nodes.reserve(nodes.size());
-    for (std::unique_ptr<SequenceNode> &e : nodes) {
-      sequence_nodes.emplace_back(e.release());
-    }
-    return std::make_unique<Sequence>(0, sequence_nodes);
-  }
+  SHIT_UNREACHABLE();
 }
 
 /* A standard pratt-parser for expressions. */

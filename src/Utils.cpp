@@ -16,8 +16,7 @@
 #include <optional>
 #include <set>
 
-/* TODO: support background processes. */
-/* TODO: support pipes. */
+/* TODO: Support background processes. */
 
 namespace shit {
 
@@ -93,6 +92,7 @@ close_consumer_stdin(int s, siginfo_t *info, void *context)
   if (si != -1) {
     call_checked(close(si));
   }
+
   if (so != -1) {
     call_checked(close(so));
   }
@@ -104,14 +104,26 @@ set_default_signal_handlers()
   /* Ignore bullshit. */
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   sigprocmask(SIG_BLOCK, &sm, nullptr);
+}
 
+static void
+set_pipe_handlers()
+{
   /* Close pipe for the consumers when their producer exits. */
-  struct sigaction sa
-  {};
+  struct sigaction sa = {};
   sa.sa_flags = SA_SIGINFO;
   sa.sa_mask = make_sigset(SIGCHLD);
   sa.sa_sigaction = close_consumer_stdin;
 
+  sigaction(SIGCHLD, &sa, NULL);
+}
+
+static void
+reset_pipe_handlers()
+{
+  struct sigaction sa = {};
+  sa.sa_mask = make_sigset(SIGCHLD);
+  sa.sa_handler = SIG_DFL;
   sigaction(SIGCHLD, &sa, NULL);
 }
 
@@ -154,8 +166,9 @@ wait_for_process(pid_t pid)
 
   i32 status{};
 
-  while (call_checked(waitpid(pid, &status, WNOHANG)) != pid)
-    ;
+  while (call_checked(waitpid(pid, &status, WNOHANG) != pid)) {
+    /* Waiting... */
+  }
 
   /* Print appropriate message if the process was sent a signal. */
   if (WIFSIGNALED(status)) {
@@ -233,6 +246,8 @@ execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
 
   bool is_first_producer = true;
 
+  set_pipe_handlers();
+
   for (const ExecContext &ec : ecs) {
     i32 pipefds[2] = {-1, -1};
 
@@ -264,7 +279,11 @@ execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
     last_pid = child_pid;
   }
 
-  return wait_for_process(last_pid);
+  i32 ret = wait_for_process(last_pid);
+
+  reset_pipe_handlers();
+
+  return ret;
 }
 
 bool
@@ -370,7 +389,7 @@ execute_program(const ExecContext &&ec)
 {
   std::string command_line;
 
-  /* TODO: remove CVE and escape quotes */
+  /* TODO: Remove CVE and escape quotes. */
   command_line += '"';
   command_line += ec.m_program;
   command_line += '"';
