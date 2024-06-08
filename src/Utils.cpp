@@ -17,6 +17,7 @@
 #include <set>
 
 /* TODO: Support background processes. */
+/* TODO: Support setting environment variables. */
 
 namespace shit {
 
@@ -89,13 +90,12 @@ close_consumer_stdin(int s, siginfo_t *info, void *context)
 
   auto [si, so] = PIPE_CONSUMER_FDS[info->si_pid];
 
-  if (si != -1) {
+  if (si != -1)
     call_checked(close(si));
-  }
-
-  if (so != -1) {
+  if (so != -1)
     call_checked(close(so));
-  }
+
+  PIPE_CONSUMER_FDS.erase(info->si_pid);
 }
 
 void
@@ -246,6 +246,7 @@ execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
 
   bool is_first_producer = true;
 
+  /* Close pipe ends on SIGCHLD. */
   set_pipe_handlers();
 
   for (const ExecContext &ec : ecs) {
@@ -253,6 +254,9 @@ execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
 
     bool is_last_consumer = &ec == &ecs.back();
 
+    /* We need N - 1 pipes for N commands. The first command uses terminal's
+     * stdin and pipe's stdout. i'th process will use i - 1 pipe's stdin. The
+     * last process will use only i - 1 pipe's stdin. */
     if (!is_last_consumer) {
       call_checked(pipe2(pipefds, O_CLOEXEC));
     }
@@ -273,6 +277,7 @@ execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
 
     is_first_producer = false;
 
+    /* Remember pipe's ends to close them when we receive SIGCHLD. */
     PIPE_CONSUMER_FDS[child_pid] = {pipefds[0], pipefds[1]};
 
     last_stdin = pipefds[0];
@@ -308,10 +313,11 @@ std::optional<std::string>
 get_current_user()
 {
   struct passwd *pw = getpwuid(getuid());
-  if (pw != nullptr)
+  if (pw != nullptr) {
     return std::string{pw->pw_name};
-  else
+  } else {
     return std::nullopt;
+  }
 }
 
 std::optional<std::filesystem::path>
@@ -715,6 +721,19 @@ search_and_cache(const std::string &program_name)
   }
 
   return std::nullopt;
+}
+
+std::vector<std::string>
+simple_shell_expand_args(const std::vector<std::string> &args)
+{
+  std::vector<std::string> expanded_args{};
+  expanded_args.reserve(args.size());
+
+  for (const std::string &arg : args) {
+    expanded_args.push_back(utils::simple_shell_expand(arg).value_or(arg));
+  }
+
+  return expanded_args;
 }
 
 /* TODO: Some directories have precedence over the others. */

@@ -31,6 +31,9 @@ bool sanitize_program_name(std::string &program_name);
 
 std::optional<std::string> simple_shell_expand(const std::string &path);
 
+std::vector<std::string>
+simple_shell_expand_args(const std::vector<std::string> &args);
+
 /* Normalizes the path. */
 std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
 
