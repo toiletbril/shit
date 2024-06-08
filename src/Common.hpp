@@ -2,7 +2,7 @@
 
 #define SHIT_VER_MAJOR 0
 #define SHIT_VER_MINOR 0
-#define SHIT_VER_PATCH 1
+#define SHIT_VER_PATCH 2
 
 #include <cstddef>
 #include <cstdint>
