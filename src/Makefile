@@ -36,7 +36,7 @@ CXXFLAGS += \
 	-O0
 ifneq ($(OS), Windows_NT)
 ifneq ($(MODE), cosmo)
-CXXFLAGS += -fsanitize=address # Windows' Asan is broken
+CXXFLAGS += -fsanitize=address -fsanitize=undefined # Windows' Asan is broken
 endif
 endif
 else ifeq ($(MODE), cosmo)
