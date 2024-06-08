@@ -188,6 +188,8 @@ main(int argc, char **argv)
       shit::show_error(e.details_to_string(contents));
     } catch (shit::ErrorWithLocation &e) {
       shit::show_error(e.to_string(contents));
+    } catch (shit::Error &e) {
+      shit::show_error(e.to_string());
     } catch (...) {
       shit::show_error("Could not execute the code due to an unexpected "
                        "explosion! Last system message: " +

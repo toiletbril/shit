@@ -30,6 +30,7 @@ namespace utils {
 #endif
 
 #include <cerrno>
+#include <fcntl.h>
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -39,6 +40,18 @@ constexpr const uchar PATH_DELIMITER = ':';
 
 /* Only parent can execute some operations. */
 static const pid_t PARENT_SHELL_PID = getpid();
+
+static i32
+call_checked_impl(i32 ret, const std::string &&func)
+{
+  if (ret == -1) {
+    throw shit::Error{func + " failed: " + last_system_error_message()};
+  }
+
+  return ret;
+}
+
+#define call_checked(f) call_checked_impl(f, std::string{#f})
 
 static sigset_t
 make_sigset_impl(int first, ...)
@@ -67,24 +80,40 @@ reset_signal_handlers()
   sigprocmask(SIG_UNBLOCK, &sm, nullptr);
 }
 
+static std::unordered_map<pid_t, std::tuple<int, int>> PIPE_CONSUMER_FDS{};
+
+static void
+close_consumer_stdin(int s, siginfo_t *info, void *context)
+{
+  SHIT_UNUSED(context);
+  SHIT_ASSERT(s == SIGCHLD);
+
+  auto [si, so] = PIPE_CONSUMER_FDS[info->si_pid];
+
+  if (si != -1) {
+    call_checked(close(si));
+  }
+  if (so != -1) {
+    call_checked(close(so));
+  }
+}
+
 void
 set_default_signal_handlers()
 {
+  /* Ignore bullshit. */
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   sigprocmask(SIG_BLOCK, &sm, nullptr);
+
+  /* Close pipe for the consumers when their producer exits. */
+  struct sigaction sa
+  {};
+  sa.sa_flags = SA_SIGINFO;
+  sa.sa_mask = make_sigset(SIGCHLD);
+  sa.sa_sigaction = close_consumer_stdin;
+
+  sigaction(SIGCHLD, &sa, NULL);
 }
-
-static i32
-call_checked_impl(i32 ret, const std::string &&func)
-{
-  if (ret == -1) {
-    throw shit::Error{func + " failed: " + last_system_error_message()};
-  }
-
-  return ret;
-}
-
-#define call_checked(f) call_checked_impl(f, std::string{#f})
 
 std::string
 last_system_error_message()
@@ -125,7 +154,8 @@ wait_for_process(pid_t pid)
 
   i32 status{};
 
-  call_checked(waitpid(pid, &status, WUNTRACED));
+  while (call_checked(waitpid(pid, &status, WNOHANG)) != pid)
+    ;
 
   /* Print appropriate message if the process was sent a signal. */
   if (WIFSIGNALED(status)) {
@@ -194,48 +224,44 @@ execute_program(const ExecContext &&ec)
 }
 
 i32
-execute_program_sequence_with_pipes(const std::vector<ExecContext> &&ecs)
+execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
 {
-  i32   pipefds[2];
+  SHIT_ASSERT(ecs.size() > 1);
+
+  i32   last_stdin = -1;
   pid_t last_pid = -1;
-  bool  first_producer = true;
+
+  bool is_first_producer = true;
 
   for (const ExecContext &ec : ecs) {
-    /* Are we the last in sequence? */
-    bool is_last_consumer = &ec != &ecs.back();
+    i32 pipefds[2] = {-1, -1};
 
-    if (is_last_consumer) {
-      call_checked(pipe(pipefds));
+    bool is_last_consumer = &ec == &ecs.back();
+
+    if (!is_last_consumer) {
+      call_checked(pipe2(pipefds, O_CLOEXEC));
     }
 
     pid_t child_pid = call_checked(fork());
 
     if (child_pid == 0) {
-      /* For the first producer, don't change stdin */
-      if (!first_producer) {
-        call_checked(dup2(pipefds[0], STDIN_FILENO));
+      if (!is_first_producer) {
+        call_checked(dup2(last_stdin, STDIN_FILENO));
       }
 
-      first_producer = false;
-
-      /* Except for the last command, redirect stdout to the pipe */
       if (!is_last_consumer) {
         call_checked(dup2(pipefds[1], STDOUT_FILENO));
       }
 
-      /* Unused pipe ends. */
-      call_checked(close(pipefds[0]));
-      call_checked(close(pipefds[1]));
-
       do_exec(ec);
     }
 
-    last_pid = child_pid;
+    is_first_producer = false;
 
-    /* Unused write end of the pipe in the parent. */
-    if (is_last_consumer) {
-      call_checked(close(pipefds[1]));
-    }
+    PIPE_CONSUMER_FDS[child_pid] = {pipefds[0], pipefds[1]};
+
+    last_stdin = pipefds[0];
+    last_pid = child_pid;
   }
 
   return wait_for_process(last_pid);
@@ -439,8 +465,7 @@ sanitize_program_name(std::string &program_name)
       std::string extension = program_name.substr(extension_pos + 1);
 
       if (auto e = OMITTED_EXTENSIONS.find(extension);
-          e != OMITTED_EXTENSIONS.end())
-      {
+          e != OMITTED_EXTENSIONS.end()) {
         program_name.erase(program_name.begin() + extension_pos,
                            program_name.end());
         return true;

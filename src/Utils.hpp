@@ -15,14 +15,14 @@ std::string last_system_error_message();
  * non-altered first arg. */
 struct ExecContext
 {
-  const std::filesystem::path    &m_path;
-  const std::string              &m_program;
-  const std::vector<std::string> &m_args;
+  const std::filesystem::path    m_path;
+  const std::string              m_program;
+  const std::vector<std::string> m_args;
 };
 
 i32 execute_program(const ExecContext &&ec);
 
-i32 execute_program_sequence_with_pipes(const std::vector<ExecContext> &&ecs);
+i32 execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs);
 
 std::optional<std::string> get_environment_variable(const std::string &key);
 
