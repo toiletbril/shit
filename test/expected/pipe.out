@@ -1,0 +1,26 @@
+[Sequence]
+  [SequenceNode Simple]
+    [ExecPipeSequence]
+      [Exec "echo 1"]
+      [Exec "cat"]
+      [Exec "cat"]
+      [Exec "cat"]
+  [SequenceNode Simple]
+    [ExecPipeSequence]
+      [Exec "echo 2"]
+      [Exec "cat"]
+  [SequenceNode And]
+    [ExecPipeSequence]
+      [Exec "echo 3"]
+      [Exec "cat"]
+  [SequenceNode Simple]
+    [ExecPipeSequence]
+      [Exec "echo 4"]
+      [Exec "false"]
+  [SequenceNode Or]
+    [Exec "echo 4"]
+1
+2
+3
+4
+[Code 0]

@@ -1,0 +1,3 @@
+echo 1 | cat | cat | cat;
+echo 2 | cat && echo 3 | cat;
+echo 4 | false || echo 4;
