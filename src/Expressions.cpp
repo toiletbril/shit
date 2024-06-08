@@ -312,7 +312,7 @@ SequenceNode::to_string() const
   case Kind::Or: k = "Or"; break;
   default: SHIT_UNREACHABLE();
   }
-  return k + "SequenceNode";
+  return "SequenceNode " + k;
 }
 
 std::string
