@@ -37,6 +37,9 @@ Parser::construct_ast()
 
   for (;;) {
     if (should_parse_command) {
+      if (lhs) {
+        lhs->reset();
+      }
       lhs = parse_shell_command();
     } else {
       should_parse_command = true;
