@@ -166,7 +166,7 @@ wait_for_process(pid_t pid)
 
   i32 status{};
 
-  while (call_checked(waitpid(pid, &status, WNOHANG) != pid)) {
+  while (call_checked(waitpid(pid, &status, WNOHANG)) != pid) {
     /* Waiting... */
   }
 
@@ -196,7 +196,7 @@ wait_for_process(pid_t pid)
               << std::to_string(sig) << " and killed]" << std::endl;
 
     /* We can't handle suspended processes yet, so goodbye. */
-    call_checked(kill(pid, SIGKILL) == -1);
+    call_checked(kill(pid, SIGKILL));
   } else if (!WIFEXITED(status)) {
     /* Process was destroyed by otherworldly forces. */
     throw shit::Error{"???: " + last_system_error_message()};
