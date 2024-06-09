@@ -23,6 +23,18 @@ namespace shit {
 
 namespace utils {
 
+template <class T>
+static usize
+find_pos_in_vec(const std::vector<T> &v, const T &p)
+{
+  for (usize i = 0; i < v.size(); i++) {
+    if (v[i] == p) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
+
 #if defined __linux__ || defined BSD || defined __APPLE__ || __COSMOPOLITAN__
 
 #if defined __COSMOPOLITAN__
@@ -40,6 +52,9 @@ static constexpr uchar PATH_DELIMITER = ':';
 
 /* Only parent can execute some operations. */
 static const pid_t PARENT_SHELL_PID = getpid();
+
+/* TODO: Get rid of this for non-Windows enviroments. */
+const static std::vector<std::string> OMITTED_SUFFIXES = {""};
 
 static i32
 call_checked_impl(i32 ret, const std::string &&func)
@@ -477,18 +492,6 @@ const static std::vector<std::string> OMITTED_SUFFIXES = {
 };
 
 constexpr static usize MIN_SUFFIX_LEN = 3;
-
-template <class T>
-static usize
-find_pos_in_vec(const std::vector<T> &v, const T &p)
-{
-  for (usize i = 0; i < v.size(); i++) {
-    if (v[i] == p) {
-      return i;
-    }
-  }
-  return std::string::npos;
-}
 
 static usize
 sanitize_program_name(std::string &program_name)
