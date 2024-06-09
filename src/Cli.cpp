@@ -13,7 +13,7 @@ namespace shit {
 /**
  * class: Flag
  */
-Flag::Flag(Flag::Kind kind, uchar short_name, const std::string &long_name,
+Flag::Flag(Flag::Kind kind, char short_name, const std::string &long_name,
            const std::string &description)
     : m_kind(kind), m_short_name(short_name), m_long_name(long_name),
       m_description(description)
@@ -25,7 +25,7 @@ Flag::kind() const
   return m_kind;
 }
 
-uchar
+char
 Flag::short_name() const
 {
   return m_short_name;
@@ -46,7 +46,7 @@ Flag::description() const
 /**
  * class: FlagBool
  */
-FlagBool::FlagBool(uchar short_name, const std::string &long_name,
+FlagBool::FlagBool(char short_name, const std::string &long_name,
                    const std::string &description)
     : Flag(Flag::Kind::Bool, short_name, long_name, description)
 {}
@@ -66,7 +66,7 @@ FlagBool::enabled() const
 /**
  * class: FlagBool
  */
-FlagString::FlagString(uchar short_name, const std::string &long_name,
+FlagString::FlagString(char short_name, const std::string &long_name,
                        const std::string &description)
     : Flag(Flag::Kind::String, short_name, long_name, description)
 {}
@@ -264,11 +264,15 @@ show_version()
   std::cout
       << "Shit " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
       << SHIT_VER_PATCH << "\n"
-      << "(c) toiletbril <https://github.com/toiletbril>\n\n"
-         "License GPLv3: GNU GPL version 3.\n"
-         "This is free software: you are free to change and redistribute it.\n"
-         "There is NO WARRANTY, to the extent permitted by law."
+      << "(c) toiletbril <https://github.com/toiletbril>\n\n" SHIT_SHORT_LICENSE
       << std::endl;
+}
+
+void
+show_short_version()
+{
+  std::cout << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.' << SHIT_VER_PATCH
+            << std::endl;
 }
 
 void

@@ -28,8 +28,9 @@ std::string
 Expression::to_ast_string(usize layer) const
 {
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
   return pad + "[" + to_string() + "]";
 }
 
@@ -46,16 +47,16 @@ If::~If()
 {
   delete m_condition;
   delete m_then;
-  if (m_otherwise != nullptr)
+
+  if (m_otherwise != nullptr) {
     delete m_otherwise;
+  }
 }
 
 i64
 If::evaluate() const
 {
-  bool condition_value = m_condition->evaluate();
-
-  if (condition_value)
+  if (m_condition->evaluate())
     return m_then->evaluate();
   else if (m_otherwise != nullptr)
     return m_otherwise->evaluate();
@@ -74,8 +75,10 @@ If::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
 
   s += pad + "[If]\n";
   s += pad + EXPRESSION_AST_INDENT + m_condition->to_ast_string(layer + 1) +
@@ -112,8 +115,9 @@ std::string
 DummyExpression::to_ast_string(usize layer) const
 {
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
   return pad + "[" + to_string() + "]";
 }
 
@@ -163,8 +167,9 @@ Exec::evaluate() const
     program_path = utils::canonicalize_path(m_program);
   }
 
-  if (!program_path)
+  if (!program_path) {
     throw ErrorWithLocation{location(), "Command not found"};
+  }
 
   try {
     return utils::execute_program({program_path.value(), m_program,
@@ -197,8 +202,9 @@ Exec::to_ast_string(usize layer) const
 {
   SHIT_UNUSED(layer);
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
   return pad + "[" + to_string() + "]";
 }
 
@@ -228,9 +234,10 @@ Sequence::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
 
+  for (usize i = 0; i < layer; i++) {
+    pad += EXPRESSION_AST_INDENT;
+  }
   s += pad + "[Sequence]";
   for (const SequenceNode *n : m_nodes) {
     s += '\n';
@@ -245,7 +252,8 @@ Sequence::evaluate() const
 {
   SHIT_ASSERT(m_nodes.size() > 0);
 
-  i64 ret = -1;
+  static constexpr i64 nothing_was_executed = -256;
+  i64                  ret = nothing_was_executed;
 
   for (const SequenceNode *n : m_nodes) {
     switch (n->kind()) {
@@ -256,22 +264,18 @@ Sequence::evaluate() const
     case SequenceNode::Kind::Or:
       if (ret != 0) {
         ret = n->evaluate();
-      } else {
-        continue;
       }
       break;
 
     case SequenceNode::Kind::And:
       if (ret == 0) {
         ret = n->evaluate();
-      } else {
-        continue;
       }
       break;
     }
   }
 
-  SHIT_ASSERT(ret != -1, "There should be at least one expression executed.");
+  SHIT_ASSERT(ret != nothing_was_executed);
 
   return ret;
 }

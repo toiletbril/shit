@@ -6,7 +6,7 @@ endif
 
 %: expected/%.out
 	cat input/$@.shit | \
-	$(BIN) -Ae - | \
+	$(BIN) -AE - | \
 	diff -wu $< - >> failed.diff && \
 	echo "	[$@		] ok." || \
 	echo "	[$@		] FAILED."

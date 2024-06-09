@@ -36,7 +36,7 @@ namespace utils {
 #include <sys/wait.h>
 #include <unistd.h>
 
-constexpr const uchar PATH_DELIMITER = ':';
+static constexpr uchar PATH_DELIMITER = ':';
 
 /* Only parent can execute some operations. */
 static const pid_t PARENT_SHELL_PID = getpid();
@@ -330,7 +330,7 @@ get_home_directory()
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-constexpr static const uchar PATH_DELIMITER = ';';
+static constexpr static uchar PATH_DELIMITER = ';';
 
 /* Only parent can execute some operations. */
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
@@ -666,9 +666,9 @@ initialize_path_map()
 
         PATH_CACHE[fs] = {dir_index, ext_index};
       }
-
-      dir_string.clear();
     }
+
+    dir_string.clear();
   }
 }
 
@@ -760,17 +760,19 @@ search_program_path(const std::string &program_name)
     }
 
     /* Does this path still exist? */
-    if (std::filesystem::exists(try_path))
-      return try_path;
-    else
+    if (!std::filesystem::exists(try_path)) {
       PATH_CACHE.erase(program_name);
-  } else {
-    /* We don't have cache? Newly added file? Try to search and cache it. */
-    if (std::optional<std::filesystem::path> p = search_and_cache(program_name);
-        p.has_value())
-    {
-      return *p;
+    } else {
+      return try_path;
     }
+  }
+
+  /* We don't have cache? Newly added file? PATH changed? Try to search and
+   * cache the program. */
+  if (std::optional<std::filesystem::path> p = search_and_cache(program_name);
+      p.has_value())
+  {
+    return p.value();
   }
 
   return std::nullopt;

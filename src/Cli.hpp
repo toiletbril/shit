@@ -6,12 +6,16 @@
 #include <string_view>
 #include <vector>
 
-#define ADD_FLAG(flag_list, var_name, kind, short_name, long_name,             \
-                 description)                                                  \
+#define FLAG_LIST T__FLAG_LIST
+
+#define FLAG_LIST_DECL()                                                       \
+  static std::vector<shit::Flag *> FLAG_LIST {}
+
+#define FLAG(var_name, kind, short_name, long_name, description)               \
   static shit::Flag##kind concat_literal(FLAG_, var_name){                     \
       short_name, long_name, description};                                     \
   static uchar concat_literal(t__flag_dummy_, __LINE__) =                      \
-      (flag_list.emplace_back(&concat_literal(FLAG_, var_name)), 0)
+      (FLAG_LIST.emplace_back(&concat_literal(FLAG_, var_name)), 0)
 
 namespace shit {
 
@@ -23,24 +27,24 @@ struct Flag
     String,
   };
 
-  Flag(Kind type, uchar short_name, const std::string &long_name,
+  Flag(Kind type, char short_name, const std::string &long_name,
        const std::string &description);
 
   Kind             kind() const;
-  uchar            short_name() const;
+  char             short_name() const;
   std::string_view long_name() const;
   std::string_view description() const;
 
 protected:
   Kind        m_kind;
-  uchar       m_short_name;
+  char        m_short_name;
   std::string m_long_name;
   std::string m_description;
 };
 
 struct FlagBool : public Flag
 {
-  FlagBool(uchar short_name, const std::string &long_name,
+  FlagBool(char short_name, const std::string &long_name,
            const std::string &description);
 
   void toggle();
@@ -52,7 +56,7 @@ private:
 
 struct FlagString : public Flag
 {
-  FlagString(uchar short_name, const std::string &long_name,
+  FlagString(char short_name, const std::string &long_name,
              const std::string &description);
 
   void             set(std::string_view v);
@@ -67,6 +71,7 @@ std::vector<std::string> parse_flags(const std::vector<Flag *> &flags, int argc,
                                      const char *const *argv);
 
 void show_version();
+void show_short_version();
 
 void show_help(std::string_view program_name, const std::vector<Flag *> &flags);
 

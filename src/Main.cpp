@@ -13,15 +13,15 @@
 #include <iostream>
 #include <string>
 
-static std::vector<shit::Flag *> FLAG_LIST{};
-
-#define FLAG(...) ADD_FLAG(FLAG_LIST, __VA_ARGS__)
+FLAG_LIST_DECL();
 
 FLAG(DUMP_AST, Bool, 'A', "dump-ast", "Dump AST for debugging purposes.");
-FLAG(EXIT_CODE, Bool, 'e', "exit-code", "Print exit code after each command.");
+FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
-FLAG(VERSION, Bool, '\0', "version", "Display program version.");
+FLAG(VERSION, Bool, 'v', "version", "Display program version and notices.");
+FLAG(SHORT_VERSION, Bool, '\0', "short-version",
+     "Display version in a short form.");
 
 int
 main(int argc, char **argv)
@@ -44,6 +44,9 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   } else if (FLAG_VERSION.enabled()) {
     shit::show_version();
+    return EXIT_SUCCESS;
+  } else if (FLAG_SHORT_VERSION.enabled()) {
+    shit::show_short_version();
     return EXIT_SUCCESS;
   }
 
