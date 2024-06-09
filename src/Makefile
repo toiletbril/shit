@@ -64,6 +64,7 @@ o/$(MODE)/%.o: %.cpp
 shit:
 	mkdir -p o/$(MODE)/
 	$(MAKE) compile
+	echo "Compilation succeeded."
 
 compile: $(OBJECTS)
 	echo "	CXX $(OBJECTS)	-o $(OUT)"
@@ -72,6 +73,7 @@ compile: $(OBJECTS)
 install: shit
 ifneq ($(OS), Windows_NT)
 	install -m 755 $(OUT) /usr/local/bin/shit
+	echo "Installed in '/usr/local/bin/shit'."
 else
 	$(error Unable to figure out install directory for Windows. \
 			Please put '$(realpath ..)' in your PATH manually)
