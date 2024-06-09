@@ -387,7 +387,8 @@ ExecPipeSequence::evaluate() const
       throw ErrorWithLocation{e->location(), "Command not found"};
     }
 
-    ecs.push_back({*program_path, e->program(), e->args()});
+    ecs.push_back({*program_path, e->program(),
+                   utils::simple_shell_expand_args(e->args())});
   }
 
   try {
