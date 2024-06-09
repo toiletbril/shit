@@ -73,8 +73,8 @@ install: shit
 ifneq ($(OS), Windows_NT)
 	install -m 755 $(OUT) /usr/local/bin/shit
 else
-	echo "Unable to figure out install directory for Windows."
-	echo "Please put $(PWD) in your PATH manually."
+	$(error Unable to figure out install directory for Windows. \
+			Please put '$(realpath ..)' in your PATH manually)
 endif
 
 CLANG_FORMAT ?= clang-format

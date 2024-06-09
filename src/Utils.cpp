@@ -124,6 +124,7 @@ reset_pipe_handlers()
   struct sigaction sa = {};
   sa.sa_mask = make_sigset(SIGCHLD);
   sa.sa_handler = SIG_DFL;
+
   sigaction(SIGCHLD, &sa, NULL);
 }
 
@@ -255,8 +256,9 @@ execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
     bool is_last_consumer = &ec == &ecs.back();
 
     /* We need N - 1 pipes for N commands. The first command uses terminal's
-     * stdin and pipe's stdout. i'th process will use i - 1 pipe's stdin. The
-     * last process will use only i - 1 pipe's stdin. */
+     * stdin and pipe's stdout. i th process will use i - 1 th pipe's stdin and
+     * i-th pipe's stdout. The last process will use only i - 1 pipe's
+     * stdin. */
     if (!is_last_consumer) {
       call_checked(pipe2(pipefds, O_CLOEXEC));
     }

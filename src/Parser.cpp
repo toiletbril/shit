@@ -104,6 +104,7 @@ Parser::construct_ast()
       /* Don't prematurely release() the pointer, since we can still error out
        * before constructing the expression. */
       std::vector<const Exec *> pipe_group = {static_cast<Exec *>(lhs.get())};
+      usize                     pipe_group_location = token->location();
       std::unique_ptr<Token>    last_pipe_token = std::move(token);
 
       /* Collect a pipe group. */
@@ -127,8 +128,7 @@ Parser::construct_ast()
       }
 
       std::ignore = lhs.release();
-      lhs = std::make_unique<ExecPipeSequence>(last_pipe_token->location(),
-                                               pipe_group);
+      lhs = std::make_unique<ExecPipeSequence>(pipe_group_location, pipe_group);
 
       should_parse_command = false;
     } break;

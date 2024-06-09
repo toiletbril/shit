@@ -313,8 +313,9 @@ SequenceNode::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
 
   s += pad + "[" + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_expr->to_ast_string(layer + 1);
@@ -351,8 +352,9 @@ ExecPipeSequence::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
 
   s += pad + "[ExecPipeSequence]";
   for (const Exec *e : m_commands) {
@@ -388,9 +390,13 @@ ExecPipeSequence::evaluate() const
     ecs.push_back({*program_path, e->program(), e->args()});
   }
 
-  i64 ret = utils::execute_program_sequence_with_pipes(ecs);
+  try {
+    return utils::execute_program_sequence_with_pipes(ecs);
+  } catch (Error &err) {
+    throw ErrorWithLocation{location(), err.message()};
+  }
 
-  return ret;
+  SHIT_UNREACHABLE();
 }
 
 /**
@@ -434,11 +440,14 @@ BinaryExpression::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
   s += pad + "[Binary " + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_lhs->to_ast_string(layer + 1) + "\n";
   s += pad + EXPRESSION_AST_INDENT + m_rhs->to_ast_string(layer + 1);
+
   return s;
 }
 
@@ -462,8 +471,9 @@ ConstantNumber::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
   s += pad + "[Number " + to_string() + "]";
   return s;
 }
@@ -494,8 +504,9 @@ ConstantString::to_ast_string(usize layer) const
 {
   std::string s;
   std::string pad;
-  for (usize i = 0; i < layer; i++)
+  for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
+  }
   s += pad + "[String \"" + to_string() + "\"]";
   return s;
 }
