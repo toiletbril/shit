@@ -26,9 +26,6 @@ i32 execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs);
 
 std::optional<std::string> get_environment_variable(const std::string &key);
 
-/* Make launching programs more convenient, e.g strip out .exe for Windows. */
-bool sanitize_program_name(std::string &program_name);
-
 std::optional<std::string> simple_shell_expand(const std::string &path);
 
 std::vector<std::string>

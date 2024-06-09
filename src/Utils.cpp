@@ -302,7 +302,7 @@ is_child_process()
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
 #if !defined __COSMOPOLITAN__
-bool
+static bool
 sanitize_program_name(std::string &program_name)
 {
   /* POSIX does not really make use of extensions for executable files. */
@@ -471,14 +471,26 @@ get_home_directory()
 
 #if defined _WIN32 || defined __COSMOPOLITAN__
 
-const static std::set<std::string> OMITTED_EXTENSIONS = {
-    "exe",
-    "com",
-    "scr",
-    "bat",
+const static std::vector<std::string> OMITTED_SUFFIXES = {
+    /* First extension entry should be empty. */
+    "", ".exe", ".com", ".scr", ".bat",
 };
 
-bool
+constexpr static usize MIN_SUFFIX_LEN = 3;
+
+template <class T>
+static usize
+find_pos_in_vec(const std::vector<T> &v, const T &p)
+{
+  for (usize i = 0; i < v.size(); i++) {
+    if (v[i] == p) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
+
+static usize
 sanitize_program_name(std::string &program_name)
 {
 #if defined __COSMOPOLITAN__
@@ -488,21 +500,21 @@ sanitize_program_name(std::string &program_name)
     usize extension_pos = program_name.rfind(".");
 
     if (extension_pos != std::string::npos &&
-        extension_pos + 3 < program_name.length())
+        extension_pos + MIN_SUFFIX_LEN < program_name.length())
     {
-      std::string extension = program_name.substr(extension_pos + 1);
+      std::string extension = program_name.substr(extension_pos);
 
-      if (auto e = OMITTED_EXTENSIONS.find(extension);
-          e != OMITTED_EXTENSIONS.end())
+      if (usize i = find_pos_in_vec(OMITTED_SUFFIXES, extension);
+          i != std::string::npos)
       {
         program_name.erase(program_name.begin() + extension_pos,
                            program_name.end());
-        return true;
+        return i;
       }
     }
   }
 
-  return false;
+  return 0;
 }
 
 #endif /* _WIN32 || __COSMOPOLITAN__ */
@@ -590,7 +602,6 @@ quit(i32 code, bool should_goodbye)
   std::exit(code);
 }
 
-static std::vector<std::string> PATH_CACHE_EXTS{};
 static std::vector<std::string> PATH_CACHE_DIRS{};
 
 /* Program name without extension maps into indexes i and j for
@@ -602,20 +613,12 @@ static std::unordered_map<std::string, std::tuple<usize, usize>> PATH_CACHE{};
  * unordered_map :c. This would be better off std::string. */
 static std::optional<std::string> MAYBE_PATH = get_environment_variable("PATH");
 
-template <class C>
+template <class T>
 static usize
-cache_path_into(std::vector<C> &cache, std::string &&p)
+cache_path_into(std::vector<T> &cache, T &&p)
 {
-  bool  found = false;
-  usize n = 0;
-  for (usize i = 0; i < cache.size(); i++) {
-    if (cache[i] == p) {
-      found = true;
-      n = i;
-      break;
-    }
-  }
-  if (!found) {
+  usize n = find_pos_in_vec(cache, p);
+  if (n == std::string::npos) {
     n = cache.size();
     cache.push_back(p);
   }
@@ -626,13 +629,8 @@ void
 clear_path_map()
 {
   MAYBE_PATH = get_environment_variable("PATH");
-
   PATH_CACHE.clear();
   PATH_CACHE_DIRS.clear();
-
-  PATH_CACHE_EXTS.clear();
-  /* First extension entry is empty. */
-  PATH_CACHE_EXTS.push_back("");
 }
 
 void
@@ -661,13 +659,7 @@ initialize_path_map()
       /* Initialize every file in the directory. */
       for (const std::filesystem::directory_entry &f : dir) {
         std::string fs = f.path().filename().string();
-
-        usize ext_index = (sanitize_program_name(fs))
-                              ? cache_path_into(PATH_CACHE_EXTS,
-                                                f.path().extension().string())
-                              : 0;
-
-        PATH_CACHE[fs] = {dir_index, ext_index};
+        PATH_CACHE[fs] = {dir_index, sanitize_program_name(fs)};
       }
     }
 
@@ -711,16 +703,27 @@ search_and_cache(const std::string &program_name)
       }
 
       /* Actually try to find the file. */
-      std::filesystem::path p = dir_path / program_name;
-      for (usize ext_index = 0; ext_index < PATH_CACHE_EXTS.size(); ext_index++)
+      std::filesystem::path full_path = dir_path / program_name;
+      std::string           full_path_str = full_path.string();
+
+      /* This file already has an extesion specified? */
+      if (usize explicit_ext = sanitize_program_name(full_path_str);
+          explicit_ext == 0)
       {
-        if (std::filesystem::path try_path =
-                p.concat(PATH_CACHE_EXTS[ext_index]);
-            std::filesystem::exists(try_path))
+        for (usize ext_index = 0; ext_index < OMITTED_SUFFIXES.size();
+             ext_index++)
         {
-          PATH_CACHE[program_name] = {dir_index, ext_index};
-          return try_path;
+          std::string try_path =
+              full_path.string() + OMITTED_SUFFIXES[ext_index];
+
+          if (std::filesystem::exists(try_path)) {
+            PATH_CACHE[program_name] = {dir_index, ext_index};
+            return try_path;
+          }
         }
+      } else if (std::filesystem::exists(full_path)) {
+        PATH_CACHE[program_name] = {dir_index, explicit_ext};
+        return full_path;
       }
     }
 
@@ -758,8 +761,8 @@ search_program_path(const std::string &program_name)
     if (s) {
       try_path /= program_name;
     } else {
-      std::filesystem::path file_name = p->first;
-      try_path /= file_name.concat(PATH_CACHE_EXTS[ext]);
+      std::filesystem::path file_name = p->first + '.';
+      try_path /= file_name.concat(OMITTED_SUFFIXES[ext]);
     }
 
     /* Does this path still exist? */
