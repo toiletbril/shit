@@ -4,6 +4,10 @@
 #define SHIT_VER_MINOR 0
 #define SHIT_VER_PATCH 2
 
+#define SHIT_SHORT_LICENSE                                                     \
+  "Licensed under the 3-Clause BSD License.\n"                                 \
+  "There is NO WARRANTY, to the extent permitted by law."
+
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
