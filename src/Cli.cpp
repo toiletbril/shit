@@ -1,6 +1,7 @@
 #include "Cli.hpp"
 
 #include "Common.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 
 #include <cstring>
@@ -123,6 +124,7 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
   return longest_length > 0;
 }
 
+/* TODO: Rewrite this to use vector instead of raw arrays. */
 std::vector<std::string>
 parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 {
@@ -151,9 +153,9 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
     bool        is_long = false;
     const char *flag_start{};
 
-    if (argv[i][1] != '-')
+    if (argv[i][1] != '-') {
       flag_start = &argv[i][1];
-    else {
+    } else {
       flag_start = &argv[i][2];
       is_long = true;
     }
@@ -202,7 +204,19 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
                separator for long flags as an error. */
             if (*value_start == '=') {
               value_start++;
-              fs->set(value_start);
+              if (*value_start != '\0') {
+                fs->set(value_start);
+              } else {
+                std::string s;
+                s += "No value provided for '-";
+                if (is_long) {
+                  s += "-" + std::string{flag->long_name()};
+                } else {
+                  s += static_cast<char>(flag->short_name());
+                }
+                s += "'";
+                throw Error{s};
+              }
             } else if (!is_long) {
               fs->set(value_start);
             } else {
@@ -228,10 +242,11 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
             std::string_view flag_sv = flag_start;
             usize            equals_pos = flag_sv.find('=');
 
-            if (equals_pos != std::string::npos)
+            if (equals_pos != std::string::npos) {
               s += flag_sv.substr(0, equals_pos);
-            else
+            } else {
               s += flag_sv;
+            }
           }
 
           s += "'";
@@ -246,11 +261,12 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
   if (next_arg_is_value) {
     std::string s;
-    s += "Unknown flag '-";
-    if (prev_is_long)
+    s += "No value provided for '-";
+    if (prev_is_long) {
       s += "-" + std::string{prev_flag->long_name()};
-    else
+    } else {
       s += static_cast<char>(prev_flag->short_name());
+    }
     s += "'";
     throw Error{s};
   }
