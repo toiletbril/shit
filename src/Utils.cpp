@@ -330,7 +330,7 @@ get_home_directory()
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-static constexpr static uchar PATH_DELIMITER = ';';
+static constexpr uchar PATH_DELIMITER = ';';
 
 /* Only parent can execute some operations. */
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
@@ -360,7 +360,7 @@ last_system_error_message()
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
           FORMAT_MESSAGE_IGNORE_INSERTS,
       nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      reinterpret_cast<LPSTR>(&errno_str), 0, );
+      reinterpret_cast<LPSTR>(&errno_str), 0, NULL);
 
   if (ret == 0) {
     return std::to_string(win_errno) + " (Error message couldn't be proccessed "
@@ -400,7 +400,7 @@ execute_program(const ExecContext &&ec)
   command_line += ec.m_program;
   command_line += '"';
 
-  if (args.size() > 0) {
+  if (ec.m_args.size() > 0) {
     for (usize i = 0; i < ec.m_args.size(); i++) {
       command_line += ' ';
       command_line += '"' + ec.m_args[i] + '"';
@@ -410,7 +410,7 @@ execute_program(const ExecContext &&ec)
   PROCESS_INFORMATION pi{};
   STARTUPINFOA        si{.cb = sizeof(si)};
 
-  if (CreateProcessA(path.string().c_str(), command_line.data(), nullptr,
+  if (CreateProcessA(ec.m_path.string().c_str(), command_line.data(), nullptr,
                      nullptr, FALSE, 0, nullptr, nullptr, &si, &pi) == 0)
   {
     throw Error{last_system_error_message()};
@@ -432,8 +432,9 @@ execute_program(const ExecContext &&ec)
 }
 
 i32
-execute_program_sequence_with_pipes(std::vector<ExecContext> &&ecs)
+execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
 {
+  SHIT_UNUSED(ecs);
   throw shit::Error{"Not implemented (Utils)"};
 }
 
