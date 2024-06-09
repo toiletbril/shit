@@ -1,16 +1,28 @@
 # Shit
 
-Revolutionary command line interpreter of a custom scripting language, or an
-interactive shell based on
+Man, my shell is shit.
+
+Revolutionary command-line interpreter, or an interactive shell based on
 [toiletline](https://github.com/toiletbril/toiletline) written in C++17. This
-program was made as a late april fools joke and everything is written
-exclusively from scratch, so use it at your own risk.
+program was made as a late april fools joke and literally everything is written
+from scratch, so use it at your own risk.
 
 There will be more information soon™ (when I feel like it).
 
 ## Building
 
-```sh
+You need a C++17 compatible compiler (only `clang` is supported for Windows),
+GNU Make, `rm`, `mkdir` to build the executable; `diff` to run tests;
+`clang-format` (better 17 or newer) to format code.
+
+The `MODE` variable controls build type.
+* `rel` is the optimized build;
+* `dbg` includes all symbols and Asan with Ubsan;
+* `cosmo` is an optimized build which will try to use `cosmoc++` from the
+  Cosmopolitan toolchain.
+
+An example of the build process:
+```bash
 $ export MODE=rel/dbg/cosmo
 $ make -j14
 $ ./shit --help
