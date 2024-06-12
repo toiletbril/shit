@@ -61,6 +61,7 @@ main(int argc, char **argv)
    * we won't waste any milliseconds traversing directories for very simple
    * scripts! */
   shit::utils::clear_path_map();
+  shit::utils::set_default_signal_handlers();
 
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
@@ -74,7 +75,6 @@ main(int argc, char **argv)
       /* If we weren't given any arguments or -c=..., fire up the toiletline. */
       if (file_names.empty() && FLAG_COMMAND.contents().empty()) {
         if (!toiletline::is_active()) {
-          shit::utils::set_default_signal_handlers();
           shit::utils::initialize_path_map();
           toiletline::initialize();
         } else {
@@ -139,7 +139,8 @@ main(int argc, char **argv)
         /* When file name is "-", use stdin. */
         if (file_names[arg_index] == "-") {
           file = &std::cin;
-        } else { /* Otherwise, process the actual file name. */
+        } else {
+          /* Otherwise, process the actual file name. */
           f = std::fstream{file_names[arg_index],
                            std::fstream::in | std::fstream::binary};
           if (!f.is_open()) {
@@ -154,9 +155,9 @@ main(int argc, char **argv)
           if (file->bad()) {
             throw shit::Error{"Could not read '" + file_names[arg_index] +
                               "': " + shit::utils::last_system_error_message()};
-          }
-          if (file->eof())
+          } else if (file->eof()) {
             break;
+          }
           contents += ch;
         }
 
@@ -202,8 +203,9 @@ main(int argc, char **argv)
 
     /* We can get here from child process if they didn't exec()
      * properly to print error. */
-    if (should_quit || shit::utils::is_child_process())
+    if (should_quit || shit::utils::is_child_process()) {
       shit::utils::quit(exit_code);
+    }
   }
 
   SHIT_UNREACHABLE();

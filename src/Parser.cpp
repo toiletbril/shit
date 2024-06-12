@@ -25,12 +25,14 @@ get_sequence_kind(Token::Kind tk)
 Parser::Parser(Lexer *lexer) : m_lexer(lexer) {}
 Parser::~Parser() { delete m_lexer; }
 
-/* Generates a Sequence of Exec and PipeExec expressions. */
+/* Greedy parser for shell commands. Generates a Sequence of Exec and PipeExec
+ * expressions. */
 std::unique_ptr<Expression>
 Parser::construct_ast()
 {
-  std::unique_ptr<Expression>                lhs{};
-  std::vector<std::unique_ptr<SequenceNode>> nodes{};
+  std::unique_ptr<Expression> lhs{};
+  /* Sequence right at the start. */
+  std::unique_ptr<Sequence> sequence = std::make_unique<Sequence>(0);
 
   bool               should_parse_command = true;
   SequenceNode::Kind next_sk = SequenceNode::Kind::Simple;
@@ -48,12 +50,12 @@ Parser::construct_ast()
     switch (token->kind()) {
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
-      /* Two operators back to back, error */
       if (!lhs) {
         throw shit::ErrorWithLocation{
             token->location(),
-            "Expected a command after an operator, found an " +
-                token->to_ast_string()};
+            "Expected a command " +
+                std::string(sequence->empty() ? "before" : "after") +
+                " operator, found '" + token->to_ast_string() + "'"};
       }
       /* fallthrough */
     case Token::Kind::EndOfFile:
@@ -63,7 +65,7 @@ Parser::construct_ast()
       if (lhs) {
         SequenceNode *sn =
             new SequenceNode{token->location(), next_sk, lhs.release()};
-        nodes.emplace_back(sn);
+        sequence->append_node(sn);
         next_sk = get_sequence_kind(token->kind());
       }
 
@@ -73,21 +75,12 @@ Parser::construct_ast()
                                         "Expected a command after an operator"};
         }
 
-        if (nodes.empty()) {
-          if (!lhs) {
-            /* Empty input? */
-            return std::make_unique<DummyExpression>(token->location());
-          }
-          /* This exec is the whole expression? */
-          return std::unique_ptr<Expression>(std::move(lhs));
+        /* Empty input? */
+        if (sequence->empty()) {
+          SHIT_ASSERT(!lhs);
+          return std::make_unique<DummyExpression>(token->location());
         } else {
-          /* Form a sequence. */
-          std::vector<const SequenceNode *> sequence_nodes{};
-          sequence_nodes.reserve(nodes.size());
-          for (std::unique_ptr<SequenceNode> &e : nodes) {
-            sequence_nodes.emplace_back(e.release());
-          }
-          return std::make_unique<Sequence>(0, sequence_nodes);
+          return sequence;
         }
       }
     } break;
@@ -95,8 +88,7 @@ Parser::construct_ast()
     case Token::Kind::Pipe: {
       if (!lhs) {
         throw shit::ErrorWithLocation{token->location(),
-                                      "Expected a command, found an " +
-                                          token->to_ast_string()};
+                                      "Expected a command before the pipe"};
       }
 
       m_lexer->advance_past_last_peek();
@@ -105,7 +97,8 @@ Parser::construct_ast()
        * before constructing the expression. */
       std::vector<const Exec *> pipe_group = {static_cast<Exec *>(lhs.get())};
       usize                     pipe_group_location = token->location();
-      std::unique_ptr<Token>    last_pipe_token = std::move(token);
+
+      std::unique_ptr<Token> last_pipe_token = std::move(token);
 
       /* Collect a pipe group. */
       for (;;) {
@@ -147,6 +140,7 @@ Parser::construct_ast()
   SHIT_UNREACHABLE();
 }
 
+/* return: Exec or nullptr if no shell command is present. */
 std::unique_ptr<Exec>
 Parser::parse_shell_command()
 {

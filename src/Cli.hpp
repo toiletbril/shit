@@ -66,7 +66,10 @@ private:
   std::string m_value{};
 };
 
-/* Returns arguments which are not flags. */
+/* These return arguments which are not flags. */
+
+std::vector<std::string> parse_flags_vec(const std::vector<Flag *>      &flags,
+                                         const std::vector<std::string> &args);
 std::vector<std::string> parse_flags(const std::vector<Flag *> &flags, int argc,
                                      const char *const *argv);
 

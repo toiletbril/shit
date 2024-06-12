@@ -38,13 +38,13 @@ Is it usable?
 - [x] Work on Linux and Windows.
 - [x] Logical sequences. (`&&`, `||`, `;`)
 - [x] Pipes.
+- [ ] Redirections. (`>`/`<`)
 - [ ] Shell expansion. (`*`, `~`, `!`)
 - [ ] Environment variables.
 - [ ] Numeric expressions.
-- [ ] Background jobs.
-- [ ] Redirections. (`>`/`<`)
 
 Is it good?
+- [ ] Background jobs.
 - [ ] Scripting capabilities. (flow control keywords)
 - [ ] Complex scripting capabilites.
 

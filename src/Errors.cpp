@@ -128,7 +128,7 @@ Error::Error(const std::string &message) : ErrorBase(message) {}
 std::string
 Error::to_string()
 {
-  return "Error: " + message();
+  return "Error: " + message() + ".";
 }
 
 /**

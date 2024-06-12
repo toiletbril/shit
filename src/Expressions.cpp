@@ -168,7 +168,8 @@ Exec::evaluate() const
   }
 
   if (!program_path) {
-    throw ErrorWithLocation{location(), "Command not found"};
+    throw ErrorWithLocation{location(),
+                            "Program '" + m_program + "' not found"};
   }
 
   try {
@@ -211,6 +212,8 @@ Exec::to_ast_string(usize layer) const
 /**
  * class: Sequence
  */
+Sequence::Sequence(usize location) : Expression(location), m_nodes() {}
+
 Sequence::Sequence(usize                                    location,
                    const std::vector<const SequenceNode *> &nodes)
     : Expression(location), m_nodes(nodes)
@@ -221,6 +224,18 @@ Sequence::~Sequence()
   for (const SequenceNode *e : m_nodes) {
     delete e;
   }
+}
+
+bool
+Sequence::empty() const
+{
+  return m_nodes.empty();
+}
+
+void
+Sequence::append_node(const SequenceNode *node)
+{
+  m_nodes.emplace_back(node);
 }
 
 std::string

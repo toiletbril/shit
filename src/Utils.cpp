@@ -452,6 +452,7 @@ i32
 execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
 {
   SHIT_UNUSED(ecs);
+  /* TODO: */
   throw shit::Error{"Not implemented (Utils)"};
 }
 

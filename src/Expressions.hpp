@@ -93,8 +93,13 @@ protected:
 
 struct Sequence : public Expression
 {
+  Sequence(usize location);
   Sequence(usize location, const std::vector<const SequenceNode *> &nodes);
+
   ~Sequence() override;
+
+  bool empty() const;
+  void append_node(const SequenceNode *node);
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
