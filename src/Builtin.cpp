@@ -61,12 +61,7 @@ execute_builtin(const utils::ExecContext &ec)
   b->set_fds(ec.in.value_or(SHIT_STDIN), ec.out.value_or(SHIT_STDOUT));
 
   try {
-    i32 ret = b->execute(utils::simple_shell_expand_args(ec.args));
-    if (ec.in)
-      CloseHandle(*ec.in);
-    if (ec.out)
-      CloseHandle(*ec.out);
-    return ret;
+    return b->execute(utils::simple_shell_expand_args(ec.args));
   } catch (Error &err) {
     throw ErrorWithLocation{ec.location, err.message()};
   }
@@ -78,7 +73,7 @@ execute_builtin(const utils::ExecContext &ec)
 Builtin::Builtin() = default;
 
 void
-Builtin::set_fds(SHIT_FD in, SHIT_FD out)
+Builtin::set_fds(os::descriptor in, os::descriptor out)
 {
   in_fd = in;
   out_fd = out;

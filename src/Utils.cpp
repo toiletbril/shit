@@ -12,11 +12,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <handleapi.h>
 #include <iostream>
 #include <optional>
 #include <variant>
-#include <winbase.h>
 
 /* TODO: Support background processes. */
 /* TODO: Support setting environment variables. */
@@ -321,6 +319,24 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
   return ret;
 }
 
+usize
+write_fd(os::descriptor fd, void *buf, u8 size)
+{
+  return write(fd, buf, size);
+}
+
+usize
+read_fd(os::descriptor fd, void *buf, u8 size)
+{
+  return read(fd, buf, size);
+}
+
+bool
+close_fd(os::descriptor fd)
+{
+  return close(fd) != -1;
+}
+
 bool
 is_child_process()
 {
@@ -591,8 +607,14 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
       last_child = execute_program(ec);
     } else {
       ret = execute_builtin(ec);
+
+      if (ec.in)
+        close_fd(*ec.in);
+      if (ec.out)
+        close_fd(*ec.out);
     }
 
+    /* Unused handle. */
     CloseHandle(pipe->stdin_read);
 
     is_first = false;
@@ -616,7 +638,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
 }
 
 usize
-write_fd(SHIT_FD fd, void *buf, u8 size)
+write_fd(os::descriptor fd, void *buf, u8 size)
 {
   DWORD w = -1;
   WriteFile(fd, buf, size, &w, 0);
@@ -624,11 +646,17 @@ write_fd(SHIT_FD fd, void *buf, u8 size)
 }
 
 usize
-read_fd(SHIT_FD fd, void *buf, u8 size)
+read_fd(os::descriptor fd, void *buf, u8 size)
 {
   DWORD r = -1;
   ReadFile(fd, buf, size, &r, 0);
   return r;
+}
+
+bool
+close_fd(os::descriptor fd)
+{
+  return CloseHandle(fd);
 }
 
 bool
@@ -661,42 +689,6 @@ get_home_directory()
 #endif /* _WIN32 */
 
 #if defined _WIN32 || defined __COSMOPOLITAN__
-
-ExecContext
-make_exec_context(const std::string              &program,
-                  const std::vector<std::string> &args, usize location)
-{
-  std::variant<shit::Builtin::Kind, std::filesystem::path> exec_kind;
-
-  std::optional<Builtin::Kind>         bk;
-  std::optional<std::filesystem::path> p;
-
-  /* This isn't a path? */
-  if (program.find('/') == std::string::npos) {
-    bk = search_builtin(program);
-
-    if (!bk) {
-      /* Not a builtin, try to search PATH. */
-      p = utils::search_program_path(program);
-    }
-  } else {
-    /* This is a path. */
-    /* TODO: Sanitize extensions here too. */
-    p = utils::canonicalize_path(program);
-  }
-
-  /* Builtins take precedence over programs. */
-  if (!bk) {
-    if (p)
-      exec_kind = *p;
-    else
-      throw ErrorWithLocation{location, "Program '" + program + "' not found"};
-  } else {
-    exec_kind = *bk;
-  }
-
-  return {exec_kind, program, args, location};
-}
 
 const static std::vector<std::string> OMITTED_SUFFIXES = {
     /* First extension entry should be empty. */
@@ -733,6 +725,42 @@ sanitize_program_name(std::string &program_name)
 }
 
 #endif /* _WIN32 || __COSMOPOLITAN__ */
+
+ExecContext
+make_exec_context(const std::string              &program,
+                  const std::vector<std::string> &args, usize location)
+{
+  std::variant<shit::Builtin::Kind, std::filesystem::path> exec_kind;
+
+  std::optional<Builtin::Kind>         bk;
+  std::optional<std::filesystem::path> p;
+
+  /* This isn't a path? */
+  if (program.find('/') == std::string::npos) {
+    bk = search_builtin(program);
+
+    if (!bk) {
+      /* Not a builtin, try to search PATH. */
+      p = utils::search_program_path(program);
+    }
+  } else {
+    /* This is a path. */
+    /* TODO: Sanitize extensions here too. */
+    p = utils::canonicalize_path(program);
+  }
+
+  /* Builtins take precedence over programs. */
+  if (!bk) {
+    if (p)
+      exec_kind = *p;
+    else
+      throw ErrorWithLocation{location, "Program '" + program + "' not found"};
+  } else {
+    exec_kind = *bk;
+  }
+
+  return {exec_kind, program, args, location};
+}
 
 std::optional<std::string>
 simple_shell_expand(const std::string &path)

@@ -18,7 +18,7 @@ struct Builtin
     Exit,
   };
 
-  void set_fds(SHIT_FD in, SHIT_FD out);
+  void set_fds(os::descriptor in, os::descriptor out);
 
   virtual Kind kind() const = 0;
   virtual i32  execute(const std::vector<std::string> &args) const = 0;
@@ -28,8 +28,8 @@ struct Builtin
 protected:
   Builtin();
 
-  SHIT_FD in_fd{SHIT_STDIN};
-  SHIT_FD out_fd{SHIT_STDOUT};
+  os::descriptor in_fd{SHIT_STDIN};
+  os::descriptor out_fd{SHIT_STDOUT};
 };
 
 struct Echo : public Builtin

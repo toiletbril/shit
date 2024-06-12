@@ -25,8 +25,8 @@ struct ExecContext
   std::vector<std::string> args;
   usize                    location;
 
-  std::optional<SHIT_FD> in{std::nullopt};
-  std::optional<SHIT_FD> out{std::nullopt};
+  std::optional<os::descriptor> in{std::nullopt};
+  std::optional<os::descriptor> out{std::nullopt};
 };
 
 ExecContext make_exec_context(const std::string              &program,
@@ -37,8 +37,10 @@ i32 execute_context(const ExecContext &&ec);
 
 i32 execute_contexts_with_pipes(std::vector<ExecContext> &ecs);
 
-usize write_fd(SHIT_FD fd, void *buf, u8 size);
-usize read_fd(SHIT_FD fd, void *buf, u8 size);
+usize write_fd(os::descriptor fd, void *buf, u8 size);
+usize read_fd(os::descriptor fd, void *buf, u8 size);
+
+bool close_fd(os::descriptor);
 
 std::optional<std::string> get_environment_variable(const std::string &key);
 
