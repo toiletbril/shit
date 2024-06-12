@@ -10,11 +10,12 @@
 #include <cstring>
 #include <iostream>
 
+#if OS_IS(POSIX)
+
 namespace shit {
 
 namespace os {
 
-#if OS_IS(POSIX)
 usize
 write_fd(os::descriptor fd, void *buf, u8 size)
 {
@@ -32,31 +33,7 @@ close_fd(os::descriptor fd)
 {
   return close(fd) != -1;
 }
-#elif OS_IS(WIN32)
-usize
-write_fd(os::descriptor fd, void *buf, u8 size)
-{
-  DWORD w = -1;
-  WriteFile(fd, buf, size, &w, 0);
-  return w;
-}
 
-usize
-read_fd(os::descriptor fd, void *buf, u8 size)
-{
-  DWORD r = -1;
-  ReadFile(fd, buf, size, &r, 0);
-  return r;
-}
-
-bool
-close_fd(os::descriptor fd)
-{
-  return CloseHandle(fd);
-}
-#endif
-
-#if OS_IS(POSIX)
 std::optional<std::string>
 get_current_user()
 {
@@ -67,38 +44,13 @@ get_current_user()
     return std::nullopt;
   }
 }
-#elif OS_IS(WIN32)
-std::optional<std::string>
-get_current_user()
-{
-  DWORD size = 0;
-  GetUserNameA(nullptr, &size);
-  if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-    std::vector<char> buffer;
-    buffer.reserve(size);
-    if (GetUserNameA(buffer.data(), &size)) {
-      return std::string{buffer.data(), size - 1};
-    }
-  }
-  return std::nullopt;
-}
-#endif
 
-#if OS_IS(POSIX)
 std::optional<std::filesystem::path>
 get_home_directory()
 {
   return get_environment_variable("HOME");
 }
-#elif OS_IS(WIN32)
-std::optional<std::filesystem::path>
-get_home_directory()
-{
-  return get_environment_variable("USERPROFILE");
-}
-#endif
 
-#if OS_IS(POSIX)
 static const pid_t PARENT_SHELL_PID = getpid();
 
 bool
@@ -106,19 +58,10 @@ is_child_process()
 {
   return getpid() != PARENT_SHELL_PID;
 }
-#elif OS_IS(WIN32)
-static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
-
-bool
-is_child_process()
-{
-  return GetCurrentProcessId() != PARENT_SHELL_PID;
-}
-#endif
 
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
-#if OS_IS(POSIX) && !OS_IS(COSMO)
+#if !OS_IS(COSMO)
 const std::vector<std::string> OMITTED_SUFFIXES = {""};
 
 usize
@@ -128,64 +71,15 @@ sanitize_program_name(std::string &program_name)
   SHIT_UNUSED(program_name);
   return false;
 }
-#elif OS_IS(WIN32)
-const std::vector<std::string> OMITTED_SUFFIXES = {
-    /* First extension entry should be empty. */
-    "", ".exe", ".com", ".scr", ".bat",
-};
-
-constexpr static usize MIN_SUFFIX_LEN = 3;
-
-usize
-sanitize_program_name(std::string &program_name)
-{
-#if OS_IS(COSMO)
-  if (IsWindows())
 #endif
-  {
-    usize extension_pos = program_name.rfind(".");
 
-    if (extension_pos != std::string::npos &&
-        extension_pos + MIN_SUFFIX_LEN < program_name.length())
-    {
-      std::string extension = program_name.substr(extension_pos);
-
-      if (usize i = utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
-          i != std::string::npos)
-      {
-        program_name.erase(program_name.begin() + extension_pos,
-                           program_name.end());
-        return i;
-      }
-    }
-  }
-
-  return 0;
-}
-#endif /* OS_IS(WIN32) */
-
-#if OS_IS(WIN32)
-constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
-
-std::optional<std::string>
-get_environment_variable(const std::string &key)
-{
-  char buffer[WIN32_MAX_ENV_SIZE] = {0};
-  if (GetEnvironmentVariableA(key.c_str(), buffer, sizeof(buffer)) == 0) {
-    return std::nullopt;
-  }
-  return std::string{buffer};
-}
-#elif OS_IS(POSIX)
 std::optional<std::string>
 get_environment_variable(const std::string &key)
 {
   const char *e = std::getenv(key.c_str());
   return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
 }
-#endif
 
-#if OS_IS(POSIX)
 process
 execute_program(const utils::ExecContext &ec)
 {
@@ -220,46 +114,7 @@ execute_program(const utils::ExecContext &ec)
 
   return child_pid;
 }
-#elif OS_IS(WIN32)
-process
-execute_program(const utils::ExecContext &ec1)
-{
-  utils::ExecContext ec = ec1;
 
-  std::string program_path = std::get<std::filesystem::path>(ec.kind).string();
-  std::string command_line = make_os_args(ec.program, ec.args);
-
-  PROCESS_INFORMATION process_info{};
-  STARTUPINFOA        startup_info{};
-
-  startup_info.cb = sizeof(startup_info);
-
-  BOOL should_use_pipe = ec.in || ec.out;
-
-  if (should_use_pipe) {
-    startup_info.dwFlags |= STARTF_USESTDHANDLES;
-  }
-
-  startup_info.hStdInput = (ec.in) ? *ec.in : SHIT_STDIN;
-  startup_info.hStdOutput = (ec.out) ? *ec.out : SHIT_STDOUT;
-
-  if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
-                     nullptr, should_use_pipe, 0, nullptr, nullptr,
-                     &startup_info, &process_info) == 0)
-  {
-    throw ErrorWithLocation{ec.location, last_system_error_message()};
-  }
-
-  if (ec.in)
-    CloseHandle(*ec.in);
-  if (ec.out)
-    CloseHandle(*ec.out);
-
-  return process_info.hProcess;
-}
-#endif
-
-#if OS_IS(POSIX)
 std::optional<Pipe>
 make_pipe()
 {
@@ -271,60 +126,7 @@ make_pipe()
 
   return Pipe{p[1], SHIT_INVALID_FD, p[1], p[0]};
 }
-#elif OS_IS(WIN32)
-std::optional<Pipe>
-make_pipe()
-{
-  SECURITY_ATTRIBUTES att{};
 
-  att.nLength = sizeof(SECURITY_ATTRIBUTES);
-  att.bInheritHandle = TRUE;
-  att.lpSecurityDescriptor = NULL;
-
-  HANDLE stdout_read = INVALID_HANDLE_VALUE;
-  HANDLE stdout_write = INVALID_HANDLE_VALUE;
-  HANDLE stdin_read = INVALID_HANDLE_VALUE;
-  HANDLE stdin_write = INVALID_HANDLE_VALUE;
-
-  if (CreatePipe(&stdout_read, &stdout_write, &att, 0) == 0) {
-    goto fail;
-  }
-
-  if (CreatePipe(&stdin_read, &stdin_write, &att, 0) == 0) {
-    goto fail;
-  }
-
-#if 0
-  if (SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) == 0) {
-    goto fail;
-  }
-
-  if (SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0) == 0) {
-    goto fail;
-  }
-#endif
-
-  /* Unused handle. */
-  os::close_fd(stdin_read);
-
-  return Pipe{stdin_write, SHIT_INVALID_FD, stdout_write, stdout_read};
-
-fail:
-  if (stdout_read != INVALID_HANDLE_VALUE)
-    close_fd(stdout_read);
-  if (stdout_write != INVALID_HANDLE_VALUE)
-    close_fd(stdout_write);
-
-  if (stdin_read != INVALID_HANDLE_VALUE)
-    close_fd(stdin_read);
-  if (stdin_write != INVALID_HANDLE_VALUE)
-    close_fd(stdin_write);
-
-  return std::nullopt;
-}
-#endif
-
-#if OS_IS(POSIX)
 i32
 wait_and_monitor_process(process pid)
 {
@@ -373,24 +175,7 @@ wait_and_monitor_process(process pid)
 
   SHIT_UNREACHABLE();
 }
-#elif OS_IS(WIN32)
-i32
-wait_and_monitor_process(process p)
-{
-  if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0) {
-    throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
-  }
 
-  DWORD code = -1;
-  if (GetExitCodeProcess(p, &code) == 0) {
-    throw Error{"GetExitCodeProcess() failed: " + last_system_error_message()};
-  }
-
-  return code;
-}
-#endif
-
-#if OS_IS(POSIX)
 OsArgs
 make_os_args(const std::string &program, const std::vector<std::string> &args)
 {
@@ -409,65 +194,13 @@ make_os_args(const std::string &program, const std::vector<std::string> &args)
 
   return os_args;
 }
-#elif OS_IS(WIN32)
-OsArgs
-make_os_args(const std::string &program, const std::vector<std::string> &args)
-{
-  std::string s;
 
-  /* TODO: Remove CVE and escape quotes. */
-  s += '"';
-  s += program;
-  s += '"';
-
-  if (args.size() > 0) {
-    for (usize i = 0; i < args.size(); i++) {
-      s += ' ';
-      s += '"' + args[i] + '"';
-    }
-  }
-
-  return s;
-}
-#endif
-
-#if OS_IS(POSIX)
 std::string
 last_system_error_message()
 {
   return std::string{strerror(errno)};
 }
-#elif OS_IS(WIN32)
-std::string
-last_system_error_message()
-{
-  LPSTR errno_str{};
-  DWORD win_errno = GetLastError();
 
-  DWORD ret = FormatMessageA(
-      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-          FORMAT_MESSAGE_IGNORE_INSERTS,
-      nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      reinterpret_cast<LPSTR>(&errno_str), 0, NULL);
-
-  if (ret == 0) {
-    return std::to_string(win_errno) + " (Error message couldn't be proccessed "
-                                       "due to FormatMessage() fail)";
-  }
-
-  std::string_view view{static_cast<char *>(errno_str)};
-  /* I do not want the PERIOD. */
-  if (view.find_last_of(". \n") != std::string::npos) {
-    view.remove_suffix(3);
-  }
-  std::string err{view};
-  LocalFree(errno_str);
-
-  return err;
-}
-#endif
-
-#if OS_IS(POSIX)
 static sigset_t
 make_sigset_impl(int first, ...)
 {
@@ -502,7 +235,278 @@ set_default_signal_handlers()
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   sigprocmask(SIG_BLOCK, &sm, nullptr);
 }
+
+} /* namespace os */
+
+} /* namespace shit */
+
 #elif OS_IS(WIN32)
+
+namespace shit {
+
+namespace os {
+
+usize
+write_fd(os::descriptor fd, void *buf, u8 size)
+{
+  DWORD w = -1;
+  WriteFile(fd, buf, size, &w, 0);
+  return w;
+}
+
+usize
+read_fd(os::descriptor fd, void *buf, u8 size)
+{
+  DWORD r = -1;
+  ReadFile(fd, buf, size, &r, 0);
+  return r;
+}
+
+bool
+close_fd(os::descriptor fd)
+{
+  return CloseHandle(fd);
+}
+
+std::optional<std::string>
+get_current_user()
+{
+  DWORD size = 0;
+  GetUserNameA(nullptr, &size);
+  if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+    std::vector<char> buffer;
+    buffer.reserve(size);
+    if (GetUserNameA(buffer.data(), &size)) {
+      return std::string{buffer.data(), size - 1};
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path>
+get_home_directory()
+{
+  return get_environment_variable("USERPROFILE");
+}
+
+static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
+
+bool
+is_child_process()
+{
+  return GetCurrentProcessId() != PARENT_SHELL_PID;
+}
+
+constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
+
+std::optional<std::string>
+get_environment_variable(const std::string &key)
+{
+  char buffer[WIN32_MAX_ENV_SIZE] = {0};
+  if (GetEnvironmentVariableA(key.c_str(), buffer, sizeof(buffer)) == 0) {
+    return std::nullopt;
+  }
+  return std::string{buffer};
+}
+
+process
+execute_program(const utils::ExecContext &ec1)
+{
+  utils::ExecContext ec = ec1;
+
+  std::string program_path = std::get<std::filesystem::path>(ec.kind).string();
+  std::string command_line = make_os_args(ec.program, ec.args);
+
+  PROCESS_INFORMATION process_info{};
+  STARTUPINFOA        startup_info{};
+
+  startup_info.cb = sizeof(startup_info);
+
+  BOOL should_use_pipe = ec.in || ec.out;
+
+  if (should_use_pipe) {
+    startup_info.dwFlags |= STARTF_USESTDHANDLES;
+  }
+
+  startup_info.hStdInput = (ec.in) ? *ec.in : SHIT_STDIN;
+  startup_info.hStdOutput = (ec.out) ? *ec.out : SHIT_STDOUT;
+
+  if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
+                     nullptr, should_use_pipe, 0, nullptr, nullptr,
+                     &startup_info, &process_info) == 0)
+  {
+    throw ErrorWithLocation{ec.location, last_system_error_message()};
+  }
+
+  if (ec.in)
+    CloseHandle(*ec.in);
+  if (ec.out)
+    CloseHandle(*ec.out);
+
+  return process_info.hProcess;
+}
+
+std::optional<Pipe>
+make_pipe()
+{
+  SECURITY_ATTRIBUTES att{};
+
+  att.nLength = sizeof(SECURITY_ATTRIBUTES);
+  att.bInheritHandle = TRUE;
+  att.lpSecurityDescriptor = NULL;
+
+  HANDLE stdout_read = INVALID_HANDLE_VALUE;
+  HANDLE stdout_write = INVALID_HANDLE_VALUE;
+  HANDLE stdin_read = INVALID_HANDLE_VALUE;
+  HANDLE stdin_write = INVALID_HANDLE_VALUE;
+
+  if (CreatePipe(&stdout_read, &stdout_write, &att, 0) == 0) {
+    goto fail;
+  }
+
+  if (CreatePipe(&stdin_read, &stdin_write, &att, 0) == 0) {
+    goto fail;
+  }
+
+  /* Microsoft docs say these calls are important, but they are not. */
+#if 0
+  if (SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) == 0) {
+    goto fail;
+  }
+
+  if (SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0) == 0) {
+    goto fail;
+  }
+#endif
+
+  /* Unused handle. */
+  os::close_fd(stdin_read);
+
+  return Pipe{stdin_write, SHIT_INVALID_FD, stdout_write, stdout_read};
+
+fail:
+  if (stdout_read != INVALID_HANDLE_VALUE)
+    close_fd(stdout_read);
+  if (stdout_write != INVALID_HANDLE_VALUE)
+    close_fd(stdout_write);
+
+  if (stdin_read != INVALID_HANDLE_VALUE)
+    close_fd(stdin_read);
+  if (stdin_write != INVALID_HANDLE_VALUE)
+    close_fd(stdin_write);
+
+  return std::nullopt;
+}
+
+} /* namespace os */
+
+} /* namespace shit */
+
+#endif /* OS_IS(WIN32) */
+
+#if OS_IS(COSMO) || OS_IS(WIN32)
+
+namespace shit {
+
+namespace os {
+
+const std::vector<std::string> OMITTED_SUFFIXES = {
+    /* First extension entry should be empty. */
+    "", ".exe", ".com", ".scr", ".bat",
+};
+
+constexpr static usize MIN_SUFFIX_LEN = 3;
+
+usize
+sanitize_program_name(std::string &program_name)
+{
+#if OS_IS(COSMO)
+  if (IsWindows())
+#endif
+  {
+    usize extension_pos = program_name.rfind(".");
+
+    if (extension_pos != std::string::npos &&
+        extension_pos + MIN_SUFFIX_LEN < program_name.length())
+    {
+      std::string extension = program_name.substr(extension_pos);
+
+      if (usize i = utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
+          i != std::string::npos)
+      {
+        program_name.erase(program_name.begin() + extension_pos,
+                           program_name.end());
+        return i;
+      }
+    }
+  }
+
+  return 0;
+}
+
+i32
+wait_and_monitor_process(process p)
+{
+  if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0) {
+    throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
+  }
+
+  DWORD code = -1;
+  if (GetExitCodeProcess(p, &code) == 0) {
+    throw Error{"GetExitCodeProcess() failed: " + last_system_error_message()};
+  }
+
+  return code;
+}
+
+OsArgs
+make_os_args(const std::string &program, const std::vector<std::string> &args)
+{
+  std::string s;
+
+  /* TODO: Remove CVE and escape quotes. */
+  s += '"';
+  s += program;
+  s += '"';
+
+  if (args.size() > 0) {
+    for (usize i = 0; i < args.size(); i++) {
+      s += ' ';
+      s += '"' + args[i] + '"';
+    }
+  }
+
+  return s;
+}
+
+std::string
+last_system_error_message()
+{
+  LPSTR errno_str{};
+  DWORD win_errno = GetLastError();
+
+  DWORD ret = FormatMessageA(
+      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+      nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+      reinterpret_cast<LPSTR>(&errno_str), 0, NULL);
+
+  if (ret == 0) {
+    return std::to_string(win_errno) + " (Error message couldn't be proccessed "
+                                       "due to FormatMessage() fail)";
+  }
+
+  std::string_view view{static_cast<char *>(errno_str)};
+  /* I do not want the PERIOD. */
+  if (view.find_last_of(". \n") != std::string::npos) {
+    view.remove_suffix(3);
+  }
+  std::string err{view};
+  LocalFree(errno_str);
+
+  return err;
+}
+
 static void
 print_lf(int s)
 {
@@ -511,6 +515,7 @@ print_lf(int s)
   signal(SIGINT, print_lf);
 }
 
+/* TODO: Use Windows events. */
 void
 set_default_signal_handlers()
 {
@@ -524,20 +529,9 @@ reset_signal_handlers()
   signal(SIGTERM, SIG_DFL);
   signal(SIGINT, SIG_DFL);
 }
-#endif
-
-#if OS_IS(POSIX)
-#elif OS_IS(WIN32)
-#endif
-
-#if OS_IS(POSIX)
-#elif OS_IS(WIN32)
-#endif
-
-#if OS_IS(POSIX)
-#elif OS_IS(WIN32)
-#endif
 
 } /* namespace os */
 
 } /* namespace shit */
+
+#endif /* OS_IS(COSMO) || OS_IS(WIN32) */
