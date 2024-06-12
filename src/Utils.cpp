@@ -23,557 +23,18 @@ namespace shit {
 
 namespace utils {
 
-template <class T>
-static usize
-find_pos_in_vec(const std::vector<T> &v, const T &p)
+i32
+execute_context(const ExecContext &&ec)
 {
-  for (usize i = 0; i < v.size(); i++) {
-    if (v[i] == p) {
-      return i;
-    }
-  }
-  return std::string::npos;
-}
-
-#if defined __linux__ || defined BSD || defined __APPLE__ || __COSMOPOLITAN__
-
-#if defined __COSMOPOLITAN__
-#include <cosmo.h>
-#endif
-
-#include <cerrno>
-#include <fcntl.h>
-#include <pwd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-
-static constexpr uchar PATH_DELIMITER = ':';
-
-/* Only parent can execute some operations. */
-static const pid_t PARENT_SHELL_PID = getpid();
-
-/* TODO: Get rid of this for non-Windows enviroments. */
-const static std::vector<std::string> OMITTED_SUFFIXES = {""};
-
-static i32
-call_checked_impl(i32 ret, const std::string &&func)
-{
-  if (ret == -1) {
-    throw shit::Error{func + " failed: " + last_system_error_message()};
-  }
-
-  return ret;
-}
-
-#define call_checked(f) call_checked_impl(f, std::string{#f})
-
-static sigset_t
-make_sigset_impl(int first, ...)
-{
-  va_list va;
-
-  sigset_t sm;
-  sigemptyset(&sm);
-
-  va_start(va, first);
-  for (int sig = first; sig != -1; sig = va_arg(va, int)) {
-    sigaddset(&sm, sig);
-  }
-  va_end(va);
-
-  return sm;
-}
-
-#define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
-
-static void
-reset_signal_handlers()
-{
-  sigset_t sm;
-  sigfillset(&sm);
-  sigprocmask(SIG_UNBLOCK, &sm, nullptr);
-}
-
-void
-set_default_signal_handlers()
-{
-  /* Ignore bullshit. */
-  sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
-  sigprocmask(SIG_BLOCK, &sm, nullptr);
-}
-
-std::string
-last_system_error_message()
-{
-  return std::string{strerror(errno)};
-}
-
-std::optional<std::string>
-get_environment_variable(const std::string &key)
-{
-  const char *e = std::getenv(key.c_str());
-  return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
-}
-
-static std::vector<const char *>
-make_os_args(const std::string &program, const std::vector<std::string> &args)
-{
-  std::vector<const char *> os_args;
-
-  /* argv[0] is the program itself. */
-  os_args.push_back(program.c_str());
-
-  /* Then actual arguments. */
-  for (const std::string &arg : args) {
-    os_args.push_back(arg.c_str());
-  }
-
-  /* And then nullptr at the end. */
-  os_args.push_back(nullptr);
-
-  return os_args;
-}
-
-static i32
-wait_for_process(pid_t pid)
-{
-  SHIT_ASSERT(pid >= 0);
-
-  i32 status{};
-
-  while (call_checked(waitpid(pid, &status, WNOHANG)) != pid) {
-    /* Waiting... */
-  }
-
-  /* Print appropriate message if the process was sent a signal. */
-  if (WIFSIGNALED(status)) {
-    i32         sig = WTERMSIG(status);
-    const char *sig_str = strsignal(sig);
-    std::string sig_desc =
-        (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
-
-    /* Ignore Ctrl-C. */
-    if (sig & ~(SIGINT)) {
-      std::cout << "[Process " << pid << ": " << sig_desc << ", signal "
-                << std::to_string(sig) << "]" << std::endl;
-    } else {
-      std::cout << std::endl;
-    }
-
-    return status;
-  } else if (WIFSTOPPED(status)) {
-    i32         sig = WSTOPSIG(status);
-    const char *sig_str = strsignal(sig);
-    std::string sig_desc =
-        (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
-
-    std::cout << "[Process " << pid << ": " << sig_desc << ", signal "
-              << std::to_string(sig) << " and killed]" << std::endl;
-
-    /* We can't handle suspended processes yet, so goodbye. */
-    call_checked(kill(pid, SIGKILL));
-  } else if (!WIFEXITED(status)) {
-    /* Process was destroyed by otherworldly forces. */
-    throw shit::Error{"???: " + last_system_error_message()};
+  if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
+    return os::wait_and_monitor_process(os::execute_program(ec));
   } else {
-    /* We exited normally. */
-    return WEXITSTATUS(status);
+    return execute_builtin(ec);
   }
 
   SHIT_UNREACHABLE();
 }
 
-[[noreturn]] static void
-execute_program(const ExecContext &ec)
-{
-  std::vector<const char *> os_args = make_os_args(ec.program, ec.args);
-
-  /* Cleanse the corruption of the holy child from evil signal spirits. */
-  reset_signal_handlers();
-
-  /* TODO: If execv() failed, try to execute the path as a shell script. */
-  if (execv(std::get<std::filesystem::path>(ec.kind).c_str(),
-            const_cast<char *const *>(os_args.data())) == -1)
-  {
-    throw shit::ErrorWithLocation{ec.location, last_system_error_message()};
-  }
-
-  SHIT_UNREACHABLE();
-}
-
-i32
-execute_context(const ExecContext &&ec)
-{
-  i32 ret = -1;
-
-  if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
-    pid_t child_pid = call_checked(fork());
-
-    if (child_pid == 0) {
-      /* Child. */
-      if (ec.in) {
-        call_checked(dup2(*ec.in, STDIN_FILENO));
-        call_checked(close(*ec.in));
-      }
-      if (ec.out) {
-        call_checked(dup2(*ec.out, STDOUT_FILENO));
-        call_checked(close(*ec.out));
-      }
-
-      execute_program(ec);
-    }
-
-    /* Parent. */
-    if (ec.in)
-      call_checked(close(*ec.in));
-    if (ec.out)
-      call_checked(close(*ec.out));
-
-    ret = wait_for_process(child_pid);
-  } else {
-    ret = execute_builtin(ec);
-
-    if (ec.in)
-      call_checked(close(*ec.in));
-    if (ec.out)
-      call_checked(close(*ec.out));
-  }
-
-  return ret;
-}
-
-i32
-execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
-{
-  SHIT_ASSERT(ecs.size() > 1);
-
-  i32   ret = -1;
-  i32   last_stdin = -1;
-  pid_t last_pid = -1;
-
-  bool is_first = true;
-
-  for (ExecContext &ec : ecs) {
-    i32 pipefds[2] = {-1, -1};
-
-    bool is_last = &ec == &ecs.back();
-
-    /* We need N - 1 pipes for N commands. The first command uses terminal's
-     * stdin and pipe's stdout. i th process will use i - 1 th pipe's stdin and
-     * i-th pipe's stdout. The last process will use only i - 1 pipe's
-     * stdin. */
-    if (!is_last) {
-      call_checked(pipe(pipefds));
-      ec.out = pipefds[1];
-    }
-
-    if (!is_first) {
-      ec.in = last_stdin;
-    }
-
-    /* Builtin or an actual program? */
-    if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
-      pid_t child_pid = call_checked(fork());
-
-      /* TODO: Make call_checked() not leak fds on error. */
-      if (child_pid == 0) {
-        /* Child. Close reading end, dup2() previous reading end and a new
-         * writing end to ourselves. */
-        if (!is_last) {
-          call_checked(close(pipefds[0]));
-        }
-
-        if (ec.in) {
-          call_checked(dup2(*ec.in, STDIN_FILENO));
-          call_checked(close(*ec.in));
-        }
-        if (ec.out) {
-          call_checked(dup2(*ec.out, STDOUT_FILENO));
-          call_checked(close(*ec.out));
-        }
-
-        execute_program(ec);
-      }
-
-      last_pid = child_pid;
-    } else {
-      /* Builtin. Everything is done in a single process, so just close the new
-       * reading end. */
-      /* TODO: Broken pipe. */
-      ret = execute_builtin(ec);
-    }
-
-    /* Parent. Close the writing end and the last reading end. There shoudn't be
-     * any loose ends remaining. When the child exits, pipes will be deleted. */
-    if (!is_last)
-      call_checked(close(pipefds[1]));
-    if (!is_first)
-      call_checked(close(last_stdin));
-
-    is_first = false;
-    last_stdin = pipefds[0];
-  }
-
-  ret = (last_pid != -1) ? wait_for_process(last_pid) : ret;
-
-  return ret;
-}
-
-usize
-write_fd(os::descriptor fd, void *buf, u8 size)
-{
-  return write(fd, buf, size);
-}
-
-usize
-read_fd(os::descriptor fd, void *buf, u8 size)
-{
-  return read(fd, buf, size);
-}
-
-bool
-close_fd(os::descriptor fd)
-{
-  return close(fd) != -1;
-}
-
-bool
-is_child_process()
-{
-  return getpid() != PARENT_SHELL_PID;
-}
-
-/* Cosmopolitan binaries can be run on both Linux and Windows. This will be
- * replaced by a runtime check. */
-#if !defined __COSMOPOLITAN__
-static bool
-sanitize_program_name(std::string &program_name)
-{
-  /* POSIX does not really make use of extensions for executable files. */
-  SHIT_UNUSED(program_name);
-  return false;
-}
-#endif /* !__COSMOPOLITAN__ */
-
-std::optional<std::string>
-get_current_user()
-{
-  struct passwd *pw = getpwuid(getuid());
-  if (pw != nullptr) {
-    return std::string{pw->pw_name};
-  } else {
-    return std::nullopt;
-  }
-}
-
-std::optional<std::filesystem::path>
-get_home_directory()
-{
-  return get_environment_variable("HOME");
-}
-
-#elif defined _WIN32 /* __linux__ || BSD || __APPLE__ */
-
-static constexpr uchar PATH_DELIMITER = ';';
-
-/* Only parent can execute some operations. */
-static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
-
-static void
-print_lf(int s)
-{
-  SHIT_UNUSED(s);
-  std::cout << std::endl;
-  signal(SIGINT, print_lf);
-}
-
-void
-set_default_signal_handlers()
-{
-  signal(SIGTERM, SIG_IGN);
-  signal(SIGINT, print_lf);
-}
-
-std::string
-last_system_error_message()
-{
-  LPSTR errno_str{};
-  DWORD win_errno = GetLastError();
-
-  DWORD ret = FormatMessageA(
-      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-          FORMAT_MESSAGE_IGNORE_INSERTS,
-      nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      reinterpret_cast<LPSTR>(&errno_str), 0, NULL);
-
-  if (ret == 0) {
-    return std::to_string(win_errno) + " (Error message couldn't be proccessed "
-                                       "due to FormatMessage() fail)";
-  }
-
-  std::string_view view{static_cast<char *>(errno_str)};
-  /* I do not want the PERIOD. */
-  if (view.find_last_of(". \n") != std::string::npos) {
-    view.remove_suffix(3);
-  }
-  std::string err{view};
-  LocalFree(errno_str);
-
-  return err;
-}
-
-constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
-
-std::optional<std::string>
-get_environment_variable(const std::string &key)
-{
-  char buffer[WIN32_MAX_ENV_SIZE] = {0};
-  if (GetEnvironmentVariableA(key.c_str(), buffer, sizeof(buffer)) == 0) {
-    return std::nullopt;
-  }
-  return std::string{buffer};
-}
-
-static std::string
-make_os_args(const std::string &program, const std::vector<std::string> &args)
-{
-  std::string s;
-
-  /* TODO: Remove CVE and escape quotes. */
-  s += '"';
-  s += program;
-  s += '"';
-
-  if (args.size() > 0) {
-    for (usize i = 0; i < args.size(); i++) {
-      s += ' ';
-      s += '"' + args[i] + '"';
-    }
-  }
-
-  return s;
-}
-
-struct WinPipe
-{
-  HANDLE stdin_write{INVALID_HANDLE_VALUE};
-  HANDLE stdin_read{INVALID_HANDLE_VALUE};
-  HANDLE stdout_write{INVALID_HANDLE_VALUE};
-  HANDLE stdout_read{INVALID_HANDLE_VALUE};
-};
-
-std::optional<WinPipe>
-win_pipe()
-{
-  SECURITY_ATTRIBUTES att{};
-
-  att.nLength = sizeof(SECURITY_ATTRIBUTES);
-  att.bInheritHandle = TRUE;
-  att.lpSecurityDescriptor = NULL;
-
-  HANDLE stdout_read = INVALID_HANDLE_VALUE;
-  HANDLE stdout_write = INVALID_HANDLE_VALUE;
-  HANDLE stdin_read = INVALID_HANDLE_VALUE;
-  HANDLE stdin_write = INVALID_HANDLE_VALUE;
-
-  if (CreatePipe(&stdout_read, &stdout_write, &att, 0) == 0) {
-    goto fail;
-  }
-
-  if (CreatePipe(&stdin_read, &stdin_write, &att, 0) == 0) {
-    goto fail;
-  }
-
-#if 0
-  if (SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) == 0) {
-    goto fail;
-  }
-
-  if (SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0) == 0) {
-    goto fail;
-  }
-#endif
-
-  return WinPipe{stdin_write, stdin_read, stdout_write, stdout_read};
-
-fail:
-  if (stdout_read != INVALID_HANDLE_VALUE)
-    CloseHandle(stdout_read);
-  if (stdout_write != INVALID_HANDLE_VALUE)
-    CloseHandle(stdout_write);
-
-  if (stdin_read != INVALID_HANDLE_VALUE)
-    CloseHandle(stdin_read);
-  if (stdin_write != INVALID_HANDLE_VALUE)
-    CloseHandle(stdin_write);
-
-  return std::nullopt;
-}
-
-static HANDLE
-execute_program(const ExecContext &ec1)
-{
-  ExecContext ec = ec1;
-
-  std::string program_path = std::get<std::filesystem::path>(ec.kind).string();
-  std::string command_line = make_os_args(ec.program, ec.args);
-
-  PROCESS_INFORMATION process_info{};
-  STARTUPINFOA        startup_info{};
-
-  startup_info.cb = sizeof(startup_info);
-
-  BOOL should_use_pipe = ec.in || ec.out;
-
-  if (should_use_pipe)
-    startup_info.dwFlags |= STARTF_USESTDHANDLES;
-
-  startup_info.hStdInput = (ec.in) ? *ec.in : SHIT_STDIN;
-  startup_info.hStdOutput = (ec.out) ? *ec.out : SHIT_STDOUT;
-
-  if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
-                     nullptr, should_use_pipe, 0, nullptr, nullptr,
-                     &startup_info, &process_info) == 0)
-  {
-    throw ErrorWithLocation{ec.location, last_system_error_message()};
-  }
-
-  if (ec.in)
-    CloseHandle(*ec.in);
-  if (ec.out)
-    CloseHandle(*ec.out);
-
-  return process_info.hProcess;
-}
-
-i32
-execute_context(const ExecContext &&ec)
-{
-  i32 ret = -1;
-
-  if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
-    HANDLE child = execute_program(ec);
-
-    if (WaitForSingleObject(child, INFINITE) != WAIT_OBJECT_0) {
-      throw Error{"WaitForSingleObject() failed: " +
-                  last_system_error_message()};
-    }
-
-    DWORD code = -1;
-    if (GetExitCodeProcess(child, &code) == 0) {
-      throw Error{"GetExitCodeProcess() failed: " +
-                  last_system_error_message()};
-    }
-
-    ret = code;
-  } else {
-    ret = execute_builtin(ec);
-  }
-
-  return ret;
-}
-
-/* TODO: */
 i32
 execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
 {
@@ -581,18 +42,18 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
 
   i32 ret = 1;
 
-  HANDLE last_stdin = INVALID_HANDLE_VALUE;
-  HANDLE last_child = INVALID_HANDLE_VALUE;
+  os::process    last_child = SHIT_INVALID_PROCESS;
+  os::descriptor last_stdin = SHIT_INVALID_FD;
 
   bool is_first = true;
 
   for (ExecContext &ec : ecs) {
-    std::optional<WinPipe> pipe;
+    std::optional<os::Pipe> pipe;
 
     bool is_last = &ec == &ecs.back();
 
     if (!is_last) {
-      pipe = win_pipe();
+      pipe = os::make_pipe();
       if (!pipe) {
         throw ErrorWithLocation{ec.location, "Could not open a pipe"};
       }
@@ -604,127 +65,29 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
     }
 
     if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
-      last_child = execute_program(ec);
+      last_child = os::execute_program(ec);
     } else {
       ret = execute_builtin(ec);
 
       if (ec.in)
-        close_fd(*ec.in);
+        os::close_fd(*ec.in);
       if (ec.out)
-        close_fd(*ec.out);
+        os::close_fd(*ec.out);
     }
 
     /* Unused handle. */
-    CloseHandle(pipe->stdin_read);
+    os::close_fd(pipe->stdin_read);
 
     is_first = false;
     last_stdin = pipe->stdout_read;
   }
 
-  if (last_child != INVALID_HANDLE_VALUE) {
-    if (WaitForSingleObject(last_child, INFINITE) != WAIT_OBJECT_0) {
-      throw Error{"WaitForSingleObject() failed: " +
-                  last_system_error_message()};
-    }
-    DWORD code = -1;
-    if (GetExitCodeProcess(last_child, &code) == 0) {
-      throw Error{"GetExitCodeProcess() failed: " +
-                  last_system_error_message()};
-    }
-    ret = code;
+  if (last_child != SHIT_INVALID_FD) {
+    ret = os::wait_and_monitor_process(last_child);
   }
 
   return ret;
 }
-
-usize
-write_fd(os::descriptor fd, void *buf, u8 size)
-{
-  DWORD w = -1;
-  WriteFile(fd, buf, size, &w, 0);
-  return w;
-}
-
-usize
-read_fd(os::descriptor fd, void *buf, u8 size)
-{
-  DWORD r = -1;
-  ReadFile(fd, buf, size, &r, 0);
-  return r;
-}
-
-bool
-close_fd(os::descriptor fd)
-{
-  return CloseHandle(fd);
-}
-
-bool
-is_child_process()
-{
-  return GetCurrentProcessId() != PARENT_SHELL_PID;
-}
-
-std::optional<std::string>
-get_current_user()
-{
-  DWORD size = 0;
-  GetUserNameA(nullptr, &size);
-  if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-    std::vector<char> buffer;
-    buffer.reserve(size);
-    if (GetUserNameA(buffer.data(), &size)) {
-      return std::string{buffer.data(), size - 1};
-    }
-  }
-  return std::nullopt;
-}
-
-std::optional<std::filesystem::path>
-get_home_directory()
-{
-  return get_environment_variable("USERPROFILE");
-}
-
-#endif /* _WIN32 */
-
-#if defined _WIN32 || defined __COSMOPOLITAN__
-
-const static std::vector<std::string> OMITTED_SUFFIXES = {
-    /* First extension entry should be empty. */
-    "", ".exe", ".com", ".scr", ".bat",
-};
-
-constexpr static usize MIN_SUFFIX_LEN = 3;
-
-static usize
-sanitize_program_name(std::string &program_name)
-{
-#if defined __COSMOPOLITAN__
-  if (IsWindows())
-#endif
-  {
-    usize extension_pos = program_name.rfind(".");
-
-    if (extension_pos != std::string::npos &&
-        extension_pos + MIN_SUFFIX_LEN < program_name.length())
-    {
-      std::string extension = program_name.substr(extension_pos);
-
-      if (usize i = find_pos_in_vec(OMITTED_SUFFIXES, extension);
-          i != std::string::npos)
-      {
-        program_name.erase(program_name.begin() + extension_pos,
-                           program_name.end());
-        return i;
-      }
-    }
-  }
-
-  return 0;
-}
-
-#endif /* _WIN32 || __COSMOPOLITAN__ */
 
 ExecContext
 make_exec_context(const std::string              &program,
@@ -784,7 +147,7 @@ simple_shell_expand(const std::string &path)
     /* Remove the tilde. */
     expanded_path.erase(pos, 1);
 
-    std::optional<std::filesystem::path> u = get_home_directory();
+    std::optional<std::filesystem::path> u = os::get_home_directory();
     if (!u) {
       return std::nullopt;
     }
@@ -831,7 +194,7 @@ quit(i32 code, bool should_goodbye)
   }
 
   /* Cleanup for main proccess. */
-  if (!is_child_process()) {
+  if (!os::is_child_process()) {
     if (toiletline::is_active()) {
       try {
         toiletline::exit();
@@ -854,7 +217,20 @@ static std::unordered_map<std::string, std::tuple<usize, usize>> PATH_CACHE{};
 
 /* FIXME: Cosmopolitan sucks and does not support std::filesystem::path in
  * unordered_map :c. This would be better off std::string. */
-static std::optional<std::string> MAYBE_PATH = get_environment_variable("PATH");
+static std::optional<std::string> MAYBE_PATH =
+    os::get_environment_variable("PATH");
+
+template <class T>
+static usize
+find_pos_in_vec(const std::vector<T> &v, const T &p)
+{
+  for (usize i = 0; i < v.size(); i++) {
+    if (v[i] == p) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
 
 template <class T>
 static usize
@@ -871,7 +247,7 @@ cache_path_into(std::vector<T> &cache, T &&p)
 void
 clear_path_map()
 {
-  MAYBE_PATH = get_environment_variable("PATH");
+  MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
   PATH_CACHE_DIRS.clear();
 }
@@ -886,7 +262,7 @@ initialize_path_map()
   std::string path_var = *MAYBE_PATH;
 
   for (const char &ch : path_var) {
-    if (ch != PATH_DELIMITER) {
+    if (ch != os::PATH_DELIMITER) {
       dir_string += ch;
       continue;
     }
@@ -902,7 +278,7 @@ initialize_path_map()
       /* Initialize every file in the directory. */
       for (const std::filesystem::directory_entry &f : dir) {
         std::string fs = f.path().filename().string();
-        PATH_CACHE[fs] = {dir_index, sanitize_program_name(fs)};
+        PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
       }
     }
 
@@ -913,7 +289,7 @@ initialize_path_map()
 std::optional<std::filesystem::path>
 search_and_cache(const std::string &program_name)
 {
-  MAYBE_PATH = get_environment_variable("PATH");
+  MAYBE_PATH = os::get_environment_variable("PATH");
   if (!MAYBE_PATH)
     return std::nullopt;
 
@@ -921,7 +297,7 @@ search_and_cache(const std::string &program_name)
   std::string path_var = *MAYBE_PATH;
 
   for (const char &ch : path_var) {
-    if (ch != PATH_DELIMITER) {
+    if (ch != os::PATH_DELIMITER) {
       dir_string += ch;
       continue;
     }
@@ -950,14 +326,14 @@ search_and_cache(const std::string &program_name)
       std::string           full_path_str = full_path.string();
 
       /* This file already has an extesion specified? */
-      if (usize explicit_ext = sanitize_program_name(full_path_str);
+      if (usize explicit_ext = os::sanitize_program_name(full_path_str);
           explicit_ext == 0)
       {
-        for (usize ext_index = 0; ext_index < OMITTED_SUFFIXES.size();
+        for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
              ext_index++)
         {
           std::string try_path =
-              full_path.string() + OMITTED_SUFFIXES[ext_index];
+              full_path.string() + os::OMITTED_SUFFIXES[ext_index];
 
           if (std::filesystem::exists(try_path)) {
             PATH_CACHE[program_name] = {dir_index, ext_index};
@@ -983,7 +359,7 @@ simple_shell_expand_args(const std::vector<std::string> &args)
   expanded_args.reserve(args.size());
 
   for (const std::string &arg : args) {
-    expanded_args.push_back(utils::simple_shell_expand(arg).value_or(arg));
+    expanded_args.push_back(simple_shell_expand(arg).value_or(arg));
   }
 
   return expanded_args;
@@ -995,7 +371,7 @@ search_program_path(const std::string &program_name)
 {
   std::string sp{program_name};
 
-  usize s_ext = sanitize_program_name(sp);
+  usize s_ext = os::sanitize_program_name(sp);
 
   if (auto p = PATH_CACHE.find(sp); p != PATH_CACHE.end()) {
     auto [dir, ext] = p->second;
@@ -1005,7 +381,7 @@ search_program_path(const std::string &program_name)
       try_path /= program_name;
     } else {
       std::filesystem::path file_name = p->first + '.';
-      try_path /= file_name.concat(OMITTED_SUFFIXES[ext]);
+      try_path /= file_name.concat(os::OMITTED_SUFFIXES[ext]);
     }
 
     /* Does this path still exist? */

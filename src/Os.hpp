@@ -1,42 +1,62 @@
 #pragma once
 
-#define POSIX 0b1
-#define WIN32 0b10
-#define COSMO 0b100
+#include "Common.hpp"
+#include "OsCommon.hpp"
+#include "Utils.hpp"
 
-/* Currently, Linux, Windows and Cosmopolitan builds are supported. */
-#if defined __linux__ || defined BSD || defined __APPLE__ || __COSMOPOLITAN__
-#include <unistd.h>
-#define SHIT_SUPPORT_VECTOR (POSIX | COSMO)
-#elif defined _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#define SHIT_SUPPORT_VECTOR (WIN32 | COSMO)
-#endif
-
-#define OS_IS(os) (SHIT_SUPPORT_VECTOR & os)
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace shit {
 
 namespace os {
 
-#if OS_IS(WIN32)
-/* Windows handles. */
-using descriptor = HANDLE;
-#define SHIT_INVALID_FD INVALID_HANDLE_VALUE
+struct Pipe
+{
+  descriptor stdin_write{SHIT_INVALID_FD};
+  descriptor stdin_read{SHIT_INVALID_FD};
+  descriptor stdout_write{SHIT_INVALID_FD};
+  descriptor stdout_read{SHIT_INVALID_FD};
+};
 
-/* Universal macros for current STDIN/STDOUT. */
-#define SHIT_STDIN  GetStdHandle(STD_OUTPUT_HANDLE)
-#define SHIT_STDOUT GetStdHandle(STD_OUTPUT_HANDLE)
-#elif OS_IS(POSIX)
-/* POSIX descriptors. */
-using descriptor = int;
-#define SHIT_INVALID_FD -1
+std::optional<Pipe> make_pipe();
 
-#define SHIT_STDIN  STDIN_FILENO
-#define SHIT_STDOUT STDOUT_FILENO
-#endif
+OsArgs
+make_os_args(const std::string &program, const std::vector<std::string> &args);
 
-} // namespace os
+
+std::string
+last_system_error_message();
+
+i32 wait_and_monitor_process(process p);
+
+extern const std::vector<std::string> OMITTED_SUFFIXES;
+
+usize write_fd(os::descriptor fd, void *buf, u8 size);
+
+usize read_fd(os::descriptor fd, void *buf, u8 size);
+
+bool close_fd(os::descriptor);
+
+std::optional<std::string> get_environment_variable(const std::string &key);
+
+bool is_child_process();
+
+usize sanitize_program_name(std::string &program_name);
+
+std::optional<std::string> get_current_user();
+
+std::optional<std::filesystem::path> get_home_directory();
+
+void set_default_signal_handlers();
+
+void reset_signal_handlers();
+
+process execute_program(const utils::ExecContext &ec);
+
+} /* namespace os */
 
 } /* namespace shit */

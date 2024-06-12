@@ -1,8 +1,8 @@
 #include "Builtin.hpp"
 
-#include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Os.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 
@@ -104,7 +104,7 @@ Echo::execute(const std::vector<std::string> &args) const
   }
   buf += '\n';
 
-  utils::write_fd(out_fd, buf.data(), buf.size());
+  os::write_fd(out_fd, buf.data(), buf.size());
 
   return 0;
 }

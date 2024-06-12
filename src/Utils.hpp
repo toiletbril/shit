@@ -2,6 +2,7 @@
 
 #include "Builtin.hpp"
 #include "Common.hpp"
+#include "Os.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -12,8 +13,6 @@
 namespace shit {
 
 namespace utils {
-
-std::string last_system_error_message();
 
 /* Path is the program path to execute, expanded from program. Program is
  * non-altered first arg. */
@@ -37,20 +36,12 @@ i32 execute_context(const ExecContext &&ec);
 
 i32 execute_contexts_with_pipes(std::vector<ExecContext> &ecs);
 
-usize write_fd(os::descriptor fd, void *buf, u8 size);
-usize read_fd(os::descriptor fd, void *buf, u8 size);
-
-bool close_fd(os::descriptor);
-
-std::optional<std::string> get_environment_variable(const std::string &key);
+std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
 
 std::optional<std::string> simple_shell_expand(const std::string &path);
 
 std::vector<std::string>
 simple_shell_expand_args(const std::vector<std::string> &args);
-
-/* Normalizes the path. */
-std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
 
 void initialize_path_map();
 
@@ -60,20 +51,12 @@ void clear_path_map();
 std::optional<std::filesystem::path>
 search_program_path(const std::string &program_name);
 
-bool is_child_process();
-
 void set_current_directory(const std::filesystem::path &path);
 
 std::filesystem::path get_current_directory();
 
 /* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] void quit(i32 code, bool should_goodbye = false);
-
-std::optional<std::string> get_current_user();
-
-std::optional<std::filesystem::path> get_home_directory();
-
-void set_default_signal_handlers();
 
 } /* namespace utils */
 

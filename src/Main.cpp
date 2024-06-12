@@ -7,6 +7,7 @@
 #include "Parser.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
+#include "Os.hpp"
 
 #include <cstdlib>
 #include <fstream>
@@ -61,12 +62,12 @@ main(int argc, char **argv)
    * we won't waste any milliseconds traversing directories for very simple
    * scripts! */
   shit::utils::clear_path_map();
-  shit::utils::set_default_signal_handlers();
+  shit::os::set_default_signal_handlers();
 
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
   for (;;) {
-    SHIT_ASSERT(!shit::utils::is_child_process());
+    SHIT_ASSERT(!shit::os::is_child_process());
 
     std::string contents;
 
@@ -145,7 +146,7 @@ main(int argc, char **argv)
                            std::fstream::in | std::fstream::binary};
           if (!f.is_open()) {
             throw shit::Error{"Could not open '" + file_names[arg_index] +
-                              "': " + shit::utils::last_system_error_message()};
+                              "': " + shit::os::last_system_error_message()};
           }
           file = &f;
         }
@@ -154,7 +155,7 @@ main(int argc, char **argv)
           char ch = file->get();
           if (file->bad()) {
             throw shit::Error{"Could not read '" + file_names[arg_index] +
-                              "': " + shit::utils::last_system_error_message()};
+                              "': " + shit::os::last_system_error_message()};
           } else if (file->eof()) {
             break;
           }
@@ -169,7 +170,7 @@ main(int argc, char **argv)
     } catch (...) {
       shit::show_error("Could not figure out what to do due to an unexpected "
                        "explosion! Last system message: " +
-                       shit::utils::last_system_error_message());
+                       shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
 
@@ -197,13 +198,13 @@ main(int argc, char **argv)
     } catch (...) {
       shit::show_error("Could not execute the code due to an unexpected "
                        "explosion! Last system message: " +
-                       shit::utils::last_system_error_message());
+                       shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
 
     /* We can get here from child process if they didn't exec()
      * properly to print error. */
-    if (should_quit || shit::utils::is_child_process()) {
+    if (should_quit || shit::os::is_child_process()) {
       shit::utils::quit(exit_code);
     }
   }
