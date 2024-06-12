@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Os.hpp"
 
 #include <optional>
 #include <string>
@@ -17,8 +18,7 @@ struct Builtin
     Exit,
   };
 
-  void set_stdin(int fd);
-  void set_stdout(int fd);
+  void set_fds(SHIT_FD in, SHIT_FD out);
 
   virtual Kind kind() const = 0;
   virtual i32  execute(const std::vector<std::string> &args) const = 0;
@@ -28,8 +28,8 @@ struct Builtin
 protected:
   Builtin();
 
-  i32 in_fd{0};
-  i32 out_fd{1};
+  SHIT_FD in_fd{SHIT_STDIN};
+  SHIT_FD out_fd{SHIT_STDOUT};
 };
 
 struct Echo : public Builtin

@@ -58,13 +58,15 @@ execute_builtin(const utils::ExecContext &ec)
   default: break;
   }
 
-  if (ec.out)
-    b->set_stdout(ec.out.value());
-  if (ec.in)
-    b->set_stdin(ec.in.value());
+  b->set_fds(ec.in.value_or(SHIT_STDIN), ec.out.value_or(SHIT_STDOUT));
 
   try {
-    return b->execute(utils::simple_shell_expand_args(ec.args));
+    i32 ret = b->execute(utils::simple_shell_expand_args(ec.args));
+    if (ec.in)
+      CloseHandle(*ec.in);
+    if (ec.out)
+      CloseHandle(*ec.out);
+    return ret;
   } catch (Error &err) {
     throw ErrorWithLocation{ec.location, err.message()};
   }
@@ -76,15 +78,10 @@ execute_builtin(const utils::ExecContext &ec)
 Builtin::Builtin() = default;
 
 void
-Builtin::set_stdin(int fd)
+Builtin::set_fds(SHIT_FD in, SHIT_FD out)
 {
-  in_fd = fd;
-}
-
-void
-Builtin::set_stdout(int fd)
-{
-  out_fd = fd;
+  in_fd = in;
+  out_fd = out;
 }
 
 /**
@@ -110,9 +107,9 @@ Echo::execute(const std::vector<std::string> &args) const
       buf += args[i];
     }
   }
+  buf += '\n';
 
-  write(out_fd, buf.data(), buf.size());
-  write(out_fd, "\n", 1);
+  utils::write_fd(out_fd, buf.data(), buf.size());
 
   return 0;
 }

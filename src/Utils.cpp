@@ -12,8 +12,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <handleapi.h>
 #include <iostream>
 #include <optional>
+#include <variant>
+#include <winbase.h>
 
 /* TODO: Support background processes. */
 /* TODO: Support setting environment variables. */
@@ -45,7 +48,6 @@ find_pos_in_vec(const std::vector<T> &v, const T &p)
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <unistd.h>
 
 static constexpr uchar PATH_DELIMITER = ':';
 
@@ -116,7 +118,7 @@ get_environment_variable(const std::string &key)
 }
 
 static std::vector<const char *>
-create_os_args(const std::string &program, const std::vector<std::string> &args)
+make_os_args(const std::string &program, const std::vector<std::string> &args)
 {
   std::vector<const char *> os_args;
 
@@ -186,7 +188,7 @@ wait_for_process(pid_t pid)
 [[noreturn]] static void
 execute_program(const ExecContext &ec)
 {
-  std::vector<const char *> os_args = create_os_args(ec.program, ec.args);
+  std::vector<const char *> os_args = make_os_args(ec.program, ec.args);
 
   /* Cleanse the corruption of the holy child from evil signal spirits. */
   reset_signal_handlers();
@@ -355,8 +357,6 @@ get_home_directory()
 }
 
 #elif defined _WIN32 /* __linux__ || BSD || __APPLE__ */
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 
 static constexpr uchar PATH_DELIMITER = ';';
 
@@ -418,50 +418,136 @@ get_environment_variable(const std::string &key)
   return std::string{buffer};
 }
 
+static std::string
+make_os_args(const std::string &program, const std::vector<std::string> &args)
+{
+  std::string s;
+
+  /* TODO: Remove CVE and escape quotes. */
+  s += '"';
+  s += program;
+  s += '"';
+
+  if (args.size() > 0) {
+    for (usize i = 0; i < args.size(); i++) {
+      s += ' ';
+      s += '"' + args[i] + '"';
+    }
+  }
+
+  return s;
+}
+
+struct WinPipe
+{
+  HANDLE stdin_write{INVALID_HANDLE_VALUE};
+  HANDLE stdin_read{INVALID_HANDLE_VALUE};
+  HANDLE stdout_write{INVALID_HANDLE_VALUE};
+  HANDLE stdout_read{INVALID_HANDLE_VALUE};
+};
+
+std::optional<WinPipe>
+win_pipe()
+{
+  SECURITY_ATTRIBUTES att{};
+
+  att.nLength = sizeof(SECURITY_ATTRIBUTES);
+  att.bInheritHandle = TRUE;
+  att.lpSecurityDescriptor = NULL;
+
+  HANDLE stdout_read = INVALID_HANDLE_VALUE;
+  HANDLE stdout_write = INVALID_HANDLE_VALUE;
+  HANDLE stdin_read = INVALID_HANDLE_VALUE;
+  HANDLE stdin_write = INVALID_HANDLE_VALUE;
+
+  if (CreatePipe(&stdout_read, &stdout_write, &att, 0) == 0) {
+    goto fail;
+  }
+
+  if (CreatePipe(&stdin_read, &stdin_write, &att, 0) == 0) {
+    goto fail;
+  }
+
+#if 0
+  if (SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) == 0) {
+    goto fail;
+  }
+
+  if (SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0) == 0) {
+    goto fail;
+  }
+#endif
+
+  return WinPipe{stdin_write, stdin_read, stdout_write, stdout_read};
+
+fail:
+  if (stdout_read != INVALID_HANDLE_VALUE)
+    CloseHandle(stdout_read);
+  if (stdout_write != INVALID_HANDLE_VALUE)
+    CloseHandle(stdout_write);
+
+  if (stdin_read != INVALID_HANDLE_VALUE)
+    CloseHandle(stdin_read);
+  if (stdin_write != INVALID_HANDLE_VALUE)
+    CloseHandle(stdin_write);
+
+  return std::nullopt;
+}
+
+static HANDLE
+execute_program(const ExecContext &ec1)
+{
+  ExecContext ec = ec1;
+
+  std::string program_path = std::get<std::filesystem::path>(ec.kind).string();
+  std::string command_line = make_os_args(ec.program, ec.args);
+
+  PROCESS_INFORMATION process_info{};
+  STARTUPINFOA        startup_info{};
+
+  startup_info.cb = sizeof(startup_info);
+
+  BOOL should_use_pipe = ec.in || ec.out;
+
+  if (should_use_pipe)
+    startup_info.dwFlags |= STARTF_USESTDHANDLES;
+
+  startup_info.hStdInput = (ec.in) ? *ec.in : SHIT_STDIN;
+  startup_info.hStdOutput = (ec.out) ? *ec.out : SHIT_STDOUT;
+
+  if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
+                     nullptr, should_use_pipe, 0, nullptr, nullptr,
+                     &startup_info, &process_info) == 0)
+  {
+    throw ErrorWithLocation{ec.location, last_system_error_message()};
+  }
+
+  if (ec.in)
+    CloseHandle(*ec.in);
+  if (ec.out)
+    CloseHandle(*ec.out);
+
+  return process_info.hProcess;
+}
+
 i32
 execute_context(const ExecContext &&ec)
 {
   i32 ret = -1;
 
   if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
-    std::string command_line;
+    HANDLE child = execute_program(ec);
 
-    /* TODO: Remove CVE and escape quotes. */
-    command_line += '"';
-    command_line += ec.program;
-    command_line += '"';
-
-    if (ec.args.size() > 0) {
-      for (usize i = 0; i < ec.args.size(); i++) {
-        command_line += ' ';
-        command_line += '"' + ec.args[i] + '"';
-      }
-    }
-
-    PROCESS_INFORMATION pi{};
-    STARTUPINFOA        si{.cb = sizeof(si)};
-
-    if (CreateProcessA(
-            std::get<std::filesystem::path>(ec.kind).string().c_str(),
-            command_line.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr,
-            &si, &pi) == 0)
-    {
-      throw Error{last_system_error_message()};
-    }
-
-    if (WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
+    if (WaitForSingleObject(child, INFINITE) != WAIT_OBJECT_0) {
       throw Error{"WaitForSingleObject() failed: " +
                   last_system_error_message()};
     }
 
-    DWORD code;
-    if (GetExitCodeProcess(pi.hProcess, &code) == 0) {
+    DWORD code = -1;
+    if (GetExitCodeProcess(child, &code) == 0) {
       throw Error{"GetExitCodeProcess() failed: " +
                   last_system_error_message()};
     }
-
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
 
     ret = code;
   } else {
@@ -475,9 +561,74 @@ execute_context(const ExecContext &&ec)
 i32
 execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
 {
-  SHIT_UNUSED(ecs);
-  throw shit::ErrorWithLocation{ecs[1].location,
-                                "Pipes are not implemented (Utils)"};
+  SHIT_ASSERT(ecs.size() > 1);
+
+  i32 ret = 1;
+
+  HANDLE last_stdin = INVALID_HANDLE_VALUE;
+  HANDLE last_child = INVALID_HANDLE_VALUE;
+
+  bool is_first = true;
+
+  for (ExecContext &ec : ecs) {
+    std::optional<WinPipe> pipe;
+
+    bool is_last = &ec == &ecs.back();
+
+    if (!is_last) {
+      pipe = win_pipe();
+      if (!pipe) {
+        throw ErrorWithLocation{ec.location, "Could not open a pipe"};
+      }
+      ec.out = pipe->stdout_write;
+    }
+
+    if (!is_first) {
+      ec.in = last_stdin;
+    }
+
+    if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
+      last_child = execute_program(ec);
+    } else {
+      ret = execute_builtin(ec);
+    }
+
+    CloseHandle(pipe->stdin_read);
+
+    is_first = false;
+    last_stdin = pipe->stdout_read;
+  }
+
+  if (last_child != INVALID_HANDLE_VALUE) {
+    if (WaitForSingleObject(last_child, INFINITE) != WAIT_OBJECT_0) {
+      throw Error{"WaitForSingleObject() failed: " +
+                  last_system_error_message()};
+    }
+    DWORD code = -1;
+    if (GetExitCodeProcess(last_child, &code) == 0) {
+      throw Error{"GetExitCodeProcess() failed: " +
+                  last_system_error_message()};
+    }
+    ret = code;
+  }
+
+  return ret;
+}
+
+usize
+write_fd(SHIT_FD fd, void *buf, u8 size)
+{
+  DWORD w = -1;
+  WriteFile(fd, buf, size, &w, 0);
+  return w;
+}
+
+usize
+read_fd(SHIT_FD fd, void *buf, u8 size)
+{
+  DWORD r = -1;
+  ReadFile(fd, buf, size, &r, 0);
+  return r;
 }
 
 bool
