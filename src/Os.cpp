@@ -134,7 +134,7 @@ wait_and_monitor_process(process pid)
 
   i32 status{};
 
-  while (waitpid(pid, &status, WNOHANG) != pid) {
+  while (waitpid(pid, &status, 0) != pid) {
     /* Waiting... */
   }
 
