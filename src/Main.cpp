@@ -16,7 +16,8 @@
 
 FLAG_LIST_DECL();
 
-FLAG(DUMP_AST, Bool, 'A', "dump-ast", "Dump AST for debugging purposes.");
+FLAG(DUMP_AST, Bool, 'A', "dump-ast",
+     "Dump AST before executing each command.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");

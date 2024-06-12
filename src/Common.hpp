@@ -3,6 +3,7 @@
 #define SHIT_VER_MAJOR 0
 #define SHIT_VER_MINOR 0
 #define SHIT_VER_PATCH 3
+#define SHIT_VER_EXTRA "alpha"
 
 #define SHIT_SHORT_LICENSE                                                     \
   "Licensed under the 3-Clause BSD License.\n"                                 \

@@ -302,8 +302,8 @@ void
 show_version()
 {
   std::cout
-      << "Shit " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
-      << SHIT_VER_PATCH << "\n"
+      << "Shit Shell " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
+      << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
       << "(c) toiletbril <https://github.com/toiletbril>\n\n" SHIT_SHORT_LICENSE
       << std::endl;
 }
@@ -323,16 +323,25 @@ show_help(std::string_view program_name, const std::vector<Flag *> &flags)
   static constexpr usize MAX_WIDTH = 24;
   static constexpr usize LONG_PADDING = 6;
 
-  s += "Usage:\n";
+  s += "SYNOPSIS\n";
+
   s += "  ";
   s += program_name;
-  s += " [-options]";
-  s += " [file1, ...]\n";
-  s += "  ";
-  s += "Command-line interpreter or shell.";
-  s += "\n\n";
+  s += ' ';
+  s += "[-OPTIONS] [--] <file1> [file2, ...]\n";
 
-  s += "Options:";
+  s += "  ";
+  s += program_name;
+  s += ' ';
+  s += "[-OPTIONS] -\n";
+
+  s += "  ";
+  s += program_name;
+  s += ' ';
+  s += "[-OPTIONS]\n";
+
+  s += '\n';
+  s += "OPTIONS";
   for (const shit::Flag *f : flags) {
     s += "\n";
 
