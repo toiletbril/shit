@@ -1,12 +1,12 @@
 #include "Utils.hpp"
 
+#include "Builtin.hpp"
 #include "Cli.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Toiletline.hpp"
 
-#include <array>
 #include <csignal>
 #include <cstdarg>
 #include <cstdlib>
@@ -14,7 +14,6 @@
 #include <filesystem>
 #include <iostream>
 #include <optional>
-#include <set>
 
 /* TODO: Support background processes. */
 /* TODO: Support setting environment variables. */
@@ -95,52 +94,12 @@ reset_signal_handlers()
   sigprocmask(SIG_UNBLOCK, &sm, nullptr);
 }
 
-static std::unordered_map<pid_t, std::tuple<int, int>> PIPE_CONSUMER_FDS{};
-
-static void
-close_consumer_stdin(int s, siginfo_t *info, void *context)
-{
-  SHIT_UNUSED(context);
-  SHIT_ASSERT(s == SIGCHLD);
-
-  auto [si, so] = PIPE_CONSUMER_FDS[info->si_pid];
-
-  if (si != -1)
-    call_checked(close(si));
-  if (so != -1)
-    call_checked(close(so));
-
-  PIPE_CONSUMER_FDS.erase(info->si_pid);
-}
-
 void
 set_default_signal_handlers()
 {
   /* Ignore bullshit. */
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   sigprocmask(SIG_BLOCK, &sm, nullptr);
-}
-
-static void
-set_pipe_handlers()
-{
-  /* Close pipe for the consumers when their producer exits. */
-  struct sigaction sa = {};
-  sa.sa_flags = SA_SIGINFO;
-  sa.sa_mask = make_sigset(SIGCHLD);
-  sa.sa_sigaction = close_consumer_stdin;
-
-  sigaction(SIGCHLD, &sa, NULL);
-}
-
-static void
-reset_pipe_handlers()
-{
-  struct sigaction sa = {};
-  sa.sa_mask = make_sigset(SIGCHLD);
-  sa.sa_handler = SIG_DFL;
-
-  sigaction(SIGCHLD, &sa, NULL);
 }
 
 std::string
@@ -154,6 +113,42 @@ get_environment_variable(const std::string &key)
 {
   const char *e = std::getenv(key.c_str());
   return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
+}
+
+ExecContext
+make_exec_context(const std::string              &program,
+                  const std::vector<std::string> &args, usize location)
+{
+  std::variant<shit::Builtin::Kind, std::filesystem::path> exec_kind;
+
+  std::optional<Builtin::Kind>         bk;
+  std::optional<std::filesystem::path> p;
+
+  /* This isn't a path? */
+  if (program.find('/') == std::string::npos) {
+    bk = search_builtin(program);
+
+    if (!bk) {
+      /* Not a builtin, try to search PATH. */
+      p = utils::search_program_path(program);
+    }
+  } else {
+    /* This is a path. */
+    /* TODO: Sanitize extensions here too. */
+    p = utils::canonicalize_path(program);
+  }
+
+  /* Builtins take precedence over programs. */
+  if (!bk) {
+    if (p)
+      exec_kind = *p;
+    else
+      throw ErrorWithLocation{location, "Program '" + program + "' not found"};
+  } else {
+    exec_kind = *bk;
+  }
+
+  return {exec_kind, program, args, location};
 }
 
 static std::vector<const char *>
@@ -225,85 +220,137 @@ wait_for_process(pid_t pid)
 }
 
 [[noreturn]] static void
-do_exec(const ExecContext &ec)
+execute_program(const ExecContext &ec)
 {
-  std::vector<const char *> os_args = create_os_args(ec.m_program, ec.m_args);
+  std::vector<const char *> os_args = create_os_args(ec.program, ec.args);
 
   /* Cleanse the corruption of the holy child from evil signal spirits. */
   reset_signal_handlers();
 
-  if (execv(ec.m_path.c_str(), const_cast<char *const *>(os_args.data())) == -1)
+  /* TODO: If execv() failed, try to execute the path as a shell script. */
+  if (execv(std::get<std::filesystem::path>(ec.kind).c_str(),
+            const_cast<char *const *>(os_args.data())) == -1)
   {
-    throw shit::Error{last_system_error_message()};
+    throw shit::ErrorWithLocation{ec.location, last_system_error_message()};
   }
 
   SHIT_UNREACHABLE();
 }
 
 i32
-execute_program(const ExecContext &&ec)
+execute_context(const ExecContext &&ec)
 {
-  pid_t child_pid = call_checked(fork());
+  i32 ret = -1;
 
-  if (child_pid == 0) {
-    do_exec(ec);
+  if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
+    pid_t child_pid = call_checked(fork());
+
+    if (child_pid == 0) {
+      /* Child. */
+      if (ec.in) {
+        call_checked(dup2(*ec.in, STDIN_FILENO));
+        call_checked(close(*ec.in));
+      }
+      if (ec.out) {
+        call_checked(dup2(*ec.out, STDOUT_FILENO));
+        call_checked(close(*ec.out));
+      }
+
+      execute_program(ec);
+    }
+
+    /* Parent. */
+    if (ec.in)
+      call_checked(close(*ec.in));
+    if (ec.out)
+      call_checked(close(*ec.out));
+
+    ret = wait_for_process(child_pid);
+  } else {
+    ret = execute_builtin(ec);
+
+    if (ec.in)
+      call_checked(close(*ec.in));
+    if (ec.out)
+      call_checked(close(*ec.out));
   }
 
-  return wait_for_process(child_pid);
+  return ret;
 }
 
 i32
-execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
+execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
 {
   SHIT_ASSERT(ecs.size() > 1);
 
+  i32   ret = -1;
   i32   last_stdin = -1;
   pid_t last_pid = -1;
 
-  bool is_first_producer = true;
+  bool is_first = true;
 
-  /* Close pipe ends on SIGCHLD. */
-  set_pipe_handlers();
-
-  for (const ExecContext &ec : ecs) {
+  for (ExecContext &ec : ecs) {
     i32 pipefds[2] = {-1, -1};
 
-    bool is_last_consumer = &ec == &ecs.back();
+    bool is_last = &ec == &ecs.back();
 
     /* We need N - 1 pipes for N commands. The first command uses terminal's
      * stdin and pipe's stdout. i th process will use i - 1 th pipe's stdin and
      * i-th pipe's stdout. The last process will use only i - 1 pipe's
      * stdin. */
-    if (!is_last_consumer) {
-      call_checked(pipe2(pipefds, O_CLOEXEC));
+    if (!is_last) {
+      call_checked(pipe(pipefds));
+      ec.out = pipefds[1];
     }
 
-    pid_t child_pid = call_checked(fork());
-
-    if (child_pid == 0) {
-      if (!is_first_producer) {
-        call_checked(dup2(last_stdin, STDIN_FILENO));
-      }
-
-      if (!is_last_consumer) {
-        call_checked(dup2(pipefds[1], STDOUT_FILENO));
-      }
-
-      do_exec(ec);
+    if (!is_first) {
+      ec.in = last_stdin;
     }
 
-    is_first_producer = false;
+    /* Builtin or an actual program? */
+    if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
+      pid_t child_pid = call_checked(fork());
 
-    /* Remember pipe's ends to close them when we receive SIGCHLD. */
-    PIPE_CONSUMER_FDS[child_pid] = {pipefds[0], pipefds[1]};
+      /* TODO: Make call_checked() not leak fds on error. */
+      if (child_pid == 0) {
+        /* Child. Close reading end, dup2() previous reading end and a new
+         * writing end to ourselves. */
+        if (!is_last) {
+          call_checked(close(pipefds[0]));
+        }
 
+        if (ec.in) {
+          call_checked(dup2(*ec.in, STDIN_FILENO));
+          call_checked(close(*ec.in));
+        }
+        if (ec.out) {
+          call_checked(dup2(*ec.out, STDOUT_FILENO));
+          call_checked(close(*ec.out));
+        }
+
+        execute_program(ec);
+      }
+
+      last_pid = child_pid;
+    } else {
+      /* Builtin. Everything is done in a single process, so just close the new
+       * reading end. */
+      /* TODO: Broken pipe. */
+      ret = execute_builtin(ec);
+    }
+
+    /* Parent. Close the writing end and the last reading end. There shoudn't be
+     * any loose ends remaining. When the child exits, pipes will be deleted. */
+    if (!is_last)
+      call_checked(close(pipefds[1]));
+    if (!is_first)
+      call_checked(close(last_stdin));
+
+    is_first = false;
     last_stdin = pipefds[0];
-    last_pid = child_pid;
   }
 
-  i32 ret = wait_for_process(last_pid);
-
-  reset_pipe_handlers();
+  ret = (last_pid != -1) ? wait_for_process(last_pid) : ret;
 
   return ret;
 }
@@ -449,7 +496,7 @@ execute_program(const ExecContext &&ec)
 }
 
 i32
-execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs)
+execute_contexts_with_pipes(const std::vector<ExecContext> &ecs)
 {
   SHIT_UNUSED(ecs);
   /* TODO: */
@@ -756,13 +803,13 @@ search_program_path(const std::string &program_name)
 {
   std::string sp{program_name};
 
-  bool s = sanitize_program_name(sp);
+  usize s_ext = sanitize_program_name(sp);
 
   if (auto p = PATH_CACHE.find(sp); p != PATH_CACHE.end()) {
     auto [dir, ext] = p->second;
     std::filesystem::path try_path = PATH_CACHE_DIRS[dir];
 
-    if (s) {
+    if (s_ext > 0) {
       try_path /= program_name;
     } else {
       std::filesystem::path file_name = p->first + '.';

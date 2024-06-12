@@ -1,6 +1,5 @@
 #include "Builtin.hpp"
 
-#include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -8,9 +7,12 @@
 #include "Utils.hpp"
 
 #include <filesystem>
-#include <iostream>
+#include <optional>
 #include <string>
 #include <unordered_map>
+
+/* TODO: Try this on Windows */
+#include <unistd.h>
 
 namespace shit {
 
@@ -20,44 +22,66 @@ static const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"cd",   Builtin::Kind::Cd  },
 };
 
-Builtin::Kind
+std::optional<Builtin::Kind>
 search_builtin(std::string_view builtin_name)
 {
   std::string lower_builtin_name;
-  for (const uchar c : builtin_name)
+  for (char c : builtin_name) {
     lower_builtin_name += std::tolower(c);
+  }
 
   if (auto b = BUILTINS.find(lower_builtin_name.c_str()); b != BUILTINS.end()) {
     return b->second;
   }
 
-  return Builtin::Kind::Invalid;
+  return std::nullopt;
 }
 
 i32
-execute_builtin(Builtin::Kind kind, const std::vector<std::string> &args)
+execute_builtin(const utils::ExecContext &ec)
 {
-  SHIT_ASSERT(kind != Builtin::Kind::Invalid);
+  Builtin::Kind kind = std::get<Builtin::Kind>(ec.kind);
 
-  std::unique_ptr<Builtin> b{};
+  std::unique_ptr<Builtin> b;
 
   switch (kind) {
     /* clang-format off */
-  case Builtin::Kind::Echo: return Echo{}.execute(args); break;
-  case Builtin::Kind::Cd:   return Cd{}.execute(args); break;
-  case Builtin::Kind::Exit: return Exit{}.execute(args); break;
+  case Builtin::Kind::Echo: b.reset(new Echo); break;
+  case Builtin::Kind::Cd:   b.reset(new Cd); break;
+  case Builtin::Kind::Exit: b.reset(new Exit); break;
     /* clang-format on */
 
   default: break;
   }
 
-  SHIT_UNREACHABLE("Unhandled builtin of type %d", E(kind));
+  if (ec.out)
+    b->set_stdout(ec.out.value());
+  if (ec.in)
+    b->set_stdin(ec.in.value());
+
+  try {
+    return b->execute(utils::simple_shell_expand_args(ec.args));
+  } catch (Error &err) {
+    throw ErrorWithLocation{ec.location, err.message()};
+  }
 }
 
 /**
  * class: Builtin
  */
 Builtin::Builtin() = default;
+
+void
+Builtin::set_stdin(int fd)
+{
+  in_fd = fd;
+}
+
+void
+Builtin::set_stdout(int fd)
+{
+  out_fd = fd;
+}
 
 /**
  * class: Echo
@@ -83,7 +107,8 @@ Echo::execute(const std::vector<std::string> &args) const
     }
   }
 
-  std::cout << buf << std::endl;
+  write(out_fd, buf.data(), buf.size());
+  write(out_fd, "\n", 1);
 
   return 0;
 }

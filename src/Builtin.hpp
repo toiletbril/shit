@@ -2,6 +2,7 @@
 
 #include "Common.hpp"
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -11,11 +12,13 @@ struct Builtin
 {
   enum class Kind : uint8_t
   {
-    Invalid,
     Echo,
     Cd,
     Exit,
   };
+
+  void set_stdin(int fd);
+  void set_stdout(int fd);
 
   virtual Kind kind() const = 0;
   virtual i32  execute(const std::vector<std::string> &args) const = 0;
@@ -24,6 +27,9 @@ struct Builtin
 
 protected:
   Builtin();
+
+  i32 in_fd{0};
+  i32 out_fd{1};
 };
 
 struct Echo : public Builtin
@@ -50,8 +56,12 @@ struct Exit : public Builtin
   [[noreturn]] i32 execute(const std::vector<std::string> &args) const override;
 };
 
-Builtin::Kind search_builtin(std::string_view builtin_name);
+std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
 
-i32 execute_builtin(Builtin::Kind kind, const std::vector<std::string> &args);
+namespace utils {
+struct ExecContext;
+}
+
+i32 execute_builtin(const utils::ExecContext &ec);
 
 } /* namespace shit */

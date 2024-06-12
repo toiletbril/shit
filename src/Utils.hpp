@@ -1,9 +1,13 @@
+#pragma once
+
+#include "Builtin.hpp"
 #include "Common.hpp"
-#include "string"
-#include "vector"
 
 #include <filesystem>
 #include <optional>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace shit {
 
@@ -15,14 +19,24 @@ std::string last_system_error_message();
  * non-altered first arg. */
 struct ExecContext
 {
-  const std::filesystem::path    m_path;
-  const std::string              m_program;
-  const std::vector<std::string> m_args;
+  std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
+
+  std::string              program;
+  std::vector<std::string> args;
+  usize                    location;
+
+  /* TODO: I'll probably die implementing this on Windows. */
+  std::optional<i32> in{std::nullopt};
+  std::optional<i32> out{std::nullopt};
 };
 
-i32 execute_program(const ExecContext &&ec);
+ExecContext make_exec_context(const std::string              &program,
+                              const std::vector<std::string> &args,
+                              usize                           location);
 
-i32 execute_program_sequence_with_pipes(const std::vector<ExecContext> &ecs);
+i32 execute_context(const ExecContext &&ec);
+
+i32 execute_contexts_with_pipes(std::vector<ExecContext> &ecs);
 
 std::optional<std::string> get_environment_variable(const std::string &key);
 

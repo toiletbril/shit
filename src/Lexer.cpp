@@ -87,7 +87,7 @@ is_string_quote(char ch)
 bool
 is_ascii_char(char ch)
 {
-  return (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122);
+  return (ch >= 'A' && ch <= 'A') || (ch >= 'a' && ch <= 'z');
 }
 
 } /* namespace lexer */
@@ -146,9 +146,9 @@ Lexer::source() const
 void
 Lexer::skip_whitespace()
 {
-  while (m_cursor_position < m_source.length()) {
-    if (!lexer::is_whitespace(m_source[m_cursor_position]))
-      return;
+  while (m_cursor_position < m_source.length() &&
+         lexer::is_whitespace(m_source[m_cursor_position]))
+  {
     m_cursor_position++;
   }
 }
@@ -161,15 +161,15 @@ Lexer::lex_expression_token()
   if (m_cursor_position < m_source.length()) {
     char ch = m_source[m_cursor_position];
 
-    if (lexer::is_number(ch))
+    if (lexer::is_number(ch)) {
       return chop_number(token_start);
-    else if (lexer::is_expression_sentinel(ch))
+    } else if (lexer::is_expression_sentinel(ch)) {
       return chop_sentinel(token_start);
-    else if (lexer::is_string_quote(ch))
+    } else if (lexer::is_string_quote(ch)) {
       return chop_string(token_start + 1, ch);
-    else if (lexer::is_ascii_char(ch))
+    } else if (lexer::is_ascii_char(ch)) {
       return chop_identifier(token_start);
-    else {
+    } else {
       std::string s;
       s += "Unexpected character";
       throw ErrorWithLocation{token_start, s};
@@ -185,7 +185,9 @@ Lexer::chop_number(usize token_start)
   usize token_end = token_start;
 
   while (token_end < m_source.length() && lexer::is_number(m_source[token_end]))
+  {
     token_end++;
+  }
 
   Token *num = new TokenNumber{
       token_start, m_source.substr(token_start, token_end - token_start)};
@@ -201,14 +203,17 @@ Lexer::chop_identifier(usize token_start)
 
   while (token_end < m_source.length() &&
          lexer::is_part_of_identifier(m_source[token_end]))
+  {
     token_end++;
+  }
 
   std::string ident_string =
       m_source.substr(token_start, token_end - token_start);
 
   std::string lower_ident_string;
-  for (const char c : ident_string)
+  for (const char c : ident_string) {
     lower_ident_string += std::tolower(c);
+  }
 
   Token *t{};
 
@@ -238,13 +243,13 @@ Lexer::lex_shell_token()
   if (m_cursor_position < m_source.length()) {
     char ch = m_source[m_cursor_position];
 
-    if (lexer::is_string_quote(ch))
+    if (lexer::is_string_quote(ch)) {
       return chop_string(token_start + 1, ch);
-    else if (lexer::is_shell_sentinel(ch))
+    } else if (lexer::is_shell_sentinel(ch)) {
       return chop_sentinel(token_start);
-    else if (lexer::is_part_of_identifier(ch))
+    } else if (lexer::is_part_of_identifier(ch)) {
       return chop_identifier(token_start);
-    else {
+    } else {
       std::string s;
       s += "Unexpected character";
       throw ErrorWithLocation{token_start, s};
@@ -261,6 +266,7 @@ Lexer::chop_string(usize token_start, char quote_char)
 
   while (m_source[token_end] != quote_char) {
     token_end++;
+
     if (token_end >= m_source.length()) {
       throw ErrorWithLocationAndDetails{
           token_start - 1, "Unterminated string literal", token_end,

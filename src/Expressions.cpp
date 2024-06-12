@@ -140,40 +140,8 @@ Exec::args() const
 i64
 Exec::evaluate() const
 {
-  std::optional<std::filesystem::path> program_path;
-
-  /* This isn't a path? */
-  if (m_program.find('/') == std::string::npos) {
-    Builtin::Kind bk = search_builtin(m_program);
-
-    /* Is this a builtin? */
-    if (bk != Builtin::Kind::Invalid) {
-      try {
-        return execute_builtin(bk, utils::simple_shell_expand_args(m_args));
-      } catch (Error &err) {
-        throw ErrorWithLocation{location(), err.message()};
-      }
-    }
-
-    /* Not a builtin, try to search PATH. */
-    program_path = utils::search_program_path(m_program);
-  } else {
-    /* This is a path. */
-    /* TODO: Sanitize extensions here too. */
-    program_path = utils::canonicalize_path(m_program);
-  }
-
-  if (!program_path) {
-    throw ErrorWithLocation{location(),
-                            "Program '" + m_program + "' not found"};
-  }
-
-  try {
-    return utils::execute_program({program_path.value(), m_program,
-                                   utils::simple_shell_expand_args(m_args)});
-  } catch (Error &err) {
-    throw ErrorWithLocation{location(), err.message()};
-  }
+  return utils::execute_context(
+      utils::make_exec_context(m_program, m_args, location()));
 
   SHIT_UNREACHABLE();
 }
@@ -382,33 +350,14 @@ ExecPipeSequence::evaluate() const
   SHIT_ASSERT(m_commands.size() > 1);
 
   std::vector<utils::ExecContext> ecs;
+  ecs.reserve(m_commands.size());
 
   for (const Exec *e : m_commands) {
-    std::optional<std::filesystem::path> program_path = e->program();
-
-    /* TODO: Support builtins for pipes. */
-    if (e->program().find('/') == std::string::npos) {
-      program_path = utils::search_program_path(e->program());
-    } else {
-      /* TODO: Sanitize extensions here too. */
-      program_path = utils::canonicalize_path(e->program());
-    }
-
-    if (!program_path) {
-      throw ErrorWithLocation{e->location(), "Command not found"};
-    }
-
-    ecs.push_back({*program_path, e->program(),
-                   utils::simple_shell_expand_args(e->args())});
+    ecs.emplace_back(
+        utils::make_exec_context(e->program(), e->args(), e->location()));
   }
 
-  try {
-    return utils::execute_program_sequence_with_pipes(ecs);
-  } catch (Error &err) {
-    throw ErrorWithLocation{location(), err.message()};
-  }
-
-  SHIT_UNREACHABLE();
+  return utils::execute_contexts_with_pipes(ecs);
 }
 
 /**
