@@ -222,18 +222,6 @@ static std::optional<std::string> MAYBE_PATH =
 
 template <class T>
 static usize
-find_pos_in_vec(const std::vector<T> &v, const T &p)
-{
-  for (usize i = 0; i < v.size(); i++) {
-    if (v[i] == p) {
-      return i;
-    }
-  }
-  return std::string::npos;
-}
-
-template <class T>
-static usize
 cache_path_into(std::vector<T> &cache, T &&p)
 {
   usize n = find_pos_in_vec(cache, p);

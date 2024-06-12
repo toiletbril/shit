@@ -24,12 +24,10 @@ struct Pipe
 
 std::optional<Pipe> make_pipe();
 
-OsArgs
-make_os_args(const std::string &program, const std::vector<std::string> &args);
+OsArgs make_os_args(const std::string              &program,
+                    const std::vector<std::string> &args);
 
-
-std::string
-last_system_error_message();
+std::string last_system_error_message();
 
 i32 wait_and_monitor_process(process p);
 

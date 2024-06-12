@@ -28,6 +28,18 @@ struct ExecContext
   std::optional<os::descriptor> out{std::nullopt};
 };
 
+template <class T>
+usize
+find_pos_in_vec(const std::vector<T> &v, const T &p)
+{
+  for (usize i = 0; i < v.size(); i++) {
+    if (v[i] == p) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
+
 ExecContext make_exec_context(const std::string              &program,
                               const std::vector<std::string> &args,
                               usize                           location);

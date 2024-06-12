@@ -26,7 +26,7 @@
 
 #define OS_IS(os) (SHIT_SUPPORT_VECTOR & os)
 
-#include <vector>
+#include <string>
 
 namespace shit {
 

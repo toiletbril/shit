@@ -4,10 +4,10 @@
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
+#include "Os.hpp"
 #include "Parser.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
-#include "Os.hpp"
 
 #include <cstdlib>
 #include <fstream>

@@ -32,7 +32,7 @@ close_fd(os::descriptor fd)
 {
   return close(fd) != -1;
 }
-#elif
+#elif OS_IS(WIN32)
 usize
 write_fd(os::descriptor fd, void *buf, u8 size)
 {
@@ -150,7 +150,7 @@ sanitize_program_name(std::string &program_name)
     {
       std::string extension = program_name.substr(extension_pos);
 
-      if (usize i = find_pos_in_vec(OMITTED_SUFFIXES, extension);
+      if (usize i = utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
           i != std::string::npos)
       {
         program_name.erase(program_name.begin() + extension_pos,
@@ -222,9 +222,9 @@ execute_program(const utils::ExecContext &ec)
 }
 #elif OS_IS(WIN32)
 process
-execute_program(const ExecContext &ec1)
+execute_program(const utils::ExecContext &ec1)
 {
-  ExecContext ec = ec1;
+  utils::ExecContext ec = ec1;
 
   std::string program_path = std::get<std::filesystem::path>(ec.kind).string();
   std::string command_line = make_os_args(ec.program, ec.args);
@@ -236,8 +236,9 @@ execute_program(const ExecContext &ec1)
 
   BOOL should_use_pipe = ec.in || ec.out;
 
-  if (should_use_pipe)
+  if (should_use_pipe) {
     startup_info.dwFlags |= STARTF_USESTDHANDLES;
+  }
 
   startup_info.hStdInput = (ec.in) ? *ec.in : SHIT_STDIN;
   startup_info.hStdOutput = (ec.out) ? *ec.out : SHIT_STDOUT;
@@ -293,6 +294,7 @@ make_pipe()
     goto fail;
   }
 
+#if 0
   if (SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) == 0) {
     goto fail;
   }
@@ -300,6 +302,7 @@ make_pipe()
   if (SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0) == 0) {
     goto fail;
   }
+#endif
 
   /* Unused handle. */
   os::close_fd(stdin_read);
