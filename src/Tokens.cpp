@@ -11,8 +11,6 @@ namespace shit {
  */
 Token::Token(usize location) : m_location(location) {}
 
-Token::~Token() = default;
-
 usize
 Token::location() const
 {

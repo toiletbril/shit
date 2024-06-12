@@ -9,12 +9,18 @@ namespace shit {
 
 struct Expression
 {
-  Expression();
+  Expression() = default;
   Expression(usize location);
 
-  virtual ~Expression();
+  virtual ~Expression() = default;
 
   virtual usize location() const;
+
+  /* Each expression should provide it's own way to copy it. */
+  Expression(const Expression &) = delete;
+  Expression(Expression &&) noexcept = delete;
+  Expression &operator=(const Expression &) = delete;
+  Expression &operator=(Expression &&) noexcept = delete;
 
   virtual i64         evaluate() const = 0;
   virtual std::string to_string() const = 0;

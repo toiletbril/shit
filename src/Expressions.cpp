@@ -12,11 +12,7 @@ static constexpr const char *EXPRESSION_AST_INDENT = " ";
 /**
  * class: Expression
  */
-Expression::Expression() = default;
-
 Expression::Expression(usize location) : m_location(location) {}
-
-Expression::~Expression() = default;
 
 usize
 Expression::location() const
@@ -925,7 +921,7 @@ Xor::evaluate() const
 }
 
 /**
- * class: Equality
+ * class: Equal
  */
 Equal::Equal(usize location, const Expression *lhs, const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)

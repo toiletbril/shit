@@ -75,7 +75,13 @@ struct Token
     /* clang-format on */
   };
 
-  virtual ~Token();
+  virtual ~Token() = default;
+
+  /* Each token should provide it's own way to copy it. */
+  Token(const Token &) = delete;
+  Token(Token &&) noexcept = delete;
+  Token &operator=(const Token &) = delete;
+  Token &operator=(Token &&) noexcept = delete;
 
   virtual Kind        kind() const = 0;
   virtual Flags       flags() const = 0;
