@@ -124,7 +124,7 @@ make_pipe()
     return std::nullopt;
   }
 
-  return Pipe{p[1], SHIT_INVALID_FD, p[1], p[0]};
+  return Pipe{p[0], p[1]};
 }
 
 i32
@@ -355,16 +355,10 @@ make_pipe()
   att.bInheritHandle = TRUE;
   att.lpSecurityDescriptor = NULL;
 
-  HANDLE stdout_read = INVALID_HANDLE_VALUE;
-  HANDLE stdout_write = INVALID_HANDLE_VALUE;
-  HANDLE stdin_read = INVALID_HANDLE_VALUE;
-  HANDLE stdin_write = INVALID_HANDLE_VALUE;
+  HANDLE in = INVALID_HANDLE_VALUE;
+  HANDLE out = INVALID_HANDLE_VALUE;
 
-  if (CreatePipe(&stdout_read, &stdout_write, &att, 0) == 0) {
-    goto fail;
-  }
-
-  if (CreatePipe(&stdin_read, &stdin_write, &att, 0) == 0) {
+  if (CreatePipe(&in, &out, &att, 0) == 0) {
     goto fail;
   }
 
@@ -373,27 +367,15 @@ make_pipe()
   if (SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) == 0) {
     goto fail;
   }
-
-  if (SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0) == 0) {
-    goto fail;
-  }
 #endif
 
-  /* Unused handle. */
-  os::close_fd(stdin_read);
-
-  return Pipe{stdin_write, SHIT_INVALID_FD, stdout_write, stdout_read};
+  return Pipe{in, out};
 
 fail:
-  if (stdout_read != INVALID_HANDLE_VALUE)
-    close_fd(stdout_read);
-  if (stdout_write != INVALID_HANDLE_VALUE)
-    close_fd(stdout_write);
-
-  if (stdin_read != INVALID_HANDLE_VALUE)
-    close_fd(stdin_read);
-  if (stdin_write != INVALID_HANDLE_VALUE)
-    close_fd(stdin_write);
+  if (in != INVALID_HANDLE_VALUE)
+    close_fd(in);
+  if (out != INVALID_HANDLE_VALUE)
+    close_fd(out);
 
   return std::nullopt;
 }

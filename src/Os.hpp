@@ -16,10 +16,8 @@ namespace os {
 
 struct Pipe
 {
-  descriptor stdin_write{SHIT_INVALID_FD};
-  descriptor stdin_read{SHIT_INVALID_FD};
-  descriptor stdout_write{SHIT_INVALID_FD};
-  descriptor stdout_read{SHIT_INVALID_FD};
+  descriptor in{SHIT_INVALID_FD};
+  descriptor out{SHIT_INVALID_FD};
 };
 
 std::optional<Pipe> make_pipe();

@@ -57,7 +57,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
       if (!pipe) {
         throw ErrorWithLocation{ec.location, "Could not open a pipe"};
       }
-      ec.out = pipe->stdout_write;
+      ec.out = pipe->out;
     }
 
     if (!is_first) {
@@ -75,11 +75,8 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
         os::close_fd(*ec.out);
     }
 
-    /* Unused handle. */
-    os::close_fd(pipe->stdin_read);
-
     is_first = false;
-    last_stdin = pipe->stdout_read;
+    last_stdin = pipe->in;
   }
 
   if (last_child != SHIT_INVALID_FD) {
