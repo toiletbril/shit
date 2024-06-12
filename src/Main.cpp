@@ -178,10 +178,9 @@ main(int argc, char **argv)
 
     /* Execute the contents. */
     try {
-      std::unique_ptr<shit::Parser> p =
-          std::make_unique<shit::Parser>(new shit::Lexer{contents});
+      shit::Parser p{shit::Lexer{contents}};
 
-      std::unique_ptr<shit::Expression> ast = p->construct_ast();
+      std::unique_ptr<shit::Expression> ast = p.construct_ast();
       if (FLAG_DUMP_AST.enabled())
         std::cout << ast->to_ast_string() << std::endl;
 

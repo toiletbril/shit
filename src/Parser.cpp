@@ -22,8 +22,9 @@ get_sequence_kind(Token::Kind tk)
   }
 }
 
-Parser::Parser(Lexer *lexer) : m_lexer(lexer) {}
-Parser::~Parser() { delete m_lexer; }
+Parser::Parser(Lexer &&lexer) : m_lexer(lexer) {}
+
+Parser::~Parser() = default;
 
 /* Greedy parser for shell commands. Generates a Sequence of Exec and PipeExec
  * expressions. */
@@ -45,7 +46,7 @@ Parser::construct_ast()
     }
 
     /* Operator right after. */
-    std::unique_ptr<Token> token{m_lexer->peek_shell_token()};
+    std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
     switch (token->kind()) {
     case Token::Kind::DoublePipe:
@@ -60,7 +61,7 @@ Parser::construct_ast()
       /* fallthrough */
     case Token::Kind::EndOfFile:
     case Token::Kind::Semicolon: {
-      m_lexer->advance_past_last_peek();
+      m_lexer.advance_past_last_peek();
 
       if (lhs) {
         SequenceNode *sn =
@@ -91,7 +92,7 @@ Parser::construct_ast()
                                       "Expected a command before the pipe"};
       }
 
-      m_lexer->advance_past_last_peek();
+      m_lexer.advance_past_last_peek();
 
       /* Don't prematurely release() the pointer, since we can still error out
        * before constructing the expression. */
@@ -106,10 +107,10 @@ Parser::construct_ast()
 
         if (rhs) {
           pipe_group.emplace_back(rhs.release());
-          last_pipe_token.reset(m_lexer->peek_shell_token());
+          last_pipe_token.reset(m_lexer.peek_shell_token());
 
           if (last_pipe_token->kind() == Token::Kind::Pipe) {
-            m_lexer->advance_past_last_peek();
+            m_lexer.advance_past_last_peek();
             continue;
           }
         } else {
@@ -148,12 +149,12 @@ Parser::parse_shell_command()
   std::vector<std::string> args_accumulator{};
 
   for (;;) {
-    std::unique_ptr<Token> token{m_lexer->peek_shell_token()};
+    std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
     switch (token->kind()) {
     case Token::Kind::Identifier:
     case Token::Kind::String:
-      m_lexer->advance_past_last_peek();
+      m_lexer.advance_past_last_peek();
       if (!program_token) {
         program_token = std::move(token);
       } else {
@@ -181,7 +182,7 @@ Parser::parse_expression(u8 min_precedence)
   m_recursion_depth++;
   SHIT_DEFER { m_recursion_depth--; };
 
-  std::unique_ptr<Token> t{m_lexer->next_expression_token()};
+  std::unique_ptr<Token> t{m_lexer.next_expression_token()};
 
   if (m_recursion_depth > MAX_RECURSION_DEPTH) {
     throw ErrorWithLocation{t->location(),
@@ -213,9 +214,9 @@ Parser::parse_expression(u8 min_precedence)
     std::unique_ptr<Expression> condition = parse_expression();
 
     /* [;] then */
-    std::unique_ptr<Token> after{m_lexer->next_expression_token()};
+    std::unique_ptr<Token> after{m_lexer.next_expression_token()};
     if (after->kind() == Token::Kind::Semicolon) {
-      after.reset(m_lexer->next_expression_token());
+      after.reset(m_lexer.next_expression_token());
     }
     if (after->kind() != Token::Kind::Then) {
       throw ErrorWithLocation{after->location(),
@@ -227,17 +228,17 @@ Parser::parse_expression(u8 min_precedence)
     std::unique_ptr<Expression> then{parse_expression()};
 
     std::unique_ptr<Expression> otherwise{};
-    after.reset(m_lexer->next_expression_token());
+    after.reset(m_lexer.next_expression_token());
 
     /* [else [then]] */
     if (after->kind() == Token::Kind::Else) {
-      after.reset(m_lexer->peek_expression_token());
+      after.reset(m_lexer.peek_expression_token());
       if (after->kind() == Token::Kind::Then)
-        m_lexer->advance_past_last_peek();
+        m_lexer.advance_past_last_peek();
 
       otherwise = parse_expression();
 
-      after.reset(m_lexer->next_expression_token());
+      after.reset(m_lexer.next_expression_token());
     }
 
     /* fi */
@@ -266,7 +267,7 @@ Parser::parse_expression(u8 min_precedence)
     m_parentheses_depth--;
 
     /* Do we have a corresponding closing parenthesis? */
-    std::unique_ptr<Token> rp{m_lexer->next_expression_token()};
+    std::unique_ptr<Token> rp{m_lexer.next_expression_token()};
     if (rp->kind() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
           t->location(), "Unterminated parenthesis", rp->location(),
@@ -296,7 +297,7 @@ Parser::parse_expression(u8 min_precedence)
    * in a loop with the same precedence, or break, if found operator has
    * higher precedence. */
   for (;;) {
-    std::unique_ptr<Token> maybe_op{m_lexer->peek_expression_token()};
+    std::unique_ptr<Token> maybe_op{m_lexer.peek_expression_token()};
 
     /* Check for tokens that terminate the parser. */
     switch (maybe_op->kind()) {
@@ -343,7 +344,7 @@ Parser::parse_expression(u8 min_precedence)
         static_cast<const TokenOperator *>(maybe_op.get());
     if (op->left_precedence() < min_precedence)
       break;
-    m_lexer->advance_past_last_peek();
+    m_lexer.advance_past_last_peek();
 
     std::unique_ptr<Expression> rhs = parse_expression(
         op->left_precedence() + (op->binary_left_associative() ? 1 : -1));

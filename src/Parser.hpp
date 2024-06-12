@@ -7,7 +7,7 @@ namespace shit {
 
 struct Parser
 {
-  Parser(Lexer *lexer);
+  Parser(Lexer &&lexer);
   ~Parser();
 
   std::unique_ptr<Expression> construct_ast();
@@ -15,7 +15,7 @@ struct Parser
 private:
   static constexpr usize MAX_RECURSION_DEPTH = 64;
 
-  Lexer *m_lexer;
+  Lexer m_lexer;
 
   usize m_recursion_depth{0};
   usize m_if_condition_depth{0};
