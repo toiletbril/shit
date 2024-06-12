@@ -1,16 +1,16 @@
-#include "Os.hpp"
+#include "Platform.hpp"
 
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
-#include "OsCommon.hpp"
 
 #include <csignal>
 #include <cstdarg>
 #include <cstring>
 #include <iostream>
+#include <optional>
 
-#if OS_IS(POSIX)
+#if PLATFORM_IS(POSIX)
 
 namespace shit {
 
@@ -61,7 +61,7 @@ is_child_process()
 
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
-#if !OS_IS(COSMO)
+#if !PLATFORM_IS(COSMO)
 const std::vector<std::string> OMITTED_SUFFIXES = {""};
 
 usize
@@ -81,12 +81,12 @@ get_environment_variable(const std::string &key)
 }
 
 process
-execute_program(const utils::ExecContext &ec)
+execute_program(utils::ExecContext &ec)
 {
   pid_t child_pid = fork();
 
   if (child_pid == 0) {
-    std::vector<const char *> os_args = make_os_args(ec.program, ec.args);
+    std::vector<const char *> os_args = make_os_args(ec.program(), ec.args());
 
     if (ec.in) {
       dup2(*ec.in, STDIN_FILENO);
@@ -100,10 +100,10 @@ execute_program(const utils::ExecContext &ec)
     reset_signal_handlers();
 
     /* TODO: If execv() failed, try to execute the path as a shell script. */
-    if (execv(std::get<std::filesystem::path>(ec.kind).c_str(),
+    if (execv(ec.program_path().c_str(),
               const_cast<char *const *>(os_args.data())) == -1)
     {
-      throw shit::ErrorWithLocation{ec.location, last_system_error_message()};
+      throw shit::ErrorWithLocation{ec.location(), last_system_error_message()};
     }
   }
 
@@ -176,7 +176,7 @@ wait_and_monitor_process(process pid)
   SHIT_UNREACHABLE();
 }
 
-OsArgs
+os_args
 make_os_args(const std::string &program, const std::vector<std::string> &args)
 {
   std::vector<const char *> os_args;
@@ -240,7 +240,7 @@ set_default_signal_handlers()
 
 } /* namespace shit */
 
-#elif OS_IS(WIN32)
+#elif PLATFORM_IS(WIN32)
 
 namespace shit {
 
@@ -310,10 +310,8 @@ get_environment_variable(const std::string &key)
 }
 
 process
-execute_program(const utils::ExecContext &ec1)
+execute_program(utils::ExecContext &ec)
 {
-  utils::ExecContext ec = ec1;
-
   std::string program_path = std::get<std::filesystem::path>(ec.kind).string();
   std::string command_line = make_os_args(ec.program, ec.args);
 
@@ -380,52 +378,6 @@ fail:
   return std::nullopt;
 }
 
-} /* namespace os */
-
-} /* namespace shit */
-
-#endif /* OS_IS(WIN32) */
-
-#if OS_IS(COSMO) || OS_IS(WIN32)
-
-namespace shit {
-
-namespace os {
-
-const std::vector<std::string> OMITTED_SUFFIXES = {
-    /* First extension entry should be empty. */
-    "", ".exe", ".com", ".scr", ".bat",
-};
-
-constexpr static usize MIN_SUFFIX_LEN = 3;
-
-usize
-sanitize_program_name(std::string &program_name)
-{
-#if OS_IS(COSMO)
-  if (IsWindows())
-#endif
-  {
-    usize extension_pos = program_name.rfind(".");
-
-    if (extension_pos != std::string::npos &&
-        extension_pos + MIN_SUFFIX_LEN < program_name.length())
-    {
-      std::string extension = program_name.substr(extension_pos);
-
-      if (usize i = utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
-          i != std::string::npos)
-      {
-        program_name.erase(program_name.begin() + extension_pos,
-                           program_name.end());
-        return i;
-      }
-    }
-  }
-
-  return 0;
-}
-
 i32
 wait_and_monitor_process(process p)
 {
@@ -441,7 +393,7 @@ wait_and_monitor_process(process p)
   return code;
 }
 
-OsArgs
+os_args
 make_os_args(const std::string &program, const std::vector<std::string> &args)
 {
   std::string s;
@@ -516,4 +468,50 @@ reset_signal_handlers()
 
 } /* namespace shit */
 
-#endif /* OS_IS(COSMO) || OS_IS(WIN32) */
+#endif /* PLATFORM_IS(WIN32) */
+
+#if PLATFORM_IS(COSMO) || PLATFORM_IS(WIN32)
+
+namespace shit {
+
+namespace os {
+
+const std::vector<std::string> OMITTED_SUFFIXES = {
+    /* First extension entry should be empty. */
+    "", ".exe", ".com", ".scr", ".bat",
+};
+
+constexpr static usize MIN_SUFFIX_LEN = 3;
+
+usize
+sanitize_program_name(std::string &program_name)
+{
+#if PLATFORM_IS(COSMO)
+  if (IsWindows())
+#endif
+  {
+    usize extension_pos = program_name.rfind(".");
+
+    if (extension_pos != std::string::npos &&
+        extension_pos + MIN_SUFFIX_LEN < program_name.length())
+    {
+      std::string extension = program_name.substr(extension_pos);
+
+      if (usize i = utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
+          i != std::string::npos)
+      {
+        program_name.erase(program_name.begin() + extension_pos,
+                           program_name.end());
+        return i;
+      }
+    }
+  }
+
+  return 0;
+}
+
+} /* namespace os */
+
+} /* namespace shit */
+
+#endif /* PLATFORM_IS(COSMO) || PLATFORM_IS(WIN32) */

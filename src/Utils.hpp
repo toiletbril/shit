@@ -2,6 +2,7 @@
 
 #include "Builtin.hpp"
 #include "Common.hpp"
+#include "Errors.hpp"
 #include "Os.hpp"
 
 #include <filesystem>
@@ -18,14 +19,32 @@ namespace utils {
  * non-altered first arg. */
 struct ExecContext
 {
-  std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
-
-  std::string              program;
-  std::vector<std::string> args;
-  usize                    location;
+  static ExecContext make(const std::string              &program,
+                          const std::vector<std::string> &args, usize location);
 
   std::optional<os::descriptor> in{std::nullopt};
   std::optional<os::descriptor> out{std::nullopt};
+
+  usize                           location() const;
+  const std::string              &program() const;
+  const std::vector<std::string> &args() const;
+
+  bool                         is_builtin() const;
+  const std::filesystem::path &program_path() const;
+  const Builtin::Kind         &builtin_kind() const;
+
+private:
+  /* clang-format off */
+  ExecContext(usize location, const std::string &program,
+              const std::vector<std::string> &args,
+              std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind);
+  /* clang-format on */
+
+  usize                    m_location;
+  std::string              m_program;
+  std::vector<std::string> m_args;
+
+  std::variant<shit::Builtin::Kind, std::filesystem::path> m_kind;
 };
 
 template <class T>
@@ -40,13 +59,9 @@ find_pos_in_vec(const std::vector<T> &v, const T &p)
   return std::string::npos;
 }
 
-ExecContext make_exec_context(const std::string              &program,
-                              const std::vector<std::string> &args,
-                              usize                           location);
+i32 execute_context(ExecContext &&ec);
 
-i32 execute_context(const ExecContext &&ec);
-
-i32 execute_contexts_with_pipes(std::vector<ExecContext> &ecs);
+i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs);
 
 std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
 

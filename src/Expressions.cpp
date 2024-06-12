@@ -141,7 +141,7 @@ i64
 Exec::evaluate() const
 {
   return utils::execute_context(
-      utils::make_exec_context(m_program, m_args, location()));
+      utils::ExecContext::make(m_program, m_args, location()));
 
   SHIT_UNREACHABLE();
 }
@@ -354,10 +354,10 @@ ExecPipeSequence::evaluate() const
 
   for (const Exec *e : m_commands) {
     ecs.emplace_back(
-        utils::make_exec_context(e->program(), e->args(), e->location()));
+        utils::ExecContext::make(e->program(), e->args(), e->location()));
   }
 
-  return utils::execute_contexts_with_pipes(ecs);
+  return utils::execute_contexts_with_pipes(std::move(ecs));
 }
 
 /**

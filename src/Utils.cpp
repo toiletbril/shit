@@ -5,6 +5,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
+#include "Platform.hpp"
 #include "Toiletline.hpp"
 
 #include <csignal>
@@ -12,7 +13,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <iostream>
 #include <optional>
 #include <variant>
 
@@ -23,10 +23,61 @@ namespace shit {
 
 namespace utils {
 
-i32
-execute_context(const ExecContext &&ec)
+ExecContext::ExecContext(
+    usize location, const std::string &program,
+    const std::vector<std::string>                            &args,
+    std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind)
+    : m_location(location), m_program(program), m_args(args), m_kind(kind)
+{}
+
+usize
+ExecContext::location() const
 {
-  if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
+  return m_location;
+}
+
+const std::string &
+ExecContext::program() const
+{
+  return m_program;
+}
+
+const std::vector<std::string> &
+ExecContext::args() const
+{
+  return m_args;
+}
+
+bool
+ExecContext::is_builtin() const
+{
+  return std::holds_alternative<shit::Builtin::Kind>(m_kind);
+}
+
+const std::filesystem::path &
+ExecContext::program_path() const
+{
+  if (!is_builtin()) {
+    return std::get<std::filesystem::path>(m_kind);
+  }
+
+  throw shit::Error{"program_path() call on a builtin"};
+}
+
+const Builtin::Kind &
+ExecContext::builtin_kind() const
+{
+  if (is_builtin()) {
+    return std::get<shit::Builtin::Kind>(m_kind);
+  }
+
+  throw shit::Error{"builtin_kind() call on a program"};
+}
+
+i32
+execute_context(ExecContext &&ec)
+{
+  if (!ec.is_builtin()) {
     return os::wait_and_monitor_process(os::execute_program(ec));
   } else {
     return execute_builtin(ec);
@@ -36,7 +87,7 @@ execute_context(const ExecContext &&ec)
 }
 
 i32
-execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
+execute_contexts_with_pipes(std::vector<ExecContext> &&ecs)
 {
   SHIT_ASSERT(ecs.size() > 1);
 
@@ -55,7 +106,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
     if (!is_last) {
       pipe = os::make_pipe();
       if (!pipe) {
-        throw ErrorWithLocation{ec.location, "Could not open a pipe"};
+        throw ErrorWithLocation{ec.location(), "Could not open a pipe"};
       }
       ec.out = pipe->out;
     }
@@ -64,7 +115,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
       ec.in = last_stdin;
     }
 
-    if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
+    if (!ec.is_builtin()) {
       last_child = os::execute_program(ec);
     } else {
       ret = execute_builtin(ec);
@@ -87,10 +138,10 @@ execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
 }
 
 ExecContext
-make_exec_context(const std::string              &program,
+ExecContext::make(const std::string              &program,
                   const std::vector<std::string> &args, usize location)
 {
-  std::variant<shit::Builtin::Kind, std::filesystem::path> exec_kind;
+  std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
 
   std::optional<Builtin::Kind>         bk;
   std::optional<std::filesystem::path> p;
@@ -112,14 +163,14 @@ make_exec_context(const std::string              &program,
   /* Builtins take precedence over programs. */
   if (!bk) {
     if (p)
-      exec_kind = *p;
+      kind = *p;
     else
       throw ErrorWithLocation{location, "Program '" + program + "' not found"};
   } else {
-    exec_kind = *bk;
+    kind = *bk;
   }
 
-  return {exec_kind, program, args, location};
+  return {location, program, args, std::move(kind)};
 }
 
 std::optional<std::string>

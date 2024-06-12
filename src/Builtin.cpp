@@ -1,8 +1,8 @@
 #include "Builtin.hpp"
 
-#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Os.hpp"
+#include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 
@@ -44,11 +44,9 @@ search_builtin(std::string_view builtin_name)
 i32
 execute_builtin(const utils::ExecContext &ec)
 {
-  Builtin::Kind kind = std::get<Builtin::Kind>(ec.kind);
-
   std::unique_ptr<Builtin> b;
 
-  switch (kind) {
+  switch (ec.builtin_kind()) {
     /* clang-format off */
   case Builtin::Kind::Echo: b.reset(new Echo); break;
   case Builtin::Kind::Cd:   b.reset(new Cd); break;
@@ -61,9 +59,9 @@ execute_builtin(const utils::ExecContext &ec)
   b->set_fds(ec.in.value_or(SHIT_STDIN), ec.out.value_or(SHIT_STDOUT));
 
   try {
-    return b->execute(utils::simple_shell_expand_args(ec.args));
+    return b->execute(utils::simple_shell_expand_args(ec.args()));
   } catch (Error &err) {
-    throw ErrorWithLocation{ec.location, err.message()};
+    throw ErrorWithLocation{ec.location(), err.message()};
   }
 }
 
