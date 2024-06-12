@@ -11,8 +11,12 @@
 #include <string>
 #include <unordered_map>
 
-/* TODO: Try this on Windows */
+#if !defined _WIN32
 #include <unistd.h>
+#else
+#include <io.h>
+#define write _write
+#endif
 
 namespace shit {
 

@@ -115,42 +115,6 @@ get_environment_variable(const std::string &key)
   return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
 }
 
-ExecContext
-make_exec_context(const std::string              &program,
-                  const std::vector<std::string> &args, usize location)
-{
-  std::variant<shit::Builtin::Kind, std::filesystem::path> exec_kind;
-
-  std::optional<Builtin::Kind>         bk;
-  std::optional<std::filesystem::path> p;
-
-  /* This isn't a path? */
-  if (program.find('/') == std::string::npos) {
-    bk = search_builtin(program);
-
-    if (!bk) {
-      /* Not a builtin, try to search PATH. */
-      p = utils::search_program_path(program);
-    }
-  } else {
-    /* This is a path. */
-    /* TODO: Sanitize extensions here too. */
-    p = utils::canonicalize_path(program);
-  }
-
-  /* Builtins take precedence over programs. */
-  if (!bk) {
-    if (p)
-      exec_kind = *p;
-    else
-      throw ErrorWithLocation{location, "Program '" + program + "' not found"};
-  } else {
-    exec_kind = *bk;
-  }
-
-  return {exec_kind, program, args, location};
-}
-
 static std::vector<const char *>
 create_os_args(const std::string &program, const std::vector<std::string> &args)
 {
@@ -455,52 +419,65 @@ get_environment_variable(const std::string &key)
 }
 
 i32
-execute_program(const ExecContext &&ec)
+execute_context(const ExecContext &&ec)
 {
-  std::string command_line;
+  i32 ret = -1;
 
-  /* TODO: Remove CVE and escape quotes. */
-  command_line += '"';
-  command_line += ec.m_program;
-  command_line += '"';
+  if (std::holds_alternative<std::filesystem::path>(ec.kind)) {
+    std::string command_line;
 
-  if (ec.m_args.size() > 0) {
-    for (usize i = 0; i < ec.m_args.size(); i++) {
-      command_line += ' ';
-      command_line += '"' + ec.m_args[i] + '"';
+    /* TODO: Remove CVE and escape quotes. */
+    command_line += '"';
+    command_line += ec.program;
+    command_line += '"';
+
+    if (ec.args.size() > 0) {
+      for (usize i = 0; i < ec.args.size(); i++) {
+        command_line += ' ';
+        command_line += '"' + ec.args[i] + '"';
+      }
     }
+
+    PROCESS_INFORMATION pi{};
+    STARTUPINFOA        si{.cb = sizeof(si)};
+
+    if (CreateProcessA(
+            std::get<std::filesystem::path>(ec.kind).string().c_str(),
+            command_line.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr,
+            &si, &pi) == 0)
+    {
+      throw Error{last_system_error_message()};
+    }
+
+    if (WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
+      throw Error{"WaitForSingleObject() failed: " +
+                  last_system_error_message()};
+    }
+
+    DWORD code;
+    if (GetExitCodeProcess(pi.hProcess, &code) == 0) {
+      throw Error{"GetExitCodeProcess() failed: " +
+                  last_system_error_message()};
+    }
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    ret = code;
+  } else {
+    ret = execute_builtin(ec);
   }
 
-  PROCESS_INFORMATION pi{};
-  STARTUPINFOA        si{.cb = sizeof(si)};
-
-  if (CreateProcessA(ec.m_path.string().c_str(), command_line.data(), nullptr,
-                     nullptr, FALSE, 0, nullptr, nullptr, &si, &pi) == 0)
-  {
-    throw Error{last_system_error_message()};
-  }
-
-  if (WaitForSingleObject(pi.hProcess, INFINITE) != WAIT_OBJECT_0) {
-    throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
-  }
-
-  DWORD code = 1;
-  if (GetExitCodeProcess(pi.hProcess, &code) == 0) {
-    throw Error{"GetExitCodeProcess() failed: " + last_system_error_message()};
-  }
-
-  CloseHandle(pi.hProcess);
-  CloseHandle(pi.hThread);
-
-  return code;
+  return ret;
 }
 
+/* TODO: */
 i32
-execute_contexts_with_pipes(const std::vector<ExecContext> &ecs)
+execute_contexts_with_pipes(std::vector<ExecContext> &ecs)
 {
   SHIT_UNUSED(ecs);
-  /* TODO: */
-  throw shit::Error{"Not implemented (Utils)"};
+  throw shit::ErrorWithLocation{ecs[1].location,
+                                "Pipes are not implemented (Utils)"};
 }
 
 bool
@@ -533,6 +510,42 @@ get_home_directory()
 #endif /* _WIN32 */
 
 #if defined _WIN32 || defined __COSMOPOLITAN__
+
+ExecContext
+make_exec_context(const std::string              &program,
+                  const std::vector<std::string> &args, usize location)
+{
+  std::variant<shit::Builtin::Kind, std::filesystem::path> exec_kind;
+
+  std::optional<Builtin::Kind>         bk;
+  std::optional<std::filesystem::path> p;
+
+  /* This isn't a path? */
+  if (program.find('/') == std::string::npos) {
+    bk = search_builtin(program);
+
+    if (!bk) {
+      /* Not a builtin, try to search PATH. */
+      p = utils::search_program_path(program);
+    }
+  } else {
+    /* This is a path. */
+    /* TODO: Sanitize extensions here too. */
+    p = utils::canonicalize_path(program);
+  }
+
+  /* Builtins take precedence over programs. */
+  if (!bk) {
+    if (p)
+      exec_kind = *p;
+    else
+      throw ErrorWithLocation{location, "Program '" + program + "' not found"};
+  } else {
+    exec_kind = *bk;
+  }
+
+  return {exec_kind, program, args, location};
+}
 
 const static std::vector<std::string> OMITTED_SUFFIXES = {
     /* First extension entry should be empty. */
