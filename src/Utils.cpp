@@ -64,6 +64,15 @@ ExecContext::program_path() const
   throw shit::Error{"program_path() call on a builtin"};
 }
 
+void
+ExecContext::close_fds()
+{
+  if (in)
+    os::close_fd(*in);
+  if (out)
+    os::close_fd(*out);
+}
+
 const Builtin::Kind &
 ExecContext::builtin_kind() const
 {
@@ -78,9 +87,9 @@ i32
 execute_context(ExecContext &&ec)
 {
   if (!ec.is_builtin()) {
-    return os::wait_and_monitor_process(os::execute_program(ec));
+    return os::wait_and_monitor_process(os::execute_program(std::move(ec)));
   } else {
-    return execute_builtin(ec);
+    return execute_builtin(std::move(ec));
   }
 
   SHIT_UNREACHABLE();
@@ -116,14 +125,9 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs)
     }
 
     if (!ec.is_builtin()) {
-      last_child = os::execute_program(ec);
+      last_child = os::execute_program(std::move(ec));
     } else {
-      ret = execute_builtin(ec);
-
-      if (ec.in)
-        os::close_fd(*ec.in);
-      if (ec.out)
-        os::close_fd(*ec.out);
+      ret = execute_builtin(std::move(ec));
     }
 
     is_first = false;

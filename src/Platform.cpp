@@ -81,7 +81,7 @@ get_environment_variable(const std::string &key)
 }
 
 process
-execute_program(utils::ExecContext &ec)
+execute_program(utils::ExecContext &&ec)
 {
   pid_t child_pid = fork();
 
@@ -107,10 +107,7 @@ execute_program(utils::ExecContext &ec)
     }
   }
 
-  if (ec.in)
-    close(*ec.in);
-  if (ec.out)
-    close(*ec.out);
+  ec.close_fds();
 
   return child_pid;
 }
@@ -310,7 +307,7 @@ get_environment_variable(const std::string &key)
 }
 
 process
-execute_program(utils::ExecContext &ec)
+execute_program(utils::ExecContext &&ec)
 {
   std::string program_path = ec.program_path().string();
   std::string command_line = make_os_args(ec.program(), ec.args());

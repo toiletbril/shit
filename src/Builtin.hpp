@@ -62,6 +62,6 @@ namespace utils {
 struct ExecContext;
 }
 
-i32 execute_builtin(const utils::ExecContext &ec);
+i32 execute_builtin(utils::ExecContext &&ec);
 
 } /* namespace shit */

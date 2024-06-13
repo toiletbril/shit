@@ -34,7 +34,7 @@ usize write_fd(os::descriptor fd, void *buf, u8 size);
 
 usize read_fd(os::descriptor fd, void *buf, u8 size);
 
-bool close_fd(os::descriptor);
+bool close_fd(os::descriptor fd);
 
 std::optional<std::string> get_environment_variable(const std::string &key);
 
@@ -50,7 +50,7 @@ void set_default_signal_handlers();
 
 void reset_signal_handlers();
 
-process execute_program(utils::ExecContext &ec);
+process execute_program(utils::ExecContext &&ec);
 
 } /* namespace os */
 

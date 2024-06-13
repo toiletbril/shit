@@ -5,6 +5,7 @@
 #include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
+#include "Debug.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -42,7 +43,7 @@ search_builtin(std::string_view builtin_name)
 }
 
 i32
-execute_builtin(const utils::ExecContext &ec)
+execute_builtin(utils::ExecContext &&ec)
 {
   std::unique_ptr<Builtin> b;
 
@@ -53,13 +54,17 @@ execute_builtin(const utils::ExecContext &ec)
   case Builtin::Kind::Exit: b.reset(new Exit); break;
     /* clang-format on */
 
-  default: break;
+  default:
+    SHIT_UNREACHABLE("Unhandled builtin of kind %d", E(ec.builtin_kind()));
   }
 
   b->set_fds(ec.in.value_or(SHIT_STDIN), ec.out.value_or(SHIT_STDOUT));
 
   try {
-    return b->execute(utils::simple_shell_expand_args(ec.args()));
+    /* Close FDs as child processes do. */
+    i32 ret = b->execute(utils::simple_shell_expand_args(ec.args()));
+    ec.close_fds();
+    return ret;
   } catch (Error &err) {
     throw ErrorWithLocation{ec.location(), err.message()};
   }

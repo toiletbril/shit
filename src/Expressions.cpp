@@ -52,10 +52,11 @@ If::~If()
 i64
 If::evaluate() const
 {
-  if (m_condition->evaluate())
+  if (m_condition->evaluate()) {
     return m_then->evaluate();
-  else if (m_otherwise != nullptr)
+  } else if (m_otherwise != nullptr) {
     return m_otherwise->evaluate();
+  }
 
   return 0;
 }

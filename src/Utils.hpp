@@ -29,6 +29,7 @@ struct ExecContext
   const std::string              &program() const;
   const std::vector<std::string> &args() const;
 
+  void                         close_fds();
   bool                         is_builtin() const;
   const std::filesystem::path &program_path() const;
   const Builtin::Kind         &builtin_kind() const;
