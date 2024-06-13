@@ -60,9 +60,11 @@ struct FlagString : public Flag
              const std::string &description);
 
   void             set(std::string_view v);
+  bool             was_set() const;
   std::string_view contents() const;
 
 private:
+  bool        m_was_set{false};
   std::string m_value{};
 };
 

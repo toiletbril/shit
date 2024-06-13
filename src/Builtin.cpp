@@ -1,11 +1,11 @@
 #include "Builtin.hpp"
 
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Os.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
-#include "Debug.hpp"
 
 #include <filesystem>
 #include <optional>

@@ -75,7 +75,7 @@ main(int argc, char **argv)
     /* Figure out what to do and retrieve the code. */
     try {
       /* If we weren't given any arguments or -c=..., fire up the toiletline. */
-      if (file_names.empty() && FLAG_COMMAND.contents().empty()) {
+      if (file_names.empty() && !FLAG_COMMAND.was_set()) {
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();
           toiletline::initialize();
@@ -126,7 +126,7 @@ main(int argc, char **argv)
         }
 
         toiletline::exit_raw_mode();
-      } else if (!FLAG_COMMAND.contents().empty()) {
+      } else if (FLAG_COMMAND.was_set()) {
         /* Were we given -c flag? */
         contents = FLAG_COMMAND.contents();
         should_quit = true;

@@ -76,6 +76,13 @@ void
 FlagString::set(std::string_view v)
 {
   m_value = v;
+  m_was_set = true;
+}
+
+bool
+FlagString::was_set() const
+{
+  return m_was_set;
 }
 
 std::string_view
