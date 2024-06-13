@@ -177,6 +177,7 @@ ExecContext::make(const std::string              &program,
   return {location, program, simple_shell_expand_args(args), std::move(kind)};
 }
 
+/* TODO: Don't shell expand strings. */
 std::optional<std::string>
 simple_shell_expand(const std::string &path)
 {
@@ -189,6 +190,7 @@ simple_shell_expand(const std::string &path)
       break;
     }
 
+    /* TODO: There may be several separators supported. */
     if (expanded_path.length() > pos + 1 &&
         expanded_path[pos + 1] != std::filesystem::path::preferred_separator)
     {
