@@ -174,7 +174,7 @@ ExecContext::make(const std::string              &program,
     kind = *bk;
   }
 
-  return {location, program, args, std::move(kind)};
+  return {location, program, simple_shell_expand_args(args), std::move(kind)};
 }
 
 std::optional<std::string>

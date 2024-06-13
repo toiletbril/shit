@@ -62,7 +62,7 @@ execute_builtin(utils::ExecContext &&ec)
 
   try {
     /* Close FDs as child processes do. */
-    i32 ret = b->execute(utils::simple_shell_expand_args(ec.args()));
+    i32 ret = b->execute(ec.args());
     ec.close_fds();
     return ret;
   } catch (Error &err) {
