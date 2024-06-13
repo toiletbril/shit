@@ -13,7 +13,7 @@ There will be more information soon™ (when I feel like it).
 
 You need a C++17 compatible compiler (but currently only Clang is supported for
 Windows), GNU Make, `rm`, `mkdir` to build the executable; `diff` to run tests;
-`clang-format` (better 17 or newer) to format code.
+`clang-format` (better 18 or newer) to format code.
 
 The `MODE` variable controls build type:
 * `rel` is the optimized build;

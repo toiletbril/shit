@@ -312,8 +312,8 @@ get_environment_variable(const std::string &key)
 process
 execute_program(utils::ExecContext &ec)
 {
-  std::string program_path = std::get<std::filesystem::path>(ec.kind).string();
-  std::string command_line = make_os_args(ec.program, ec.args);
+  std::string program_path = ec.program_path().string();
+  std::string command_line = make_os_args(ec.program(), ec.args());
 
   PROCESS_INFORMATION process_info{};
   STARTUPINFOA        startup_info{};
@@ -333,7 +333,7 @@ execute_program(utils::ExecContext &ec)
                      nullptr, should_use_pipe, 0, nullptr, nullptr,
                      &startup_info, &process_info) == 0)
   {
-    throw ErrorWithLocation{ec.location, last_system_error_message()};
+    throw ErrorWithLocation{ec.location(), last_system_error_message()};
   }
 
   if (ec.in)
