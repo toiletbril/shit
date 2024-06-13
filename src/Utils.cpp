@@ -225,13 +225,21 @@ canonicalize_path(const std::string &path)
 void
 set_current_directory(const std::filesystem::path &path)
 {
-  std::filesystem::current_path(path);
+  try {
+    std::filesystem::current_path(path);
+  } catch (std::filesystem::filesystem_error &err) {
+    throw shit::Error{os::last_system_error_message()};
+  }
 }
 
 std::filesystem::path
 get_current_directory()
 {
-  return std::filesystem::current_path();
+  try {
+    return std::filesystem::current_path();
+  } catch (std::filesystem::filesystem_error &err) {
+    throw shit::Error{os::last_system_error_message()};
+  }
 }
 
 [[noreturn]] void
