@@ -9,7 +9,10 @@ from scratch, so use it at your own risk.
 
 There will be more information soon™ (when I feel like it).
 
-## Building
+## Development
+
+`staging` is the development branch. It may be broken at any time. `master` is
+more stable and should usually pass all tests.
 
 You need a C++17 compatible compiler (but currently only Clang is supported for
 Windows), GNU Make, `rm`, `mkdir` to build the executable; `diff` to run tests;
@@ -27,9 +30,6 @@ $ export MODE=rel/dbg/cosmo
 $ make -j14
 $ ./shit --help
 ```
-
-Don't expect the tests to fully pass on Windows yet, since this project is
-mainly developed by me on Linux :3
 
 ## ...
 
