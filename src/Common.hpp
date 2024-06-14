@@ -1,5 +1,19 @@
 #pragma once
 
+/* Timestamp the build. */
+
+#if !defined SHIT_COMMIT_HASH
+#define SHIT_COMMIT_HASH "<unknown commit>"
+#endif
+
+#if !defined SHIT_BUILD_MODE
+#define SHIT_BUILD_MODE "<unset mode>"
+#endif
+
+#define SHIT_BUILD_DATE (__DATE__ " at " __TIME__)
+
+/* Constants for --help and --version. */
+
 #define SHIT_VER_MAJOR 0
 #define SHIT_VER_MINOR 0
 #define SHIT_VER_PATCH 3
@@ -13,7 +27,7 @@
 #include <cstdint>
 #include <cstdlib>
 
-/* Crablang types */
+/* Crablang types. */
 
 using u8 = uint8_t;
 using u16 = uint16_t;

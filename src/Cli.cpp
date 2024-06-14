@@ -308,18 +308,22 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 void
 show_version()
 {
-  std::cout
-      << "Shit Shell " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
-      << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
-      << "(c) toiletbril <https://github.com/toiletbril>\n\n" SHIT_SHORT_LICENSE
-      << std::endl;
+  std::cout << "Shit Shell " << SHIT_VER_MAJOR << "." << SHIT_VER_MINOR << '.'
+            << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
+            << "Built on " << SHIT_BUILD_DATE << '\n'
+            << "MODE=" << SHIT_BUILD_MODE << ' ' << SHIT_COMMIT_HASH << '\n'
+            << '\n'
+            << SHIT_SHORT_LICENSE << '\n'
+            << "(c) toiletbril "
+               "<https://github.com/toiletbril>"
+            << std::endl;
 }
 
 void
 show_short_version()
 {
   std::cout << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.' << SHIT_VER_PATCH
-            << std::endl;
+            << '-' << SHIT_VER_EXTRA << std::endl;
 }
 
 void

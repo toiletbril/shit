@@ -21,7 +21,7 @@ FLAG(DUMP_AST, Bool, 'A', "dump-ast",
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
-FLAG(VERSION, Bool, 'v', "version", "Display program version and notices.");
+FLAG(VERSION, Bool, 'V', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, '\0', "short-version",
      "Display version in a short form.");
 

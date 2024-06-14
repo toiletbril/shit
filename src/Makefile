@@ -17,13 +17,20 @@ else ifeq ($(OS), Windows_NT)
 CXX := clang++
 endif
 
+COMMIT_HASH := $(shell git rev-parse HEAD)
+
+DEFINES := \
+	-DSHIT_COMMIT_HASH=\"$(COMMIT_HASH)\" \
+	-DSHIT_BUILD_MODE=\"$(MODE)\"
+
 CXXFLAGS := \
 	-Wall \
 	-Wextra \
 	-Wdouble-promotion \
 	-Wno-format \
 	-Werror \
-	-std=c++17
+	-std=c++17 \
+	$(DEFINES)
 
 ifeq ($(MODE), rel)
 CXXFLAGS += \
