@@ -281,27 +281,35 @@ Lexer::chop_string(usize token_start, char quote_char)
   return str;
 }
 
+/* Only single-character operators are defined here. Further parsing is done in
+ * related routines. */
 static const std::unordered_map<uchar, Token::Kind> OPERATORS = {
     /* Sentinels */
-    {')', Token::Kind::RightParen     },
-    {'(', Token::Kind::LeftParen      },
-    {';', Token::Kind::Semicolon      },
-    {'.', Token::Kind::Dot            },
+    {')', Token::Kind::RightParen        },
+    {'(', Token::Kind::LeftParen         },
+    {']', Token::Kind::RightSquareBracket},
+    {'[', Token::Kind::LeftSquareBracket },
+    {'}', Token::Kind::RightBracket      },
+    {'{', Token::Kind::LeftBracket       },
+
+    {';', Token::Kind::Semicolon         },
+    {'.', Token::Kind::Dot               },
+    {'$', Token::Kind::Dollar            },
 
     /* Operators */
-    {'+', Token::Kind::Plus           },
-    {'-', Token::Kind::Minus          },
-    {'*', Token::Kind::Asterisk       },
-    {'/', Token::Kind::Slash          },
-    {'%', Token::Kind::Percent        },
-    {'~', Token::Kind::Tilde          },
-    {'^', Token::Kind::Cap            },
-    {'!', Token::Kind::ExclamationMark},
-    {'&', Token::Kind::Ampersand      },
-    {'>', Token::Kind::Greater        },
-    {'<', Token::Kind::Less           },
-    {'|', Token::Kind::Pipe           },
-    {'=', Token::Kind::Equals         },
+    {'+', Token::Kind::Plus              },
+    {'-', Token::Kind::Minus             },
+    {'*', Token::Kind::Asterisk          },
+    {'/', Token::Kind::Slash             },
+    {'%', Token::Kind::Percent           },
+    {'~', Token::Kind::Tilde             },
+    {'^', Token::Kind::Cap               },
+    {'!', Token::Kind::ExclamationMark   },
+    {'&', Token::Kind::Ampersand         },
+    {'>', Token::Kind::Greater           },
+    {'<', Token::Kind::Less              },
+    {'|', Token::Kind::Pipe              },
+    {'=', Token::Kind::Equals            },
 };
 
 Token *
@@ -315,19 +323,41 @@ Lexer::chop_sentinel(usize token_start)
   if (auto op = OPERATORS.find(ch); op != OPERATORS.end()) {
     switch (op->second) {
       /* clang-format off */
-    case Token::Kind::RightParen: t = new TokenRightParen{token_start}; break;
-    case Token::Kind::LeftParen:  t = new TokenLeftParen{token_start}; break;
-    case Token::Kind::Semicolon:  t = new TokenSemicolon{token_start}; break;
-    case Token::Kind::Dot:        t = new TokenDot{token_start}; break;
+    case Token::Kind::RightParen:   t = new TokenRightParen{token_start}; break;
+    case Token::Kind::LeftParen:    t = new TokenLeftParen{token_start}; break;
+    case Token::Kind::RightBracket: t = new TokenRightBracket{token_start}; break;
+    case Token::Kind::LeftBracket:  t = new TokenLeftBracket{token_start}; break;
 
-    case Token::Kind::Plus:       t = new TokenPlus{token_start}; break;
-    case Token::Kind::Minus:      t = new TokenMinus{token_start}; break;
-    case Token::Kind::Asterisk:   t = new TokenAsterisk{token_start}; break;
-    case Token::Kind::Slash:      t = new TokenSlash{token_start}; break;
-    case Token::Kind::Percent:    t = new TokenPercent{token_start}; break;
-    case Token::Kind::Tilde:      t = new TokenTilde{token_start}; break;
-    case Token::Kind::Cap:        t = new TokenCap{token_start}; break;
+    case Token::Kind::Semicolon:    t = new TokenSemicolon{token_start}; break;
+    case Token::Kind::Dot:          t = new TokenDot{token_start}; break;
+    case Token::Kind::Dollar:       t = new TokenDollar{token_start}; break;
+
+    case Token::Kind::Plus:         t = new TokenPlus{token_start}; break;
+    case Token::Kind::Minus:        t = new TokenMinus{token_start}; break;
+    case Token::Kind::Asterisk:     t = new TokenAsterisk{token_start}; break;
+    case Token::Kind::Slash:        t = new TokenSlash{token_start}; break;
+    case Token::Kind::Percent:      t = new TokenPercent{token_start}; break;
+    case Token::Kind::Tilde:        t = new TokenTilde{token_start}; break;
+    case Token::Kind::Cap:          t = new TokenCap{token_start}; break;
       /* clang-format on */
+
+    case Token::Kind::RightSquareBracket: {
+      if (token_end < m_source.length() && m_source[token_end] == ']') {
+        t = new TokenDoubleRightSquareBracket{token_start};
+        token_end++;
+      } else {
+        t = new TokenRightSquareBracket{token_start};
+      }
+    } break;
+
+    case Token::Kind::LeftSquareBracket: {
+      if (token_end < m_source.length() && m_source[token_end] == '[') {
+        t = new TokenDoubleLeftSquareBracket{token_start};
+        token_end++;
+      } else {
+        t = new TokenLeftSquareBracket{token_start};
+      }
+    } break;
 
     case Token::Kind::ExclamationMark: {
       if (token_end < m_source.length() && m_source[token_end] == '=') {

@@ -185,6 +185,29 @@ TokenDot::value() const
 }
 
 /**
+ * class: TokenDollar
+ */
+TokenDollar::TokenDollar(usize location) : Token(location) {}
+
+Token::Kind
+TokenDollar::kind() const
+{
+  return Token::Kind::Dollar;
+}
+
+Token::Flags
+TokenDollar::flags() const
+{
+  return Token::Flag::Sentinel;
+}
+
+std::string
+TokenDollar::value() const
+{
+  return "$";
+}
+
+/**
  * class: TokenValue
  */
 TokenValue::TokenValue(usize location, std::string_view sv)
@@ -540,6 +563,151 @@ TokenRightParen::value() const
 
 Token::Flags
 TokenRightParen::flags() const
+{
+  return Token::Flag::Value;
+}
+
+/**
+ * class: TokenLeftSquareBracket
+ */
+TokenLeftSquareBracket::TokenLeftSquareBracket(usize location) : Token(location)
+{}
+
+Token::Kind
+TokenLeftSquareBracket::kind() const
+{
+  return Token::Kind::LeftSquareBracket;
+}
+
+std::string
+TokenLeftSquareBracket::value() const
+{
+  return "[";
+}
+
+Token::Flags
+TokenLeftSquareBracket::flags() const
+{
+  return Token::Flag::Value;
+}
+
+/**
+ * class: TokenRightSquareBracket
+ */
+TokenRightSquareBracket::TokenRightSquareBracket(usize location)
+    : Token(location)
+{}
+
+Token::Kind
+TokenRightSquareBracket::kind() const
+{
+  return Token::Kind::RightSquareBracket;
+}
+
+std::string
+TokenRightSquareBracket::value() const
+{
+  return "]";
+}
+
+Token::Flags
+TokenRightSquareBracket::flags() const
+{
+  return Token::Flag::Value;
+}
+
+/**
+ * class: TokenDoubleLeftSquareBracket
+ */
+TokenDoubleLeftSquareBracket::TokenDoubleLeftSquareBracket(usize location)
+    : Token(location)
+{}
+
+Token::Kind
+TokenDoubleLeftSquareBracket::kind() const
+{
+  return Token::Kind::DoubleLeftSquareBracket;
+}
+
+std::string
+TokenDoubleLeftSquareBracket::value() const
+{
+  return "[[";
+}
+
+Token::Flags
+TokenDoubleLeftSquareBracket::flags() const
+{
+  return Token::Flag::Value;
+}
+
+/**
+ * class: TokenDoubleRightSquareBracket
+ */
+TokenDoubleRightSquareBracket::TokenDoubleRightSquareBracket(usize location)
+    : Token(location)
+{}
+
+Token::Kind
+TokenDoubleRightSquareBracket::kind() const
+{
+  return Token::Kind::DoubleRightSquareBracket;
+}
+
+std::string
+TokenDoubleRightSquareBracket::value() const
+{
+  return "]]";
+}
+
+Token::Flags
+TokenDoubleRightSquareBracket::flags() const
+{
+  return Token::Flag::Value;
+}
+
+/**
+ * class: TokenLeftBracket
+ */
+TokenLeftBracket::TokenLeftBracket(usize location) : Token(location) {}
+
+Token::Kind
+TokenLeftBracket::kind() const
+{
+  return Token::Kind::LeftBracket;
+}
+
+std::string
+TokenLeftBracket::value() const
+{
+  return "[";
+}
+
+Token::Flags
+TokenLeftBracket::flags() const
+{
+  return Token::Flag::Value;
+}
+
+/**
+ * class: TokenRightBracket
+ */
+TokenRightBracket::TokenRightBracket(usize location) : Token(location) {}
+
+Token::Kind
+TokenRightBracket::kind() const
+{
+  return Token::Kind::RightBracket;
+}
+
+std::string
+TokenRightBracket::value() const
+{
+  return "]";
+}
+
+Token::Flags
+TokenRightBracket::flags() const
 {
   return Token::Flag::Value;
 }

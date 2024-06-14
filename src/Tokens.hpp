@@ -20,11 +20,19 @@ struct Token
     Invalid,
 
     /* Significant symbols */
-    EndOfFile,
     RightParen,
     LeftParen,
+    LeftSquareBracket,
+    RightSquareBracket,
+    DoubleLeftSquareBracket,
+    DoubleRightSquareBracket,
+    RightBracket,
+    LeftBracket,
+
+    EndOfFile,
     Semicolon,
     Dot,
+    Dollar,
 
     /* Values */
     Number,
@@ -168,6 +176,15 @@ struct TokenDot : public Token
   std::string value() const override;
 };
 
+struct TokenDollar : public Token
+{
+  TokenDollar(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string value() const override;
+};
+
 struct TokenLeftParen : public Token
 {
   TokenLeftParen(usize location);
@@ -180,6 +197,60 @@ struct TokenLeftParen : public Token
 struct TokenRightParen : public Token
 {
   TokenRightParen(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string value() const override;
+};
+
+struct TokenLeftSquareBracket : public Token
+{
+  TokenLeftSquareBracket(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string value() const override;
+};
+
+struct TokenRightSquareBracket : public Token
+{
+  TokenRightSquareBracket(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string value() const override;
+};
+
+struct TokenDoubleLeftSquareBracket : public Token
+{
+  TokenDoubleLeftSquareBracket(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string value() const override;
+};
+
+struct TokenDoubleRightSquareBracket : public Token
+{
+  TokenDoubleRightSquareBracket(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string value() const override;
+};
+
+struct TokenRightBracket : public Token
+{
+  TokenRightBracket(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string value() const override;
+};
+
+struct TokenLeftBracket : public Token
+{
+  TokenLeftBracket(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
