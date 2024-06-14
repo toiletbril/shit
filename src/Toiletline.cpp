@@ -41,7 +41,7 @@ initialize()
         e != TL_SUCCESS)
     {
       /* Don't count non-existent history file as an error. */
-      if (e != ENOENT) {
+      if (e != -ENOENT) {
         throw shit::Error{"Toiletline: Could not load history: " +
                           shit::os::last_system_error_message()};
       }
