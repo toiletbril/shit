@@ -1,13 +1,20 @@
 # Shit
 
-Man, my shell is shit.
+Man, my shell is shit™
 
 Revolutionary command-line interpreter, or an interactive shell based on
-[toiletline](https://github.com/toiletbril/toiletline) written in C++17. This
-program was made as a late april fools joke and literally everything is written
-from scratch, so use it at your own risk.
+[toiletline](https://github.com/toiletbril/toiletline) written in C++17.
 
-There will be more information soon™ (when I feel like it).
+This software was made as a late april fools joke and literally everything is
+written from scratch. There's no guarantee that this project will come any close
+to being finished, so use it at your own risk.
+
+The goal I initially had in mind is to make a native, interactive,
+`sh`-compatible shell that can be used interchangeably on **Windows** and Linux,
+to provide a good `sh` experience on Windows without having to tolerate
+PowerShell 💩, preferrably being faster (which seems very trivial). Later goals
+were to offer basic replacements of most common coreutils commands like `mkdir`,
+`rm`, `cat` and others as shell builtins.
 
 ## Development
 
