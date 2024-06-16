@@ -170,9 +170,7 @@ Lexer::lex_expression_token()
     } else if (lexer::is_ascii_char(ch)) {
       return chop_identifier(token_start);
     } else {
-      std::string s;
-      s += "Unexpected character";
-      throw ErrorWithLocation{token_start, s};
+      throw ErrorWithLocation{token_start, "Unexpected character"};
     }
   }
 
@@ -250,9 +248,7 @@ Lexer::lex_shell_token()
     } else if (lexer::is_part_of_identifier(ch)) {
       return chop_identifier(token_start);
     } else {
-      std::string s;
-      s += "Unexpected character";
-      throw ErrorWithLocation{token_start, s};
+      throw ErrorWithLocation{token_start, "Unexpected character"};
     }
   }
 
