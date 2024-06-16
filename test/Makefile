@@ -4,10 +4,12 @@ else
 BIN := ../shit
 endif
 
+FAILED := failed.diff
+
 %: expected/%.out
 	cat input/$@.shit | \
 	$(BIN) -AE - | \
-	diff -wu $< - >> failed.diff && \
+	diff -wu $< - >> $(FAILED) && \
 	echo "	[$@		] ok." || \
 	echo "	[$@		] FAILED."
 
@@ -22,4 +24,4 @@ INPUT_FILES := $(wildcard input/*.shit)
 
 run_tests: $(INPUT_FILES:input/%.shit=%)
 
-.PHONY: test clean test_list
+.PHONY: test clean run_tests
