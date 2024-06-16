@@ -10,6 +10,8 @@
 #include <iostream>
 #include <optional>
 
+/* TODO: Error handling should not leak resources. */
+
 #if PLATFORM_IS(POSIX)
 
 namespace shit {
@@ -323,8 +325,8 @@ execute_program(utils::ExecContext &&ec)
     startup_info.dwFlags |= STARTF_USESTDHANDLES;
   }
 
-  startup_info.hStdInput = (ec.in) ? *ec.in : SHIT_STDIN;
-  startup_info.hStdOutput = (ec.out) ? *ec.out : SHIT_STDOUT;
+  startup_info.hStdInput = ec.in.value_or(SHIT_STDIN);
+  startup_info.hStdOutput = ec.out.value_or(SHIT_STDOUT);
 
   if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
                      nullptr, should_use_pipe, 0, nullptr, nullptr,
@@ -354,25 +356,15 @@ make_pipe()
   HANDLE out = INVALID_HANDLE_VALUE;
 
   if (CreatePipe(&in, &out, &att, 0) == 0) {
-    goto fail;
-  }
+    if (in != INVALID_HANDLE_VALUE)
+      close_fd(in);
+    if (out != INVALID_HANDLE_VALUE)
+      close_fd(out);
 
-  /* Microsoft docs say these calls are important, but they are not. */
-#if 0
-  if (SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0) == 0) {
-    goto fail;
+    return std::nullopt;
   }
-#endif
 
   return Pipe{in, out};
-
-fail:
-  if (in != INVALID_HANDLE_VALUE)
-    close_fd(in);
-  if (out != INVALID_HANDLE_VALUE)
-    close_fd(out);
-
-  return std::nullopt;
 }
 
 i32

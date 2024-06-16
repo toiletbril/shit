@@ -9,12 +9,13 @@ This software was made as a late april fools joke and literally everything is
 written from scratch. There's no guarantee that this project will come any close
 to being finished, so use it at your own risk.
 
-The goal I initially had in mind is to make a native, interactive,
-`sh`-compatible shell that can be used interchangeably on **Windows** and Linux,
-to provide a good `sh` experience on Windows without having to tolerate
-PowerShell 💩, preferrably being faster (which seems very trivial). Later goals
-were to offer basic replacements of most common coreutils commands like `mkdir`,
-`rm`, `cat` and others as shell builtins.
+The goal is to be a native, interactive, `sh`-compatible shell without any bells
+and whistles, that can be used interchangeably on Windows and Linux and offer a
+good `sh` experience on Windows to avoid having to tolerate PowerShell or some
+other fancy crossplatform shells, while being faster than all of them. Later
+goal is to offer basic replacements of most common coreutils commands like
+`mkdir`, `rm`, `cat` and others as shell builtins (and for the moment,
+`busybox-w32` can be used instead).
 
 ## Development
 
@@ -53,9 +54,10 @@ Is it usable?
 Is it good?
 - [ ] Background jobs.
 - [ ] Scripting capabilities. (flow control keywords)
-- [ ] Complex scripting capabilites.
+- [ ] Blocks and functions.
 
 Is is exceptional? 
+- [ ] Complex scripting capabilites.
 - [ ] Arbitrary precision numeric expressions.
 - [ ] Cross-platform replacement for most common Unix programs which Windows
       does not have.

@@ -7,6 +7,8 @@
 
 #include <string>
 
+/* Glob identifiers. */
+
 namespace shit {
 
 namespace lexer {

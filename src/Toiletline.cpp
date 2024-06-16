@@ -29,6 +29,7 @@ is_active()
   return ::itl_global_is_active;
 }
 
+/* TODO: Cosmo build's history explodes. */
 void
 initialize()
 {
