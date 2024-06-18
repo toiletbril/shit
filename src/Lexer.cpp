@@ -262,18 +262,18 @@ Lexer::chop_string(usize token_start, char quote_char)
 {
   usize token_end = token_start;
 
-  while (m_source[token_end] != quote_char) {
+  while (token_end < m_source.length() && m_source[token_end] != quote_char) {
     token_end++;
+  }
 
-    if (token_end >= m_source.length()) {
-      throw ErrorWithLocationAndDetails{
-          token_start - 1, "Unterminated string literal", token_end,
-          "Expected " + std::string{quote_char} + " here"};
-    }
+  if (token_end >= m_source.length()) {
+    throw ErrorWithLocationAndDetails{
+        token_start - 1, "Unterminated string literal", token_end,
+        "Expected " + std::string{quote_char} + " here"};
   }
 
   TokenString *str = new TokenString{
-      token_start, m_source.substr(token_start, token_end - token_start)};
+      token_start - 1, m_source.substr(token_start, token_end - token_start)};
   m_cached_offset = token_end - m_cursor_position + 1;
 
   return str;
@@ -281,7 +281,7 @@ Lexer::chop_string(usize token_start, char quote_char)
 
 /* Only single-character operators are defined here. Further parsing is done in
  * related routines. */
-static const std::unordered_map<uchar, Token::Kind> OPERATORS = {
+static const std::unordered_map<char, Token::Kind> OPERATORS = {
     /* Sentinels */
     {')', Token::Kind::RightParen        },
     {'(', Token::Kind::LeftParen         },
@@ -313,8 +313,8 @@ static const std::unordered_map<uchar, Token::Kind> OPERATORS = {
 Token *
 Lexer::chop_sentinel(usize token_start)
 {
+  char ch = m_source[token_start];
   usize token_end = token_start + 1;
-  uchar ch = static_cast<uchar>(m_source[token_start]);
 
   Token *t{};
 
@@ -422,7 +422,7 @@ Lexer::chop_sentinel(usize token_start)
   } else {
     std::string s;
     s += "Unknown operator '";
-    s += static_cast<char>(ch);
+    s += ch;
     s += "'";
     throw ErrorWithLocation{token_start, s};
   }
