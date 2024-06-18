@@ -47,7 +47,7 @@ CXXFLAGS += -fsanitize=address -fsanitize=undefined # Windows' Asan is broken
 endif
 endif
 else ifeq ($(MODE), cosmo)
-CXXFLAGS += -fexceptions
+CXXFLAGS += -fexceptions -g -O2
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
 endif
@@ -56,12 +56,12 @@ $(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "cosmo")
 endif
 
 ifeq ($(OS), Windows_NT)
-	CXXFLAGS += \
-		-Wno-unused-command-line-argument \
-		-Wno-deprecated-declarations
-	CXXFLAGS += \
-		-luserenv \
-		-ladvapi32
+CXXFLAGS += \
+	-Wno-unused-command-line-argument \
+	-Wno-deprecated-declarations
+CXXFLAGS += \
+	-luserenv \
+	-ladvapi32
 endif
 
 o/$(MODE)/%.o: %.cpp
