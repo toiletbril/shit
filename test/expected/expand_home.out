@@ -1,4 +1,0 @@
-[Sequence]
-  [SequenceNode Simple]
-    [Exec "test -d ~"]
-[Code 0]

@@ -65,12 +65,9 @@ i32 execute_context(ExecContext &&ec);
 
 i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs);
 
+std::string lowercase_string(const std::string &s);
+
 std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
-
-std::optional<std::string> simple_shell_expand(const std::string &path);
-
-std::vector<std::string>
-simple_shell_expand_args(const std::vector<std::string> &args);
 
 void initialize_path_map();
 

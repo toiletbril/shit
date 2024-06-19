@@ -4,7 +4,6 @@
 #include "Cli.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
-#include "Lexer.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
 
@@ -14,6 +13,7 @@
 #include <cstring>
 #include <filesystem>
 #include <optional>
+#include <unordered_map>
 #include <variant>
 
 /* TODO: Support background processes. */
@@ -174,44 +174,18 @@ ExecContext::make(const std::string              &program,
     kind = *bk;
   }
 
-  return {location, program, simple_shell_expand_args(args), std::move(kind)};
+  return {location, program, args, std::move(kind)};
 }
 
-/* TODO: Don't shell expand strings. */
-std::optional<std::string>
-simple_shell_expand(const std::string &path)
+std::string
+lowercase_string(const std::string &s)
 {
-  usize       pos = std::string::npos;
-  std::string expanded_path{path};
-
-  /* Expand tilde. */
-  while ((pos = expanded_path.find('~')) != std::string::npos) {
-    if (pos > 0 && !lexer::is_whitespace(expanded_path[pos - 1])) {
-      break;
-    }
-
-    /* TODO: There may be several separators supported. */
-    if (expanded_path.length() > pos + 1 &&
-        expanded_path[pos + 1] != std::filesystem::path::preferred_separator)
-    {
-      /* TODO: Expand different users. */
-      break;
-    }
-
-    /* Remove the tilde. */
-    expanded_path.erase(pos, 1);
-
-    std::optional<std::filesystem::path> u = os::get_home_directory();
-    if (!u) {
-      return std::nullopt;
-    }
-
-    expanded_path.insert(pos, u.value().string());
+  std::string l;
+  l.reserve(s.length());
+  for (usize i = 0; i < s.length(); i++) {
+    l += std::tolower(s[i]);
   }
-
-  /* TODO: Expand asterisk, exclamation mark. */
-
-  return expanded_path;
+  return l;
 }
 
 std::optional<std::filesystem::path>
@@ -400,19 +374,6 @@ search_and_cache(const std::string &program_name)
   }
 
   return std::nullopt;
-}
-
-std::vector<std::string>
-simple_shell_expand_args(const std::vector<std::string> &args)
-{
-  std::vector<std::string> expanded_args{};
-  expanded_args.reserve(args.size());
-
-  for (const std::string &arg : args) {
-    expanded_args.push_back(simple_shell_expand(arg).value_or(arg));
-  }
-
-  return expanded_args;
 }
 
 /* TODO: Some directories have precedence over the others. */

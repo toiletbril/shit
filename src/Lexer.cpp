@@ -4,10 +4,11 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Tokens.hpp"
+#include "Utils.hpp"
 
 #include <string>
 
-/* Glob identifiers. */
+/* TODO: Glob identifiers. */
 
 namespace shit {
 
@@ -90,6 +91,16 @@ bool
 is_ascii_char(char ch)
 {
   return (ch >= 'A' && ch <= 'A') || (ch >= 'a' && ch <= 'z');
+}
+
+bool
+is_expandable_char(char ch)
+{
+  switch (ch) {
+  case '~':
+  case '*': return true;
+  default: return false;
+  }
 }
 
 } /* namespace lexer */
@@ -186,49 +197,26 @@ void
 Lexer::skip_whitespace()
 {
   usize i = 0;
-  while (lexer::is_whitespace(chop_character(i++)))
-    ;
+  while (lexer::is_whitespace(chop_character(i++))) {
+    /* Chop chop... */
+  }
   advance_forward((i > 0) ? i - 1 : 0);
 }
 
 usize
 Lexer::advance_forward(usize offset)
 {
-  usize overflow = offset;
-
-  /* Do we have something in expand buffer? Move it's cursor. */
-  if (m_expand_buffer_cursor_position < m_expand_buffer.length()) {
-    usize until_end =
-        m_expand_buffer.length() - m_expand_buffer_cursor_position;
-
-    /* Cached offset is greater than expand buffer's length? Then we need to
-     * move the actual cursor too. */
-    if (offset < until_end) {
-      m_expand_buffer_cursor_position += offset;
-      overflow = 0;
-    } else {
-      m_expand_buffer_cursor_position += until_end;
-      overflow = offset - until_end;
-    }
-  }
-
-  SHIT_ASSERT(m_cursor_position + overflow <= m_source.length());
-  m_cursor_position += overflow;
-
+  SHIT_ASSERT(m_cursor_position + offset <= m_source.length());
+  m_cursor_position += offset;
   return offset;
 }
 
 char
 Lexer::chop_character(usize offset)
 {
-  if (m_expand_buffer_cursor_position + offset < m_expand_buffer.length()) {
-    return m_expand_buffer[m_expand_buffer_cursor_position + offset];
-  } else if (m_cursor_position + offset - m_expand_buffer_cursor_position <
-             m_source.length())
-  {
+  if (m_cursor_position + offset < m_source.length()) {
     return m_source[m_cursor_position + offset];
   }
-
   return EOF;
 }
 
@@ -236,7 +224,7 @@ Token *
 Lexer::lex_number()
 {
   char        ch;
-  std::string n;
+  std::string n{};
   usize       length = 0;
 
   while (lexer::is_number((ch = chop_character(length)))) {
@@ -250,27 +238,25 @@ Lexer::lex_number()
   return num;
 }
 
+/* NOTE: This function triggers shell expansion. */
 Token *
 Lexer::lex_identifier()
 {
   char        ch;
-  std::string ident;
+  std::string id{};
   usize       length = 0;
 
   while (lexer::is_part_of_identifier((ch = chop_character(length)))) {
-    ident += ch;
+    id += ch;
     length++;
   }
 
-  std::string lower_ident;
-  for (const char c : ident) {
-    lower_ident += std::tolower(c);
-  }
+  std::string lower_id = shit::utils::lowercase_string(id);
 
   Token *t{};
 
   /* An identifier may be a keyword. */
-  if (auto kw = KEYWORDS.find(lower_ident); kw != KEYWORDS.end()) {
+  if (auto kw = KEYWORDS.find(lower_id); kw != KEYWORDS.end()) {
     switch (kw->second) {
       /* clang-format off */
     case Token::Kind::If:   t = new TokenIf{m_cursor_position}; break;
@@ -281,7 +267,7 @@ Lexer::lex_identifier()
     default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
     }
   } else {
-    t = new TokenIdentifier{m_cursor_position, ident};
+    t = new TokenIdentifier{m_cursor_position, id};
   }
 
   m_cached_offset = length;

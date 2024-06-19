@@ -16,6 +16,7 @@ bool is_expression_sentinel(char ch);
 bool is_shell_sentinel(char ch);
 bool is_part_of_identifier(char ch);
 bool is_string_quote(char ch);
+bool is_expandable_char(char ch);
 
 } /* namespace lexer */
 
@@ -38,18 +39,14 @@ struct Lexer
 protected:
   std::string m_source{};
   usize       m_cursor_position{0};
-
-  std::string m_expand_buffer{};
-  usize       m_expand_buffer_cursor_position{0};
-
-  usize m_cached_offset{0};
+  usize       m_cached_offset{0};
 
   Token *lex_expression_token();
   Token *lex_shell_token();
 
   void  skip_whitespace();
-  char  chop_character(usize offset = 0);
   usize advance_forward(usize offset);
+  char  chop_character(usize offset = 0);
 
   Token *lex_number();
   Token *lex_identifier();
