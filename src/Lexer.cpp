@@ -72,7 +72,7 @@ is_shell_sentinel(char ch)
 bool
 is_part_of_identifier(char ch)
 {
-  return !is_shell_sentinel(ch) && !is_whitespace(ch);
+  return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != EOF;
 }
 
 bool
@@ -112,15 +112,6 @@ Lexer::peek_shell_token()
   return lex_shell_token();
 }
 
-usize
-Lexer::advance_past_last_peek()
-{
-  usize r = m_cached_offset;
-  m_cursor_position += r;
-  m_cached_offset = 0;
-  return r;
-}
-
 Token *
 Lexer::next_expression_token()
 {
@@ -145,22 +136,18 @@ Lexer::source() const
   return m_source;
 }
 
-void
-Lexer::skip_whitespace()
+usize
+Lexer::advance_past_last_peek()
 {
-  while (m_cursor_position < m_source.length() &&
-         lexer::is_whitespace(m_source[m_cursor_position]))
-  {
-    m_cursor_position++;
-  }
+  usize r = advance_forward(m_cached_offset);
+  m_cached_offset = 0;
+  return r;
 }
 
 Token *
 Lexer::lex_expression_token()
 {
-  if (m_cursor_position < m_source.length()) {
-    char ch = m_source[m_cursor_position];
-
+  if (char ch = chop_character(); ch != EOF) {
     if (lexer::is_number(ch)) {
       return lex_number();
     } else if (lexer::is_expression_sentinel(ch)) {
@@ -178,69 +165,9 @@ Lexer::lex_expression_token()
 }
 
 Token *
-Lexer::lex_number()
-{
-  usize length = 0;
-
-  while (m_cursor_position + length < m_source.length() &&
-         lexer::is_number(m_source[m_cursor_position + length]))
-  {
-    length++;
-  }
-
-  Token *num = new TokenNumber{m_cursor_position,
-                               m_source.substr(m_cursor_position, length)};
-  m_cached_offset = length;
-
-  return num;
-}
-
-Token *
-Lexer::lex_identifier()
-{
-  usize length = 0;
-
-  while (m_cursor_position + length < m_source.length() &&
-         lexer::is_part_of_identifier(m_source[m_cursor_position + length]))
-  {
-    length++;
-  }
-
-  std::string ident_string = m_source.substr(m_cursor_position, length);
-
-  std::string lower_ident_string;
-  for (const char c : ident_string) {
-    lower_ident_string += std::tolower(c);
-  }
-
-  Token *t{};
-
-  /* An identifier may be a keyword. */
-  if (auto kw = KEYWORDS.find(lower_ident_string); kw != KEYWORDS.end()) {
-    switch (kw->second) {
-      /* clang-format off */
-    case Token::Kind::If:   t = new TokenIf{m_cursor_position}; break;
-    case Token::Kind::Then: t = new TokenThen{m_cursor_position}; break;
-    case Token::Kind::Else: t = new TokenElse{m_cursor_position}; break;
-    case Token::Kind::Fi:   t = new TokenFi{m_cursor_position}; break;
-      /* clang-format on */
-    default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
-    }
-  } else {
-    t = new TokenIdentifier{m_cursor_position, ident_string};
-  }
-
-  m_cached_offset = length;
-
-  return t;
-}
-
-Token *
 Lexer::lex_shell_token()
 {
-  if (m_cursor_position < m_source.length()) {
-    char ch = m_source[m_cursor_position];
-
+  if (char ch = chop_character(); ch != EOF) {
     if (lexer::is_string_quote(ch)) {
       return lex_string(ch);
     } else if (lexer::is_shell_sentinel(ch)) {
@@ -255,15 +182,123 @@ Lexer::lex_shell_token()
   return new TokenEndOfFile{m_cursor_position};
 }
 
+void
+Lexer::skip_whitespace()
+{
+  usize i = 0;
+  while (lexer::is_whitespace(chop_character(i++)))
+    ;
+  advance_forward((i > 0) ? i - 1 : 0);
+}
+
+usize
+Lexer::advance_forward(usize offset)
+{
+  usize overflow = offset;
+
+  /* Do we have something in expand buffer? Move it's cursor. */
+  if (m_expand_buffer_cursor_position < m_expand_buffer.length()) {
+    usize until_end =
+        m_expand_buffer.length() - m_expand_buffer_cursor_position;
+
+    /* Cached offset is greater than expand buffer's length? Then we need to
+     * move the actual cursor too. */
+    if (offset < until_end) {
+      m_expand_buffer_cursor_position += offset;
+      overflow = 0;
+    } else {
+      m_expand_buffer_cursor_position += until_end;
+      overflow = offset - until_end;
+    }
+  }
+
+  SHIT_ASSERT(m_cursor_position + overflow <= m_source.length());
+  m_cursor_position += overflow;
+
+  return offset;
+}
+
+char
+Lexer::chop_character(usize offset)
+{
+  if (m_expand_buffer_cursor_position + offset < m_expand_buffer.length()) {
+    return m_expand_buffer[m_expand_buffer_cursor_position + offset];
+  } else if (m_cursor_position + offset - m_expand_buffer_cursor_position <
+             m_source.length())
+  {
+    return m_source[m_cursor_position + offset];
+  }
+
+  return EOF;
+}
+
+Token *
+Lexer::lex_number()
+{
+  char        ch;
+  std::string n;
+  usize       length = 0;
+
+  while (lexer::is_number((ch = chop_character(length)))) {
+    n += ch;
+    length++;
+  }
+
+  Token *num = new TokenNumber{m_cursor_position, n};
+  m_cached_offset = length;
+
+  return num;
+}
+
+Token *
+Lexer::lex_identifier()
+{
+  char        ch;
+  std::string ident;
+  usize       length = 0;
+
+  while (lexer::is_part_of_identifier((ch = chop_character(length)))) {
+    ident += ch;
+    length++;
+  }
+
+  std::string lower_ident;
+  for (const char c : ident) {
+    lower_ident += std::tolower(c);
+  }
+
+  Token *t{};
+
+  /* An identifier may be a keyword. */
+  if (auto kw = KEYWORDS.find(lower_ident); kw != KEYWORDS.end()) {
+    switch (kw->second) {
+      /* clang-format off */
+    case Token::Kind::If:   t = new TokenIf{m_cursor_position}; break;
+    case Token::Kind::Then: t = new TokenThen{m_cursor_position}; break;
+    case Token::Kind::Else: t = new TokenElse{m_cursor_position}; break;
+    case Token::Kind::Fi:   t = new TokenFi{m_cursor_position}; break;
+      /* clang-format on */
+    default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
+    }
+  } else {
+    t = new TokenIdentifier{m_cursor_position, ident};
+  }
+
+  m_cached_offset = length;
+
+  return t;
+}
+
 Token *
 Lexer::lex_string(char quote_char)
 {
+  char        ch;
+  std::string str_str;
   /* Skip the first quote. */
   usize length = 1;
 
-  while (m_cursor_position + length < m_source.length() &&
-         m_source[m_cursor_position + length] != quote_char)
-  {
+  while ((ch = chop_character(length)) != quote_char) {
+    str_str += ch;
     length++;
   }
 
@@ -275,8 +310,7 @@ Lexer::lex_string(char quote_char)
   }
 
   /* Skip the first and last quote here too. */
-  TokenString *str = new TokenString{
-      m_cursor_position, m_source.substr(m_cursor_position + 1, length - 1)};
+  TokenString *str = new TokenString{m_cursor_position, str_str};
 
   /* Account for the quote char. */
   m_cached_offset = length + 1;
@@ -318,8 +352,8 @@ static const std::unordered_map<char, Token::Kind> OPERATORS = {
 Token *
 Lexer::lex_sentinel()
 {
-  char  ch = m_source[m_cursor_position];
-  usize token_end = m_cursor_position + 1;
+  char  ch = chop_character();
+  usize extra_length = 0;
 
   Token *t{};
 
@@ -345,78 +379,78 @@ Lexer::lex_sentinel()
       /* clang-format on */
 
     case Token::Kind::RightSquareBracket: {
-      if (token_end < m_source.length() && m_source[token_end] == ']') {
+      if (chop_character(1) == ']') {
         t = new TokenDoubleRightSquareBracket{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenRightSquareBracket{m_cursor_position};
       }
     } break;
 
     case Token::Kind::LeftSquareBracket: {
-      if (token_end < m_source.length() && m_source[token_end] == '[') {
+      if (chop_character(1) == '[') {
         t = new TokenDoubleLeftSquareBracket{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenLeftSquareBracket{m_cursor_position};
       }
     } break;
 
     case Token::Kind::ExclamationMark: {
-      if (token_end < m_source.length() && m_source[token_end] == '=') {
+      if (chop_character(1) == '=') {
         t = new TokenExclamationEquals{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenExclamationMark{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Ampersand: {
-      if (token_end < m_source.length() && m_source[token_end] == '&') {
+      if (chop_character(1) == '&') {
         t = new TokenDoubleAmpersand{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenAmpersand{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Greater: {
-      if (token_end < m_source.length() && m_source[token_end] == '>') {
+      if (chop_character(1) == '>') {
         t = new TokenDoubleGreater{m_cursor_position};
-        token_end++;
-      } else if (token_end < m_source.length() && m_source[token_end] == '=') {
+        extra_length++;
+      } else if (chop_character(1) == '=') {
         t = new TokenGreaterEquals{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenGreater{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Less: {
-      if (token_end < m_source.length() && m_source[token_end] == '<') {
+      if (chop_character(1) == '<') {
         t = new TokenDoubleLess{m_cursor_position};
-        token_end++;
-      } else if (token_end < m_source.length() && m_source[token_end] == '=') {
+        extra_length++;
+      } else if (chop_character(1) == '=') {
         t = new TokenLessEquals{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenLess{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Pipe: {
-      if (token_end < m_source.length() && m_source[token_end] == '|') {
+      if (chop_character(1) == '|') {
         t = new TokenDoublePipe{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenPipe{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Equals: {
-      if (token_end < m_source.length() && m_source[token_end] == '=') {
+      if (chop_character(1) == '=') {
         t = new TokenDoubleEquals{m_cursor_position};
-        token_end++;
+        extra_length++;
       } else {
         t = new TokenEquals{m_cursor_position};
       }
@@ -432,7 +466,7 @@ Lexer::lex_sentinel()
     throw ErrorWithLocation{m_cursor_position, s};
   }
 
-  m_cached_offset = token_end - m_cursor_position;
+  m_cached_offset = 1 + extra_length;
 
   return t;
 }

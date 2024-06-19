@@ -19,6 +19,9 @@ bool is_string_quote(char ch);
 
 } /* namespace lexer */
 
+/* Dumb note: Main idea is that none of the routines except
+ * advance_past_last_peek(), skip_whitespace() and advance_forward() move
+ * internal cursor. */
 struct Lexer
 {
   Lexer(std::string source);
@@ -26,10 +29,11 @@ struct Lexer
 
   [[nodiscard]] Token *peek_expression_token();
   [[nodiscard]] Token *peek_shell_token();
-  usize                advance_past_last_peek();
   [[nodiscard]] Token *next_expression_token();
   [[nodiscard]] Token *next_shell_token();
-  std::string_view     source() const;
+
+  std::string_view source() const;
+  usize            advance_past_last_peek();
 
 protected:
   std::string m_source{};
@@ -43,8 +47,9 @@ protected:
   Token *lex_expression_token();
   Token *lex_shell_token();
 
-  void skip_whitespace();
-  char chop_character(usize offset = 0);
+  void  skip_whitespace();
+  char  chop_character(usize offset = 0);
+  usize advance_forward(usize offset);
 
   Token *lex_number();
   Token *lex_identifier();
