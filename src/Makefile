@@ -86,10 +86,16 @@ else
 			Please put '$(realpath ..)' in your PATH manually)
 endif
 
+CLANG_TIDY ?= clang-tidy
+
+tidy:
+	echo "	CLANG_TIDY $(SOURCES) $(HEADERS)"
+	$(CLANG_TIDY) $(SOURCES) $(HEADERS) --header-filter="*.hpp"
+
 CLANG_FORMAT ?= clang-format
 
 fmt:
-	echo "	CLANG-FORMAT -i $(SOURCES) $(HEADERS)"
+	echo "	CLANG_FORMAT -i $(SOURCES) $(HEADERS)"
 	$(CLANG_FORMAT) -i $(SOURCES) $(HEADERS)
 
 clean:

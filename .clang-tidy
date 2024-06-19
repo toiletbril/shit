@@ -2,7 +2,9 @@
 Checks: |
   -*,
   performance-*,
+  -performance-avoid-endl,
   clang-analyzer-*,
+  -clang-analyzer-valist.Uninitialized,
   clang-diagnostic-*,
   modernize-use-using,
   modernize-use-nullptr,
