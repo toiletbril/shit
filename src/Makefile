@@ -40,7 +40,7 @@ CXXFLAGS += \
 else ifeq ($(MODE), dbg)
 CXXFLAGS += \
 	-g3 \
-	-Og
+	-O0
 ifneq ($(OS), Windows_NT)
 ifneq ($(MODE), cosmo)
 CXXFLAGS += -fsanitize=address -fsanitize=undefined # Windows' Asan is broken
