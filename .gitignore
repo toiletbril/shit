@@ -7,6 +7,9 @@
 *.pdb
 *.lib
 
+*.gch
+*.pch
+
 *.swp
 
 .vs
