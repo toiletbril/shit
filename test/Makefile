@@ -6,20 +6,23 @@ endif
 
 FAILED := failed.diff
 
+# TODO: Custom test runner?
 %: expected/%.out
 	cat input/$@.shit | \
-	$(BIN) -AE - | \
-	diff -wu $< - >> $(FAILED) && \
-	echo "	[$@		] ok." || \
-	echo "	[$@		] FAILED."
-
-test: $(BIN)
-	@rm -f $(FAILED)
-	@$(MAKE) -B run_tests
+	$(BIN) -AE - 2>&1 | \
+	diff -u $< - >> $(FAILED_LIST) && \
+	printf "	[%32s] ok.\n" $@ || \
+	printf "	[%32s] FAILED.\n" $@
 
 clean:
-	@rm -f $(FAILED)
+	@rm -f $(FAILED_LIST)
 
+test: $(BIN)
+	@$(MAKE) -B clean
+	@$(MAKE) -B run_tests
+	cat $(FAILED_LIST)
+
+# NOTE: Input shouldn't have newline at the end of file.
 INPUT_FILES := $(wildcard input/*.shit)
 
 run_tests: $(INPUT_FILES:input/%.shit=%)

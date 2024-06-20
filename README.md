@@ -23,8 +23,9 @@ goal is to offer basic replacements of most common coreutils commands like
 more stable and should usually pass all tests.
 
 You need a C++17 compatible compiler (but currently only Clang is supported for
-Windows), GNU Make, `rm`, `mkdir` to build the executable; `diff` to run tests;
-`clang-format` (better 18 or newer) to format code.
+Windows), GNU Make, `rm`, `mkdir` to build the executable; `cat`, `diff`,
+`printf` to run the tests; `clang-format`, `clang-tidy` (better 18 or newer) to
+check the code.
 
 The `MODE` variable controls build type:
 * `rel` is the optimized build;

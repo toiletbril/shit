@@ -1,0 +1,3 @@
+shit: 1:8: Error: Expected a command after an operator.
+     1 |  true ||
+                 ^~ Error happened here.

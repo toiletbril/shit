@@ -65,12 +65,12 @@ get_context_pointing_to(std::string_view source, usize location,
   for (usize i = 0; i < 6 - line_number_length; i++)
     msg += ' ';
 
-  /* offset before the error arrow beneath the context. */
+  /* Offset before the error arrow beneath the context. */
   usize added_symbols = 10;
 
   msg += std::to_string(line_number + 1) + " |  ";
 
-  /* did we cut the start? */
+  /* Did we cut the start? */
   if (location - start_offset != last_newline_location + 1 &&
       location - start_offset != 0)
   {
@@ -80,13 +80,15 @@ get_context_pointing_to(std::string_view source, usize location,
 
   std::string_view context =
       source.substr(location - start_offset, start_offset + size);
-  /* we don't need accidental newlines in the middle of the context.
+
+  /* We don't need accidental newlines in the middle of the context.
    * *pulls hair out* */
   SHIT_ASSERT(context.find('\n') == std::string::npos, "'%s'", context.data());
+
   msg += context;
 
-  /* did we cut the end? */
-  if (size > ERROR_CONTEXT_SIZE)
+  /* Did we cut the end? */
+  if (size > ERROR_CONTEXT_SIZE) {
     msg += "..";
 
   msg += "\n";
