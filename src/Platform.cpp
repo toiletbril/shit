@@ -385,7 +385,7 @@ wait_and_monitor_process(process p)
 os_args
 make_os_args(const std::string &program, const std::vector<std::string> &args)
 {
-  std::string s;
+  std::string s{};
 
   /* TODO: Remove CVE and escape quotes. */
   s += '"';

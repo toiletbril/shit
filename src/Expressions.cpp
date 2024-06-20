@@ -23,7 +23,7 @@ Expression::location() const
 std::string
 Expression::to_ast_string(usize layer) const
 {
-  std::string pad;
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -70,8 +70,8 @@ If::to_string() const
 std::string
 If::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
 
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
@@ -111,7 +111,7 @@ DummyExpression::to_string() const
 std::string
 DummyExpression::to_ast_string(usize layer) const
 {
-  std::string pad;
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -150,7 +150,7 @@ Exec::evaluate() const
 std::string
 Exec::to_string() const
 {
-  std::string args;
+  std::string args{};
   std::string s = "Exec \"" + m_program;
   if (!m_args.empty()) {
     for (std::string_view arg : m_args) {
@@ -167,7 +167,7 @@ std::string
 Exec::to_ast_string(usize layer) const
 {
   SHIT_UNUSED(layer);
-  std::string pad;
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -212,8 +212,8 @@ Sequence::to_string() const
 std::string
 Sequence::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
 
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
@@ -291,8 +291,8 @@ SequenceNode::to_string() const
 std::string
 SequenceNode::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -330,8 +330,8 @@ ExecPipeSequence::to_string() const
 std::string
 ExecPipeSequence::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -373,8 +373,8 @@ UnaryExpression::~UnaryExpression() { delete m_rhs; }
 std::string
 UnaryExpression::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -400,8 +400,8 @@ BinaryExpression::~BinaryExpression()
 std::string
 BinaryExpression::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
 
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
@@ -431,8 +431,8 @@ ConstantNumber::evaluate() const
 std::string
 ConstantNumber::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -464,8 +464,8 @@ ConstantString::evaluate() const
 std::string
 ConstantString::to_ast_string(usize layer) const
 {
-  std::string s;
-  std::string pad;
+  std::string s{};
+  std::string pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }

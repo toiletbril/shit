@@ -65,7 +65,7 @@ i32 execute_context(ExecContext &&ec);
 
 i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs);
 
-std::string lowercase_string(const std::string &s);
+std::string lowercase_string(std::string_view s);
 
 std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
 

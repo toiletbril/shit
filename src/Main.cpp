@@ -70,7 +70,7 @@ main(int argc, char **argv)
   for (;;) {
     SHIT_ASSERT(!shit::os::is_child_process());
 
-    std::string contents;
+    std::string contents{};
 
     /* Figure out what to do and retrieve the code. */
     try {
@@ -176,6 +176,8 @@ main(int argc, char **argv)
     }
 
     exit_code = EXIT_FAILURE;
+    /* Shut up the compiler. */
+    SHIT_UNUSED(exit_code);
 
     /* Execute the contents. */
     try {

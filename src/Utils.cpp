@@ -169,7 +169,8 @@ ExecContext::make(const std::string              &program,
     if (p)
       kind = *p;
     else
-      throw ErrorWithLocation{location, "Program '" + program + "' not found"};
+      throw ErrorWithLocation{location,
+                              "Program '" + program + "' wasn't found"};
   } else {
     kind = *bk;
   }
@@ -178,9 +179,9 @@ ExecContext::make(const std::string              &program,
 }
 
 std::string
-lowercase_string(const std::string &s)
+lowercase_string(std::string_view s)
 {
-  std::string l;
+  std::string l{};
   l.reserve(s.length());
   for (usize i = 0; i < s.length(); i++) {
     l += std::tolower(s[i]);
@@ -282,7 +283,7 @@ initialize_path_map()
   if (!MAYBE_PATH)
     return;
 
-  std::string dir_string;
+  std::string dir_string{};
   std::string path_var = *MAYBE_PATH;
 
   for (const char &ch : path_var) {
@@ -317,7 +318,7 @@ search_and_cache(const std::string &program_name)
   if (!MAYBE_PATH)
     return std::nullopt;
 
-  std::string dir_string;
+  std::string dir_string{};
   std::string path_var = *MAYBE_PATH;
 
   for (const char &ch : path_var) {

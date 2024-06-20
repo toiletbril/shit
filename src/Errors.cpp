@@ -44,8 +44,9 @@ get_context_pointing_to(std::string_view source, usize location,
     size++;
   }
 
-  if (source[location - start_offset] == '\n')
+  if (source[location - start_offset] == '\n') {
     start_offset--;
+  }
 
   SHIT_ASSERT(location + size <= source.length(), "end: %zu, length: %zu",
               location + size, source.length());
@@ -61,9 +62,10 @@ get_context_pointing_to(std::string_view source, usize location,
     line_number_length++;
   }
 
-  std::string msg;
-  for (usize i = 0; i < 6 - line_number_length; i++)
+  std::string msg{};
+  for (usize i = 0; i < 6 - line_number_length; i++) {
     msg += ' ';
+  }
 
   /* Offset before the error arrow beneath the context. */
   usize added_symbols = 10;
@@ -90,10 +92,12 @@ get_context_pointing_to(std::string_view source, usize location,
   /* Did we cut the end? */
   if (size > ERROR_CONTEXT_SIZE) {
     msg += "..";
+  }
 
   msg += "\n";
-  for (usize i = 0; i < start_offset + added_symbols; i++)
+  for (usize i = 0; i < start_offset + added_symbols; i++) {
     msg += ' ';
+  }
   msg += "^~ ";
   msg += message;
   msg += '.';

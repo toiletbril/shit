@@ -12,15 +12,9 @@
 #include <string>
 #include <unordered_map>
 
-#if !defined _WIN32
-#include <unistd.h>
-#else
-#include <io.h>
-#define write _write
-#endif
-
 namespace shit {
 
+/* TODO: Separate builtins into files. */
 static const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"echo", Builtin::Kind::Echo},
     {"exit", Builtin::Kind::Exit},
@@ -30,10 +24,7 @@ static const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
 std::optional<Builtin::Kind>
 search_builtin(std::string_view builtin_name)
 {
-  std::string lower_builtin_name;
-  for (char c : builtin_name) {
-    lower_builtin_name += std::tolower(c);
-  }
+  std::string lower_builtin_name = utils::lowercase_string(builtin_name);
 
   if (auto b = BUILTINS.find(lower_builtin_name.c_str()); b != BUILTINS.end()) {
     return b->second;
@@ -96,7 +87,7 @@ Echo::kind() const
 i32
 Echo::execute(const std::vector<std::string> &args) const
 {
-  std::string buf;
+  std::string buf{};
 
   if (args.size() > 0) {
     buf += args[0];
@@ -126,7 +117,7 @@ Cd::kind() const
 i32
 Cd::execute(const std::vector<std::string> &args) const
 {
-  std::string arg_path;
+  std::string arg_path{};
 
   if (args.size() > 0) {
     arg_path += args[0];

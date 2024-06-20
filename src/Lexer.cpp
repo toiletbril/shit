@@ -279,7 +279,7 @@ Token *
 Lexer::lex_string(char quote_char)
 {
   char        ch;
-  std::string str_str;
+  std::string str_str{};
   /* Skip the first quote. */
   usize length = 1;
 
@@ -445,7 +445,7 @@ Lexer::lex_sentinel()
     default: SHIT_UNREACHABLE("Unhandled operator of type %d", E(op->second));
     }
   } else {
-    std::string s;
+    std::string s{};
     s += "Unknown operator '";
     s += ch;
     s += "'";
