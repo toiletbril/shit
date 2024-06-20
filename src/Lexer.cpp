@@ -283,7 +283,7 @@ Lexer::lex_string(char quote_char)
   /* Skip the first quote. */
   usize length = 1;
 
-  while ((ch = chop_character(length)) != quote_char) {
+  while ((ch = chop_character(length)) != quote_char && ch != EOF) {
     str_str += ch;
     length++;
   }
