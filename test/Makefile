@@ -4,7 +4,7 @@ else
 BIN := ../shit
 endif
 
-FAILED := failed.diff
+FAILED_LIST := failed.diff
 
 # TODO: Custom test runner?
 %: expected/%.out

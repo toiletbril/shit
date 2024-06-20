@@ -68,14 +68,14 @@ o/$(MODE)/%.o: %.cpp
 	echo "	CXX $< 	-o $@"
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
-shit:
-	mkdir -p o/$(MODE)/
-	$(MAKE) compile
-	echo "Compilation succeeded."
-
-compile: $(OBJECTS)
+$(OUT): $(OBJECTS)
 	echo "	CXX $(OBJECTS)	-o $(OUT)"
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
+
+shit:
+	mkdir -p o/$(MODE)/
+	$(MAKE) $(OUT)
+	echo "Compilation succeeded."
 
 install: shit
 ifneq ($(OS), Windows_NT)
