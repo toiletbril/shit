@@ -50,9 +50,8 @@ initialize()
   }
 
   if (::tl_init() != TL_SUCCESS) {
-    throw shit::Error{
-        "Toiletline: Could not initialize. If you meant use stdin, "
-        "provide '-' as an argument"};
+    throw shit::Error{"Toiletline: Could not initialize the terminal. If you "
+                      "meant use stdin, provide '-' as an argument"};
   }
 }
 
@@ -101,7 +100,8 @@ void
 exit_raw_mode()
 {
   if (::tl_exit_raw_mode() != TL_SUCCESS) {
-    throw shit::Error{"Couldn't force the terminal to exit raw mode"};
+    throw shit::Error{
+        "Toiletline: Couldn't force the terminal to exit raw mode"};
   }
 }
 
