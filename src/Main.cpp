@@ -18,6 +18,7 @@ FLAG_LIST_DECL();
 
 FLAG(DUMP_AST, Bool, 'A', "dump-ast",
      "Dump AST before executing each command.");
+FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
@@ -54,6 +55,10 @@ main(int argc, char **argv)
 
   bool should_quit = false;
 
+  if (FLAG_STDIN.enabled() || FLAG_COMMAND.was_set()) {
+    should_quit = true;
+  }
+
   usize arg_index = 0;
   int   exit_code = EXIT_SUCCESS;
 
@@ -75,7 +80,9 @@ main(int argc, char **argv)
     /* Figure out what to do and retrieve the code. */
     try {
       /* If we weren't given any arguments or -c=..., fire up the toiletline. */
-      if (file_names.empty() && !FLAG_COMMAND.was_set()) {
+      if (file_names.empty() && !FLAG_COMMAND.was_set() &&
+          !FLAG_STDIN.enabled())
+      {
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();
           toiletline::initialize();
@@ -129,7 +136,6 @@ main(int argc, char **argv)
       } else if (FLAG_COMMAND.was_set()) {
         /* Were we given -c flag? */
         contents = FLAG_COMMAND.contents();
-        should_quit = true;
       } else {
         /* Were we given a list of files? */
         if (arg_index + 1 == file_names.size())
@@ -138,8 +144,8 @@ main(int argc, char **argv)
         std::fstream  f{};
         std::istream *file{};
 
-        /* When file name is "-", use stdin. */
-        if (file_names[arg_index] == "-") {
+        /* If -s is used, or when file name is "-", use stdin. */
+        if (FLAG_STDIN.enabled() || file_names[arg_index] == "-") {
           file = &std::cin;
         } else {
           /* Otherwise, process the actual file name. */
