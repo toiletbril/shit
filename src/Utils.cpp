@@ -411,7 +411,11 @@ search_program_path(const std::string &program_name)
     if (s_ext > 0) {
       try_path /= program_name;
     } else {
-      std::filesystem::path file_name = p->first + '.';
+      std::filesystem::path file_name = p->first;
+      /* If index is 0, there's no extension to omit. */
+      if (s_ext != 0) {
+        file_name += '.';
+      }
       try_path /= file_name.concat(os::OMITTED_SUFFIXES[ext]);
     }
 
