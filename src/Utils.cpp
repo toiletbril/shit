@@ -292,19 +292,29 @@ initialize_path_map()
       continue;
     }
 
-    /* What the heck? A path in PATH that does not exist? Are you a Windows
-     * user? */
-    if (std::filesystem::exists(dir_string)) {
-      std::filesystem::path               dir_path{dir_string};
-      std::filesystem::directory_iterator dir{dir_path};
+    try {
+      /* What the heck? A path in PATH that does not exist? Are you a Windows
+       * user? */
+      if (std::filesystem::exists(dir_string)) {
+        std::filesystem::path               dir_path{dir_string};
+        std::filesystem::directory_iterator dir{dir_path};
 
-      usize dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
+        usize dir_index =
+            cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
 
-      /* Initialize every file in the directory. */
-      for (const std::filesystem::directory_entry &f : dir) {
-        std::string fs = f.path().filename().string();
-        PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
+        /* Initialize every file in the directory. */
+        for (const std::filesystem::directory_entry &f : dir) {
+          std::string fs = f.path().filename().string();
+          PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
+        }
       }
+    } catch (std::filesystem::filesystem_error &e) {
+      std::string s;
+      s += "Unable to descend into '";
+      s += dir_string;
+      s += "' while reading PATH: ";
+      s += os::last_system_error_message();
+      shit::show_error(s);
     }
 
     dir_string.clear();
@@ -327,48 +337,57 @@ search_and_cache(const std::string &program_name)
       continue;
     }
 
-    if (std::filesystem::exists(dir_string)) {
-      std::filesystem::path dir_path{dir_string};
+    try {
+      if (std::filesystem::exists(dir_string)) {
+        std::filesystem::path dir_path{dir_string};
 
-      /* Cache the directory if it was not present before. */
-      bool  found = false;
-      usize dir_index = 0;
+        /* Cache the directory if it was not present before. */
+        bool  found = false;
+        usize dir_index = 0;
 
-      for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
-        if (PATH_CACHE_DIRS[dir_i] == dir_string) {
-          found = true;
-          dir_index = dir_i;
-          break;
-        }
-      }
-
-      if (!found) {
-        dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-      }
-
-      /* Actually try to find the file. */
-      std::filesystem::path full_path = dir_path / program_name;
-      std::string           full_path_str = full_path.string();
-
-      /* This file already has an extesion specified? */
-      if (usize explicit_ext = os::sanitize_program_name(full_path_str);
-          explicit_ext == 0)
-      {
-        for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
-             ext_index++)
-        {
-          std::string try_path =
-              full_path.string() + os::OMITTED_SUFFIXES[ext_index];
-
-          if (std::filesystem::exists(try_path)) {
-            PATH_CACHE[program_name] = {dir_index, ext_index};
-            return try_path;
+        for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
+          if (PATH_CACHE_DIRS[dir_i] == dir_string) {
+            found = true;
+            dir_index = dir_i;
+            break;
           }
         }
-      } else if (std::filesystem::exists(full_path)) {
-        PATH_CACHE[program_name] = {dir_index, explicit_ext};
-        return full_path;
+
+        if (!found) {
+          dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
+        }
+
+        /* Actually try to find the file. */
+        std::filesystem::path full_path = dir_path / program_name;
+        std::string           full_path_str = full_path.string();
+
+        /* This file already has an extesion specified? */
+        if (usize explicit_ext = os::sanitize_program_name(full_path_str);
+            explicit_ext == 0)
+        {
+          for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
+               ext_index++)
+          {
+            std::string try_path =
+                full_path.string() + os::OMITTED_SUFFIXES[ext_index];
+
+            if (std::filesystem::exists(try_path)) {
+              PATH_CACHE[program_name] = {dir_index, ext_index};
+              return try_path;
+            }
+          }
+        } else if (std::filesystem::exists(full_path)) {
+          PATH_CACHE[program_name] = {dir_index, explicit_ext};
+          return full_path;
+        }
       }
+    } catch (std::filesystem::filesystem_error &e) {
+      std::string s;
+      s += "Unable to descend into '";
+      s += dir_string;
+      s += "' while searching: ";
+      s += os::last_system_error_message();
+      shit::show_error(s);
     }
 
     dir_string.clear();
