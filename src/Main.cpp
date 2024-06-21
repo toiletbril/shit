@@ -168,9 +168,13 @@ main(int argc, char **argv)
     } catch (shit::Error &e) {
       shit::show_error(e.to_string());
       shit::utils::quit(EXIT_FAILURE);
+    } catch (std::exception &e) {
+      shit::show_error("Uncaught std::exception while getting the input.");
+      shit::show_error("what(): " + std::string{e.what()});
+      shit::utils::quit(EXIT_FAILURE);
     } catch (...) {
-      shit::show_error("Could not figure out what to do due to an unexpected "
-                       "explosion! Last system message: " +
+      shit::show_error("Unexpected system explosion while getting the input.");
+      shit::show_error("Last system message: " +
                        shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
@@ -197,9 +201,12 @@ main(int argc, char **argv)
       shit::show_error(e.to_string(contents));
     } catch (shit::Error &e) {
       shit::show_error(e.to_string());
+    } catch (std::exception &e) {
+      shit::show_error("Uncaught std::exception while executing the AST.");
+      shit::show_error("what(): " + std::string{e.what()});
     } catch (...) {
-      shit::show_error("Could not execute the code due to an unexpected "
-                       "explosion! Last system message: " +
+      shit::show_error("Unexpected system explosion while executing the AST.");
+      shit::show_error("Last system message: " +
                        shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
