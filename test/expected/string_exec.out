@@ -1,0 +1,5 @@
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "echo"]
+
+[Code 0]
