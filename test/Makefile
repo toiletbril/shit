@@ -1,5 +1,8 @@
+DFLAGS := -u
+
 ifeq ($(OS), Windows_NT)
 BIN := ../shit.exe
+DFLAGS := -w # CRLF on Windows SMH
 else
 BIN := ../shit
 endif
@@ -10,7 +13,7 @@ FAILED_LIST := failed.diff
 %: expected/%.out
 	cat input/$@.shit | \
 	$(BIN) -AE - 2>&1 | \
-	diff -u $< - >> $(FAILED_LIST) && \
+	diff $(DFLAGS) $< - >> $(FAILED_LIST) && \
 	printf "	[%32s] ok.\n" $@ || \
 	printf "	[%32s] FAILED.\n" $@
 
