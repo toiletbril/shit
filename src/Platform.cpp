@@ -18,16 +18,24 @@ namespace shit {
 
 namespace os {
 
-usize
-write_fd(os::descriptor fd, void *buf, u8 size)
+std::optional<usize>
+write_fd(os::descriptor fd, void *buf, usize size)
 {
-  return write(fd, buf, size);
+  ssize_t w = write(fd, buf, size);
+  if (w == -1) {
+    return std::nullopt;
+  }
+  return static_cast<usize>(w);
 }
 
-usize
-read_fd(os::descriptor fd, void *buf, u8 size)
+std::optional<usize>
+read_fd(os::descriptor fd, void *buf, usize size)
 {
-  return read(fd, buf, size);
+  ssize_t r = read(fd, buf, size);
+  if (r == -1) {
+    return std::nullopt;
+  }
+  return static_cast<usize>(r);
 }
 
 bool
@@ -245,20 +253,24 @@ namespace shit {
 
 namespace os {
 
-usize
-write_fd(os::descriptor fd, void *buf, u8 size)
+std::optional<usize>
+write_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD w = -1;
-  WriteFile(fd, buf, size, &w, 0);
-  return w;
+  if (WriteFile(fd, buf, size, &w, 0) == FALSE) {
+    return std::nullopt:
+  }
+  return static_cast<usize>(w);
 }
 
-usize
-read_fd(os::descriptor fd, void *buf, u8 size)
+std::optional<usize>
+read_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD r = -1;
-  ReadFile(fd, buf, size, &r, 0);
-  return r;
+  if (ReadFile(fd, buf, size, &r, 0) == FALSE) {
+    return std::nullopt;
+  }
+  return static_cast<usize>(r);
 }
 
 bool

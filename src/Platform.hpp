@@ -30,9 +30,9 @@ i32 wait_and_monitor_process(process p);
 
 extern const std::vector<std::string> OMITTED_SUFFIXES;
 
-usize write_fd(os::descriptor fd, void *buf, u8 size);
+std::optional<usize> write_fd(os::descriptor fd, void *buf, usize size);
 
-usize read_fd(os::descriptor fd, void *buf, u8 size);
+std::optional<usize> read_fd(os::descriptor fd, void *buf, usize size);
 
 bool close_fd(os::descriptor fd);
 

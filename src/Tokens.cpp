@@ -4,8 +4,6 @@
 
 namespace shit {
 
-/* Implementations for specific token types */
-
 /**
  * class: Token
  */

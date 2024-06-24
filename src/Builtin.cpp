@@ -52,11 +52,11 @@ execute_builtin(utils::ExecContext &&ec)
   b->set_fds(ec.in.value_or(SHIT_STDIN), ec.out.value_or(SHIT_STDOUT));
 
   try {
-    /* Close FDs as child processes do. */
     i32 ret = b->execute(ec.args());
     ec.close_fds();
     return ret;
   } catch (Error &err) {
+    ec.close_fds();
     throw ErrorWithLocation{ec.location(), err.message()};
   }
 }
@@ -98,7 +98,9 @@ Echo::execute(const std::vector<std::string> &args) const
   }
   buf += '\n';
 
-  os::write_fd(out_fd, buf.data(), buf.size());
+  if (!os::write_fd(out_fd, buf.data(), buf.size()).has_value()) {
+    throw Error{"Could not write to stdout"};
+  }
 
   return 0;
 }

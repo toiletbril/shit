@@ -2,7 +2,7 @@ DFLAGS := -u
 
 ifeq ($(OS), Windows_NT)
 BIN := ../shit.exe
-DFLAGS := -w # CRLF on Windows SMH
+DFLAGS += -w # CRLF on Windows SMH
 else
 BIN := ../shit
 endif
