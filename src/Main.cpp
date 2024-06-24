@@ -16,11 +16,29 @@
 
 FLAG_LIST_DECL();
 
+FLAG(INTERACTIVE, Bool, 'i', "interactive",
+     "Specify that the shell is interactive.");
+FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
+FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
+
+FLAG(EXPORT_ALL, Bool, 'a', "export-all",
+     "UNIMPLEMENTED: Export all variables assigned to.");
+FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
+     "UNIMPLEMENTED: Don't overwrite existing files with '>'.");
+FLAG(EXIT_ERROR, Bool, 'e', "error-exit", "UNIMPLEMENTED: Die on first error.");
+FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob",
+     "UNIMPLEMENTED: Disable path expansion.");
+FLAG(UNUSED1, Bool, 'h', "\0", "Ignored.");
+FLAG(JOB_CONTROL, Bool, 'm', "monitor", "UNIMPLEMENTED: Turn on job control.");
+FLAG(VERBOSE, Bool, 'v', "verbose",
+     "UNIMPLEMENTED: Write input to standard error as it is read.");
+FLAG(UNUSED2, Bool, 'u', "\0", "Ignored.");
+FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
+     "UNIMPLEMENTED: Write expanded input to standard error as it is read.");
+
 FLAG(DUMP_AST, Bool, 'A', "dump-ast",
      "Dump AST before executing each command.");
-FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
-FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
 FLAG(VERSION, Bool, 'V', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, '\0', "short-version",
@@ -36,6 +54,14 @@ main(int argc, char **argv)
   } catch (shit::Error &e) {
     shit::show_error(e.to_string());
     return EXIT_SUCCESS;
+  }
+
+  if (FLAG_EXPORT_ALL.enabled() || FLAG_NO_CLOBBER.enabled() ||
+      FLAG_EXIT_ERROR.enabled() || FLAG_DISABLE_EXPANSION.enabled() ||
+      FLAG_JOB_CONTROL.enabled() || FLAG_VERBOSE.enabled() ||
+      FLAG_EXPAND_VERBOSE.enabled())
+  {
+    shit::show_error("One or more unimplemented options were ignored.");
   }
 
   /* Program path is the first argument. Pull it out and get rid of it. */
@@ -80,8 +106,9 @@ main(int argc, char **argv)
     /* Figure out what to do and retrieve the code. */
     try {
       /* If we weren't given any arguments or -c=..., fire up the toiletline. */
-      if (file_names.empty() && !FLAG_COMMAND.was_set() &&
-          !FLAG_STDIN.enabled())
+      if ((file_names.empty() && !FLAG_COMMAND.was_set() &&
+           !FLAG_STDIN.enabled()) ||
+          FLAG_INTERACTIVE.enabled())
       {
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();

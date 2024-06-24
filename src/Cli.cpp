@@ -383,6 +383,8 @@ show_help(std::string_view program_name, const std::vector<Flag *> &flags)
         s += "=<...>";
         long_is_string = true;
       }
+    } else {
+      s += "    ";
     }
 
     usize padding = MAX_WIDTH - f->long_name().length() -
