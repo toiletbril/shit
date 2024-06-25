@@ -21,10 +21,6 @@ FLAG(INTERACTIVE, Bool, 'i', "interactive",
 FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 
-FLAG(IGNORED1, Bool, 'h', "\0", "Ignored.");
-FLAG(IGNORED2, Bool, 'm', "\0", "Ignored.");
-FLAG(IGNORED3, Bool, 'u', "\0", "Ignored.");
-
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
@@ -36,6 +32,10 @@ FLAG(VERBOSE, Bool, 'v', "verbose",
      "UNIMPLEMENTED: Write input to standard error as it is read.");
 FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
      "UNIMPLEMENTED: Write expanded input to standard error as it is read.");
+
+FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
+FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
+FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
 FLAG(DUMP_AST, Bool, 'A', "dump-ast",
      "Dump AST before executing each command.");
