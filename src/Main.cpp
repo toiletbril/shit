@@ -21,6 +21,10 @@ FLAG(INTERACTIVE, Bool, 'i', "interactive",
 FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
 
+FLAG(IGNORED1, Bool, 'h', "\0", "Ignored.");
+FLAG(IGNORED2, Bool, 'm', "\0", "Ignored.");
+FLAG(IGNORED3, Bool, 'u', "\0", "Ignored.");
+
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
@@ -28,11 +32,8 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
 FLAG(EXIT_ERROR, Bool, 'e', "error-exit", "UNIMPLEMENTED: Die on first error.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob",
      "UNIMPLEMENTED: Disable path expansion.");
-FLAG(IGNORED1, Bool, 'h', "\0", "Ignored.");
-FLAG(IGNORED2, Bool, 'm', "\0", "Ignored.");
 FLAG(VERBOSE, Bool, 'v', "verbose",
      "UNIMPLEMENTED: Write input to standard error as it is read.");
-FLAG(IGNORED3, Bool, 'u', "\0", "Ignored.");
 FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
      "UNIMPLEMENTED: Write expanded input to standard error as it is read.");
 
@@ -40,7 +41,7 @@ FLAG(DUMP_AST, Bool, 'A', "dump-ast",
      "Dump AST before executing each command.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
-FLAG(VERSION, Bool, 'V', "version", "Display program version and notices.");
+FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, '\0', "short-version",
      "Display version in a short form.");
 
