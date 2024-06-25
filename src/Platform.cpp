@@ -257,8 +257,8 @@ std::optional<usize>
 write_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD w = -1;
-  if (WriteFile(fd, buf, size, &w, 0) == FALSE) {
-    return std::nullopt:
+  if (WriteFile(fd, buf, size, &w, 0) == FALSE) { /* NOLINT */
+    return std::nullopt;
   }
   return static_cast<usize>(w);
 }
@@ -267,7 +267,7 @@ std::optional<usize>
 read_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD r = -1;
-  if (ReadFile(fd, buf, size, &r, 0) == FALSE) {
+  if (ReadFile(fd, buf, size, &r, 0) == FALSE) { /* NOLINT */
     return std::nullopt;
   }
   return static_cast<usize>(r);

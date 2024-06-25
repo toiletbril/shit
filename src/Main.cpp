@@ -28,11 +28,11 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
 FLAG(EXIT_ERROR, Bool, 'e', "error-exit", "UNIMPLEMENTED: Die on first error.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob",
      "UNIMPLEMENTED: Disable path expansion.");
-FLAG(UNUSED1, Bool, 'h', "\0", "Ignored.");
-FLAG(JOB_CONTROL, Bool, 'm', "monitor", "UNIMPLEMENTED: Turn on job control.");
+FLAG(IGNORED1, Bool, 'h', "\0", "Ignored.");
+FLAG(IGNORED2, Bool, 'm', "\0", "Ignored.");
 FLAG(VERBOSE, Bool, 'v', "verbose",
      "UNIMPLEMENTED: Write input to standard error as it is read.");
-FLAG(UNUSED2, Bool, 'u', "\0", "Ignored.");
+FLAG(IGNORED3, Bool, 'u', "\0", "Ignored.");
 FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
      "UNIMPLEMENTED: Write expanded input to standard error as it is read.");
 
@@ -58,8 +58,7 @@ main(int argc, char **argv)
 
   if (FLAG_EXPORT_ALL.enabled() || FLAG_NO_CLOBBER.enabled() ||
       FLAG_EXIT_ERROR.enabled() || FLAG_DISABLE_EXPANSION.enabled() ||
-      FLAG_JOB_CONTROL.enabled() || FLAG_VERBOSE.enabled() ||
-      FLAG_EXPAND_VERBOSE.enabled())
+      FLAG_VERBOSE.enabled() || FLAG_EXPAND_VERBOSE.enabled())
   {
     shit::show_error("One or more unimplemented options were ignored.");
   }
