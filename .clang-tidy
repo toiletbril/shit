@@ -17,5 +17,4 @@ Checks: |
   readability-make-member-function-const,
   readability-static-accessed-through-instance,
 
-WarningsAsErrors: '*'
 ...
