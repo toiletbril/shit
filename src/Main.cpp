@@ -20,12 +20,12 @@ FLAG(INTERACTIVE, Bool, 'i', "interactive",
      "Specify that the shell is interactive.");
 FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
+FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
 
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
      "UNIMPLEMENTED: Don't overwrite existing files with '>'.");
-FLAG(EXIT_ERROR, Bool, 'e', "error-exit", "UNIMPLEMENTED: Die on first error.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob",
      "UNIMPLEMENTED: Disable path expansion.");
 FLAG(VERBOSE, Bool, 'v', "verbose",
@@ -58,7 +58,7 @@ main(int argc, char **argv)
   }
 
   if (FLAG_EXPORT_ALL.enabled() || FLAG_NO_CLOBBER.enabled() ||
-      FLAG_EXIT_ERROR.enabled() || FLAG_DISABLE_EXPANSION.enabled() ||
+      FLAG_ERROR_EXIT.enabled() || FLAG_DISABLE_EXPANSION.enabled() ||
       FLAG_VERBOSE.enabled() || FLAG_EXPAND_VERBOSE.enabled())
   {
     shit::show_error("One or more unimplemented options were ignored.");
@@ -246,7 +246,9 @@ main(int argc, char **argv)
 
     /* We can get here from child process if they didn't exec()
      * properly to print error. */
-    if (should_quit || shit::os::is_child_process()) {
+    if (should_quit || shit::os::is_child_process() ||
+        (FLAG_ERROR_EXIT.enabled() && exit_code != 0))
+    {
       shit::utils::quit(exit_code);
     }
   }
