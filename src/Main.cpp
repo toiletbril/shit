@@ -53,35 +53,35 @@ main(int argc, char **argv)
   try {
     file_names = shit::parse_flags(FLAG_LIST, argc, argv);
   } catch (shit::Error &e) {
-    shit::show_error(e.to_string());
+    shit::show_message(e.to_string());
     return EXIT_SUCCESS;
   }
 
-  if (FLAG_EXPORT_ALL.enabled() || FLAG_NO_CLOBBER.enabled() ||
-      FLAG_ERROR_EXIT.enabled() || FLAG_DISABLE_EXPANSION.enabled() ||
-      FLAG_VERBOSE.enabled() || FLAG_EXPAND_VERBOSE.enabled())
+  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
+      FLAG_ERROR_EXIT.is_enabled() || FLAG_DISABLE_EXPANSION.is_enabled() ||
+      FLAG_VERBOSE.is_enabled() || FLAG_EXPAND_VERBOSE.is_enabled())
   {
-    shit::show_error("One or more unimplemented options were ignored.");
+    shit::show_message("One or more unimplemented options were ignored.");
   }
 
   /* Program path is the first argument. Pull it out and get rid of it. */
   std::string program_path = file_names[0];
   file_names.erase(file_names.begin());
 
-  if (FLAG_HELP.enabled()) {
+  if (FLAG_HELP.is_enabled()) {
     shit::show_help(program_path, FLAG_LIST);
     return EXIT_SUCCESS;
-  } else if (FLAG_VERSION.enabled()) {
+  } else if (FLAG_VERSION.is_enabled()) {
     shit::show_version();
     return EXIT_SUCCESS;
-  } else if (FLAG_SHORT_VERSION.enabled()) {
+  } else if (FLAG_SHORT_VERSION.is_enabled()) {
     shit::show_short_version();
     return EXIT_SUCCESS;
   }
 
   bool should_quit = false;
 
-  if (FLAG_STDIN.enabled() || FLAG_COMMAND.was_set()) {
+  if (FLAG_STDIN.is_enabled() || FLAG_COMMAND.is_set()) {
     should_quit = true;
   }
 
@@ -106,9 +106,9 @@ main(int argc, char **argv)
     /* Figure out what to do and retrieve the code. */
     try {
       /* If we weren't given any arguments or -c=..., fire up the toiletline. */
-      if ((file_names.empty() && !FLAG_COMMAND.was_set() &&
-           !FLAG_STDIN.enabled()) ||
-          FLAG_INTERACTIVE.enabled())
+      if ((file_names.empty() && !FLAG_COMMAND.is_set() &&
+           !FLAG_STDIN.is_enabled()) ||
+          FLAG_INTERACTIVE.is_enabled())
       {
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();
@@ -160,9 +160,9 @@ main(int argc, char **argv)
         }
 
         toiletline::exit_raw_mode();
-      } else if (FLAG_COMMAND.was_set()) {
+      } else if (FLAG_COMMAND.is_set()) {
         /* Were we given -c flag? */
-        contents = FLAG_COMMAND.contents();
+        contents = FLAG_COMMAND.value();
       } else {
         /* Were we given a list of files? */
         if (arg_index + 1 == file_names.size())
@@ -172,7 +172,7 @@ main(int argc, char **argv)
         std::istream *file{};
 
         /* If -s is used, or when file name is "-", use stdin. */
-        if (FLAG_STDIN.enabled() || file_names[arg_index] == "-") {
+        if (FLAG_STDIN.is_enabled() || file_names[arg_index] == "-") {
           file = &std::cin;
         } else {
           /* Otherwise, process the actual file name. */
@@ -199,15 +199,15 @@ main(int argc, char **argv)
         arg_index++;
       }
     } catch (shit::Error &e) {
-      shit::show_error(e.to_string());
+      shit::show_message(e.to_string());
       shit::utils::quit(EXIT_FAILURE);
     } catch (std::exception &e) {
-      shit::show_error("Uncaught std::exception while getting the input.");
-      shit::show_error("what(): " + std::string{e.what()});
+      shit::show_message("Uncaught std::exception while getting the input.");
+      shit::show_message("what(): " + std::string{e.what()});
       shit::utils::quit(EXIT_FAILURE);
     } catch (...) {
-      shit::show_error("Unexpected system explosion while getting the input.");
-      shit::show_error("Last system message: " +
+      shit::show_message("Unexpected system explosion while getting the input.");
+      shit::show_message("Last system message: " +
                        shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
@@ -221,25 +221,25 @@ main(int argc, char **argv)
       shit::Parser p{shit::Lexer{contents}};
 
       std::unique_ptr<shit::Expression> ast = p.construct_ast();
-      if (FLAG_DUMP_AST.enabled())
+      if (FLAG_DUMP_AST.is_enabled())
         std::cout << ast->to_ast_string() << std::endl;
 
       exit_code = ast->evaluate();
-      if (FLAG_EXIT_CODE.enabled())
+      if (FLAG_EXIT_CODE.is_enabled())
         std::cout << "[Code " << exit_code << "]" << std::endl;
     } catch (shit::ErrorWithLocationAndDetails &e) {
-      shit::show_error(e.to_string(contents));
-      shit::show_error(e.details_to_string(contents));
+      shit::show_message(e.to_string(contents));
+      shit::show_message(e.details_to_string(contents));
     } catch (shit::ErrorWithLocation &e) {
-      shit::show_error(e.to_string(contents));
+      shit::show_message(e.to_string(contents));
     } catch (shit::Error &e) {
-      shit::show_error(e.to_string());
+      shit::show_message(e.to_string());
     } catch (std::exception &e) {
-      shit::show_error("Uncaught std::exception while executing the AST.");
-      shit::show_error("what(): " + std::string{e.what()});
+      shit::show_message("Uncaught std::exception while executing the AST.");
+      shit::show_message("what(): " + std::string{e.what()});
     } catch (...) {
-      shit::show_error("Unexpected system explosion while executing the AST.");
-      shit::show_error("Last system message: " +
+      shit::show_message("Unexpected system explosion while executing the AST.");
+      shit::show_message("Last system message: " +
                        shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
@@ -247,7 +247,7 @@ main(int argc, char **argv)
     /* We can get here from child process if they didn't exec()
      * properly to print error. */
     if (should_quit || shit::os::is_child_process() ||
-        (FLAG_ERROR_EXIT.enabled() && exit_code != 0))
+        (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {
       shit::utils::quit(exit_code);
     }

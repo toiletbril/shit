@@ -227,7 +227,7 @@ get_current_directory()
 quit(i32 code, bool should_goodbye)
 {
   if (should_goodbye) {
-    show_error("Goodbye.");
+    show_message("Goodbye.");
   }
 
   /* Cleanup for main proccess. */
@@ -237,7 +237,7 @@ quit(i32 code, bool should_goodbye)
         toiletline::exit();
       } catch (Error &e) {
         /* TODO: A wild bug appeared! */
-        show_error(e.to_string());
+        show_message(e.to_string());
       }
     }
   }
@@ -314,7 +314,7 @@ initialize_path_map()
       s += dir_string;
       s += "' while reading PATH: ";
       s += os::last_system_error_message();
-      shit::show_error(s);
+      shit::show_message(s);
     }
 
     dir_string.clear();
@@ -387,7 +387,7 @@ search_and_cache(const std::string &program_name)
       s += dir_string;
       s += "' while searching: ";
       s += os::last_system_error_message();
-      shit::show_error(s);
+      shit::show_message(s);
     }
 
     dir_string.clear();

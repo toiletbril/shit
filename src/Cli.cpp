@@ -26,6 +26,12 @@ Flag::kind() const
   return m_kind;
 }
 
+void
+Flag::set_position(u32 n)
+{
+  m_position = n;
+}
+
 char
 Flag::short_name() const
 {
@@ -59,13 +65,13 @@ FlagBool::toggle()
 }
 
 bool
-FlagBool::enabled() const
+FlagBool::is_enabled() const
 {
   return m_value;
 }
 
 /**
- * class: FlagBool
+ * class: FlagString
  */
 FlagString::FlagString(char short_name, const std::string &long_name,
                        const std::string &description)
@@ -76,19 +82,45 @@ void
 FlagString::set(std::string_view v)
 {
   m_value = v;
-  m_was_set = true;
+  m_is_set = true;
 }
 
 bool
-FlagString::was_set() const
+FlagString::is_set() const
 {
-  return m_was_set;
+  return m_is_set;
 }
 
 std::string_view
-FlagString::contents() const
+FlagString::value() const
 {
   return m_value;
+}
+
+/**
+ * class: FlagManyStrings
+ */
+FlagManyStrings::FlagManyStrings(char short_name, const std::string &long_name,
+                                 const std::string &description)
+    : Flag(Flag::Kind::String, short_name, long_name, description)
+{}
+
+void
+FlagManyStrings::append(std::string_view v)
+{
+  m_values.emplace_back(v);
+}
+
+bool
+FlagManyStrings::empty() const
+{
+  return m_values.empty();
+}
+
+usize
+FlagManyStrings::size() const
+{
+  return m_values.size();
 }
 
 static bool
@@ -162,6 +194,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
   SHIT_ASSERT(argv);
 
+  u32 position = 0;
   std::vector<std::string> args{};
 
   Flag *prev_flag{};
@@ -217,7 +250,10 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
       if (found) {
         switch (flag->kind()) {
         case Flag::Kind::Bool: {
-          static_cast<FlagBool *>(flag)->toggle();
+          FlagBool *fb = static_cast<FlagBool *>(flag);
+
+          fb->toggle();
+          fb->set_position(++position);
 
           /* Check for combined flags, e.g -vAsn. */
           if (!is_long && *value_offset != '\0') {
@@ -227,9 +263,8 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
           }
         } break;
 
-        case Flag::Kind::String: {
-          FlagString *fs = static_cast<FlagString *>(flag);
-
+        case Flag::Kind::String:
+        case Flag::Kind::ManyStrings: {
           if (*value_offset == '\0') {
             /* There is nothing after the flag. Expect next argument to be the
              * value. */
@@ -243,14 +278,24 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
               /* Value is provided with '='. */
               if (*value_offset != '\0') {
-                fs->set(value_offset);
+                if (flag->kind() == Flag::Kind::String) {
+                  static_cast<FlagString *>(flag)->set(value_offset);
+                } else {
+                  static_cast<FlagManyStrings *>(flag)->append(value_offset);
+                }
+                flag->set_position(++position);
               } else {
                 throw Error{"No value provided for '" +
                             flag_name(flag, is_long) + "'"};
               }
             } else if (!is_long) {
               /* Flag is short, value is provided without a separator. */
-              fs->set(value_offset);
+              if (flag->kind() == Flag::Kind::String) {
+                static_cast<FlagString *>(flag)->set(value_offset);
+              } else {
+                static_cast<FlagManyStrings *>(flag)->append(value_offset);
+              }
+              flag->set_position(++position);
             } else {
               throw Error{
                   "Long flags require a separator between the flag and the "
@@ -402,7 +447,7 @@ show_help(std::string_view program_name, const std::vector<Flag *> &flags)
 }
 
 void
-show_error(std::string_view err)
+show_message(std::string_view err)
 {
   std::cerr << "shit: " << err << std::endl;
 }

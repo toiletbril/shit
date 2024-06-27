@@ -25,18 +25,22 @@ struct Flag
   {
     Bool,
     String,
+    ManyStrings,
   };
 
-  Flag(Kind type, char short_name, const std::string &long_name,
-       const std::string &description);
-
   Kind             kind() const;
+  u32              position() const;
+  void             set_position(u32 n);
   char             short_name() const;
   std::string_view long_name() const;
   std::string_view description() const;
 
 protected:
+  Flag(Kind type, char short_name, const std::string &long_name,
+       const std::string &description);
+
   Kind        m_kind;
+  u32         m_position{0}; /* 0 if it wasn't specified. */
   char        m_short_name;
   std::string m_long_name;
   std::string m_description;
@@ -48,7 +52,7 @@ struct FlagBool : public Flag
            const std::string &description);
 
   void toggle();
-  bool enabled() const;
+  bool is_enabled() const;
 
 private:
   bool m_value{};
@@ -60,12 +64,26 @@ struct FlagString : public Flag
              const std::string &description);
 
   void             set(std::string_view v);
-  bool             was_set() const;
-  std::string_view contents() const;
+  bool             is_set() const;
+  std::string_view value() const;
 
 private:
-  bool        m_was_set{false};
+  bool        m_is_set{false};
   std::string m_value{};
+};
+
+struct FlagManyStrings : public Flag
+{
+  FlagManyStrings(char short_name, const std::string &long_name,
+                  const std::string &description);
+
+  void             append(std::string_view v);
+  bool             empty() const;
+  usize            size() const;
+  std::string_view get(usize i) const;
+
+private:
+  std::vector<std::string> m_values{};
 };
 
 /* These return arguments which are not flags. */
@@ -80,6 +98,6 @@ void show_short_version();
 
 void show_help(std::string_view program_name, const std::vector<Flag *> &flags);
 
-void show_error(std::string_view err);
+void show_message(std::string_view err);
 
 } /* namespace shit */
