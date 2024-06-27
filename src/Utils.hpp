@@ -25,12 +25,14 @@ struct ExecContext
   std::optional<os::descriptor> in{std::nullopt};
   std::optional<os::descriptor> out{std::nullopt};
 
+  bool is_builtin() const;
+
   usize                           location() const;
   const std::string              &program() const;
   const std::vector<std::string> &args() const;
 
   void close_fds();
-  bool is_builtin() const;
+  void print_to_stdout(const std::string &s) const;
 
   const std::filesystem::path &program_path() const;
   const Builtin::Kind         &builtin_kind() const;

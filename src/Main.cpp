@@ -16,6 +16,9 @@
 
 FLAG_LIST_DECL();
 
+HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]", "[-OPTIONS] -",
+                   "[-OPTIONS]");
+
 FLAG(INTERACTIVE, Bool, 'i', "interactive",
      "Specify that the shell is interactive.");
 FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
@@ -63,7 +66,11 @@ main(int argc, char **argv)
   file_names.erase(file_names.begin());
 
   if (FLAG_HELP.is_enabled()) {
-    shit::show_help(program_path, FLAG_LIST);
+    std::string h{};
+    h += shit::make_synopsis(program_path, HELP_SYNOPSIS);
+    h += '\n';
+    h += shit::make_flag_help(FLAG_LIST);
+    std::cerr << h << std::endl;
     return EXIT_SUCCESS;
   } else if (FLAG_VERSION.is_enabled()) {
     shit::show_version();

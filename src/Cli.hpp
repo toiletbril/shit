@@ -8,6 +8,11 @@
 
 #define FLAG_LIST T__FLAG_LIST
 
+#define HELP_SYNOPSIS T__FLAG_HELP_SYNOPSIS
+
+#define HELP_SYNOPSIS_DECL(...)                                                \
+  static std::vector<std::string> HELP_SYNOPSIS { __VA_ARGS__ }
+
 #define FLAG_LIST_DECL()                                                       \
   static std::vector<shit::Flag *> FLAG_LIST {}
 
@@ -101,7 +106,9 @@ std::vector<std::string> parse_flags(const std::vector<Flag *> &flags, int argc,
 void show_version();
 void show_short_version();
 
-void show_help(std::string_view program_name, const std::vector<Flag *> &flags);
+std::string make_synopsis(std::string_view                program_name,
+                          const std::vector<std::string> &lines);
+std::string make_flag_help(const std::vector<Flag *> &flags);
 
 void show_message(std::string_view err);
 

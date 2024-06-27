@@ -83,6 +83,15 @@ ExecContext::builtin_kind() const
   throw shit::Error{"builtin_kind() call on a program"};
 }
 
+void
+ExecContext::print_to_stdout(const std::string &s) const
+{
+  if (!os::write_fd(out.value_or(SHIT_STDOUT), s.data(), s.size()).has_value())
+  {
+    throw Error{"Unable to write to stdout"};
+  }
+}
+
 i32
 execute_context(ExecContext &&ec)
 {

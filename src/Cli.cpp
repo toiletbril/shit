@@ -399,32 +399,33 @@ show_short_version()
             << '-' << SHIT_VER_EXTRA << std::endl;
 }
 
-void
-show_help(std::string_view program_name, const std::vector<Flag *> &flags)
+std::string
+make_synopsis(std::string_view                program_name,
+              const std::vector<std::string> &lines)
 {
-  std::string s;
+  std::string s{};
+
+  s += "SYNOPSIS\n";
+
+  for (std::string_view l : lines) {
+    s += "  ";
+    s += program_name;
+    s += ' ';
+    s += l;
+    s += '\n';
+  }
+
+  return s;
+}
+
+std::string
+make_flag_help(const std::vector<Flag *> &flags)
+{
+  std::string s{};
 
   static constexpr usize MAX_WIDTH = 24;
   static constexpr usize LONG_PADDING = 6;
 
-  s += "SYNOPSIS\n";
-
-  s += "  ";
-  s += program_name;
-  s += ' ';
-  s += "[-OPTIONS] [--] <file1> [file2, ...]\n";
-
-  s += "  ";
-  s += program_name;
-  s += ' ';
-  s += "[-OPTIONS] -\n";
-
-  s += "  ";
-  s += program_name;
-  s += ' ';
-  s += "[-OPTIONS]\n";
-
-  s += '\n';
   s += "OPTIONS";
   for (const shit::Flag *f : flags) {
     s += "\n";
@@ -471,7 +472,7 @@ show_help(std::string_view program_name, const std::vector<Flag *> &flags)
     s += f->description();
   }
 
-  std::cerr << s << std::endl;
+  return s;
 }
 
 void

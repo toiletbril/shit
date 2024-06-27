@@ -3,6 +3,11 @@ MODE ?= dbg
 
 SOURCES := $(wildcard *.cpp)
 HEADERS := $(wildcard *.hpp)
+
+# Subfolders.
+SOURCES += $(wildcard */**.cpp)
+HEADERS += $(wildcard */**.hpp)
+
 OBJECTS := $(SOURCES:%.cpp=o/$(MODE)/%.o)
 
 ifeq ($(OS), Windows_NT)
@@ -69,11 +74,14 @@ o/$(MODE)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
 $(OUT): $(OBJECTS)
-	echo "	CXX $(OBJECTS)	-o $(OUT)"
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(OUT)
+	echo "	CXX $(OBJECTS)	-o $@"
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@
 
-shit:
+dirs:
 	mkdir -p o/$(MODE)/
+	mkdir -p o/$(MODE)/builtin
+
+shit: dirs
 	$(MAKE) $(OUT)
 	echo "Compilation succeeded."
 
@@ -103,4 +111,4 @@ clean:
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
 	rm -rf $(OUT).com.dbg $(OUT).aarch64.elf # Cosmopolitan
 
-.PHONY: sanity shit compile install fmt clean
+.PHONY: dirs shit install tidy fmt clean

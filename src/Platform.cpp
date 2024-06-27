@@ -19,7 +19,7 @@ namespace shit {
 namespace os {
 
 std::optional<usize>
-write_fd(os::descriptor fd, void *buf, usize size)
+write_fd(os::descriptor fd, const void *buf, usize size)
 {
   ssize_t w = write(fd, buf, size);
   if (w == -1) {
