@@ -1,0 +1,14 @@
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "../shit -AE -c echo 1 -c echo 2"]
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "echo 1"]
+1
+[Code 0]
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "echo 2"]
+2
+[Code 0]
+[Code 0]

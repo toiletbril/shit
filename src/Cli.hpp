@@ -29,7 +29,7 @@ struct Flag
   };
 
   Kind             kind() const;
-  u32              position() const;
+  usize            position() const;
   void             set_position(u32 n);
   char             short_name() const;
   std::string_view long_name() const;
@@ -40,7 +40,7 @@ protected:
        const std::string &description);
 
   Kind        m_kind;
-  u32         m_position{0}; /* 0 if it wasn't specified. */
+  usize       m_position{0}; /* 0 if it wasn't specified. */
   char        m_short_name;
   std::string m_long_name;
   std::string m_description;
@@ -77,13 +77,18 @@ struct FlagManyStrings : public Flag
   FlagManyStrings(char short_name, const std::string &long_name,
                   const std::string &description);
 
-  void             append(std::string_view v);
-  bool             empty() const;
-  usize            size() const;
+  void  append(std::string_view v);
+  usize size() const;
+  bool  is_empty() const;
+
   std::string_view get(usize i) const;
+
+  std::string_view next();
+  bool             at_end() const;
 
 private:
   std::vector<std::string> m_values{};
+  usize                    m_value_position{0};
 };
 
 /* These return arguments which are not flags. */

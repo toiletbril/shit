@@ -19,7 +19,8 @@ FLAG_LIST_DECL();
 FLAG(INTERACTIVE, Bool, 'i', "interactive",
      "Specify that the shell is interactive.");
 FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
-FLAG(COMMAND, String, 'c', "command", "Execute specified command and exit.");
+FLAG(COMMAND, ManyStrings, 'c', "command",
+     "Execute specified command and exit. Can be specified multiple times.");
 FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
 
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
@@ -57,13 +58,6 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
-      FLAG_ERROR_EXIT.is_enabled() || FLAG_DISABLE_EXPANSION.is_enabled() ||
-      FLAG_VERBOSE.is_enabled() || FLAG_EXPAND_VERBOSE.is_enabled())
-  {
-    shit::show_message("One or more unimplemented options were ignored.");
-  }
-
   /* Program path is the first argument. Pull it out and get rid of it. */
   std::string program_path = file_names[0];
   file_names.erase(file_names.begin());
@@ -79,13 +73,31 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  bool should_quit = false;
+  /* Figure out what to do. Note that "-c" can be specified multiple times.
+   * Option precedence should behave as follows: "-s", then files (arguments),
+   * then "-i" (or no arguments). */
+  bool should_read_files = !file_names.empty();
+  bool should_read_stdin = FLAG_STDIN.is_enabled();
+  bool should_execute_commands = !FLAG_COMMAND.is_empty();
+  bool should_be_interactive =
+      (!should_execute_commands && FLAG_INTERACTIVE.is_enabled()) ||
+      (!should_read_files && !should_read_stdin);
 
-  if (FLAG_STDIN.is_enabled() || FLAG_COMMAND.is_set()) {
-    should_quit = true;
+  if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
+    shit::show_message(
+        "Both '-s' and '-i' options are specified. Falling back to only '-s'.");
   }
 
+  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
+      FLAG_DISABLE_EXPANSION.is_enabled() || FLAG_VERBOSE.is_enabled() ||
+      FLAG_EXPAND_VERBOSE.is_enabled())
+  {
+    shit::show_message("One or more unimplemented options were ignored.");
+  }
+
+  /* Main loop state. */
   usize arg_index = 0;
+  bool  should_quit = false;
   int   exit_code = EXIT_SUCCESS;
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,
@@ -105,11 +117,47 @@ main(int argc, char **argv)
 
     /* Figure out what to do and retrieve the code. */
     try {
-      /* If we weren't given any arguments or -c=..., fire up the toiletline. */
-      if ((file_names.empty() && !FLAG_COMMAND.is_set() &&
-           !FLAG_STDIN.is_enabled()) ||
-          FLAG_INTERACTIVE.is_enabled())
-      {
+      if (should_read_files || should_read_stdin) {
+        /* Were we given a list of files or "-s" flag? */
+        std::fstream  f{};
+        std::istream *file{};
+
+        /* If "-s" is used, or when file name is "-", use stdin. */
+        if (should_read_stdin || file_names[arg_index] == "-") {
+          /* Exit if "-s" is present. */
+          should_quit = should_quit || should_read_stdin;
+          file = &std::cin;
+        } else {
+          /* Otherwise, process the actual file name. */
+          f = std::fstream{file_names[arg_index],
+                           std::fstream::in | std::fstream::binary};
+          if (!f.is_open()) {
+            throw shit::Error{"Could not open '" + file_names[arg_index] +
+                              "': " + shit::os::last_system_error_message()};
+          }
+          file = &f;
+        }
+
+        for (;;) {
+          char ch = file->get();
+          if (file->bad()) {
+            throw shit::Error{"Could not read '" + file_names[arg_index] +
+                              "': " + shit::os::last_system_error_message()};
+          } else if (file->eof()) {
+            break;
+          }
+          contents += ch;
+        }
+
+        if ((arg_index += 1) == file_names.size()) {
+          should_quit = true;
+        }
+      } else if (should_execute_commands) {
+        contents = FLAG_COMMAND.next();
+        if (FLAG_COMMAND.at_end()) {
+          should_quit = true;
+        }
+      } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();
           toiletline::initialize();
@@ -160,43 +208,8 @@ main(int argc, char **argv)
         }
 
         toiletline::exit_raw_mode();
-      } else if (FLAG_COMMAND.is_set()) {
-        /* Were we given -c flag? */
-        contents = FLAG_COMMAND.value();
       } else {
-        /* Were we given a list of files? */
-        if (arg_index + 1 == file_names.size())
-          should_quit = true;
-
-        std::fstream  f{};
-        std::istream *file{};
-
-        /* If -s is used, or when file name is "-", use stdin. */
-        if (FLAG_STDIN.is_enabled() || file_names[arg_index] == "-") {
-          file = &std::cin;
-        } else {
-          /* Otherwise, process the actual file name. */
-          f = std::fstream{file_names[arg_index],
-                           std::fstream::in | std::fstream::binary};
-          if (!f.is_open()) {
-            throw shit::Error{"Could not open '" + file_names[arg_index] +
-                              "': " + shit::os::last_system_error_message()};
-          }
-          file = &f;
-        }
-
-        for (;;) {
-          char ch = file->get();
-          if (file->bad()) {
-            throw shit::Error{"Could not read '" + file_names[arg_index] +
-                              "': " + shit::os::last_system_error_message()};
-          } else if (file->eof()) {
-            break;
-          }
-          contents += ch;
-        }
-
-        arg_index++;
+        SHIT_UNREACHABLE();
       }
     } catch (shit::Error &e) {
       shit::show_message(e.to_string());
@@ -206,9 +219,10 @@ main(int argc, char **argv)
       shit::show_message("what(): " + std::string{e.what()});
       shit::utils::quit(EXIT_FAILURE);
     } catch (...) {
-      shit::show_message("Unexpected system explosion while getting the input.");
+      shit::show_message(
+          "Unexpected system explosion while getting the input.");
       shit::show_message("Last system message: " +
-                       shit::os::last_system_error_message());
+                         shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
 
@@ -238,9 +252,10 @@ main(int argc, char **argv)
       shit::show_message("Uncaught std::exception while executing the AST.");
       shit::show_message("what(): " + std::string{e.what()});
     } catch (...) {
-      shit::show_message("Unexpected system explosion while executing the AST.");
+      shit::show_message(
+          "Unexpected system explosion while executing the AST.");
       shit::show_message("Last system message: " +
-                       shit::os::last_system_error_message());
+                         shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
 

@@ -32,6 +32,12 @@ Flag::set_position(u32 n)
   m_position = n;
 }
 
+usize
+Flag::position() const
+{
+  return m_position;
+}
+
 char
 Flag::short_name() const
 {
@@ -102,7 +108,7 @@ FlagString::value() const
  */
 FlagManyStrings::FlagManyStrings(char short_name, const std::string &long_name,
                                  const std::string &description)
-    : Flag(Flag::Kind::String, short_name, long_name, description)
+    : Flag(Flag::Kind::ManyStrings, short_name, long_name, description)
 {}
 
 void
@@ -112,7 +118,7 @@ FlagManyStrings::append(std::string_view v)
 }
 
 bool
-FlagManyStrings::empty() const
+FlagManyStrings::is_empty() const
 {
   return m_values.empty();
 }
@@ -121,6 +127,24 @@ usize
 FlagManyStrings::size() const
 {
   return m_values.size();
+}
+
+std::string_view
+FlagManyStrings::get(usize i) const
+{
+  return m_values[i];
+}
+
+std::string_view
+FlagManyStrings::next()
+{
+  return m_values[m_value_position++];
+}
+
+bool
+FlagManyStrings::at_end() const
+{
+  return m_value_position == size();
 }
 
 static bool
@@ -194,7 +218,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
   SHIT_ASSERT(argv);
 
-  u32 position = 0;
+  u32                      position = 0;
   std::vector<std::string> args{};
 
   Flag *prev_flag{};
@@ -207,7 +231,11 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
     if (next_arg_is_value) {
       next_arg_is_value = false;
-      static_cast<FlagString *>(prev_flag)->set(argv[i]);
+      if (prev_flag->kind() == Flag::Kind::String) {
+        static_cast<FlagString *>(prev_flag)->set(argv[i]);
+      } else {
+        static_cast<FlagManyStrings *>(prev_flag)->append(argv[i]);
+      }
       continue;
     }
 
