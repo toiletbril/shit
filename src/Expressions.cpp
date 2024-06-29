@@ -23,8 +23,17 @@ EvalContext::add_evaluated_expression()
 }
 
 void
+EvalContext::add_expansion()
+{
+  m_expansions_last++;
+}
+
+void
 EvalContext::end_command()
 {
+  m_expansions_total += m_expansions_last;
+  m_expansions_last = 0;
+
   m_expressions_executed_total += m_expressions_executed_last;
   m_expressions_executed_last = 0;
 }
@@ -33,16 +42,24 @@ std::string
 EvalContext::make_stats_string() const
 {
   std::string s{};
+
   s += "[Statistics:\n";
 
   s += EXPRESSION_DOUBLE_AST_INDENT;
+  s += "Expansions: " + std::to_string(last_expansion_count());
+  s += '\n';
+  s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Nodes evaluated: " + std::to_string(last_expressions_executed());
+  s += '\n';
+  s += EXPRESSION_DOUBLE_AST_INDENT;
+  s += "Total expansions: " + std::to_string(total_expansion_count());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Total nodes evaluated: " + std::to_string(total_expressions_executed());
   s += '\n';
 
   s += "]";
+
   return s;
 }
 
@@ -56,6 +73,18 @@ usize
 EvalContext::total_expressions_executed() const
 {
   return m_expressions_executed_total + m_expressions_executed_last;
+}
+
+usize
+EvalContext::last_expansion_count() const
+{
+  return m_expansions_last;
+}
+
+usize
+EvalContext::total_expansion_count() const
+{
+  return m_expansions_total + m_expansions_last;
 }
 
 std::vector<std::string>

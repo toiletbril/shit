@@ -289,12 +289,21 @@ struct String : public Value
   Flags flags() const override;
 };
 
-struct ExpandableString : public Value
+/* Expand cases:
+ * 1. ~[user]/some/path;
+ * 2. /some/path/file*;
+ * 5. $VARIABLE. */
+struct Expandable : public Token
 {
-  ExpandableString(usize location, std::string_view sv);
+  Expandable(usize location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
+
+protected:
+  std::string m_raw_value{};
+
+  virtual std::string expanded_value(EvalContext &cxt) const = 0;
 };
 
 struct Identifier : Value

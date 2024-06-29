@@ -14,6 +14,8 @@ struct EvalContext
   EvalContext();
 
   void add_evaluated_expression();
+  void add_expansion();
+
   void end_command();
 
   std::vector<std::string>
@@ -24,9 +26,14 @@ struct EvalContext
   usize last_expressions_executed() const;
   usize total_expressions_executed() const;
 
+  usize last_expansion_count() const;
+  usize total_expansion_count() const;
+
 protected:
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
+  usize m_expansions_last{0};
+  usize m_expansions_total{0};
 };
 
 struct Expression

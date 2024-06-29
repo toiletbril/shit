@@ -254,6 +254,34 @@ String::flags() const
 }
 
 /**
+ * class: ExpandableString
+ */
+Expandable::Expandable(usize location, std::string_view sv)
+    : Token(location), m_raw_value(sv)
+{}
+
+Token::Kind
+Expandable::kind() const
+{
+  return Token::Kind::ExpandableString;
+}
+
+Token::Flags
+Expandable::flags() const
+{
+  return Token::Flag::Value;
+}
+
+std::string
+Expandable::expanded_value(EvalContext &cxt) const
+{
+  cxt.add_expansion();
+
+  std::string s{};
+  return s;
+}
+
+/**
  * class: Identifier
  */
 Identifier::Identifier(usize location, std::string_view sv)
