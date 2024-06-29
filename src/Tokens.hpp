@@ -37,6 +37,7 @@ struct Token
     /* Values */
     Number,
     String,
+    ExpandableString,
     Identifier,
 
     /* Operators */
@@ -113,144 +114,146 @@ const std::unordered_map<std::string, Token::Kind> KEYWORDS = {
     {"fi",   Token::Kind::Fi  },
 };
 
-struct TokenIf : public Token
+namespace tokens {
+
+struct If : public Token
 {
-  TokenIf(usize location);
+  If(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenFi : public Token
+struct Fi : public Token
 {
-  TokenFi(usize location);
+  Fi(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenElse : public Token
+struct Else : public Token
 {
-  TokenElse(usize location);
+  Else(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenThen : public Token
+struct Then : public Token
 {
-  TokenThen(usize location);
+  Then(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenEndOfFile : public Token
+struct EndOfFile : public Token
 {
-  TokenEndOfFile(usize location);
+  EndOfFile(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenSemicolon : public Token
+struct Semicolon : public Token
 {
-  TokenSemicolon(usize location);
+  Semicolon(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenDot : public Token
+struct Dot : public Token
 {
-  TokenDot(usize location);
+  Dot(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenDollar : public Token
+struct Dollar : public Token
 {
-  TokenDollar(usize location);
+  Dollar(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenLeftParen : public Token
+struct LeftParen : public Token
 {
-  TokenLeftParen(usize location);
+  LeftParen(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenRightParen : public Token
+struct RightParen : public Token
 {
-  TokenRightParen(usize location);
+  RightParen(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenLeftSquareBracket : public Token
+struct LeftSquareBracket : public Token
 {
-  TokenLeftSquareBracket(usize location);
+  LeftSquareBracket(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenRightSquareBracket : public Token
+struct RightSquareBracket : public Token
 {
-  TokenRightSquareBracket(usize location);
+  RightSquareBracket(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenDoubleLeftSquareBracket : public Token
+struct DoubleLeftSquareBracket : public Token
 {
-  TokenDoubleLeftSquareBracket(usize location);
+  DoubleLeftSquareBracket(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenDoubleRightSquareBracket : public Token
+struct DoubleRightSquareBracket : public Token
 {
-  TokenDoubleRightSquareBracket(usize location);
+  DoubleRightSquareBracket(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenRightBracket : public Token
+struct RightBracket : public Token
 {
-  TokenRightBracket(usize location);
+  RightBracket(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
   std::string value() const override;
 };
 
-struct TokenLeftBracket : public Token
+struct LeftBracket : public Token
 {
-  TokenLeftBracket(usize location);
+  LeftBracket(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -260,9 +263,9 @@ struct TokenLeftBracket : public Token
 /**
  * Tokens with important values
  */
-struct TokenValue : public Token
+struct Value : public Token
 {
-  TokenValue(usize location, std::string_view sv);
+  Value(usize location, std::string_view sv);
 
   std::string value() const override;
 
@@ -270,25 +273,33 @@ protected:
   std::string m_value;
 };
 
-struct TokenNumber : public TokenValue
+struct Number : public Value
 {
-  TokenNumber(usize location, std::string_view sv);
+  Number(usize location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
 };
 
-struct TokenString : public TokenValue
+struct String : public Value
 {
-  TokenString(usize location, std::string_view sv);
+  String(usize location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
 };
 
-struct TokenIdentifier : public TokenValue
+struct ExpandableString : public Value
 {
-  TokenIdentifier(usize location, std::string_view sv);
+  ExpandableString(usize location, std::string_view sv);
+
+  Kind  kind() const override;
+  Flags flags() const override;
+};
+
+struct Identifier : Value
+{
+  Identifier(usize location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
@@ -297,9 +308,9 @@ struct TokenIdentifier : public TokenValue
 /**
  * Operators
  */
-struct TokenOperator : public Token
+struct Operator : public Token
 {
-  TokenOperator(usize location);
+  Operator(usize location);
 
   virtual bool binary_left_associative() const;
 
@@ -313,9 +324,9 @@ struct TokenOperator : public Token
   construct_unary_expression(const Expression *rhs) const;
 };
 
-struct TokenPlus : public TokenOperator
+struct Plus : Operator
 {
-  TokenPlus(usize location);
+  Plus(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -331,9 +342,9 @@ struct TokenPlus : public TokenOperator
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct TokenMinus : public TokenOperator
+struct Minus : Operator
 {
-  TokenMinus(usize location);
+  Minus(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -349,9 +360,9 @@ struct TokenMinus : public TokenOperator
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct TokenSlash : public TokenOperator
+struct Slash : Operator
 {
-  TokenSlash(usize location);
+  Slash(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -363,9 +374,9 @@ struct TokenSlash : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenAsterisk : public TokenOperator
+struct Asterisk : Operator
 {
-  TokenAsterisk(usize location);
+  Asterisk(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -377,9 +388,9 @@ struct TokenAsterisk : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenPercent : public TokenOperator
+struct Percent : Operator
 {
-  TokenPercent(usize location);
+  Percent(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -391,9 +402,9 @@ struct TokenPercent : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenTilde : public TokenOperator
+struct Tilde : Operator
 {
-  TokenTilde(usize location);
+  Tilde(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -404,9 +415,9 @@ struct TokenTilde : public TokenOperator
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct TokenExclamationMark : public TokenOperator
+struct ExclamationMark : Operator
 {
-  TokenExclamationMark(usize location);
+  ExclamationMark(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -417,9 +428,9 @@ struct TokenExclamationMark : public TokenOperator
   construct_unary_expression(const Expression *rhs) const override;
 };
 
-struct TokenAmpersand : public TokenOperator
+struct Ampersand : Operator
 {
-  TokenAmpersand(usize location);
+  Ampersand(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -431,9 +442,9 @@ struct TokenAmpersand : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenDoubleAmpersand : public TokenOperator
+struct DoubleAmpersand : Operator
 {
-  TokenDoubleAmpersand(usize location);
+  DoubleAmpersand(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -445,9 +456,9 @@ struct TokenDoubleAmpersand : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenGreater : public TokenOperator
+struct Greater : Operator
 {
-  TokenGreater(usize location);
+  Greater(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -459,9 +470,9 @@ struct TokenGreater : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenDoubleGreater : public TokenOperator
+struct DoubleGreater : Operator
 {
-  TokenDoubleGreater(usize location);
+  DoubleGreater(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -473,9 +484,9 @@ struct TokenDoubleGreater : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenGreaterEquals : public TokenOperator
+struct GreaterEquals : Operator
 {
-  TokenGreaterEquals(usize location);
+  GreaterEquals(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -487,9 +498,9 @@ struct TokenGreaterEquals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenLess : public TokenOperator
+struct Less : Operator
 {
-  TokenLess(usize location);
+  Less(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -501,9 +512,9 @@ struct TokenLess : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenDoubleLess : public TokenOperator
+struct DoubleLess : Operator
 {
-  TokenDoubleLess(usize location);
+  DoubleLess(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -515,9 +526,9 @@ struct TokenDoubleLess : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenLessEquals : public TokenOperator
+struct LessEquals : Operator
 {
-  TokenLessEquals(usize location);
+  LessEquals(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -529,9 +540,9 @@ struct TokenLessEquals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenPipe : public TokenOperator
+struct Pipe : Operator
 {
-  TokenPipe(usize location);
+  Pipe(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -543,9 +554,9 @@ struct TokenPipe : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenDoublePipe : public TokenOperator
+struct DoublePipe : Operator
 {
-  TokenDoublePipe(usize location);
+  DoublePipe(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -557,9 +568,9 @@ struct TokenDoublePipe : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenCap : public TokenOperator
+struct Cap : Operator
 {
-  TokenCap(usize location);
+  Cap(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -571,9 +582,9 @@ struct TokenCap : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenEquals : public TokenOperator
+struct Equals : Operator
 {
-  TokenEquals(usize location);
+  Equals(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -585,9 +596,9 @@ struct TokenEquals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenDoubleEquals : public TokenOperator
+struct DoubleEquals : Operator
 {
-  TokenDoubleEquals(usize location);
+  DoubleEquals(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -599,9 +610,9 @@ struct TokenDoubleEquals : public TokenOperator
                               const Expression *rhs) const override;
 };
 
-struct TokenExclamationEquals : public TokenOperator
+struct ExclamationEquals : Operator
 {
-  TokenExclamationEquals(usize location);
+  ExclamationEquals(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -612,5 +623,7 @@ struct TokenExclamationEquals : public TokenOperator
   construct_binary_expression(const Expression *lhs,
                               const Expression *rhs) const override;
 };
+
+} /* namespace tokens */
 
 } /* namespace shit */

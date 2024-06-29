@@ -279,7 +279,8 @@ Parser::parse_expression(u8 min_precedence)
   /* Now it's either a unary operator or something odd */
   default:
     if (t->flags() & Token::Flag::UnaryOperator) {
-      const TokenOperator *op = static_cast<const TokenOperator *>(t.get());
+      const tokens::Operator *op =
+          static_cast<const tokens::Operator *>(t.get());
 
       std::unique_ptr<Expression> rhs =
           parse_expression(op->unary_precedence());
@@ -341,8 +342,8 @@ Parser::parse_expression(u8 min_precedence)
                                   maybe_op->value() + "'"};
     }
 
-    const TokenOperator *op =
-        static_cast<const TokenOperator *>(maybe_op.get());
+    const tokens::Operator *op =
+        static_cast<const tokens::Operator *>(maybe_op.get());
     if (op->left_precedence() < min_precedence)
       break;
     m_lexer.advance_past_last_peek();

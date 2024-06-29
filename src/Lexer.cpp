@@ -172,7 +172,7 @@ Lexer::lex_expression_token()
     }
   }
 
-  return new TokenEndOfFile{m_cursor_position};
+  return new tokens::EndOfFile{m_cursor_position};
 }
 
 Token *
@@ -190,7 +190,7 @@ Lexer::lex_shell_token()
     }
   }
 
-  return new TokenEndOfFile{m_cursor_position};
+  return new tokens::EndOfFile{m_cursor_position};
 }
 
 void
@@ -232,7 +232,7 @@ Lexer::lex_number()
     length++;
   }
 
-  Token *num = new TokenNumber{m_cursor_position, n};
+  Token *num = new tokens::Number{m_cursor_position, n};
   m_cached_offset = length;
 
   return num;
@@ -259,15 +259,15 @@ Lexer::lex_identifier()
   if (auto kw = KEYWORDS.find(lower_id); kw != KEYWORDS.end()) {
     switch (kw->second) {
       /* clang-format off */
-    case Token::Kind::If:   t = new TokenIf{m_cursor_position}; break;
-    case Token::Kind::Then: t = new TokenThen{m_cursor_position}; break;
-    case Token::Kind::Else: t = new TokenElse{m_cursor_position}; break;
-    case Token::Kind::Fi:   t = new TokenFi{m_cursor_position}; break;
+    case Token::Kind::If:   t = new tokens::If{m_cursor_position}; break;
+    case Token::Kind::Then: t = new tokens::Then{m_cursor_position}; break;
+    case Token::Kind::Else: t = new tokens::Else{m_cursor_position}; break;
+    case Token::Kind::Fi:   t = new tokens::Fi{m_cursor_position}; break;
       /* clang-format on */
     default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
     }
   } else {
-    t = new TokenIdentifier{m_cursor_position, id};
+    t = new tokens::Identifier{m_cursor_position, id};
   }
 
   m_cached_offset = length;
@@ -296,7 +296,7 @@ Lexer::lex_string(char quote_char)
   }
 
   /* Skip the first and last quote here too. */
-  TokenString *str = new TokenString{m_cursor_position, str_str};
+  tokens::String *str = new tokens::String{m_cursor_position, str_str};
 
   /* Account for the quote char. */
   m_cached_offset = length + 1;
@@ -346,99 +346,99 @@ Lexer::lex_sentinel()
   if (auto op = OPERATORS.find(ch); op != OPERATORS.end()) {
     switch (op->second) {
       /* clang-format off */
-    case Token::Kind::RightParen:   t = new TokenRightParen{m_cursor_position}; break;
-    case Token::Kind::LeftParen:    t = new TokenLeftParen{m_cursor_position}; break;
-    case Token::Kind::RightBracket: t = new TokenRightBracket{m_cursor_position}; break;
-    case Token::Kind::LeftBracket:  t = new TokenLeftBracket{m_cursor_position}; break;
+    case Token::Kind::RightParen:   t = new tokens::RightParen{m_cursor_position}; break;
+    case Token::Kind::LeftParen:    t = new tokens::LeftParen{m_cursor_position}; break;
+    case Token::Kind::RightBracket: t = new tokens::RightBracket{m_cursor_position}; break;
+    case Token::Kind::LeftBracket:  t = new tokens::LeftBracket{m_cursor_position}; break;
 
-    case Token::Kind::Semicolon:    t = new TokenSemicolon{m_cursor_position}; break;
-    case Token::Kind::Dot:          t = new TokenDot{m_cursor_position}; break;
-    case Token::Kind::Dollar:       t = new TokenDollar{m_cursor_position}; break;
+    case Token::Kind::Semicolon:    t = new tokens::Semicolon{m_cursor_position}; break;
+    case Token::Kind::Dot:          t = new tokens::Dot{m_cursor_position}; break;
+    case Token::Kind::Dollar:       t = new tokens::Dollar{m_cursor_position}; break;
 
-    case Token::Kind::Plus:         t = new TokenPlus{m_cursor_position}; break;
-    case Token::Kind::Minus:        t = new TokenMinus{m_cursor_position}; break;
-    case Token::Kind::Asterisk:     t = new TokenAsterisk{m_cursor_position}; break;
-    case Token::Kind::Slash:        t = new TokenSlash{m_cursor_position}; break;
-    case Token::Kind::Percent:      t = new TokenPercent{m_cursor_position}; break;
-    case Token::Kind::Tilde:        t = new TokenTilde{m_cursor_position}; break;
-    case Token::Kind::Cap:          t = new TokenCap{m_cursor_position}; break;
+    case Token::Kind::Plus:         t = new tokens::Plus{m_cursor_position}; break;
+    case Token::Kind::Minus:        t = new tokens::Minus{m_cursor_position}; break;
+    case Token::Kind::Asterisk:     t = new tokens::Asterisk{m_cursor_position}; break;
+    case Token::Kind::Slash:        t = new tokens::Slash{m_cursor_position}; break;
+    case Token::Kind::Percent:      t = new tokens::Percent{m_cursor_position}; break;
+    case Token::Kind::Tilde:        t = new tokens::Tilde{m_cursor_position}; break;
+    case Token::Kind::Cap:          t = new tokens::Cap{m_cursor_position}; break;
       /* clang-format on */
 
     case Token::Kind::RightSquareBracket: {
       if (chop_character(1) == ']') {
-        t = new TokenDoubleRightSquareBracket{m_cursor_position};
+        t = new tokens::DoubleRightSquareBracket{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenRightSquareBracket{m_cursor_position};
+        t = new tokens::RightSquareBracket{m_cursor_position};
       }
     } break;
 
     case Token::Kind::LeftSquareBracket: {
       if (chop_character(1) == '[') {
-        t = new TokenDoubleLeftSquareBracket{m_cursor_position};
+        t = new tokens::DoubleLeftSquareBracket{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenLeftSquareBracket{m_cursor_position};
+        t = new tokens::LeftSquareBracket{m_cursor_position};
       }
     } break;
 
     case Token::Kind::ExclamationMark: {
       if (chop_character(1) == '=') {
-        t = new TokenExclamationEquals{m_cursor_position};
+        t = new tokens::ExclamationEquals{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenExclamationMark{m_cursor_position};
+        t = new tokens::ExclamationMark{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Ampersand: {
       if (chop_character(1) == '&') {
-        t = new TokenDoubleAmpersand{m_cursor_position};
+        t = new tokens::DoubleAmpersand{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenAmpersand{m_cursor_position};
+        t = new tokens::Ampersand{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Greater: {
       if (chop_character(1) == '>') {
-        t = new TokenDoubleGreater{m_cursor_position};
+        t = new tokens::DoubleGreater{m_cursor_position};
         extra_length++;
       } else if (chop_character(1) == '=') {
-        t = new TokenGreaterEquals{m_cursor_position};
+        t = new tokens::GreaterEquals{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenGreater{m_cursor_position};
+        t = new tokens::Greater{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Less: {
       if (chop_character(1) == '<') {
-        t = new TokenDoubleLess{m_cursor_position};
+        t = new tokens::DoubleLess{m_cursor_position};
         extra_length++;
       } else if (chop_character(1) == '=') {
-        t = new TokenLessEquals{m_cursor_position};
+        t = new tokens::LessEquals{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenLess{m_cursor_position};
+        t = new tokens::Less{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Pipe: {
       if (chop_character(1) == '|') {
-        t = new TokenDoublePipe{m_cursor_position};
+        t = new tokens::DoublePipe{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenPipe{m_cursor_position};
+        t = new tokens::Pipe{m_cursor_position};
       }
     } break;
 
     case Token::Kind::Equals: {
       if (chop_character(1) == '=') {
-        t = new TokenDoubleEquals{m_cursor_position};
+        t = new tokens::DoubleEquals{m_cursor_position};
         extra_length++;
       } else {
-        t = new TokenEquals{m_cursor_position};
+        t = new tokens::Equals{m_cursor_position};
       }
     } break;
 
