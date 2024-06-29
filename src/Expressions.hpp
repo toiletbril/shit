@@ -56,6 +56,8 @@ protected:
   usize m_location{std::string::npos};
 };
 
+namespace expressions {
+
 struct If : public Expression
 {
   If(usize location, const Expression *condition, const Expression *then,
@@ -430,5 +432,7 @@ struct NotEqual : public BinaryExpression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 };
+
+} /* namespace expressions */
 
 } /* namespace shit */

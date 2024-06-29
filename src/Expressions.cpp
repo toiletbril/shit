@@ -97,6 +97,8 @@ Expression::evaluate(EvalContext &cxt) const
   return evaluate_impl(cxt);
 }
 
+namespace expressions {
+
 /**
  * class: If
  */
@@ -982,5 +984,7 @@ NotEqual::evaluate_impl(EvalContext &cxt) const
 {
   return m_lhs->evaluate(cxt) != m_rhs->evaluate(cxt);
 }
+
+} /* namespace expressions */
 
 } /* namespace shit */

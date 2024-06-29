@@ -24,7 +24,7 @@ Token::to_ast_string() const
 namespace tokens {
 
 /**
- * class: TokenIf
+ * class: If
  */
 If::If(usize location) : Token(location) {}
 
@@ -47,7 +47,7 @@ If::value() const
 }
 
 /**
- * class: TokenElse
+ * class: Else
  */
 Else::Else(usize location) : Token(location) {}
 
@@ -70,7 +70,7 @@ Else::value() const
 }
 
 /**
- * class: TokenThen
+ * class: Then
  */
 Then::Then(usize location) : Token(location) {}
 
@@ -93,7 +93,7 @@ Then::value() const
 }
 
 /**
- * class: TokenFi
+ * class: Fi
  */
 Fi::Fi(usize location) : Token(location) {}
 
@@ -116,7 +116,7 @@ Fi::value() const
 }
 
 /**
- * class: TokenEndOfFile
+ * class: EndOfFile
  */
 EndOfFile::EndOfFile(usize location) : Token(location) {}
 
@@ -139,7 +139,7 @@ EndOfFile::value() const
 }
 
 /**
- * class: TokenSemicolon
+ * class: Semicolon
  */
 Semicolon::Semicolon(usize location) : Token(location) {}
 
@@ -162,7 +162,7 @@ Semicolon::value() const
 }
 
 /**
- * class: TokenDot
+ * class: Dot
  */
 Dot::Dot(usize location) : Token(location) {}
 
@@ -185,7 +185,7 @@ Dot::value() const
 }
 
 /**
- * class: TokenDollar
+ * class: Dollar
  */
 Dollar::Dollar(usize location) : Token(location) {}
 
@@ -210,8 +210,7 @@ Dollar::value() const
 /**
  * class: Value
  */
-Value::Value(usize location, std::string_view sv)
-    : Token(location), m_value(sv)
+Value::Value(usize location, std::string_view sv) : Token(location), m_value(sv)
 {}
 
 std::string
@@ -221,11 +220,9 @@ Value::value() const
 }
 
 /**
- * class: TokenNumber
+ * class: Number
  */
-Number::Number(usize location, std::string_view sv)
-    : Value(location, sv)
-{}
+Number::Number(usize location, std::string_view sv) : Value(location, sv) {}
 
 Token::Kind
 Number::kind() const
@@ -240,11 +237,9 @@ Number::flags() const
 }
 
 /**
- * class: TokenString
+ * class: String
  */
-String::String(usize location, std::string_view sv)
-    : Value(location, sv)
-{}
+String::String(usize location, std::string_view sv) : Value(location, sv) {}
 
 Token::Kind
 String::kind() const
@@ -259,7 +254,7 @@ String::flags() const
 }
 
 /**
- * class: TokenIdentifier
+ * class: Identifier
  */
 Identifier::Identifier(usize location, std::string_view sv)
     : Value(location, sv)
@@ -302,7 +297,7 @@ Operator::binary_left_associative() const
 
 std::unique_ptr<Expression>
 Operator::construct_binary_expression(const Expression *lhs,
-                                           const Expression *rhs) const
+                                      const Expression *rhs) const
 {
   SHIT_UNUSED(lhs);
   SHIT_UNUSED(rhs);
@@ -318,7 +313,7 @@ Operator::construct_unary_expression(const Expression *rhs) const
 }
 
 /**
- * class: TokenPlus
+ * class: Plus
  */
 Plus::Plus(usize location) : Operator(location) {}
 
@@ -354,19 +349,19 @@ Plus::unary_precedence() const
 
 std::unique_ptr<Expression>
 Plus::construct_binary_expression(const Expression *lhs,
-                                       const Expression *rhs) const
+                                  const Expression *rhs) const
 {
-  return std::make_unique<Add>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::Add>(source_location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
 Plus::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<Unnegate>(source_location(), rhs);
+  return std::make_unique<expressions::Unnegate>(source_location(), rhs);
 }
 
 /**
- * class: TokenMinus
+ * class: Minus
  */
 Minus::Minus(usize location) : Operator(location) {}
 
@@ -402,19 +397,19 @@ Minus::unary_precedence() const
 
 std::unique_ptr<Expression>
 Minus::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
+                                   const Expression *rhs) const
 {
-  return std::make_unique<Subtract>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::Subtract>(source_location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
 Minus::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<Negate>(source_location(), rhs);
+  return std::make_unique<expressions::Negate>(source_location(), rhs);
 }
 
 /**
- * class: TokenSlash
+ * class: Slash
  */
 Slash::Slash(usize location) : Operator(location) {}
 
@@ -444,13 +439,13 @@ Slash::left_precedence() const
 
 std::unique_ptr<Expression>
 Slash::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
+                                   const Expression *rhs) const
 {
-  return std::make_unique<Divide>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::Divide>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenAsterisk
+ * class: Asterisk
  */
 Asterisk::Asterisk(usize location) : Operator(location) {}
 
@@ -480,13 +475,13 @@ Asterisk::left_precedence() const
 
 std::unique_ptr<Expression>
 Asterisk::construct_binary_expression(const Expression *lhs,
-                                           const Expression *rhs) const
+                                      const Expression *rhs) const
 {
-  return std::make_unique<Multiply>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::Multiply>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenPercent
+ * class: Percent
  */
 Percent::Percent(usize location) : Operator(location) {}
 
@@ -516,13 +511,13 @@ Percent::left_precedence() const
 
 std::unique_ptr<Expression>
 Percent::construct_binary_expression(const Expression *lhs,
-                                          const Expression *rhs) const
+                                     const Expression *rhs) const
 {
-  return std::make_unique<Module>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::Module>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenLeftParen
+ * class: LeftParen
  */
 LeftParen::LeftParen(usize location) : Token(location) {}
 
@@ -545,7 +540,7 @@ LeftParen::flags() const
 }
 
 /**
- * class: TokenRightParen
+ * class: RightParen
  */
 RightParen::RightParen(usize location) : Token(location) {}
 
@@ -568,10 +563,9 @@ RightParen::flags() const
 }
 
 /**
- * class: TokenLeftSquareBracket
+ * class: LeftSquareBracket
  */
-LeftSquareBracket::LeftSquareBracket(usize location) : Token(location)
-{}
+LeftSquareBracket::LeftSquareBracket(usize location) : Token(location) {}
 
 Token::Kind
 LeftSquareBracket::kind() const
@@ -592,11 +586,9 @@ LeftSquareBracket::flags() const
 }
 
 /**
- * class: TokenRightSquareBracket
+ * class: RightSquareBracket
  */
-RightSquareBracket::RightSquareBracket(usize location)
-    : Token(location)
-{}
+RightSquareBracket::RightSquareBracket(usize location) : Token(location) {}
 
 Token::Kind
 RightSquareBracket::kind() const
@@ -617,7 +609,7 @@ RightSquareBracket::flags() const
 }
 
 /**
- * class: TokenDoubleLeftSquareBracket
+ * class: DoubleLeftSquareBracket
  */
 DoubleLeftSquareBracket::DoubleLeftSquareBracket(usize location)
     : Token(location)
@@ -642,7 +634,7 @@ DoubleLeftSquareBracket::flags() const
 }
 
 /**
- * class: TokenDoubleRightSquareBracket
+ * class: DoubleRightSquareBracket
  */
 DoubleRightSquareBracket::DoubleRightSquareBracket(usize location)
     : Token(location)
@@ -667,7 +659,7 @@ DoubleRightSquareBracket::flags() const
 }
 
 /**
- * class: TokenLeftBracket
+ * class: LeftBracket
  */
 LeftBracket::LeftBracket(usize location) : Token(location) {}
 
@@ -690,7 +682,7 @@ LeftBracket::flags() const
 }
 
 /**
- * class: TokenRightBracket
+ * class: RightBracket
  */
 RightBracket::RightBracket(usize location) : Token(location) {}
 
@@ -713,11 +705,9 @@ RightBracket::flags() const
 }
 
 /**
- * class: TokenExclamationMark
+ * class: ExclamationMark
  */
-ExclamationMark::ExclamationMark(usize location)
-    : Operator(location)
-{}
+ExclamationMark::ExclamationMark(usize location) : Operator(location) {}
 
 Token::Kind
 ExclamationMark::kind() const
@@ -746,11 +736,11 @@ ExclamationMark::unary_precedence() const
 std::unique_ptr<Expression>
 ExclamationMark::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<LogicalNot>(source_location(), rhs);
+  return std::make_unique<expressions::LogicalNot>(source_location(), rhs);
 }
 
 /**
- * class: TokenTilde
+ * class: Tilde
  */
 Tilde::Tilde(usize location) : Operator(location) {}
 
@@ -781,11 +771,12 @@ Tilde::unary_precedence() const
 std::unique_ptr<Expression>
 Tilde::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<BinaryComplement>(source_location(), rhs);
+  return std::make_unique<expressions::BinaryComplement>(source_location(),
+                                                         rhs);
 }
 
 /**
- * class: TokenAmpersand
+ * class: Ampersand
  */
 Ampersand::Ampersand(usize location) : Operator(location) {}
 
@@ -815,17 +806,15 @@ Ampersand::left_precedence() const
 
 std::unique_ptr<Expression>
 Ampersand::construct_binary_expression(const Expression *lhs,
-                                            const Expression *rhs) const
+                                       const Expression *rhs) const
 {
-  return std::make_unique<BinaryAnd>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::BinaryAnd>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenDoubleAmpersand
+ * class: DoubleAmpersand
  */
-DoubleAmpersand::DoubleAmpersand(usize location)
-    : Operator(location)
-{}
+DoubleAmpersand::DoubleAmpersand(usize location) : Operator(location) {}
 
 Token::Kind
 DoubleAmpersand::kind() const
@@ -853,13 +842,13 @@ DoubleAmpersand::left_precedence() const
 
 std::unique_ptr<Expression>
 DoubleAmpersand::construct_binary_expression(const Expression *lhs,
-                                                  const Expression *rhs) const
+                                             const Expression *rhs) const
 {
-  return std::make_unique<LogicalAnd>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::LogicalAnd>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenGreater
+ * class: Greater
  */
 Greater::Greater(usize location) : Operator(location) {}
 
@@ -889,16 +878,16 @@ Greater::left_precedence() const
 
 std::unique_ptr<Expression>
 Greater::construct_binary_expression(const Expression *lhs,
-                                          const Expression *rhs) const
+                                     const Expression *rhs) const
 {
-  return std::make_unique<GreaterThan>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::GreaterThan>(source_location(), lhs,
+                                                    rhs);
 }
 
 /**
- * class: TokenDoubleGreater
+ * class: DoubleGreater
  */
-DoubleGreater::DoubleGreater(usize location) : Operator(location)
-{}
+DoubleGreater::DoubleGreater(usize location) : Operator(location) {}
 
 Token::Kind
 DoubleGreater::kind() const
@@ -926,16 +915,15 @@ DoubleGreater::left_precedence() const
 
 std::unique_ptr<Expression>
 DoubleGreater::construct_binary_expression(const Expression *lhs,
-                                                const Expression *rhs) const
+                                           const Expression *rhs) const
 {
-  return std::make_unique<RightShift>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::RightShift>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenGreaterEquals
+ * class: GreaterEquals
  */
-GreaterEquals::GreaterEquals(usize location) : Operator(location)
-{}
+GreaterEquals::GreaterEquals(usize location) : Operator(location) {}
 
 Token::Kind
 GreaterEquals::kind() const
@@ -963,13 +951,14 @@ GreaterEquals::left_precedence() const
 
 std::unique_ptr<Expression>
 GreaterEquals::construct_binary_expression(const Expression *lhs,
-                                                const Expression *rhs) const
+                                           const Expression *rhs) const
 {
-  return std::make_unique<GreaterOrEqual>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::GreaterOrEqual>(source_location(), lhs,
+                                                       rhs);
 }
 
 /**
- * class: TokenLess
+ * class: Less
  */
 Less::Less(usize location) : Operator(location) {}
 
@@ -999,13 +988,13 @@ Less::left_precedence() const
 
 std::unique_ptr<Expression>
 Less::construct_binary_expression(const Expression *lhs,
-                                       const Expression *rhs) const
+                                  const Expression *rhs) const
 {
-  return std::make_unique<LessThan>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::LessThan>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenDoubleLess
+ * class: DoubleLess
  */
 DoubleLess::DoubleLess(usize location) : Operator(location) {}
 
@@ -1035,13 +1024,13 @@ DoubleLess::left_precedence() const
 
 std::unique_ptr<Expression>
 DoubleLess::construct_binary_expression(const Expression *lhs,
-                                             const Expression *rhs) const
+                                        const Expression *rhs) const
 {
-  return std::make_unique<LeftShift>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::LeftShift>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenLessEquals
+ * class: LessEquals
  */
 LessEquals::LessEquals(usize location) : Operator(location) {}
 
@@ -1071,13 +1060,14 @@ LessEquals::left_precedence() const
 
 std::unique_ptr<Expression>
 LessEquals::construct_binary_expression(const Expression *lhs,
-                                             const Expression *rhs) const
+                                        const Expression *rhs) const
 {
-  return std::make_unique<LessOrEqual>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::LessOrEqual>(source_location(), lhs,
+                                                    rhs);
 }
 
 /**
- * class: TokenPipe
+ * class: Pipe
  */
 Pipe::Pipe(usize location) : Operator(location) {}
 
@@ -1107,13 +1097,13 @@ Pipe::left_precedence() const
 
 std::unique_ptr<Expression>
 Pipe::construct_binary_expression(const Expression *lhs,
-                                       const Expression *rhs) const
+                                  const Expression *rhs) const
 {
-  return std::make_unique<BinaryOr>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::BinaryOr>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenDoublePipe
+ * class: DoublePipe
  */
 DoublePipe::DoublePipe(usize location) : Operator(location) {}
 
@@ -1143,13 +1133,13 @@ DoublePipe::left_precedence() const
 
 std::unique_ptr<Expression>
 DoublePipe::construct_binary_expression(const Expression *lhs,
-                                             const Expression *rhs) const
+                                        const Expression *rhs) const
 {
-  return std::make_unique<LogicalOr>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::LogicalOr>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenCap
+ * class: Cap
  */
 Cap::Cap(usize location) : Operator(location) {}
 
@@ -1179,13 +1169,13 @@ Cap::left_precedence() const
 
 std::unique_ptr<Expression>
 Cap::construct_binary_expression(const Expression *lhs,
-                                      const Expression *rhs) const
+                                 const Expression *rhs) const
 {
-  return std::make_unique<Xor>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::Xor>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenEquals
+ * class: Equals
  */
 Equals::Equals(usize location) : Operator(location) {}
 
@@ -1215,7 +1205,7 @@ Equals::left_precedence() const
 
 std::unique_ptr<Expression>
 Equals::construct_binary_expression(const Expression *lhs,
-                                         const Expression *rhs) const
+                                    const Expression *rhs) const
 {
   SHIT_UNUSED(lhs);
   SHIT_UNUSED(rhs);
@@ -1223,10 +1213,9 @@ Equals::construct_binary_expression(const Expression *lhs,
 }
 
 /**
- * class: TokenDoubleEquals
+ * class: DoubleEquals
  */
-DoubleEquals::DoubleEquals(usize location) : Operator(location)
-{}
+DoubleEquals::DoubleEquals(usize location) : Operator(location) {}
 
 Token::Kind
 DoubleEquals::kind() const
@@ -1254,17 +1243,15 @@ DoubleEquals::left_precedence() const
 
 std::unique_ptr<Expression>
 DoubleEquals::construct_binary_expression(const Expression *lhs,
-                                               const Expression *rhs) const
+                                          const Expression *rhs) const
 {
-  return std::make_unique<Equal>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::Equal>(source_location(), lhs, rhs);
 }
 
 /**
- * class: TokenExclamationEquals
+ * class: ExclamationEquals
  */
-ExclamationEquals::ExclamationEquals(usize location)
-    : Operator(location)
-{}
+ExclamationEquals::ExclamationEquals(usize location) : Operator(location) {}
 
 Token::Kind
 ExclamationEquals::kind() const
@@ -1292,9 +1279,9 @@ ExclamationEquals::left_precedence() const
 
 std::unique_ptr<Expression>
 ExclamationEquals::construct_binary_expression(const Expression *lhs,
-                                                    const Expression *rhs) const
+                                               const Expression *rhs) const
 {
-  return std::make_unique<NotEqual>(source_location(), lhs, rhs);
+  return std::make_unique<expressions::NotEqual>(source_location(), lhs, rhs);
 }
 
 } /* namespace tokens */
