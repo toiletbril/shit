@@ -238,15 +238,19 @@ Lexer::lex_number()
   return num;
 }
 
-/* NOTE: This function triggers shell expansion. */
 Token *
 Lexer::lex_identifier()
 {
   char        ch;
   std::string id{};
   usize       length = 0;
+  bool        is_expandable = false;
 
   while (lexer::is_part_of_identifier((ch = chop_character(length)))) {
+    if (lexer::is_expandable_char(ch)) {
+      is_expandable = true;
+    }
+
     id += ch;
     length++;
   }
@@ -266,8 +270,10 @@ Lexer::lex_identifier()
       /* clang-format on */
     default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
     }
-  } else {
+  } else if (!is_expandable) {
     t = new tokens::Identifier{m_cursor_position, id};
+  } else {
+    t = new tokens::Expandable{m_cursor_position, id};
   }
 
   m_cached_offset = length;
@@ -280,10 +286,17 @@ Lexer::lex_string(char quote_char)
 {
   char        ch;
   std::string str_str{};
+
   /* Skip the first quote. */
   usize length = 1;
 
+  bool is_expandable = false;
+
   while ((ch = chop_character(length)) != quote_char && ch != EOF) {
+    if (lexer::is_expandable_char(ch)) {
+      is_expandable = true;
+    }
+
     str_str += ch;
     length++;
   }
@@ -296,12 +309,17 @@ Lexer::lex_string(char quote_char)
   }
 
   /* Skip the first and last quote here too. */
-  tokens::String *str = new tokens::String{m_cursor_position, str_str};
+  Token *t;
+  if (!is_expandable) {
+    t = new tokens::String{m_cursor_position, str_str};
+  } else {
+    t = new tokens::Expandable{m_cursor_position, str_str};
+  }
 
   /* Account for the quote char. */
   m_cached_offset = length + 1;
 
-  return str;
+  return t;
 }
 
 /* Only single-character operators are defined here. Further parsing is done in

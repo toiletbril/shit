@@ -37,7 +37,7 @@ struct Token
     /* Values */
     Number,
     String,
-    ExpandableString,
+    Expandable,
     Identifier,
 
     /* Operators */
@@ -81,6 +81,7 @@ struct Token
     Value          = 1,
     UnaryOperator  = 1 << 1,
     BinaryOperator = 1 << 2,
+    Expandable     = 1 << 3,
     /* clang-format on */
   };
 
@@ -94,7 +95,7 @@ struct Token
 
   virtual Kind        kind() const = 0;
   virtual Flags       flags() const = 0;
-  virtual std::string value() const = 0;
+  virtual std::string raw_string() const = 0;
 
   virtual std::string to_ast_string() const;
 
@@ -122,7 +123,7 @@ struct If : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct Fi : public Token
@@ -131,7 +132,7 @@ struct Fi : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct Else : public Token
@@ -140,7 +141,7 @@ struct Else : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct Then : public Token
@@ -149,7 +150,7 @@ struct Then : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct EndOfFile : public Token
@@ -158,7 +159,7 @@ struct EndOfFile : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct Semicolon : public Token
@@ -167,7 +168,7 @@ struct Semicolon : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct Dot : public Token
@@ -176,7 +177,7 @@ struct Dot : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct Dollar : public Token
@@ -185,7 +186,7 @@ struct Dollar : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct LeftParen : public Token
@@ -194,7 +195,7 @@ struct LeftParen : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct RightParen : public Token
@@ -203,7 +204,7 @@ struct RightParen : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct LeftSquareBracket : public Token
@@ -212,7 +213,7 @@ struct LeftSquareBracket : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct RightSquareBracket : public Token
@@ -221,7 +222,7 @@ struct RightSquareBracket : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct DoubleLeftSquareBracket : public Token
@@ -230,7 +231,7 @@ struct DoubleLeftSquareBracket : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct DoubleRightSquareBracket : public Token
@@ -239,7 +240,7 @@ struct DoubleRightSquareBracket : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct RightBracket : public Token
@@ -248,7 +249,7 @@ struct RightBracket : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 struct LeftBracket : public Token
@@ -257,7 +258,7 @@ struct LeftBracket : public Token
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 };
 
 /**
@@ -267,7 +268,7 @@ struct Value : public Token
 {
   Value(usize location, std::string_view sv);
 
-  std::string value() const override;
+  std::string raw_string() const override;
 
 protected:
   std::string m_value;
@@ -293,17 +294,12 @@ struct String : public Value
  * 1. ~[user]/some/path;
  * 2. /some/path/file*;
  * 5. $VARIABLE. */
-struct Expandable : public Token
+struct Expandable : public Value
 {
   Expandable(usize location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
-
-protected:
-  std::string m_raw_value{};
-
-  virtual std::string expanded_value(EvalContext &cxt) const = 0;
 };
 
 struct Identifier : Value
@@ -339,7 +335,7 @@ struct Plus : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -357,7 +353,7 @@ struct Minus : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -375,7 +371,7 @@ struct Slash : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -389,7 +385,7 @@ struct Asterisk : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -403,7 +399,7 @@ struct Percent : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -417,7 +413,7 @@ struct Tilde : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 unary_precedence() const override;
   std::unique_ptr<Expression>
@@ -430,7 +426,7 @@ struct ExclamationMark : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 unary_precedence() const override;
   std::unique_ptr<Expression>
@@ -443,7 +439,7 @@ struct Ampersand : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -457,7 +453,7 @@ struct DoubleAmpersand : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -471,7 +467,7 @@ struct Greater : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -485,7 +481,7 @@ struct DoubleGreater : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -499,7 +495,7 @@ struct GreaterEquals : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -513,7 +509,7 @@ struct Less : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -527,7 +523,7 @@ struct DoubleLess : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -541,7 +537,7 @@ struct LessEquals : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -555,7 +551,7 @@ struct Pipe : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -569,7 +565,7 @@ struct DoublePipe : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -583,7 +579,7 @@ struct Cap : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -597,7 +593,7 @@ struct Equals : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -611,7 +607,7 @@ struct DoubleEquals : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>
@@ -625,7 +621,7 @@ struct ExclamationEquals : Operator
 
   Kind        kind() const override;
   Flags       flags() const override;
-  std::string value() const override;
+  std::string raw_string() const override;
 
   u8 left_precedence() const override;
   std::unique_ptr<Expression>

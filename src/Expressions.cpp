@@ -88,13 +88,39 @@ EvalContext::total_expansion_count() const
 }
 
 std::vector<std::string>
+EvalContext::expand(const tokens::Expandable *e) const
+{
+  SHIT_ASSERT(e->flags() & Token::Flag::Expandable);
+  std::string              r = e->raw_string();
+  std::vector<std::string> values{};
+
+  if (r == "*") {
+    values.emplace_back("asterisk");
+  } else {
+    values.emplace_back(e->raw_string());
+  }
+
+  return values;
+}
+
+std::vector<std::string>
 EvalContext::expand_args(const std::vector<const Token *> &args) const
 {
   std::vector<std::string> expanded_args{};
   expanded_args.reserve(args.size());
+
   for (const Token *t : args) {
-    expanded_args.emplace_back(t->value());
+    if (t->flags() & Token::Flag::Expandable) {
+      std::vector<std::string> e =
+          expand(static_cast<const tokens::Expandable *>(t));
+      for (const std::string &a : e) {
+        expanded_args.emplace_back(a);
+      }
+    } else {
+      expanded_args.emplace_back(t->raw_string());
+    }
   }
+
   return expanded_args;
 }
 
@@ -254,11 +280,11 @@ std::string
 Exec::to_string() const
 {
   std::string args{};
-  std::string s = "Exec \"" + m_args[0]->value();
+  std::string s = "Exec \"" + m_args[0]->raw_string();
   if (!m_args.empty()) {
     for (usize i = 1; i < m_args.size(); i++) {
       args += " ";
-      args += m_args[i]->value();
+      args += m_args[i]->raw_string();
     }
     s += args;
   }

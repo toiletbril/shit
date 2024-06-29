@@ -163,8 +163,9 @@ Parser::parse_shell_command()
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
     switch (token->kind()) {
-    case Token::Kind::Identifier:
     case Token::Kind::String:
+    case Token::Kind::Identifier:
+    case Token::Kind::Expandable:
       m_lexer.advance_past_last_peek();
       if (!source_location) {
         source_location = token->source_location();
@@ -206,12 +207,12 @@ Parser::parse_expression(u8 min_precedence)
   /* Values */
   case Token::Kind::Number:
     lhs = std::make_unique<expressions::ConstantNumber>(
-        t->source_location(), std::atoll(t->value().data()));
+        t->source_location(), std::atoll(t->raw_string().data()));
     break;
 
   case Token::Kind::String:
     lhs = std::make_unique<expressions::ConstantString>(t->source_location(),
-                                                        t->value());
+                                                        t->raw_string());
     break;
 
   /* Keywords */
@@ -299,7 +300,7 @@ Parser::parse_expression(u8 min_precedence)
     } else {
       throw ErrorWithLocation{t->source_location(),
                               "Expected a value or an expression, found '" +
-                                  t->value() + "'"};
+                                  t->raw_string() + "'"};
     }
     break;
   }
@@ -328,7 +329,7 @@ Parser::parse_expression(u8 min_precedence)
     case Token::Kind::Fi: {
       if (m_recursion_depth == 0) {
         throw ErrorWithLocation{maybe_op->source_location(),
-                                "Unexpected '" + maybe_op->value() +
+                                "Unexpected '" + maybe_op->raw_string() +
                                     "' without matching If condition"};
       }
       return lhs;
@@ -337,7 +338,7 @@ Parser::parse_expression(u8 min_precedence)
     case Token::Kind::Then: {
       if (m_if_condition_depth == 0) {
         throw ErrorWithLocation{maybe_op->source_location(),
-                                "Unexpected '" + maybe_op->value() +
+                                "Unexpected '" + maybe_op->raw_string() +
                                     "' without matching If condition"};
       }
       return lhs;
@@ -349,7 +350,7 @@ Parser::parse_expression(u8 min_precedence)
     if (!(maybe_op->flags() & Token::Flag::BinaryOperator)) {
       throw ErrorWithLocation{maybe_op->source_location(),
                               "Expected a binary operator, found '" +
-                                  maybe_op->value() + "'"};
+                                  maybe_op->raw_string() + "'"};
     }
 
     const tokens::Operator *op =

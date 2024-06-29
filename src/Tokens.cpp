@@ -1,6 +1,7 @@
 #include "Tokens.hpp"
 
 #include "Debug.hpp"
+#include "Errors.hpp"
 
 namespace shit {
 
@@ -18,7 +19,7 @@ Token::source_location() const
 std::string
 Token::to_ast_string() const
 {
-  return value();
+  return raw_string();
 }
 
 namespace tokens {
@@ -41,7 +42,7 @@ If::flags() const
 }
 
 std::string
-If::value() const
+If::raw_string() const
 {
   return "If";
 }
@@ -64,7 +65,7 @@ Else::flags() const
 }
 
 std::string
-Else::value() const
+Else::raw_string() const
 {
   return "Else";
 }
@@ -87,7 +88,7 @@ Then::flags() const
 }
 
 std::string
-Then::value() const
+Then::raw_string() const
 {
   return "Then";
 }
@@ -110,7 +111,7 @@ Fi::flags() const
 }
 
 std::string
-Fi::value() const
+Fi::raw_string() const
 {
   return "Fi";
 }
@@ -133,7 +134,7 @@ EndOfFile::flags() const
 }
 
 std::string
-EndOfFile::value() const
+EndOfFile::raw_string() const
 {
   return "EOF";
 }
@@ -156,7 +157,7 @@ Semicolon::flags() const
 }
 
 std::string
-Semicolon::value() const
+Semicolon::raw_string() const
 {
   return ";";
 }
@@ -179,7 +180,7 @@ Dot::flags() const
 }
 
 std::string
-Dot::value() const
+Dot::raw_string() const
 {
   return ".";
 }
@@ -202,7 +203,7 @@ Dollar::flags() const
 }
 
 std::string
-Dollar::value() const
+Dollar::raw_string() const
 {
   return "$";
 }
@@ -214,7 +215,7 @@ Value::Value(usize location, std::string_view sv) : Token(location), m_value(sv)
 {}
 
 std::string
-Value::value() const
+Value::raw_string() const
 {
   return m_value;
 }
@@ -257,28 +258,19 @@ String::flags() const
  * class: ExpandableString
  */
 Expandable::Expandable(usize location, std::string_view sv)
-    : Token(location), m_raw_value(sv)
+    : Value(location, sv)
 {}
 
 Token::Kind
 Expandable::kind() const
 {
-  return Token::Kind::ExpandableString;
+  return Token::Kind::Expandable;
 }
 
 Token::Flags
 Expandable::flags() const
 {
-  return Token::Flag::Value;
-}
-
-std::string
-Expandable::expanded_value(EvalContext &cxt) const
-{
-  cxt.add_expansion();
-
-  std::string s{};
-  return s;
+  return Token::Flag::Value | Token::Flag::Expandable;
 }
 
 /**
@@ -358,7 +350,7 @@ Plus::flags() const
 }
 
 std::string
-Plus::value() const
+Plus::raw_string() const
 {
   return "+";
 }
@@ -406,7 +398,7 @@ Minus::flags() const
 }
 
 std::string
-Minus::value() const
+Minus::raw_string() const
 {
   return "-";
 }
@@ -454,7 +446,7 @@ Slash::flags() const
 }
 
 std::string
-Slash::value() const
+Slash::raw_string() const
 {
   return "/";
 }
@@ -490,7 +482,7 @@ Asterisk::flags() const
 }
 
 std::string
-Asterisk::value() const
+Asterisk::raw_string() const
 {
   return "*";
 }
@@ -526,7 +518,7 @@ Percent::flags() const
 }
 
 std::string
-Percent::value() const
+Percent::raw_string() const
 {
   return "%";
 }
@@ -556,7 +548,7 @@ LeftParen::kind() const
 }
 
 std::string
-LeftParen::value() const
+LeftParen::raw_string() const
 {
   return "(";
 }
@@ -579,7 +571,7 @@ RightParen::kind() const
 }
 
 std::string
-RightParen::value() const
+RightParen::raw_string() const
 {
   return ")";
 }
@@ -602,7 +594,7 @@ LeftSquareBracket::kind() const
 }
 
 std::string
-LeftSquareBracket::value() const
+LeftSquareBracket::raw_string() const
 {
   return "[";
 }
@@ -625,7 +617,7 @@ RightSquareBracket::kind() const
 }
 
 std::string
-RightSquareBracket::value() const
+RightSquareBracket::raw_string() const
 {
   return "]";
 }
@@ -650,7 +642,7 @@ DoubleLeftSquareBracket::kind() const
 }
 
 std::string
-DoubleLeftSquareBracket::value() const
+DoubleLeftSquareBracket::raw_string() const
 {
   return "[[";
 }
@@ -675,7 +667,7 @@ DoubleRightSquareBracket::kind() const
 }
 
 std::string
-DoubleRightSquareBracket::value() const
+DoubleRightSquareBracket::raw_string() const
 {
   return "]]";
 }
@@ -698,7 +690,7 @@ LeftBracket::kind() const
 }
 
 std::string
-LeftBracket::value() const
+LeftBracket::raw_string() const
 {
   return "[";
 }
@@ -721,7 +713,7 @@ RightBracket::kind() const
 }
 
 std::string
-RightBracket::value() const
+RightBracket::raw_string() const
 {
   return "]";
 }
@@ -750,7 +742,7 @@ ExclamationMark::flags() const
 }
 
 std::string
-ExclamationMark::value() const
+ExclamationMark::raw_string() const
 {
   return "!";
 }
@@ -785,7 +777,7 @@ Tilde::flags() const
 }
 
 std::string
-Tilde::value() const
+Tilde::raw_string() const
 {
   return "~";
 }
@@ -821,7 +813,7 @@ Ampersand::flags() const
 }
 
 std::string
-Ampersand::value() const
+Ampersand::raw_string() const
 {
   return "&";
 }
@@ -857,7 +849,7 @@ DoubleAmpersand::flags() const
 }
 
 std::string
-DoubleAmpersand::value() const
+DoubleAmpersand::raw_string() const
 {
   return "&&";
 }
@@ -893,7 +885,7 @@ Greater::flags() const
 }
 
 std::string
-Greater::value() const
+Greater::raw_string() const
 {
   return ">";
 }
@@ -930,7 +922,7 @@ DoubleGreater::flags() const
 }
 
 std::string
-DoubleGreater::value() const
+DoubleGreater::raw_string() const
 {
   return ">>";
 }
@@ -966,7 +958,7 @@ GreaterEquals::flags() const
 }
 
 std::string
-GreaterEquals::value() const
+GreaterEquals::raw_string() const
 {
   return ">=";
 }
@@ -1003,7 +995,7 @@ Less::flags() const
 }
 
 std::string
-Less::value() const
+Less::raw_string() const
 {
   return "<";
 }
@@ -1039,7 +1031,7 @@ DoubleLess::flags() const
 }
 
 std::string
-DoubleLess::value() const
+DoubleLess::raw_string() const
 {
   return "<<";
 }
@@ -1075,7 +1067,7 @@ LessEquals::flags() const
 }
 
 std::string
-LessEquals::value() const
+LessEquals::raw_string() const
 {
   return "<=";
 }
@@ -1112,7 +1104,7 @@ Pipe::flags() const
 }
 
 std::string
-Pipe::value() const
+Pipe::raw_string() const
 {
   return "|";
 }
@@ -1148,7 +1140,7 @@ DoublePipe::flags() const
 }
 
 std::string
-DoublePipe::value() const
+DoublePipe::raw_string() const
 {
   return "||";
 }
@@ -1184,7 +1176,7 @@ Cap::flags() const
 }
 
 std::string
-Cap::value() const
+Cap::raw_string() const
 {
   return "^";
 }
@@ -1220,7 +1212,7 @@ Equals::flags() const
 }
 
 std::string
-Equals::value() const
+Equals::raw_string() const
 {
   return "=";
 }
@@ -1258,7 +1250,7 @@ DoubleEquals::flags() const
 }
 
 std::string
-DoubleEquals::value() const
+DoubleEquals::raw_string() const
 {
   return "==";
 }
@@ -1294,7 +1286,7 @@ ExclamationEquals::flags() const
 }
 
 std::string
-ExclamationEquals::value() const
+ExclamationEquals::raw_string() const
 {
   return "!=";
 }

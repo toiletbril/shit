@@ -9,6 +9,10 @@ namespace shit {
 
 struct Token;
 
+namespace tokens {
+struct Expandable;
+}
+
 struct EvalContext
 {
   EvalContext();
@@ -30,6 +34,8 @@ struct EvalContext
   usize total_expansion_count() const;
 
 protected:
+  std::vector<std::string> expand(const tokens::Expandable *e) const;
+
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
   usize m_expansions_last{0};
