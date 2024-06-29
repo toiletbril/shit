@@ -2,7 +2,6 @@
 
 #include "Builtin.hpp"
 #include "Common.hpp"
-#include "Errors.hpp"
 #include "Os.hpp"
 
 #include <filesystem>

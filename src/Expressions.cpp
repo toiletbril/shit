@@ -3,6 +3,7 @@
 #include "Builtin.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Tokens.hpp"
 #include "Utils.hpp"
 
 namespace shit {
@@ -55,6 +56,17 @@ usize
 EvalContext::total_expressions_executed() const
 {
   return m_expressions_executed_total + m_expressions_executed_last;
+}
+
+std::vector<std::string>
+EvalContext::expand_args(const std::vector<const Token *> &args) const
+{
+  std::vector<std::string> expanded_args{};
+  expanded_args.reserve(args.size());
+  for (const Token *t : args) {
+    expanded_args.emplace_back(t->value());
+  }
+  return expanded_args;
 }
 
 /**
@@ -179,11 +191,18 @@ DummyExpression::to_ast_string(usize layer) const
 /**
  * class: Exec
  */
-Exec::Exec(usize location, const std::vector<std::string> &args)
+Exec::Exec(usize location, const std::vector<const Token *> &&args)
     : Expression(location), m_args(args)
 {}
 
-std::vector<std::string>
+Exec::~Exec()
+{
+  for (const Token *t : m_args) {
+    delete t;
+  }
+}
+
+const std::vector<const Token *> &
 Exec::args() const
 {
   return m_args;
@@ -192,11 +211,10 @@ Exec::args() const
 i64
 Exec::evaluate_impl(EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
   SHIT_ASSERT(m_args.size() > 0);
 
   return utils::execute_context(
-      utils::ExecContext::make(source_location(), m_args));
+      utils::ExecContext::make(source_location(), cxt.expand_args(m_args)));
 
   SHIT_UNREACHABLE();
 }
@@ -205,11 +223,11 @@ std::string
 Exec::to_string() const
 {
   std::string args{};
-  std::string s = "Exec \"" + m_args[0];
+  std::string s = "Exec \"" + m_args[0]->value();
   if (!m_args.empty()) {
     for (usize i = 1; i < m_args.size(); i++) {
       args += " ";
-      args += m_args[i];
+      args += m_args[i]->value();
     }
     s += args;
   }
@@ -409,7 +427,8 @@ ExecPipeSequence::evaluate_impl(EvalContext &cxt) const
 
   for (const Exec *e : m_commands) {
     cxt.add_evaluated_expression();
-    ecs.emplace_back(utils::ExecContext::make(e->source_location(), e->args()));
+    ecs.emplace_back(utils::ExecContext::make(e->source_location(),
+                                              cxt.expand_args(e->args())));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs));

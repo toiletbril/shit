@@ -7,12 +7,17 @@
 
 namespace shit {
 
+struct Token;
+
 struct EvalContext
 {
   EvalContext();
 
   void add_evaluated_expression();
   void end_command();
+
+  std::vector<std::string>
+  expand_args(const std::vector<const Token *> &args) const;
 
   std::string make_stats_string() const;
 
@@ -82,9 +87,10 @@ protected:
 
 struct Exec : public Expression
 {
-  Exec(usize location, const std::vector<std::string> &args);
+  Exec(usize location, const std::vector<const Token *> &&args);
+  ~Exec() override;
 
-  std::vector<std::string> args() const;
+  const std::vector<const Token *> &args() const;
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -92,7 +98,7 @@ struct Exec : public Expression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::vector<std::string> m_args;
+  std::vector<const Token *> m_args;
 };
 
 struct SequenceNode : public Expression

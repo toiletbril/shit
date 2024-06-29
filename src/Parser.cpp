@@ -127,7 +127,9 @@ Parser::construct_ast()
       should_parse_command = false;
     } break;
 
+    case Token::Kind::Less:
     case Token::Kind::Greater:
+    case Token::Kind::Ampersand:
       throw ErrorWithLocation{token->source_location(),
                               "Not implemented (Parser)"};
 
@@ -146,8 +148,8 @@ Parser::construct_ast()
 std::unique_ptr<Exec>
 Parser::parse_shell_command()
 {
-  std::optional<usize>     source_location;
-  std::vector<std::string> args_accumulator{};
+  std::optional<usize>       source_location;
+  std::vector<const Token *> args_accumulator{};
 
   for (;;) {
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
@@ -159,14 +161,15 @@ Parser::parse_shell_command()
       if (!source_location) {
         source_location = token->source_location();
       }
-      args_accumulator.emplace_back(token->value());
+      args_accumulator.emplace_back(token.release());
       break;
 
     default:
       if (!source_location) {
         return nullptr;
       }
-      return std::make_unique<Exec>(*source_location, args_accumulator);
+      return std::make_unique<Exec>(*source_location,
+                                    std::move(args_accumulator));
     }
   }
 
