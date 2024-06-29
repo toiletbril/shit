@@ -21,8 +21,7 @@ struct Pipe
 
 std::optional<Pipe> make_pipe();
 
-os_args make_os_args(const std::string              &program,
-                     const std::vector<std::string> &args);
+os_args make_os_args(const std::vector<std::string> &args);
 
 std::string last_system_error_message();
 

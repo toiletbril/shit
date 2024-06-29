@@ -34,7 +34,7 @@ struct Expression
   usize source_location() const;
   /* Expressions should override evaluate_impl() instead. This method is used
    * mainly for initialization before the actual evaluation. */
-  i64   evaluate(EvalContext &cxt) const;
+  i64 evaluate(EvalContext &cxt) const;
 
   /* Each expression should provide it's own way to copy it. */
   Expression(const Expression &) = delete;
@@ -82,10 +82,8 @@ protected:
 
 struct Exec : public Expression
 {
-  Exec(usize location, const std::string &path,
-       const std::vector<std::string> &args);
+  Exec(usize location, const std::vector<std::string> &args);
 
-  std::string              program() const;
   std::vector<std::string> args() const;
 
   std::string to_string() const override;
@@ -94,7 +92,6 @@ struct Exec : public Expression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::string              m_program;
   std::vector<std::string> m_args;
 };
 

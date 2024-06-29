@@ -23,12 +23,13 @@ namespace shit {
 
 namespace utils {
 
+/* clang-format off */
 ExecContext::ExecContext(
-    usize location, const std::string &program,
-    const std::vector<std::string>                            &args,
-    std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind)
-    : m_location(location), m_program(program), m_args(args), m_kind(kind)
+    usize location, std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
+    const std::vector<std::string> &args)
+    : m_kind(kind), m_location(location), m_args(args)
 {}
+/* clang-format on */
 
 usize
 ExecContext::location() const
@@ -39,7 +40,7 @@ ExecContext::location() const
 const std::string &
 ExecContext::program() const
 {
-  return m_program;
+  return m_args[0];
 }
 
 const std::vector<std::string> &
@@ -92,6 +93,46 @@ ExecContext::print_to_stdout(const std::string &s) const
     throw Error{"Unable to write to stdout: " +
                 os::last_system_error_message()};
   }
+}
+
+ExecContext
+ExecContext::make(usize location, const std::vector<std::string> &args)
+{
+  SHIT_ASSERT(args.size() > 0);
+
+  std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
+
+  const std::string &program = args[0];
+
+  std::optional<Builtin::Kind>         bk;
+  std::optional<std::filesystem::path> p;
+
+  /* This isn't a path? */
+  if (program.find('/') == std::string::npos) {
+    bk = search_builtin(program);
+
+    if (!bk) {
+      /* Not a builtin, try to search PATH. */
+      p = utils::search_program_path(program);
+    }
+  } else {
+    /* This is a path. */
+    /* TODO: Sanitize extensions here too. */
+    p = utils::canonicalize_path(program);
+  }
+
+  /* Builtins take precedence over programs. */
+  if (!bk) {
+    if (p)
+      kind = *p;
+    else
+      throw ErrorWithLocation{location,
+                              "Program '" + program + "' wasn't found"};
+  } else {
+    kind = *bk;
+  }
+
+  return {location, std::move(kind), args};
 }
 
 i32
@@ -150,43 +191,6 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs)
   }
 
   return ret;
-}
-
-ExecContext
-ExecContext::make(const std::string              &program,
-                  const std::vector<std::string> &args, usize location)
-{
-  std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
-
-  std::optional<Builtin::Kind>         bk;
-  std::optional<std::filesystem::path> p;
-
-  /* This isn't a path? */
-  if (program.find('/') == std::string::npos) {
-    bk = search_builtin(program);
-
-    if (!bk) {
-      /* Not a builtin, try to search PATH. */
-      p = utils::search_program_path(program);
-    }
-  } else {
-    /* This is a path. */
-    /* TODO: Sanitize extensions here too. */
-    p = utils::canonicalize_path(program);
-  }
-
-  /* Builtins take precedence over programs. */
-  if (!bk) {
-    if (p)
-      kind = *p;
-    else
-      throw ErrorWithLocation{location,
-                              "Program '" + program + "' wasn't found"};
-  } else {
-    kind = *bk;
-  }
-
-  return {location, program, args, std::move(kind)};
 }
 
 std::string

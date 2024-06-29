@@ -96,7 +96,7 @@ execute_program(utils::ExecContext &&ec)
   pid_t child_pid = fork();
 
   if (child_pid == 0) {
-    std::vector<const char *> os_args = make_os_args(ec.program(), ec.args());
+    std::vector<const char *> os_args = make_os_args(ec.args());
 
     if (ec.in_fd) {
       dup2(*ec.in_fd, STDIN_FILENO);
@@ -184,12 +184,9 @@ wait_and_monitor_process(process pid)
 }
 
 os_args
-make_os_args(const std::string &program, const std::vector<std::string> &args)
+make_os_args(const std::vector<std::string> &args)
 {
   std::vector<const char *> os_args;
-
-  /* argv[0] is the program itself. */
-  os_args.push_back(program.c_str());
 
   /* Then actual arguments. */
   for (const std::string &arg : args) {

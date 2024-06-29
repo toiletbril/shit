@@ -40,8 +40,8 @@ Echo::execute(utils::ExecContext &ec) const
   std::string buf{};
 
   if (args.size() > 0) {
-    buf += args[0];
-    for (usize i = 1; i < args.size(); i++) {
+    buf += args[1];
+    for (usize i = 2; i < args.size(); i++) {
       buf += ' ';
       buf += args[i];
     }

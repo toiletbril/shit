@@ -146,7 +146,7 @@ Parser::construct_ast()
 std::unique_ptr<Exec>
 Parser::parse_shell_command()
 {
-  std::unique_ptr<Token>   program_token{};
+  std::optional<usize>     source_location;
   std::vector<std::string> args_accumulator{};
 
   for (;;) {
@@ -156,20 +156,17 @@ Parser::parse_shell_command()
     case Token::Kind::Identifier:
     case Token::Kind::String:
       m_lexer.advance_past_last_peek();
-      if (!program_token) {
-        program_token = std::move(token);
-      } else {
-        args_accumulator.emplace_back(token->value());
+      if (!source_location) {
+        source_location = token->source_location();
       }
+      args_accumulator.emplace_back(token->value());
       break;
 
     default:
-      if (!program_token) {
+      if (!source_location) {
         return nullptr;
       }
-      const Token *pt = program_token.get();
-      return std::make_unique<Exec>(pt->source_location(), pt->value(),
-                                    args_accumulator);
+      return std::make_unique<Exec>(*source_location, args_accumulator);
     }
   }
 

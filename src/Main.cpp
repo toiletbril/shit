@@ -104,7 +104,7 @@ main(int argc, char **argv)
   }
 
   /* Main loop state. */
-  shit::EvalContext cxt{};
+  shit::EvalContext context{};
   usize             arg_index = 0;
   bool              should_quit = false;
   int               exit_code = EXIT_SUCCESS;
@@ -244,20 +244,20 @@ main(int argc, char **argv)
       shit::Parser p{shit::Lexer{contents}};
 
       std::unique_ptr<shit::Expression> ast = p.construct_ast();
-      if (FLAG_DUMP_AST.is_enabled())
+      if (FLAG_DUMP_AST.is_enabled()) {
         std::cout << ast->to_ast_string() << std::endl;
+      }
 
-      exit_code = ast->evaluate(cxt);
-
+      exit_code = ast->evaluate(context);
       if (FLAG_EXIT_CODE.is_enabled()) {
         std::cout << "[Code " << exit_code << "]" << std::endl;
       }
 
       if (FLAG_STATS.is_enabled()) {
-        std::cout << cxt.make_stats_string() << std::endl;
+        std::cout << context.make_stats_string() << std::endl;
       }
 
-      cxt.end_command();
+      context.end_command();
     } catch (shit::ErrorWithLocationAndDetails &e) {
       shit::show_message(e.to_string(contents));
       shit::show_message(e.details_to_string(contents));

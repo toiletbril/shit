@@ -179,16 +179,9 @@ DummyExpression::to_ast_string(usize layer) const
 /**
  * class: Exec
  */
-Exec::Exec(usize location, const std::string &path,
-           const std::vector<std::string> &args)
-    : Expression(location), m_program(path), m_args(args)
+Exec::Exec(usize location, const std::vector<std::string> &args)
+    : Expression(location), m_args(args)
 {}
-
-std::string
-Exec::program() const
-{
-  return m_program;
-}
 
 std::vector<std::string>
 Exec::args() const
@@ -200,9 +193,10 @@ i64
 Exec::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
+  SHIT_ASSERT(m_args.size() > 0);
 
   return utils::execute_context(
-      utils::ExecContext::make(m_program, m_args, source_location()));
+      utils::ExecContext::make(source_location(), m_args));
 
   SHIT_UNREACHABLE();
 }
@@ -211,11 +205,11 @@ std::string
 Exec::to_string() const
 {
   std::string args{};
-  std::string s = "Exec \"" + m_program;
+  std::string s = "Exec \"" + m_args[0];
   if (!m_args.empty()) {
-    for (std::string_view arg : m_args) {
+    for (usize i = 1; i < m_args.size(); i++) {
       args += " ";
-      args += arg;
+      args += m_args[i];
     }
     s += args;
   }
@@ -415,8 +409,7 @@ ExecPipeSequence::evaluate_impl(EvalContext &cxt) const
 
   for (const Exec *e : m_commands) {
     cxt.add_evaluated_expression();
-    ecs.emplace_back(utils::ExecContext::make(e->program(), e->args(),
-                                              e->source_location()));
+    ecs.emplace_back(utils::ExecContext::make(e->source_location(), e->args()));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs));

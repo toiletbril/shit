@@ -19,8 +19,7 @@ namespace utils {
  * from program. Program is non-altered first arg. */
 struct ExecContext
 {
-  static ExecContext make(const std::string              &program,
-                          const std::vector<std::string> &args, usize location);
+  static ExecContext make(usize location, const std::vector<std::string> &args);
 
   std::optional<os::descriptor> in_fd{std::nullopt};
   std::optional<os::descriptor> out_fd{std::nullopt};
@@ -39,16 +38,15 @@ struct ExecContext
 
 private:
   /* clang-format off */
-  ExecContext(usize location, const std::string &program,
-              const std::vector<std::string> &args,
-              std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind);
+  ExecContext(usize location,
+              std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
+              const std::vector<std::string> &args);
   /* clang-format on */
 
-  usize                    m_location;
-  std::string              m_program;
-  std::vector<std::string> m_args;
-
   std::variant<shit::Builtin::Kind, std::filesystem::path> m_kind;
+
+  usize                    m_location;
+  std::vector<std::string> m_args;
 };
 
 template <class T>
