@@ -97,7 +97,7 @@ struct Token
 
   virtual std::string to_ast_string() const;
 
-  usize location() const;
+  usize source_location() const;
 
 protected:
   Token(usize location);

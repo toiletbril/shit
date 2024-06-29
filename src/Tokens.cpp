@@ -10,7 +10,7 @@ namespace shit {
 Token::Token(usize location) : m_location(location) {}
 
 usize
-Token::location() const
+Token::source_location() const
 {
   return m_location;
 }
@@ -354,13 +354,13 @@ std::unique_ptr<Expression>
 TokenPlus::construct_binary_expression(const Expression *lhs,
                                        const Expression *rhs) const
 {
-  return std::make_unique<Add>(location(), lhs, rhs);
+  return std::make_unique<Add>(source_location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
 TokenPlus::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<Unnegate>(location(), rhs);
+  return std::make_unique<Unnegate>(source_location(), rhs);
 }
 
 /**
@@ -402,13 +402,13 @@ std::unique_ptr<Expression>
 TokenMinus::construct_binary_expression(const Expression *lhs,
                                         const Expression *rhs) const
 {
-  return std::make_unique<Subtract>(location(), lhs, rhs);
+  return std::make_unique<Subtract>(source_location(), lhs, rhs);
 }
 
 std::unique_ptr<Expression>
 TokenMinus::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<Negate>(location(), rhs);
+  return std::make_unique<Negate>(source_location(), rhs);
 }
 
 /**
@@ -444,7 +444,7 @@ std::unique_ptr<Expression>
 TokenSlash::construct_binary_expression(const Expression *lhs,
                                         const Expression *rhs) const
 {
-  return std::make_unique<Divide>(location(), lhs, rhs);
+  return std::make_unique<Divide>(source_location(), lhs, rhs);
 }
 
 /**
@@ -480,7 +480,7 @@ std::unique_ptr<Expression>
 TokenAsterisk::construct_binary_expression(const Expression *lhs,
                                            const Expression *rhs) const
 {
-  return std::make_unique<Multiply>(location(), lhs, rhs);
+  return std::make_unique<Multiply>(source_location(), lhs, rhs);
 }
 
 /**
@@ -516,7 +516,7 @@ std::unique_ptr<Expression>
 TokenPercent::construct_binary_expression(const Expression *lhs,
                                           const Expression *rhs) const
 {
-  return std::make_unique<Module>(location(), lhs, rhs);
+  return std::make_unique<Module>(source_location(), lhs, rhs);
 }
 
 /**
@@ -744,7 +744,7 @@ TokenExclamationMark::unary_precedence() const
 std::unique_ptr<Expression>
 TokenExclamationMark::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<LogicalNot>(location(), rhs);
+  return std::make_unique<LogicalNot>(source_location(), rhs);
 }
 
 /**
@@ -779,7 +779,7 @@ TokenTilde::unary_precedence() const
 std::unique_ptr<Expression>
 TokenTilde::construct_unary_expression(const Expression *rhs) const
 {
-  return std::make_unique<BinaryComplement>(location(), rhs);
+  return std::make_unique<BinaryComplement>(source_location(), rhs);
 }
 
 /**
@@ -815,7 +815,7 @@ std::unique_ptr<Expression>
 TokenAmpersand::construct_binary_expression(const Expression *lhs,
                                             const Expression *rhs) const
 {
-  return std::make_unique<BinaryAnd>(location(), lhs, rhs);
+  return std::make_unique<BinaryAnd>(source_location(), lhs, rhs);
 }
 
 /**
@@ -853,7 +853,7 @@ std::unique_ptr<Expression>
 TokenDoubleAmpersand::construct_binary_expression(const Expression *lhs,
                                                   const Expression *rhs) const
 {
-  return std::make_unique<LogicalAnd>(location(), lhs, rhs);
+  return std::make_unique<LogicalAnd>(source_location(), lhs, rhs);
 }
 
 /**
@@ -889,7 +889,7 @@ std::unique_ptr<Expression>
 TokenGreater::construct_binary_expression(const Expression *lhs,
                                           const Expression *rhs) const
 {
-  return std::make_unique<GreaterThan>(location(), lhs, rhs);
+  return std::make_unique<GreaterThan>(source_location(), lhs, rhs);
 }
 
 /**
@@ -926,7 +926,7 @@ std::unique_ptr<Expression>
 TokenDoubleGreater::construct_binary_expression(const Expression *lhs,
                                                 const Expression *rhs) const
 {
-  return std::make_unique<RightShift>(location(), lhs, rhs);
+  return std::make_unique<RightShift>(source_location(), lhs, rhs);
 }
 
 /**
@@ -963,7 +963,7 @@ std::unique_ptr<Expression>
 TokenGreaterEquals::construct_binary_expression(const Expression *lhs,
                                                 const Expression *rhs) const
 {
-  return std::make_unique<GreaterOrEqual>(location(), lhs, rhs);
+  return std::make_unique<GreaterOrEqual>(source_location(), lhs, rhs);
 }
 
 /**
@@ -999,7 +999,7 @@ std::unique_ptr<Expression>
 TokenLess::construct_binary_expression(const Expression *lhs,
                                        const Expression *rhs) const
 {
-  return std::make_unique<LessThan>(location(), lhs, rhs);
+  return std::make_unique<LessThan>(source_location(), lhs, rhs);
 }
 
 /**
@@ -1035,7 +1035,7 @@ std::unique_ptr<Expression>
 TokenDoubleLess::construct_binary_expression(const Expression *lhs,
                                              const Expression *rhs) const
 {
-  return std::make_unique<LeftShift>(location(), lhs, rhs);
+  return std::make_unique<LeftShift>(source_location(), lhs, rhs);
 }
 
 /**
@@ -1071,7 +1071,7 @@ std::unique_ptr<Expression>
 TokenLessEquals::construct_binary_expression(const Expression *lhs,
                                              const Expression *rhs) const
 {
-  return std::make_unique<LessOrEqual>(location(), lhs, rhs);
+  return std::make_unique<LessOrEqual>(source_location(), lhs, rhs);
 }
 
 /**
@@ -1107,7 +1107,7 @@ std::unique_ptr<Expression>
 TokenPipe::construct_binary_expression(const Expression *lhs,
                                        const Expression *rhs) const
 {
-  return std::make_unique<BinaryOr>(location(), lhs, rhs);
+  return std::make_unique<BinaryOr>(source_location(), lhs, rhs);
 }
 
 /**
@@ -1143,7 +1143,7 @@ std::unique_ptr<Expression>
 TokenDoublePipe::construct_binary_expression(const Expression *lhs,
                                              const Expression *rhs) const
 {
-  return std::make_unique<LogicalOr>(location(), lhs, rhs);
+  return std::make_unique<LogicalOr>(source_location(), lhs, rhs);
 }
 
 /**
@@ -1179,7 +1179,7 @@ std::unique_ptr<Expression>
 TokenCap::construct_binary_expression(const Expression *lhs,
                                       const Expression *rhs) const
 {
-  return std::make_unique<Xor>(location(), lhs, rhs);
+  return std::make_unique<Xor>(source_location(), lhs, rhs);
 }
 
 /**
@@ -1254,7 +1254,7 @@ std::unique_ptr<Expression>
 TokenDoubleEquals::construct_binary_expression(const Expression *lhs,
                                                const Expression *rhs) const
 {
-  return std::make_unique<Equal>(location(), lhs, rhs);
+  return std::make_unique<Equal>(source_location(), lhs, rhs);
 }
 
 /**
@@ -1292,7 +1292,7 @@ std::unique_ptr<Expression>
 TokenExclamationEquals::construct_binary_expression(const Expression *lhs,
                                                     const Expression *rhs) const
 {
-  return std::make_unique<NotEqual>(location(), lhs, rhs);
+  return std::make_unique<NotEqual>(source_location(), lhs, rhs);
 }
 
 } /* namespace shit */

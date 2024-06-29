@@ -53,7 +53,7 @@ Parser::construct_ast()
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
         throw shit::ErrorWithLocation{
-            token->location(),
+            token->source_location(),
             "Expected a command " +
                 std::string(sequence->empty() ? "before" : "after") +
                 " operator, found '" + token->to_ast_string() + "'"};
@@ -65,21 +65,21 @@ Parser::construct_ast()
 
       if (lhs) {
         SequenceNode *sn =
-            new SequenceNode{token->location(), next_sk, lhs.release()};
+            new SequenceNode{token->source_location(), next_sk, lhs.release()};
         sequence->append_node(sn);
         next_sk = get_sequence_kind(token->kind());
       }
 
       if (token->kind() == Token::Kind::EndOfFile) {
         if (next_sk != SequenceNode::Kind::Simple) {
-          throw shit::ErrorWithLocation{token->location(),
+          throw shit::ErrorWithLocation{token->source_location(),
                                         "Expected a command after an operator"};
         }
 
         /* Empty input? */
         if (sequence->empty()) {
           SHIT_ASSERT(!lhs);
-          return std::make_unique<DummyExpression>(token->location());
+          return std::make_unique<DummyExpression>(token->source_location());
         } else {
           return sequence;
         }
@@ -88,7 +88,7 @@ Parser::construct_ast()
 
     case Token::Kind::Pipe: {
       if (!lhs) {
-        throw shit::ErrorWithLocation{token->location(),
+        throw shit::ErrorWithLocation{token->source_location(),
                                       "Expected a command before the pipe"};
       }
 
@@ -97,7 +97,7 @@ Parser::construct_ast()
       /* Don't prematurely release() the pointer, since we can still error out
        * before constructing the expression. */
       std::vector<const Exec *> pipe_group = {static_cast<Exec *>(lhs.get())};
-      usize                     pipe_group_location = token->location();
+      usize                     pipe_group_location = token->source_location();
 
       std::unique_ptr<Token> last_pipe_token = std::move(token);
 
@@ -114,7 +114,7 @@ Parser::construct_ast()
             continue;
           }
         } else {
-          throw shit::ErrorWithLocation{last_pipe_token->location(),
+          throw shit::ErrorWithLocation{last_pipe_token->source_location(),
                                         "Nowhere to pipe output to"};
         }
 
@@ -128,10 +128,11 @@ Parser::construct_ast()
     } break;
 
     case Token::Kind::Greater:
-      throw ErrorWithLocation{token->location(), "Not implemented (Parser)"};
+      throw ErrorWithLocation{token->source_location(),
+                              "Not implemented (Parser)"};
 
     default:
-      throw ErrorWithLocation{token->location(),
+      throw ErrorWithLocation{token->source_location(),
                               "Expected a shell operator, found '" +
                                   token->to_ast_string() + "'"};
     }
@@ -167,7 +168,7 @@ Parser::parse_shell_command()
         return nullptr;
       }
       const Token *pt = program_token.get();
-      return std::make_unique<Exec>(pt->location(), pt->value(),
+      return std::make_unique<Exec>(pt->source_location(), pt->value(),
                                     args_accumulator);
     }
   }
@@ -185,7 +186,7 @@ Parser::parse_expression(u8 min_precedence)
   std::unique_ptr<Token> t{m_lexer.next_expression_token()};
 
   if (m_recursion_depth > MAX_RECURSION_DEPTH) {
-    throw ErrorWithLocation{t->location(),
+    throw ErrorWithLocation{t->source_location(),
                             "Expression nesting level exceeded maximum of " +
                                 std::to_string(MAX_RECURSION_DEPTH)};
   }
@@ -196,12 +197,12 @@ Parser::parse_expression(u8 min_precedence)
   switch (t->kind()) {
   /* Values */
   case Token::Kind::Number:
-    lhs = std::make_unique<ConstantNumber>(t->location(),
+    lhs = std::make_unique<ConstantNumber>(t->source_location(),
                                            std::atoll(t->value().data()));
     break;
 
   case Token::Kind::String:
-    lhs = std::make_unique<ConstantString>(t->location(), t->value());
+    lhs = std::make_unique<ConstantString>(t->source_location(), t->value());
     break;
 
   /* Keywords */
@@ -219,7 +220,7 @@ Parser::parse_expression(u8 min_precedence)
       after.reset(m_lexer.next_expression_token());
     }
     if (after->kind() != Token::Kind::Then) {
-      throw ErrorWithLocation{after->location(),
+      throw ErrorWithLocation{after->source_location(),
                               "Expected 'Then' after the condition, found '" +
                                   after->to_ast_string() + "'"};
     }
@@ -244,20 +245,20 @@ Parser::parse_expression(u8 min_precedence)
     /* fi */
     if (after->kind() != Token::Kind::Fi) {
       throw ErrorWithLocationAndDetails{
-          t->location(), "Unterminated If condition", after->location(),
-          "Expected 'Fi' here"};
+          t->source_location(), "Unterminated If condition",
+          after->source_location(), "Expected 'Fi' here"};
     }
 
     m_if_condition_depth--;
 
-    lhs = std::make_unique<If>(t->location(), condition.release(),
+    lhs = std::make_unique<If>(t->source_location(), condition.release(),
                                then.release(), otherwise.release());
   } break;
 
   /* Blocks */
   case Token::Kind::LeftParen: {
     if (m_recursion_depth + m_parentheses_depth > MAX_RECURSION_DEPTH) {
-      throw ErrorWithLocation{t->location(),
+      throw ErrorWithLocation{t->source_location(),
                               "Bracket nesting level exceeded maximum of " +
                                   std::to_string(MAX_RECURSION_DEPTH)};
     }
@@ -270,8 +271,8 @@ Parser::parse_expression(u8 min_precedence)
     std::unique_ptr<Token> rp{m_lexer.next_expression_token()};
     if (rp->kind() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
-          t->location(), "Unterminated parenthesis", rp->location(),
-          "Expected a closing parenthesis here"};
+          t->source_location(), "Unterminated parenthesis",
+          rp->source_location(), "Expected a closing parenthesis here"};
     }
   } break;
 
@@ -285,7 +286,7 @@ Parser::parse_expression(u8 min_precedence)
 
       lhs = op->construct_unary_expression(rhs.release());
     } else {
-      throw ErrorWithLocation{t->location(),
+      throw ErrorWithLocation{t->source_location(),
                               "Expected a value or an expression, found '" +
                                   t->value() + "'"};
     }
@@ -306,7 +307,7 @@ Parser::parse_expression(u8 min_precedence)
 
     case Token::Kind::RightParen: {
       if (m_parentheses_depth == 0) {
-        throw ErrorWithLocation{maybe_op->location(),
+        throw ErrorWithLocation{maybe_op->source_location(),
                                 "Unexpected closing parenthesis"};
       }
       return lhs;
@@ -315,7 +316,7 @@ Parser::parse_expression(u8 min_precedence)
     case Token::Kind::Else:
     case Token::Kind::Fi: {
       if (m_recursion_depth == 0) {
-        throw ErrorWithLocation{maybe_op->location(),
+        throw ErrorWithLocation{maybe_op->source_location(),
                                 "Unexpected '" + maybe_op->value() +
                                     "' without matching If condition"};
       }
@@ -324,7 +325,7 @@ Parser::parse_expression(u8 min_precedence)
 
     case Token::Kind::Then: {
       if (m_if_condition_depth == 0) {
-        throw ErrorWithLocation{maybe_op->location(),
+        throw ErrorWithLocation{maybe_op->source_location(),
                                 "Unexpected '" + maybe_op->value() +
                                     "' without matching If condition"};
       }
@@ -335,7 +336,7 @@ Parser::parse_expression(u8 min_precedence)
     }
 
     if (!(maybe_op->flags() & Token::Flag::BinaryOperator)) {
-      throw ErrorWithLocation{maybe_op->location(),
+      throw ErrorWithLocation{maybe_op->source_location(),
                               "Expected a binary operator, found '" +
                                   maybe_op->value() + "'"};
     }

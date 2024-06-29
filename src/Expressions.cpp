@@ -8,6 +8,54 @@
 namespace shit {
 
 static constexpr const char *EXPRESSION_AST_INDENT = " ";
+static constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";
+
+/**
+ * class: EvalContext
+ */
+EvalContext::EvalContext() = default;
+
+void
+EvalContext::add_evaluated_expression()
+{
+  m_expressions_executed_last++;
+}
+
+void
+EvalContext::end_command()
+{
+  m_expressions_executed_total += m_expressions_executed_last;
+  m_expressions_executed_last = 0;
+}
+
+std::string
+EvalContext::make_stats_string() const
+{
+  std::string s{};
+  s += "[Statistics:\n";
+
+  s += EXPRESSION_DOUBLE_AST_INDENT;
+  s += "Nodes evaluated: " + std::to_string(last_expressions_executed());
+  s += '\n';
+  s += EXPRESSION_DOUBLE_AST_INDENT;
+  s += "Total nodes evaluated: " + std::to_string(total_expressions_executed());
+  s += '\n';
+
+  s += "]";
+  return s;
+}
+
+usize
+EvalContext::last_expressions_executed() const
+{
+  return m_expressions_executed_last;
+}
+
+usize
+EvalContext::total_expressions_executed() const
+{
+  return m_expressions_executed_total + m_expressions_executed_last;
+}
 
 /**
  * class: Expression
@@ -15,7 +63,7 @@ static constexpr const char *EXPRESSION_AST_INDENT = " ";
 Expression::Expression(usize location) : m_location(location) {}
 
 usize
-Expression::location() const
+Expression::source_location() const
 {
   return m_location;
 }
@@ -28,6 +76,13 @@ Expression::to_ast_string(usize layer) const
     pad += EXPRESSION_AST_INDENT;
   }
   return pad + "[" + to_string() + "]";
+}
+
+i64
+Expression::evaluate(EvalContext &cxt) const
+{
+  cxt.add_evaluated_expression();
+  return evaluate_impl(cxt);
 }
 
 /**
@@ -50,12 +105,14 @@ If::~If()
 }
 
 i64
-If::evaluate() const
+If::evaluate_impl(EvalContext &cxt) const
 {
-  if (m_condition->evaluate()) {
-    return m_then->evaluate();
+  SHIT_UNUSED(cxt);
+
+  if (m_condition->evaluate(cxt)) {
+    return m_then->evaluate(cxt);
   } else if (m_otherwise != nullptr) {
-    return m_otherwise->evaluate();
+    return m_otherwise->evaluate(cxt);
   }
 
   return 0;
@@ -97,8 +154,9 @@ If::to_ast_string(usize layer) const
 DummyExpression::DummyExpression(usize location) : Expression(location) {}
 
 i64
-DummyExpression::evaluate() const
+DummyExpression::evaluate_impl(EvalContext &cxt) const
 {
+  SHIT_UNUSED(cxt);
   return 0;
 }
 
@@ -139,10 +197,12 @@ Exec::args() const
 }
 
 i64
-Exec::evaluate() const
+Exec::evaluate_impl(EvalContext &cxt) const
 {
+  SHIT_UNUSED(cxt);
+
   return utils::execute_context(
-      utils::ExecContext::make(m_program, m_args, location()));
+      utils::ExecContext::make(m_program, m_args, source_location()));
 
   SHIT_UNREACHABLE();
 }
@@ -228,7 +288,7 @@ Sequence::to_ast_string(usize layer) const
 }
 
 i64
-Sequence::evaluate() const
+Sequence::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_nodes.size() > 0);
 
@@ -238,18 +298,18 @@ Sequence::evaluate() const
   for (const SequenceNode *n : m_nodes) {
     switch (n->kind()) {
     case SequenceNode::Kind::Simple: {
-      ret = n->evaluate();
+      ret = n->evaluate(cxt);
     } break;
 
     case SequenceNode::Kind::Or:
       if (ret != 0) {
-        ret = n->evaluate();
+        ret = n->evaluate(cxt);
       }
       break;
 
     case SequenceNode::Kind::And:
       if (ret == 0) {
-        ret = n->evaluate();
+        ret = n->evaluate(cxt);
       }
       break;
     }
@@ -304,9 +364,9 @@ SequenceNode::to_ast_string(usize layer) const
 }
 
 i64
-SequenceNode::evaluate() const
+SequenceNode::evaluate_impl(EvalContext &cxt) const
 {
-  return m_expr->evaluate();
+  return m_expr->evaluate(cxt);
 }
 
 ExecPipeSequence::ExecPipeSequence(usize                            location,
@@ -346,7 +406,7 @@ ExecPipeSequence::to_ast_string(usize layer) const
 }
 
 i64
-ExecPipeSequence::evaluate() const
+ExecPipeSequence::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_commands.size() > 1);
 
@@ -354,8 +414,9 @@ ExecPipeSequence::evaluate() const
   ecs.reserve(m_commands.size());
 
   for (const Exec *e : m_commands) {
-    ecs.emplace_back(
-        utils::ExecContext::make(e->program(), e->args(), e->location()));
+    cxt.add_evaluated_expression();
+    ecs.emplace_back(utils::ExecContext::make(e->program(), e->args(),
+                                              e->source_location()));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs));
@@ -423,8 +484,9 @@ ConstantNumber::ConstantNumber(usize location, i64 value)
 ConstantNumber::~ConstantNumber() = default;
 
 i64
-ConstantNumber::evaluate() const
+ConstantNumber::evaluate_impl(EvalContext &cxt) const
 {
+  SHIT_UNUSED(cxt);
   return m_value;
 }
 
@@ -456,9 +518,10 @@ ConstantString::ConstantString(usize location, const std::string &value)
 ConstantString::~ConstantString() = default;
 
 i64
-ConstantString::evaluate() const
+ConstantString::evaluate_impl(EvalContext &cxt) const
 {
-  return 0;
+  SHIT_UNUSED(cxt);
+  SHIT_UNREACHABLE();
 }
 
 std::string
@@ -493,9 +556,9 @@ Negate::to_string() const
 }
 
 i64
-Negate::evaluate() const
+Negate::evaluate_impl(EvalContext &cxt) const
 {
-  return -m_rhs->evaluate();
+  return -m_rhs->evaluate(cxt);
 }
 
 /**
@@ -512,9 +575,9 @@ Unnegate::to_string() const
 }
 
 i64
-Unnegate::evaluate() const
+Unnegate::evaluate_impl(EvalContext &cxt) const
 {
-  return +m_rhs->evaluate();
+  return +m_rhs->evaluate(cxt);
 }
 
 /**
@@ -531,9 +594,9 @@ LogicalNot::to_string() const
 }
 
 i64
-LogicalNot::evaluate() const
+LogicalNot::evaluate_impl(EvalContext &cxt) const
 {
-  return !m_rhs->evaluate();
+  return !m_rhs->evaluate(cxt);
 }
 
 /**
@@ -550,9 +613,9 @@ BinaryComplement::to_string() const
 }
 
 i64
-BinaryComplement::evaluate() const
+BinaryComplement::evaluate_impl(EvalContext &cxt) const
 {
-  return ~m_rhs->evaluate();
+  return ~m_rhs->evaluate(cxt);
 }
 
 /**
@@ -569,9 +632,9 @@ Add::to_string() const
 }
 
 i64
-Add::evaluate() const
+Add::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() + m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) + m_rhs->evaluate(cxt);
 }
 
 /**
@@ -588,9 +651,9 @@ Subtract::to_string() const
 }
 
 i64
-Subtract::evaluate() const
+Subtract::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() - m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) - m_rhs->evaluate(cxt);
 }
 
 /**
@@ -607,9 +670,9 @@ Multiply::to_string() const
 }
 
 i64
-Multiply::evaluate() const
+Multiply::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() * m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) * m_rhs->evaluate(cxt);
 }
 
 /**
@@ -626,12 +689,12 @@ Divide::to_string() const
 }
 
 i64
-Divide::evaluate() const
+Divide::evaluate_impl(EvalContext &cxt) const
 {
-  i64 denom = m_rhs->evaluate();
+  i64 denom = m_rhs->evaluate(cxt);
   if (denom == 0)
-    throw ErrorWithLocation{m_rhs->location(), "Division by 0"};
-  return m_lhs->evaluate() / denom;
+    throw ErrorWithLocation{m_rhs->source_location(), "Division by 0"};
+  return m_lhs->evaluate(cxt) / denom;
 }
 
 /**
@@ -648,9 +711,9 @@ Module::to_string() const
 }
 
 i64
-Module::evaluate() const
+Module::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() % m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) % m_rhs->evaluate(cxt);
 }
 
 /**
@@ -668,9 +731,9 @@ BinaryAnd::to_string() const
 }
 
 i64
-BinaryAnd::evaluate() const
+BinaryAnd::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() & m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) & m_rhs->evaluate(cxt);
 }
 
 /**
@@ -688,9 +751,9 @@ LogicalAnd::to_string() const
 }
 
 i64
-LogicalAnd::evaluate() const
+LogicalAnd::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() && m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) && m_rhs->evaluate(cxt);
 }
 
 /**
@@ -708,9 +771,9 @@ GreaterThan::to_string() const
 }
 
 i64
-GreaterThan::evaluate() const
+GreaterThan::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() > m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) > m_rhs->evaluate(cxt);
 }
 
 /**
@@ -728,9 +791,9 @@ GreaterOrEqual::to_string() const
 }
 
 i64
-GreaterOrEqual::evaluate() const
+GreaterOrEqual::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() >= m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) >= m_rhs->evaluate(cxt);
 }
 
 /**
@@ -748,9 +811,9 @@ RightShift::to_string() const
 }
 
 i64
-RightShift::evaluate() const
+RightShift::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() >> m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) >> m_rhs->evaluate(cxt);
 }
 
 /**
@@ -767,9 +830,9 @@ LessThan::to_string() const
 }
 
 i64
-LessThan::evaluate() const
+LessThan::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() < m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) < m_rhs->evaluate(cxt);
 }
 
 /**
@@ -787,9 +850,9 @@ LessOrEqual::to_string() const
 }
 
 i64
-LessOrEqual::evaluate() const
+LessOrEqual::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() <= m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) <= m_rhs->evaluate(cxt);
 }
 
 /**
@@ -807,9 +870,9 @@ LeftShift::to_string() const
 }
 
 i64
-LeftShift::evaluate() const
+LeftShift::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() << m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) << m_rhs->evaluate(cxt);
 }
 
 /**
@@ -826,9 +889,9 @@ BinaryOr::to_string() const
 }
 
 i64
-BinaryOr::evaluate() const
+BinaryOr::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() | m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) | m_rhs->evaluate(cxt);
 }
 
 /**
@@ -846,9 +909,9 @@ LogicalOr::to_string() const
 }
 
 i64
-LogicalOr::evaluate() const
+LogicalOr::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() || m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) || m_rhs->evaluate(cxt);
 }
 
 /**
@@ -865,9 +928,9 @@ Xor::to_string() const
 }
 
 i64
-Xor::evaluate() const
+Xor::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() ^ m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) ^ m_rhs->evaluate(cxt);
 }
 
 /**
@@ -884,9 +947,9 @@ Equal::to_string() const
 }
 
 i64
-Equal::evaluate() const
+Equal::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() == m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) == m_rhs->evaluate(cxt);
 }
 
 /**
@@ -903,9 +966,9 @@ NotEqual::to_string() const
 }
 
 i64
-NotEqual::evaluate() const
+NotEqual::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate() != m_rhs->evaluate();
+  return m_lhs->evaluate(cxt) != m_rhs->evaluate(cxt);
 }
 
 } /* namespace shit */

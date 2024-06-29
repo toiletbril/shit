@@ -48,12 +48,12 @@ execute_builtin(utils::ExecContext &&ec)
     SHIT_UNREACHABLE("Unhandled builtin of kind %d", E(ec.builtin_kind()));
   }
 
+  SHIT_DEFER { ec.close_fds(); };
+
   try {
     i32 ret = b->execute(ec);
-    ec.close_fds();
     return ret;
   } catch (Error &err) {
-    ec.close_fds();
     throw ErrorWithLocation{ec.location(), err.message()};
   }
 }

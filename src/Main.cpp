@@ -25,6 +25,7 @@ FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(COMMAND, ManyStrings, 'c', "command",
      "Execute specified command and exit. Can be specified multiple times.");
 FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
+FLAG(STATS, Bool, 'S', "stats", "Print statistics after each command.");
 
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
@@ -103,9 +104,10 @@ main(int argc, char **argv)
   }
 
   /* Main loop state. */
-  usize arg_index = 0;
-  bool  should_quit = false;
-  int   exit_code = EXIT_SUCCESS;
+  shit::EvalContext cxt{};
+  usize             arg_index = 0;
+  bool              should_quit = false;
+  int               exit_code = EXIT_SUCCESS;
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,
    * since it's only really noticeable in interactive mode. This way,
@@ -245,9 +247,17 @@ main(int argc, char **argv)
       if (FLAG_DUMP_AST.is_enabled())
         std::cout << ast->to_ast_string() << std::endl;
 
-      exit_code = ast->evaluate();
-      if (FLAG_EXIT_CODE.is_enabled())
+      exit_code = ast->evaluate(cxt);
+
+      if (FLAG_EXIT_CODE.is_enabled()) {
         std::cout << "[Code " << exit_code << "]" << std::endl;
+      }
+
+      if (FLAG_STATS.is_enabled()) {
+        std::cout << cxt.make_stats_string() << std::endl;
+      }
+
+      cxt.end_command();
     } catch (shit::ErrorWithLocationAndDetails &e) {
       shit::show_message(e.to_string(contents));
       shit::show_message(e.details_to_string(contents));

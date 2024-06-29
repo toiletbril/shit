@@ -7,6 +7,23 @@
 
 namespace shit {
 
+struct EvalContext
+{
+  EvalContext();
+
+  void add_evaluated_expression();
+  void end_command();
+
+  std::string make_stats_string() const;
+
+  usize last_expressions_executed() const;
+  usize total_expressions_executed() const;
+
+protected:
+  usize m_expressions_executed_last{0};
+  usize m_expressions_executed_total{0};
+};
+
 struct Expression
 {
   Expression() = default;
@@ -14,7 +31,10 @@ struct Expression
 
   virtual ~Expression() = default;
 
-  virtual usize location() const;
+  usize source_location() const;
+  /* Expressions should override evaluate_impl() instead. This method is used
+   * mainly for initialization before the actual evaluation. */
+  i64   evaluate(EvalContext &cxt) const;
 
   /* Each expression should provide it's own way to copy it. */
   Expression(const Expression &) = delete;
@@ -22,11 +42,12 @@ struct Expression
   Expression &operator=(const Expression &) = delete;
   Expression &operator=(Expression &&) noexcept = delete;
 
-  virtual i64         evaluate() const = 0;
   virtual std::string to_string() const = 0;
   virtual std::string to_ast_string(usize layer = 0) const;
 
 protected:
+  virtual i64 evaluate_impl(EvalContext &cxt) const = 0;
+
   usize m_location{std::string::npos};
 };
 
@@ -37,11 +58,12 @@ struct If : public Expression
 
   ~If() override;
 
-  i64         evaluate() const override;
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
 protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
   const Expression *m_condition;
   const Expression *m_then;
   const Expression *m_otherwise;
@@ -51,9 +73,11 @@ struct DummyExpression : public Expression
 {
   DummyExpression(usize location);
 
-  i64         evaluate() const override;
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Exec : public Expression
@@ -64,11 +88,12 @@ struct Exec : public Expression
   std::string              program() const;
   std::vector<std::string> args() const;
 
-  i64         evaluate() const override;
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
 protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
   std::string              m_program;
   std::vector<std::string> m_args;
 };
@@ -90,9 +115,10 @@ struct SequenceNode : public Expression
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
-  i64         evaluate() const override;
 
 protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
   Kind              m_kind;
   const Expression *m_expr;
 };
@@ -109,9 +135,10 @@ struct Sequence : public Expression
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
-  i64         evaluate() const override;
 
 protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
   std::vector<const SequenceNode *> m_nodes;
 };
 
@@ -122,9 +149,10 @@ struct ExecPipeSequence : public Expression
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
-  i64         evaluate() const override;
 
 protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
   std::vector<const Exec *> m_commands;
 };
 
@@ -157,11 +185,12 @@ struct ConstantNumber : public Expression
   ConstantNumber(usize location, i64 value);
   ~ConstantNumber() override;
 
-  i64         evaluate() const override;
   std::string to_ast_string(usize layer = 0) const override;
   std::string to_string() const override;
 
 protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
   const i64 m_value;
 };
 
@@ -170,11 +199,12 @@ struct ConstantString : public Expression
   ConstantString(usize location, const std::string &value);
   ~ConstantString() override;
 
-  i64         evaluate() const override;
   std::string to_ast_string(usize layer = 0) const override;
   std::string to_string() const override;
 
 protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
   const std::string m_value;
 };
 
@@ -183,7 +213,9 @@ struct Negate : public UnaryExpression
   Negate(usize location, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Unnegate : public UnaryExpression
@@ -191,7 +223,9 @@ struct Unnegate : public UnaryExpression
   Unnegate(usize location, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct LogicalNot : public UnaryExpression
@@ -199,7 +233,9 @@ struct LogicalNot : public UnaryExpression
   LogicalNot(usize location, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct BinaryComplement : public UnaryExpression
@@ -207,7 +243,9 @@ struct BinaryComplement : public UnaryExpression
   BinaryComplement(usize location, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Add : public BinaryExpression
@@ -215,7 +253,9 @@ struct Add : public BinaryExpression
   Add(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Subtract : public BinaryExpression
@@ -223,7 +263,9 @@ struct Subtract : public BinaryExpression
   Subtract(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Multiply : public BinaryExpression
@@ -231,7 +273,9 @@ struct Multiply : public BinaryExpression
   Multiply(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Divide : public BinaryExpression
@@ -239,7 +283,9 @@ struct Divide : public BinaryExpression
   Divide(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Module : public BinaryExpression
@@ -247,7 +293,9 @@ struct Module : public BinaryExpression
   Module(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct BinaryAnd : public BinaryExpression
@@ -255,7 +303,9 @@ struct BinaryAnd : public BinaryExpression
   BinaryAnd(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct LogicalAnd : public BinaryExpression
@@ -263,7 +313,9 @@ struct LogicalAnd : public BinaryExpression
   LogicalAnd(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct GreaterThan : public BinaryExpression
@@ -271,7 +323,9 @@ struct GreaterThan : public BinaryExpression
   GreaterThan(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct GreaterOrEqual : public BinaryExpression
@@ -279,7 +333,9 @@ struct GreaterOrEqual : public BinaryExpression
   GreaterOrEqual(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct RightShift : public BinaryExpression
@@ -287,7 +343,9 @@ struct RightShift : public BinaryExpression
   RightShift(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct LessThan : public BinaryExpression
@@ -295,7 +353,9 @@ struct LessThan : public BinaryExpression
   LessThan(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct LessOrEqual : public BinaryExpression
@@ -303,7 +363,9 @@ struct LessOrEqual : public BinaryExpression
   LessOrEqual(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct LeftShift : public BinaryExpression
@@ -311,7 +373,9 @@ struct LeftShift : public BinaryExpression
   LeftShift(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct BinaryOr : public BinaryExpression
@@ -319,7 +383,9 @@ struct BinaryOr : public BinaryExpression
   BinaryOr(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct LogicalOr : public BinaryExpression
@@ -327,7 +393,9 @@ struct LogicalOr : public BinaryExpression
   LogicalOr(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Xor : public BinaryExpression
@@ -335,7 +403,9 @@ struct Xor : public BinaryExpression
   Xor(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct Equal : public BinaryExpression
@@ -343,7 +413,9 @@ struct Equal : public BinaryExpression
   Equal(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 struct NotEqual : public BinaryExpression
@@ -351,7 +423,9 @@ struct NotEqual : public BinaryExpression
   NotEqual(usize location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
-  i64         evaluate() const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
 } /* namespace shit */
