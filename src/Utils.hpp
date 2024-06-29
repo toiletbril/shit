@@ -15,15 +15,15 @@ namespace shit {
 
 namespace utils {
 
-/* Path is the program path to execute, expanded from program. Program is
- * non-altered first arg. */
+/* Lower-level execution context. Path is the program path to execute, expanded
+ * from program. Program is non-altered first arg. */
 struct ExecContext
 {
   static ExecContext make(const std::string              &program,
                           const std::vector<std::string> &args, usize location);
 
-  std::optional<os::descriptor> in{std::nullopt};
-  std::optional<os::descriptor> out{std::nullopt};
+  std::optional<os::descriptor> in_fd{std::nullopt};
+  std::optional<os::descriptor> out_fd{std::nullopt};
 
   bool is_builtin() const;
 

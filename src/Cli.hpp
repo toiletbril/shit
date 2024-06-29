@@ -60,7 +60,7 @@ struct FlagBool : public Flag
   bool is_enabled() const;
 
 private:
-  bool m_value{};
+  bool m_value{false};
 };
 
 struct FlagString : public Flag

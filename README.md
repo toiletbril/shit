@@ -29,13 +29,14 @@ check the code.
 
 The `MODE` variable controls build type:
 * `rel` is the optimized build;
+* `prof` is optimized build with debug symbols for profiling;
 * `dbg` includes all symbols and Asan with Ubsan;
 * `cosmo` is an optimized build which will try to use `cosmoc++` from the
   Cosmopolitan toolchain.
 
 An example of the build process:
 ```bash
-$ export MODE=rel/dbg/cosmo
+$ export MODE=rel/prof/dbg/cosmo
 $ make -j14
 $ ./shit --help
 ```

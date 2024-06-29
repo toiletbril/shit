@@ -9,7 +9,6 @@
 
 *.gch
 *.pch
-
 *.swp
 
 .vs
@@ -18,6 +17,7 @@
 CppProperties.json
 compile_commands.json
 events.json
+perf*
 
 garbage/
 src/o

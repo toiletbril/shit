@@ -3,11 +3,15 @@
 /* Timestamp the build. */
 
 #if !defined SHIT_COMMIT_HASH
-#define SHIT_COMMIT_HASH "<unknown commit>"
+#warning SHIT_COMMIT_HASH should be defined.Please use provided makefile for \
+         compilation!
+#define SHIT_COMMIT_HASH "<unknown>"
 #endif
 
 #if !defined SHIT_BUILD_MODE
-#define SHIT_BUILD_MODE "<unset mode>"
+#warning SHIT_BUILD_MODE should be defined. Please use provided makefile for \
+         compilation!
+#define SHIT_BUILD_MODE "<unset>"
 #endif
 
 #define SHIT_BUILD_DATE (__DATE__ " at " __TIME__)

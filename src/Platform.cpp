@@ -98,13 +98,13 @@ execute_program(utils::ExecContext &&ec)
   if (child_pid == 0) {
     std::vector<const char *> os_args = make_os_args(ec.program(), ec.args());
 
-    if (ec.in) {
-      dup2(*ec.in, STDIN_FILENO);
-      close(*ec.in);
+    if (ec.in_fd) {
+      dup2(*ec.in_fd, STDIN_FILENO);
+      close(*ec.in_fd);
     }
-    if (ec.out) {
-      dup2(*ec.out, STDOUT_FILENO);
-      close(*ec.out);
+    if (ec.out_fd) {
+      dup2(*ec.out_fd, STDOUT_FILENO);
+      close(*ec.out_fd);
     }
 
     reset_signal_handlers();

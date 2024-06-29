@@ -25,9 +25,8 @@ Echo::kind() const
 i32
 Echo::execute(utils::ExecContext &ec) const
 {
-  std::string buf{};
-
   std::vector<std::string> args = parse_flags_vec(FLAG_LIST, ec.args());
+
   if (FLAG_HELP.is_enabled()) {
     std::string h{};
     h += make_synopsis("echo", HELP_SYNOPSIS);
@@ -37,6 +36,8 @@ Echo::execute(utils::ExecContext &ec) const
     ec.print_to_stdout(h);
     return 0;
   }
+
+  std::string buf{};
 
   if (args.size() > 0) {
     buf += args[0];

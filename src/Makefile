@@ -1,10 +1,12 @@
-# make MODE=dbg/rel/cosmo
+# make MODE=dbg/rel/prof/cosmo
 MODE ?= dbg
 
 SOURCES := $(wildcard *.cpp)
 HEADERS := $(wildcard *.hpp)
 
 # Subfolders.
+DIRS := $(wildcard */.)
+
 SOURCES += $(wildcard */**.cpp)
 HEADERS += $(wildcard */**.hpp)
 
@@ -40,8 +42,7 @@ CXXFLAGS := \
 ifeq ($(MODE), rel)
 CXXFLAGS += \
 	-DNDEBUG \
-	-g \
-	-O2
+	-O3
 else ifeq ($(MODE), dbg)
 CXXFLAGS += \
 	-g3 \
@@ -56,8 +57,12 @@ CXXFLAGS += -fexceptions -g -O2
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
 endif
+else ifeq ($(MODE), prof)
+CXXFLAGS += \
+	-g3 \
+	-O3
 else
-$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "cosmo")
+$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cosmo")
 endif
 
 ifeq ($(OS), Windows_NT)
@@ -70,20 +75,19 @@ CXXFLAGS += \
 endif
 
 o/$(MODE)/%.o: %.cpp
-	echo "	CXX $< 	-o $@"
+	printf "\t%-24s 🡲  $@\n" $<
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
 $(OUT): $(OBJECTS)
-	echo "	CXX $(OBJECTS)	-o $@"
+	printf "\t$(OBJECTS) 🡲  $(OUT)\n"
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@
 
-dirs:
+dirs: $(DIRS)
 	mkdir -p o/$(MODE)/
-	mkdir -p o/$(MODE)/builtin
+	mkdir -p o/$(MODE)/$<
 
 shit: dirs
 	$(MAKE) $(OUT)
-	echo "Compilation succeeded."
 
 install: shit
 ifneq ($(OS), Windows_NT)

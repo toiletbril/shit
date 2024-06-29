@@ -67,10 +67,10 @@ ExecContext::program_path() const
 void
 ExecContext::close_fds()
 {
-  if (in)
-    os::close_fd(*in);
-  if (out)
-    os::close_fd(*out);
+  if (in_fd)
+    os::close_fd(*in_fd);
+  if (out_fd)
+    os::close_fd(*out_fd);
 }
 
 const Builtin::Kind &
@@ -80,15 +80,17 @@ ExecContext::builtin_kind() const
     return std::get<shit::Builtin::Kind>(m_kind);
   }
 
-  throw shit::Error{"builtin_kind() call on a program"};
+  SHIT_UNREACHABLE("builtin_kind() call on a program");
 }
 
 void
 ExecContext::print_to_stdout(const std::string &s) const
 {
-  if (!os::write_fd(out.value_or(SHIT_STDOUT), s.data(), s.size()).has_value())
+  if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data(), s.size())
+           .has_value())
   {
-    throw Error{"Unable to write to stdout"};
+    throw Error{"Unable to write to stdout: " +
+                os::last_system_error_message()};
   }
 }
 
@@ -126,11 +128,11 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs)
       if (!pipe) {
         throw ErrorWithLocation{ec.location(), "Could not open a pipe"};
       }
-      ec.out = pipe->out;
+      ec.out_fd = pipe->out;
     }
 
     if (!is_first) {
-      ec.in = last_stdin;
+      ec.in_fd = last_stdin;
     }
 
     if (!ec.is_builtin()) {
