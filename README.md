@@ -49,7 +49,7 @@ Is it usable?
 - [x] Logical sequences. (`&&`, `||`, `;`)
 - [x] Pipes.
 - [ ] Redirections. (`>`/`<`)
-- [ ] Shell expansion. (`*`, `~`, `!`)
+- [x] Shell expansion. (`?`, `[...]`, `*`, `~`)
 - [ ] Environment variables.
 - [ ] Numeric expressions.
 

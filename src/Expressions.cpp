@@ -91,39 +91,12 @@ EvalContext::total_expansion_count() const
   return m_expansions_total + m_expansions_last;
 }
 
+/* TODO: Test symlinks. */
+/* TODO: What the fuck is happening. */
 std::vector<std::string>
-EvalContext::expand(const tokens::Expandable *e) const
+EvalContext::expand_once(std::string_view r, bool should_expand_files) const
 {
-  SHIT_ASSERT(e->flags() & Token::Flag::Expandable);
-  std::string              r = e->raw_string();
   std::vector<std::string> values{};
-
-  /* Expand tilde. */
-  for (usize i = 0; i < r.length(); i++) {
-    if (r[i] == '~') {
-      if (i > 0 && !lexer::is_whitespace(r[i - 1])) {
-        break;
-      }
-
-      /* TODO: There may be several separators supported. */
-      if (r.length() > i + 1 &&
-          r[i + 1] != std::filesystem::path::preferred_separator)
-      {
-        /* TODO: Expand different users. */
-        break;
-      }
-
-      /* Remove the tilde. */
-      r.erase(i, 1);
-
-      std::optional<std::filesystem::path> u = os::get_home_directory();
-      if (!u) {
-        throw Error{"Could not figure out home directory"};
-      }
-
-      r.insert(i, u.value().string());
-    }
-  }
 
   usize last_slash = r.rfind('/');
   bool  has_slashes = (last_slash != std::string::npos);
@@ -134,7 +107,7 @@ EvalContext::expand(const tokens::Expandable *e) const
   if (has_slashes) {
     parent_dir = r.substr(0, last_slash);
   } else {
-    parent_dir = utils::get_current_directory();
+    parent_dir = ".";
   }
 
   /* Stem of the glob after the last slash. */
@@ -162,11 +135,20 @@ EvalContext::expand(const tokens::Expandable *e) const
 
   if (glob) {
     for (const std::filesystem::directory_entry &e : d) {
+      if (!should_expand_files && !e.is_directory()) {
+        continue;
+      }
       std::string f = e.path().filename().string();
+      /* TODO: Figure the rules of hidden file expansion. */
+      if (f[0] == '.') {
+        continue;
+      }
       if (utils::glob_matches(*glob, f)) {
         std::string v{};
-        v += parent_dir;
-        v += '/';
+        if (parent_dir != ".") {
+          v += parent_dir;
+          v += '/';
+        }
         v += f;
         values.emplace_back(v);
       }
@@ -174,6 +156,91 @@ EvalContext::expand(const tokens::Expandable *e) const
   } else {
     values.emplace_back(r);
   }
+
+  return values;
+}
+
+std::vector<std::string>
+EvalContext::expand_many(const std::vector<std::string> &vs) const
+{
+  std::vector<std::string> vvs{};
+  std::optional<usize>     expand_ch{};
+
+  for (std::string_view vo : vs) {
+    std::string_view v = vo;
+
+    for (usize i = 0; i < v.length(); i++) {
+      if (lexer::is_expandable_char(v[i])) {
+        expand_ch = i;
+        break;
+      }
+    }
+    if (expand_ch) {
+      std::optional<usize> slash_after{};
+
+      for (usize i = *expand_ch; i < v.length(); i++) {
+        if (v[i] == '/') {
+          slash_after = i;
+          break;
+        }
+      }
+      if (slash_after) {
+        v.remove_suffix(v.length() - *slash_after);
+      }
+
+      std::vector<std::string> tvs = expand_once(v, !slash_after);
+
+      if (slash_after) {
+        /* Bring back the removed prefix. */
+        vo.remove_prefix(*slash_after);
+        for (std::string &vv : tvs) {
+          vv += vo;
+        }
+        /* Call this function recursively on expanded entries. */
+        std::vector<std::string> tvvs = expand_many(tvs);
+        for (const std::string &vvv : tvvs) {
+          vvs.emplace_back(vvv);
+        }
+      } else {
+        for (const std::string &vv : tvs) {
+          vvs.emplace_back(vv);
+        }
+      }
+    } else {
+      vvs.emplace_back(v);
+    }
+  }
+
+  return vvs;
+}
+
+std::vector<std::string>
+EvalContext::expand(const tokens::Expandable *e) const
+{
+  std::string r = e->raw_string();
+
+  auto expand_tilde = [](std::string &r) {
+    if (r[0] == '~') {
+      /* TODO: There may be several separators supported. */
+      if (r.length() > 1 && r[1] != '/') {
+        /* TODO: Expand different users. */
+        return;
+      }
+
+      /* Remove the tilde. */
+      r.erase(0, 1);
+
+      std::optional<std::filesystem::path> u = os::get_home_directory();
+      if (!u) {
+        throw Error{"Could not figure out home directory"};
+      }
+
+      r.insert(0, u->string());
+    }
+  };
+
+  expand_tilde(r);
+  std::vector<std::string> values = expand_many({r});
 
   if (values.empty()) {
     throw Error{"No expansions found for '" + r + "'"};

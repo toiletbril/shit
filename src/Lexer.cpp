@@ -98,6 +98,8 @@ is_expandable_char(char ch)
 {
   switch (ch) {
   case '~':
+  case '[':
+  case '?':
   case '*': return true;
   default: return false;
   }
