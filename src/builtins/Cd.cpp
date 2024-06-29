@@ -17,9 +17,9 @@ Cd::execute(utils::ExecContext &ec) const
 {
   std::string arg_path{};
 
-  if (ec.args().size() > 0) {
-    arg_path += ec.args()[0];
-    for (usize i = 1; i < ec.args().size(); i++) {
+  if (ec.args().size() > 1) {
+    arg_path += ec.args()[1];
+    for (usize i = 2; i < ec.args().size(); i++) {
       arg_path += ' ';
       arg_path += ec.args()[i];
     }
