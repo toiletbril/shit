@@ -80,6 +80,8 @@ void set_current_directory(const std::filesystem::path &path);
 
 std::filesystem::path get_current_directory();
 
+bool glob_matches(std::string_view glob, std::string_view str);
+
 /* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] void quit(i32 code, bool should_goodbye = false);
 

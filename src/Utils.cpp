@@ -238,6 +238,110 @@ get_current_directory()
   }
 }
 
+/* Inspiration taken from https://github.com/tsoding/glob.h :3
+ * MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
+bool
+glob_matches(std::string_view glob, std::string_view str)
+{
+  usize str_pos = 0;
+  usize glob_pos = 0;
+
+  while (glob_pos < glob.length() && str_pos < str.length()) {
+    switch (glob[glob_pos]) {
+    case '?': {
+      glob_pos++;
+      str_pos++;
+    } break;
+
+    case '*': {
+      if (glob_matches(glob.substr(glob_pos + 1), str.substr(str_pos))) {
+        return true;
+      }
+      str_pos++;
+    } break;
+
+    case '[': {
+      bool matched = false;
+      bool negate = false;
+
+      glob_pos++; /* skip [ */
+      if (glob_pos >= glob.length()) {
+        throw Error{"glob: unclosed '['"};
+      }
+
+      if (glob[glob_pos] == '!') {
+        negate = true;
+        glob_pos += 1;
+        if (glob_pos >= glob.length()) {
+          throw Error{"glob: unclosed '['"};
+        }
+      }
+
+      char prev = glob[glob_pos];
+      matched |= prev == str[str_pos];
+      glob_pos += 1;
+
+      while (glob[glob_pos] != ']' && glob_pos < glob.length()) {
+        if (glob[glob_pos] == '-') {
+          glob_pos += 1;
+          if (glob_pos >= glob.length()) {
+            throw Error{"glob: unclosed '['"};
+          }
+
+          if (glob[glob_pos] == ']') {
+            matched |= '-' == str[str_pos];
+          } else {
+            matched |= prev <= str[str_pos] && str[str_pos] <= glob[glob_pos];
+            prev = glob[glob_pos];
+            glob_pos += 1;
+          }
+        } else {
+          prev = glob[glob_pos];
+          matched |= prev == str[str_pos];
+          glob_pos += 1;
+        }
+      }
+
+      if (glob[glob_pos] != ']') {
+        throw Error{"glob: unclosed '['"};
+      }
+      if (negate) {
+        matched = !matched;
+      }
+      if (!matched) {
+        return false;
+      }
+
+      glob_pos++;
+      str_pos++;
+    } break;
+
+    case '\\':
+      glob_pos++;
+      if (glob_pos >= glob.length()) {
+        throw Error{"glob: unfinished escape"};
+      }
+      /* fallthrough */
+
+    default:
+      if (glob[glob_pos++] != str[str_pos++]) {
+        return false;
+      }
+    }
+  }
+
+  if (str_pos >= str.length()) {
+    while (glob[glob_pos] == '*') {
+      glob_pos++;
+    }
+    if (glob_pos >= glob.length()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 [[noreturn]] void
 quit(i32 code, bool should_goodbye)
 {

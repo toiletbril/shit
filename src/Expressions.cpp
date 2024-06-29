@@ -3,8 +3,12 @@
 #include "Builtin.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Lexer.hpp"
+#include "Platform.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
+
+#include <filesystem>
 
 namespace shit {
 
@@ -94,10 +98,85 @@ EvalContext::expand(const tokens::Expandable *e) const
   std::string              r = e->raw_string();
   std::vector<std::string> values{};
 
-  if (r == "*") {
-    values.emplace_back("asterisk");
+  /* Expand tilde. */
+  for (usize i = 0; i < r.length(); i++) {
+    if (r[i] == '~') {
+      if (i > 0 && !lexer::is_whitespace(r[i - 1])) {
+        break;
+      }
+
+      /* TODO: There may be several separators supported. */
+      if (r.length() > i + 1 &&
+          r[i + 1] != std::filesystem::path::preferred_separator)
+      {
+        /* TODO: Expand different users. */
+        break;
+      }
+
+      /* Remove the tilde. */
+      r.erase(i, 1);
+
+      std::optional<std::filesystem::path> u = os::get_home_directory();
+      if (!u) {
+        throw Error{"Could not figure out home directory"};
+      }
+
+      r.insert(i, u.value().string());
+    }
+  }
+
+  usize last_slash = r.rfind('/');
+  bool  has_slashes = (last_slash != std::string::npos);
+
+  /* Prefix is the parent directory. */
+  std::string parent_dir{};
+
+  if (has_slashes) {
+    parent_dir = r.substr(0, last_slash);
   } else {
-    values.emplace_back(e->raw_string());
+    parent_dir = utils::get_current_directory();
+  }
+
+  /* Stem of the glob after the last slash. */
+  std::optional<std::string_view> glob{};
+
+  if (has_slashes) {
+    if (last_slash + 1 < r.length()) {
+      glob = r;
+      glob->remove_prefix(last_slash + 1);
+    } else {
+      /* glob is empty. */
+    }
+  } else {
+    glob = r;
+  }
+
+  std::filesystem::directory_iterator d{};
+
+  try {
+    d = std::filesystem::directory_iterator{parent_dir};
+  } catch (std::filesystem::filesystem_error &e) {
+    throw Error{"Could not descend into '" + std::string{parent_dir} +
+                "': " + os::last_system_error_message()};
+  }
+
+  if (glob) {
+    for (const std::filesystem::directory_entry &e : d) {
+      std::string f = e.path().filename().string();
+      if (utils::glob_matches(*glob, f)) {
+        std::string v{};
+        v += parent_dir;
+        v += '/';
+        v += f;
+        values.emplace_back(v);
+      }
+    }
+  } else {
+    values.emplace_back(r);
+  }
+
+  if (values.empty()) {
+    throw Error{"No expansions found for '" + r + "'"};
   }
 
   return values;
