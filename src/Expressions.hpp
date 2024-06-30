@@ -34,11 +34,11 @@ struct EvalContext
   usize total_expansion_count() const;
 
 protected:
-  std::vector<std::string> expand_once(std::string_view r,
-                                       bool should_count_files) const;
+  std::vector<std::string> expand_path_once(std::string_view r,
+                                            bool should_count_files) const;
   std::vector<std::string>
-  expand_many(const std::vector<std::string> &vs) const;
-  std::vector<std::string> expand(const tokens::Expandable *e) const;
+  expand_path_recurse(const std::vector<std::string> &vs) const;
+  std::vector<std::string> expand_path(const tokens::Expandable *e) const;
 
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};

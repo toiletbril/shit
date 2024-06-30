@@ -16,7 +16,7 @@
   [SequenceNode Simple]
     [Exec "echo data/[a-b]*/"]
   [SequenceNode Simple]
-    [Exec "echo data/*[!g]"]
+    [Exec "echo data/*[^g]"]
   [SequenceNode Simple]
     [Exec "echo data/.*"]
 data/abcd data/abcdefg data/fourth

@@ -163,7 +163,14 @@ Parser::parse_shell_command()
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
     switch (token->kind()) {
-    case Token::Kind::String:
+    case Token::Kind::String: {
+      char q = static_cast<const tokens::String *>(token.get())->quote_char();
+      if (q == '`') {
+        throw ErrorWithLocation{token->source_location(),
+                                "Unimplemented quote type"};
+      }
+    }
+    /* fallthrough */
     case Token::Kind::Identifier:
     case Token::Kind::Expandable:
       m_lexer.advance_past_last_peek();

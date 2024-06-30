@@ -284,10 +284,15 @@ struct Number : public Value
 
 struct String : public Value
 {
-  String(usize location, std::string_view sv);
+  String(usize location, char quote_char, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
+
+  char quote_char() const;
+
+protected:
+  char m_quote_char;
 };
 
 /* Expand cases:

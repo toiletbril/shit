@@ -240,7 +240,9 @@ Number::flags() const
 /**
  * class: String
  */
-String::String(usize location, std::string_view sv) : Value(location, sv) {}
+String::String(usize location, char quote_char, std::string_view sv)
+    : Value(location, sv), m_quote_char(quote_char)
+{}
 
 Token::Kind
 String::kind() const
@@ -252,6 +254,12 @@ Token::Flags
 String::flags() const
 {
   return Token::Flag::Value;
+}
+
+char
+String::quote_char() const
+{
+  return m_quote_char;
 }
 
 /**

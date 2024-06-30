@@ -292,13 +292,7 @@ Lexer::lex_string(char quote_char)
   /* Skip the first quote. */
   usize length = 1;
 
-  bool is_expandable = false;
-
   while ((ch = chop_character(length)) != quote_char && ch != EOF) {
-    if (lexer::is_expandable_char(ch)) {
-      is_expandable = true;
-    }
-
     str_str += ch;
     length++;
   }
@@ -306,17 +300,11 @@ Lexer::lex_string(char quote_char)
   if (m_cursor_position + length >= m_source.length()) {
     throw ErrorWithLocationAndDetails{
         m_cursor_position, "Unterminated string literal",
-        m_cursor_position + length,
-        "Expected " + std::string{quote_char} + " here"};
+        m_cursor_position + length, "Expected a quote char here"};
   }
 
   /* Skip the first and last quote here too. */
-  Token *t;
-  if (!is_expandable) {
-    t = new tokens::String{m_cursor_position, str_str};
-  } else {
-    t = new tokens::Expandable{m_cursor_position, str_str};
-  }
+  Token *t = new tokens::String{m_cursor_position, quote_char, str_str};
 
   /* Account for the quote char. */
   m_cached_offset = length + 1;

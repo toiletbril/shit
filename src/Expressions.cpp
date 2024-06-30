@@ -94,7 +94,8 @@ EvalContext::total_expansion_count() const
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
 std::vector<std::string>
-EvalContext::expand_once(std::string_view r, bool should_expand_files) const
+EvalContext::expand_path_once(std::string_view r,
+                              bool             should_expand_files) const
 {
   std::vector<std::string> values{};
 
@@ -105,7 +106,11 @@ EvalContext::expand_once(std::string_view r, bool should_expand_files) const
   std::string parent_dir{};
 
   if (has_slashes) {
-    parent_dir = r.substr(0, last_slash);
+    if (last_slash != 0) {
+      parent_dir = r.substr(0, last_slash);
+    } else {
+      parent_dir = r.substr(0, 1);
+    }
   } else {
     parent_dir = ".";
   }
@@ -147,7 +152,9 @@ EvalContext::expand_once(std::string_view r, bool should_expand_files) const
         std::string v{};
         if (parent_dir != ".") {
           v += parent_dir;
-          v += '/';
+          if (parent_dir != "/") {
+            v += '/';
+          }
         }
         v += f;
         values.emplace_back(v);
@@ -161,7 +168,7 @@ EvalContext::expand_once(std::string_view r, bool should_expand_files) const
 }
 
 std::vector<std::string>
-EvalContext::expand_many(const std::vector<std::string> &vs) const
+EvalContext::expand_path_recurse(const std::vector<std::string> &vs) const
 {
   std::vector<std::string> vvs{};
   std::optional<usize>     expand_ch{};
@@ -188,7 +195,7 @@ EvalContext::expand_many(const std::vector<std::string> &vs) const
         v.remove_suffix(v.length() - *slash_after);
       }
 
-      std::vector<std::string> tvs = expand_once(v, !slash_after);
+      std::vector<std::string> tvs = expand_path_once(v, !slash_after);
 
       if (slash_after) {
         /* Bring back the removed prefix. */
@@ -197,7 +204,7 @@ EvalContext::expand_many(const std::vector<std::string> &vs) const
           vv += vo;
         }
         /* Call this function recursively on expanded entries. */
-        std::vector<std::string> tvvs = expand_many(tvs);
+        std::vector<std::string> tvvs = expand_path_recurse(tvs);
         for (const std::string &vvv : tvvs) {
           vvs.emplace_back(vvv);
         }
@@ -215,7 +222,7 @@ EvalContext::expand_many(const std::vector<std::string> &vs) const
 }
 
 std::vector<std::string>
-EvalContext::expand(const tokens::Expandable *e) const
+EvalContext::expand_path(const tokens::Expandable *e) const
 {
   std::string r = e->raw_string();
 
@@ -240,7 +247,7 @@ EvalContext::expand(const tokens::Expandable *e) const
   };
 
   expand_tilde(r);
-  std::vector<std::string> values = expand_many({r});
+  std::vector<std::string> values = expand_path_recurse({r});
 
   if (values.empty()) {
     throw Error{"No expansions found for '" + r + "'"};
@@ -256,14 +263,19 @@ EvalContext::expand_args(const std::vector<const Token *> &args) const
   expanded_args.reserve(args.size());
 
   for (const Token *t : args) {
-    if (t->flags() & Token::Flag::Expandable) {
-      std::vector<std::string> e =
-          expand(static_cast<const tokens::Expandable *>(t));
-      for (const std::string &a : e) {
-        expanded_args.emplace_back(a);
+    try {
+      if (t->flags() & Token::Flag::Expandable) {
+        std::vector<std::string> e =
+            expand_path(static_cast<const tokens::Expandable *>(t));
+        for (const std::string &a : e) {
+          expanded_args.emplace_back(a);
+        }
+      } else {
+        expanded_args.emplace_back(t->raw_string());
       }
-    } else {
-      expanded_args.emplace_back(t->raw_string());
+    } catch (Error &e) {
+      throw ErrorWithLocation{t->source_location(),
+                              "Could not expand path: " + e.message()};
     }
   }
 

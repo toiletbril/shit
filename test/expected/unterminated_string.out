@@ -3,4 +3,4 @@ shit: 1:1: Error: Unterminated string literal.
           ^~ Error happened here.
 shit: 1:47: Note:
      1 |  ..t where is another quote?
-                                     ^~ Expected " here.
+                                     ^~ Expected a quote char here.

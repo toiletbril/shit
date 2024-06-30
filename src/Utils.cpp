@@ -215,7 +215,7 @@ canonicalize_path(const std::string &path)
     actual_path = std::filesystem::absolute(actual_path);
   }
 
-  return actual_path.lexically_normal().make_preferred();
+  return actual_path.lexically_normal();
 }
 
 void
@@ -238,103 +238,100 @@ get_current_directory()
   }
 }
 
+/* TODO: Make proper tests. */
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 bool
 glob_matches(std::string_view glob, std::string_view str)
 {
-  usize str_pos = 0;
-  usize glob_pos = 0;
+  usize s = 0;
+  usize g = 0;
 
-  while (glob_pos < glob.length() && str_pos < str.length()) {
-    switch (glob[glob_pos]) {
+  while (g < glob.length() && s < str.length()) {
+    switch (glob[g]) {
     case '?': {
-      glob_pos++;
-      str_pos++;
+      g++;
+      s++;
     } break;
 
     case '*': {
-      if (glob_matches(glob.substr(glob_pos + 1), str.substr(str_pos))) {
+      if (glob_matches(glob.substr(g + 1), str.substr(s))) {
         return true;
       }
-      str_pos++;
+      s++;
     } break;
 
     case '[': {
-      bool matched = false;
-      bool negate = false;
+      bool is_matched = false;
+      bool should_negate = false;
 
-      glob_pos++; /* skip [ */
-      if (glob_pos >= glob.length()) {
-        throw Error{"glob: unclosed '['"};
+      g++; /* skip [ */
+      if (g >= glob.length()) {
+        throw Error{"Unclosed '[' group"};
       }
 
-      if (glob[glob_pos] == '!') {
-        negate = true;
-        glob_pos += 1;
-        if (glob_pos >= glob.length()) {
-          throw Error{"glob: unclosed '['"};
+      if (glob[g] == '^') {
+        g++;
+        should_negate = true;
+        if (g >= glob.length()) {
+          throw Error{"Unclosed '[' group"};
         }
       }
 
-      char prev = glob[glob_pos];
-      matched |= prev == str[str_pos];
-      glob_pos += 1;
+      char prev_glob_ch = glob[g++];
+      is_matched |= (prev_glob_ch == str[s]);
 
-      while (glob[glob_pos] != ']' && glob_pos < glob.length()) {
-        if (glob[glob_pos] == '-') {
-          glob_pos += 1;
-          if (glob_pos >= glob.length()) {
-            throw Error{"glob: unclosed '['"};
+      while (glob[g] != ']' && g < glob.length()) {
+        if (glob[g] == '-') {
+          g++;
+          if (g >= glob.length()) {
+            throw Error{"Unclosed '[' group"};
           }
 
-          if (glob[glob_pos] == ']') {
-            matched |= '-' == str[str_pos];
+          if (glob[g] == ']') {
+            is_matched |= ('-' == str[s]);
           } else {
-            matched |= prev <= str[str_pos] && str[str_pos] <= glob[glob_pos];
-            prev = glob[glob_pos];
-            glob_pos += 1;
+            is_matched |= (prev_glob_ch <= str[s] && str[s] <= glob[g]);
+            prev_glob_ch = glob[g++];
           }
         } else {
-          prev = glob[glob_pos];
-          matched |= prev == str[str_pos];
-          glob_pos += 1;
+          prev_glob_ch = glob[g++];
+          is_matched |= (prev_glob_ch == str[s]);
         }
       }
 
-      if (glob[glob_pos] != ']') {
-        throw Error{"glob: unclosed '['"};
+      if (glob[g] != ']') {
+        throw Error{"Unclosed '[' group"};
       }
-      if (negate) {
-        matched = !matched;
+      if (should_negate) {
+        is_matched = !is_matched;
       }
-      if (!matched) {
+      if (!is_matched) {
         return false;
       }
 
-      glob_pos++;
-      str_pos++;
+      g++;
+      s++;
     } break;
 
     case '\\':
-      glob_pos++;
-      if (glob_pos >= glob.length()) {
-        throw Error{"glob: unfinished escape"};
+      g++;
+      if (g >= glob.length()) {
+        throw Error{"Unfinished escape"};
       }
       /* fallthrough */
-
     default:
-      if (glob[glob_pos++] != str[str_pos++]) {
+      if (glob[g++] != str[s++]) {
         return false;
       }
     }
   }
 
-  if (str_pos >= str.length()) {
-    while (glob[glob_pos] == '*') {
-      glob_pos++;
+  if (s >= str.length()) {
+    while (g < glob.length() && glob[g] == '*') {
+      g++;
     }
-    if (glob_pos >= glob.length()) {
+    if (g >= glob.length()) {
       return true;
     }
   }
@@ -411,29 +408,30 @@ initialize_path_map()
       continue;
     }
 
-    try {
-      /* What the heck? A path in PATH that does not exist? Are you a Windows
-       * user? */
-      if (std::filesystem::exists(dir_string)) {
-        std::filesystem::path               dir_path{dir_string};
-        std::filesystem::directory_iterator dir{dir_path};
+    /* What the heck? A path in PATH that does not exist? Are you a Windows
+     * user? */
+    if (std::filesystem::exists(dir_string)) {
+      std::filesystem::directory_iterator di{};
+      std::filesystem::path               dir_path{dir_string};
 
-        usize dir_index =
-            cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-
-        /* Initialize every file in the directory. */
-        for (const std::filesystem::directory_entry &f : dir) {
-          std::string fs = f.path().filename().string();
-          PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
-        }
+      try {
+        di = std::filesystem::directory_iterator{dir_path};
+      } catch (std::filesystem::filesystem_error &e) {
+        std::string s;
+        s += "Unable to descend into '";
+        s += dir_string;
+        s += "' while reading PATH: ";
+        s += os::last_system_error_message();
+        shit::show_message(s);
       }
-    } catch (std::filesystem::filesystem_error &e) {
-      std::string s;
-      s += "Unable to descend into '";
-      s += dir_string;
-      s += "' while reading PATH: ";
-      s += os::last_system_error_message();
-      shit::show_message(s);
+
+      usize dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
+
+      /* Initialize every file in the directory. */
+      for (const std::filesystem::directory_entry &f : di) {
+        std::string fs = f.path().filename().string();
+        PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
+      }
     }
 
     dir_string.clear();
@@ -456,57 +454,48 @@ search_and_cache(const std::string &program_name)
       continue;
     }
 
-    try {
-      if (std::filesystem::exists(dir_string)) {
-        std::filesystem::path dir_path{dir_string};
+    if (std::filesystem::exists(dir_string)) {
+      std::filesystem::path dir_path{dir_string};
 
-        /* Cache the directory if it was not present before. */
-        bool  found = false;
-        usize dir_index = 0;
+      /* Cache the directory if it was not present before. */
+      bool  found = false;
+      usize dir_index = 0;
 
-        for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
-          if (PATH_CACHE_DIRS[dir_i] == dir_string) {
-            found = true;
-            dir_index = dir_i;
-            break;
-          }
-        }
-
-        if (!found) {
-          dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-        }
-
-        /* Actually try to find the file. */
-        std::filesystem::path full_path = dir_path / program_name;
-        std::string           full_path_str = full_path.string();
-
-        /* This file already has an extesion specified? */
-        if (usize explicit_ext = os::sanitize_program_name(full_path_str);
-            explicit_ext == 0)
-        {
-          for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
-               ext_index++)
-          {
-            std::string try_path =
-                full_path.string() + os::OMITTED_SUFFIXES[ext_index];
-
-            if (std::filesystem::exists(try_path)) {
-              PATH_CACHE[program_name] = {dir_index, ext_index};
-              return try_path;
-            }
-          }
-        } else if (std::filesystem::exists(full_path)) {
-          PATH_CACHE[program_name] = {dir_index, explicit_ext};
-          return full_path;
+      for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
+        if (PATH_CACHE_DIRS[dir_i] == dir_string) {
+          found = true;
+          dir_index = dir_i;
+          break;
         }
       }
-    } catch (std::filesystem::filesystem_error &e) {
-      std::string s;
-      s += "Unable to descend into '";
-      s += dir_string;
-      s += "' while searching: ";
-      s += os::last_system_error_message();
-      shit::show_message(s);
+
+      if (!found) {
+        dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
+      }
+
+      /* Actually try to find the file. */
+      std::filesystem::path full_path = dir_path / program_name;
+      std::string           full_path_str = full_path.string();
+
+      /* This file already has an extesion specified? */
+      if (usize explicit_ext = os::sanitize_program_name(full_path_str);
+          explicit_ext == 0)
+      {
+        for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
+             ext_index++)
+        {
+          std::string try_path =
+              full_path.string() + os::OMITTED_SUFFIXES[ext_index];
+
+          if (std::filesystem::exists(try_path)) {
+            PATH_CACHE[program_name] = {dir_index, ext_index};
+            return try_path;
+          }
+        }
+      } else if (std::filesystem::exists(full_path)) {
+        PATH_CACHE[program_name] = {dir_index, explicit_ext};
+        return full_path;
+      }
     }
 
     dir_string.clear();
