@@ -394,11 +394,15 @@ wait_and_monitor_process(process p)
 os_args
 make_os_args(const std::vector<std::string> &args)
 {
+  SHIT_ASSERT(args.size() > 0);
+
   std::string s{};
 
+  s += '"' + args[0] + '"';
+
   /* TODO: Remove CVE and escape quotes. */
-  if (args.size() > 0) {
-    for (usize i = 0; i < args.size(); i++) {
+  if (args.size() > 1) {
+    for (usize i = 1; i < args.size(); i++) {
       s += ' ';
       s += '"' + args[i] + '"';
     }
