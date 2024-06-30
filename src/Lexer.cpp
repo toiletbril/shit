@@ -14,6 +14,8 @@ namespace shit {
 
 namespace lexer {
 
+static constexpr char CEOF = static_cast<char>(EOF);
+
 bool
 is_whitespace(char ch)
 {
@@ -73,7 +75,7 @@ is_shell_sentinel(char ch)
 bool
 is_part_of_identifier(char ch)
 {
-  return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != EOF;
+  return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
 }
 
 bool
@@ -160,7 +162,7 @@ Lexer::advance_past_last_peek()
 Token *
 Lexer::lex_expression_token()
 {
-  if (char ch = chop_character(); ch != EOF) {
+  if (char ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_number(ch)) {
       return lex_number();
     } else if (lexer::is_expression_sentinel(ch)) {
@@ -180,7 +182,7 @@ Lexer::lex_expression_token()
 Token *
 Lexer::lex_shell_token()
 {
-  if (char ch = chop_character(); ch != EOF) {
+  if (char ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_string_quote(ch)) {
       return lex_string(ch);
     } else if (lexer::is_shell_sentinel(ch)) {
@@ -219,7 +221,7 @@ Lexer::chop_character(usize offset)
   if (m_cursor_position + offset < m_source.length()) {
     return m_source[m_cursor_position + offset];
   }
-  return EOF;
+  return lexer::CEOF;
 }
 
 Token *
@@ -292,7 +294,7 @@ Lexer::lex_string(char quote_char)
   /* Skip the first quote. */
   usize length = 1;
 
-  while ((ch = chop_character(length)) != quote_char && ch != EOF) {
+  while ((ch = chop_character(length)) != quote_char && ch != lexer::CEOF) {
     str_str += ch;
     length++;
   }
