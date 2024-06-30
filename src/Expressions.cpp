@@ -258,16 +258,20 @@ EvalContext::expand_path(const tokens::Expandable *e)
     values.emplace_back(r);
   }
 
-  /* Sort expansion in lexicographical order. Ignore punctioation. */
-  std::sort(values.begin(), values.end(), [](const auto &lhs, const auto &rhs) {
-    const auto x = mismatch(lhs.cbegin(), lhs.cend(), rhs.cbegin(), rhs.cend(),
-                            [](const auto &lhs, const auto &rhs) {
-                              return tolower(lhs) == tolower(rhs) ||
-                                     (ispunct(lhs) && ispunct(rhs));
-                            });
-    return x.second != rhs.cend() &&
-           (x.first == lhs.cend() || tolower(*x.first) < tolower(*x.second));
-  });
+  /* Sort expansion in lexicographical order. Ignore punctuation to be somewhat
+   * compatible with bash. */
+  std::stable_sort(
+      values.begin(), values.end(), [](const auto &lhs, const auto &rhs) {
+        const auto x =
+            mismatch(lhs.cbegin(), lhs.cend(), rhs.cbegin(), rhs.cend(),
+                     [](const auto &lhs, const auto &rhs) {
+                       return tolower(lhs) == tolower(rhs) ||
+                              (ispunct(lhs) && ispunct(rhs));
+                     });
+        return x.second != rhs.cend() &&
+               (x.first == lhs.cend() ||
+                tolower(*x.first) < tolower(*x.second));
+      });
 
   if (values.empty()) {
     throw Error{"No expansions found for '" + r + "'"};
