@@ -25,9 +25,9 @@ struct ExecContext
 
   bool is_builtin() const;
 
-  usize                           location() const;
-  const std::string              &program() const;
   const std::vector<std::string> &args() const;
+  const std::string              &program() const;
+  usize                           source_location() const;
 
   void close_fds();
   void print_to_stdout(const std::string &s) const;

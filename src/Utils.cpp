@@ -32,7 +32,7 @@ ExecContext::ExecContext(
 /* clang-format on */
 
 usize
-ExecContext::location() const
+ExecContext::source_location() const
 {
   return m_location;
 }
@@ -167,7 +167,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs)
     if (!is_last) {
       pipe = os::make_pipe();
       if (!pipe) {
-        throw ErrorWithLocation{ec.location(), "Could not open a pipe"};
+        throw ErrorWithLocation{ec.source_location(), "Could not open a pipe"};
       }
       ec.out_fd = pipe->out;
     }

@@ -113,7 +113,8 @@ execute_program(utils::ExecContext &&ec)
     if (execv(ec.program_path().c_str(),
               const_cast<char *const *>(os_args.data())) == -1)
     {
-      throw shit::ErrorWithLocation{ec.location(), last_system_error_message()};
+      throw shit::ErrorWithLocation{ec.source_location(),
+                                    last_system_error_message()};
     }
   }
 
@@ -337,17 +338,20 @@ execute_program(utils::ExecContext &&ec)
   startup_info.hStdInput = ec.in_fd.value_or(SHIT_STDIN);
   startup_info.hStdOutput = ec.out_fd.value_or(SHIT_STDOUT);
 
+  SHIT_DEFER
+  {
+    if (ec.in_fd)
+      CloseHandle(*ec.in_fd);
+    if (ec.out_fd)
+      CloseHandle(*ec.out_fd);
+  };
+
   if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
                      nullptr, should_use_pipe, 0, nullptr, nullptr,
                      &startup_info, &process_info) == 0)
   {
-    throw ErrorWithLocation{ec.location(), last_system_error_message()};
+    throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
   }
-
-  if (ec.in_fd)
-    CloseHandle(*ec.in_fd);
-  if (ec.out_fd)
-    CloseHandle(*ec.out_fd);
 
   return process_info.hProcess;
 }
@@ -435,6 +439,20 @@ last_system_error_message()
   }
   std::string err{view};
   LocalFree(errno_str);
+
+  /* Remove stupid inserts. I can't stand Windows */
+  for (usize i = 0; i < err.length() - 1; i++) {
+    if (err[i] == '%' && isdigit(err[i + 1])) {
+      err.erase(i, 2);
+      /* Replace %N bullshit with just "Input". */
+      err.insert(i, "input");
+    }
+  }
+
+  if (err.length() > 0) {
+    /* Capitalize first letter to sound formal. */
+    err[0] = toupper(err[0]);
+  }
 
   return err;
 }
