@@ -1,0 +1,32 @@
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "echo data/*"]
+  [SequenceNode Simple]
+    [Exec "echo data/*/"]
+  [SequenceNode Simple]
+    [Exec "echo data/*/*"]
+  [SequenceNode Simple]
+    [Exec "echo data/*/*/"]
+  [SequenceNode Simple]
+    [Exec "echo data/*g"]
+  [SequenceNode Simple]
+    [Exec "echo data/abcd*"]
+  [SequenceNode Simple]
+    [Exec "echo data/??*fg"]
+  [SequenceNode Simple]
+    [Exec "echo data/[a-b]*/"]
+  [SequenceNode Simple]
+    [Exec "echo data/*[!g]"]
+  [SequenceNode Simple]
+    [Exec "echo data/.*"]
+data/abcd data/abcdefg data/fourth
+data/abcd/ data/abcdefg/
+data/abcd/first data/abcd/second data/abcdefg/third data/abcdefg/hjkl
+data/abcdefg/hjkl/
+data/abcdefg
+data/abcd data/abcdefg
+data/abcdefg
+data/abcd/ data/abcdefg/
+data/abcd data/fourth
+data/.fifth
+[Code 0]

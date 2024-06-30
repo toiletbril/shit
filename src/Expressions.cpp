@@ -140,7 +140,7 @@ EvalContext::expand_once(std::string_view r, bool should_expand_files) const
       }
       std::string f = e.path().filename().string();
       /* TODO: Figure the rules of hidden file expansion. */
-      if (f[0] == '.') {
+      if ((*glob)[0] != '.' && f[0] == '.') {
         continue;
       }
       if (utils::glob_matches(*glob, f)) {
