@@ -76,6 +76,13 @@ FlagBool::is_enabled() const
   return m_value;
 }
 
+void
+FlagBool::reset()
+{
+  m_position = 0;
+  m_value = false;
+}
+
 /**
  * class: FlagString
  */
@@ -101,6 +108,14 @@ std::string_view
 FlagString::value() const
 {
   return m_value;
+}
+
+void
+FlagString::reset()
+{
+  m_position = 0;
+  m_value.clear();
+  m_is_set = false;
 }
 
 /**
@@ -145,6 +160,14 @@ bool
 FlagManyStrings::at_end() const
 {
   return m_value_position == size();
+}
+
+void
+FlagManyStrings::reset()
+{
+  m_position = 0;
+  m_values.clear();
+  m_value_position = 0;
 }
 
 static bool
@@ -376,6 +399,14 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
   }
 
   return args;
+}
+
+void
+reset_flags(const std::vector<Flag *> &flags)
+{
+  for (Flag *f : flags) {
+    f->reset();
+  }
 }
 
 void

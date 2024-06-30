@@ -40,6 +40,9 @@ struct Flag
   std::string_view long_name() const;
   std::string_view description() const;
 
+  /* Reset the flag state, mainly for builtins. */
+  virtual void reset() = 0;
+
 protected:
   Flag(Kind type, char short_name, const std::string &long_name,
        const std::string &description);
@@ -59,6 +62,8 @@ struct FlagBool : public Flag
   void toggle();
   bool is_enabled() const;
 
+  void reset() override;
+
 private:
   bool m_value{false};
 };
@@ -71,6 +76,8 @@ struct FlagString : public Flag
   void             set(std::string_view v);
   bool             is_set() const;
   std::string_view value() const;
+
+  void reset() override;
 
 private:
   bool        m_is_set{false};
@@ -91,6 +98,8 @@ struct FlagManyStrings : public Flag
   std::string_view next();
   bool             at_end() const;
 
+  void reset() override;
+
 private:
   std::vector<std::string> m_values{};
   usize                    m_value_position{0};
@@ -102,6 +111,8 @@ std::vector<std::string> parse_flags_vec(const std::vector<Flag *>      &flags,
                                          const std::vector<std::string> &args);
 std::vector<std::string> parse_flags(const std::vector<Flag *> &flags, int argc,
                                      const char *const *argv);
+
+void reset_flags(const std::vector<Flag *> &flags);
 
 void show_version();
 void show_short_version();

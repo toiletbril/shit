@@ -26,6 +26,7 @@ i32
 Echo::execute(utils::ExecContext &ec) const
 {
   std::vector<std::string> args = parse_flags_vec(FLAG_LIST, ec.args());
+  SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) {
     std::string h{};
