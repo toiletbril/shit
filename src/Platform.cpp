@@ -251,7 +251,7 @@ namespace shit {
 namespace os {
 
 std::optional<usize>
-write_fd(os::descriptor fd, void *buf, usize size)
+write_fd(os::descriptor fd, const void *buf, usize size)
 {
   DWORD w = -1;
   if (WriteFile(fd, buf, size, &w, 0) == FALSE) { /* NOLINT */
@@ -321,21 +321,21 @@ process
 execute_program(utils::ExecContext &&ec)
 {
   std::string program_path = ec.program_path().string();
-  std::string command_line = make_os_args(ec.program(), ec.args());
+  std::string command_line = make_os_args(ec.args());
 
   PROCESS_INFORMATION process_info{};
   STARTUPINFOA        startup_info{};
 
   startup_info.cb = sizeof(startup_info);
 
-  BOOL should_use_pipe = ec.in || ec.out;
+  BOOL should_use_pipe = ec.in_fd || ec.out_fd;
 
   if (should_use_pipe) {
     startup_info.dwFlags |= STARTF_USESTDHANDLES;
   }
 
-  startup_info.hStdInput = ec.in.value_or(SHIT_STDIN);
-  startup_info.hStdOutput = ec.out.value_or(SHIT_STDOUT);
+  startup_info.hStdInput = ec.in_fd.value_or(SHIT_STDIN);
+  startup_info.hStdOutput = ec.out_fd.value_or(SHIT_STDOUT);
 
   if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
                      nullptr, should_use_pipe, 0, nullptr, nullptr,
@@ -344,10 +344,10 @@ execute_program(utils::ExecContext &&ec)
     throw ErrorWithLocation{ec.location(), last_system_error_message()};
   }
 
-  if (ec.in)
-    CloseHandle(*ec.in);
-  if (ec.out)
-    CloseHandle(*ec.out);
+  if (ec.in_fd)
+    CloseHandle(*ec.in_fd);
+  if (ec.out_fd)
+    CloseHandle(*ec.out_fd);
 
   return process_info.hProcess;
 }
@@ -359,7 +359,7 @@ make_pipe()
 
   att.nLength = sizeof(SECURITY_ATTRIBUTES);
   att.bInheritHandle = TRUE;
-  att.lpSecurityDescriptor = NULL;
+  att.lpSecurityDescriptor = NULL; /* NOLINT */
 
   HANDLE in = INVALID_HANDLE_VALUE;
   HANDLE out = INVALID_HANDLE_VALUE;
@@ -392,15 +392,11 @@ wait_and_monitor_process(process p)
 }
 
 os_args
-make_os_args(const std::string &program, const std::vector<std::string> &args)
+make_os_args(const std::vector<std::string> &args)
 {
   std::string s{};
 
   /* TODO: Remove CVE and escape quotes. */
-  s += '"';
-  s += program;
-  s += '"';
-
   if (args.size() > 0) {
     for (usize i = 0; i < args.size(); i++) {
       s += ' ';
@@ -421,7 +417,7 @@ last_system_error_message()
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
           FORMAT_MESSAGE_IGNORE_INSERTS,
       nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      reinterpret_cast<LPSTR>(&errno_str), 0, NULL);
+      reinterpret_cast<LPSTR>(&errno_str), 0, NULL); /* NOLINT */
 
   if (ret == 0) {
     return std::to_string(win_errno) + " (Error message couldn't be proccessed "
@@ -488,7 +484,7 @@ sanitize_program_name(std::string &program_name)
   if (IsWindows())
 #endif
   {
-    usize extension_pos = program_name.rfind(".");
+    usize extension_pos = program_name.rfind('.');
 
     if (extension_pos != std::string::npos &&
         extension_pos + MIN_SUFFIX_LEN < program_name.length())
