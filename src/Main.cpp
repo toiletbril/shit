@@ -26,13 +26,12 @@ FLAG(COMMAND, ManyStrings, 'c', "command",
      "Execute specified command and exit. Can be specified multiple times.");
 FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
 FLAG(STATS, Bool, 'S', "stats", "Print statistics after each command.");
+FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", "Disable path expansion.");
 
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
      "UNIMPLEMENTED: Don't overwrite existing files with '>'.");
-FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob",
-     "UNIMPLEMENTED: Disable path expansion.");
 FLAG(VERBOSE, Bool, 'v', "verbose",
      "UNIMPLEMENTED: Write input to standard error as it is read.");
 FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
@@ -97,17 +96,17 @@ main(int argc, char **argv)
   }
 
   if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
-      FLAG_DISABLE_EXPANSION.is_enabled() || FLAG_VERBOSE.is_enabled() ||
-      FLAG_EXPAND_VERBOSE.is_enabled())
+      FLAG_VERBOSE.is_enabled() || FLAG_EXPAND_VERBOSE.is_enabled())
   {
     shit::show_message("One or more unimplemented options were ignored.");
   }
 
   /* Main loop state. */
-  shit::EvalContext context{};
-  usize             arg_index = 0;
-  bool              should_quit = false;
-  int               exit_code = EXIT_SUCCESS;
+  shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled()};
+
+  usize arg_index = 0;
+  bool  should_quit = false;
+  int   exit_code = EXIT_SUCCESS;
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,
    * since it's only really noticeable in interactive mode. This way,

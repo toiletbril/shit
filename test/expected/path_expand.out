@@ -19,14 +19,14 @@
     [Exec "echo data/*[^g]"]
   [SequenceNode Simple]
     [Exec "echo data/.*"]
-data/abcd data/abcdefg data/fourth
+data/abcd data/abcdefg data/fourth data/hello-d data/hello+K
 data/abcd/ data/abcdefg/
-data/abcd/first data/abcd/second data/abcdefg/third data/abcdefg/hjkl
+data/abcd/first data/abcd/second data/abcdefg/hjkl data/abcdefg/third
 data/abcdefg/hjkl/
 data/abcdefg
 data/abcd data/abcdefg
 data/abcdefg
 data/abcd/ data/abcdefg/
-data/abcd data/fourth
+data/abcd data/fourth data/hello-d data/hello+K
 data/.fifth
 [Code 0]

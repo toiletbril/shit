@@ -15,15 +15,14 @@ struct Expandable;
 
 struct EvalContext
 {
-  EvalContext();
+  EvalContext(bool should_disable_path_expansion);
 
   void add_evaluated_expression();
   void add_expansion();
 
   void end_command();
 
-  std::vector<std::string>
-  expand_args(const std::vector<const Token *> &args) const;
+  std::vector<std::string> expand_args(const std::vector<const Token *> &args);
 
   std::string make_stats_string() const;
 
@@ -34,11 +33,13 @@ struct EvalContext
   usize total_expansion_count() const;
 
 protected:
+  bool m_enable_path_expansion;
+
   std::vector<std::string> expand_path_once(std::string_view r,
-                                            bool should_count_files) const;
+                                            bool should_count_files);
   std::vector<std::string>
-  expand_path_recurse(const std::vector<std::string> &vs) const;
-  std::vector<std::string> expand_path(const tokens::Expandable *e) const;
+  expand_path_recurse(const std::vector<std::string> &vs);
+  std::vector<std::string> expand_path(const tokens::Expandable *e);
 
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};

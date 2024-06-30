@@ -8,6 +8,7 @@
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
+#include <algorithm>
 #include <filesystem>
 
 namespace shit {
@@ -18,7 +19,9 @@ static constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";
 /**
  * class: EvalContext
  */
-EvalContext::EvalContext() = default;
+EvalContext::EvalContext(bool should_disable_path_expansion)
+    : m_enable_path_expansion(!should_disable_path_expansion)
+{}
 
 void
 EvalContext::add_evaluated_expression()
@@ -94,8 +97,7 @@ EvalContext::total_expansion_count() const
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
 std::vector<std::string>
-EvalContext::expand_path_once(std::string_view r,
-                              bool             should_expand_files) const
+EvalContext::expand_path_once(std::string_view r, bool should_expand_files)
 {
   std::vector<std::string> values{};
 
@@ -157,6 +159,7 @@ EvalContext::expand_path_once(std::string_view r,
           }
         }
         v += f;
+        add_expansion();
         values.emplace_back(v);
       }
     }
@@ -168,7 +171,7 @@ EvalContext::expand_path_once(std::string_view r,
 }
 
 std::vector<std::string>
-EvalContext::expand_path_recurse(const std::vector<std::string> &vs) const
+EvalContext::expand_path_recurse(const std::vector<std::string> &vs)
 {
   std::vector<std::string> vvs{};
   std::optional<usize>     expand_ch{};
@@ -222,7 +225,7 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &vs) const
 }
 
 std::vector<std::string>
-EvalContext::expand_path(const tokens::Expandable *e) const
+EvalContext::expand_path(const tokens::Expandable *e)
 {
   std::string r = e->raw_string();
 
@@ -247,7 +250,24 @@ EvalContext::expand_path(const tokens::Expandable *e) const
   };
 
   expand_tilde(r);
-  std::vector<std::string> values = expand_path_recurse({r});
+  std::vector<std::string> values{};
+
+  if (m_enable_path_expansion) {
+    values = expand_path_recurse({r});
+  } else {
+    values.emplace_back(r);
+  }
+
+  /* Sort expansion in lexicographical order. Ignore punctioation. */
+  std::sort(values.begin(), values.end(), [](const auto &lhs, const auto &rhs) {
+    const auto x = mismatch(lhs.cbegin(), lhs.cend(), rhs.cbegin(), rhs.cend(),
+                            [](const auto &lhs, const auto &rhs) {
+                              return tolower(lhs) == tolower(rhs) ||
+                                     (ispunct(lhs) && ispunct(rhs));
+                            });
+    return x.second != rhs.cend() &&
+           (x.first == lhs.cend() || tolower(*x.first) < tolower(*x.second));
+  });
 
   if (values.empty()) {
     throw Error{"No expansions found for '" + r + "'"};
@@ -257,7 +277,7 @@ EvalContext::expand_path(const tokens::Expandable *e) const
 }
 
 std::vector<std::string>
-EvalContext::expand_args(const std::vector<const Token *> &args) const
+EvalContext::expand_args(const std::vector<const Token *> &args)
 {
   std::vector<std::string> expanded_args{};
   expanded_args.reserve(args.size());
