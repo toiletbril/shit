@@ -8,8 +8,6 @@
 
 #include <string>
 
-/* TODO: Glob identifiers. */
-
 namespace shit {
 
 namespace lexer {

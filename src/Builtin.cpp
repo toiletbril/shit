@@ -13,7 +13,6 @@
 
 namespace shit {
 
-/* TODO: Separate builtins into files. */
 static const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"echo", Builtin::Kind::Echo},
     {"exit", Builtin::Kind::Exit},
