@@ -7,10 +7,9 @@
 #include <csignal>
 #include <cstdarg>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <optional>
-
-/* TODO: Error handling should not leak resources. */
 
 #if PLATFORM_IS(POSIX)
 
@@ -90,21 +89,43 @@ get_environment_variable(const std::string &key)
   return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
 }
 
+i32
+call_checked_impl(
+    i32 status, const std::string &invocation,
+    const std::optional<std::function<void()>> &cleanup = std::nullopt)
+{
+  if (status == -1) {
+    if (cleanup) {
+      (*cleanup)();
+    }
+
+    throw shit::Error{"'" + invocation +
+                      "' fail: " + last_system_error_message()};
+  }
+
+  return status;
+}
+
+#define call_checked(f, ...)   call_checked_impl(f, #f, __VA_ARGS__)
+#define call_checked_simple(f) call_checked_impl(f, #f)
+
 process
 execute_program(utils::ExecContext &&ec)
 {
-  pid_t child_pid = fork();
+  auto c = [&]() { ec.close_fds(); };
+
+  pid_t child_pid = call_checked(fork(), c);
 
   if (child_pid == 0) {
     std::vector<const char *> os_args = make_os_args(ec.args());
 
     if (ec.in_fd) {
-      dup2(*ec.in_fd, STDIN_FILENO);
-      close(*ec.in_fd);
+      call_checked(dup2(*ec.in_fd, STDIN_FILENO), c);
+      call_checked(close(*ec.in_fd), c);
     }
     if (ec.out_fd) {
-      dup2(*ec.out_fd, STDOUT_FILENO);
-      close(*ec.out_fd);
+      call_checked(dup2(*ec.out_fd, STDOUT_FILENO), c);
+      call_checked(close(*ec.out_fd), c);
     }
 
     reset_signal_handlers();
@@ -113,8 +134,9 @@ execute_program(utils::ExecContext &&ec)
     if (execv(ec.program_path().c_str(),
               const_cast<char *const *>(os_args.data())) == -1)
     {
-      throw shit::ErrorWithLocation{ec.source_location(),
-                                    last_system_error_message()};
+      /* Throw a readable error message. */
+      throw ErrorWithLocation{ec.source_location(),
+                              last_system_error_message()};
     }
   }
 
@@ -142,7 +164,7 @@ wait_and_monitor_process(process pid)
 
   i32 status{};
 
-  while (waitpid(pid, &status, 0) != pid) {
+  while (call_checked_simple(waitpid(pid, &status, 0) != pid)) {
     /* Waiting... */
   }
 
@@ -172,7 +194,7 @@ wait_and_monitor_process(process pid)
               << std::to_string(sig) << " and killed]" << std::endl;
 
     /* We can't handle suspended processes yet, so goodbye. */
-    kill(pid, SIGKILL);
+    call_checked_simple(kill(pid, SIGKILL));
   } else if (!WIFEXITED(status)) {
     /* Process was destroyed by otherworldly forces. */
     throw shit::Error{"???: " + last_system_error_message()};
@@ -188,13 +210,12 @@ os_args
 make_os_args(const std::vector<std::string> &args)
 {
   std::vector<const char *> os_args;
+  os_args.reserve(args.size() + 1);
 
-  /* Then actual arguments. */
   for (const std::string &arg : args) {
     os_args.push_back(arg.c_str());
   }
 
-  /* And then nullptr at the end. */
   os_args.push_back(nullptr);
 
   return os_args;
@@ -230,7 +251,7 @@ reset_signal_handlers()
 {
   sigset_t sm;
   sigfillset(&sm);
-  sigprocmask(SIG_UNBLOCK, &sm, nullptr);
+  call_checked_simple(sigprocmask(SIG_UNBLOCK, &sm, nullptr));
 }
 
 void
@@ -238,7 +259,7 @@ set_default_signal_handlers()
 {
   /* Ignore bullshit. */
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
-  sigprocmask(SIG_BLOCK, &sm, nullptr);
+  call_checked_simple(sigprocmask(SIG_BLOCK, &sm, nullptr));
 }
 
 } /* namespace os */
@@ -462,6 +483,7 @@ print_lf(int s)
 {
   SHIT_UNUSED(s);
   std::cout << std::endl;
+  /* TODO: Ignore error? */
   signal(SIGINT, print_lf);
 }
 
@@ -469,15 +491,20 @@ print_lf(int s)
 void
 set_default_signal_handlers()
 {
-  signal(SIGTERM, SIG_IGN);
-  signal(SIGINT, print_lf);
+  if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||
+      signal(SIGINT, print_lf) == SIG_ERR)
+  {
+    throw Error{"signal() failed: " + last_system_error_message()};
+  }
 }
 
 void
 reset_signal_handlers()
 {
-  signal(SIGTERM, SIG_DFL);
-  signal(SIGINT, SIG_DFL);
+  if (signal(SIGTERM, SIG_DFL) == SIG_ERR || signal(SIGINT, SIG_DFL) == SIG_ERR)
+  {
+    throw Error{"signal() failed: " + last_system_error_message()};
+  }
 }
 
 } /* namespace os */
