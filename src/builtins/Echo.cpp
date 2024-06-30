@@ -39,7 +39,7 @@ Echo::execute(utils::ExecContext &ec) const
 
   std::string buf{};
 
-  if (args.size() > 0) {
+  if (args.size() > 1) {
     buf += args[1];
     for (usize i = 2; i < args.size(); i++) {
       buf += ' ';
