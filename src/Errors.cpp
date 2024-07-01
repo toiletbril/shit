@@ -4,6 +4,8 @@
 
 #include <tuple>
 
+/* TODO: Print proper offset and context for UTF-8. */
+
 namespace shit {
 
 static std::tuple<usize, usize>
