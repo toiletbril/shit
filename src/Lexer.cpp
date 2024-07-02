@@ -20,7 +20,6 @@ is_whitespace(char ch)
   switch (ch) {
   case ' ':
   case '\v':
-  case '\n':
   case '\r':
   case '\t': return true;
   default: return false;
@@ -37,6 +36,7 @@ bool
 is_expression_sentinel(char ch)
 {
   switch (ch) {
+  case '\n':
   case '+':
   case '-':
   case '*':
@@ -62,6 +62,7 @@ bool
 is_shell_sentinel(char ch)
 {
   switch (ch) {
+  case '\n':
   case '|':
   case '&':
   case ';':
@@ -316,31 +317,31 @@ Lexer::lex_string(char quote_char)
  * related routines. */
 static const std::unordered_map<char, Token::Kind> OPERATORS = {
     /* Sentinels */
-    {')', Token::Kind::RightParen        },
-    {'(', Token::Kind::LeftParen         },
-    {']', Token::Kind::RightSquareBracket},
-    {'[', Token::Kind::LeftSquareBracket },
-    {'}', Token::Kind::RightBracket      },
-    {'{', Token::Kind::LeftBracket       },
+    {')',  Token::Kind::RightParen        },
+    {'(',  Token::Kind::LeftParen         },
+    {']',  Token::Kind::RightSquareBracket},
+    {'[',  Token::Kind::LeftSquareBracket },
+    {'}',  Token::Kind::RightBracket      },
+    {'{',  Token::Kind::LeftBracket       },
 
-    {';', Token::Kind::Semicolon         },
-    {'.', Token::Kind::Dot               },
-    {'$', Token::Kind::Dollar            },
+    {';',  Token::Kind::Semicolon         },
+    {'.',  Token::Kind::Dot               },
+    {'\n', Token::Kind::Newline           },
 
     /* Operators */
-    {'+', Token::Kind::Plus              },
-    {'-', Token::Kind::Minus             },
-    {'*', Token::Kind::Asterisk          },
-    {'/', Token::Kind::Slash             },
-    {'%', Token::Kind::Percent           },
-    {'~', Token::Kind::Tilde             },
-    {'^', Token::Kind::Cap               },
-    {'!', Token::Kind::ExclamationMark   },
-    {'&', Token::Kind::Ampersand         },
-    {'>', Token::Kind::Greater           },
-    {'<', Token::Kind::Less              },
-    {'|', Token::Kind::Pipe              },
-    {'=', Token::Kind::Equals            },
+    {'+',  Token::Kind::Plus              },
+    {'-',  Token::Kind::Minus             },
+    {'*',  Token::Kind::Asterisk          },
+    {'/',  Token::Kind::Slash             },
+    {'%',  Token::Kind::Percent           },
+    {'~',  Token::Kind::Tilde             },
+    {'^',  Token::Kind::Cap               },
+    {'!',  Token::Kind::ExclamationMark   },
+    {'&',  Token::Kind::Ampersand         },
+    {'>',  Token::Kind::Greater           },
+    {'<',  Token::Kind::Less              },
+    {'|',  Token::Kind::Pipe              },
+    {'=',  Token::Kind::Equals            },
 };
 
 Token *
@@ -361,7 +362,7 @@ Lexer::lex_sentinel()
 
     case Token::Kind::Semicolon:    t = new tokens::Semicolon{m_cursor_position}; break;
     case Token::Kind::Dot:          t = new tokens::Dot{m_cursor_position}; break;
-    case Token::Kind::Dollar:       t = new tokens::Dollar{m_cursor_position}; break;
+    case Token::Kind::Newline:      t = new tokens::Newline{m_cursor_position}; break;
 
     case Token::Kind::Plus:         t = new tokens::Plus{m_cursor_position}; break;
     case Token::Kind::Minus:        t = new tokens::Minus{m_cursor_position}; break;

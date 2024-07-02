@@ -30,6 +30,7 @@ struct Token
     LeftBracket,
 
     EndOfFile,
+    Newline,
     Semicolon,
     Dot,
     Dollar,
@@ -162,6 +163,15 @@ struct EndOfFile : public Token
   std::string raw_string() const override;
 };
 
+struct Newline : public Token
+{
+  Newline(usize location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
 struct Semicolon : public Token
 {
   Semicolon(usize location);
@@ -174,15 +184,6 @@ struct Semicolon : public Token
 struct Dot : public Token
 {
   Dot(usize location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Dollar : public Token
-{
-  Dollar(usize location);
 
   Kind        kind() const override;
   Flags       flags() const override;

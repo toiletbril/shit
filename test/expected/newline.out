@@ -1,0 +1,11 @@
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "echo 1"]
+  [SequenceNode Simple]
+    [Exec "echo 2"]
+  [SequenceNode Simple]
+    [Exec "echo 3"]
+1
+2
+3
+[Code 0]

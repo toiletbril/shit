@@ -23,10 +23,12 @@ FLAG(INTERACTIVE, Bool, 'i', "interactive",
      "Specify that the shell is interactive.");
 FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(COMMAND, ManyStrings, 'c', "command",
-     "Execute specified command and exit. Can be specified multiple times.");
+     "Execute specified command and exit. Can be used multiple times.");
 FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
 FLAG(STATS, Bool, 'S', "stats", "Print statistics after each command.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", "Disable path expansion.");
+FLAG(ONE_COMMAND, Bool, 't', "one-command",
+     "Exit after executing one command.");
 
 /* TODO: */
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
@@ -42,9 +44,6 @@ FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
-
-/* Exit after one command. Bash-exclusive. */
-FLAG(IGNORED4, Bool, 't', "\0", "Ignored, left for compatibility.");
 
 FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell.");
 FLAG(DUMP_AST, Bool, 'A', "dump-ast",
@@ -126,7 +125,7 @@ main(int argc, char **argv)
   shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled()};
 
   usize arg_index = 0;
-  bool  should_quit = false;
+  bool  should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
   int   exit_code = EXIT_SUCCESS;
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,

@@ -140,6 +140,29 @@ EndOfFile::raw_string() const
 }
 
 /**
+ * class: Newline
+ */
+Newline::Newline(usize location) : Token(location) {}
+
+Token::Kind
+Newline::kind() const
+{
+  return Token::Kind::Newline;
+}
+
+Token::Flags
+Newline::flags() const
+{
+  return Token::Flag::Sentinel;
+}
+
+std::string
+Newline::raw_string() const
+{
+  return "\\n";
+}
+
+/**
  * class: Semicolon
  */
 Semicolon::Semicolon(usize location) : Token(location) {}
@@ -183,29 +206,6 @@ std::string
 Dot::raw_string() const
 {
   return ".";
-}
-
-/**
- * class: Dollar
- */
-Dollar::Dollar(usize location) : Token(location) {}
-
-Token::Kind
-Dollar::kind() const
-{
-  return Token::Kind::Dollar;
-}
-
-Token::Flags
-Dollar::flags() const
-{
-  return Token::Flag::Sentinel;
-}
-
-std::string
-Dollar::raw_string() const
-{
-  return "$";
 }
 
 /**

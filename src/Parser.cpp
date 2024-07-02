@@ -14,6 +14,7 @@ static expressions::SequenceNode::Kind
 get_sequence_kind(Token::Kind tk)
 {
   switch (tk) {
+  case Token::Kind::Newline:
   case Token::Kind::EndOfFile:
   case Token::Kind::Semicolon: return expressions::SequenceNode::Kind::Simple;
   case Token::Kind::DoubleAmpersand:
@@ -21,6 +22,7 @@ get_sequence_kind(Token::Kind tk)
   case Token::Kind::DoublePipe:
     return expressions::SequenceNode::Kind::Or;
     break;
+
   default: SHIT_UNREACHABLE("Invalid shell sequence token: %d", E(tk));
   }
 }
@@ -64,6 +66,7 @@ Parser::construct_ast()
                 " operator, found '" + token->to_ast_string() + "'"};
       }
       /* fallthrough */
+    case Token::Kind::Newline:
     case Token::Kind::EndOfFile:
     case Token::Kind::Semicolon: {
       m_lexer.advance_past_last_peek();
@@ -75,6 +78,7 @@ Parser::construct_ast()
         next_sk = get_sequence_kind(token->kind());
       }
 
+      /* Terminate the command. */
       if (token->kind() == Token::Kind::EndOfFile) {
         if (next_sk != expressions::SequenceNode::Kind::Simple) {
           throw shit::ErrorWithLocation{token->source_location(),
