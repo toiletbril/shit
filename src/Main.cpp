@@ -28,6 +28,7 @@ FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
 FLAG(STATS, Bool, 'S', "stats", "Print statistics after each command.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", "Disable path expansion.");
 
+/* TODO: */
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
@@ -37,10 +38,15 @@ FLAG(VERBOSE, Bool, 'v', "verbose",
 FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
      "UNIMPLEMENTED: Write expanded input to standard error as it is read.");
 
+/* Total bullcrap. */
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
+/* Exit after one command. Bash-exclusive. */
+FLAG(IGNORED4, Bool, 't', "\0", "Ignored, left for compatibility.");
+
+FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell.");
 FLAG(DUMP_AST, Bool, 'A', "dump-ast",
      "Dump AST before executing each command.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
@@ -52,7 +58,8 @@ FLAG(SHORT_VERSION, Bool, '\0', "short-version",
 int
 main(int argc, char **argv)
 {
-  std::vector<std::string> file_names;
+  bool                     is_login_shell = false;
+  std::vector<std::string> file_names{};
 
   try {
     file_names = shit::parse_flags(FLAG_LIST, argc, argv);
@@ -62,8 +69,17 @@ main(int argc, char **argv)
   }
 
   /* Program path is the first argument. Pull it out and get rid of it. */
-  std::string program_path = file_names[0];
-  file_names.erase(file_names.begin());
+  std::string program_path{};
+
+  if (file_names.size() > 0) {
+    program_path = file_names[0];
+    file_names.erase(file_names.begin());
+    if (program_path == "-") {
+      is_login_shell = true;
+    }
+  } else {
+    program_path = "<unknown path>";
+  }
 
   if (FLAG_HELP.is_enabled()) {
     std::string h{};
@@ -80,6 +96,16 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
+  if (FLAG_LOGIN.is_enabled()) {
+    is_login_shell = true;
+  }
+
+  if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
+    shit::show_message(
+        "Both '-s' and '-i' options are specified. Falling back to '-i'.");
+    FLAG_STDIN.toggle();
+  }
+
   /* Figure out what to do. Note that "-c" can be specified multiple times.
    * Option precedence should behave as follows: "-s", then files (arguments),
    * then "-i" (or no arguments). */
@@ -88,12 +114,7 @@ main(int argc, char **argv)
   bool should_execute_commands = !FLAG_COMMAND.is_empty();
   bool should_be_interactive =
       (!should_execute_commands && FLAG_INTERACTIVE.is_enabled()) ||
-      (!should_read_files && !should_read_stdin);
-
-  if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
-    shit::show_message(
-        "Both '-s' and '-i' options are specified. Falling back to only '-s'.");
-  }
+      (!should_read_files);
 
   if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
       FLAG_VERBOSE.is_enabled() || FLAG_EXPAND_VERBOSE.is_enabled())
@@ -115,6 +136,16 @@ main(int argc, char **argv)
    * scripts! */
   shit::utils::clear_path_map();
   shit::os::set_default_signal_handlers();
+
+  if (is_login_shell) {
+    /* TODO: We can't really execute complex scripts yet. From 'man dash':
+     * A login shell first reads commands from the files /etc/profile and
+     * .profile if they exist.  If the environment variable ENV is set on entry
+     * to an interactive shell, or is set in the .profile of a login shell, the
+     * shell next reads commands from the file named in ENV. */
+    shit::show_message("Acting as a login shell is not supported yet. "
+                       "Please bear with me!");
+  }
 
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
