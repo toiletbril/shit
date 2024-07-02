@@ -17,12 +17,13 @@ struct EvalContext
 {
   EvalContext(bool should_disable_path_expansion);
 
-  void add_evaluated_expression();
   void add_expansion();
+  void add_evaluated_expression();
 
   void end_command();
 
-  std::vector<std::string> expand_args(const std::vector<const Token *> &args);
+  /* Path-expand, tilde-expand and escape. */
+  std::vector<std::string> process_args(const std::vector<const Token *> &args);
 
   std::string make_stats_string() const;
 
@@ -39,7 +40,10 @@ protected:
                                             bool should_count_files);
   std::vector<std::string>
   expand_path_recurse(const std::vector<std::string> &vs);
-  std::vector<std::string> expand_path(const tokens::ExpandableIdentifier *e);
+  std::vector<std::string> expand_path(std::string &&r);
+
+  void expand_tilde(std::string &r);
+  void erase_escapes(std::string &r);
 
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};

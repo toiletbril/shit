@@ -181,8 +181,11 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &vs)
 
     for (usize i = 0; i < v.length(); i++) {
       if (lexer::is_expandable_char(v[i])) {
-        expand_ch = i;
-        break;
+        /* Is it escaped? */
+        if (!(i > 0 && v[i - 1] == '\\')) {
+          expand_ch = i;
+          break;
+        }
       }
     }
     if (expand_ch) {
@@ -224,32 +227,46 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &vs)
   return vvs;
 }
 
-std::vector<std::string>
-EvalContext::expand_path(const tokens::ExpandableIdentifier *e)
+void
+EvalContext::expand_tilde(std::string &r)
 {
-  std::string r = e->raw_string();
-
-  auto expand_tilde = [](std::string &r) {
-    if (r[0] == '~') {
-      /* TODO: There may be several separators supported. */
-      if (r.length() > 1 && r[1] != '/') {
-        /* TODO: Expand different users. */
-        return;
-      }
-
-      /* Remove the tilde. */
-      r.erase(0, 1);
-
-      std::optional<std::filesystem::path> u = os::get_home_directory();
-      if (!u) {
-        throw Error{"Could not figure out home directory"};
-      }
-
-      r.insert(0, u->string());
+  if (r[0] == '~') {
+    /* NOTE: escapes are not processed here. It works because 0-position is
+     * hardcoded. */
+    /* TODO: There may be several separators supported. */
+    if (r.length() > 1 && r[1] != '/') {
+      /* TODO: Expand different users. */
+      return;
     }
-  };
 
-  expand_tilde(r);
+    /* Remove the tilde. */
+    r.erase(0, 1);
+
+    std::optional<std::filesystem::path> u = os::get_home_directory();
+    if (!u) {
+      throw Error{"Could not figure out home directory"};
+    }
+
+    r.insert(0, u->string());
+  }
+}
+
+void
+EvalContext::erase_escapes(std::string &r)
+{
+  for (usize i = 0; i < r.size(); i++) {
+    if (r[i] == '\\') {
+      r.erase(i, 1);
+      if (i == r.size()) {
+        throw Error{"Nothing to escape"};
+      }
+    }
+  }
+}
+
+std::vector<std::string>
+EvalContext::expand_path(std::string &&r)
+{
   std::vector<std::string> values{};
 
   if (m_enable_path_expansion) {
@@ -281,7 +298,7 @@ EvalContext::expand_path(const tokens::ExpandableIdentifier *e)
 }
 
 std::vector<std::string>
-EvalContext::expand_args(const std::vector<const Token *> &args)
+EvalContext::process_args(const std::vector<const Token *> &args)
 {
   std::vector<std::string> expanded_args{};
   expanded_args.reserve(args.size());
@@ -289,13 +306,18 @@ EvalContext::expand_args(const std::vector<const Token *> &args)
   for (const Token *t : args) {
     try {
       if (t->flags() & Token::Flag::Expandable) {
-        std::vector<std::string> e =
-            expand_path(static_cast<const tokens::ExpandableIdentifier *>(t));
-        for (const std::string &a : e) {
+        std::string r = t->raw_string();
+        expand_tilde(r);
+        std::vector<std::string> e = expand_path(std::move(r));
+        for (std::string &a : e) {
+          erase_escapes(a);
           expanded_args.emplace_back(a);
         }
       } else {
-        expanded_args.emplace_back(t->raw_string());
+        std::string a = t->raw_string();
+        expand_tilde(a);
+        erase_escapes(a);
+        expanded_args.emplace_back(a);
       }
     } catch (Error &e) {
       throw ErrorWithLocation{t->source_location(),
@@ -453,7 +475,7 @@ Exec::evaluate_impl(EvalContext &cxt) const
   SHIT_ASSERT(m_args.size() > 0);
 
   return utils::execute_context(
-      utils::ExecContext::make(source_location(), cxt.expand_args(m_args)));
+      utils::ExecContext::make(source_location(), cxt.process_args(m_args)));
 
   SHIT_UNREACHABLE();
 }
@@ -667,7 +689,7 @@ ExecPipeSequence::evaluate_impl(EvalContext &cxt) const
   for (const Exec *e : m_commands) {
     cxt.add_evaluated_expression();
     ecs.emplace_back(utils::ExecContext::make(e->source_location(),
-                                              cxt.expand_args(e->args())));
+                                              cxt.process_args(e->args())));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs));

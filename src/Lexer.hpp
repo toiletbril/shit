@@ -50,7 +50,6 @@ protected:
 
   Token *lex_number();
   Token *lex_identifier();
-  Token *lex_string(char quote_char);
   Token *lex_sentinel();
 };
 

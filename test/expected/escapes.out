@@ -1,0 +1,5 @@
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "echo a\\ hello\ \ worldlol \""]
+a\ hello  worldlol "
+[Code 0]

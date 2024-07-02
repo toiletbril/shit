@@ -98,7 +98,6 @@ bool
 is_expandable_char(char ch)
 {
   switch (ch) {
-  case '~':
   case '[':
   case '?':
   case '*': return true;
@@ -166,9 +165,7 @@ Lexer::lex_expression_token()
       return lex_number();
     } else if (lexer::is_expression_sentinel(ch)) {
       return lex_sentinel();
-    } else if (lexer::is_string_quote(ch)) {
-      return lex_string(ch);
-    } else if (lexer::is_ascii_char(ch)) {
+    } else if (lexer::is_part_of_identifier(ch)) {
       return lex_identifier();
     } else {
       throw ErrorWithLocation{m_cursor_position, "Unexpected character"};
@@ -182,9 +179,7 @@ Token *
 Lexer::lex_shell_token()
 {
   if (char ch = chop_character(); ch != lexer::CEOF) {
-    if (lexer::is_string_quote(ch)) {
-      return lex_string(ch);
-    } else if (lexer::is_shell_sentinel(ch)) {
+    if (lexer::is_shell_sentinel(ch)) {
       return lex_sentinel();
     } else if (lexer::is_part_of_identifier(ch)) {
       return lex_identifier();
@@ -220,6 +215,7 @@ Lexer::chop_character(usize offset)
   if (m_cursor_position + offset < m_source.length()) {
     return m_source[m_cursor_position + offset];
   }
+
   return lexer::CEOF;
 }
 
@@ -241,29 +237,71 @@ Lexer::lex_number()
   return num;
 }
 
+/* TODO: Escaping looks terrible here, but I can't think of a better way. */
 Token *
 Lexer::lex_identifier()
 {
   char        ch;
   std::string id{};
-  usize       length = 0;
-  bool        is_expandable = false;
 
-  while (lexer::is_part_of_identifier((ch = chop_character(length)))) {
+  usize length = 0;
+  bool  is_expandable = false;
+  bool  should_escape = false;
+
+  std::optional<char> quote_char{};
+  usize               last_quote_char_pos = m_cursor_position;
+
+  /* Handle quote escapes and strings. */
+  while (lexer::is_part_of_identifier((ch = chop_character(length))) ||
+         ((quote_char || should_escape) && ch != lexer::CEOF))
+  {
+    bool is_escape = (ch == '\\');
+    bool is_in_single_quotes = (quote_char == '\'');
+
     if (lexer::is_expandable_char(ch)) {
+      /* Escape all expandable chars inside quotes. */
+      if (quote_char) {
+        id += '\\';
+      }
+
       is_expandable = true;
     }
 
-    id += ch;
+    if (is_escape && is_in_single_quotes) {
+      /* Single quotes ignore escapes. */
+      id += '\\';
+    }
+
     length++;
+
+    if (!should_escape) {
+      if (quote_char == ch) {
+        quote_char = std::nullopt;
+        continue;
+      } else if (!quote_char && lexer::is_string_quote(ch)) {
+        quote_char = ch;
+        last_quote_char_pos = m_cursor_position + length - 1;
+        continue;
+      }
+    }
+
+    id += ch;
+    should_escape = is_escape && !is_in_single_quotes;
   }
 
-  std::string lower_id = shit::utils::lowercase_string(id);
+  if (quote_char) {
+    throw ErrorWithLocationAndDetails{
+        last_quote_char_pos, "Unterminated string literal",
+        m_cursor_position + length,
+        "Expected a " + std::string{*quote_char} + " here"};
+  }
 
   Token *t{};
 
   /* An identifier may be a keyword. */
-  if (auto kw = KEYWORDS.find(lower_id); kw != KEYWORDS.end()) {
+  if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(id));
+      kw != KEYWORDS.end())
+  {
     switch (kw->second) {
       /* clang-format off */
     case Token::Kind::If:   t = new tokens::If{m_cursor_position}; break;
@@ -280,35 +318,6 @@ Lexer::lex_identifier()
   }
 
   m_cached_offset = length;
-
-  return t;
-}
-
-Token *
-Lexer::lex_string(char quote_char)
-{
-  char        ch;
-  std::string str_str{};
-
-  /* Skip the first quote. */
-  usize length = 1;
-
-  while ((ch = chop_character(length)) != quote_char && ch != lexer::CEOF) {
-    str_str += ch;
-    length++;
-  }
-
-  if (m_cursor_position + length >= m_source.length()) {
-    throw ErrorWithLocationAndDetails{
-        m_cursor_position, "Unterminated string literal",
-        m_cursor_position + length, "Expected a quote char here"};
-  }
-
-  /* Skip the first and last quote here too. */
-  Token *t = new tokens::String{m_cursor_position, quote_char, str_str};
-
-  /* Account for the quote char. */
-  m_cached_offset = length + 1;
 
   return t;
 }
