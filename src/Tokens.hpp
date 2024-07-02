@@ -38,8 +38,8 @@ struct Token
     /* Values */
     Number,
     String,
-    Expandable,
     Identifier,
+    ExpandableIdentifier,
 
     /* Operators */
     Plus,
@@ -296,13 +296,9 @@ protected:
   char m_quote_char;
 };
 
-/* Expand cases:
- * 1. ~[user]/some/path;
- * 2. /some/path/file*;
- * 5. $VARIABLE. */
-struct Expandable : public Value
+struct ExpandableIdentifier : public Value
 {
-  Expandable(usize location, std::string_view sv);
+  ExpandableIdentifier(usize location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;

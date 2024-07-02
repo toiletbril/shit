@@ -276,7 +276,7 @@ Lexer::lex_identifier()
   } else if (!is_expandable) {
     t = new tokens::Identifier{m_cursor_position, id};
   } else {
-    t = new tokens::Expandable{m_cursor_position, id};
+    t = new tokens::ExpandableIdentifier{m_cursor_position, id};
   }
 
   m_cached_offset = length;

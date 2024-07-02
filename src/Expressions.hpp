@@ -10,7 +10,7 @@ namespace shit {
 struct Token;
 
 namespace tokens {
-struct Expandable;
+struct ExpandableIdentifier;
 }
 
 struct EvalContext
@@ -39,7 +39,7 @@ protected:
                                             bool should_count_files);
   std::vector<std::string>
   expand_path_recurse(const std::vector<std::string> &vs);
-  std::vector<std::string> expand_path(const tokens::Expandable *e);
+  std::vector<std::string> expand_path(const tokens::ExpandableIdentifier *e);
 
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};

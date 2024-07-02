@@ -176,7 +176,7 @@ Parser::parse_shell_command()
     }
     /* fallthrough */
     case Token::Kind::Identifier:
-    case Token::Kind::Expandable:
+    case Token::Kind::ExpandableIdentifier:
       m_lexer.advance_past_last_peek();
       if (!source_location) {
         source_location = token->source_location();

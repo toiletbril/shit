@@ -265,18 +265,18 @@ String::quote_char() const
 /**
  * class: ExpandableString
  */
-Expandable::Expandable(usize location, std::string_view sv)
+ExpandableIdentifier::ExpandableIdentifier(usize location, std::string_view sv)
     : Value(location, sv)
 {}
 
 Token::Kind
-Expandable::kind() const
+ExpandableIdentifier::kind() const
 {
-  return Token::Kind::Expandable;
+  return Token::Kind::ExpandableIdentifier;
 }
 
 Token::Flags
-Expandable::flags() const
+ExpandableIdentifier::flags() const
 {
   return Token::Flag::Value | Token::Flag::Expandable;
 }

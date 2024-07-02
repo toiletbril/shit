@@ -225,7 +225,7 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &vs)
 }
 
 std::vector<std::string>
-EvalContext::expand_path(const tokens::Expandable *e)
+EvalContext::expand_path(const tokens::ExpandableIdentifier *e)
 {
   std::string r = e->raw_string();
 
@@ -290,7 +290,7 @@ EvalContext::expand_args(const std::vector<const Token *> &args)
     try {
       if (t->flags() & Token::Flag::Expandable) {
         std::vector<std::string> e =
-            expand_path(static_cast<const tokens::Expandable *>(t));
+            expand_path(static_cast<const tokens::ExpandableIdentifier *>(t));
         for (const std::string &a : e) {
           expanded_args.emplace_back(a);
         }
