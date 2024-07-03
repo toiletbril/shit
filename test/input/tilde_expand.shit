@@ -1,0 +1,3 @@
+test -d ~ && echo 1
+test -d ~/ && echo 2
+test -d \~ && echo 3

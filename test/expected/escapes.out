@@ -1,5 +1,13 @@
 [Sequence]
   [SequenceNode Simple]
+    [Exec "test -e ~/\*"]
+  [SequenceNode And]
+    [Exec "no such file"]
+  [SequenceNode Simple]
+    [Exec "test -d \~"]
+  [SequenceNode And]
+    [Exec "echo no such dir"]
+  [SequenceNode Simple]
     [Exec "echo a\\ hello\ \ worldlol \""]
 a\ hello  worldlol "
 [Code 0]

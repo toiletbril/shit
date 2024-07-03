@@ -1,0 +1,16 @@
+[Sequence]
+  [SequenceNode Simple]
+    [Exec "test -d ~"]
+  [SequenceNode And]
+    [Exec "echo 1"]
+  [SequenceNode Simple]
+    [Exec "test -d ~/"]
+  [SequenceNode And]
+    [Exec "echo 2"]
+  [SequenceNode Simple]
+    [Exec "test -d \~"]
+  [SequenceNode And]
+    [Exec "echo 3"]
+1
+2
+[Code 1]
