@@ -100,9 +100,32 @@ std::vector<std::string>
 EvalContext::expand_path_once(std::string_view r, bool should_expand_files)
 {
   std::vector<std::string> values{};
+  std::optional<char>      current_quote{};
 
-  usize last_slash = r.rfind('/');
-  bool  has_slashes = (last_slash != std::string::npos);
+  usize last_slash = std::string::npos;
+  for (usize i = 0; i > r.length(); i++) {
+    char ch = r[i];
+
+    if (ch == '\\') {
+      i++;
+      continue;
+    } else if (Lexer::is_string_quote(ch)) {
+      if (!current_quote) {
+        current_quote = ch;
+      } else if (current_quote == ch) {
+        current_quote = std::nullopt;
+      }
+      continue;
+    }
+    if (current_quote) {
+      continue;
+    }
+
+    if (r[i] == '\\' && (i < 1 || r[i - 1] != '\\')) {
+      last_slash = i;
+    }
+  }
+  bool has_slashes = (last_slash != std::string::npos);
 
   /* Prefix is the parent directory. */
   std::string parent_dir{};
@@ -180,7 +203,7 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &vs)
     std::string_view v = vo;
 
     for (usize i = 0; i < v.length(); i++) {
-      if (lexer::is_expandable_char(v[i])) {
+      if (Lexer::is_expandable_char(v[i])) {
         /* Is it escaped? */
         if (!(i > 0 && v[i - 1] == '\\')) {
           expand_ch = i;
@@ -252,15 +275,34 @@ EvalContext::expand_tilde(std::string &r)
 }
 
 void
-EvalContext::erase_escapes(std::string &r)
+EvalContext::erase_escapes_and_quotes(std::vector<std::string> &a)
 {
-  for (usize i = 0; i < r.size(); i++) {
-    if (r[i] == '\\') {
-      r.erase(i, 1);
-      if (i == r.size()) {
-        throw Error{"Nothing to escape"};
+  std::optional<char> current_quote{};
+
+  for (std::string &r : a) {
+    for (usize i = 0; i < r.size(); i++) {
+      char ch = r[i];
+
+      if (ch == '\\') {
+        r.erase(i, 1);
+        if (i == r.size()) {
+          throw Error{"Unfinished escape"};
+        }
+      } else if (Lexer::is_string_quote(ch)) {
+        if (!current_quote || current_quote == ch) {
+          if (!current_quote) {
+            current_quote = ch;
+          } else {
+            current_quote = std::nullopt;
+          }
+          r.erase(i, 1);
+        }
       }
     }
+  }
+
+  if (current_quote) {
+    throw Error{"Unclosed quote"};
   }
 }
 
@@ -297,32 +339,81 @@ EvalContext::expand_path(std::string &&r)
   return values;
 }
 
+/* -> operator, source, destination */
+std::optional<Redirection>
+EvalContext::find_and_remove_redirection(std::vector<std::string> &a)
+{
+  std::vector<usize> to_erase{};
+  bool               needs_destination = false;
+
+  std::string op;
+  std::string source = "1";
+  std::string destination{};
+
+  for (usize i = 0; i < a.size(); i++) {
+    std::string_view arg = a[i];
+    if (needs_destination) {
+      needs_destination = false;
+      destination = arg;
+      a.erase(a.begin() + E(i--));
+      break;
+    }
+    for (usize pos = 0; pos < arg.length(); pos++) {
+      if (Lexer::is_redirect_char(arg[pos])) {
+        usize initial_pos = pos;
+        /* Cut out the operator. */
+        while (Lexer::is_redirect_char(arg[pos]) || arg[pos] == '&') {
+          pos++;
+        }
+        op = arg.substr(initial_pos, pos - initial_pos);
+        /* Consume the preceding source if the form of a descriptor number. */
+        usize source_pos = (initial_pos > 0) ? initial_pos - 1 : 0;
+        while (source_pos > 0 &&
+               (Lexer::is_number(arg[source_pos]) || arg[source_pos] == '&'))
+        {
+          source_pos--;
+        }
+        if (source_pos != initial_pos) {
+          source = arg.substr(source_pos, initial_pos);
+        }
+        /* Remove this argument from the argument list. */
+        a.erase(a.begin() + E(i--));
+        /* If there's no destination, it's the next argument in the list. */
+        if (pos != arg.length()) {
+          destination = arg.substr(pos);
+          break;
+        } else {
+          needs_destination = true;
+        }
+      }
+    }
+  }
+
+  if (needs_destination) {
+    throw Error{"No destination for the redirection"};
+  }
+
+  return {};
+}
+
 /* TODO: Command substitution. */
 std::vector<std::string>
-EvalContext::process_args(const std::vector<const Token *> &args)
+EvalContext::glob_and_tilde_expand(const std::vector<const Token *> &args)
 {
   std::vector<std::string> expanded_args{};
   expanded_args.reserve(args.size());
 
   for (const Token *t : args) {
     try {
-      if (t->flags() & Token::Flag::Expandable) {
-        std::string r = t->raw_string();
-        expand_tilde(r);
-        std::vector<std::string> e = expand_path(std::move(r));
-        for (std::string &a : e) {
-          erase_escapes(a);
-          expanded_args.emplace_back(a);
-        }
-      } else {
-        std::string a = t->raw_string();
-        expand_tilde(a);
-        erase_escapes(a);
+      std::string r = t->raw_string();
+      expand_tilde(r);
+      std::vector<std::string> e = expand_path(std::move(r));
+      for (std::string &a : e) {
         expanded_args.emplace_back(a);
       }
     } catch (Error &e) {
       throw ErrorWithLocation{t->source_location(),
-                              "Could not expand path: " + e.message()};
+                              "Expansion failed: " + e.message()};
     }
   }
 
@@ -493,9 +584,14 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_args.size() > 0);
 
+  std::vector<std::string> expanded_args = cxt.glob_and_tilde_expand(m_args);
+
+  auto r = cxt.find_and_remove_redirection(expanded_args);
+
+  cxt.erase_escapes_and_quotes(expanded_args);
+
   return utils::execute_context(
-      utils::ExecContext::make(source_location(), cxt.process_args(m_args)),
-      is_async());
+      utils::ExecContext::make(source_location(), expanded_args), is_async());
 
   SHIT_UNREACHABLE();
 }
@@ -504,7 +600,7 @@ std::string
 SimpleCommand::to_string() const
 {
   std::string args{};
-  std::string s = "SimpleCommand \"" + m_args[0]->raw_string();
+  std::string s = "SimpleCommand, " + m_args[0]->raw_string();
   if (!m_args.empty()) {
     for (usize i = 1; i < m_args.size(); i++) {
       args += " ";
@@ -512,7 +608,6 @@ SimpleCommand::to_string() const
     }
     s += args;
   }
-  s += "\"";
   if (is_async()) {
     s += ", Async";
   }
@@ -737,8 +832,8 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
 
   for (const SimpleCommand *e : m_commands) {
     cxt.add_evaluated_expression();
-    ecs.emplace_back(utils::ExecContext::make(e->source_location(),
-                                              cxt.process_args(e->args())));
+    ecs.emplace_back(utils::ExecContext::make(
+        e->source_location(), cxt.glob_and_tilde_expand(e->args())));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs), is_async());

@@ -2,7 +2,9 @@
 
 #include "Common.hpp"
 
+#include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace shit {
@@ -13,6 +15,21 @@ namespace tokens {
 struct ExpandableIdentifier;
 }
 
+struct Redirection
+{
+  enum class Kind : uint8_t
+  {
+    Overwrite,
+    Append,
+    ReadWrite,
+  };
+
+  bool should_duplicate_fd;
+
+  usize       in_fd;
+  std::string out_file;
+};
+
 struct EvalContext
 {
   EvalContext(bool should_disable_path_expansion);
@@ -22,8 +39,12 @@ struct EvalContext
 
   void end_command();
 
-  /* Path-expand, tilde-expand and escape. */
-  std::vector<std::string> process_args(const std::vector<const Token *> &args);
+  std::vector<std::string>
+  glob_and_tilde_expand(const std::vector<const Token *> &args);
+  std::optional<Redirection>
+  find_and_remove_redirection(std::vector<std::string> &a);
+
+  void erase_escapes_and_quotes(std::vector<std::string> &a);
 
   std::string make_stats_string() const;
 
@@ -43,7 +64,6 @@ protected:
   std::vector<std::string> expand_path(std::string &&r);
 
   void expand_tilde(std::string &r);
-  void erase_escapes(std::string &r);
 
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};

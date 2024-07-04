@@ -8,18 +8,6 @@
 
 namespace shit {
 
-namespace lexer {
-
-bool is_whitespace(char ch);
-bool is_number(char ch);
-bool is_expression_sentinel(char ch);
-bool is_shell_sentinel(char ch);
-bool is_part_of_identifier(char ch);
-bool is_string_quote(char ch);
-bool is_expandable_char(char ch);
-
-} /* namespace lexer */
-
 /* Dumb note: Main idea is that none of the routines except
  * advance_past_last_peek(), skip_whitespace() and advance_forward() move
  * internal cursor. */
@@ -27,6 +15,16 @@ struct Lexer
 {
   Lexer(std::string source);
   ~Lexer();
+
+  static bool is_whitespace(char ch);
+  static bool is_number(char ch);
+  static bool is_expression_sentinel(char ch);
+  static bool is_shell_sentinel(char ch);
+  static bool is_part_of_identifier(char ch);
+  static bool is_string_quote(char ch);
+  static bool is_ascii_char(char ch);
+  static bool is_expandable_char(char ch);
+  static bool is_redirect_char(char ch);
 
   [[nodiscard]] Token *peek_expression_token();
   [[nodiscard]] Token *peek_shell_token();
@@ -49,7 +47,7 @@ protected:
   char  chop_character(usize offset = 0);
 
   Token *lex_number();
-  Token *lex_identifier();
+  Token *lex_argument();
   Token *lex_sentinel();
 };
 

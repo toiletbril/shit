@@ -25,10 +25,10 @@ FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(COMMAND, ManyStrings, 'c', "command",
      "Execute specified command and exit. Can be used multiple times.");
 FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
-FLAG(STATS, Bool, 'S', "stats", "Print statistics after each command.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", "Disable path expansion.");
 FLAG(ONE_COMMAND, Bool, 't', "one-command",
      "Exit after executing one command.");
+FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell.");
 
 /* TODO: */
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
@@ -45,7 +45,7 @@ FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
-FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell.");
+FLAG(STATS, Bool, 'S', "stats", "Print statistics after each command.");
 FLAG(DUMP_AST, Bool, 'A', "dump-ast",
      "Dump AST before executing each command.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");

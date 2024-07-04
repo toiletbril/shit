@@ -10,12 +10,10 @@
 
 namespace shit {
 
-namespace lexer {
-
 static constexpr char CEOF = static_cast<char>(EOF);
 
 bool
-is_whitespace(char ch)
+Lexer::is_whitespace(char ch)
 {
   switch (ch) {
   case ' ':
@@ -27,13 +25,13 @@ is_whitespace(char ch)
 }
 
 bool
-is_number(char ch)
+Lexer::is_number(char ch)
 {
   return ch >= '0' && ch <= '9';
 }
 
 bool
-is_expression_sentinel(char ch)
+Lexer::is_expression_sentinel(char ch)
 {
   switch (ch) {
   case '\n':
@@ -58,9 +56,8 @@ is_expression_sentinel(char ch)
   };
 }
 
-/* TODO: Separate redirections from here. */
 bool
-is_shell_sentinel(char ch)
+Lexer::is_shell_sentinel(char ch)
 {
   switch (ch) {
   case '\n':
@@ -68,21 +65,19 @@ is_shell_sentinel(char ch)
   case '{':
   case '}':
   case '&':
-  case ';':
-  case '<':
-  case '>': return true;
+  case ';': return true;
   default: return false;
   };
 }
 
 bool
-is_part_of_identifier(char ch)
+Lexer::is_part_of_identifier(char ch)
 {
   return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
 }
 
 bool
-is_string_quote(char ch)
+Lexer::is_string_quote(char ch)
 {
   switch (ch) {
   case '"':
@@ -93,13 +88,13 @@ is_string_quote(char ch)
 }
 
 bool
-is_ascii_char(char ch)
+Lexer::is_ascii_char(char ch)
 {
   return (ch >= 'A' && ch <= 'A') || (ch >= 'a' && ch <= 'z');
 }
 
 bool
-is_expandable_char(char ch)
+Lexer::is_expandable_char(char ch)
 {
   switch (ch) {
   case '[':
@@ -109,7 +104,15 @@ is_expandable_char(char ch)
   }
 }
 
-} /* namespace lexer */
+bool
+Lexer::is_redirect_char(char ch)
+{
+  switch (ch) {
+  case '>':
+  case '<': return true;
+  default: return false;
+  }
+}
 
 Lexer::Lexer(std::string source) : m_source(std::move(source)) {}
 
@@ -164,13 +167,13 @@ Lexer::advance_past_last_peek()
 Token *
 Lexer::lex_expression_token()
 {
-  if (char ch = chop_character(); ch != lexer::CEOF) {
-    if (lexer::is_number(ch)) {
+  if (char ch = chop_character(); ch != CEOF) {
+    if (is_number(ch)) {
       return lex_number();
-    } else if (lexer::is_expression_sentinel(ch)) {
+    } else if (is_expression_sentinel(ch)) {
       return lex_sentinel();
-    } else if (lexer::is_part_of_identifier(ch)) {
-      return lex_identifier();
+    } else if (is_part_of_identifier(ch)) {
+      return lex_argument();
     } else {
       throw ErrorWithLocation{m_cursor_position, "Unexpected character"};
     }
@@ -182,11 +185,11 @@ Lexer::lex_expression_token()
 Token *
 Lexer::lex_shell_token()
 {
-  if (char ch = chop_character(); ch != lexer::CEOF) {
-    if (lexer::is_shell_sentinel(ch)) {
+  if (char ch = chop_character(); ch != CEOF) {
+    if (is_shell_sentinel(ch)) {
       return lex_sentinel();
-    } else if (lexer::is_part_of_identifier(ch)) {
-      return lex_identifier();
+    } else if (is_part_of_identifier(ch)) {
+      return lex_argument();
     } else {
       throw ErrorWithLocation{m_cursor_position, "Unexpected character"};
     }
@@ -199,7 +202,7 @@ void
 Lexer::skip_whitespace()
 {
   usize i = 0;
-  while (lexer::is_whitespace(chop_character(i++))) {
+  while (is_whitespace(chop_character(i++))) {
     /* Chop chop... */
   }
   advance_forward((i > 0) ? i - 1 : 0);
@@ -220,7 +223,7 @@ Lexer::chop_character(usize offset)
     return m_source[m_cursor_position + offset];
   }
 
-  return lexer::CEOF;
+  return CEOF;
 }
 
 Token *
@@ -230,7 +233,7 @@ Lexer::lex_number()
   std::string n{};
   usize       length = 0;
 
-  while (lexer::is_number((ch = chop_character(length)))) {
+  while (is_number((ch = chop_character(length)))) {
     n += ch;
     length++;
   }
@@ -243,63 +246,22 @@ Lexer::lex_number()
 
 /* TODO: Escaping looks terrible here, but I can't think of a better way. */
 Token *
-Lexer::lex_identifier()
+Lexer::lex_argument()
 {
   char        ch;
   std::string id{};
 
   usize length = 0;
-  bool  is_expandable = false;
   bool  should_escape = false;
 
   std::optional<char> quote_char{};
-  usize               last_quote_char_pos = m_cursor_position;
 
   /* Handle quote escapes and strings. */
-  while (lexer::is_part_of_identifier((ch = chop_character(length))) ||
-         ((quote_char || should_escape) && ch != lexer::CEOF))
+  while (is_part_of_identifier((ch = chop_character(length))) ||
+         ((quote_char || should_escape) && ch != CEOF))
   {
-    bool is_escape = (ch == '\\');
-    bool is_dollar = (ch == '$');
-
-    bool is_in_single_quotes = (quote_char == '\'');
-
-    if (lexer::is_expandable_char(ch)) {
-      /* Escape all expandable chars inside quotes. */
-      if (quote_char) {
-        id += '\\';
-      }
-
-      is_expandable = true;
-    }
-
-    /* Single quotes ignore escapes/variables. */
-    if ((is_escape || is_dollar) && is_in_single_quotes) {
-      id += '\\';
-    }
-
     length++;
-
-    if (!should_escape) {
-      if (quote_char == ch) {
-        quote_char = std::nullopt;
-        continue;
-      } else if (!quote_char && lexer::is_string_quote(ch)) {
-        quote_char = ch;
-        last_quote_char_pos = m_cursor_position + length - 1;
-        continue;
-      }
-    }
-
     id += ch;
-    should_escape = is_escape && !is_in_single_quotes;
-  }
-
-  if (quote_char) {
-    throw ErrorWithLocationAndDetails{
-        last_quote_char_pos, "Unterminated string literal",
-        m_cursor_position + length,
-        "Expected a " + std::string{*quote_char} + " here"};
   }
 
   Token *t{};
@@ -317,10 +279,8 @@ Lexer::lex_identifier()
       /* clang-format on */
     default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
     }
-  } else if (!is_expandable) {
-    t = new tokens::Identifier{m_cursor_position, id};
   } else {
-    t = new tokens::ExpandableIdentifier{m_cursor_position, id};
+    t = new tokens::Identifier{m_cursor_position, id};
   }
 
   m_cached_offset = length;
