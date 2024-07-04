@@ -109,15 +109,32 @@ protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 };
 
-struct Exec : public Expression
+struct Command : public Expression
 {
-  Exec(usize location, const std::vector<const Token *> &&args);
-  ~Exec() override;
+  Command(usize location);
+
+  void make_async();
+  bool is_async() const;
+
+  virtual void append_to(usize d, std::string &f, bool duplicate) = 0;
+  virtual void redirect_to(usize d, std::string &f, bool duplicate) = 0;
+
+protected:
+  bool m_is_async{false};
+};
+
+struct SimpleCommand : public Command
+{
+  SimpleCommand(usize location, const std::vector<const Token *> &&args);
+  ~SimpleCommand() override;
 
   const std::vector<const Token *> &args() const;
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
+
+  void append_to(usize d, std::string &f, bool duplicate) override;
+  void redirect_to(usize d, std::string &f, bool duplicate) override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -125,18 +142,17 @@ protected:
   std::vector<const Token *> m_args;
 };
 
-struct SequenceNode : public Expression
+struct CompoundListCondition : public Expression
 {
-  /* Does this sequence node need evaluation? */
   enum class Kind : uint8_t
   {
-    Simple,
+    None,
     And,
     Or,
   };
 
-  SequenceNode(usize location, Kind kind, const Expression *expr);
-  ~SequenceNode() override;
+  CompoundListCondition(usize location, Kind kind, const Command *expr);
+  ~CompoundListCondition() override;
 
   Kind kind() const;
 
@@ -146,19 +162,20 @@ struct SequenceNode : public Expression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  Kind              m_kind;
-  const Expression *m_expr;
+  Kind           m_kind;
+  const Command *m_cmd;
 };
 
-struct Sequence : public Expression
+struct CompoundList : public Expression
 {
-  Sequence(usize location);
-  Sequence(usize location, const std::vector<const SequenceNode *> &nodes);
+  CompoundList(usize location);
+  CompoundList(usize                                             location,
+               const std::vector<const CompoundListCondition *> &nodes);
 
-  ~Sequence() override;
+  ~CompoundList() override;
 
   bool empty() const;
-  void append_node(const SequenceNode *node);
+  void append_node(const CompoundListCondition *node);
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -166,21 +183,24 @@ struct Sequence : public Expression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::vector<const SequenceNode *> m_nodes;
+  std::vector<const CompoundListCondition *> m_nodes;
 };
 
-struct ExecPipeSequence : public Expression
+struct Pipeline : public Command
 {
-  ExecPipeSequence(usize location, const std::vector<const Exec *> &commands);
-  ~ExecPipeSequence() override;
+  Pipeline(usize location, const std::vector<const SimpleCommand *> &commands);
+  ~Pipeline() override;
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
+  void append_to(usize d, std::string &f, bool duplicate) override;
+  void redirect_to(usize d, std::string &f, bool duplicate) override;
+
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::vector<const Exec *> m_commands;
+  std::vector<const SimpleCommand *> m_commands;
 };
 
 struct UnaryExpression : public Expression

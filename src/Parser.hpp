@@ -21,7 +21,9 @@ private:
   usize m_if_condition_depth{0};
   usize m_parentheses_depth{0};
 
-  [[nodiscard]] std::unique_ptr<expressions::Exec> parse_shell_command();
+  [[nodiscard]] std::unique_ptr<expressions::SimpleCommand>
+                                            parse_simple_command();
+  [[nodiscard]] std::unique_ptr<Expression> parse_compound_command();
   [[nodiscard]] std::unique_ptr<Expression>
   parse_expression(u8 min_precedence = 0);
 };

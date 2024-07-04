@@ -58,14 +58,18 @@ is_expression_sentinel(char ch)
   };
 }
 
+/* TODO: Separate redirections from here. */
 bool
 is_shell_sentinel(char ch)
 {
   switch (ch) {
   case '\n':
   case '|':
+  case '{':
+  case '}':
   case '&':
   case ';':
+  case '<':
   case '>': return true;
   default: return false;
   };
@@ -256,6 +260,8 @@ Lexer::lex_identifier()
          ((quote_char || should_escape) && ch != lexer::CEOF))
   {
     bool is_escape = (ch == '\\');
+    bool is_dollar = (ch == '$');
+
     bool is_in_single_quotes = (quote_char == '\'');
 
     if (lexer::is_expandable_char(ch)) {
@@ -267,8 +273,8 @@ Lexer::lex_identifier()
       is_expandable = true;
     }
 
-    if (is_escape && is_in_single_quotes) {
-      /* Single quotes ignore escapes. */
+    /* Single quotes ignore escapes/variables. */
+    if ((is_escape || is_dollar) && is_in_single_quotes) {
       id += '\\';
     }
 

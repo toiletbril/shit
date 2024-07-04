@@ -301,6 +301,38 @@ Identifier::flags() const
 }
 
 /**
+ * class: Redirection
+ */
+Redirection::Redirection(usize location, std::string_view what_fd,
+                         std::string_view to_file)
+    : Token(location), m_from_fd(what_fd), m_to_file(to_file)
+{}
+
+Token::Kind
+Redirection::kind() const
+{
+  return Token::Kind::Redirection;
+}
+
+Token::Flags
+Redirection::flags() const
+{
+  return Token::Flag::Special;
+}
+
+const std::string &
+Redirection::from_fd() const
+{
+  return m_from_fd;
+}
+
+const std::string &
+Redirection::to_file() const
+{
+  return m_to_file;
+}
+
+/**
  * class: Operator
  */
 Operator::Operator(usize location) : Token(location) {}

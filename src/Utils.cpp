@@ -136,10 +136,14 @@ ExecContext::make(usize location, const std::vector<std::string> &args)
 }
 
 i32
-execute_context(ExecContext &&ec)
+execute_context(ExecContext &&ec, bool is_async)
 {
   if (!ec.is_builtin()) {
-    return os::wait_and_monitor_process(os::execute_program(std::move(ec)));
+    os::process p = os::execute_program(std::move(ec));
+    if (is_async) {
+      return 0;
+    }
+    return os::wait_and_monitor_process(p);
   } else {
     return execute_builtin(std::move(ec));
   }
@@ -148,11 +152,11 @@ execute_context(ExecContext &&ec)
 }
 
 i32
-execute_contexts_with_pipes(std::vector<ExecContext> &&ecs)
+execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
 {
   SHIT_ASSERT(ecs.size() > 1);
 
-  i32 ret = 1;
+  i32 ret = 0;
 
   os::process    last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
@@ -186,7 +190,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs)
     last_stdin = pipe->in;
   }
 
-  if (last_child != SHIT_INVALID_FD) {
+  if (last_child != SHIT_INVALID_FD && !is_async) {
     ret = os::wait_and_monitor_process(last_child);
   }
 

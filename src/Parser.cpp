@@ -10,17 +10,19 @@
 
 namespace shit {
 
-static expressions::SequenceNode::Kind
+static expressions::CompoundListCondition::Kind
 get_sequence_kind(Token::Kind tk)
 {
   switch (tk) {
   case Token::Kind::Newline:
   case Token::Kind::EndOfFile:
-  case Token::Kind::Semicolon: return expressions::SequenceNode::Kind::Simple;
+  case Token::Kind::Ampersand:
+  case Token::Kind::Semicolon:
+    return expressions::CompoundListCondition::Kind::None;
   case Token::Kind::DoubleAmpersand:
-    return expressions::SequenceNode::Kind::And;
+    return expressions::CompoundListCondition::Kind::And;
   case Token::Kind::DoublePipe:
-    return expressions::SequenceNode::Kind::Or;
+    return expressions::CompoundListCondition::Kind::Or;
     break;
 
   default: SHIT_UNREACHABLE("Invalid shell sequence token: %d", E(tk));
@@ -31,23 +33,27 @@ Parser::Parser(Lexer &&lexer) : m_lexer(lexer) {}
 
 Parser::~Parser() = default;
 
-/* Greedy parser for shell commands. Generates a Sequence of expressions::Exec
- * and PipeExec expressions. */
 std::unique_ptr<Expression>
 Parser::construct_ast()
 {
-  std::unique_ptr<Expression> lhs{};
-  /* Sequence right at the start. */
-  std::unique_ptr<expressions::Sequence> sequence =
-      std::make_unique<expressions::Sequence>(0);
+  return parse_compound_command();
+}
 
-  bool                            should_parse_command = true;
-  expressions::SequenceNode::Kind next_sk =
-      expressions::SequenceNode::Kind::Simple;
+std::unique_ptr<Expression>
+Parser::parse_compound_command()
+{
+  std::unique_ptr<expressions::Command> lhs{};
+  /* Sequence right at the start. */
+  std::unique_ptr<expressions::CompoundList> sequence =
+      std::make_unique<expressions::CompoundList>(0);
+
+  bool                                     should_parse_command = true;
+  expressions::CompoundListCondition::Kind next_cond =
+      expressions::CompoundListCondition::Kind::None;
 
   for (;;) {
     if (should_parse_command) {
-      lhs = parse_shell_command();
+      lhs = parse_simple_command();
     } else {
       should_parse_command = true;
     }
@@ -56,6 +62,11 @@ Parser::construct_ast()
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
     switch (token->kind()) {
+    /* These operators require a command after them. */
+    case Token::Kind::Ampersand:
+      if (lhs) {
+        lhs->make_async();
+      }
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
@@ -72,15 +83,16 @@ Parser::construct_ast()
       m_lexer.advance_past_last_peek();
 
       if (lhs) {
-        expressions::SequenceNode *sn = new expressions::SequenceNode{
-            token->source_location(), next_sk, lhs.release()};
+        expressions::CompoundListCondition *sn =
+            new expressions::CompoundListCondition{token->source_location(),
+                                                   next_cond, lhs.release()};
         sequence->append_node(sn);
-        next_sk = get_sequence_kind(token->kind());
+        next_cond = get_sequence_kind(token->kind());
       }
 
       /* Terminate the command. */
       if (token->kind() == Token::Kind::EndOfFile) {
-        if (next_sk != expressions::SequenceNode::Kind::Simple) {
+        if (next_cond != expressions::CompoundListCondition::Kind::None) {
           throw shit::ErrorWithLocation{token->source_location(),
                                         "Expected a command after an operator"};
         }
@@ -104,17 +116,15 @@ Parser::construct_ast()
 
       m_lexer.advance_past_last_peek();
 
-      /* Don't prematurely release() the pointer, since we can still error out
-       * before constructing the expression. */
-      std::vector<const expressions::Exec *> pipe_group = {
-          static_cast<expressions::Exec *>(lhs.get())};
+      std::vector<const expressions::SimpleCommand *> pipe_group = {
+          static_cast<expressions::SimpleCommand *>(lhs.get())};
       usize pipe_group_location = token->source_location();
 
       std::unique_ptr<Token> last_pipe_token = std::move(token);
 
       /* Collect a pipe group. */
       for (;;) {
-        std::unique_ptr<expressions::Exec> rhs{parse_shell_command()};
+        std::unique_ptr<expressions::SimpleCommand> rhs{parse_simple_command()};
 
         if (rhs) {
           pipe_group.emplace_back(rhs.release());
@@ -133,17 +143,11 @@ Parser::construct_ast()
       }
 
       std::ignore = lhs.release();
-      lhs = std::make_unique<expressions::ExecPipeSequence>(pipe_group_location,
-                                                            pipe_group);
+      lhs = std::make_unique<expressions::Pipeline>(pipe_group_location,
+                                                    pipe_group);
 
       should_parse_command = false;
     } break;
-
-    case Token::Kind::Less:
-    case Token::Kind::Greater:
-    case Token::Kind::Ampersand:
-      throw ErrorWithLocation{token->source_location(),
-                              "Not implemented (Parser)"};
 
     default:
       throw ErrorWithLocation{token->source_location(),
@@ -157,8 +161,8 @@ Parser::construct_ast()
 }
 
 /* return: expressions::Exec or nullptr if no shell command is present. */
-std::unique_ptr<expressions::Exec>
-Parser::parse_shell_command()
+std::unique_ptr<expressions::SimpleCommand>
+Parser::parse_simple_command()
 {
   std::optional<usize>                source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
@@ -184,6 +188,10 @@ Parser::parse_shell_command()
       args_accumulator.emplace_back(std::move(token));
       break;
 
+    case Token::Kind::Redirection:
+      throw ErrorWithLocation{token->source_location(),
+                              "Not implemented (Parser)"};
+
     default: {
       if (!source_location) {
         return nullptr;
@@ -196,8 +204,8 @@ Parser::parse_shell_command()
         args.emplace_back(t.release());
       }
 
-      return std::make_unique<expressions::Exec>(*source_location,
-                                                 std::move(args));
+      return std::make_unique<expressions::SimpleCommand>(*source_location,
+                                                          std::move(args));
     }
     }
   }

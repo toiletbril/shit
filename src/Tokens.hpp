@@ -39,6 +39,7 @@ struct Token
     Number,
     String,
     Identifier,
+    Redirection,
     ExpandableIdentifier,
 
     /* Operators */
@@ -83,6 +84,7 @@ struct Token
     UnaryOperator  = 1 << 1,
     BinaryOperator = 1 << 2,
     Expandable     = 1 << 3,
+    Special        = 1 << 4,
     /* clang-format on */
   };
 
@@ -310,6 +312,22 @@ struct Identifier : Value
 
   Kind  kind() const override;
   Flags flags() const override;
+};
+
+struct Redirection : Token
+{
+  Redirection(usize location, std::string_view what_fd,
+              std::string_view to_file);
+
+  Kind  kind() const override;
+  Flags flags() const override;
+
+  const std::string &from_fd() const;
+  const std::string &to_file() const;
+
+protected:
+  std::string m_from_fd{};
+  std::string m_to_file{};
 };
 
 /**

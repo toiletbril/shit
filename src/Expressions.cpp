@@ -297,6 +297,7 @@ EvalContext::expand_path(std::string &&r)
   return values;
 }
 
+/* TODO: Command substitution. */
 std::vector<std::string>
 EvalContext::process_args(const std::vector<const Token *> &args)
 {
@@ -422,6 +423,23 @@ If::to_ast_string(usize layer) const
 }
 
 /**
+ * class: Command
+ */
+Command::Command(usize location) : Expression(location) {}
+
+void
+Command::make_async()
+{
+  m_is_async = true;
+}
+
+bool
+Command::is_async() const
+{
+  return m_is_async;
+}
+
+/**
  * class: DummyExpression
  */
 DummyExpression::DummyExpression(usize location) : Expression(location) {}
@@ -450,13 +468,14 @@ DummyExpression::to_ast_string(usize layer) const
 }
 
 /**
- * class: Exec
+ * class: SimpleCommand
  */
-Exec::Exec(usize location, const std::vector<const Token *> &&args)
-    : Expression(location), m_args(args)
+SimpleCommand::SimpleCommand(usize                              location,
+                             const std::vector<const Token *> &&args)
+    : Command(location), m_args(args)
 {}
 
-Exec::~Exec()
+SimpleCommand::~SimpleCommand()
 {
   for (const Token *t : m_args) {
     delete t;
@@ -464,27 +483,28 @@ Exec::~Exec()
 }
 
 const std::vector<const Token *> &
-Exec::args() const
+SimpleCommand::args() const
 {
   return m_args;
 }
 
 i64
-Exec::evaluate_impl(EvalContext &cxt) const
+SimpleCommand::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_args.size() > 0);
 
   return utils::execute_context(
-      utils::ExecContext::make(source_location(), cxt.process_args(m_args)));
+      utils::ExecContext::make(source_location(), cxt.process_args(m_args)),
+      is_async());
 
   SHIT_UNREACHABLE();
 }
 
 std::string
-Exec::to_string() const
+SimpleCommand::to_string() const
 {
   std::string args{};
-  std::string s = "Exec \"" + m_args[0]->raw_string();
+  std::string s = "SimpleCommand \"" + m_args[0]->raw_string();
   if (!m_args.empty()) {
     for (usize i = 1; i < m_args.size(); i++) {
       args += " ";
@@ -497,7 +517,7 @@ Exec::to_string() const
 }
 
 std::string
-Exec::to_ast_string(usize layer) const
+SimpleCommand::to_ast_string(usize layer) const
 {
   SHIT_UNUSED(layer);
   std::string pad{};
@@ -507,43 +527,61 @@ Exec::to_ast_string(usize layer) const
   return pad + "[" + to_string() + "]";
 }
 
+void
+SimpleCommand::append_to(usize d, std::string &f, bool duplicate)
+{
+  SHIT_UNUSED(d);
+  SHIT_UNUSED(f);
+  SHIT_UNUSED(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+void
+SimpleCommand::redirect_to(usize d, std::string &f, bool duplicate)
+{
+  SHIT_UNUSED(d);
+  SHIT_UNUSED(f);
+  SHIT_UNUSED(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
 /**
  * class: Sequence
  */
-Sequence::Sequence(usize location) : Expression(location), m_nodes() {}
+CompoundList::CompoundList(usize location) : Expression(location), m_nodes() {}
 
-Sequence::Sequence(usize                                    location,
-                   const std::vector<const SequenceNode *> &nodes)
+CompoundList::CompoundList(
+    usize location, const std::vector<const CompoundListCondition *> &nodes)
     : Expression(location), m_nodes(nodes)
 {}
 
-Sequence::~Sequence()
+CompoundList::~CompoundList()
 {
-  for (const SequenceNode *e : m_nodes) {
+  for (const CompoundListCondition *e : m_nodes) {
     delete e;
   }
 }
 
 bool
-Sequence::empty() const
+CompoundList::empty() const
 {
   return m_nodes.empty();
 }
 
 void
-Sequence::append_node(const SequenceNode *node)
+CompoundList::append_node(const CompoundListCondition *node)
 {
   m_nodes.emplace_back(node);
 }
 
 std::string
-Sequence::to_string() const
+CompoundList::to_string() const
 {
-  return "Sequence";
+  return "CompoundList";
 }
 
 std::string
-Sequence::to_ast_string(usize layer) const
+CompoundList::to_ast_string(usize layer) const
 {
   std::string s{};
   std::string pad{};
@@ -551,8 +589,8 @@ Sequence::to_ast_string(usize layer) const
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
-  s += pad + "[Sequence]";
-  for (const SequenceNode *n : m_nodes) {
+  s += pad + "[" + to_string() + "]";
+  for (const CompoundListCondition *n : m_nodes) {
     s += '\n';
     s += pad + EXPRESSION_AST_INDENT + n->to_ast_string(layer + 1);
   }
@@ -561,26 +599,26 @@ Sequence::to_ast_string(usize layer) const
 }
 
 i64
-Sequence::evaluate_impl(EvalContext &cxt) const
+CompoundList::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_nodes.size() > 0);
 
   static constexpr i64 nothing_was_executed = -256;
   i64                  ret = nothing_was_executed;
 
-  for (const SequenceNode *n : m_nodes) {
+  for (const CompoundListCondition *n : m_nodes) {
     switch (n->kind()) {
-    case SequenceNode::Kind::Simple: {
+    case CompoundListCondition::Kind::None: {
       ret = n->evaluate(cxt);
     } break;
 
-    case SequenceNode::Kind::Or:
+    case CompoundListCondition::Kind::Or:
       if (ret != 0) {
         ret = n->evaluate(cxt);
       }
       break;
 
-    case SequenceNode::Kind::And:
+    case CompoundListCondition::Kind::And:
       if (ret == 0) {
         ret = n->evaluate(cxt);
       }
@@ -594,35 +632,36 @@ Sequence::evaluate_impl(EvalContext &cxt) const
 }
 
 /**
- * class: SequenceNode
+ * class: CompoundListCondition
  */
-SequenceNode::SequenceNode(usize location, Kind kind, const Expression *expr)
-    : Expression(location), m_kind(kind), m_expr(expr)
+CompoundListCondition::CompoundListCondition(usize location, Kind kind,
+                                             const Command *expr)
+    : Expression(location), m_kind(kind), m_cmd(expr)
 {}
 
-SequenceNode::~SequenceNode() { delete m_expr; }
+CompoundListCondition::~CompoundListCondition() { delete m_cmd; }
 
-SequenceNode::Kind
-SequenceNode::kind() const
+CompoundListCondition::Kind
+CompoundListCondition::kind() const
 {
   return m_kind;
 }
 
 std::string
-SequenceNode::to_string() const
+CompoundListCondition::to_string() const
 {
   std::string k;
   switch (kind()) {
-  case Kind::Simple: k = "Simple"; break;
-  case Kind::And: k = "And"; break;
-  case Kind::Or: k = "Or"; break;
+  case Kind::None: k = "None"; break;
+  case Kind::And: k = "&&"; break;
+  case Kind::Or: k = "||"; break;
   default: SHIT_UNREACHABLE();
   }
-  return "SequenceNode " + k;
+  return "CompoundListCondition, " + k;
 }
 
 std::string
-SequenceNode::to_ast_string(usize layer) const
+CompoundListCondition::to_ast_string(usize layer) const
 {
   std::string s{};
   std::string pad{};
@@ -631,37 +670,40 @@ SequenceNode::to_ast_string(usize layer) const
   }
 
   s += pad + "[" + to_string() + "]\n";
-  s += pad + EXPRESSION_AST_INDENT + m_expr->to_ast_string(layer + 1);
+  s += pad + EXPRESSION_AST_INDENT + m_cmd->to_ast_string(layer + 1);
 
   return s;
 }
 
 i64
-SequenceNode::evaluate_impl(EvalContext &cxt) const
+CompoundListCondition::evaluate_impl(EvalContext &cxt) const
 {
-  return m_expr->evaluate(cxt);
+  return m_cmd->evaluate(cxt);
 }
 
-ExecPipeSequence::ExecPipeSequence(usize                            location,
-                                   const std::vector<const Exec *> &commands)
-    : Expression(location), m_commands(commands)
+/**
+ * class: Pipeline
+ */
+Pipeline::Pipeline(usize                                     location,
+                   const std::vector<const SimpleCommand *> &commands)
+    : Command(location), m_commands(commands)
 {}
 
-ExecPipeSequence::~ExecPipeSequence()
+Pipeline::~Pipeline()
 {
-  for (const Exec *e : m_commands) {
+  for (const SimpleCommand *e : m_commands) {
     delete e;
   }
 }
 
 std::string
-ExecPipeSequence::to_string() const
+Pipeline::to_string() const
 {
-  return "ExecPipeSequence";
+  return "Pipeline";
 }
 
 std::string
-ExecPipeSequence::to_ast_string(usize layer) const
+Pipeline::to_ast_string(usize layer) const
 {
   std::string s{};
   std::string pad{};
@@ -669,8 +711,8 @@ ExecPipeSequence::to_ast_string(usize layer) const
     pad += EXPRESSION_AST_INDENT;
   }
 
-  s += pad + "[ExecPipeSequence]";
-  for (const Exec *e : m_commands) {
+  s += pad + "[" + to_string() + "]";
+  for (const SimpleCommand *e : m_commands) {
     s += '\n';
     s += pad + EXPRESSION_AST_INDENT + e->to_ast_string(layer + 1);
   }
@@ -679,20 +721,38 @@ ExecPipeSequence::to_ast_string(usize layer) const
 }
 
 i64
-ExecPipeSequence::evaluate_impl(EvalContext &cxt) const
+Pipeline::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_commands.size() > 1);
 
   std::vector<utils::ExecContext> ecs;
   ecs.reserve(m_commands.size());
 
-  for (const Exec *e : m_commands) {
+  for (const SimpleCommand *e : m_commands) {
     cxt.add_evaluated_expression();
     ecs.emplace_back(utils::ExecContext::make(e->source_location(),
                                               cxt.process_args(e->args())));
   }
 
-  return utils::execute_contexts_with_pipes(std::move(ecs));
+  return utils::execute_contexts_with_pipes(std::move(ecs), is_async());
+}
+
+void
+Pipeline::append_to(usize d, std::string &f, bool duplicate)
+{
+  SHIT_UNUSED(d);
+  SHIT_UNUSED(f);
+  SHIT_UNUSED(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+void
+Pipeline::redirect_to(usize d, std::string &f, bool duplicate)
+{
+  SHIT_UNUSED(d);
+  SHIT_UNUSED(f);
+  SHIT_UNUSED(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
 /**

@@ -1,5 +1,5 @@
-[Sequence]
-  [SequenceNode Simple]
-    [Exec "echo Hello World"]
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo Hello World"]
 Hello World
 [Code 0]
