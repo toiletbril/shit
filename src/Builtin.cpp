@@ -53,7 +53,8 @@ execute_builtin(utils::ExecContext &&ec)
     i32 ret = b->execute(ec);
     return ret;
   } catch (Error &err) {
-    throw ErrorWithLocation{ec.source_location(), err.message()};
+    throw ErrorWithLocation{ec.source_location(), "Builtin \"" + ec.args()[0] +
+                                                      "\": " + err.message()};
   }
 }
 

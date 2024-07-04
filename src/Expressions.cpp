@@ -513,6 +513,9 @@ SimpleCommand::to_string() const
     s += args;
   }
   s += "\"";
+  if (is_async()) {
+    s += ", Async";
+  }
   return s;
 }
 
@@ -711,7 +714,11 @@ Pipeline::to_ast_string(usize layer) const
     pad += EXPRESSION_AST_INDENT;
   }
 
-  s += pad + "[" + to_string() + "]";
+  s += pad + "[" + to_string();
+  if (is_async()) {
+    s += ", Async";
+  }
+  s += "]";
   for (const SimpleCommand *e : m_commands) {
     s += '\n';
     s += pad + EXPRESSION_AST_INDENT + e->to_ast_string(layer + 1);

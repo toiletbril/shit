@@ -1,0 +1,16 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo", Async]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo 1", Async]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo 1"]
+  [CompoundListCondition, None]
+    [Pipeline, Async]
+      [SimpleCommand "echo 1"]
+      [SimpleCommand "cat"]
+
+1
+1
+[Code 0]
+1
