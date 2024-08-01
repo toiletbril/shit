@@ -4,23 +4,24 @@
 
 #if !defined NDEBUG
 #include <cstdio>
-#define t__trace_lf() SHIT_UNUSED(fputc('\n', stderr))
 /* fprintf(stderr, ...) */
 #define SHIT_TRACE(...)                                                        \
   do {                                                                         \
     SHIT_UNUSED(                                                               \
         std::fprintf(stderr, "[SHIT_TRACE] " __FILE__ ":%d: ", __LINE__));     \
     SHIT_UNUSED(std::fprintf(stderr, __VA_ARGS__));                            \
+    fflush(stderr);                                                            \
   } while (0)
 /* fprintf(stderr, ... + "\n") */
 #define SHIT_TRACELN(...)                                                      \
   do {                                                                         \
-    SHIT_TRACE(__VA_ARGS__);                                                   \
-    t__trace_lf();                                                             \
+    SHIT_UNUSED(                                                               \
+        std::fprintf(stderr, "[SHIT_TRACE] " __FILE__ ":%d: ", __LINE__));     \
+    SHIT_UNUSED(std::fprintf(stderr, __VA_ARGS__));                            \
+    SHIT_UNUSED(fputc('\n', stderr));                                          \
+    fflush(stderr);                                                            \
   } while (0)
 #else /* !NDEBUG */
-
-#define t__trace_lf()     /* nothing */
 #define SHIT_TRACE(...)   /* nothing */
 #define SHIT_TRACELN(...) /* nothing */
 #endif
@@ -56,7 +57,7 @@
   do {                                                                         \
     if (!(x)) [[unlikely]] {                                                   \
       SHIT_TRACELN("'SHIT_ASSERT(" #x ")' fail in %s().", __func__);           \
-      if (!t__va_is_empty(__VA_ARGS__)) {                                      \
+      if (!SHIT_VA_ARE_EMPTY(__VA_ARGS__)) {                                   \
         SHIT_TRACELN("Details: " __VA_ARGS__);                                 \
       }                                                                        \
       SHIT_TRAP();                                                             \

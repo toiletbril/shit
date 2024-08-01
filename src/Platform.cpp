@@ -48,10 +48,9 @@ get_current_user()
 {
   struct passwd *pw = getpwuid(getuid());
   if (pw != nullptr) {
-    return std::string{pw->pw_name};
-  } else {
-    return std::nullopt;
+    return pw->pw_name;
   }
+  return std::nullopt;
 }
 
 std::optional<std::filesystem::path>
@@ -86,7 +85,7 @@ std::optional<std::string>
 get_environment_variable(const std::string &key)
 {
   const char *e = std::getenv(key.c_str());
-  return (e != nullptr) ? std::optional(std::string{e}) : std::nullopt;
+  return (e != nullptr) ? std::optional(e) : std::nullopt;
 }
 
 i32

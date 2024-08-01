@@ -3,14 +3,14 @@
 /* Timestamp the build. */
 
 #if !defined SHIT_COMMIT_HASH
-#warning SHIT_COMMIT_HASH should be defined.Please use provided makefile for \
-         compilation!
+#warning                                                                       \
+    SHIT_COMMIT_HASH should be defined. Please use provided makefile for compilation!
 #define SHIT_COMMIT_HASH "<unknown>"
 #endif
 
 #if !defined SHIT_BUILD_MODE
-#warning SHIT_BUILD_MODE should be defined. Please use provided makefile for \
-         compilation!
+#warning                                                                       \
+    SHIT_BUILD_MODE should be defined. Please use provided makefile for compilation!
 #define SHIT_BUILD_MODE "<unset>"
 #endif
 
