@@ -67,6 +67,7 @@ Parser::parse_compound_command()
       if (lhs) {
         lhs->make_async();
       }
+      /* fallthrough */
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
