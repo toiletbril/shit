@@ -412,32 +412,29 @@ initialize_path_map()
       continue;
     }
 
-    /* What the heck? A path in PATH that does not exist? Are you a Windows
-     * user? */
-    bool is_valid_dir = false;
-
     try {
-      is_valid_dir = std::filesystem::exists(dir_string);
+      /* What the heck? A path in PATH that does not exist? Are you a Windows
+       * user? */
+      if (std::filesystem::exists(dir_string)) {
+        std::filesystem::directory_iterator di{dir_string};
+        std::filesystem::path               dir_path{dir_string};
+
+        usize dir_index =
+            cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
+
+        /* Initialize every file in the directory. */
+        for (const std::filesystem::directory_entry &f : di) {
+          std::string fs = f.path().filename().string();
+          PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
+        }
+      }
     } catch (std::filesystem::filesystem_error &e) {
       std::string s;
       s += "Unable to read '";
-      s += dir_string;
+      s += e.path1();
       s += "' while reading PATH: ";
       s += os::last_system_error_message();
       shit::show_message(s);
-    }
-
-    if (is_valid_dir) {
-      std::filesystem::directory_iterator di{dir_string};
-      std::filesystem::path               dir_path{dir_string};
-
-      usize dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-
-      /* Initialize every file in the directory. */
-      for (const std::filesystem::directory_entry &f : di) {
-        std::string fs = f.path().filename().string();
-        PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
-      }
     }
 
     dir_string.clear();
