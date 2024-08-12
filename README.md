@@ -50,6 +50,7 @@ Is it usable?
 - [x] Pipes.
 - [ ] Redirections. (`>`/`<`)
 - [x] Shell expansion. (`?`, `[...]`, `*`, `~`)
+- [ ] Escaping.
 - [ ] Environment variables.
 - [ ] Numeric expressions.
 
@@ -57,6 +58,7 @@ Is it good?
 - [ ] Background jobs.
 - [ ] Scripting capabilities. (flow control keywords)
 - [ ] Blocks and functions.
+- [ ] `sh`-compatible.
 
 Is is exceptional? 
 - [ ] Complex scripting capabilites.
