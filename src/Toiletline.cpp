@@ -1,6 +1,7 @@
 /* Toiletline.hpp is not included to define toiletline configuration macros here
  * rather than in the header. */
 
+#include "Cli.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Platform.hpp"
@@ -12,7 +13,8 @@
 namespace {
 
 #define TL_NO_SUSPEND
-#define TL_ASSERT SHIT_ASSERT
+#define TL_ASSERT           SHIT_ASSERT
+#define TL_HISTORY_MAX_SIZE 1024
 
 #define TOILETLINE_IMPLEMENTATION
 #include "toiletline/toiletline.h"
@@ -29,7 +31,6 @@ is_active()
   return ::itl_global_is_active;
 }
 
-/* TODO: Cosmo build's history explodes. */
 void
 initialize()
 {
@@ -38,13 +39,18 @@ initialize()
       h.has_value())
   {
     std::filesystem::path shit_history = *h / SHIT_HISTORY_FILE;
-    if (int e = ::tl_history_load(shit_history.string().c_str());
-        e != TL_SUCCESS)
+    if (int ret = ::tl_history_load(shit_history.string().c_str());
+        ret != TL_SUCCESS)
     {
       /* Don't count non-existent history file as an error. */
-      if (e != -ENOENT) {
-        throw shit::Error{"Toiletline: Could not load history: " +
-                          shit::os::last_system_error_message()};
+      if (ret != -ENOENT) {
+        std::string err_message = "Toiletline: Could not load history: ";
+        err_message += (errno == EINVAL)
+                           ? std::string{"Non-text byte detected in history "
+                                         "file. Truncate it manually"}
+                           : shit::os::last_system_error_message();
+        shit::Error e{err_message};
+        shit::show_message(e.to_string());
       }
     }
   }
@@ -63,9 +69,12 @@ exit()
       h.has_value())
   {
     std::filesystem::path shit_history = *h / SHIT_HISTORY_FILE;
-    if (::tl_history_dump(shit_history.string().c_str()) != TL_SUCCESS) {
-      throw shit::Error{"Toiletline: Could not dump history: " +
-                        shit::os::last_system_error_message()};
+    if (int ret = ::tl_history_dump(shit_history.string().c_str());
+        ret != TL_SUCCESS && ret != -EINVAL)
+    {
+      shit::Error e{"Toiletline: Could not dump history: " +
+                    shit::os::last_system_error_message()};
+      shit::show_message(e.to_string());
     }
   }
 
