@@ -431,7 +431,7 @@ initialize_path_map()
     } catch (std::filesystem::filesystem_error &e) {
       std::string s;
       s += "Unable to read '";
-      s += e.path1();
+      s += e.path1().string();
       s += "' while reading PATH: ";
       s += os::last_system_error_message();
       shit::show_message(s);
