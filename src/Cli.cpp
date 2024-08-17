@@ -412,9 +412,10 @@ reset_flags(const std::vector<Flag *> &flags)
 void
 show_version()
 {
-  std::cout << "Shit Shell " << SHIT_VER_MAJOR << "." << SHIT_VER_MINOR << '.'
+  std::cout << "Shit Shell " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
             << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
             << "Built on " << SHIT_BUILD_DATE << '\n'
+            << "OS " << SHIT_OS_INFO << "\n"
             << "MODE=" << SHIT_BUILD_MODE << ' ' << SHIT_COMMIT_HASH << '\n'
             << '\n'
             << SHIT_SHORT_LICENSE << '\n'

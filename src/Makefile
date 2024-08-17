@@ -25,10 +25,12 @@ CXX := clang++
 endif
 
 COMMIT_HASH := $(shell git rev-parse HEAD)
+OS_INFO := $(shell uname -rvom)
 
 DEFINES := \
-	-DSHIT_COMMIT_HASH=\"$(COMMIT_HASH)\" \
-	-DSHIT_BUILD_MODE=\"$(MODE)\"
+	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
+	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
+	-DSHIT_BUILD_MODE="\"$(MODE)\""
 
 CXXFLAGS := \
 	-Wall \
