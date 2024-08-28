@@ -199,10 +199,10 @@ void
 Lexer::skip_whitespace()
 {
   usize i = 0;
-  while (lexer::is_whitespace(chop_character(i++))) {
-    /* Chop chop... */
+  while (lexer::is_whitespace(chop_character(i))) {
+    i++;
   }
-  advance_forward((i > 0) ? i - 1 : 0);
+  advance_forward(i);
 }
 
 usize

@@ -415,8 +415,10 @@ show_version()
   std::cout << "Shit Shell " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
             << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
             << "Built on " << SHIT_BUILD_DATE << '\n'
-            << "OS " << SHIT_OS_INFO << "\n"
+            << '\n'
             << "MODE=" << SHIT_BUILD_MODE << ' ' << SHIT_COMMIT_HASH << '\n'
+            << "Compiler " << SHIT_COMPILER << '\n'
+            << "OS " << SHIT_OS_INFO << '\n'
             << '\n'
             << SHIT_SHORT_LICENSE << '\n'
             << "(c) toiletbril "
@@ -456,7 +458,7 @@ make_flag_help(const std::vector<Flag *> &flags)
   std::string s{};
 
   static constexpr usize MAX_WIDTH = 24;
-  static constexpr usize LONG_PADDING = 6;
+  static constexpr usize LONG_PADDING = 9;
 
   s += "OPTIONS";
   for (const shit::Flag *f : flags) {
@@ -484,10 +486,18 @@ make_flag_help(const std::vector<Flag *> &flags)
       /* '-E, --exit-code' */
       s += "--";
       s += f->long_name();
-      if (f->kind() == shit::Flag::Kind::String) {
-        /* '-E, --exit-code=<...>' */
-        s += "=<...>";
+
+      switch (f->kind()) {
+      /* '-E, --exit-code=<...>' */
+      case shit::Flag::Kind::String:
+        s += "=<...>   ";
         long_is_string = true;
+        break;
+      /* '-E, --exit-code=<.., ..>' */
+      case shit::Flag::Kind::ManyStrings:
+        s += "=<.., ..>";
+        long_is_string = true;
+      case shit::Flag::Kind::Bool: break;
       }
     } else {
       s += "    ";

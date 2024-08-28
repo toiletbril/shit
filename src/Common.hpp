@@ -21,6 +21,7 @@
 #endif
 
 #define SHIT_BUILD_DATE (__DATE__ " at " __TIME__)
+#define SHIT_COMPILER   __VERSION__
 
 /* Constants for --help and --version. */
 
@@ -105,12 +106,12 @@ struct t__exit_scope_help
   }
 };
 
-/* Silence enum warnings. */
-#define E(e) static_cast<int>(e)
-
 /* Defer a block until the end of the scope. */
 #define SHIT_DEFER                                                             \
   const auto &concat_literal(defer__, __LINE__) = t__exit_scope_help() + [&]()
+
+/* Silence enum warnings. */
+#define E(e) static_cast<int>(e)
 
 /* The length of statically allocated array. */
 #define countof(arr) (sizeof(arr) / sizeof(*(arr)))

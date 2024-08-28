@@ -4,7 +4,6 @@ MODE ?= dbg
 SOURCES := $(wildcard *.cpp)
 HEADERS := $(wildcard *.hpp)
 
-# Subfolders.
 DIRS := $(wildcard */.)
 
 SOURCES += $(wildcard */**.cpp)
@@ -24,12 +23,17 @@ else ifeq ($(OS), Windows_NT)
 CXX := clang++
 endif
 
-COMMIT_HASH := $(shell git rev-parse HEAD)
+ifeq ($(MODE), cosmo)
+OS_INFO := COSMO_FIXME_UNKNOWN_HOST
+else
 OS_INFO := $(shell uname -rvom)
+endif
+
+COMMIT_HASH := $(shell git rev-parse HEAD)
 
 DEFINES := \
-	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
 	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
+	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
 	-DSHIT_BUILD_MODE="\"$(MODE)\""
 
 CXXFLAGS := \
@@ -52,11 +56,11 @@ CXXFLAGS += \
 	-O0
 ifneq ($(OS), Windows_NT)
 ifneq ($(MODE), cosmo)
-CXXFLAGS += -fsanitize=address -fsanitize=undefined # Windows' Asan is broken
+CXXFLAGS += -fsanitize=address -fsanitize=undefined # Asan is broken
 endif
 endif
 else ifeq ($(MODE), cosmo)
-CXXFLAGS += -fexceptions -g -O2
+CXXFLAGS += -fexceptions -g -O3
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
 endif
@@ -115,7 +119,7 @@ fmt:
 
 clean:
 	rm -rf ./o $(OUT)
-	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
+	rm -rf ../*.ilk ../*.pdb ../*.lib        # Windows
 	rm -rf $(OUT).com.dbg $(OUT).aarch64.elf # Cosmopolitan
 
 .PHONY: dirs shit install tidy fmt clean
