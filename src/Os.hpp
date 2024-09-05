@@ -44,7 +44,6 @@ using os_args = std::string;
 #define SHIT_INVALID_FD      INVALID_HANDLE_VALUE
 #define SHIT_INVALID_PROCESS INVALID_HANDLE_VALUE
 
-/* Universal macros for current STDIN/STDOUT. */
 #define SHIT_STDIN  GetStdHandle(STD_OUTPUT_HANDLE)
 #define SHIT_STDOUT GetStdHandle(STD_OUTPUT_HANDLE)
 

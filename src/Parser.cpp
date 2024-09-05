@@ -47,7 +47,8 @@ Parser::parse_compound_command()
   std::unique_ptr<expressions::CompoundList> sequence =
       std::make_unique<expressions::CompoundList>(0);
 
-  bool                                     should_parse_command = true;
+  bool should_parse_command = true;
+
   expressions::CompoundListCondition::Kind next_cond =
       expressions::CompoundListCondition::Kind::None;
 
@@ -152,7 +153,7 @@ Parser::parse_compound_command()
 
     default:
       throw ErrorWithLocation{token->source_location(),
-                              "Expected a shell operator, found '" +
+                              "Expected a keyword or identifier, found '" +
                                   token->to_ast_string() + "'"};
     }
   }
@@ -173,8 +174,8 @@ Parser::parse_simple_command()
 
     switch (token->kind()) {
     case Token::Kind::String: {
-      char q = static_cast<const tokens::String *>(token.get())->quote_char();
-      if (q == '`') {
+      if (static_cast<const tokens::String *>(token.get())->quote_char() == '`')
+      {
         throw ErrorWithLocation{token->source_location(),
                                 "Unimplemented quote type"};
       }
@@ -189,6 +190,8 @@ Parser::parse_simple_command()
       args_accumulator.emplace_back(std::move(token));
       break;
 
+    case Token::Kind::If:
+    case Token::Kind::Then:
     case Token::Kind::Redirection:
       throw ErrorWithLocation{token->source_location(),
                               "Not implemented (Parser)"};

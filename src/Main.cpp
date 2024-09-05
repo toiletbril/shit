@@ -10,13 +10,14 @@
 #include "Utils.hpp"
 
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]", "[-OPTIONS] -",
+HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]", "[-OPTIONS] [-]",
                    "[-OPTIONS]");
 
 FLAG(INTERACTIVE, Bool, 'i', "interactive",
@@ -95,7 +96,7 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  if (FLAG_LOGIN.is_enabled()) {
+  if (FLAG_LOGIN.is_enabled() || strcmp(argv[0], "-") == 0) {
     is_login_shell = true;
   }
 
@@ -109,11 +110,11 @@ main(int argc, char **argv)
    * Option precedence should behave as follows: "-s", then files (arguments),
    * then "-i" (or no arguments). */
   bool should_read_files = !file_names.empty();
-  bool should_read_stdin = FLAG_STDIN.is_enabled();
   bool should_execute_commands = !FLAG_COMMAND.is_empty();
   bool should_be_interactive =
       (!should_execute_commands && FLAG_INTERACTIVE.is_enabled()) ||
-      (!should_read_files);
+      (!should_read_files && shit::os::is_stdin_a_tty());
+  bool should_read_stdin = !should_be_interactive || FLAG_STDIN.is_enabled();
 
   if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
       FLAG_VERBOSE.is_enabled() || FLAG_EXPAND_VERBOSE.is_enabled())

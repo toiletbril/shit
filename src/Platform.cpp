@@ -1,5 +1,6 @@
 #include "Platform.hpp"
 
+#include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -67,6 +68,12 @@ is_child_process()
   return getpid() != PARENT_SHELL_PID;
 }
 
+bool
+is_stdin_a_tty()
+{
+  return isatty(SHIT_STDIN);
+}
+
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
 #if !PLATFORM_IS(COSMO)
@@ -89,7 +96,7 @@ get_environment_variable(const std::string &key)
 }
 
 i32
-call_checked_impl(
+check_syscall_impl(
     i32 status, const std::string &invocation,
     const std::optional<std::function<void()>> &cleanup = std::nullopt)
 {
@@ -105,26 +112,26 @@ call_checked_impl(
   return status;
 }
 
-#define call_checked(f, ...)   call_checked_impl(f, #f, __VA_ARGS__)
-#define call_checked_simple(f) call_checked_impl(f, #f)
+#define check_syscall(fn)              check_syscall_impl(fn, #fn)
+#define check_syscall2(fn, cleanup_fn) check_syscall_impl(fn, #fn, cleanup_fn)
 
 process
 execute_program(utils::ExecContext &&ec)
 {
-  auto c = [&]() { ec.close_fds(); };
+  SHIT_DEFER { ec.close_fds(); };
 
-  pid_t child_pid = call_checked(fork(), c);
+  pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
     std::vector<const char *> os_args = make_os_args(ec.args());
 
     if (ec.in_fd) {
-      call_checked(dup2(*ec.in_fd, STDIN_FILENO), c);
-      call_checked(close(*ec.in_fd), c);
+      check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
+      check_syscall(close(*ec.in_fd));
     }
     if (ec.out_fd) {
-      call_checked(dup2(*ec.out_fd, STDOUT_FILENO), c);
-      call_checked(close(*ec.out_fd), c);
+      check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
+      check_syscall(close(*ec.out_fd));
     }
 
     reset_signal_handlers();
@@ -133,7 +140,6 @@ execute_program(utils::ExecContext &&ec)
     if (execv(ec.program_path().c_str(),
               const_cast<char *const *>(os_args.data())) == -1)
     {
-      /* Throw a readable error message. */
       throw ErrorWithLocation{ec.source_location(),
                               last_system_error_message()};
     }
@@ -163,7 +169,7 @@ wait_and_monitor_process(process pid)
 
   i32 status{};
 
-  while (call_checked_simple(waitpid(pid, &status, 0) != pid)) {
+  while (check_syscall(waitpid(pid, &status, 0) != pid)) {
     /* Waiting... */
   }
 
@@ -193,7 +199,7 @@ wait_and_monitor_process(process pid)
               << std::to_string(sig) << " and killed]" << std::endl;
 
     /* We can't handle suspended processes yet, so goodbye. */
-    call_checked_simple(kill(pid, SIGKILL));
+    check_syscall(kill(pid, SIGKILL));
   } else if (!WIFEXITED(status)) {
     /* Process was destroyed by otherworldly forces. */
     throw shit::Error{"???: " + last_system_error_message()};
@@ -245,20 +251,36 @@ make_sigset_impl(int first, ...)
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
+static void
+sigchild_handler(int n, siginfo_t *siginfo, void *ctx)
+{
+  SHIT_UNUSED(n);
+  SHIT_UNUSED(ctx);
+  SHIT_UNUSED(siginfo);
+}
+
 void
 reset_signal_handlers()
 {
   sigset_t sm;
   sigfillset(&sm);
-  call_checked_simple(sigprocmask(SIG_UNBLOCK, &sm, nullptr));
+  check_syscall(sigprocmask(SIG_UNBLOCK, &sm, nullptr));
+
+  struct sigaction sa = {};
+  sa.sa_handler = SIG_DFL;
+  check_syscall(sigaction(SIGCHLD, &sa, nullptr));
 }
 
 void
 set_default_signal_handlers()
 {
-  /* Ignore bullshit. */
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
-  call_checked_simple(sigprocmask(SIG_BLOCK, &sm, nullptr));
+  check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
+
+  struct sigaction sa = {};
+  sa.sa_flags = SA_SIGINFO;
+  sa.sa_sigaction = sigchild_handler;
+  check_syscall(sigaction(SIGCHLD, &sa, nullptr));
 }
 
 } /* namespace os */
@@ -324,6 +346,12 @@ bool
 is_child_process()
 {
   return GetCurrentProcessId() != PARENT_SHELL_PID;
+}
+
+bool
+is_stdin_a_tty()
+{
+  return _isatty(SHIT_STDIN);
 }
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
@@ -478,12 +506,12 @@ last_system_error_message()
 }
 
 static void
-print_lf(int s)
+handle_interrupt(int s)
 {
   SHIT_UNUSED(s);
   std::cout << std::endl;
   /* TODO: Ignore error? */
-  signal(SIGINT, print_lf);
+  signal(SIGINT, handle_interrupt);
 }
 
 /* TODO: Use Windows events. */
@@ -491,7 +519,7 @@ void
 set_default_signal_handlers()
 {
   if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||
-      signal(SIGINT, print_lf) == SIG_ERR)
+      signal(SIGINT, handle_interrupt) == SIG_ERR)
   {
     throw Error{"signal() failed: " + last_system_error_message()};
   }

@@ -97,11 +97,11 @@ EvalContext::total_expansion_count() const
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
 std::vector<std::string>
-EvalContext::expand_path_once(std::string_view r, bool should_expand_files)
+EvalContext::expand_path_once(std::string_view path, bool should_expand_files)
 {
-  std::vector<std::string> values{};
+  std::vector<std::string> expanded_paths{};
 
-  usize last_slash = r.rfind('/');
+  usize last_slash = path.rfind('/');
   bool  has_slashes = (last_slash != std::string::npos);
 
   /* Prefix is the parent directory. */
@@ -109,9 +109,9 @@ EvalContext::expand_path_once(std::string_view r, bool should_expand_files)
 
   if (has_slashes) {
     if (last_slash != 0) {
-      parent_dir = r.substr(0, last_slash);
+      parent_dir = path.substr(0, last_slash);
     } else {
-      parent_dir = r.substr(0, 1);
+      parent_dir = path.substr(0, 1);
     }
   } else {
     parent_dir = ".";
@@ -121,14 +121,14 @@ EvalContext::expand_path_once(std::string_view r, bool should_expand_files)
   std::optional<std::string_view> glob{};
 
   if (has_slashes) {
-    if (last_slash + 1 < r.length()) {
-      glob = r;
+    if (last_slash + 1 < path.length()) {
+      glob = path;
       glob->remove_prefix(last_slash + 1);
     } else {
       /* glob is empty. */
     }
   } else {
-    glob = r;
+    glob = path;
   }
 
   std::filesystem::directory_iterator d{};
@@ -151,38 +151,38 @@ EvalContext::expand_path_once(std::string_view r, bool should_expand_files)
         continue;
       }
       if (utils::glob_matches(*glob, f)) {
-        std::string v{};
+        std::string expanded_path{};
         if (parent_dir != ".") {
-          v += parent_dir;
+          expanded_path += parent_dir;
           if (parent_dir != "/") {
-            v += '/';
+            expanded_path += '/';
           }
         }
-        v += f;
+        expanded_path += f;
         add_expansion();
-        values.emplace_back(v);
+        expanded_paths.emplace_back(expanded_path);
       }
     }
   } else {
-    values.emplace_back(r);
+    expanded_paths.emplace_back(path);
   }
 
-  return values;
+  return expanded_paths;
 }
 
 std::vector<std::string>
-EvalContext::expand_path_recurse(const std::vector<std::string> &vs)
+EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
 {
-  std::vector<std::string> vvs{};
+  std::vector<std::string> resulting_expanded_paths{};
   std::optional<usize>     expand_ch{};
 
-  for (std::string_view vo : vs) {
-    std::string_view v = vo;
+  for (std::string_view original_path : paths) {
+    std::string_view path = original_path;
 
-    for (usize i = 0; i < v.length(); i++) {
-      if (lexer::is_expandable_char(v[i])) {
+    for (usize i = 0; i < path.length(); i++) {
+      if (lexer::is_expandable_char(path[i])) {
         /* Is it escaped? */
-        if (!(i > 0 && v[i - 1] == '\\')) {
+        if (!(i > 0 && path[i - 1] == '\\')) {
           expand_ch = i;
           break;
         }
@@ -191,63 +191,67 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &vs)
     if (expand_ch) {
       std::optional<usize> slash_after{};
 
-      for (usize i = *expand_ch; i < v.length(); i++) {
-        if (v[i] == '/') {
+      for (usize i = *expand_ch; i < path.length(); i++) {
+        if (path[i] == '/') {
           slash_after = i;
           break;
         }
       }
       if (slash_after) {
-        v.remove_suffix(v.length() - *slash_after);
+        path.remove_suffix(path.length() - *slash_after);
       }
 
-      std::vector<std::string> tvs = expand_path_once(v, !slash_after);
-
+      std::vector<std::string> expanded_paths =
+          expand_path_once(path, !slash_after);
       if (slash_after) {
-        /* Bring back the removed prefix. */
-        vo.remove_prefix(*slash_after);
-        for (std::string &vv : tvs) {
-          vv += vo;
+        /* Bring back the removed suffix. */
+        std::string_view removed_suffix = original_path;
+        removed_suffix.remove_prefix(*slash_after);
+
+        for (std::string &expanded_path : expanded_paths) {
+          expanded_path += removed_suffix;
         }
+
         /* Call this function recursively on expanded entries. */
-        std::vector<std::string> tvvs = expand_path_recurse(tvs);
-        for (const std::string &vvv : tvvs) {
-          vvs.emplace_back(vvv);
+        std::vector<std::string> twice_expanded_paths =
+            expand_path_recurse(expanded_paths);
+        for (const std::string &twice_expanded_path : twice_expanded_paths) {
+          resulting_expanded_paths.emplace_back(twice_expanded_path);
         }
       } else {
-        for (const std::string &vv : tvs) {
-          vvs.emplace_back(vv);
+        for (const std::string &resulting_path : expanded_paths) {
+          resulting_expanded_paths.emplace_back(resulting_path);
         }
       }
     } else {
-      vvs.emplace_back(v);
+      resulting_expanded_paths.emplace_back(path);
     }
   }
 
-  return vvs;
+  return resulting_expanded_paths;
 }
 
 void
-EvalContext::expand_tilde(std::string &r)
+EvalContext::expand_tilde(std::string &p)
 {
-  if (r[0] == '~') {
+  if (p[0] == '~') {
     /* NOTE: escapes are not processed here. It works because 0-position is
      * hardcoded. */
     /* TODO: There may be several separators supported. */
-    if (r.length() > 1 && r[1] != '/') {
+    if (p.length() > 1 && p[1] != '/') {
       /* TODO: Expand different users. */
       return;
     }
 
     /* Remove the tilde. */
-    r.erase(0, 1);
+    p.erase(0, 1);
 
     std::optional<std::filesystem::path> u = os::get_home_directory();
     if (!u) {
       throw Error{"Could not figure out home directory"};
     }
 
-    r.insert(0, u->string());
+    p.insert(0, u->string());
   }
 }
 
