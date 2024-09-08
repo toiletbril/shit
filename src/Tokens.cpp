@@ -362,14 +362,15 @@ Operator::construct_binary_expression(const Expression *lhs,
   SHIT_UNUSED(lhs);
   SHIT_UNUSED(rhs);
   SHIT_UNREACHABLE("Invalid binary operator construction of type %d",
-                   E(kind()));
+                   SHIT_ENUM(kind()));
 }
 
 std::unique_ptr<Expression>
 Operator::construct_unary_expression(const Expression *rhs) const
 {
   SHIT_UNUSED(rhs);
-  SHIT_UNREACHABLE("Invalid unary operator construction of type %d", E(kind()));
+  SHIT_UNREACHABLE("Invalid unary operator construction of type %d",
+                   SHIT_ENUM(kind()));
 }
 
 /**

@@ -37,6 +37,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <utility>
 
 /* Crablang types. */
 
@@ -62,7 +63,7 @@ using uintptr = uintptr_t;
 #define t__used               __attribute__((used))
 #define t__forceinline        inline __attribute__((always_inline))
 #define t__unreachable()      __builtin_unreachable()
-#define t__debugtrap()        __builtin_trap()
+#define t__debugtrap()        __builtin_debugtrap()
 #else /* __GNUC__ || __clang__ || __COSMOCC__ */
 #error Oh no! Segmentation fault. Please download a better compiler that \
        supports GNU extensions!
@@ -73,16 +74,12 @@ using uintptr = uintptr_t;
 #define t__debugtrap()        abort()
 #endif
 
-/* Do not remove the symbol, even if it's not used. */
-#define SHIT_USED t__used
-/* The return value must be used. */
+#define SHIT_USED        t__used
 #define SHIT_FORCEINLINE t__forceinline
-/* The value is unused. Suppress the compiler warning. */
-#define SHIT_UNUSED(x) ((void) (x))
+#define SHIT_UNUSED(x)   (std::ignore = (x))
 
 #define t__concat_literal(x, y) x##y
-/* Concatenate two identifiers without quoting them. */
-#define concat_literal(x, y) t__concat_literal(x, y)
+#define concat_literal(x, y)    t__concat_literal(x, y)
 
 template <typename T>
 struct t__exit_scope
@@ -111,7 +108,7 @@ struct t__exit_scope_help
   const auto &concat_literal(defer__, __LINE__) = t__exit_scope_help() + [&]()
 
 /* Silence enum warnings. */
-#define E(e) static_cast<int>(e)
+#define SHIT_ENUM(e) static_cast<int>(e)
 
 /* The length of statically allocated array. */
 #define countof(arr) (sizeof(arr) / sizeof(*(arr)))

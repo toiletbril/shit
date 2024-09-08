@@ -25,7 +25,7 @@ get_sequence_kind(Token::Kind tk)
     return expressions::CompoundListCondition::Kind::Or;
     break;
 
-  default: SHIT_UNREACHABLE("Invalid shell sequence token: %d", E(tk));
+  default: SHIT_UNREACHABLE("Invalid shell sequence token: %d", SHIT_ENUM(tk));
   }
 }
 

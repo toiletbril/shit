@@ -36,6 +36,7 @@ DEFINES := \
 	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
 	-DSHIT_BUILD_MODE="\"$(MODE)\""
 
+# Use $CPPFLAGS or $CFLAGS to append new flags on command line.
 CXXFLAGS := \
 	-Wall \
 	-Wextra \
@@ -45,6 +46,7 @@ CXXFLAGS := \
 	-Wno-deprecated \
 	-std=c++17 \
 	$(DEFINES) \
+	$(CPPFLAGS) \
 	$(CFLAGS)
 
 ifeq ($(MODE), rel)

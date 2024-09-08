@@ -44,7 +44,8 @@ execute_builtin(utils::ExecContext &&ec)
     /* clang-format on */
 
   default:
-    SHIT_UNREACHABLE("Unhandled builtin of kind %d", E(ec.builtin_kind()));
+    SHIT_UNREACHABLE("Unhandled builtin of kind %d",
+                     SHIT_ENUM(ec.builtin_kind()));
   }
 
   SHIT_DEFER { ec.close_fds(); };

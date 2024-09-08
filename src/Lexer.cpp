@@ -315,7 +315,8 @@ Lexer::lex_identifier()
     case Token::Kind::Else: t = new tokens::Else{m_cursor_position}; break;
     case Token::Kind::Fi:   t = new tokens::Fi{m_cursor_position}; break;
       /* clang-format on */
-    default: SHIT_UNREACHABLE("Unhandled keyword of type %d", E(kw->second));
+    default:
+      SHIT_UNREACHABLE("Unhandled keyword of type %d", SHIT_ENUM(kw->second));
     }
   } else if (!is_expandable) {
     t = new tokens::Identifier{m_cursor_position, id};
@@ -466,7 +467,8 @@ Lexer::lex_sentinel()
       }
     } break;
 
-    default: SHIT_UNREACHABLE("Unhandled operator of type %d", E(op->second));
+    default:
+      SHIT_UNREACHABLE("Unhandled operator of type %d", SHIT_ENUM(op->second));
     }
   } else {
     std::string s{};
