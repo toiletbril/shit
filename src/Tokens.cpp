@@ -8,9 +8,9 @@ namespace shit {
 /**
  * class: Token
  */
-Token::Token(usize location) : m_location(location) {}
+Token::Token(SourceLocation location) : m_location(location) {}
 
-usize
+SourceLocation
 Token::source_location() const
 {
   return m_location;
@@ -27,7 +27,7 @@ namespace tokens {
 /**
  * class: If
  */
-If::If(usize location) : Token(location) {}
+If::If(SourceLocation location) : Token(location) {}
 
 Token::Kind
 If::kind() const
@@ -50,7 +50,7 @@ If::raw_string() const
 /**
  * class: Else
  */
-Else::Else(usize location) : Token(location) {}
+Else::Else(SourceLocation location) : Token(location) {}
 
 Token::Kind
 Else::kind() const
@@ -73,7 +73,7 @@ Else::raw_string() const
 /**
  * class: Then
  */
-Then::Then(usize location) : Token(location) {}
+Then::Then(SourceLocation location) : Token(location) {}
 
 Token::Kind
 Then::kind() const
@@ -96,7 +96,7 @@ Then::raw_string() const
 /**
  * class: Fi
  */
-Fi::Fi(usize location) : Token(location) {}
+Fi::Fi(SourceLocation location) : Token(location) {}
 
 Token::Kind
 Fi::kind() const
@@ -119,7 +119,7 @@ Fi::raw_string() const
 /**
  * class: EndOfFile
  */
-EndOfFile::EndOfFile(usize location) : Token(location) {}
+EndOfFile::EndOfFile(SourceLocation location) : Token(location) {}
 
 Token::Kind
 EndOfFile::kind() const
@@ -142,7 +142,7 @@ EndOfFile::raw_string() const
 /**
  * class: Newline
  */
-Newline::Newline(usize location) : Token(location) {}
+Newline::Newline(SourceLocation location) : Token(location) {}
 
 Token::Kind
 Newline::kind() const
@@ -165,7 +165,7 @@ Newline::raw_string() const
 /**
  * class: Semicolon
  */
-Semicolon::Semicolon(usize location) : Token(location) {}
+Semicolon::Semicolon(SourceLocation location) : Token(location) {}
 
 Token::Kind
 Semicolon::kind() const
@@ -188,7 +188,7 @@ Semicolon::raw_string() const
 /**
  * class: Dot
  */
-Dot::Dot(usize location) : Token(location) {}
+Dot::Dot(SourceLocation location) : Token(location) {}
 
 Token::Kind
 Dot::kind() const
@@ -211,7 +211,8 @@ Dot::raw_string() const
 /**
  * class: Value
  */
-Value::Value(usize location, std::string_view sv) : Token(location), m_value(sv)
+Value::Value(SourceLocation location, std::string_view sv)
+    : Token(location), m_value(sv)
 {}
 
 std::string
@@ -223,7 +224,9 @@ Value::raw_string() const
 /**
  * class: Number
  */
-Number::Number(usize location, std::string_view sv) : Value(location, sv) {}
+Number::Number(SourceLocation location, std::string_view sv)
+    : Value(location, sv)
+{}
 
 Token::Kind
 Number::kind() const
@@ -240,7 +243,7 @@ Number::flags() const
 /**
  * class: String
  */
-String::String(usize location, char quote_char, std::string_view sv)
+String::String(SourceLocation location, char quote_char, std::string_view sv)
     : Value(location, sv), m_quote_char(quote_char)
 {}
 
@@ -265,7 +268,8 @@ String::quote_char() const
 /**
  * class: ExpandableString
  */
-ExpandableIdentifier::ExpandableIdentifier(usize location, std::string_view sv)
+ExpandableIdentifier::ExpandableIdentifier(SourceLocation   location,
+                                           std::string_view sv)
     : Value(location, sv)
 {}
 
@@ -284,7 +288,7 @@ ExpandableIdentifier::flags() const
 /**
  * class: Identifier
  */
-Identifier::Identifier(usize location, std::string_view sv)
+Identifier::Identifier(SourceLocation location, std::string_view sv)
     : Value(location, sv)
 {}
 
@@ -303,7 +307,7 @@ Identifier::flags() const
 /**
  * class: Redirection
  */
-Redirection::Redirection(usize location, std::string_view what_fd,
+Redirection::Redirection(SourceLocation location, std::string_view what_fd,
                          std::string_view to_file)
     : Token(location), m_from_fd(what_fd), m_to_file(to_file)
 {}
@@ -335,7 +339,7 @@ Redirection::to_file() const
 /**
  * class: Operator
  */
-Operator::Operator(usize location) : Token(location) {}
+Operator::Operator(SourceLocation location) : Token(location) {}
 
 u8
 Operator::left_precedence() const
@@ -376,7 +380,7 @@ Operator::construct_unary_expression(const Expression *rhs) const
 /**
  * class: Plus
  */
-Plus::Plus(usize location) : Operator(location) {}
+Plus::Plus(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Plus::kind() const
@@ -424,7 +428,7 @@ Plus::construct_unary_expression(const Expression *rhs) const
 /**
  * class: Minus
  */
-Minus::Minus(usize location) : Operator(location) {}
+Minus::Minus(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Minus::kind() const
@@ -472,7 +476,7 @@ Minus::construct_unary_expression(const Expression *rhs) const
 /**
  * class: Slash
  */
-Slash::Slash(usize location) : Operator(location) {}
+Slash::Slash(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Slash::kind() const
@@ -508,7 +512,7 @@ Slash::construct_binary_expression(const Expression *lhs,
 /**
  * class: Asterisk
  */
-Asterisk::Asterisk(usize location) : Operator(location) {}
+Asterisk::Asterisk(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Asterisk::kind() const
@@ -544,7 +548,7 @@ Asterisk::construct_binary_expression(const Expression *lhs,
 /**
  * class: Percent
  */
-Percent::Percent(usize location) : Operator(location) {}
+Percent::Percent(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Percent::kind() const
@@ -580,7 +584,7 @@ Percent::construct_binary_expression(const Expression *lhs,
 /**
  * class: LeftParen
  */
-LeftParen::LeftParen(usize location) : Token(location) {}
+LeftParen::LeftParen(SourceLocation location) : Token(location) {}
 
 Token::Kind
 LeftParen::kind() const
@@ -603,7 +607,7 @@ LeftParen::flags() const
 /**
  * class: RightParen
  */
-RightParen::RightParen(usize location) : Token(location) {}
+RightParen::RightParen(SourceLocation location) : Token(location) {}
 
 Token::Kind
 RightParen::kind() const
@@ -626,7 +630,8 @@ RightParen::flags() const
 /**
  * class: LeftSquareBracket
  */
-LeftSquareBracket::LeftSquareBracket(usize location) : Token(location) {}
+LeftSquareBracket::LeftSquareBracket(SourceLocation location) : Token(location)
+{}
 
 Token::Kind
 LeftSquareBracket::kind() const
@@ -649,7 +654,9 @@ LeftSquareBracket::flags() const
 /**
  * class: RightSquareBracket
  */
-RightSquareBracket::RightSquareBracket(usize location) : Token(location) {}
+RightSquareBracket::RightSquareBracket(SourceLocation location)
+    : Token(location)
+{}
 
 Token::Kind
 RightSquareBracket::kind() const
@@ -672,7 +679,7 @@ RightSquareBracket::flags() const
 /**
  * class: DoubleLeftSquareBracket
  */
-DoubleLeftSquareBracket::DoubleLeftSquareBracket(usize location)
+DoubleLeftSquareBracket::DoubleLeftSquareBracket(SourceLocation location)
     : Token(location)
 {}
 
@@ -697,7 +704,7 @@ DoubleLeftSquareBracket::flags() const
 /**
  * class: DoubleRightSquareBracket
  */
-DoubleRightSquareBracket::DoubleRightSquareBracket(usize location)
+DoubleRightSquareBracket::DoubleRightSquareBracket(SourceLocation location)
     : Token(location)
 {}
 
@@ -722,7 +729,7 @@ DoubleRightSquareBracket::flags() const
 /**
  * class: LeftBracket
  */
-LeftBracket::LeftBracket(usize location) : Token(location) {}
+LeftBracket::LeftBracket(SourceLocation location) : Token(location) {}
 
 Token::Kind
 LeftBracket::kind() const
@@ -745,7 +752,7 @@ LeftBracket::flags() const
 /**
  * class: RightBracket
  */
-RightBracket::RightBracket(usize location) : Token(location) {}
+RightBracket::RightBracket(SourceLocation location) : Token(location) {}
 
 Token::Kind
 RightBracket::kind() const
@@ -768,7 +775,8 @@ RightBracket::flags() const
 /**
  * class: ExclamationMark
  */
-ExclamationMark::ExclamationMark(usize location) : Operator(location) {}
+ExclamationMark::ExclamationMark(SourceLocation location) : Operator(location)
+{}
 
 Token::Kind
 ExclamationMark::kind() const
@@ -803,7 +811,7 @@ ExclamationMark::construct_unary_expression(const Expression *rhs) const
 /**
  * class: Tilde
  */
-Tilde::Tilde(usize location) : Operator(location) {}
+Tilde::Tilde(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Tilde::kind() const
@@ -839,7 +847,7 @@ Tilde::construct_unary_expression(const Expression *rhs) const
 /**
  * class: Ampersand
  */
-Ampersand::Ampersand(usize location) : Operator(location) {}
+Ampersand::Ampersand(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Ampersand::kind() const
@@ -875,7 +883,8 @@ Ampersand::construct_binary_expression(const Expression *lhs,
 /**
  * class: DoubleAmpersand
  */
-DoubleAmpersand::DoubleAmpersand(usize location) : Operator(location) {}
+DoubleAmpersand::DoubleAmpersand(SourceLocation location) : Operator(location)
+{}
 
 Token::Kind
 DoubleAmpersand::kind() const
@@ -911,7 +920,7 @@ DoubleAmpersand::construct_binary_expression(const Expression *lhs,
 /**
  * class: Greater
  */
-Greater::Greater(usize location) : Operator(location) {}
+Greater::Greater(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Greater::kind() const
@@ -948,7 +957,7 @@ Greater::construct_binary_expression(const Expression *lhs,
 /**
  * class: DoubleGreater
  */
-DoubleGreater::DoubleGreater(usize location) : Operator(location) {}
+DoubleGreater::DoubleGreater(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 DoubleGreater::kind() const
@@ -984,7 +993,7 @@ DoubleGreater::construct_binary_expression(const Expression *lhs,
 /**
  * class: GreaterEquals
  */
-GreaterEquals::GreaterEquals(usize location) : Operator(location) {}
+GreaterEquals::GreaterEquals(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 GreaterEquals::kind() const
@@ -1021,7 +1030,7 @@ GreaterEquals::construct_binary_expression(const Expression *lhs,
 /**
  * class: Less
  */
-Less::Less(usize location) : Operator(location) {}
+Less::Less(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Less::kind() const
@@ -1057,7 +1066,7 @@ Less::construct_binary_expression(const Expression *lhs,
 /**
  * class: DoubleLess
  */
-DoubleLess::DoubleLess(usize location) : Operator(location) {}
+DoubleLess::DoubleLess(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 DoubleLess::kind() const
@@ -1093,7 +1102,7 @@ DoubleLess::construct_binary_expression(const Expression *lhs,
 /**
  * class: LessEquals
  */
-LessEquals::LessEquals(usize location) : Operator(location) {}
+LessEquals::LessEquals(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 LessEquals::kind() const
@@ -1130,7 +1139,7 @@ LessEquals::construct_binary_expression(const Expression *lhs,
 /**
  * class: Pipe
  */
-Pipe::Pipe(usize location) : Operator(location) {}
+Pipe::Pipe(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Pipe::kind() const
@@ -1166,7 +1175,7 @@ Pipe::construct_binary_expression(const Expression *lhs,
 /**
  * class: DoublePipe
  */
-DoublePipe::DoublePipe(usize location) : Operator(location) {}
+DoublePipe::DoublePipe(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 DoublePipe::kind() const
@@ -1202,7 +1211,7 @@ DoublePipe::construct_binary_expression(const Expression *lhs,
 /**
  * class: Cap
  */
-Cap::Cap(usize location) : Operator(location) {}
+Cap::Cap(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Cap::kind() const
@@ -1238,7 +1247,7 @@ Cap::construct_binary_expression(const Expression *lhs,
 /**
  * class: Equals
  */
-Equals::Equals(usize location) : Operator(location) {}
+Equals::Equals(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 Equals::kind() const
@@ -1276,7 +1285,7 @@ Equals::construct_binary_expression(const Expression *lhs,
 /**
  * class: DoubleEquals
  */
-DoubleEquals::DoubleEquals(usize location) : Operator(location) {}
+DoubleEquals::DoubleEquals(SourceLocation location) : Operator(location) {}
 
 Token::Kind
 DoubleEquals::kind() const
@@ -1312,7 +1321,9 @@ DoubleEquals::construct_binary_expression(const Expression *lhs,
 /**
  * class: ExclamationEquals
  */
-ExclamationEquals::ExclamationEquals(usize location) : Operator(location) {}
+ExclamationEquals::ExclamationEquals(SourceLocation location)
+    : Operator(location)
+{}
 
 Token::Kind
 ExclamationEquals::kind() const

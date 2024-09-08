@@ -2,6 +2,7 @@
 
 #include "Builtin.hpp"
 #include "Common.hpp"
+#include "Eval.hpp"
 #include "Os.hpp"
 
 #include <filesystem>
@@ -18,7 +19,8 @@ namespace utils {
  * from program. Program is non-altered first arg. */
 struct ExecContext
 {
-  static ExecContext make(usize location, const std::vector<std::string> &args);
+  static ExecContext make_from(SourceLocation                  location,
+                               const std::vector<std::string> &args);
 
   std::optional<os::descriptor> in_fd{std::nullopt};
   std::optional<os::descriptor> out_fd{std::nullopt};
@@ -27,7 +29,7 @@ struct ExecContext
 
   const std::vector<std::string> &args() const;
   const std::string              &program() const;
-  usize                           source_location() const;
+  const SourceLocation           &source_location() const;
 
   void close_fds();
   void print_to_stdout(const std::string &s) const;
@@ -37,14 +39,14 @@ struct ExecContext
 
 private:
   /* clang-format off */
-  ExecContext(usize location,
+  ExecContext(SourceLocation location,
               std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
               const std::vector<std::string> &args);
   /* clang-format on */
 
   std::variant<shit::Builtin::Kind, std::filesystem::path> m_kind;
 
-  usize                    m_location;
+  SourceLocation           m_location;
   std::vector<std::string> m_args;
 };
 

@@ -4,6 +4,7 @@
 #define WIN32 0b10
 #define COSMO 0b100
 
+/* clang-format off */
 /* Currently, Linux, Windows and Cosmopolitan builds are supported. */
 #if defined __linux__ || defined BSD || defined __APPLE__ ||                   \
     defined __COSMOPOLITAN__
@@ -24,6 +25,7 @@
 #include <windows.h>
 #define SHIT_SUPPORT_VECTOR (WIN32)
 #endif
+/* clang-format on */
 
 #define PLATFORM_IS(os) (SHIT_SUPPORT_VECTOR & os)
 

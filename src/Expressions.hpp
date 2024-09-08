@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Eval.hpp"
 
 #include <string>
 #include <vector>
@@ -9,56 +10,14 @@ namespace shit {
 
 struct Token;
 
-namespace tokens {
-struct ExpandableIdentifier;
-}
-
-struct EvalContext
-{
-  EvalContext(bool should_disable_path_expansion);
-
-  void add_expansion();
-  void add_evaluated_expression();
-
-  void end_command();
-
-  /* Path-expand, tilde-expand and escape. */
-  std::vector<std::string> process_args(const std::vector<const Token *> &args);
-
-  std::string make_stats_string() const;
-
-  usize last_expressions_executed() const;
-  usize total_expressions_executed() const;
-
-  usize last_expansion_count() const;
-  usize total_expansion_count() const;
-
-protected:
-  bool m_enable_path_expansion;
-
-  std::vector<std::string> expand_path_once(std::string_view r,
-                                            bool should_count_files);
-  std::vector<std::string>
-  expand_path_recurse(const std::vector<std::string> &vs);
-  std::vector<std::string> expand_path(std::string &&r);
-
-  void expand_tilde(std::string &r);
-  void erase_escapes(std::string &r);
-
-  usize m_expressions_executed_last{0};
-  usize m_expressions_executed_total{0};
-  usize m_expansions_last{0};
-  usize m_expansions_total{0};
-};
-
 struct Expression
 {
-  Expression() = default;
-  Expression(usize location);
+  Expression() = delete;
+  Expression(SourceLocation location);
 
   virtual ~Expression() = default;
 
-  usize source_location() const;
+  SourceLocation source_location() const;
   /* Expressions should override evaluate_impl() instead. This method is used
    * mainly for initialization before the actual evaluation. */
   i64 evaluate(EvalContext &cxt) const;
@@ -75,15 +34,15 @@ struct Expression
 protected:
   virtual i64 evaluate_impl(EvalContext &cxt) const = 0;
 
-  usize m_location{std::string::npos};
+  SourceLocation m_location;
 };
 
 namespace expressions {
 
 struct If : public Expression
 {
-  If(usize location, const Expression *condition, const Expression *then,
-     const Expression *otherwise);
+  If(SourceLocation location, const Expression *condition,
+     const Expression *then, const Expression *otherwise);
 
   ~If() override;
 
@@ -100,7 +59,7 @@ protected:
 
 struct DummyExpression : public Expression
 {
-  DummyExpression(usize location);
+  DummyExpression(SourceLocation location);
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -111,7 +70,7 @@ protected:
 
 struct Command : public Expression
 {
-  Command(usize location);
+  Command(SourceLocation location);
 
   void make_async();
   bool is_async() const;
@@ -125,7 +84,8 @@ protected:
 
 struct SimpleCommand : public Command
 {
-  SimpleCommand(usize location, const std::vector<const Token *> &&args);
+  SimpleCommand(SourceLocation                     location,
+                const std::vector<const Token *> &&args);
   ~SimpleCommand() override;
 
   const std::vector<const Token *> &args() const;
@@ -151,7 +111,8 @@ struct CompoundListCondition : public Expression
     Or,
   };
 
-  CompoundListCondition(usize location, Kind kind, const Command *expr);
+  CompoundListCondition(SourceLocation location, Kind kind,
+                        const Command *expr);
   ~CompoundListCondition() override;
 
   Kind kind() const;
@@ -168,8 +129,8 @@ protected:
 
 struct CompoundList : public Expression
 {
-  CompoundList(usize location);
-  CompoundList(usize                                             location,
+  CompoundList();
+  CompoundList(SourceLocation                                    location,
                const std::vector<const CompoundListCondition *> &nodes);
 
   ~CompoundList() override;
@@ -188,7 +149,8 @@ protected:
 
 struct Pipeline : public Command
 {
-  Pipeline(usize location, const std::vector<const SimpleCommand *> &commands);
+  Pipeline(SourceLocation                            location,
+           const std::vector<const SimpleCommand *> &commands);
   ~Pipeline() override;
 
   std::string to_string() const override;
@@ -205,7 +167,7 @@ protected:
 
 struct UnaryExpression : public Expression
 {
-  UnaryExpression(usize location, const Expression *rhs);
+  UnaryExpression(SourceLocation location, const Expression *rhs);
   ~UnaryExpression() override;
 
   std::string to_ast_string(usize layer = 0) const override;
@@ -216,7 +178,7 @@ protected:
 
 struct BinaryExpression : public Expression
 {
-  BinaryExpression(usize location, const Expression *lhs,
+  BinaryExpression(SourceLocation location, const Expression *lhs,
                    const Expression *rhs);
   ~BinaryExpression() override;
 
@@ -229,7 +191,7 @@ protected:
 
 struct ConstantNumber : public Expression
 {
-  ConstantNumber(usize location, i64 value);
+  ConstantNumber(SourceLocation location, i64 value);
   ~ConstantNumber() override;
 
   std::string to_ast_string(usize layer = 0) const override;
@@ -243,7 +205,7 @@ protected:
 
 struct ConstantString : public Expression
 {
-  ConstantString(usize location, const std::string &value);
+  ConstantString(SourceLocation location, const std::string &value);
   ~ConstantString() override;
 
   std::string to_ast_string(usize layer = 0) const override;
@@ -257,7 +219,7 @@ protected:
 
 struct Negate : public UnaryExpression
 {
-  Negate(usize location, const Expression *rhs);
+  Negate(SourceLocation location, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -267,7 +229,7 @@ protected:
 
 struct Unnegate : public UnaryExpression
 {
-  Unnegate(usize location, const Expression *rhs);
+  Unnegate(SourceLocation location, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -277,7 +239,7 @@ protected:
 
 struct LogicalNot : public UnaryExpression
 {
-  LogicalNot(usize location, const Expression *rhs);
+  LogicalNot(SourceLocation location, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -287,7 +249,7 @@ protected:
 
 struct BinaryComplement : public UnaryExpression
 {
-  BinaryComplement(usize location, const Expression *rhs);
+  BinaryComplement(SourceLocation location, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -297,7 +259,7 @@ protected:
 
 struct Add : public BinaryExpression
 {
-  Add(usize location, const Expression *lhs, const Expression *rhs);
+  Add(SourceLocation location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -307,7 +269,8 @@ protected:
 
 struct Subtract : public BinaryExpression
 {
-  Subtract(usize location, const Expression *lhs, const Expression *rhs);
+  Subtract(SourceLocation location, const Expression *lhs,
+           const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -317,7 +280,8 @@ protected:
 
 struct Multiply : public BinaryExpression
 {
-  Multiply(usize location, const Expression *lhs, const Expression *rhs);
+  Multiply(SourceLocation location, const Expression *lhs,
+           const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -327,7 +291,7 @@ protected:
 
 struct Divide : public BinaryExpression
 {
-  Divide(usize location, const Expression *lhs, const Expression *rhs);
+  Divide(SourceLocation location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -337,7 +301,7 @@ protected:
 
 struct Module : public BinaryExpression
 {
-  Module(usize location, const Expression *lhs, const Expression *rhs);
+  Module(SourceLocation location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -347,7 +311,8 @@ protected:
 
 struct BinaryAnd : public BinaryExpression
 {
-  BinaryAnd(usize location, const Expression *lhs, const Expression *rhs);
+  BinaryAnd(SourceLocation location, const Expression *lhs,
+            const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -357,7 +322,8 @@ protected:
 
 struct LogicalAnd : public BinaryExpression
 {
-  LogicalAnd(usize location, const Expression *lhs, const Expression *rhs);
+  LogicalAnd(SourceLocation location, const Expression *lhs,
+             const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -367,7 +333,8 @@ protected:
 
 struct GreaterThan : public BinaryExpression
 {
-  GreaterThan(usize location, const Expression *lhs, const Expression *rhs);
+  GreaterThan(SourceLocation location, const Expression *lhs,
+              const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -377,7 +344,8 @@ protected:
 
 struct GreaterOrEqual : public BinaryExpression
 {
-  GreaterOrEqual(usize location, const Expression *lhs, const Expression *rhs);
+  GreaterOrEqual(SourceLocation location, const Expression *lhs,
+                 const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -387,7 +355,8 @@ protected:
 
 struct RightShift : public BinaryExpression
 {
-  RightShift(usize location, const Expression *lhs, const Expression *rhs);
+  RightShift(SourceLocation location, const Expression *lhs,
+             const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -397,7 +366,8 @@ protected:
 
 struct LessThan : public BinaryExpression
 {
-  LessThan(usize location, const Expression *lhs, const Expression *rhs);
+  LessThan(SourceLocation location, const Expression *lhs,
+           const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -407,7 +377,8 @@ protected:
 
 struct LessOrEqual : public BinaryExpression
 {
-  LessOrEqual(usize location, const Expression *lhs, const Expression *rhs);
+  LessOrEqual(SourceLocation location, const Expression *lhs,
+              const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -417,7 +388,8 @@ protected:
 
 struct LeftShift : public BinaryExpression
 {
-  LeftShift(usize location, const Expression *lhs, const Expression *rhs);
+  LeftShift(SourceLocation location, const Expression *lhs,
+            const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -427,7 +399,8 @@ protected:
 
 struct BinaryOr : public BinaryExpression
 {
-  BinaryOr(usize location, const Expression *lhs, const Expression *rhs);
+  BinaryOr(SourceLocation location, const Expression *lhs,
+           const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -437,7 +410,8 @@ protected:
 
 struct LogicalOr : public BinaryExpression
 {
-  LogicalOr(usize location, const Expression *lhs, const Expression *rhs);
+  LogicalOr(SourceLocation location, const Expression *lhs,
+            const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -447,7 +421,7 @@ protected:
 
 struct Xor : public BinaryExpression
 {
-  Xor(usize location, const Expression *lhs, const Expression *rhs);
+  Xor(SourceLocation location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -457,7 +431,7 @@ protected:
 
 struct Equal : public BinaryExpression
 {
-  Equal(usize location, const Expression *lhs, const Expression *rhs);
+  Equal(SourceLocation location, const Expression *lhs, const Expression *rhs);
 
   std::string to_string() const override;
 
@@ -467,7 +441,8 @@ protected:
 
 struct NotEqual : public BinaryExpression
 {
-  NotEqual(usize location, const Expression *lhs, const Expression *rhs);
+  NotEqual(SourceLocation location, const Expression *lhs,
+           const Expression *rhs);
 
   std::string to_string() const override;
 

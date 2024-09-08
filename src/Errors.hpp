@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Eval.hpp"
 
 #include <string>
 
@@ -43,27 +44,28 @@ struct ErrorWithLocation : public ErrorBase
 {
   ErrorWithLocation();
 
-  ErrorWithLocation(usize location, const std::string &message);
+  ErrorWithLocation(SourceLocation location, const std::string &message);
 
   virtual std::string to_string(std::string_view source);
 
 protected:
-  usize m_location{0};
+  SourceLocation m_location;
 };
 
 struct ErrorWithLocationAndDetails : public ErrorWithLocation
 {
   ErrorWithLocationAndDetails();
 
-  ErrorWithLocationAndDetails(usize location, const std::string &message,
-                              usize              details_location,
+  ErrorWithLocationAndDetails(SourceLocation     location,
+                              const std::string &message,
+                              SourceLocation     details_location,
                               const std::string &details_message);
 
   std::string details_to_string(std::string_view source);
 
 protected:
-  usize       m_details_location{0};
-  std::string m_details_message;
+  SourceLocation m_details_location;
+  std::string    m_details_message;
 };
 
 } /* namespace shit */

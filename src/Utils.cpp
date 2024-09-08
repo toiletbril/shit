@@ -25,13 +25,13 @@ namespace utils {
 
 /* clang-format off */
 ExecContext::ExecContext(
-    usize location, std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
+    SourceLocation location, std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
     const std::vector<std::string> &args)
     : m_kind(kind), m_location(location), m_args(args)
 {}
 /* clang-format on */
 
-usize
+const SourceLocation &
 ExecContext::source_location() const
 {
   return m_location;
@@ -96,7 +96,8 @@ ExecContext::print_to_stdout(const std::string &s) const
 }
 
 ExecContext
-ExecContext::make(usize location, const std::vector<std::string> &args)
+ExecContext::make_from(SourceLocation                  location,
+                       const std::vector<std::string> &args)
 {
   SHIT_ASSERT(args.size() > 0);
 

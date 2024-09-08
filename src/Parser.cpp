@@ -45,7 +45,7 @@ Parser::parse_compound_command()
   std::unique_ptr<expressions::Command> lhs{};
   /* Sequence right at the start. */
   std::unique_ptr<expressions::CompoundList> sequence =
-      std::make_unique<expressions::CompoundList>(0);
+      std::make_unique<expressions::CompoundList>();
 
   bool should_parse_command = true;
 
@@ -120,7 +120,7 @@ Parser::parse_compound_command()
 
       std::vector<const expressions::SimpleCommand *> pipe_group = {
           static_cast<expressions::SimpleCommand *>(lhs.get())};
-      usize pipe_group_location = token->source_location();
+      SourceLocation pipe_group_location = token->source_location();
 
       std::unique_ptr<Token> last_pipe_token = std::move(token);
 
@@ -166,7 +166,7 @@ Parser::parse_compound_command()
 std::unique_ptr<expressions::SimpleCommand>
 Parser::parse_simple_command()
 {
-  std::optional<usize>                source_location;
+  std::optional<SourceLocation>       source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
 
   for (;;) {
@@ -288,7 +288,7 @@ Parser::parse_expression(u8 min_precedence)
     if (after->kind() != Token::Kind::Fi) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated If condition",
-          after->source_location(), "Expected 'Fi' here"};
+          after->source_location(), "expected 'Fi' here"};
     }
 
     m_if_condition_depth--;
@@ -315,7 +315,7 @@ Parser::parse_expression(u8 min_precedence)
     if (rp->kind() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated parenthesis",
-          rp->source_location(), "Expected a closing parenthesis here"};
+          rp->source_location(), "expected a closing parenthesis here"};
     }
   } break;
 

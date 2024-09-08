@@ -172,11 +172,16 @@ Lexer::lex_expression_token()
     } else if (lexer::is_part_of_identifier(ch)) {
       return lex_identifier();
     } else {
-      throw ErrorWithLocation{m_cursor_position, "Unexpected character"};
+      throw ErrorWithLocation{
+          {m_cursor_position, 1},
+          "Unexpected character"
+      };
     }
   }
 
-  return new tokens::EndOfFile{m_cursor_position};
+  return new tokens::EndOfFile{
+      {m_cursor_position, 1}
+  };
 }
 
 Token *
@@ -188,11 +193,16 @@ Lexer::lex_shell_token()
     } else if (lexer::is_part_of_identifier(ch)) {
       return lex_identifier();
     } else {
-      throw ErrorWithLocation{m_cursor_position, "Unexpected character"};
+      throw ErrorWithLocation{
+          {m_cursor_position, 1},
+          "unexpected character"
+      };
     }
   }
 
-  return new tokens::EndOfFile{m_cursor_position};
+  return new tokens::EndOfFile{
+      {m_cursor_position, 1}
+  };
 }
 
 void
@@ -235,7 +245,10 @@ Lexer::lex_number()
     length++;
   }
 
-  Token *num = new tokens::Number{m_cursor_position, n};
+  Token *num = new tokens::Number{
+      {m_cursor_position, length},
+      n
+  };
   m_cached_offset = length;
 
   return num;
@@ -297,9 +310,12 @@ Lexer::lex_identifier()
 
   if (quote_char) {
     throw ErrorWithLocationAndDetails{
-        last_quote_char_pos, "Unterminated string literal",
-        m_cursor_position + length,
-        "Expected a " + std::string{*quote_char} + " here"};
+        {last_quote_char_pos, length},
+        "Unterminated string literal",
+        {m_cursor_position + length, 1},
+        "expected a " + std::string{*quote_char}
+        + " here"
+    };
   }
 
   Token *t{};
@@ -309,19 +325,39 @@ Lexer::lex_identifier()
       kw != KEYWORDS.end())
   {
     switch (kw->second) {
-      /* clang-format off */
-    case Token::Kind::If:   t = new tokens::If{m_cursor_position}; break;
-    case Token::Kind::Then: t = new tokens::Then{m_cursor_position}; break;
-    case Token::Kind::Else: t = new tokens::Else{m_cursor_position}; break;
-    case Token::Kind::Fi:   t = new tokens::Fi{m_cursor_position}; break;
-      /* clang-format on */
+    case Token::Kind::If:
+      t = new tokens::If{
+          {m_cursor_position, length}
+      };
+      break;
+    case Token::Kind::Then:
+      t = new tokens::Then{
+          {m_cursor_position, length}
+      };
+      break;
+    case Token::Kind::Else:
+      t = new tokens::Else{
+          {m_cursor_position, length}
+      };
+      break;
+    case Token::Kind::Fi:
+      t = new tokens::Fi{
+          {m_cursor_position, length}
+      };
+      break;
     default:
-      SHIT_UNREACHABLE("Unhandled keyword of type %d", SHIT_ENUM(kw->second));
+      SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(kw->second));
     }
   } else if (!is_expandable) {
-    t = new tokens::Identifier{m_cursor_position, id};
+    t = new tokens::Identifier{
+        {m_cursor_position, length},
+        id
+    };
   } else {
-    t = new tokens::ExpandableIdentifier{m_cursor_position, id};
+    t = new tokens::ExpandableIdentifier{
+        {m_cursor_position, length},
+        id
+    };
   }
 
   m_cached_offset = length;
@@ -331,6 +367,7 @@ Lexer::lex_identifier()
 
 /* Only single-character operators are defined here. Further parsing is done in
  * related routines. */
+/* clang-format off */
 static const std::unordered_map<char, Token::Kind> OPERATORS = {
     /* Sentinels */
     {')',  Token::Kind::RightParen        },
@@ -359,6 +396,7 @@ static const std::unordered_map<char, Token::Kind> OPERATORS = {
     {'|',  Token::Kind::Pipe              },
     {'=',  Token::Kind::Equals            },
 };
+/* clang-format on */
 
 Token *
 Lexer::lex_sentinel()
@@ -370,112 +408,205 @@ Lexer::lex_sentinel()
 
   if (auto op = OPERATORS.find(ch); op != OPERATORS.end()) {
     switch (op->second) {
-      /* clang-format off */
-    case Token::Kind::RightParen:   t = new tokens::RightParen{m_cursor_position}; break;
-    case Token::Kind::LeftParen:    t = new tokens::LeftParen{m_cursor_position}; break;
-    case Token::Kind::RightBracket: t = new tokens::RightBracket{m_cursor_position}; break;
-    case Token::Kind::LeftBracket:  t = new tokens::LeftBracket{m_cursor_position}; break;
+    case Token::Kind::RightParen:
+      t = new tokens::RightParen{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::LeftParen:
+      t = new tokens::LeftParen{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::RightBracket:
+      t = new tokens::RightBracket{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::LeftBracket:
+      t = new tokens::LeftBracket{
+          {m_cursor_position, 1}
+      };
+      break;
 
-    case Token::Kind::Semicolon:    t = new tokens::Semicolon{m_cursor_position}; break;
-    case Token::Kind::Dot:          t = new tokens::Dot{m_cursor_position}; break;
-    case Token::Kind::Newline:      t = new tokens::Newline{m_cursor_position}; break;
+    case Token::Kind::Semicolon:
+      t = new tokens::Semicolon{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Dot:
+      t = new tokens::Dot{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Newline:
+      t = new tokens::Newline{
+          {m_cursor_position, 1}
+      };
+      break;
 
-    case Token::Kind::Plus:         t = new tokens::Plus{m_cursor_position}; break;
-    case Token::Kind::Minus:        t = new tokens::Minus{m_cursor_position}; break;
-    case Token::Kind::Asterisk:     t = new tokens::Asterisk{m_cursor_position}; break;
-    case Token::Kind::Slash:        t = new tokens::Slash{m_cursor_position}; break;
-    case Token::Kind::Percent:      t = new tokens::Percent{m_cursor_position}; break;
-    case Token::Kind::Tilde:        t = new tokens::Tilde{m_cursor_position}; break;
-    case Token::Kind::Cap:          t = new tokens::Cap{m_cursor_position}; break;
-      /* clang-format on */
+    case Token::Kind::Plus:
+      t = new tokens::Plus{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Minus:
+      t = new tokens::Minus{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Asterisk:
+      t = new tokens::Asterisk{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Slash:
+      t = new tokens::Slash{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Percent:
+      t = new tokens::Percent{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Tilde:
+      t = new tokens::Tilde{
+          {m_cursor_position, 1}
+      };
+      break;
+    case Token::Kind::Cap:
+      t = new tokens::Cap{
+          {m_cursor_position, 1}
+      };
+      break;
 
     case Token::Kind::RightSquareBracket: {
       if (chop_character(1) == ']') {
-        t = new tokens::DoubleRightSquareBracket{m_cursor_position};
+        t = new tokens::DoubleRightSquareBracket{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::RightSquareBracket{m_cursor_position};
+        t = new tokens::RightSquareBracket{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     case Token::Kind::LeftSquareBracket: {
       if (chop_character(1) == '[') {
-        t = new tokens::DoubleLeftSquareBracket{m_cursor_position};
+        t = new tokens::DoubleLeftSquareBracket{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::LeftSquareBracket{m_cursor_position};
+        t = new tokens::LeftSquareBracket{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     case Token::Kind::ExclamationMark: {
       if (chop_character(1) == '=') {
-        t = new tokens::ExclamationEquals{m_cursor_position};
+        t = new tokens::ExclamationEquals{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::ExclamationMark{m_cursor_position};
+        t = new tokens::ExclamationMark{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     case Token::Kind::Ampersand: {
       if (chop_character(1) == '&') {
-        t = new tokens::DoubleAmpersand{m_cursor_position};
+        t = new tokens::DoubleAmpersand{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::Ampersand{m_cursor_position};
+        t = new tokens::Ampersand{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     case Token::Kind::Greater: {
       if (chop_character(1) == '>') {
-        t = new tokens::DoubleGreater{m_cursor_position};
+        t = new tokens::DoubleGreater{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else if (chop_character(1) == '=') {
-        t = new tokens::GreaterEquals{m_cursor_position};
+        t = new tokens::GreaterEquals{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::Greater{m_cursor_position};
+        t = new tokens::Greater{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     case Token::Kind::Less: {
       if (chop_character(1) == '<') {
-        t = new tokens::DoubleLess{m_cursor_position};
+        t = new tokens::DoubleLess{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else if (chop_character(1) == '=') {
-        t = new tokens::LessEquals{m_cursor_position};
+        t = new tokens::LessEquals{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::Less{m_cursor_position};
+        t = new tokens::Less{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     case Token::Kind::Pipe: {
       if (chop_character(1) == '|') {
-        t = new tokens::DoublePipe{m_cursor_position};
+        t = new tokens::DoublePipe{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::Pipe{m_cursor_position};
+        t = new tokens::Pipe{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     case Token::Kind::Equals: {
       if (chop_character(1) == '=') {
-        t = new tokens::DoubleEquals{m_cursor_position};
+        t = new tokens::DoubleEquals{
+            {m_cursor_position, 2}
+        };
         extra_length++;
       } else {
-        t = new tokens::Equals{m_cursor_position};
+        t = new tokens::Equals{
+            {m_cursor_position, 1}
+        };
       }
     } break;
 
     default:
-      SHIT_UNREACHABLE("Unhandled operator of type %d", SHIT_ENUM(op->second));
+      SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(op->second));
     }
   } else {
     std::string s{};
-    s += "Unknown operator '";
+    s += "unknown operator '";
     s += ch;
     s += "'";
-    throw ErrorWithLocation{m_cursor_position, s};
+    throw ErrorWithLocation{
+        {m_cursor_position, extra_length},
+        s
+    };
   }
 
   m_cached_offset = 1 + extra_length;

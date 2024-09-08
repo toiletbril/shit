@@ -88,6 +88,7 @@ struct Token
     /* clang-format on */
   };
 
+  Token() = delete;
   virtual ~Token() = default;
 
   /* Each token should provide it's own way to copy it. */
@@ -102,13 +103,13 @@ struct Token
 
   virtual std::string to_ast_string() const;
 
-  usize source_location() const;
+  SourceLocation source_location() const;
 
 protected:
-  Token(usize location);
+  Token(SourceLocation location);
 
 private:
-  usize m_location;
+  SourceLocation m_location;
 };
 
 const std::unordered_map<std::string, Token::Kind> KEYWORDS = {
@@ -122,7 +123,7 @@ namespace tokens {
 
 struct If : public Token
 {
-  If(usize location);
+  If(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -131,7 +132,7 @@ struct If : public Token
 
 struct Fi : public Token
 {
-  Fi(usize location);
+  Fi(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -140,7 +141,7 @@ struct Fi : public Token
 
 struct Else : public Token
 {
-  Else(usize location);
+  Else(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -149,7 +150,7 @@ struct Else : public Token
 
 struct Then : public Token
 {
-  Then(usize location);
+  Then(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -158,7 +159,7 @@ struct Then : public Token
 
 struct EndOfFile : public Token
 {
-  EndOfFile(usize location);
+  EndOfFile(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -167,7 +168,7 @@ struct EndOfFile : public Token
 
 struct Newline : public Token
 {
-  Newline(usize location);
+  Newline(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -176,7 +177,7 @@ struct Newline : public Token
 
 struct Semicolon : public Token
 {
-  Semicolon(usize location);
+  Semicolon(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -185,7 +186,7 @@ struct Semicolon : public Token
 
 struct Dot : public Token
 {
-  Dot(usize location);
+  Dot(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -194,7 +195,7 @@ struct Dot : public Token
 
 struct LeftParen : public Token
 {
-  LeftParen(usize location);
+  LeftParen(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -203,7 +204,7 @@ struct LeftParen : public Token
 
 struct RightParen : public Token
 {
-  RightParen(usize location);
+  RightParen(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -212,7 +213,7 @@ struct RightParen : public Token
 
 struct LeftSquareBracket : public Token
 {
-  LeftSquareBracket(usize location);
+  LeftSquareBracket(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -221,7 +222,7 @@ struct LeftSquareBracket : public Token
 
 struct RightSquareBracket : public Token
 {
-  RightSquareBracket(usize location);
+  RightSquareBracket(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -230,7 +231,7 @@ struct RightSquareBracket : public Token
 
 struct DoubleLeftSquareBracket : public Token
 {
-  DoubleLeftSquareBracket(usize location);
+  DoubleLeftSquareBracket(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -239,7 +240,7 @@ struct DoubleLeftSquareBracket : public Token
 
 struct DoubleRightSquareBracket : public Token
 {
-  DoubleRightSquareBracket(usize location);
+  DoubleRightSquareBracket(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -248,7 +249,7 @@ struct DoubleRightSquareBracket : public Token
 
 struct RightBracket : public Token
 {
-  RightBracket(usize location);
+  RightBracket(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -257,7 +258,7 @@ struct RightBracket : public Token
 
 struct LeftBracket : public Token
 {
-  LeftBracket(usize location);
+  LeftBracket(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -269,7 +270,7 @@ struct LeftBracket : public Token
  */
 struct Value : public Token
 {
-  Value(usize location, std::string_view sv);
+  Value(SourceLocation location, std::string_view sv);
 
   std::string raw_string() const override;
 
@@ -279,7 +280,7 @@ protected:
 
 struct Number : public Value
 {
-  Number(usize location, std::string_view sv);
+  Number(SourceLocation location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
@@ -287,7 +288,7 @@ struct Number : public Value
 
 struct String : public Value
 {
-  String(usize location, char quote_char, std::string_view sv);
+  String(SourceLocation location, char quote_char, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
@@ -300,7 +301,7 @@ protected:
 
 struct ExpandableIdentifier : public Value
 {
-  ExpandableIdentifier(usize location, std::string_view sv);
+  ExpandableIdentifier(SourceLocation location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
@@ -308,7 +309,7 @@ struct ExpandableIdentifier : public Value
 
 struct Identifier : Value
 {
-  Identifier(usize location, std::string_view sv);
+  Identifier(SourceLocation location, std::string_view sv);
 
   Kind  kind() const override;
   Flags flags() const override;
@@ -316,7 +317,7 @@ struct Identifier : Value
 
 struct Redirection : Token
 {
-  Redirection(usize location, std::string_view what_fd,
+  Redirection(SourceLocation location, std::string_view what_fd,
               std::string_view to_file);
 
   Kind  kind() const override;
@@ -335,7 +336,7 @@ protected:
  */
 struct Operator : public Token
 {
-  Operator(usize location);
+  Operator(SourceLocation location);
 
   virtual bool binary_left_associative() const;
 
@@ -351,7 +352,7 @@ struct Operator : public Token
 
 struct Plus : Operator
 {
-  Plus(usize location);
+  Plus(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -369,7 +370,7 @@ struct Plus : Operator
 
 struct Minus : Operator
 {
-  Minus(usize location);
+  Minus(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -387,7 +388,7 @@ struct Minus : Operator
 
 struct Slash : Operator
 {
-  Slash(usize location);
+  Slash(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -401,7 +402,7 @@ struct Slash : Operator
 
 struct Asterisk : Operator
 {
-  Asterisk(usize location);
+  Asterisk(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -415,7 +416,7 @@ struct Asterisk : Operator
 
 struct Percent : Operator
 {
-  Percent(usize location);
+  Percent(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -429,7 +430,7 @@ struct Percent : Operator
 
 struct Tilde : Operator
 {
-  Tilde(usize location);
+  Tilde(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -442,7 +443,7 @@ struct Tilde : Operator
 
 struct ExclamationMark : Operator
 {
-  ExclamationMark(usize location);
+  ExclamationMark(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -455,7 +456,7 @@ struct ExclamationMark : Operator
 
 struct Ampersand : Operator
 {
-  Ampersand(usize location);
+  Ampersand(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -469,7 +470,7 @@ struct Ampersand : Operator
 
 struct DoubleAmpersand : Operator
 {
-  DoubleAmpersand(usize location);
+  DoubleAmpersand(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -483,7 +484,7 @@ struct DoubleAmpersand : Operator
 
 struct Greater : Operator
 {
-  Greater(usize location);
+  Greater(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -497,7 +498,7 @@ struct Greater : Operator
 
 struct DoubleGreater : Operator
 {
-  DoubleGreater(usize location);
+  DoubleGreater(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -511,7 +512,7 @@ struct DoubleGreater : Operator
 
 struct GreaterEquals : Operator
 {
-  GreaterEquals(usize location);
+  GreaterEquals(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -525,7 +526,7 @@ struct GreaterEquals : Operator
 
 struct Less : Operator
 {
-  Less(usize location);
+  Less(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -539,7 +540,7 @@ struct Less : Operator
 
 struct DoubleLess : Operator
 {
-  DoubleLess(usize location);
+  DoubleLess(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -553,7 +554,7 @@ struct DoubleLess : Operator
 
 struct LessEquals : Operator
 {
-  LessEquals(usize location);
+  LessEquals(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -567,7 +568,7 @@ struct LessEquals : Operator
 
 struct Pipe : Operator
 {
-  Pipe(usize location);
+  Pipe(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -581,7 +582,7 @@ struct Pipe : Operator
 
 struct DoublePipe : Operator
 {
-  DoublePipe(usize location);
+  DoublePipe(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -595,7 +596,7 @@ struct DoublePipe : Operator
 
 struct Cap : Operator
 {
-  Cap(usize location);
+  Cap(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -609,7 +610,7 @@ struct Cap : Operator
 
 struct Equals : Operator
 {
-  Equals(usize location);
+  Equals(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -623,7 +624,7 @@ struct Equals : Operator
 
 struct DoubleEquals : Operator
 {
-  DoubleEquals(usize location);
+  DoubleEquals(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -637,7 +638,7 @@ struct DoubleEquals : Operator
 
 struct ExclamationEquals : Operator
 {
-  ExclamationEquals(usize location);
+  ExclamationEquals(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;

@@ -112,3 +112,8 @@ struct t__exit_scope_help
 
 /* The length of statically allocated array. */
 #define countof(arr) (sizeof(arr) / sizeof(*(arr)))
+
+namespace shit {
+constexpr const char *EXPRESSION_AST_INDENT = " ";
+constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";
+} /* namespace shit */
