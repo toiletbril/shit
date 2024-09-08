@@ -43,6 +43,7 @@ CXXFLAGS := \
 	-Wdouble-promotion \
 	-Wno-format \
 	-Werror \
+	-Wno-unused-command-line-argument \
 	-Wno-deprecated \
 	-std=c++17 \
 	$(DEFINES) \

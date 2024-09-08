@@ -83,10 +83,12 @@ get_context_pointing_to(std::string_view source, SourceLocation location,
 
   msg += context;
 
-  /* Did we cut the end? */
   msg += '\n';
-  for (usize i = 0; i < start_offset + added_symbols; i++) {
-    msg += ' ';
+  msg += "       |  "; /* 10 chars */
+  if (start_offset + added_symbols > 10) {
+    for (usize i = 0; i < start_offset + added_symbols - 10; i++) {
+      msg += ' ';
+    }
   }
 
   msg += "^~";
