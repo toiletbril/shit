@@ -289,6 +289,8 @@ set_default_signal_handlers()
 
 #elif PLATFORM_IS(WIN32)
 
+#include <io.h>
+
 namespace shit {
 
 namespace os {
@@ -351,7 +353,7 @@ is_child_process()
 bool
 is_stdin_a_tty()
 {
-  return _isatty(SHIT_STDIN);
+  return _isatty(_fileno(stdin));
 }
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;

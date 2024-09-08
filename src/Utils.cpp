@@ -197,6 +197,31 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
   return ret;
 }
 
+void
+string_replace(std::string &s, const std::string_view to_replace,
+               const std::string_view replace_with)
+{
+  std::string b{};
+  b.reserve(s.size());
+
+  std::size_t i{0};
+  std::size_t p{0};
+
+  for (;;) {
+    p = i;
+    i = s.find(to_replace, i);
+    if (i == std::string::npos) {
+      break;
+    }
+    b.append(s, p, i - p);
+    b += replace_with;
+    i += to_replace.size();
+  }
+
+  b.append(s, p, s.size() - p);
+  s.swap(b);
+}
+
 std::string
 lowercase_string(std::string_view s)
 {

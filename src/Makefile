@@ -44,10 +44,12 @@ CXXFLAGS := \
 	-Werror \
 	-Wno-deprecated \
 	-std=c++17 \
-	$(DEFINES)
+	$(DEFINES) \
+	$(CFLAGS)
 
 ifeq ($(MODE), rel)
 CXXFLAGS += \
+	-s \
 	-DNDEBUG \
 	-O3
 else ifeq ($(MODE), dbg)

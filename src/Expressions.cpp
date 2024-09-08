@@ -251,7 +251,14 @@ EvalContext::expand_tilde(std::string &p)
       throw Error{"Could not figure out home directory"};
     }
 
-    p.insert(0, u->string());
+    std::string s{u->string()};
+
+#if PLATFORM_IS(WIN32)
+    /* FIXME: Double-escape the bullshit path delimiters. */
+    utils::string_replace(s, "\\", "\\\\");
+#endif
+
+    p.insert(0, s);
   }
 }
 

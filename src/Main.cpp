@@ -114,7 +114,8 @@ main(int argc, char **argv)
   bool should_be_interactive =
       (!should_execute_commands && FLAG_INTERACTIVE.is_enabled()) ||
       (!should_read_files && shit::os::is_stdin_a_tty());
-  bool should_read_stdin = !should_be_interactive || FLAG_STDIN.is_enabled();
+  bool should_read_stdin =
+      (!should_be_interactive && !should_read_files) || FLAG_STDIN.is_enabled();
 
   if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
       FLAG_VERBOSE.is_enabled() || FLAG_EXPAND_VERBOSE.is_enabled())

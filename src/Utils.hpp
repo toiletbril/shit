@@ -64,6 +64,9 @@ i32 execute_context(ExecContext &&ec, bool is_async);
 
 i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async);
 
+void string_replace(std::string &s, std::string_view to_replace,
+                    std::string_view replace_with);
+
 std::string lowercase_string(std::string_view s);
 
 std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
