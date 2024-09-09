@@ -41,6 +41,12 @@ EvalContext::end_command()
   m_expressions_executed_last = 0;
 }
 
+void
+EvalContext::steal_escape_map(const EscapeMap &&em)
+{
+  m_escape_map = em;
+}
+
 std::string
 EvalContext::make_stats_string() const
 {
@@ -350,6 +356,28 @@ usize
 SourceLocation::length() const
 {
   return m_length;
+}
+
+EscapeMap::EscapeMap()
+  : m_bitmap()
+{}
+
+void
+EscapeMap::add_escape(usize position)
+{
+  if (m_bitmap.size() * 8 <= position) {
+    m_bitmap.reserve(position / 8 + 1);
+  }
+  m_bitmap[position / 8] |= (1 << (position % 8));
+}
+
+bool
+EscapeMap::is_escaped(usize position) const
+{
+  if (m_bitmap.size() * 8 <= position) {
+    return false;
+  }
+  return m_bitmap[position / 8] & (1 << (position % 8));
 }
 
 } /* namespace shit */

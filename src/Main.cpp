@@ -279,7 +279,9 @@ main(int argc, char **argv)
         std::cout << ast->to_ast_string() << std::endl;
       }
 
+      context.steal_escape_map(std::move(p.escape_map()));
       exit_code = ast->evaluate(context);
+
       if (FLAG_EXIT_CODE.is_enabled()) {
         std::cout << "[Code " << exit_code << "]" << std::endl;
       }

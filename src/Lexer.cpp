@@ -153,6 +153,12 @@ Lexer::source() const
   return m_source;
 }
 
+EscapeMap &
+Lexer::escape_map()
+{
+  return m_escape_map;
+}
+
 usize
 Lexer::advance_past_last_peek()
 {
@@ -259,11 +265,13 @@ Token *
 Lexer::lex_identifier()
 {
   char        ch;
-  std::string id{};
+  std::string ident_string{};
 
   usize length = 0;
+
   bool  is_expandable = false;
   bool  should_escape = false;
+  bool  should_append = false;
 
   std::optional<char> quote_char{};
   usize               last_quote_char_pos = m_cursor_position;
@@ -272,6 +280,8 @@ Lexer::lex_identifier()
   while (lexer::is_part_of_identifier((ch = chop_character(length))) ||
          ((quote_char || should_escape) && ch != lexer::CEOF))
   {
+    should_append = true;
+
     bool is_escape = (ch == '\\');
     bool is_dollar = (ch == '$');
 
@@ -280,15 +290,18 @@ Lexer::lex_identifier()
     if (lexer::is_expandable_char(ch)) {
       /* Escape all expandable chars inside quotes. */
       if (quote_char) {
-        id += '\\';
+        m_escape_map.add_escape(m_cursor_position + length);
+        should_append = false;
+      } else {
+        is_expandable = true;
       }
-
-      is_expandable = true;
-    }
-
-    /* Single quotes ignore escapes/variables. */
-    if ((is_escape || is_dollar) && is_in_single_quotes) {
-      id += '\\';
+    } else if ((is_escape || is_dollar) && is_in_single_quotes) {
+      /* Single quotes ignore escapes/variables. */
+      m_escape_map.add_escape(m_cursor_position + length);
+      should_append = false;
+    } else if (is_escape) {
+      m_escape_map.add_escape(m_cursor_position + length);
+      should_append = false;
     }
 
     length++;
@@ -304,7 +317,10 @@ Lexer::lex_identifier()
       }
     }
 
-    id += ch;
+    if (should_append) {
+      ident_string += ch;
+    }
+
     should_escape = is_escape && !is_in_single_quotes;
   }
 
@@ -321,7 +337,7 @@ Lexer::lex_identifier()
   Token *t{};
 
   /* An identifier may be a keyword. */
-  if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(id));
+  if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(ident_string));
       kw != KEYWORDS.end())
   {
     switch (kw->second) {
@@ -351,12 +367,12 @@ Lexer::lex_identifier()
   } else if (!is_expandable) {
     t = new tokens::Identifier{
         {m_cursor_position, length},
-        id
+        ident_string
     };
   } else {
     t = new tokens::ExpandableIdentifier{
         {m_cursor_position, length},
-        id
+        ident_string
     };
   }
 

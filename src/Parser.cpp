@@ -33,6 +33,12 @@ Parser::Parser(Lexer &&lexer) : m_lexer(lexer) {}
 
 Parser::~Parser() = default;
 
+EscapeMap &
+Parser::escape_map()
+{
+  return m_lexer.escape_map();
+}
+
 std::unique_ptr<Expression>
 Parser::construct_ast()
 {

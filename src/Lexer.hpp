@@ -34,12 +34,14 @@ struct Lexer
   [[nodiscard]] Token *next_shell_token();
 
   std::string_view source() const;
+  EscapeMap       &escape_map();
   usize            advance_past_last_peek();
 
 protected:
   std::string m_source{};
   usize       m_cursor_position{0};
   usize       m_cached_offset{0};
+  EscapeMap   m_escape_map{};
 
   Token *lex_expression_token();
   Token *lex_shell_token();
