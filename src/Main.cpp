@@ -201,6 +201,7 @@ main(int argc, char **argv)
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();
           toiletline::initialize();
+          shit::show_message("Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
            * previosly! */

@@ -372,10 +372,6 @@ glob_matches(std::string_view glob, std::string_view str)
 [[noreturn]] void
 quit(i32 code, bool should_goodbye)
 {
-  if (should_goodbye) {
-    show_message("Goodbye.");
-  }
-
   /* Cleanup for main proccess. */
   if (!os::is_child_process()) {
     if (toiletline::is_active()) {
@@ -386,6 +382,10 @@ quit(i32 code, bool should_goodbye)
         show_message(e.to_string());
       }
     }
+  }
+
+  if (should_goodbye) {
+    show_message("Goodbye :c");
   }
 
   std::exit(code);
