@@ -73,6 +73,7 @@ struct Token
     Exit,
     Elif,
     When,
+    While,
     Case,
     For,
     Done,
@@ -121,274 +122,90 @@ private:
   SourceLocation m_location;
 };
 
+const std::unordered_map<std::string, Token::Kind> KEYWORDS = {
+    {"if",       Token::Kind::If      },
+    {"then",     Token::Kind::Then    },
+    {"else",     Token::Kind::Else    },
+    {"elif",     Token::Kind::Elif    },
+    {"fi",       Token::Kind::Fi      },
+    {"when",     Token::Kind::When    },
+    {"case",     Token::Kind::Case    },
+    {"esac",     Token::Kind::Esac    },
+    {"while",    Token::Kind::While   },
+    {"for",      Token::Kind::For     },
+    {"done",     Token::Kind::Done    },
+    {"until",    Token::Kind::Until   },
+    {"time",     Token::Kind::Time    },
+    {"do",       Token::Kind::Do      },
+    {"function", Token::Kind::Function},
+};
+
+/* clang-format off */
+#define KW_CASE(k)                                                             \
+  case Token::Kind::k:                                                         \
+    t = new tokens::k{                                                         \
+        {m_cursor_position, length}                                            \
+    };                                                                         \
+    break
+/* clang-format on */
+
+#define KW_SWITCH_CASES()                                                      \
+  KW_CASE(If);                                                                 \
+  KW_CASE(Then);                                                               \
+  KW_CASE(Else);                                                               \
+  KW_CASE(Elif);                                                               \
+  KW_CASE(Fi);                                                                 \
+  KW_CASE(When);                                                               \
+  KW_CASE(Case);                                                               \
+  KW_CASE(While);                                                              \
+  KW_CASE(Esac);                                                               \
+  KW_CASE(For);                                                                \
+  KW_CASE(Done);                                                               \
+  KW_CASE(Until);                                                              \
+  KW_CASE(Time);                                                               \
+  KW_CASE(Do);                                                                 \
+  KW_CASE(Function);
+
 namespace tokens {
 
-struct If : public Token
-{
-  If(SourceLocation location);
+#define TOKEN_STRUCT(t)                                                        \
+  struct t : public Token                                                      \
+  {                                                                            \
+    t(SourceLocation location);                                                \
+                                                                               \
+    Kind        kind() const override;                                         \
+    Flags       flags() const override;                                        \
+    std::string raw_string() const override;                                   \
+  }
 
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
+TOKEN_STRUCT(If);
+TOKEN_STRUCT(Fi);
+TOKEN_STRUCT(Else);
+TOKEN_STRUCT(Elif);
+TOKEN_STRUCT(Then);
+TOKEN_STRUCT(Case);
+TOKEN_STRUCT(When);
+TOKEN_STRUCT(Esac);
+TOKEN_STRUCT(For);
+TOKEN_STRUCT(While);
+TOKEN_STRUCT(Until);
+TOKEN_STRUCT(Do);
+TOKEN_STRUCT(Done);
+TOKEN_STRUCT(Time);
+TOKEN_STRUCT(Function);
 
-struct Fi : public Token
-{
-  Fi(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Else : public Token
-{
-  Else(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Then : public Token
-{
-  Then(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Case : public Token
-{
-  Case(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Esac : public Token
-{
-  Esac(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct For : public Token
-{
-  For(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Done : public Token
-{
-  Done(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Until : public Token
-{
-  Until(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Time : public Token
-{
-  Time(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Do : public Token
-{
-  Do(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Function : public Token
-{
-  Function(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct When : public Token
-{
-  When(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct EndOfFile : public Token
-{
-  EndOfFile(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Newline : public Token
-{
-  Newline(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Semicolon : public Token
-{
-  Semicolon(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct Dot : public Token
-{
-  Dot(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct LeftParen : public Token
-{
-  LeftParen(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct RightParen : public Token
-{
-  RightParen(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct LeftSquareBracket : public Token
-{
-  LeftSquareBracket(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct RightSquareBracket : public Token
-{
-  RightSquareBracket(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct DoubleLeftSquareBracket : public Token
-{
-  DoubleLeftSquareBracket(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct DoubleRightSquareBracket : public Token
-{
-  DoubleRightSquareBracket(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct RightBracket : public Token
-{
-  RightBracket(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-struct LeftBracket : public Token
-{
-  LeftBracket(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-};
-
-/**
- * Tokens with important values
- */
-struct Value : public Token
-{
-  Value(SourceLocation location, std::string_view sv);
-
-  std::string raw_string() const override;
-
-protected:
-  std::string m_value;
-};
-
-struct Number : public Value
-{
-  Number(SourceLocation location, std::string_view sv);
-
-  Kind  kind() const override;
-  Flags flags() const override;
-};
-
-struct String : public Value
-{
-  String(SourceLocation location, char quote_char, std::string_view sv);
-
-  Kind  kind() const override;
-  Flags flags() const override;
-
-  char quote_char() const;
-
-protected:
-  char m_quote_char;
-};
-
-struct Identifier : Value
-{
-  Identifier(SourceLocation location, std::string_view sv);
-
-  Kind  kind() const override;
-  Flags flags() const override;
-};
+TOKEN_STRUCT(EndOfFile);
+TOKEN_STRUCT(Newline);
+TOKEN_STRUCT(Semicolon);
+TOKEN_STRUCT(Dot);
+TOKEN_STRUCT(LeftParen);
+TOKEN_STRUCT(RightParen);
+TOKEN_STRUCT(LeftSquareBracket);
+TOKEN_STRUCT(RightSquareBracket);
+TOKEN_STRUCT(LeftBracket);
+TOKEN_STRUCT(RightBracket);
+TOKEN_STRUCT(DoubleLeftSquareBracket);
+TOKEN_STRUCT(DoubleRightSquareBracket);
 
 struct Redirection : Token
 {
@@ -406,9 +223,42 @@ protected:
   std::string m_to_file{};
 };
 
-/**
- * Operators
- */
+/* Tokens with values. */
+struct Value : public Token
+{
+  Value(SourceLocation location, std::string_view sv);
+
+  std::string raw_string() const override;
+
+protected:
+  std::string m_value;
+};
+
+#define VALUE_TOKEN_STRUCT(t)                                                  \
+  struct t : public Value                                                      \
+  {                                                                            \
+    t(SourceLocation location, std::string_view sv);                           \
+                                                                               \
+    Kind  kind() const override;                                               \
+    Flags flags() const override;                                              \
+  }
+
+VALUE_TOKEN_STRUCT(Number);
+VALUE_TOKEN_STRUCT(Identifier);
+
+struct String : public Value
+{
+  String(SourceLocation location, char quote_char, std::string_view sv);
+
+  Kind  kind() const override;
+  Flags flags() const override;
+
+  char quote_char() const;
+
+protected:
+  char m_quote_char;
+};
+
 struct Operator : public Token
 {
   Operator(SourceLocation location);
@@ -425,305 +275,77 @@ struct Operator : public Token
   construct_unary_expression(const Expression *rhs) const;
 };
 
-struct Plus : Operator
-{
-  Plus(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-
-  u8 unary_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_unary_expression(const Expression *rhs) const override;
-};
-
-struct Minus : Operator
-{
-  Minus(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-
-  u8 unary_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_unary_expression(const Expression *rhs) const override;
-};
-
-struct Slash : Operator
-{
-  Slash(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Asterisk : Operator
-{
-  Asterisk(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Percent : Operator
-{
-  Percent(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Tilde : Operator
-{
-  Tilde(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 unary_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_unary_expression(const Expression *rhs) const override;
-};
-
-struct ExclamationMark : Operator
-{
-  ExclamationMark(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 unary_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_unary_expression(const Expression *rhs) const override;
-};
-
-struct Ampersand : Operator
-{
-  Ampersand(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct DoubleAmpersand : Operator
-{
-  DoubleAmpersand(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Greater : Operator
-{
-  Greater(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct DoubleGreater : Operator
-{
-  DoubleGreater(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct GreaterEquals : Operator
-{
-  GreaterEquals(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Less : Operator
-{
-  Less(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct DoubleLess : Operator
-{
-  DoubleLess(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct LessEquals : Operator
-{
-  LessEquals(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Pipe : Operator
-{
-  Pipe(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct DoublePipe : Operator
-{
-  DoublePipe(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Cap : Operator
-{
-  Cap(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct Equals : Operator
-{
-  Equals(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct DoubleEquals : Operator
-{
-  DoubleEquals(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
-
-struct ExclamationEquals : Operator
-{
-  ExclamationEquals(SourceLocation location);
-
-  Kind        kind() const override;
-  Flags       flags() const override;
-  std::string raw_string() const override;
-
-  u8 left_precedence() const override;
-  std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const override;
-};
+#define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \
+  struct t : Operator                                                          \
+  {                                                                            \
+    t(SourceLocation location);                                                \
+                                                                               \
+    Kind        kind() const override;                                         \
+    Flags       flags() const override;                                        \
+    std::string raw_string() const override;                                   \
+                                                                               \
+    u8 left_precedence() const override;                                       \
+    std::unique_ptr<Expression>                                                \
+    construct_binary_expression(const Expression *lhs,                         \
+                                const Expression *rhs) const override;         \
+                                                                               \
+    u8 unary_precedence() const override;                                      \
+    std::unique_ptr<Expression>                                                \
+    construct_unary_expression(const Expression *rhs) const override;          \
+  }
+
+UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Plus);
+UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
+
+#define UNARY_OPERATOR_TOKEN_STRUCT(t)                                         \
+  struct t : Operator                                                          \
+  {                                                                            \
+    t(SourceLocation location);                                                \
+                                                                               \
+    Kind        kind() const override;                                         \
+    Flags       flags() const override;                                        \
+    std::string raw_string() const override;                                   \
+                                                                               \
+    u8 unary_precedence() const override;                                      \
+    std::unique_ptr<Expression>                                                \
+    construct_unary_expression(const Expression *rhs) const override;          \
+  }
+
+UNARY_OPERATOR_TOKEN_STRUCT(Tilde);
+UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
+
+#define BINARY_OPERATOR_TOKEN_STRUCT(t)                                        \
+  struct t : Operator                                                          \
+  {                                                                            \
+    t(SourceLocation location);                                                \
+                                                                               \
+    Kind        kind() const override;                                         \
+    Flags       flags() const override;                                        \
+    std::string raw_string() const override;                                   \
+                                                                               \
+    u8 left_precedence() const override;                                       \
+    std::unique_ptr<Expression>                                                \
+    construct_binary_expression(const Expression *lhs,                         \
+                                const Expression *rhs) const override;         \
+  }
+
+BINARY_OPERATOR_TOKEN_STRUCT(Slash);
+BINARY_OPERATOR_TOKEN_STRUCT(Percent);
+BINARY_OPERATOR_TOKEN_STRUCT(Asterisk);
+BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);
+BINARY_OPERATOR_TOKEN_STRUCT(DoubleAmpersand);
+BINARY_OPERATOR_TOKEN_STRUCT(Greater);
+BINARY_OPERATOR_TOKEN_STRUCT(DoubleGreater);
+BINARY_OPERATOR_TOKEN_STRUCT(GreaterEquals);
+BINARY_OPERATOR_TOKEN_STRUCT(Less);
+BINARY_OPERATOR_TOKEN_STRUCT(DoubleLess);
+BINARY_OPERATOR_TOKEN_STRUCT(LessEquals);
+BINARY_OPERATOR_TOKEN_STRUCT(Pipe);
+BINARY_OPERATOR_TOKEN_STRUCT(DoublePipe);
+BINARY_OPERATOR_TOKEN_STRUCT(Cap);
+BINARY_OPERATOR_TOKEN_STRUCT(Equals);
+BINARY_OPERATOR_TOKEN_STRUCT(DoubleEquals);
+BINARY_OPERATOR_TOKEN_STRUCT(ExclamationEquals);
 
 } /* namespace tokens */
 

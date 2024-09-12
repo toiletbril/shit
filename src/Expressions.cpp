@@ -9,9 +9,6 @@
 
 namespace shit {
 
-/**
- * class: Expression
- */
 Expression::Expression(SourceLocation location) : m_location(location) {}
 
 SourceLocation
@@ -39,9 +36,6 @@ Expression::evaluate(EvalContext &cxt) const
 
 namespace expressions {
 
-/**
- * class: If
- */
 If::If(SourceLocation location, const Expression *condition,
        const Expression *then, const Expression *otherwise)
     : Expression(location), m_condition(condition), m_then(then),
@@ -102,9 +96,6 @@ If::to_ast_string(usize layer) const
   return s;
 }
 
-/**
- * class: Command
- */
 Command::Command(SourceLocation location) : Expression(location) {}
 
 void
@@ -119,9 +110,6 @@ Command::is_async() const
   return m_is_async;
 }
 
-/**
- * class: DummyExpression
- */
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
 {}
 
@@ -148,9 +136,6 @@ DummyExpression::to_ast_string(usize layer) const
   return pad + "[" + to_string() + "]";
 }
 
-/**
- * class: SimpleCommand
- */
 SimpleCommand::SimpleCommand(SourceLocation                     location,
                              const std::vector<const Token *> &&args)
     : Command(location), m_args(args)
@@ -229,9 +214,6 @@ SimpleCommand::redirect_to(usize d, std::string &f, bool duplicate)
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-/**
- * class: Sequence
- */
 CompoundList::CompoundList() : Expression({0, 0}), m_nodes() {}
 
 CompoundList::CompoundList(
@@ -316,9 +298,6 @@ CompoundList::evaluate_impl(EvalContext &cxt) const
   return ret;
 }
 
-/**
- * class: CompoundListCondition
- */
 CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
                                              const Command *expr)
     : Expression(location), m_kind(kind), m_cmd(expr)
@@ -366,9 +345,6 @@ CompoundListCondition::evaluate_impl(EvalContext &cxt) const
   return m_cmd->evaluate(cxt);
 }
 
-/**
- * class: Pipeline
- */
 Pipeline::Pipeline(SourceLocation                            location,
                    const std::vector<const SimpleCommand *> &commands)
     : Command(location), m_commands(commands)
@@ -444,9 +420,6 @@ Pipeline::redirect_to(usize d, std::string &f, bool duplicate)
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-/**
- * class: UnaryExpression
- */
 UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
     : Expression(location), m_rhs(rhs)
 {}
@@ -466,9 +439,6 @@ UnaryExpression::to_ast_string(usize layer) const
   return s;
 }
 
-/**
- * class: BinaryExpression
- */
 BinaryExpression::BinaryExpression(SourceLocation    location,
                                    const Expression *lhs, const Expression *rhs)
     : Expression(location), m_lhs(lhs), m_rhs(rhs)
@@ -565,145 +535,40 @@ ConstantString::to_string() const
   return m_value;
 }
 
-/**
- * class: Negate
- */
-Negate::Negate(SourceLocation location, const Expression *rhs)
-    : UnaryExpression(location, rhs)
-{}
+#define UNARY_EXPRESSION_DECLS(e, expr)                                        \
+  e::e(SourceLocation location, const Expression *rhs)                         \
+      : UnaryExpression(location, rhs)                                         \
+  {}                                                                           \
+  std::string e::to_string() const { return #expr; }                           \
+  i64         e::evaluate_impl(EvalContext &cxt) const                         \
+  {                                                                            \
+    return expr m_rhs->evaluate(cxt);                                          \
+  }
 
-std::string
-Negate::to_string() const
-{
-  return "-";
-}
+UNARY_EXPRESSION_DECLS(Negate, -);
+UNARY_EXPRESSION_DECLS(Unnegate, +);
+UNARY_EXPRESSION_DECLS(LogicalNot, !);
+UNARY_EXPRESSION_DECLS(BinaryComplement, ~);
 
-i64
-Negate::evaluate_impl(EvalContext &cxt) const
-{
-  return -m_rhs->evaluate(cxt);
-}
-
-/**
- * class: Unnegate
- */
-Unnegate::Unnegate(SourceLocation location, const Expression *rhs)
-    : UnaryExpression(location, rhs)
-{}
-
-std::string
-Unnegate::to_string() const
-{
-  return "+";
-}
-
-i64
-Unnegate::evaluate_impl(EvalContext &cxt) const
-{
-  return +m_rhs->evaluate(cxt);
-}
-
-/**
- * class: LogicalNot
- */
-LogicalNot::LogicalNot(SourceLocation location, const Expression *rhs)
-    : UnaryExpression(location, rhs)
-{}
-
-std::string
-LogicalNot::to_string() const
-{
-  return "!";
-}
-
-i64
-LogicalNot::evaluate_impl(EvalContext &cxt) const
-{
-  return !m_rhs->evaluate(cxt);
-}
-
-/**
- * class: BinaryComplement
- */
-BinaryComplement::BinaryComplement(SourceLocation    location,
-                                   const Expression *rhs)
-    : UnaryExpression(location, rhs)
-{}
-
-std::string
-BinaryComplement::to_string() const
-{
-  return "~";
-}
-
-i64
-BinaryComplement::evaluate_impl(EvalContext &cxt) const
-{
-  return ~m_rhs->evaluate(cxt);
-}
-
-/**
- * class: Add
- */
-Add::Add(SourceLocation location, const Expression *lhs, const Expression *rhs)
+BinaryDummyExpression::BinaryDummyExpression(SourceLocation    location,
+                                             const Expression *lhs,
+                                             const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
 {}
 
 std::string
-Add::to_string() const
+BinaryDummyExpression::to_string() const
 {
-  return "+";
+  SHIT_UNREACHABLE();
 }
 
 i64
-Add::evaluate_impl(EvalContext &cxt) const
+BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const
 {
-  return m_lhs->evaluate(cxt) + m_rhs->evaluate(cxt);
+  SHIT_UNUSED(cxt);
+  SHIT_UNREACHABLE();
 }
 
-/**
- * class: Subtract
- */
-Subtract::Subtract(SourceLocation location, const Expression *lhs,
-                   const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-Subtract::to_string() const
-{
-  return "-";
-}
-
-i64
-Subtract::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) - m_rhs->evaluate(cxt);
-}
-
-/**
- * class: Multiply
- */
-Multiply::Multiply(SourceLocation location, const Expression *lhs,
-                   const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-Multiply::to_string() const
-{
-  return "*";
-}
-
-i64
-Multiply::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) * m_rhs->evaluate(cxt);
-}
-
-/**
- * class: Divide
- */
 Divide::Divide(SourceLocation location, const Expression *lhs,
                const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
@@ -715,6 +580,7 @@ Divide::to_string() const
   return "/";
 }
 
+/* Custom evaluation, since we can't divide by zero. */
 i64
 Divide::evaluate_impl(EvalContext &cxt) const
 {
@@ -724,284 +590,33 @@ Divide::evaluate_impl(EvalContext &cxt) const
   return m_lhs->evaluate(cxt) / denom;
 }
 
-/**
- * class: Module
- */
-Module::Module(SourceLocation location, const Expression *lhs,
-               const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
+#define BINARY_EXPRESSION_DECLS(e, expr)                                       \
+  e::e(SourceLocation location, const Expression *lhs, const Expression *rhs)  \
+      : BinaryExpression(location, lhs, rhs)                                   \
+  {}                                                                           \
+  std::string e::to_string() const { return #expr; }                           \
+  i64         e::evaluate_impl(EvalContext &cxt) const                         \
+  {                                                                            \
+    return m_lhs->evaluate(cxt) expr m_rhs->evaluate(cxt);                     \
+  }
 
-std::string
-Module::to_string() const
-{
-  return "%";
-}
-
-i64
-Module::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) % m_rhs->evaluate(cxt);
-}
-
-/**
- * class: BinaryAnd
- */
-BinaryAnd::BinaryAnd(SourceLocation location, const Expression *lhs,
-                     const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-BinaryAnd::to_string() const
-{
-  return "&";
-}
-
-i64
-BinaryAnd::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) & m_rhs->evaluate(cxt);
-}
-
-/**
- * class: LogicalAnd
- */
-LogicalAnd::LogicalAnd(SourceLocation location, const Expression *lhs,
-                       const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-LogicalAnd::to_string() const
-{
-  return "&&";
-}
-
-i64
-LogicalAnd::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) && m_rhs->evaluate(cxt);
-}
-
-/**
- * class: GreaterThan
- */
-GreaterThan::GreaterThan(SourceLocation location, const Expression *lhs,
-                         const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-GreaterThan::to_string() const
-{
-  return ">";
-}
-
-i64
-GreaterThan::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) > m_rhs->evaluate(cxt);
-}
-
-/**
- * class: GreaterOrEqual
- */
-GreaterOrEqual::GreaterOrEqual(SourceLocation location, const Expression *lhs,
-                               const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-GreaterOrEqual::to_string() const
-{
-  return ">=";
-}
-
-i64
-GreaterOrEqual::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) >= m_rhs->evaluate(cxt);
-}
-
-/**
- * class: RightShift
- */
-RightShift::RightShift(SourceLocation location, const Expression *lhs,
-                       const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-RightShift::to_string() const
-{
-  return ">>";
-}
-
-i64
-RightShift::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) >> m_rhs->evaluate(cxt);
-}
-
-/**
- * class: LessThan
- */
-LessThan::LessThan(SourceLocation location, const Expression *lhs,
-                   const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-LessThan::to_string() const
-{
-  return "<";
-}
-
-i64
-LessThan::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) < m_rhs->evaluate(cxt);
-}
-
-/**
- * class: LessOrEqual
- */
-LessOrEqual::LessOrEqual(SourceLocation location, const Expression *lhs,
-                         const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-LessOrEqual::to_string() const
-{
-  return "<=";
-}
-
-i64
-LessOrEqual::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) <= m_rhs->evaluate(cxt);
-}
-
-/**
- * class: LeftShift
- */
-LeftShift::LeftShift(SourceLocation location, const Expression *lhs,
-                     const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-LeftShift::to_string() const
-{
-  return "<<";
-}
-
-i64
-LeftShift::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) << m_rhs->evaluate(cxt);
-}
-
-/**
- * class: BinaryOr
- */
-BinaryOr::BinaryOr(SourceLocation location, const Expression *lhs,
-                   const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-BinaryOr::to_string() const
-{
-  return "|";
-}
-
-i64
-BinaryOr::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) | m_rhs->evaluate(cxt);
-}
-
-/**
- * class: LogicalOr
- */
-LogicalOr::LogicalOr(SourceLocation location, const Expression *lhs,
-                     const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-LogicalOr::to_string() const
-{
-  return "||";
-}
-
-i64
-LogicalOr::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) || m_rhs->evaluate(cxt);
-}
-
-/**
- * class: Xor
- */
-Xor::Xor(SourceLocation location, const Expression *lhs, const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-Xor::to_string() const
-{
-  return "^";
-}
-
-i64
-Xor::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) ^ m_rhs->evaluate(cxt);
-}
-
-/**
- * class: Equal
- */
-Equal::Equal(SourceLocation location, const Expression *lhs,
-             const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-Equal::to_string() const
-{
-  return "==";
-}
-
-i64
-Equal::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) == m_rhs->evaluate(cxt);
-}
-
-/**
- * class: NotEqual
- */
-NotEqual::NotEqual(SourceLocation location, const Expression *lhs,
-                   const Expression *rhs)
-    : BinaryExpression(location, lhs, rhs)
-{}
-
-std::string
-NotEqual::to_string() const
-{
-  return "!=";
-}
-
-i64
-NotEqual::evaluate_impl(EvalContext &cxt) const
-{
-  return m_lhs->evaluate(cxt) != m_rhs->evaluate(cxt);
-}
+BINARY_EXPRESSION_DECLS(Add, +);
+BINARY_EXPRESSION_DECLS(Subtract, -);
+BINARY_EXPRESSION_DECLS(Multiply, *);
+BINARY_EXPRESSION_DECLS(Module, %);
+BINARY_EXPRESSION_DECLS(BinaryAnd, &);
+BINARY_EXPRESSION_DECLS(LogicalAnd, &&);
+BINARY_EXPRESSION_DECLS(GreaterThan, >);
+BINARY_EXPRESSION_DECLS(GreaterOrEqual, >=);
+BINARY_EXPRESSION_DECLS(RightShift, >>);
+BINARY_EXPRESSION_DECLS(LessThan, <);
+BINARY_EXPRESSION_DECLS(LessOrEqual, <=);
+BINARY_EXPRESSION_DECLS(LeftShift, <<);
+BINARY_EXPRESSION_DECLS(BinaryOr, |);
+BINARY_EXPRESSION_DECLS(LogicalOr, ||);
+BINARY_EXPRESSION_DECLS(Xor, ^);
+BINARY_EXPRESSION_DECLS(Equal, ==);
+BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
 } /* namespace expressions */
 

@@ -205,6 +205,8 @@ Parser::parse_simple_command()
     case Token::Kind::Case:
     case Token::Kind::Esac:
     case Token::Kind::Then:
+    case Token::Kind::Done:
+    case Token::Kind::While:
     case Token::Kind::Redirection:
       throw ErrorWithLocation{token->source_location(),
                               "Not implemented (Parser)"};

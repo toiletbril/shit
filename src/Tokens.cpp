@@ -2,12 +2,10 @@
 
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Expressions.hpp"
 
 namespace shit {
 
-/**
- * class: Token
- */
 Token::Token(SourceLocation location) : m_location(location) {}
 
 SourceLocation
@@ -24,400 +22,48 @@ Token::to_ast_string() const
 
 namespace tokens {
 
-/**
- * class: If
- */
-If::If(SourceLocation location) : Token(location) {}
+#define KEYWORD_TOKEN_DECLS(t)                                                 \
+  t::t(SourceLocation location) : Token(location) {}                           \
+  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Flags t::flags() const { return Token::Flag::Keyword; }               \
+  std::string  t::raw_string() const { return #t; }
+
+KEYWORD_TOKEN_DECLS(If);
+KEYWORD_TOKEN_DECLS(Then);
+KEYWORD_TOKEN_DECLS(Else);
+KEYWORD_TOKEN_DECLS(Elif);
+KEYWORD_TOKEN_DECLS(Fi);
+KEYWORD_TOKEN_DECLS(For);
+KEYWORD_TOKEN_DECLS(While);
+KEYWORD_TOKEN_DECLS(Until);
+KEYWORD_TOKEN_DECLS(Do);
+KEYWORD_TOKEN_DECLS(Done);
+KEYWORD_TOKEN_DECLS(Case);
+KEYWORD_TOKEN_DECLS(When);
+KEYWORD_TOKEN_DECLS(Esac);
+KEYWORD_TOKEN_DECLS(Time);
+KEYWORD_TOKEN_DECLS(Function);
+
+#define SENTINEL_TOKEN_DECLS(t)                                                \
+  t::t(SourceLocation location) : Token(location) {}                           \
+  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Flags t::flags() const { return Token::Flag::Sentinel; }              \
+  std::string  t::raw_string() const { return #t; }
+
+SENTINEL_TOKEN_DECLS(EndOfFile);
+SENTINEL_TOKEN_DECLS(Newline);
+SENTINEL_TOKEN_DECLS(Semicolon);
+SENTINEL_TOKEN_DECLS(Dot);
+
+SENTINEL_TOKEN_DECLS(LeftParen);
+SENTINEL_TOKEN_DECLS(RightParen);
+SENTINEL_TOKEN_DECLS(LeftSquareBracket);
+SENTINEL_TOKEN_DECLS(DoubleLeftSquareBracket);
+SENTINEL_TOKEN_DECLS(RightSquareBracket);
+SENTINEL_TOKEN_DECLS(DoubleRightSquareBracket);
+SENTINEL_TOKEN_DECLS(LeftBracket);
+SENTINEL_TOKEN_DECLS(RightBracket);
 
-Token::Kind
-If::kind() const
-{
-  return Token::Kind::If;
-}
-
-Token::Flags
-If::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-If::raw_string() const
-{
-  return "If";
-}
-
-/**
- * class: Else
- */
-Else::Else(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Else::kind() const
-{
-  return Token::Kind::Else;
-}
-
-Token::Flags
-Else::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Else::raw_string() const
-{
-  return "Else";
-}
-
-/**
- * class: Then
- */
-Then::Then(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Then::kind() const
-{
-  return Token::Kind::Then;
-}
-
-Token::Flags
-Then::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Then::raw_string() const
-{
-  return "Then";
-}
-
-/**
- * class: Fi
- */
-Fi::Fi(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Fi::kind() const
-{
-  return Token::Kind::Fi;
-}
-
-Token::Flags
-Fi::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Fi::raw_string() const
-{
-  return "Fi";
-}
-
-/**
- * class: When
- */
-When::When(SourceLocation location) : Token(location) {}
-
-Token::Kind
-When::kind() const
-{
-  return Token::Kind::When;
-}
-
-Token::Flags
-When::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-When::raw_string() const
-{
-  return "When";
-}
-
-/**
- * class: For
- */
-For::For(SourceLocation location) : Token(location) {}
-
-Token::Kind
-For::kind() const
-{
-  return Token::Kind::For;
-}
-
-Token::Flags
-For::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-For::raw_string() const
-{
-  return "For";
-}
-
-/**
- * class: Done
- */
-Done::Done(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Done::kind() const
-{
-  return Token::Kind::Done;
-}
-
-Token::Flags
-Done::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Done::raw_string() const
-{
-  return "Done";
-}
-
-/**
- * class: Case
- */
-Case::Case(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Case::kind() const
-{
-  return Token::Kind::Case;
-}
-
-Token::Flags
-Case::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Case::raw_string() const
-{
-  return "Case";
-}
-
-/**
- * class: Esac
- */
-Esac::Esac(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Esac::kind() const
-{
-  return Token::Kind::Esac;
-}
-
-Token::Flags
-Esac::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Esac::raw_string() const
-{
-  return "Esac";
-}
-
-/**
- * class: Time
- */
-Time::Time(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Time::kind() const
-{
-  return Token::Kind::Time;
-}
-
-Token::Flags
-Time::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Time::raw_string() const
-{
-  return "Time";
-}
-
-/**
- * class: Do
- */
-Do::Do(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Do::kind() const
-{
-  return Token::Kind::Do;
-}
-
-Token::Flags
-Do::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Do::raw_string() const
-{
-  return "Do";
-}
-
-/**
- * class: Function
- */
-Function::Function(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Function::kind() const
-{
-  return Token::Kind::Function;
-}
-
-Token::Flags
-Function::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Function::raw_string() const
-{
-  return "Function";
-}
-
-/**
- * class: Until
- */
-Until::Until(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Until::kind() const
-{
-  return Token::Kind::Until;
-}
-
-Token::Flags
-Until::flags() const
-{
-  return Token::Flag::Keyword;
-}
-
-std::string
-Until::raw_string() const
-{
-  return "Until";
-}
-
-/**
- * class: EndOfFile
- */
-EndOfFile::EndOfFile(SourceLocation location) : Token(location) {}
-
-Token::Kind
-EndOfFile::kind() const
-{
-  return Token::Kind::EndOfFile;
-}
-
-Token::Flags
-EndOfFile::flags() const
-{
-  return Token::Flag::Sentinel;
-}
-
-std::string
-EndOfFile::raw_string() const
-{
-  return "EOF";
-}
-
-/**
- * class: Newline
- */
-Newline::Newline(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Newline::kind() const
-{
-  return Token::Kind::Newline;
-}
-
-Token::Flags
-Newline::flags() const
-{
-  return Token::Flag::Sentinel;
-}
-
-std::string
-Newline::raw_string() const
-{
-  return "\\n";
-}
-
-/**
- * class: Semicolon
- */
-Semicolon::Semicolon(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Semicolon::kind() const
-{
-  return Token::Kind::Semicolon;
-}
-
-Token::Flags
-Semicolon::flags() const
-{
-  return Token::Flag::Sentinel;
-}
-
-std::string
-Semicolon::raw_string() const
-{
-  return ";";
-}
-
-/**
- * class: Dot
- */
-Dot::Dot(SourceLocation location) : Token(location) {}
-
-Token::Kind
-Dot::kind() const
-{
-  return Token::Kind::Dot;
-}
-
-Token::Flags
-Dot::flags() const
-{
-  return Token::Flag::Sentinel;
-}
-
-std::string
-Dot::raw_string() const
-{
-  return ".";
-}
-
-/**
- * class: Value
- */
 Value::Value(SourceLocation location, std::string_view sv)
     : Token(location), m_value(sv)
 {}
@@ -428,9 +74,6 @@ Value::raw_string() const
   return m_value;
 }
 
-/**
- * class: Number
- */
 Number::Number(SourceLocation location, std::string_view sv)
     : Value(location, sv)
 {}
@@ -447,9 +90,6 @@ Number::flags() const
   return Token::Flag::Value;
 }
 
-/**
- * class: String
- */
 String::String(SourceLocation location, char quote_char, std::string_view sv)
     : Value(location, sv), m_quote_char(quote_char)
 {}
@@ -472,9 +112,6 @@ String::quote_char() const
   return m_quote_char;
 }
 
-/**
- * class: Identifier
- */
 Identifier::Identifier(SourceLocation location, std::string_view sv)
     : Value(location, sv)
 {}
@@ -491,9 +128,6 @@ Identifier::flags() const
   return Token::Flag::Value;
 }
 
-/**
- * class: Redirection
- */
 Redirection::Redirection(SourceLocation location, std::string_view what_fd,
                          std::string_view to_file)
     : Token(location), m_from_fd(what_fd), m_to_file(to_file)
@@ -523,9 +157,6 @@ Redirection::to_file() const
   return m_to_file;
 }
 
-/**
- * class: Operator
- */
 Operator::Operator(SourceLocation location) : Token(location) {}
 
 u8
@@ -564,984 +195,74 @@ Operator::construct_unary_expression(const Expression *rhs) const
                    SHIT_ENUM(kind()));
 }
 
-/**
- * class: Plus
- */
-Plus::Plus(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Plus::kind() const
-{
-  return Token::Kind::Plus;
-}
-
-Token::Flags
-Plus::flags() const
-{
-  return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;
-}
-
-std::string
-Plus::raw_string() const
-{
-  return "+";
-}
-
-u8
-Plus::left_precedence() const
-{
-  return 11;
-}
-
-u8
-Plus::unary_precedence() const
-{
-  return 13;
-}
-
-std::unique_ptr<Expression>
-Plus::construct_binary_expression(const Expression *lhs,
-                                  const Expression *rhs) const
-{
-  return std::make_unique<expressions::Add>(source_location(), lhs, rhs);
-}
-
-std::unique_ptr<Expression>
-Plus::construct_unary_expression(const Expression *rhs) const
-{
-  return std::make_unique<expressions::Unnegate>(source_location(), rhs);
-}
-
-/**
- * class: Minus
- */
-Minus::Minus(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Minus::kind() const
-{
-  return Token::Kind::Minus;
-}
-
-Token::Flags
-Minus::flags() const
-{
-  return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;
-}
-
-std::string
-Minus::raw_string() const
-{
-  return "-";
-}
-
-u8
-Minus::left_precedence() const
-{
-  return 11;
-}
-
-u8
-Minus::unary_precedence() const
-{
-  return 13;
-}
-
-std::unique_ptr<Expression>
-Minus::construct_binary_expression(const Expression *lhs,
-                                   const Expression *rhs) const
-{
-  return std::make_unique<expressions::Subtract>(source_location(), lhs, rhs);
-}
-
-std::unique_ptr<Expression>
-Minus::construct_unary_expression(const Expression *rhs) const
-{
-  return std::make_unique<expressions::Negate>(source_location(), rhs);
-}
-
-/**
- * class: Slash
- */
-Slash::Slash(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Slash::kind() const
-{
-  return Token::Kind::Slash;
-}
-
-Token::Flags
-Slash::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Slash::raw_string() const
-{
-  return "/";
-}
-
-u8
-Slash::left_precedence() const
-{
-  return 12;
-}
-
-std::unique_ptr<Expression>
-Slash::construct_binary_expression(const Expression *lhs,
-                                   const Expression *rhs) const
-{
-  return std::make_unique<expressions::Divide>(source_location(), lhs, rhs);
-}
-
-/**
- * class: Asterisk
- */
-Asterisk::Asterisk(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Asterisk::kind() const
-{
-  return Token::Kind::Asterisk;
-}
-
-Token::Flags
-Asterisk::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Asterisk::raw_string() const
-{
-  return "*";
-}
-
-u8
-Asterisk::left_precedence() const
-{
-  return 12;
-}
-
-std::unique_ptr<Expression>
-Asterisk::construct_binary_expression(const Expression *lhs,
-                                      const Expression *rhs) const
-{
-  return std::make_unique<expressions::Multiply>(source_location(), lhs, rhs);
-}
-
-/**
- * class: Percent
- */
-Percent::Percent(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Percent::kind() const
-{
-  return Token::Kind::Percent;
-}
-
-Token::Flags
-Percent::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Percent::raw_string() const
-{
-  return "%";
-}
-
-u8
-Percent::left_precedence() const
-{
-  return 12;
-}
-
-std::unique_ptr<Expression>
-Percent::construct_binary_expression(const Expression *lhs,
-                                     const Expression *rhs) const
-{
-  return std::make_unique<expressions::Module>(source_location(), lhs, rhs);
-}
-
-/**
- * class: LeftParen
- */
-LeftParen::LeftParen(SourceLocation location) : Token(location) {}
-
-Token::Kind
-LeftParen::kind() const
-{
-  return Token::Kind::LeftParen;
-}
-
-std::string
-LeftParen::raw_string() const
-{
-  return "(";
-}
-
-Token::Flags
-LeftParen::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: RightParen
- */
-RightParen::RightParen(SourceLocation location) : Token(location) {}
-
-Token::Kind
-RightParen::kind() const
-{
-  return Token::Kind::RightParen;
-}
-
-std::string
-RightParen::raw_string() const
-{
-  return ")";
-}
-
-Token::Flags
-RightParen::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: LeftSquareBracket
- */
-LeftSquareBracket::LeftSquareBracket(SourceLocation location) : Token(location)
-{}
-
-Token::Kind
-LeftSquareBracket::kind() const
-{
-  return Token::Kind::LeftSquareBracket;
-}
-
-std::string
-LeftSquareBracket::raw_string() const
-{
-  return "[";
-}
-
-Token::Flags
-LeftSquareBracket::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: RightSquareBracket
- */
-RightSquareBracket::RightSquareBracket(SourceLocation location)
-    : Token(location)
-{}
-
-Token::Kind
-RightSquareBracket::kind() const
-{
-  return Token::Kind::RightSquareBracket;
-}
-
-std::string
-RightSquareBracket::raw_string() const
-{
-  return "]";
-}
-
-Token::Flags
-RightSquareBracket::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: DoubleLeftSquareBracket
- */
-DoubleLeftSquareBracket::DoubleLeftSquareBracket(SourceLocation location)
-    : Token(location)
-{}
-
-Token::Kind
-DoubleLeftSquareBracket::kind() const
-{
-  return Token::Kind::DoubleLeftSquareBracket;
-}
-
-std::string
-DoubleLeftSquareBracket::raw_string() const
-{
-  return "[[";
-}
-
-Token::Flags
-DoubleLeftSquareBracket::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: DoubleRightSquareBracket
- */
-DoubleRightSquareBracket::DoubleRightSquareBracket(SourceLocation location)
-    : Token(location)
-{}
-
-Token::Kind
-DoubleRightSquareBracket::kind() const
-{
-  return Token::Kind::DoubleRightSquareBracket;
-}
-
-std::string
-DoubleRightSquareBracket::raw_string() const
-{
-  return "]]";
-}
-
-Token::Flags
-DoubleRightSquareBracket::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: LeftBracket
- */
-LeftBracket::LeftBracket(SourceLocation location) : Token(location) {}
-
-Token::Kind
-LeftBracket::kind() const
-{
-  return Token::Kind::LeftBracket;
-}
-
-std::string
-LeftBracket::raw_string() const
-{
-  return "[";
-}
-
-Token::Flags
-LeftBracket::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: RightBracket
- */
-RightBracket::RightBracket(SourceLocation location) : Token(location) {}
-
-Token::Kind
-RightBracket::kind() const
-{
-  return Token::Kind::RightBracket;
-}
-
-std::string
-RightBracket::raw_string() const
-{
-  return "]";
-}
-
-Token::Flags
-RightBracket::flags() const
-{
-  return Token::Flag::Value;
-}
-
-/**
- * class: ExclamationMark
- */
-ExclamationMark::ExclamationMark(SourceLocation location) : Operator(location)
-{}
-
-Token::Kind
-ExclamationMark::kind() const
-{
-  return Token::Kind::ExclamationMark;
-}
-
-Token::Flags
-ExclamationMark::flags() const
-{
-  return Token::Flag::UnaryOperator;
-}
-
-std::string
-ExclamationMark::raw_string() const
-{
-  return "!";
-}
-
-u8
-ExclamationMark::unary_precedence() const
-{
-  return 13;
-}
-
-std::unique_ptr<Expression>
-ExclamationMark::construct_unary_expression(const Expression *rhs) const
-{
-  return std::make_unique<expressions::LogicalNot>(source_location(), rhs);
-}
-
-/**
- * class: Tilde
- */
-Tilde::Tilde(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Tilde::kind() const
-{
-  return Token::Kind::Tilde;
-}
-
-Token::Flags
-Tilde::flags() const
-{
-  return Token::Flag::UnaryOperator;
-}
-
-std::string
-Tilde::raw_string() const
-{
-  return "~";
-}
-
-u8
-Tilde::unary_precedence() const
-{
-  return 13;
-}
-
-std::unique_ptr<Expression>
-Tilde::construct_unary_expression(const Expression *rhs) const
-{
-  return std::make_unique<expressions::BinaryComplement>(source_location(),
-                                                         rhs);
-}
-
-/**
- * class: Ampersand
- */
-Ampersand::Ampersand(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Ampersand::kind() const
-{
-  return Token::Kind::Ampersand;
-}
-
-Token::Flags
-Ampersand::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Ampersand::raw_string() const
-{
-  return "&";
-}
-
-u8
-Ampersand::left_precedence() const
-{
-  return 7;
-}
-
-std::unique_ptr<Expression>
-Ampersand::construct_binary_expression(const Expression *lhs,
-                                       const Expression *rhs) const
-{
-  return std::make_unique<expressions::BinaryAnd>(source_location(), lhs, rhs);
-}
-
-/**
- * class: DoubleAmpersand
- */
-DoubleAmpersand::DoubleAmpersand(SourceLocation location) : Operator(location)
-{}
-
-Token::Kind
-DoubleAmpersand::kind() const
-{
-  return Token::Kind::DoubleAmpersand;
-}
-
-Token::Flags
-DoubleAmpersand::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-DoubleAmpersand::raw_string() const
-{
-  return "&&";
-}
-
-u8
-DoubleAmpersand::left_precedence() const
-{
-  return 4;
-}
-
-std::unique_ptr<Expression>
-DoubleAmpersand::construct_binary_expression(const Expression *lhs,
-                                             const Expression *rhs) const
-{
-  return std::make_unique<expressions::LogicalAnd>(source_location(), lhs, rhs);
-}
-
-/**
- * class: Greater
- */
-Greater::Greater(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Greater::kind() const
-{
-  return Token::Kind::Greater;
-}
-
-Token::Flags
-Greater::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Greater::raw_string() const
-{
-  return ">";
-}
-
-u8
-Greater::left_precedence() const
-{
-  return 8;
-}
-
-std::unique_ptr<Expression>
-Greater::construct_binary_expression(const Expression *lhs,
-                                     const Expression *rhs) const
-{
-  return std::make_unique<expressions::GreaterThan>(source_location(), lhs,
-                                                    rhs);
-}
-
-/**
- * class: DoubleGreater
- */
-DoubleGreater::DoubleGreater(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-DoubleGreater::kind() const
-{
-  return Token::Kind::DoubleGreater;
-}
-
-Token::Flags
-DoubleGreater::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-DoubleGreater::raw_string() const
-{
-  return ">>";
-}
-
-u8
-DoubleGreater::left_precedence() const
-{
-  return 8;
-}
-
-std::unique_ptr<Expression>
-DoubleGreater::construct_binary_expression(const Expression *lhs,
-                                           const Expression *rhs) const
-{
-  return std::make_unique<expressions::RightShift>(source_location(), lhs, rhs);
-}
-
-/**
- * class: GreaterEquals
- */
-GreaterEquals::GreaterEquals(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-GreaterEquals::kind() const
-{
-  return Token::Kind::GreaterEquals;
-}
-
-Token::Flags
-GreaterEquals::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-GreaterEquals::raw_string() const
-{
-  return ">=";
-}
-
-u8
-GreaterEquals::left_precedence() const
-{
-  return 8;
-}
-
-std::unique_ptr<Expression>
-GreaterEquals::construct_binary_expression(const Expression *lhs,
-                                           const Expression *rhs) const
-{
-  return std::make_unique<expressions::GreaterOrEqual>(source_location(), lhs,
-                                                       rhs);
-}
-
-/**
- * class: Less
- */
-Less::Less(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Less::kind() const
-{
-  return Token::Kind::Less;
-}
-
-Token::Flags
-Less::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Less::raw_string() const
-{
-  return "<";
-}
-
-u8
-Less::left_precedence() const
-{
-  return 8;
-}
-
-std::unique_ptr<Expression>
-Less::construct_binary_expression(const Expression *lhs,
-                                  const Expression *rhs) const
-{
-  return std::make_unique<expressions::LessThan>(source_location(), lhs, rhs);
-}
-
-/**
- * class: DoubleLess
- */
-DoubleLess::DoubleLess(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-DoubleLess::kind() const
-{
-  return Token::Kind::DoubleLess;
-}
-
-Token::Flags
-DoubleLess::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-DoubleLess::raw_string() const
-{
-  return "<<";
-}
-
-u8
-DoubleLess::left_precedence() const
-{
-  return 8;
-}
-
-std::unique_ptr<Expression>
-DoubleLess::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
-{
-  return std::make_unique<expressions::LeftShift>(source_location(), lhs, rhs);
-}
-
-/**
- * class: LessEquals
- */
-LessEquals::LessEquals(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-LessEquals::kind() const
-{
-  return Token::Kind::LessEquals;
-}
-
-Token::Flags
-LessEquals::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-LessEquals::raw_string() const
-{
-  return "<=";
-}
-
-u8
-LessEquals::left_precedence() const
-{
-  return 8;
-}
-
-std::unique_ptr<Expression>
-LessEquals::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
-{
-  return std::make_unique<expressions::LessOrEqual>(source_location(), lhs,
-                                                    rhs);
-}
-
-/**
- * class: Pipe
- */
-Pipe::Pipe(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Pipe::kind() const
-{
-  return Token::Kind::Pipe;
-}
-
-Token::Flags
-Pipe::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Pipe::raw_string() const
-{
-  return "|";
-}
-
-u8
-Pipe::left_precedence() const
-{
-  return 5;
-}
-
-std::unique_ptr<Expression>
-Pipe::construct_binary_expression(const Expression *lhs,
-                                  const Expression *rhs) const
-{
-  return std::make_unique<expressions::BinaryOr>(source_location(), lhs, rhs);
-}
-
-/**
- * class: DoublePipe
- */
-DoublePipe::DoublePipe(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-DoublePipe::kind() const
-{
-  return Token::Kind::DoublePipe;
-}
-
-Token::Flags
-DoublePipe::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-DoublePipe::raw_string() const
-{
-  return "||";
-}
-
-u8
-DoublePipe::left_precedence() const
-{
-  return 4;
-}
-
-std::unique_ptr<Expression>
-DoublePipe::construct_binary_expression(const Expression *lhs,
-                                        const Expression *rhs) const
-{
-  return std::make_unique<expressions::LogicalOr>(source_location(), lhs, rhs);
-}
-
-/**
- * class: Cap
- */
-Cap::Cap(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Cap::kind() const
-{
-  return Token::Kind::Cap;
-}
-
-Token::Flags
-Cap::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Cap::raw_string() const
-{
-  return "^";
-}
-
-u8
-Cap::left_precedence() const
-{
-  return 9;
-}
-
-std::unique_ptr<Expression>
-Cap::construct_binary_expression(const Expression *lhs,
-                                 const Expression *rhs) const
-{
-  return std::make_unique<expressions::Xor>(source_location(), lhs, rhs);
-}
-
-/**
- * class: Equals
- */
-Equals::Equals(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-Equals::kind() const
-{
-  return Token::Kind::Equals;
-}
-
-Token::Flags
-Equals::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-Equals::raw_string() const
-{
-  return "=";
-}
-
-u8
-Equals::left_precedence() const
-{
-  return 3;
-}
-
-std::unique_ptr<Expression>
-Equals::construct_binary_expression(const Expression *lhs,
-                                    const Expression *rhs) const
-{
-  SHIT_UNUSED(lhs);
-  SHIT_UNUSED(rhs);
-  SHIT_UNREACHABLE("Invalid call");
-}
-
-/**
- * class: DoubleEquals
- */
-DoubleEquals::DoubleEquals(SourceLocation location) : Operator(location) {}
-
-Token::Kind
-DoubleEquals::kind() const
-{
-  return Token::Kind::DoubleEquals;
-}
-
-Token::Flags
-DoubleEquals::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-DoubleEquals::raw_string() const
-{
-  return "==";
-}
-
-u8
-DoubleEquals::left_precedence() const
-{
-  return 3;
-}
-
-std::unique_ptr<Expression>
-DoubleEquals::construct_binary_expression(const Expression *lhs,
-                                          const Expression *rhs) const
-{
-  return std::make_unique<expressions::Equal>(source_location(), lhs, rhs);
-}
-
-/**
- * class: ExclamationEquals
- */
-ExclamationEquals::ExclamationEquals(SourceLocation location)
-    : Operator(location)
-{}
-
-Token::Kind
-ExclamationEquals::kind() const
-{
-  return Token::Kind::DoubleEquals;
-}
-
-Token::Flags
-ExclamationEquals::flags() const
-{
-  return Token::Flag::BinaryOperator;
-}
-
-std::string
-ExclamationEquals::raw_string() const
-{
-  return "!=";
-}
-
-u8
-ExclamationEquals::left_precedence() const
-{
-  return 3;
-}
-
-std::unique_ptr<Expression>
-ExclamationEquals::construct_binary_expression(const Expression *lhs,
-                                               const Expression *rhs) const
-{
-  return std::make_unique<expressions::NotEqual>(source_location(), lhs, rhs);
-}
+#define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \
+  t::t(SourceLocation location) : Operator(location) {}                        \
+  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Flags t::flags() const                                                \
+  {                                                                            \
+    return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;           \
+  }                                                                            \
+  std::string                 t::raw_string() const { return s; }              \
+  u8                          t::left_precedence() const { return bp; }        \
+  u8                          t::unary_precedence() const { return up; }       \
+  std::unique_ptr<Expression> t::construct_binary_expression(                  \
+      const Expression *lhs, const Expression *rhs) const                      \
+  {                                                                            \
+    return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
+  }                                                                            \
+  std::unique_ptr<Expression> t::construct_unary_expression(                   \
+      const Expression *rhs) const                                             \
+  {                                                                            \
+    return std::make_unique<expressions::uexpr>(source_location(), rhs);       \
+  }
+
+BINARY_UNARY_OPERATOR_TOKEN_DECLS(Plus, "+", 13, 11, Unnegate, Add);
+BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
+
+#define BINARY_OPERATOR_TOKEN_DECLS(t, s, bp, bexpr)                           \
+  t::t(SourceLocation location) : Operator(location) {}                        \
+  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Flags t::flags() const { return Token::Flag::BinaryOperator; }        \
+  std::string  t::raw_string() const { return s; }                             \
+  u8           t::left_precedence() const { return bp; }                       \
+  std::unique_ptr<Expression> t::construct_binary_expression(                  \
+      const Expression *lhs, const Expression *rhs) const                      \
+  {                                                                            \
+    return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
+  }
+
+BINARY_OPERATOR_TOKEN_DECLS(Slash, "/", 12, Divide);
+BINARY_OPERATOR_TOKEN_DECLS(Asterisk, "*", 12, Multiply);
+BINARY_OPERATOR_TOKEN_DECLS(Percent, "%", 12, Module);
+BINARY_OPERATOR_TOKEN_DECLS(Ampersand, "&", 7, BinaryAnd);
+BINARY_OPERATOR_TOKEN_DECLS(DoubleAmpersand, "&&", 4, LogicalAnd);
+BINARY_OPERATOR_TOKEN_DECLS(Greater, ">", 8, GreaterThan);
+BINARY_OPERATOR_TOKEN_DECLS(DoubleGreater, ">>", 8, RightShift);
+BINARY_OPERATOR_TOKEN_DECLS(GreaterEquals, ">=", 8, GreaterOrEqual);
+BINARY_OPERATOR_TOKEN_DECLS(Less, "<", 8, LessThan);
+BINARY_OPERATOR_TOKEN_DECLS(DoubleLess, "<<", 8, LeftShift);
+BINARY_OPERATOR_TOKEN_DECLS(LessEquals, "<=", 8, LessOrEqual);
+BINARY_OPERATOR_TOKEN_DECLS(Pipe, "|", 5, BinaryOr);
+BINARY_OPERATOR_TOKEN_DECLS(DoublePipe, "||", 4, LogicalOr);
+BINARY_OPERATOR_TOKEN_DECLS(Cap, "^", 9, Xor);
+BINARY_OPERATOR_TOKEN_DECLS(Equals, "=", 3, BinaryDummyExpression);
+BINARY_OPERATOR_TOKEN_DECLS(DoubleEquals, "==", 3, Equal);
+BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
+
+#define UNARY_OPERATOR_TOKEN_DECLS(t, s, up, uexpr)                            \
+  t::t(SourceLocation location) : Operator(location) {}                        \
+  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Flags t::flags() const { return Token::Flag::UnaryOperator; }         \
+  std::string  t::raw_string() const { return s; }                             \
+  u8           t::unary_precedence() const { return up; }                      \
+  std::unique_ptr<Expression> t::construct_unary_expression(                   \
+      const Expression *rhs) const                                             \
+  {                                                                            \
+    return std::make_unique<expressions::uexpr>(source_location(), rhs);       \
+  }
+
+UNARY_OPERATOR_TOKEN_DECLS(ExclamationMark, "!", 13, LogicalNot);
+UNARY_OPERATOR_TOKEN_DECLS(Tilde, "~", 13, BinaryComplement);
 
 } /* namespace tokens */
 

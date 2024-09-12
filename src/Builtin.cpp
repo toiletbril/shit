@@ -13,12 +13,6 @@
 
 namespace shit {
 
-static const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
-    {"echo", Builtin::Kind::Echo},
-    {"exit", Builtin::Kind::Exit},
-    {"cd",   Builtin::Kind::Cd  },
-};
-
 std::optional<Builtin::Kind>
 search_builtin(std::string_view builtin_name)
 {
@@ -37,12 +31,7 @@ execute_builtin(ExecContext &&ec)
   std::unique_ptr<Builtin> b;
 
   switch (ec.builtin_kind()) {
-    /* clang-format off */
-  case Builtin::Kind::Echo: b.reset(new Echo); break;
-  case Builtin::Kind::Cd:   b.reset(new Cd); break;
-  case Builtin::Kind::Exit: b.reset(new Exit); break;
-    /* clang-format on */
-
+    BUILTIN_SWITCH_CASES();
   default:
     SHIT_UNREACHABLE("Unhandled builtin of kind %d",
                      SHIT_ENUM(ec.builtin_kind()));

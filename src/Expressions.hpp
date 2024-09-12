@@ -165,30 +165,6 @@ protected:
   std::vector<const SimpleCommand *> m_commands;
 };
 
-struct UnaryExpression : public Expression
-{
-  UnaryExpression(SourceLocation location, const Expression *rhs);
-  ~UnaryExpression() override;
-
-  std::string to_ast_string(usize layer = 0) const override;
-
-protected:
-  const Expression *m_rhs;
-};
-
-struct BinaryExpression : public Expression
-{
-  BinaryExpression(SourceLocation location, const Expression *lhs,
-                   const Expression *rhs);
-  ~BinaryExpression() override;
-
-  std::string to_ast_string(usize layer = 0) const override;
-
-protected:
-  const Expression *m_lhs;
-  const Expression *m_rhs;
-};
-
 struct ConstantNumber : public Expression
 {
   ConstantNumber(SourceLocation location, i64 value);
@@ -217,238 +193,74 @@ protected:
   const std::string m_value;
 };
 
-struct Negate : public UnaryExpression
+struct UnaryExpression : public Expression
 {
-  Negate(SourceLocation location, const Expression *rhs);
+  UnaryExpression(SourceLocation location, const Expression *rhs);
+  ~UnaryExpression() override;
 
-  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  const Expression *m_rhs;
 };
 
-struct Unnegate : public UnaryExpression
-{
-  Unnegate(SourceLocation location, const Expression *rhs);
+#define UNARY_EXPRESSION_STRUCT(e)                                             \
+  struct e : public UnaryExpression                                            \
+  {                                                                            \
+    e(SourceLocation location, const Expression *rhs);                         \
+    std::string to_string() const override;                                    \
+                                                                               \
+  protected:                                                                   \
+    i64 evaluate_impl(EvalContext &cxt) const override;                        \
+  }
 
-  std::string to_string() const override;
+UNARY_EXPRESSION_STRUCT(Negate);
+UNARY_EXPRESSION_STRUCT(Unnegate);
+UNARY_EXPRESSION_STRUCT(LogicalNot);
+UNARY_EXPRESSION_STRUCT(BinaryComplement);
+
+struct BinaryExpression : public Expression
+{
+  BinaryExpression(SourceLocation location, const Expression *lhs,
+                   const Expression *rhs);
+  ~BinaryExpression() override;
+
+  std::string to_ast_string(usize layer = 0) const override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  const Expression *m_lhs;
+  const Expression *m_rhs;
 };
 
-struct LogicalNot : public UnaryExpression
-{
-  LogicalNot(SourceLocation location, const Expression *rhs);
+#define BINARY_EXPRESSION_STRUCT(e)                                            \
+  struct e : public BinaryExpression                                           \
+  {                                                                            \
+    e(SourceLocation location, const Expression *lhs, const Expression *rhs);  \
+    std::string to_string() const override;                                    \
+                                                                               \
+  protected:                                                                   \
+    i64 evaluate_impl(EvalContext &cxt) const override;                        \
+  }
 
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct BinaryComplement : public UnaryExpression
-{
-  BinaryComplement(SourceLocation location, const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct Add : public BinaryExpression
-{
-  Add(SourceLocation location, const Expression *lhs, const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct Subtract : public BinaryExpression
-{
-  Subtract(SourceLocation location, const Expression *lhs,
-           const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct Multiply : public BinaryExpression
-{
-  Multiply(SourceLocation location, const Expression *lhs,
-           const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct Divide : public BinaryExpression
-{
-  Divide(SourceLocation location, const Expression *lhs, const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct Module : public BinaryExpression
-{
-  Module(SourceLocation location, const Expression *lhs, const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct BinaryAnd : public BinaryExpression
-{
-  BinaryAnd(SourceLocation location, const Expression *lhs,
-            const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct LogicalAnd : public BinaryExpression
-{
-  LogicalAnd(SourceLocation location, const Expression *lhs,
-             const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct GreaterThan : public BinaryExpression
-{
-  GreaterThan(SourceLocation location, const Expression *lhs,
-              const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct GreaterOrEqual : public BinaryExpression
-{
-  GreaterOrEqual(SourceLocation location, const Expression *lhs,
-                 const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct RightShift : public BinaryExpression
-{
-  RightShift(SourceLocation location, const Expression *lhs,
-             const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct LessThan : public BinaryExpression
-{
-  LessThan(SourceLocation location, const Expression *lhs,
-           const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct LessOrEqual : public BinaryExpression
-{
-  LessOrEqual(SourceLocation location, const Expression *lhs,
-              const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct LeftShift : public BinaryExpression
-{
-  LeftShift(SourceLocation location, const Expression *lhs,
-            const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct BinaryOr : public BinaryExpression
-{
-  BinaryOr(SourceLocation location, const Expression *lhs,
-           const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct LogicalOr : public BinaryExpression
-{
-  LogicalOr(SourceLocation location, const Expression *lhs,
-            const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct Xor : public BinaryExpression
-{
-  Xor(SourceLocation location, const Expression *lhs, const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct Equal : public BinaryExpression
-{
-  Equal(SourceLocation location, const Expression *lhs, const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
-
-struct NotEqual : public BinaryExpression
-{
-  NotEqual(SourceLocation location, const Expression *lhs,
-           const Expression *rhs);
-
-  std::string to_string() const override;
-
-protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
-};
+BINARY_EXPRESSION_STRUCT(BinaryDummyExpression);
+BINARY_EXPRESSION_STRUCT(Add);
+BINARY_EXPRESSION_STRUCT(Subtract);
+BINARY_EXPRESSION_STRUCT(Multiply);
+BINARY_EXPRESSION_STRUCT(Divide);
+BINARY_EXPRESSION_STRUCT(Module);
+BINARY_EXPRESSION_STRUCT(BinaryAnd);
+BINARY_EXPRESSION_STRUCT(LogicalAnd);
+BINARY_EXPRESSION_STRUCT(GreaterThan);
+BINARY_EXPRESSION_STRUCT(GreaterOrEqual);
+BINARY_EXPRESSION_STRUCT(RightShift);
+BINARY_EXPRESSION_STRUCT(LeftShift);
+BINARY_EXPRESSION_STRUCT(LessThan);
+BINARY_EXPRESSION_STRUCT(LessOrEqual);
+BINARY_EXPRESSION_STRUCT(BinaryOr);
+BINARY_EXPRESSION_STRUCT(LogicalOr);
+BINARY_EXPRESSION_STRUCT(Xor);
+BINARY_EXPRESSION_STRUCT(Equal);
+BINARY_EXPRESSION_STRUCT(NotEqual);
 
 } /* namespace expressions */
 

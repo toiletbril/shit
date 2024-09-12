@@ -261,23 +261,6 @@ Lexer::lex_number()
   return num;
 }
 
-const static std::unordered_map<std::string, Token::Kind> KEYWORDS = {
-    {"if",       Token::Kind::If      },
-    {"then",     Token::Kind::Then    },
-    {"else",     Token::Kind::Else    },
-    {"elif",     Token::Kind::Elif    },
-    {"fi",       Token::Kind::Fi      },
-    {"when",     Token::Kind::When    },
-    {"case",     Token::Kind::Case    },
-    {"esac",     Token::Kind::Esac    },
-    {"for",      Token::Kind::For     },
-    {"done",     Token::Kind::Done    },
-    {"until",    Token::Kind::Until   },
-    {"time",     Token::Kind::Time    },
-    {"do",       Token::Kind::Do      },
-    {"function", Token::Kind::Function},
-};
-
 /* TODO: Escaping looks terrible here, but I can't think of a better way. */
 Token *
 Lexer::lex_identifier()
@@ -357,32 +340,11 @@ Lexer::lex_identifier()
   if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(ident_string));
       kw != KEYWORDS.end())
   {
-    /* clang-format off */
-#define KW_CASE(k)                                                             \
-  case Token::Kind::k:                                                         \
-    t = new tokens::k{                                                         \
-        {m_cursor_position, length}                                            \
-    };                                                                         \
-    break
-    /* clang-format on */
     switch (kw->second) {
-      KW_CASE(Case);
-      KW_CASE(Esac);
-      KW_CASE(For);
-      KW_CASE(Done);
-      KW_CASE(Until);
-      KW_CASE(Time);
-      KW_CASE(Do);
-      KW_CASE(Function);
-      KW_CASE(If);
-      KW_CASE(Then);
-      KW_CASE(Else);
-      KW_CASE(Fi);
-      KW_CASE(When);
+      KW_SWITCH_CASES();
     default:
       SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(kw->second));
     }
-#undef KW_CASE
   } else {
     t = new tokens::Identifier{
         {m_cursor_position, length},

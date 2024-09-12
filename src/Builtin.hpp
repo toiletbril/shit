@@ -5,6 +5,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 
 namespace shit {
 
@@ -17,6 +18,7 @@ struct Builtin
     Echo,
     Cd,
     Exit,
+    Pwd,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -30,6 +32,22 @@ struct Builtin
 protected:
   Builtin();
 };
+
+const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
+    {"echo", Builtin::Kind::Echo},
+    {"exit", Builtin::Kind::Exit},
+    {"cd",   Builtin::Kind::Cd  },
+    {"pwd",  Builtin::Kind::Pwd },
+};
+
+#define B_CASE(btin)                                                           \
+  case Builtin::Kind::btin: b.reset(new btin); break
+
+#define BUILTIN_SWITCH_CASES()                                                 \
+  B_CASE(Echo);                                                                \
+  B_CASE(Cd);                                                                  \
+  B_CASE(Exit);                                                                \
+  B_CASE(Pwd)
 
 struct Echo : public Builtin
 {
@@ -53,6 +71,14 @@ struct Exit : public Builtin
 
   Kind             kind() const override;
   [[noreturn]] i32 execute(ExecContext &ec) const override;
+};
+
+struct Pwd : public Builtin
+{
+  Pwd();
+
+  Kind kind() const override;
+  i32  execute(ExecContext &ec) const override;
 };
 
 std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
