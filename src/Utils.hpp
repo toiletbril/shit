@@ -50,6 +50,20 @@ private:
   std::vector<std::string> m_args;
 };
 
+template<class T>
+std::string
+merge_args_to_string(const std::vector<T> &v)
+{
+  std::string r{};
+  for (const std::string &s : v) {
+    r += s;
+    if (s != v.back()) {
+      r += ' ';
+    }
+  }
+  return r;
+}
+
 template <class T>
 usize
 find_pos_in_vec(const std::vector<T> &v, const T &p)

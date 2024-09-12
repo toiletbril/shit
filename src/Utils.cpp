@@ -145,6 +145,7 @@ execute_context(ExecContext &&ec, bool is_async)
     if (is_async) {
       return 0;
     }
+    toiletline::set_title(merge_args_to_string(ec.args()));
     return os::wait_and_monitor_process(p);
   } else {
     return execute_builtin(std::move(ec));

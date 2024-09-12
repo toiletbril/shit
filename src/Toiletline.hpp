@@ -11,6 +11,8 @@ namespace {
 
 namespace toiletline {
 
+bool set_title(const std::string &title);
+
 usize utf8_strlen(const std::string &s);
 
 bool is_active();

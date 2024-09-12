@@ -210,12 +210,16 @@ main(int argc, char **argv)
 
         static constexpr usize PWD_LENGTH = 24;
 
-        /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
-        std::string prompt = "shit % ";
         std::string pwd = shit::utils::get_current_directory().string();
+        toiletline::set_title(pwd);
+
         if (pwd.length() > PWD_LENGTH) {
           pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
         }
+
+        /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
+        std::string prompt{};
+        prompt += "shit % ";
         prompt += pwd;
         prompt += " $ ";
 

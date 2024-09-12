@@ -25,6 +25,12 @@ namespace toiletline {
 
 static const std::string SHIT_HISTORY_FILE = ".shit_history";
 
+bool
+set_title(const std::string &title)
+{
+  return ::tl_set_title(title.c_str()) != -1;
+}
+
 usize
 utf8_strlen(const std::string &s)
 {
