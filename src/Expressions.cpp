@@ -175,8 +175,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   SHIT_ASSERT(m_args.size() > 0);
 
   return utils::execute_context(
-      utils::ExecContext::make_from(source_location(),
-                                    cxt.process_args(m_args)),
+      ExecContext::make_from(source_location(), cxt.process_args(m_args)),
       is_async());
 
   SHIT_UNREACHABLE();
@@ -415,13 +414,13 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_commands.size() > 1);
 
-  std::vector<utils::ExecContext> ecs;
+  std::vector<ExecContext> ecs;
   ecs.reserve(m_commands.size());
 
   for (const SimpleCommand *e : m_commands) {
     cxt.add_evaluated_expression();
-    ecs.emplace_back(utils::ExecContext::make_from(
-        e->source_location(), cxt.process_args(e->args())));
+    ecs.emplace_back(ExecContext::make_from(e->source_location(),
+                                            cxt.process_args(e->args())));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs), is_async());

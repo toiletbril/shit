@@ -1,8 +1,12 @@
 #pragma once
 
+#include "Builtin.hpp"
 #include "Common.hpp"
 
+#include <filesystem>
+#include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace shit {
@@ -73,6 +77,43 @@ protected:
   usize m_expressions_executed_total{0};
   usize m_expansions_last{0};
   usize m_expansions_total{0};
+};
+
+/* Lower-level execution context. Path is the program path to execute, expanded
+ * from program. Program is non-altered first arg. */
+struct ExecContext
+{
+  static ExecContext make_from(SourceLocation                  location,
+                               const std::vector<std::string> &args);
+
+  std::optional<os::descriptor> in_fd{std::nullopt};
+  std::optional<os::descriptor> out_fd{std::nullopt};
+
+  bool is_builtin() const;
+
+  const std::vector<std::string> &args() const;
+  const std::string              &program() const;
+  const SourceLocation           &source_location() const;
+
+  void close_fds();
+  void print_to_stdout(const std::string &s) const;
+
+  i32 execute(bool is_async);
+
+  const std::filesystem::path &program_path() const;
+  const Builtin::Kind         &builtin_kind() const;
+
+private:
+  /* clang-format off */
+  ExecContext(SourceLocation location,
+              std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
+              const std::vector<std::string> &args);
+  /* clang-format on */
+
+  std::variant<shit::Builtin::Kind, std::filesystem::path> m_kind;
+
+  SourceLocation           m_location;
+  std::vector<std::string> m_args;
 };
 
 } /* namespace shit */

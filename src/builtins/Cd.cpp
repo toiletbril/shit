@@ -14,7 +14,7 @@ Cd::kind() const
 }
 
 i32
-Cd::execute(utils::ExecContext &ec) const
+Cd::execute(ExecContext &ec) const
 {
   std::string arg_path{};
 

@@ -337,7 +337,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
                 flag->set_position(++position);
               } else {
                 throw Error{"No value provided for '" +
-                            flag_name(flag, is_long) + "'"};
+                            flag_name(flag, is_long) + "' flag"};
               }
             } else if (!is_long) {
               /* Flag is short, value is provided without a separator. */
@@ -395,7 +395,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
   /* Previous flag expected a value after space. */
   if (next_arg_is_value) {
     throw Error{"No value provided for '" + flag_name(prev_flag, prev_is_long) +
-                "'"};
+                "' flag"};
   }
 
   return args;

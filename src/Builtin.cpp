@@ -32,7 +32,7 @@ search_builtin(std::string_view builtin_name)
 }
 
 i32
-execute_builtin(utils::ExecContext &&ec)
+execute_builtin(ExecContext &&ec)
 {
   std::unique_ptr<Builtin> b;
 

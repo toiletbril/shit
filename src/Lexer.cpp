@@ -357,14 +357,14 @@ Lexer::lex_identifier()
   if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(ident_string));
       kw != KEYWORDS.end())
   {
-/* clang-format off */
+    /* clang-format off */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
     t = new tokens::k{                                                         \
         {m_cursor_position, length}                                            \
     };                                                                         \
     break
-/* clang-format on */
+    /* clang-format on */
     switch (kw->second) {
       KW_CASE(Case);
       KW_CASE(Esac);

@@ -8,9 +8,7 @@
 
 namespace shit {
 
-namespace utils {
 struct ExecContext;
-}
 
 struct Builtin
 {
@@ -25,7 +23,7 @@ struct Builtin
   void print_to_stdout(const std::string &s) const;
 
   virtual Kind kind() const = 0;
-  virtual i32  execute(utils::ExecContext &ec) const = 0;
+  virtual i32  execute(ExecContext &ec) const = 0;
 
   virtual ~Builtin() = default;
 
@@ -38,7 +36,7 @@ struct Echo : public Builtin
   Echo();
 
   Kind kind() const override;
-  i32  execute(utils::ExecContext &ec) const override;
+  i32  execute(ExecContext &ec) const override;
 };
 
 struct Cd : public Builtin
@@ -46,7 +44,7 @@ struct Cd : public Builtin
   Cd();
 
   Kind kind() const override;
-  i32  execute(utils::ExecContext &ec) const override;
+  i32  execute(ExecContext &ec) const override;
 };
 
 struct Exit : public Builtin
@@ -54,11 +52,11 @@ struct Exit : public Builtin
   Exit();
 
   Kind             kind() const override;
-  [[noreturn]] i32 execute(utils::ExecContext &ec) const override;
+  [[noreturn]] i32 execute(ExecContext &ec) const override;
 };
 
 std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
 
-i32 execute_builtin(utils::ExecContext &&ec);
+i32 execute_builtin(ExecContext &&ec);
 
 } /* namespace shit */

@@ -153,7 +153,7 @@ main(int argc, char **argv)
   for (;;) {
     SHIT_ASSERT(!shit::os::is_child_process());
 
-    std::string contents{};
+    std::string script_contents{};
 
     /* Figure out what to do and retrieve the code. */
     try {
@@ -186,14 +186,14 @@ main(int argc, char **argv)
           } else if (file->eof()) {
             break;
           }
-          contents += ch;
+          script_contents += ch;
         }
 
         if ((arg_index += 1) == file_names.size()) {
           should_quit = true;
         }
       } else if (should_execute_commands) {
-        contents = FLAG_COMMAND.next();
+        script_contents = FLAG_COMMAND.next();
         if (FLAG_COMMAND.at_end()) {
           should_quit = true;
         }
@@ -211,7 +211,7 @@ main(int argc, char **argv)
         static constexpr usize PWD_LENGTH = 24;
 
         std::string pwd = shit::utils::get_current_directory().string();
-        toiletline::set_title(pwd);
+        toiletline::set_title("shit % " + pwd);
 
         if (pwd.length() > PWD_LENGTH) {
           pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
@@ -247,7 +247,7 @@ main(int argc, char **argv)
 
           /* Execute the command without raw mode. */
           if (code == TL_PRESSED_ENTER && !input.empty()) {
-            contents = input;
+            script_contents = input;
             break;
           }
         }
@@ -277,7 +277,7 @@ main(int argc, char **argv)
 
     /* Execute the contents. */
     try {
-      shit::Parser p{shit::Lexer{contents}};
+      shit::Parser p{shit::Lexer{script_contents}};
 
       std::unique_ptr<shit::Expression> ast = p.construct_ast();
       if (FLAG_DUMP_AST.is_enabled()) {
@@ -297,10 +297,10 @@ main(int argc, char **argv)
 
       context.end_command();
     } catch (shit::ErrorWithLocationAndDetails &e) {
-      shit::show_message(e.to_string(contents));
-      shit::show_message(e.details_to_string(contents));
+      shit::show_message(e.to_string(script_contents));
+      shit::show_message(e.details_to_string(script_contents));
     } catch (shit::ErrorWithLocation &e) {
-      shit::show_message(e.to_string(contents));
+      shit::show_message(e.to_string(script_contents));
     } catch (shit::Error &e) {
       shit::show_message(e.to_string());
     } catch (std::exception &e) {

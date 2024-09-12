@@ -12,7 +12,7 @@ Exit::kind() const
 }
 
 i32
-Exit::execute(utils::ExecContext &ec) const
+Exit::execute(ExecContext &ec) const
 {
   utils::quit(ec.args().size() > 0 ? std::atoi(ec.args()[0].c_str()) : 0, true);
 }

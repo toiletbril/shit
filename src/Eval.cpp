@@ -1,6 +1,7 @@
 #include "Eval.hpp"
 
 #include "Common.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Platform.hpp"
@@ -333,6 +334,120 @@ EvalContext::process_args(const std::vector<const Token *> &args)
   }
 
   return expanded_args;
+}
+
+/* clang-format off */
+ExecContext::ExecContext(
+    SourceLocation location,
+    std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
+    const std::vector<std::string> &args)
+    : m_kind(kind), m_location(location), m_args(args)
+{}
+/* clang-format on */
+
+const SourceLocation &
+ExecContext::source_location() const
+{
+  return m_location;
+}
+
+const std::string &
+ExecContext::program() const
+{
+  return m_args[0];
+}
+
+const std::vector<std::string> &
+ExecContext::args() const
+{
+  return m_args;
+}
+
+bool
+ExecContext::is_builtin() const
+{
+  return std::holds_alternative<shit::Builtin::Kind>(m_kind);
+}
+
+const std::filesystem::path &
+ExecContext::program_path() const
+{
+  if (!is_builtin()) {
+    return std::get<std::filesystem::path>(m_kind);
+  }
+
+  throw shit::Error{"program_path() call on a builtin"};
+}
+
+void
+ExecContext::close_fds()
+{
+  if (in_fd)
+    os::close_fd(*in_fd);
+  if (out_fd)
+    os::close_fd(*out_fd);
+}
+
+const Builtin::Kind &
+ExecContext::builtin_kind() const
+{
+  if (is_builtin()) {
+    return std::get<shit::Builtin::Kind>(m_kind);
+  }
+
+  SHIT_UNREACHABLE("builtin_kind() call on a program");
+}
+
+void
+ExecContext::print_to_stdout(const std::string &s) const
+{
+  if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data(), s.size())
+           .has_value())
+  {
+    throw Error{"Unable to write to stdout: " +
+                os::last_system_error_message()};
+  }
+}
+
+ExecContext
+ExecContext::make_from(SourceLocation                  location,
+                       const std::vector<std::string> &args)
+{
+  SHIT_ASSERT(args.size() > 0);
+
+  std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
+
+  const std::string &program = args[0];
+
+  std::optional<Builtin::Kind>         bk;
+  std::optional<std::filesystem::path> p;
+
+  /* This isn't a path? */
+  if (program.find('/') == std::string::npos) {
+    bk = search_builtin(program);
+
+    if (!bk) {
+      /* Not a builtin, try to search PATH. */
+      p = utils::search_program_path(program);
+    }
+  } else {
+    /* This is a path. */
+    /* TODO: Sanitize extensions here too. */
+    p = utils::canonicalize_path(program);
+  }
+
+  /* Builtins take precedence over programs. */
+  if (!bk) {
+    if (p)
+      kind = *p;
+    else
+      throw ErrorWithLocation{location,
+                              "Program '" + program + "' wasn't found"};
+  } else {
+    kind = *bk;
+  }
+
+  return {location, std::move(kind), args};
 }
 
 SourceLocation::SourceLocation(usize position, usize length)

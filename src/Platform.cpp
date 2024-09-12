@@ -116,7 +116,7 @@ check_syscall_impl(
 #define check_syscall2(fn, cleanup_fn) check_syscall_impl(fn, #fn, cleanup_fn)
 
 process
-execute_program(utils::ExecContext &&ec)
+execute_program(ExecContext &&ec)
 {
   SHIT_DEFER { ec.close_fds(); };
 
@@ -369,7 +369,7 @@ get_environment_variable(const std::string &key)
 }
 
 process
-execute_program(utils::ExecContext &&ec)
+execute_program(ExecContext &&ec)
 {
   std::string program_path = ec.program_path().string();
   std::string command_line = make_os_args(ec.args());

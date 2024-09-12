@@ -50,7 +50,7 @@ void set_default_signal_handlers();
 
 void reset_signal_handlers();
 
-process execute_program(utils::ExecContext &&ec);
+process execute_program(ExecContext &&ec);
 
 } /* namespace os */
 
