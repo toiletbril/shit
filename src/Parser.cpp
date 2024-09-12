@@ -188,7 +188,6 @@ Parser::parse_simple_command()
     }
     /* fallthrough */
     case Token::Kind::Identifier:
-    case Token::Kind::ExpandableIdentifier:
       m_lexer.advance_past_last_peek();
       if (!source_location) {
         source_location = token->source_location();
@@ -197,6 +196,14 @@ Parser::parse_simple_command()
       break;
 
     case Token::Kind::If:
+    case Token::Kind::Do:
+    case Token::Kind::For:
+    case Token::Kind::Time:
+    case Token::Kind::When:
+    case Token::Kind::Elif:
+    case Token::Kind::Else:
+    case Token::Kind::Case:
+    case Token::Kind::Esac:
     case Token::Kind::Then:
     case Token::Kind::Redirection:
       throw ErrorWithLocation{token->source_location(),

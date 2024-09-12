@@ -319,17 +319,10 @@ EvalContext::process_args(const std::vector<const Token *> &args)
 
   for (const Token *t : args) {
     try {
-      if (t->flags() & Token::Flag::Expandable) {
-        std::string r = t->raw_string();
-        expand_tilde(r);
-        std::vector<std::string> e = expand_path(std::move(r));
-        for (std::string &a : e) {
-          erase_escapes(a);
-          expanded_args.emplace_back(a);
-        }
-      } else {
-        std::string a = t->raw_string();
-        expand_tilde(a);
+      std::string r = t->raw_string();
+      expand_tilde(r);
+      std::vector<std::string> e = expand_path(std::move(r));
+      for (std::string &a : e) {
         erase_escapes(a);
         expanded_args.emplace_back(a);
       }
@@ -358,9 +351,7 @@ SourceLocation::length() const
   return m_length;
 }
 
-EscapeMap::EscapeMap()
-  : m_bitmap()
-{}
+EscapeMap::EscapeMap() : m_bitmap() {}
 
 void
 EscapeMap::add_escape(usize position)

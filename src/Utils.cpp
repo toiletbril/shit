@@ -25,7 +25,8 @@ namespace utils {
 
 /* clang-format off */
 ExecContext::ExecContext(
-    SourceLocation location, std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
+    SourceLocation location,
+    std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
     const std::vector<std::string> &args)
     : m_kind(kind), m_location(location), m_args(args)
 {}

@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
@@ -260,6 +261,23 @@ Lexer::lex_number()
   return num;
 }
 
+const static std::unordered_map<std::string, Token::Kind> KEYWORDS = {
+    {"if",       Token::Kind::If      },
+    {"then",     Token::Kind::Then    },
+    {"else",     Token::Kind::Else    },
+    {"elif",     Token::Kind::Elif    },
+    {"fi",       Token::Kind::Fi      },
+    {"when",     Token::Kind::When    },
+    {"case",     Token::Kind::Case    },
+    {"esac",     Token::Kind::Esac    },
+    {"for",      Token::Kind::For     },
+    {"done",     Token::Kind::Done    },
+    {"until",    Token::Kind::Until   },
+    {"time",     Token::Kind::Time    },
+    {"do",       Token::Kind::Do      },
+    {"function", Token::Kind::Function},
+};
+
 /* TODO: Escaping looks terrible here, but I can't think of a better way. */
 Token *
 Lexer::lex_identifier()
@@ -267,17 +285,16 @@ Lexer::lex_identifier()
   char        ch;
   std::string ident_string{};
 
-  usize length = 0;
+  usize byte_count = 0;
 
-  bool  is_expandable = false;
-  bool  should_escape = false;
-  bool  should_append = false;
+  bool should_escape = false;
+  bool should_append = false;
 
   std::optional<char> quote_char{};
   usize               last_quote_char_pos = m_cursor_position;
 
   /* Handle quote escapes and strings. */
-  while (lexer::is_part_of_identifier((ch = chop_character(length))) ||
+  while (lexer::is_part_of_identifier((ch = chop_character(byte_count))) ||
          ((quote_char || should_escape) && ch != lexer::CEOF))
   {
     should_append = true;
@@ -290,21 +307,19 @@ Lexer::lex_identifier()
     if (lexer::is_expandable_char(ch)) {
       /* Escape all expandable chars inside quotes. */
       if (quote_char) {
-        m_escape_map.add_escape(m_cursor_position + length);
+        m_escape_map.add_escape(m_cursor_position + byte_count);
         should_append = false;
-      } else {
-        is_expandable = true;
       }
     } else if ((is_escape || is_dollar) && is_in_single_quotes) {
       /* Single quotes ignore escapes/variables. */
-      m_escape_map.add_escape(m_cursor_position + length);
+      m_escape_map.add_escape(m_cursor_position + byte_count);
       should_append = false;
     } else if (is_escape) {
-      m_escape_map.add_escape(m_cursor_position + length);
+      m_escape_map.add_escape(m_cursor_position + byte_count);
       should_append = false;
     }
 
-    length++;
+    byte_count++;
 
     if (!should_escape) {
       if (quote_char == ch) {
@@ -312,7 +327,7 @@ Lexer::lex_identifier()
         continue;
       } else if (!quote_char && lexer::is_string_quote(ch)) {
         quote_char = ch;
-        last_quote_char_pos = m_cursor_position + length - 1;
+        last_quote_char_pos = m_cursor_position + byte_count - 1;
         continue;
       }
     }
@@ -326,9 +341,9 @@ Lexer::lex_identifier()
 
   if (quote_char) {
     throw ErrorWithLocationAndDetails{
-        {last_quote_char_pos, length},
+        {last_quote_char_pos, byte_count},
         "Unterminated string literal",
-        {m_cursor_position + length, 1},
+        {m_cursor_position + byte_count, 1},
         "expected a " + std::string{*quote_char}
         + " here"
     };
@@ -336,47 +351,46 @@ Lexer::lex_identifier()
 
   Token *t{};
 
+  usize length = toiletline::utf8_strlen(ident_string.c_str());
+
   /* An identifier may be a keyword. */
   if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(ident_string));
       kw != KEYWORDS.end())
   {
+/* clang-format off */
+#define KW_CASE(k)                                                             \
+  case Token::Kind::k:                                                         \
+    t = new tokens::k{                                                         \
+        {m_cursor_position, length}                                            \
+    };                                                                         \
+    break
+/* clang-format on */
     switch (kw->second) {
-    case Token::Kind::If:
-      t = new tokens::If{
-          {m_cursor_position, length}
-      };
-      break;
-    case Token::Kind::Then:
-      t = new tokens::Then{
-          {m_cursor_position, length}
-      };
-      break;
-    case Token::Kind::Else:
-      t = new tokens::Else{
-          {m_cursor_position, length}
-      };
-      break;
-    case Token::Kind::Fi:
-      t = new tokens::Fi{
-          {m_cursor_position, length}
-      };
-      break;
+      KW_CASE(Case);
+      KW_CASE(Esac);
+      KW_CASE(For);
+      KW_CASE(Done);
+      KW_CASE(Until);
+      KW_CASE(Time);
+      KW_CASE(Do);
+      KW_CASE(Function);
+      KW_CASE(If);
+      KW_CASE(Then);
+      KW_CASE(Else);
+      KW_CASE(Fi);
+      KW_CASE(When);
     default:
       SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(kw->second));
     }
-  } else if (!is_expandable) {
-    t = new tokens::Identifier{
-        {m_cursor_position, length},
-        ident_string
-    };
+#undef KW_CASE
   } else {
-    t = new tokens::ExpandableIdentifier{
+    t = new tokens::Identifier{
         {m_cursor_position, length},
         ident_string
     };
   }
 
-  m_cached_offset = length;
+  m_cached_offset = byte_count;
 
   return t;
 }

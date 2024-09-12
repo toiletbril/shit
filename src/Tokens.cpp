@@ -38,7 +38,7 @@ If::kind() const
 Token::Flags
 If::flags() const
 {
-  return Token::Flag::Sentinel;
+  return Token::Flag::Keyword;
 }
 
 std::string
@@ -61,7 +61,7 @@ Else::kind() const
 Token::Flags
 Else::flags() const
 {
-  return Token::Flag::Sentinel;
+  return Token::Flag::Keyword;
 }
 
 std::string
@@ -84,7 +84,7 @@ Then::kind() const
 Token::Flags
 Then::flags() const
 {
-  return Token::Flag::Sentinel;
+  return Token::Flag::Keyword;
 }
 
 std::string
@@ -107,13 +107,220 @@ Fi::kind() const
 Token::Flags
 Fi::flags() const
 {
-  return Token::Flag::Sentinel;
+  return Token::Flag::Keyword;
 }
 
 std::string
 Fi::raw_string() const
 {
   return "Fi";
+}
+
+/**
+ * class: When
+ */
+When::When(SourceLocation location) : Token(location) {}
+
+Token::Kind
+When::kind() const
+{
+  return Token::Kind::When;
+}
+
+Token::Flags
+When::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+When::raw_string() const
+{
+  return "When";
+}
+
+/**
+ * class: For
+ */
+For::For(SourceLocation location) : Token(location) {}
+
+Token::Kind
+For::kind() const
+{
+  return Token::Kind::For;
+}
+
+Token::Flags
+For::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+For::raw_string() const
+{
+  return "For";
+}
+
+/**
+ * class: Done
+ */
+Done::Done(SourceLocation location) : Token(location) {}
+
+Token::Kind
+Done::kind() const
+{
+  return Token::Kind::Done;
+}
+
+Token::Flags
+Done::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+Done::raw_string() const
+{
+  return "Done";
+}
+
+/**
+ * class: Case
+ */
+Case::Case(SourceLocation location) : Token(location) {}
+
+Token::Kind
+Case::kind() const
+{
+  return Token::Kind::Case;
+}
+
+Token::Flags
+Case::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+Case::raw_string() const
+{
+  return "Case";
+}
+
+/**
+ * class: Esac
+ */
+Esac::Esac(SourceLocation location) : Token(location) {}
+
+Token::Kind
+Esac::kind() const
+{
+  return Token::Kind::Esac;
+}
+
+Token::Flags
+Esac::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+Esac::raw_string() const
+{
+  return "Esac";
+}
+
+/**
+ * class: Time
+ */
+Time::Time(SourceLocation location) : Token(location) {}
+
+Token::Kind
+Time::kind() const
+{
+  return Token::Kind::Time;
+}
+
+Token::Flags
+Time::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+Time::raw_string() const
+{
+  return "Time";
+}
+
+/**
+ * class: Do
+ */
+Do::Do(SourceLocation location) : Token(location) {}
+
+Token::Kind
+Do::kind() const
+{
+  return Token::Kind::Do;
+}
+
+Token::Flags
+Do::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+Do::raw_string() const
+{
+  return "Do";
+}
+
+/**
+ * class: Function
+ */
+Function::Function(SourceLocation location) : Token(location) {}
+
+Token::Kind
+Function::kind() const
+{
+  return Token::Kind::Function;
+}
+
+Token::Flags
+Function::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+Function::raw_string() const
+{
+  return "Function";
+}
+
+/**
+ * class: Until
+ */
+Until::Until(SourceLocation location) : Token(location) {}
+
+Token::Kind
+Until::kind() const
+{
+  return Token::Kind::Until;
+}
+
+Token::Flags
+Until::flags() const
+{
+  return Token::Flag::Keyword;
+}
+
+std::string
+Until::raw_string() const
+{
+  return "Until";
 }
 
 /**
@@ -263,26 +470,6 @@ char
 String::quote_char() const
 {
   return m_quote_char;
-}
-
-/**
- * class: ExpandableString
- */
-ExpandableIdentifier::ExpandableIdentifier(SourceLocation   location,
-                                           std::string_view sv)
-    : Value(location, sv)
-{}
-
-Token::Kind
-ExpandableIdentifier::kind() const
-{
-  return Token::Kind::ExpandableIdentifier;
-}
-
-Token::Flags
-ExpandableIdentifier::flags() const
-{
-  return Token::Flag::Value | Token::Flag::Expandable;
 }
 
 /**

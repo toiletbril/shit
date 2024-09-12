@@ -25,6 +25,12 @@ namespace toiletline {
 
 static const std::string SHIT_HISTORY_FILE = ".shit_history";
 
+usize
+utf8_strlen(const std::string &s)
+{
+  return ::tl_utf8_strlen(s.c_str());
+}
+
 bool
 is_active()
 {

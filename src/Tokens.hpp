@@ -40,7 +40,6 @@ struct Token
     String,
     Identifier,
     Redirection,
-    ExpandableIdentifier,
 
     /* Operators */
     Plus,
@@ -72,6 +71,16 @@ struct Token
     Fi,
     Echo,
     Exit,
+    Elif,
+    When,
+    Case,
+    For,
+    Done,
+    Esac,
+    Until,
+    Time,
+    Do,
+    Function,
   };
 
   using Flags = u8;
@@ -83,8 +92,8 @@ struct Token
     Value          = 1,
     UnaryOperator  = 1 << 1,
     BinaryOperator = 1 << 2,
-    Expandable     = 1 << 3,
-    Special        = 1 << 4,
+    Special        = 1 << 3,
+    Keyword        = 1 << 4,
     /* clang-format on */
   };
 
@@ -110,13 +119,6 @@ protected:
 
 private:
   SourceLocation m_location;
-};
-
-const std::unordered_map<std::string, Token::Kind> KEYWORDS = {
-    {"if",   Token::Kind::If  },
-    {"then", Token::Kind::Then},
-    {"else", Token::Kind::Else},
-    {"fi",   Token::Kind::Fi  },
 };
 
 namespace tokens {
@@ -151,6 +153,87 @@ struct Else : public Token
 struct Then : public Token
 {
   Then(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct Case : public Token
+{
+  Case(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct Esac : public Token
+{
+  Esac(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct For : public Token
+{
+  For(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct Done : public Token
+{
+  Done(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct Until : public Token
+{
+  Until(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct Time : public Token
+{
+  Time(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct Do : public Token
+{
+  Do(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct Function : public Token
+{
+  Function(SourceLocation location);
+
+  Kind        kind() const override;
+  Flags       flags() const override;
+  std::string raw_string() const override;
+};
+
+struct When : public Token
+{
+  When(SourceLocation location);
 
   Kind        kind() const override;
   Flags       flags() const override;
@@ -297,14 +380,6 @@ struct String : public Value
 
 protected:
   char m_quote_char;
-};
-
-struct ExpandableIdentifier : public Value
-{
-  ExpandableIdentifier(SourceLocation location, std::string_view sv);
-
-  Kind  kind() const override;
-  Flags flags() const override;
 };
 
 struct Identifier : Value
