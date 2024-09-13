@@ -111,11 +111,10 @@ EvalContext::expand_path_once(std::string_view path, bool should_expand_files)
   std::string parent_dir{};
 
   if (has_slashes) {
-    if (last_slash != 0) {
+    if (last_slash != 0)
       parent_dir = path.substr(0, last_slash);
-    } else {
+    else
       parent_dir = path.substr(0, 1);
-    }
   } else {
     parent_dir = ".";
   }
@@ -145,21 +144,15 @@ EvalContext::expand_path_once(std::string_view path, bool should_expand_files)
 
   if (glob) {
     for (const std::filesystem::directory_entry &e : d) {
-      if (!should_expand_files && !e.is_directory()) {
-        continue;
-      }
+      if (!should_expand_files && !e.is_directory()) continue;
       std::string f = e.path().filename().string();
       /* TODO: Figure the rules of hidden file expansion. */
-      if ((*glob)[0] != '.' && f[0] == '.') {
-        continue;
-      }
+      if ((*glob)[0] != '.' && f[0] == '.') continue;
       if (utils::glob_matches(*glob, f)) {
         std::string expanded_path{};
         if (parent_dir != ".") {
           expanded_path += parent_dir;
-          if (parent_dir != "/") {
-            expanded_path += '/';
-          }
+          if (parent_dir != "/") expanded_path += '/';
         }
         expanded_path += f;
         add_expansion();
@@ -200,9 +193,8 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
           break;
         }
       }
-      if (slash_after) {
-        path.remove_suffix(path.length() - *slash_after);
-      }
+
+      if (slash_after) path.remove_suffix(path.length() - *slash_after);
 
       std::vector<std::string> expanded_paths =
           expand_path_once(path, !slash_after);
@@ -222,9 +214,8 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
           resulting_expanded_paths.emplace_back(twice_expanded_path);
         }
       } else {
-        for (const std::string &resulting_path : expanded_paths) {
+        for (const std::string &resulting_path : expanded_paths)
           resulting_expanded_paths.emplace_back(resulting_path);
-        }
       }
     } else {
       resulting_expanded_paths.emplace_back(path);
@@ -382,10 +373,8 @@ ExecContext::program_path() const
 void
 ExecContext::close_fds()
 {
-  if (in_fd)
-    os::close_fd(*in_fd);
-  if (out_fd)
-    os::close_fd(*out_fd);
+  if (in_fd) os::close_fd(*in_fd);
+  if (out_fd) os::close_fd(*out_fd);
 }
 
 const Builtin::Kind &
@@ -480,9 +469,7 @@ EscapeMap::add_escape(usize position)
 bool
 EscapeMap::is_escaped(usize position) const
 {
-  if (m_bitmap.size() * 8 <= position) {
-    return false;
-  }
+  if (m_bitmap.size() * 8 <= position) return false;
   return m_bitmap[position / 8] & (1 << (position % 8));
 }
 

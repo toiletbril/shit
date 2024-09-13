@@ -18,9 +18,8 @@ search_builtin(std::string_view builtin_name)
 {
   std::string lower_builtin_name = utils::lowercase_string(builtin_name);
 
-  if (auto b = BUILTINS.find(lower_builtin_name.c_str()); b != BUILTINS.end()) {
+  if (auto b = BUILTINS.find(lower_builtin_name.c_str()); b != BUILTINS.end())
     return b->second;
-  }
 
   return std::nullopt;
 }

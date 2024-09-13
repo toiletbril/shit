@@ -28,9 +28,7 @@ execute_context(ExecContext &&ec, bool is_async)
 {
   if (!ec.is_builtin()) {
     os::process p = os::execute_program(std::move(ec));
-    if (is_async) {
-      return 0;
-    }
+    if (is_async) return 0;
     toiletline::set_title(merge_args_to_string(ec.args()));
     return os::wait_and_monitor_process(p);
   } else {
@@ -69,19 +67,17 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
       ec.in_fd = last_stdin;
     }
 
-    if (!ec.is_builtin()) {
+    if (!ec.is_builtin())
       last_child = os::execute_program(std::move(ec));
-    } else {
+    else
       ret = execute_builtin(std::move(ec));
-    }
 
     is_first = false;
     last_stdin = pipe->in;
   }
 
-  if (last_child != SHIT_INVALID_FD && !is_async) {
+  if (last_child != SHIT_INVALID_FD && !is_async)
     ret = os::wait_and_monitor_process(last_child);
-  }
 
   return ret;
 }
@@ -99,9 +95,7 @@ string_replace(std::string &s, const std::string_view to_replace,
   for (;;) {
     p = i;
     i = s.find(to_replace, i);
-    if (i == std::string::npos) {
-      break;
-    }
+    if (i == std::string::npos) break;
     b.append(s, p, i - p);
     b += replace_with;
     i += to_replace.size();
@@ -116,9 +110,8 @@ lowercase_string(std::string_view s)
 {
   std::string l{};
   l.reserve(s.length());
-  for (usize i = 0; i < s.length(); i++) {
+  for (usize i = 0; i < s.length(); i++)
     l += std::tolower(s[i]);
-  }
   return l;
 }
 
@@ -314,8 +307,7 @@ clear_path_map()
 void
 initialize_path_map()
 {
-  if (!MAYBE_PATH)
-    return;
+  if (!MAYBE_PATH) return;
 
   std::string dir_string{};
   std::string path_var = *MAYBE_PATH;
@@ -359,8 +351,7 @@ std::optional<std::filesystem::path>
 search_and_cache(const std::string &program_name)
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
-  if (!MAYBE_PATH)
-    return std::nullopt;
+  if (!MAYBE_PATH) return std::nullopt;
 
   std::string dir_string{};
   std::string path_var = *MAYBE_PATH;

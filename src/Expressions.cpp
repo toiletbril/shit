@@ -21,9 +21,8 @@ std::string
 Expression::to_ast_string(usize layer) const
 {
   std::string pad{};
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
   return pad + "[" + to_string() + "]";
 }
 
@@ -51,9 +50,7 @@ If::~If()
   delete m_condition;
   delete m_then;
 
-  if (m_otherwise != nullptr) {
-    delete m_otherwise;
-  }
+  if (m_otherwise != nullptr) delete m_otherwise;
 }
 
 i64
@@ -61,11 +58,10 @@ If::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  if (m_condition->evaluate(cxt)) {
+  if (m_condition->evaluate(cxt))
     return m_then->evaluate(cxt);
-  } else if (m_otherwise != nullptr) {
+  else if (m_otherwise != nullptr)
     return m_otherwise->evaluate(cxt);
-  }
 
   return 0;
 }
@@ -82,9 +78,8 @@ If::to_ast_string(usize layer) const
   std::string s{};
   std::string pad{};
 
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
 
   s += pad + "[If]\n";
   s += pad + EXPRESSION_AST_INDENT + m_condition->to_ast_string(layer + 1) +
@@ -183,9 +178,7 @@ SimpleCommand::to_string() const
     s += args;
   }
   s += "\"";
-  if (is_async()) {
-    s += ", Async";
-  }
+  if (is_async()) s += ", Async";
   return s;
 }
 
@@ -194,9 +187,8 @@ SimpleCommand::to_ast_string(usize layer) const
 {
   SHIT_UNUSED(layer);
   std::string pad{};
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
   return pad + "[" + to_string() + "]";
 }
 
@@ -257,9 +249,8 @@ CompoundList::to_ast_string(usize layer) const
   std::string s{};
   std::string pad{};
 
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
   s += pad + "[" + to_string() + "]";
   for (const CompoundListCondition *n : m_nodes) {
     s += '\n';
@@ -274,30 +265,25 @@ CompoundList::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_nodes.size() > 0);
 
-  static constexpr i64 nothing_was_executed = -256;
-  i64                  ret = nothing_was_executed;
+  static const i64 NOTHING_WAS_EXECUTED = -256;
+
+  i64 ret = NOTHING_WAS_EXECUTED;
 
   for (const CompoundListCondition *n : m_nodes) {
     switch (n->kind()) {
-    case CompoundListCondition::Kind::None: {
-      ret = n->evaluate(cxt);
-    } break;
+    case CompoundListCondition::Kind::None: ret = n->evaluate(cxt); break;
 
     case CompoundListCondition::Kind::Or:
-      if (ret != 0) {
-        ret = n->evaluate(cxt);
-      }
+      if (ret != 0) ret = n->evaluate(cxt);
       break;
 
     case CompoundListCondition::Kind::And:
-      if (ret == 0) {
-        ret = n->evaluate(cxt);
-      }
+      if (ret == 0) ret = n->evaluate(cxt);
       break;
     }
   }
 
-  SHIT_ASSERT(ret != nothing_was_executed);
+  SHIT_ASSERT(ret != NOTHING_WAS_EXECUTED);
 
   return ret;
 }
@@ -333,9 +319,8 @@ CompoundListCondition::to_ast_string(usize layer) const
 {
   std::string s{};
   std::string pad{};
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
 
   s += pad + "[" + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_cmd->to_ast_string(layer + 1);
@@ -377,9 +362,7 @@ Pipeline::to_ast_string(usize layer) const
   }
 
   s += pad + "[" + to_string();
-  if (is_async()) {
-    s += ", Async";
-  }
+  if (is_async()) s += ", Async";
   s += "]";
   for (const SimpleCommand *e : m_commands) {
     s += '\n';
@@ -460,9 +443,8 @@ BinaryExpression::to_ast_string(usize layer) const
   std::string s{};
   std::string pad{};
 
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
   s += pad + "[Binary " + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_lhs->to_ast_string(layer + 1) + "\n";
   s += pad + EXPRESSION_AST_INDENT + m_rhs->to_ast_string(layer + 1);
@@ -491,9 +473,8 @@ ConstantNumber::to_ast_string(usize layer) const
 {
   std::string s{};
   std::string pad{};
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
   s += pad + "[Number " + to_string() + "]";
   return s;
 }
@@ -526,9 +507,8 @@ ConstantString::to_ast_string(usize layer) const
 {
   std::string s{};
   std::string pad{};
-  for (usize i = 0; i < layer; i++) {
+  for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
-  }
   s += pad + "[String \"" + to_string() + "\"]";
   return s;
 }

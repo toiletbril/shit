@@ -17,6 +17,7 @@ AlignArrayOfStructures: Left
 AlignConsecutiveDeclarations: true
 AlignConsecutiveMacros: true
 AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortCaseLabelsOnASingleLine: true
 AlwaysBreakAfterReturnType: AllDefinitions
 AlwaysBreakTemplateDeclarations: true

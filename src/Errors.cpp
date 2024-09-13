@@ -34,21 +34,19 @@ get_context_pointing_to(std::string_view source, SourceLocation location,
                         usize line_number, usize last_newline_location,
                         std::optional<std::string_view> message)
 {
-  usize       start_offset = 0;
+  usize size = 0;
+  usize start_offset = 0;
+
   const usize pos = location.position();
 
   while (pos - start_offset > last_newline_location) {
     start_offset++;
   }
 
-  usize size = 0;
-  while (pos + size < source.length() && source[pos + size] != '\n') {
+  while (pos + size < source.length() && source[pos + size] != '\n')
     size++;
-  }
 
-  if (source[pos - start_offset] == '\n') {
-    start_offset--;
-  }
+  if (source[pos - start_offset] == '\n') start_offset--;
 
   SHIT_ASSERT(pos + size <= source.length(), "end: %zu, length: %zu",
               pos + size, source.length());
@@ -59,6 +57,7 @@ get_context_pointing_to(std::string_view source, SourceLocation location,
 
   usize line_number_length = 0;
   usize line_number_copy = line_number + 1;
+
   while (line_number_copy > 0) {
     line_number_copy /= 10;
     line_number_length++;
@@ -85,18 +84,14 @@ get_context_pointing_to(std::string_view source, SourceLocation location,
 
   msg += '\n';
   msg += "       |  "; /* 10 chars */
-  if (start_offset + added_symbols > 10) {
-    for (usize i = 0; i < start_offset + added_symbols - 10; i++) {
+  if (start_offset + added_symbols > 10)
+    for (usize i = 0; i < start_offset + added_symbols - 10; i++)
       msg += ' ';
-    }
-  }
 
   msg += "^~";
-  if (location.length() > 2) {
-    for (usize i = 0; i < location.length() - 2; i++) {
+  if (location.length() > 2)
+    for (usize i = 0; i < location.length() - 2; i++)
       msg += '~';
-    }
-  }
 
   if (message) {
     msg += ' ';

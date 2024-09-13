@@ -216,9 +216,8 @@ parse_flags_vec(const std::vector<Flag *>      &flags,
 {
   std::vector<const char *> os_argv;
   os_argv.reserve(args.size());
-  for (const std::string &arg : args) {
+  for (const std::string &arg : args)
     os_argv.emplace_back(arg.c_str());
-  }
   return parse_flags(flags, os_argv.size(),
                      const_cast<char const *const *>(os_argv.data()));
 }
@@ -235,9 +234,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 {
   SHIT_ASSERT(argc >= 0);
 
-  if (argc == 0) {
-    return {};
-  }
+  if (argc == 0) return {};
 
   SHIT_ASSERT(argv);
 
@@ -254,11 +251,12 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
     if (next_arg_is_value) {
       next_arg_is_value = false;
-      if (prev_flag->kind() == Flag::Kind::String) {
+
+      if (prev_flag->kind() == Flag::Kind::String)
         static_cast<FlagString *>(prev_flag)->set(argv[i]);
-      } else {
+      else
         static_cast<FlagManyStrings *>(prev_flag)->append(argv[i]);
-      }
+
       continue;
     }
 
@@ -277,14 +275,13 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
       is_long = true;
     }
 
+    /* Skip the rest of the flags after '--' or treat '-' as an argument. */
     if (*flag_offset == '\0') {
-      if (is_long) {
-        /* Skip the rest of the flags after '--'. */
+      if (is_long)
         ignore_rest = true;
-      } else {
-        /* Treat '-' as an argument. */
+      else
         args.push_back(argv[i]);
-      }
+
       continue;
     }
 
@@ -329,11 +326,11 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
               /* Value is provided with '='. */
               if (*value_offset != '\0') {
-                if (flag->kind() == Flag::Kind::String) {
+                if (flag->kind() == Flag::Kind::String)
                   static_cast<FlagString *>(flag)->set(value_offset);
-                } else {
+                else
                   static_cast<FlagManyStrings *>(flag)->append(value_offset);
-                }
+
                 flag->set_position(++position);
               } else {
                 throw Error{"No value provided for '" +
@@ -341,11 +338,11 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
               }
             } else if (!is_long) {
               /* Flag is short, value is provided without a separator. */
-              if (flag->kind() == Flag::Kind::String) {
+              if (flag->kind() == Flag::Kind::String)
                 static_cast<FlagString *>(flag)->set(value_offset);
-              } else {
+              else
                 static_cast<FlagManyStrings *>(flag)->append(value_offset);
-              }
+
               flag->set_position(++position);
             } else {
               throw Error{
@@ -375,11 +372,10 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
             std::string_view flag_sv = flag_offset;
             usize            equals_pos = flag_sv.find('=');
 
-            if (equals_pos != std::string::npos) {
+            if (equals_pos != std::string::npos)
               s += flag_sv.substr(0, equals_pos);
-            } else {
+            else
               s += flag_sv;
-            }
           }
           s += "'";
 

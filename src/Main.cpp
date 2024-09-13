@@ -74,9 +74,7 @@ main(int argc, char **argv)
   if (file_names.size() > 0) {
     program_path = file_names[0];
     file_names.erase(file_names.begin());
-    if (program_path == "-") {
-      is_login_shell = true;
-    }
+    if (program_path == "-") is_login_shell = true;
   } else {
     program_path = "<unknown path>";
   }
@@ -96,9 +94,8 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  if (FLAG_LOGIN.is_enabled() || strcmp(argv[0], "-") == 0) {
+  if (FLAG_LOGIN.is_enabled() || strcmp(argv[0], "-") == 0)
     is_login_shell = true;
-  }
 
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
     shit::show_message(
@@ -171,10 +168,11 @@ main(int argc, char **argv)
           /* Otherwise, process the actual file name. */
           f = std::fstream{file_names[arg_index],
                            std::fstream::in | std::fstream::binary};
-          if (!f.is_open()) {
+
+          if (!f.is_open())
             throw shit::Error{"Could not open '" + file_names[arg_index] +
                               "': " + shit::os::last_system_error_message()};
-          }
+
           file = &f;
         }
 
@@ -194,9 +192,7 @@ main(int argc, char **argv)
         }
       } else if (should_execute_commands) {
         script_contents = FLAG_COMMAND.next();
-        if (FLAG_COMMAND.at_end()) {
-          should_quit = true;
-        }
+        if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();
@@ -213,9 +209,8 @@ main(int argc, char **argv)
         std::string pwd = shit::utils::get_current_directory().string();
         toiletline::set_title("shit % " + pwd);
 
-        if (pwd.length() > PWD_LENGTH) {
+        if (pwd.length() > PWD_LENGTH)
           pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
-        }
 
         /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
         std::string prompt{};
@@ -287,13 +282,11 @@ main(int argc, char **argv)
       context.steal_escape_map(std::move(p.escape_map()));
       exit_code = ast->evaluate(context);
 
-      if (FLAG_EXIT_CODE.is_enabled()) {
+      if (FLAG_EXIT_CODE.is_enabled())
         std::cout << "[Code " << exit_code << "]" << std::endl;
-      }
 
-      if (FLAG_STATS.is_enabled()) {
+      if (FLAG_STATS.is_enabled())
         std::cout << context.make_stats_string() << std::endl;
-      }
 
       context.end_command();
     } catch (shit::ErrorWithLocationAndDetails &e) {

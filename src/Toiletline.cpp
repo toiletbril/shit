@@ -103,9 +103,8 @@ readline(usize max_buffer_size, std::string_view prompt)
   b.reserve(max_buffer_size);
 
   i32 code = ::tl_readline(b.data(), max_buffer_size, prompt.data());
-  if (code == TL_ERROR) {
+  if (code == TL_ERROR)
     throw shit::Error{"Toiletline: Unexpected internal error"};
-  }
 
   return {code, b.data()};
 }
@@ -113,9 +112,8 @@ readline(usize max_buffer_size, std::string_view prompt)
 void
 enter_raw_mode()
 {
-  if (::tl_enter_raw_mode() != TL_SUCCESS) {
+  if (::tl_enter_raw_mode() != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't force the terminal into raw mode"};
-  }
 }
 
 void
@@ -130,9 +128,8 @@ exit_raw_mode()
 void
 emit_newlines(std::string_view buffer)
 {
-  if (::tl_emit_newlines(buffer.data()) != TL_SUCCESS) {
+  if (::tl_emit_newlines(buffer.data()) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
-  }
 }
 
 } /* namespace toiletline */

@@ -172,18 +172,17 @@ Token *
 Lexer::lex_expression_token()
 {
   if (char ch = chop_character(); ch != lexer::CEOF) {
-    if (lexer::is_number(ch)) {
+    if (lexer::is_number(ch))
       return lex_number();
-    } else if (lexer::is_expression_sentinel(ch)) {
+    else if (lexer::is_expression_sentinel(ch))
       return lex_sentinel();
-    } else if (lexer::is_part_of_identifier(ch)) {
+    else if (lexer::is_part_of_identifier(ch))
       return lex_identifier();
-    } else {
+    else
       throw ErrorWithLocation{
           {m_cursor_position, 1},
           "Unexpected character"
       };
-    }
   }
 
   return new tokens::EndOfFile{
@@ -195,16 +194,15 @@ Token *
 Lexer::lex_shell_token()
 {
   if (char ch = chop_character(); ch != lexer::CEOF) {
-    if (lexer::is_shell_sentinel(ch)) {
+    if (lexer::is_shell_sentinel(ch))
       return lex_sentinel();
-    } else if (lexer::is_part_of_identifier(ch)) {
+    else if (lexer::is_part_of_identifier(ch))
       return lex_identifier();
-    } else {
+    else
       throw ErrorWithLocation{
           {m_cursor_position, 1},
           "unexpected character"
       };
-    }
   }
 
   return new tokens::EndOfFile{
@@ -216,9 +214,8 @@ void
 Lexer::skip_whitespace()
 {
   usize i = 0;
-  while (lexer::is_whitespace(chop_character(i))) {
+  while (lexer::is_whitespace(chop_character(i)))
     i++;
-  }
   advance_forward(i);
 }
 
@@ -269,13 +266,13 @@ Lexer::lex_identifier()
   std::string ident_string{};
 
   usize byte_count = 0;
+  usize last_quote_char_pos = m_cursor_position;
 
   bool has_quotes = false;
   bool should_escape = false;
   bool should_append = false;
 
   std::optional<char> quote_char{};
-  usize               last_quote_char_pos = m_cursor_position;
 
   /* Handle quote escapes and strings. */
   while (lexer::is_part_of_identifier((ch = chop_character(byte_count))) ||
@@ -290,10 +287,7 @@ Lexer::lex_identifier()
 
     if (lexer::is_expandable_char(ch)) {
       /* Escape all expandable chars inside quotes. */
-      if (quote_char) {
-        m_escape_map.add_escape(m_cursor_position + byte_count);
-        should_append = false;
-      }
+      if (quote_char) m_escape_map.add_escape(m_cursor_position + byte_count);
     } else if ((is_escape || is_dollar) && is_in_single_quotes) {
       /* Single quotes ignore escapes/variables. */
       m_escape_map.add_escape(m_cursor_position + byte_count);
@@ -317,17 +311,15 @@ Lexer::lex_identifier()
       }
     }
 
-    if (should_append) {
-      ident_string += ch;
-    }
+    if (should_append) ident_string += ch;
 
-    should_escape = is_escape && !is_in_single_quotes;
+    should_escape = (is_escape && !is_in_single_quotes);
   }
 
   usize length =
       toiletline::utf8_strlen(ident_string.c_str()) + ((has_quotes) ? 2 : 0);
 
-  if (quote_char) {
+  if (quote_char)
     throw ErrorWithLocationAndDetails{
         {last_quote_char_pos, length - 1},
         "Unterminated string literal",
@@ -335,7 +327,6 @@ Lexer::lex_identifier()
         "expected a " + std::string{*quote_char}
         + " here"
     };
-  }
 
   Token *t{};
 

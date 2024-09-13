@@ -22,9 +22,7 @@ std::optional<usize>
 write_fd(os::descriptor fd, const void *buf, usize size)
 {
   ssize_t w = write(fd, buf, size);
-  if (w == -1) {
-    return std::nullopt;
-  }
+  if (w == -1) return std::nullopt;
   return static_cast<usize>(w);
 }
 
@@ -32,9 +30,7 @@ std::optional<usize>
 read_fd(os::descriptor fd, void *buf, usize size)
 {
   ssize_t r = read(fd, buf, size);
-  if (r == -1) {
-    return std::nullopt;
-  }
+  if (r == -1) return std::nullopt;
   return static_cast<usize>(r);
 }
 
@@ -48,9 +44,7 @@ std::optional<std::string>
 get_current_user()
 {
   struct passwd *pw = getpwuid(getuid());
-  if (pw != nullptr) {
-    return pw->pw_name;
-  }
+  if (pw != nullptr) return pw->pw_name;
   return std::nullopt;
 }
 
@@ -101,9 +95,7 @@ check_syscall_impl(
     const std::optional<std::function<void()>> &cleanup = std::nullopt)
 {
   if (status == -1) {
-    if (cleanup) {
-      (*cleanup)();
-    }
+    if (cleanup) (*cleanup)();
 
     throw shit::Error{"'" + invocation +
                       "' fail: " + last_system_error_message()};
@@ -217,9 +209,8 @@ make_os_args(const std::vector<std::string> &args)
   std::vector<const char *> os_args;
   os_args.reserve(args.size() + 1);
 
-  for (const std::string &arg : args) {
+  for (const std::string &arg : args)
     os_args.push_back(arg.c_str());
-  }
 
   os_args.push_back(nullptr);
 
@@ -241,9 +232,8 @@ make_sigset_impl(int first, ...)
   sigemptyset(&sm);
 
   va_start(va, first);
-  for (int sig = first; sig != -1; sig = va_arg(va, int)) {
+  for (int sig = first; sig != -1; sig = va_arg(va, int))
     sigaddset(&sm, sig);
-  }
   va_end(va);
 
   return sm;
@@ -299,9 +289,8 @@ std::optional<usize>
 write_fd(os::descriptor fd, const void *buf, usize size)
 {
   DWORD w = -1;
-  if (WriteFile(fd, buf, size, &w, 0) == FALSE) { /* NOLINT */
+  if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
     return std::nullopt;
-  }
   return static_cast<usize>(w);
 }
 
@@ -309,9 +298,8 @@ std::optional<usize>
 read_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD r = -1;
-  if (ReadFile(fd, buf, size, &r, 0) == FALSE) { /* NOLINT */
+  if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
     return std::nullopt;
-  }
   return static_cast<usize>(r);
 }
 
@@ -329,9 +317,8 @@ get_current_user()
   if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
     std::vector<char> buffer;
     buffer.reserve(size);
-    if (GetUserNameA(buffer.data(), &size)) {
+    if (GetUserNameA(buffer.data(), &size))
       return std::string{buffer.data(), size - 1};
-    }
   }
   return std::nullopt;
 }
@@ -362,9 +349,8 @@ std::optional<std::string>
 get_environment_variable(const std::string &key)
 {
   char buffer[WIN32_MAX_ENV_SIZE] = {0};
-  if (GetEnvironmentVariableA(key.c_str(), buffer, sizeof(buffer)) == 0) {
+  if (GetEnvironmentVariableA(key.c_str(), buffer, sizeof(buffer)) == 0)
     return std::nullopt;
-  }
   return std::string{buffer};
 }
 
@@ -381,19 +367,15 @@ execute_program(ExecContext &&ec)
 
   BOOL should_use_pipe = ec.in_fd || ec.out_fd;
 
-  if (should_use_pipe) {
-    startup_info.dwFlags |= STARTF_USESTDHANDLES;
-  }
+  if (should_use_pipe) startup_info.dwFlags |= STARTF_USESTDHANDLES;
 
   startup_info.hStdInput = ec.in_fd.value_or(SHIT_STDIN);
   startup_info.hStdOutput = ec.out_fd.value_or(SHIT_STDOUT);
 
   SHIT_DEFER
   {
-    if (ec.in_fd)
-      CloseHandle(*ec.in_fd);
-    if (ec.out_fd)
-      CloseHandle(*ec.out_fd);
+    if (ec.in_fd) CloseHandle(*ec.in_fd);
+    if (ec.out_fd) CloseHandle(*ec.out_fd);
   };
 
   if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
@@ -419,10 +401,8 @@ make_pipe()
   HANDLE out = INVALID_HANDLE_VALUE;
 
   if (CreatePipe(&in, &out, &att, 0) == 0) {
-    if (in != INVALID_HANDLE_VALUE)
-      close_fd(in);
-    if (out != INVALID_HANDLE_VALUE)
-      close_fd(out);
+    if (in != INVALID_HANDLE_VALUE) close_fd(in);
+    if (out != INVALID_HANDLE_VALUE) close_fd(out);
 
     return std::nullopt;
   }
@@ -433,14 +413,12 @@ make_pipe()
 i32
 wait_and_monitor_process(process p)
 {
-  if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0) {
+  if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
-  }
 
   DWORD code = -1;
-  if (GetExitCodeProcess(p, &code) == 0) {
+  if (GetExitCodeProcess(p, &code) == 0)
     throw Error{"GetExitCodeProcess() failed: " + last_system_error_message()};
-  }
 
   return code;
 }

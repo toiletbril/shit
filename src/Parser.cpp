@@ -59,11 +59,10 @@ Parser::parse_compound_command()
       expressions::CompoundListCondition::Kind::None;
 
   for (;;) {
-    if (should_parse_command) {
+    if (should_parse_command)
       lhs = parse_simple_command();
-    } else {
+    else
       should_parse_command = true;
-    }
 
     /* Operator right after. */
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
@@ -71,9 +70,7 @@ Parser::parse_compound_command()
     switch (token->kind()) {
     /* These operators require a command after them. */
     case Token::Kind::Ampersand:
-      if (lhs) {
-        lhs->make_async();
-      }
+      if (lhs) lhs->make_async();
       /* fallthrough */
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
@@ -212,9 +209,7 @@ Parser::parse_simple_command()
                               "Not implemented (Parser)"};
 
     default: {
-      if (!source_location) {
-        return nullptr;
-      }
+      if (!source_location) return nullptr;
 
       std::vector<const Token *> args{};
       args.reserve(args_accumulator.size());
@@ -291,8 +286,7 @@ Parser::parse_expression(u8 min_precedence)
     /* [else [then]] */
     if (after->kind() == Token::Kind::Else) {
       after.reset(m_lexer.peek_expression_token());
-      if (after->kind() == Token::Kind::Then)
-        m_lexer.advance_past_last_peek();
+      if (after->kind() == Token::Kind::Then) m_lexer.advance_past_last_peek();
 
       otherwise = parse_expression();
 
@@ -402,8 +396,7 @@ Parser::parse_expression(u8 min_precedence)
 
     const tokens::Operator *op =
         static_cast<const tokens::Operator *>(maybe_op.get());
-    if (op->left_precedence() < min_precedence)
-      break;
+    if (op->left_precedence() < min_precedence) break;
     m_lexer.advance_past_last_peek();
 
     std::unique_ptr<Expression> rhs = parse_expression(
