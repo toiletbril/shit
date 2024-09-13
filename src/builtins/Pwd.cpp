@@ -16,7 +16,7 @@ i32
 Pwd::execute(ExecContext &ec) const
 {
   std::string p{};
-  p = utils::get_current_directory();
+  p = utils::get_current_directory().string();
   p += '\n';
   ec.print_to_stdout(p);
   return 0;

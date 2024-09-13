@@ -1,6 +1,6 @@
 shit: 1:1: Error: Unterminated string literal.
      1 |  "This is a string. But where is another quote?
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
-shit: 1:47: Note:
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+shit: 1:46: Note:
      1 |  "This is a string. But where is another quote?
-       |                                                ^~ expected a " here.
+       |                                               ^~ expected a " here.
