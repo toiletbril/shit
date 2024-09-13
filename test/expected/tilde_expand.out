@@ -8,7 +8,7 @@
   [CompoundListCondition, &&]
     [SimpleCommand "echo 2"]
   [CompoundListCondition, None]
-    [SimpleCommand "test -d \~"]
+    [SimpleCommand "test -d ~"]
   [CompoundListCondition, &&]
     [SimpleCommand "echo 3"]
 1

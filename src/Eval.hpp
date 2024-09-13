@@ -31,6 +31,8 @@ struct EscapeMap
   void add_escape(usize position);
   bool is_escaped(usize position) const;
 
+  std::string to_string() const;
+
 private:
   std::vector<u8> m_bitmap;
 };
@@ -64,14 +66,22 @@ protected:
 
   EscapeMap m_escape_map;
 
-  std::vector<std::string> expand_path_once(std::string_view r,
-                                            bool should_count_files);
+  /* clang-format off */
   std::vector<std::string>
-  expand_path_recurse(const std::vector<std::string> &vs);
-  std::vector<std::string> expand_path(std::string &&r);
+  expand_path_once(std::string_view r,
+                   usize source_position,
+                   bool should_count_files);
 
-  void expand_tilde(std::string &r);
-  void erase_escapes(std::string &r);
+  std::vector<std::string>
+  expand_path_recurse(const std::vector<std::string> &vs,
+                      usize source_position);
+
+  std::vector<std::string>
+  expand_path(std::string &&r, usize source_position);
+  /* clang-format off */
+
+  /* Returns an offset by which the string was shifted. */
+  usize expand_tilde(std::string &r, usize source_position);
 
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};

@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <iostream>
 #include <optional>
 #include <unordered_map>
 
@@ -153,12 +154,19 @@ get_current_directory()
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 bool
-glob_matches(std::string_view glob, std::string_view str)
+glob_matches(std::string_view glob, std::string_view str, usize source_position,
+             const EscapeMap &em)
 {
   usize s = 0;
   usize g = 0;
 
   while (g < glob.length() && s < str.length()) {
+    if (em.is_escaped(source_position + g)) {
+      if (glob[g++] != str[s++]) return false;
+
+      continue;
+    }
+
     switch (glob[g]) {
     case '?': {
       g++;
@@ -166,7 +174,8 @@ glob_matches(std::string_view glob, std::string_view str)
     } break;
 
     case '*': {
-      if (glob_matches(glob.substr(g + 1), str.substr(s))) {
+      if (glob_matches(glob.substr(g + 1), str.substr(s), source_position, em))
+      {
         return true;
       }
       s++;
@@ -225,12 +234,6 @@ glob_matches(std::string_view glob, std::string_view str)
       s++;
     } break;
 
-    case '\\':
-      g++;
-      if (g >= glob.length()) {
-        throw Error{"Unfinished escape"};
-      }
-      /* fallthrough */
     default:
       if (glob[g++] != str[s++]) {
         return false;

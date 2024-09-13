@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 #include <optional>
 
 namespace shit {
@@ -100,7 +101,8 @@ EvalContext::total_expansion_count() const
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
 std::vector<std::string>
-EvalContext::expand_path_once(std::string_view path, bool should_expand_files)
+EvalContext::expand_path_once(std::string_view path, usize source_position,
+                              bool should_expand_files)
 {
   std::vector<std::string> expanded_paths{};
 
@@ -146,9 +148,11 @@ EvalContext::expand_path_once(std::string_view path, bool should_expand_files)
     for (const std::filesystem::directory_entry &e : d) {
       if (!should_expand_files && !e.is_directory()) continue;
       std::string f = e.path().filename().string();
+
       /* TODO: Figure the rules of hidden file expansion. */
       if ((*glob)[0] != '.' && f[0] == '.') continue;
-      if (utils::glob_matches(*glob, f)) {
+
+      if (utils::glob_matches(*glob, f, source_position, m_escape_map)) {
         std::string expanded_path{};
         if (parent_dir != ".") {
           expanded_path += parent_dir;
@@ -167,7 +171,8 @@ EvalContext::expand_path_once(std::string_view path, bool should_expand_files)
 }
 
 std::vector<std::string>
-EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
+EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
+                                 usize source_position)
 {
   std::vector<std::string> resulting_expanded_paths{};
   std::optional<usize>     expand_ch{};
@@ -176,12 +181,11 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
     std::string_view path = original_path;
 
     for (usize i = 0; i < path.length(); i++) {
-      if (lexer::is_expandable_char(path[i])) {
-        /* Is it escaped? */
-        if (!(i > 0 && path[i - 1] == '\\')) {
-          expand_ch = i;
-          break;
-        }
+      if (lexer::is_expandable_char(path[i]) &&
+          !m_escape_map.is_escaped(source_position + i))
+      {
+        expand_ch = i;
+        break;
       }
     }
     if (expand_ch) {
@@ -197,7 +201,8 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
       if (slash_after) path.remove_suffix(path.length() - *slash_after);
 
       std::vector<std::string> expanded_paths =
-          expand_path_once(path, !slash_after);
+          expand_path_once(path, source_position, !slash_after);
+
       if (slash_after) {
         /* Bring back the removed suffix. */
         std::string_view removed_suffix = original_path;
@@ -209,7 +214,7 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
 
         /* Call this function recursively on expanded entries. */
         std::vector<std::string> twice_expanded_paths =
-            expand_path_recurse(expanded_paths);
+            expand_path_recurse(expanded_paths, source_position);
         for (const std::string &twice_expanded_path : twice_expanded_paths) {
           resulting_expanded_paths.emplace_back(twice_expanded_path);
         }
@@ -225,16 +230,14 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths)
   return resulting_expanded_paths;
 }
 
-void
-EvalContext::expand_tilde(std::string &p)
+usize
+EvalContext::expand_tilde(std::string &p, usize source_position)
 {
-  if (p[0] == '~') {
-    /* NOTE: escapes are not processed here. It works because 0-position is
-     * hardcoded. */
+  if (p[0] == '~' && !m_escape_map.is_escaped(source_position)) {
     /* TODO: There may be several separators supported. */
     if (p.length() > 1 && p[1] != '/') {
       /* TODO: Expand different users. */
-      return;
+      return 0;
     }
 
     /* Remove the tilde. */
@@ -247,35 +250,21 @@ EvalContext::expand_tilde(std::string &p)
 
     std::string s{u->string()};
 
-#if PLATFORM_IS(WIN32)
-    /* FIXME: Double-escape the bullshit path delimiters. */
-    utils::string_replace(s, "\\", "\\\\");
-#endif
-
     p.insert(0, s);
-  }
-}
 
-void
-EvalContext::erase_escapes(std::string &r)
-{
-  for (usize i = 0; i < r.size(); i++) {
-    if (r[i] == '\\') {
-      r.erase(i, 1);
-      if (i == r.size()) {
-        throw Error{"Nothing to escape"};
-      }
-    }
+    return s.size() - 1;
   }
+
+  return 0;
 }
 
 std::vector<std::string>
-EvalContext::expand_path(std::string &&r)
+EvalContext::expand_path(std::string &&r, usize source_position)
 {
   std::vector<std::string> values{};
 
   if (m_enable_path_expansion) {
-    values = expand_path_recurse({r});
+    values = expand_path_recurse({r}, source_position);
   } else {
     values.emplace_back(r);
   }
@@ -309,15 +298,16 @@ EvalContext::process_args(const std::vector<const Token *> &args)
   std::vector<std::string> expanded_args{};
   expanded_args.reserve(args.size());
 
+  usize tilde_offset = 0;
+
   for (const Token *t : args) {
     try {
       std::string r = t->raw_string();
-      expand_tilde(r);
-      std::vector<std::string> e = expand_path(std::move(r));
-      for (std::string &a : e) {
-        erase_escapes(a);
+      tilde_offset += expand_tilde(r, t->source_location().position());
+      std::vector<std::string> e = expand_path(
+          std::move(r), t->source_location().position() - tilde_offset);
+      for (std::string &a : e)
         expanded_args.emplace_back(a);
-      }
     } catch (Error &e) {
       throw ErrorWithLocation{t->source_location(),
                               "Could not expand path: " + e.message()};
@@ -460,9 +450,7 @@ EscapeMap::EscapeMap() : m_bitmap() {}
 void
 EscapeMap::add_escape(usize position)
 {
-  if (m_bitmap.size() * 8 <= position) {
-    m_bitmap.reserve(position / 8 + 1);
-  }
+  if (m_bitmap.size() * 8 <= position) m_bitmap.resize(position / 8 + 1);
   m_bitmap[position / 8] |= (1 << (position % 8));
 }
 
@@ -471,6 +459,19 @@ EscapeMap::is_escaped(usize position) const
 {
   if (m_bitmap.size() * 8 <= position) return false;
   return m_bitmap[position / 8] & (1 << (position % 8));
+}
+
+std::string
+EscapeMap::to_string() const
+{
+  std::string s{};
+  for (usize byte = 0; byte < m_bitmap.size(); byte++) {
+    for (usize bit = 0; bit < 8; bit++) {
+      s += std::to_string((m_bitmap[byte] >> bit) & 1);
+    }
+    s += ' ';
+  }
+  return s;
 }
 
 } /* namespace shit */

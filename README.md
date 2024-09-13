@@ -50,7 +50,7 @@ Is it usable?
 - [x] Pipes.
 - [ ] Redirections. (`>`/`<`)
 - [x] Shell expansion. (`?`, `[...]`, `*`, `~`)
-- [ ] Escaping.
+- [x] Escaping.
 - [ ] Environment variables.
 - [ ] Numeric expressions.
 

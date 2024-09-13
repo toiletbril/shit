@@ -26,7 +26,6 @@ FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
 FLAG(COMMAND, ManyStrings, 'c', "command",
      "Execute specified command and exit. Can be used multiple times.");
 FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
-FLAG(STATS, Bool, 'S', "stats", "Print statistics after each command.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", "Disable path expansion.");
 FLAG(ONE_COMMAND, Bool, 't', "one-command",
      "Exit after executing one command.");
@@ -47,10 +46,16 @@ FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
 FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell.");
-FLAG(DUMP_AST, Bool, 'A', "dump-ast",
-     "Dump AST before executing each command.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
+
+FLAG(ESCAPE_MAP, Bool, 'M', "escape-map",
+     "Print escape map after each command parsed.");
+FLAG(STATS, Bool, 'S', "stats",
+     "Print statistics after each command executed.");
+FLAG(DUMP_AST, Bool, 'A', "dump-ast",
+     "Dump AST before executing each command.");
+
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, '\0', "short-version",
      "Display version in a short form.");
@@ -275,15 +280,21 @@ main(int argc, char **argv)
       shit::Parser p{shit::Lexer{script_contents}};
 
       std::unique_ptr<shit::Expression> ast = p.construct_ast();
+
       if (FLAG_DUMP_AST.is_enabled()) {
         std::cout << ast->to_ast_string() << std::endl;
+      }
+
+      if (FLAG_ESCAPE_MAP.is_enabled()) {
+        std::cout << "[Escape Map\n  " << p.escape_map().to_string() << "\n]"
+                  << std::endl;
       }
 
       context.steal_escape_map(std::move(p.escape_map()));
       exit_code = ast->evaluate(context);
 
       if (FLAG_EXIT_CODE.is_enabled())
-        std::cout << "[Code " << exit_code << "]" << std::endl;
+        std::cout << "[Code " << exit_code << ']' << std::endl;
 
       if (FLAG_STATS.is_enabled())
         std::cout << context.make_stats_string() << std::endl;

@@ -266,6 +266,7 @@ Lexer::lex_identifier()
   std::string ident_string{};
 
   usize byte_count = 0;
+  usize amount_of_backslashes = 0;
   usize last_quote_char_pos = m_cursor_position;
 
   bool has_quotes = false;
@@ -280,7 +281,7 @@ Lexer::lex_identifier()
   {
     should_append = true;
 
-    bool is_escape = (ch == '\\');
+    bool is_escape = (ch == '\\' && !should_escape);
     bool is_dollar = (ch == '$');
 
     bool is_in_single_quotes = (quote_char == '\'');
@@ -291,10 +292,10 @@ Lexer::lex_identifier()
     } else if ((is_escape || is_dollar) && is_in_single_quotes) {
       /* Single quotes ignore escapes/variables. */
       m_escape_map.add_escape(m_cursor_position + byte_count);
-      should_append = false;
     } else if (is_escape) {
       m_escape_map.add_escape(m_cursor_position + byte_count);
       should_append = false;
+      amount_of_backslashes++;
     }
 
     byte_count++;
@@ -316,8 +317,8 @@ Lexer::lex_identifier()
     should_escape = (is_escape && !is_in_single_quotes);
   }
 
-  usize length =
-      toiletline::utf8_strlen(ident_string.c_str()) + ((has_quotes) ? 2 : 0);
+  usize length = toiletline::utf8_strlen(ident_string.c_str()) +
+                 ((has_quotes) ? 2 : 0) + amount_of_backslashes;
 
   if (quote_char)
     throw ErrorWithLocationAndDetails{
@@ -326,6 +327,14 @@ Lexer::lex_identifier()
         {m_cursor_position + length - 1, 1},
         "expected a " + std::string{*quote_char}
         + " here"
+    };
+
+  if (should_escape)
+    throw ErrorWithLocationAndDetails{
+        {m_cursor_position + length - 1, 1},
+        "Nothing to escape",
+        {m_cursor_position + length,     1},
+        "expected a character here"
     };
 
   Token *t{};
