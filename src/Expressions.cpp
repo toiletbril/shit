@@ -40,7 +40,11 @@ If::If(SourceLocation location, const Expression *condition,
        const Expression *then, const Expression *otherwise)
     : Expression(location), m_condition(condition), m_then(then),
       m_otherwise(otherwise)
-{}
+{
+  SHIT_ASSERT(condition != nullptr);
+  SHIT_ASSERT(then != nullptr);
+  /* And *otherwise may be NULL. */
+}
 
 If::~If()
 {
@@ -559,14 +563,14 @@ BinaryDummyExpression::BinaryDummyExpression(SourceLocation    location,
 std::string
 BinaryDummyExpression::to_string() const
 {
-  SHIT_UNREACHABLE();
+  return "BinaryDummyExpression";
 }
 
 i64
 BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
-  SHIT_UNREACHABLE();
+  return 0;
 }
 
 Divide::Divide(SourceLocation location, const Expression *lhs,

@@ -270,6 +270,7 @@ Lexer::lex_identifier()
 
   usize byte_count = 0;
 
+  bool has_quotes = false;
   bool should_escape = false;
   bool should_append = false;
 
@@ -309,6 +310,7 @@ Lexer::lex_identifier()
         quote_char = std::nullopt;
         continue;
       } else if (!quote_char && lexer::is_string_quote(ch)) {
+        has_quotes = true;
         quote_char = ch;
         last_quote_char_pos = m_cursor_position + byte_count - 1;
         continue;
@@ -322,19 +324,20 @@ Lexer::lex_identifier()
     should_escape = is_escape && !is_in_single_quotes;
   }
 
+  usize length =
+      toiletline::utf8_strlen(ident_string.c_str()) + ((has_quotes) ? 2 : 0);
+
   if (quote_char) {
     throw ErrorWithLocationAndDetails{
-        {last_quote_char_pos, byte_count},
+        {last_quote_char_pos, length - 1},
         "Unterminated string literal",
-        {m_cursor_position + byte_count, 1},
+        {m_cursor_position + length - 1, 1},
         "expected a " + std::string{*quote_char}
         + " here"
     };
   }
 
   Token *t{};
-
-  usize length = toiletline::utf8_strlen(ident_string.c_str());
 
   /* An identifier may be a keyword. */
   if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(ident_string));
