@@ -17,8 +17,10 @@ namespace shit {
 /**
  * class: EvalContext
  */
-EvalContext::EvalContext(bool should_disable_path_expansion)
-    : m_enable_path_expansion(!should_disable_path_expansion)
+EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
+                         bool should_echo_expanded)
+    : m_enable_path_expansion(!should_disable_path_expansion),
+      m_enable_echo(should_echo), m_enable_echo_expanded(should_echo_expanded)
 {}
 
 void
@@ -74,6 +76,18 @@ EvalContext::make_stats_string() const
   return s;
 }
 
+bool
+EvalContext::should_echo() const
+{
+  return m_enable_echo;
+}
+
+bool
+EvalContext::should_echo_expanded() const
+{
+  return m_enable_echo_expanded;
+}
+
 usize
 EvalContext::last_expressions_executed() const
 {
@@ -121,6 +135,8 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
     parent_dir = ".";
   }
 
+  SHIT_TRACELN("p: %.*s", (int) path.length(), path.data());
+
   /* Stem of the glob after the last slash. */
   std::optional<std::string_view> glob{};
 
@@ -152,7 +168,7 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
       /* TODO: Figure the rules of hidden file expansion. */
       if ((*glob)[0] != '.' && f[0] == '.') continue;
 
-      if (utils::glob_matches(*glob, f, source_position, m_escape_map)) {
+      if (utils::glob_matches(*glob, f, source_position, escape_map())) {
         std::string expanded_path{};
         if (parent_dir != ".") {
           expanded_path += parent_dir;
@@ -170,6 +186,11 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
   return expanded_paths;
 }
 
+const EscapeMap &EvalContext::escape_map() const
+{
+  return m_escape_map;
+}
+
 std::vector<std::string>
 EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
                                  usize source_position)
@@ -182,12 +203,13 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
 
     for (usize i = 0; i < path.length(); i++) {
       if (lexer::is_expandable_char(path[i]) &&
-          !m_escape_map.is_escaped(source_position + i))
+          !escape_map().is_escaped(source_position + i))
       {
         expand_ch = i;
         break;
       }
     }
+
     if (expand_ch) {
       std::optional<usize> slash_after{};
 
@@ -231,9 +253,9 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
 }
 
 usize
-EvalContext::expand_tilde(std::string &p, usize source_position)
+EvalContext::expand_tilde(std::string &p, usize source_position) const
 {
-  if (p[0] == '~' && !m_escape_map.is_escaped(source_position)) {
+  if (p[0] == '~' && !escape_map().is_escaped(source_position)) {
     /* TODO: There may be several separators supported. */
     if (p.length() > 1 && p[1] != '/') {
       /* TODO: Expand different users. */
@@ -313,6 +335,10 @@ EvalContext::process_args(const std::vector<const Token *> &args)
                               "Could not expand path: " + e.message()};
     }
   }
+
+  if (should_echo_expanded())
+    std::cout << "+ " << utils::merge_args_to_string(expanded_args)
+              << std::endl;
 
   return expanded_args;
 }

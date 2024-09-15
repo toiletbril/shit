@@ -24,12 +24,12 @@ CXX := clang++
 endif
 
 ifeq ($(MODE), cosmo)
-OS_INFO := COSMO_FIXME_UNKNOWN_HOST
+OS_INFO := "cosmopolitan toolchain"
 else
-OS_INFO := $(shell uname -rvom)
+OS_INFO := $(shell uname -rvom || echo "<no uname>")
 endif
 
-COMMIT_HASH := $(shell git rev-parse HEAD)
+COMMIT_HASH := $(shell git rev-parse HEAD || echo "<no git>")
 
 DEFINES := \
 	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
@@ -61,7 +61,7 @@ CXXFLAGS += \
 	-O0
 ifneq ($(OS), Windows_NT)
 ifneq ($(MODE), cosmo)
-CXXFLAGS += -fsanitize=address -fsanitize=undefined # Asan is broken
+CXXFLAGS += -fsanitize=address -fsanitize=undefined
 endif
 endif
 else ifeq ($(MODE), cosmo)
@@ -123,8 +123,8 @@ fmt:
 	$(CLANG_FORMAT) -i $(SOURCES) $(HEADERS)
 
 clean:
-	rm -rf ./o $(OUT)
-	rm -rf ../*.ilk ../*.pdb ../*.lib        # Windows
-	rm -rf $(OUT).com.dbg $(OUT).aarch64.elf # Cosmopolitan
+	rm -rf ./o shit shit.exe
+	rm -rf ../*.ilk ../*.pdb ../*.lib    # Windows
+	rm -rf shit.com.dbg shit.aarch64.elf # Cosmopolitan
 
 .PHONY: dirs shit install tidy fmt clean

@@ -24,6 +24,19 @@ namespace shit {
 
 namespace utils {
 
+std::string
+merge_tokens_to_string(const std::vector<const Token *> &v)
+{
+  std::string r{};
+  for (const shit::Token *t : v) {
+    r += t->raw_string();
+    if (t != v.back()) {
+      r += ' ';
+    }
+  }
+  return r;
+}
+
 i32
 execute_context(ExecContext &&ec, bool is_async)
 {
@@ -160,11 +173,16 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
   usize s = 0;
   usize g = 0;
 
-  while (g < glob.length() && s < str.length()) {
-    if (em.is_escaped(source_position + g)) {
-      if (glob[g++] != str[s++]) return false;
+  SHIT_TRACELN("glob: %.*s, sl: %zu", (int) glob.length(), glob.data(), source_position);
 
-      continue;
+  while (g < glob.length() && s < str.length()) {
+    SHIT_TRACELN("%zu", source_position + g);
+
+    if (em.is_escaped(source_position + g)) {
+      if (glob[g++] != str[s++])
+        return false;
+      else
+        continue;
     }
 
     switch (glob[g]) {

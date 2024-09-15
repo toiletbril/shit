@@ -3,6 +3,7 @@
 #include "Builtin.hpp"
 #include "Common.hpp"
 #include "Eval.hpp"
+#include "Tokens.hpp"
 #include "Os.hpp"
 
 #include <filesystem>
@@ -14,6 +15,8 @@
 namespace shit {
 
 namespace utils {
+
+std::string merge_tokens_to_string(const std::vector<const Token *> &v);
 
 template <class T>
 std::string

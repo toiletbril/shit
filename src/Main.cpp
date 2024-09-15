@@ -29,16 +29,16 @@ FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
 FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", "Disable path expansion.");
 FLAG(ONE_COMMAND, Bool, 't', "one-command",
      "Exit after executing one command.");
+FLAG(VERBOSE, Bool, 'v', "verbose",
+     "Write input to standard error as it is read.");
+FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
+     "Write expanded input to standard error as it is read.");
 
 /* TODO: */
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
      "UNIMPLEMENTED: Don't overwrite existing files with '>'.");
-FLAG(VERBOSE, Bool, 'v', "verbose",
-     "UNIMPLEMENTED: Write input to standard error as it is read.");
-FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
-     "UNIMPLEMENTED: Write expanded input to standard error as it is read.");
 
 /* Total bullcrap. */
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
@@ -119,14 +119,14 @@ main(int argc, char **argv)
   bool should_read_stdin =
       (!should_be_interactive && !should_read_files) || FLAG_STDIN.is_enabled();
 
-  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled() ||
-      FLAG_VERBOSE.is_enabled() || FLAG_EXPAND_VERBOSE.is_enabled())
-  {
+  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled()) {
     shit::show_message("One or more unimplemented options were ignored.");
   }
 
   /* Main loop state. */
-  shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled()};
+  shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
+                            FLAG_VERBOSE.is_enabled(),
+                            FLAG_EXPAND_VERBOSE.is_enabled()};
 
   usize arg_index = 0;
   bool  should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;

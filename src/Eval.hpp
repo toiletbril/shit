@@ -41,17 +41,22 @@ struct Token;
 
 struct EvalContext
 {
-  EvalContext(bool should_disable_path_expansion);
+  EvalContext(bool should_disable_path_expansion, bool should_echo,
+              bool should_echo_expanded);
 
   void add_expansion();
   void add_evaluated_expression();
 
   void end_command();
 
-  void steal_escape_map(const EscapeMap &&em);
+  const EscapeMap &escape_map() const;
+  void             steal_escape_map(const EscapeMap &&em);
 
   /* Path-expand, tilde-expand and escape. */
   std::vector<std::string> process_args(const std::vector<const Token *> &args);
+
+  bool should_echo() const;
+  bool should_echo_expanded() const;
 
   std::string make_stats_string() const;
 
@@ -62,31 +67,32 @@ struct EvalContext
   usize total_expansion_count() const;
 
 protected:
-  bool m_enable_path_expansion;
+  usize m_expressions_executed_last{0};
+  usize m_expressions_executed_total{0};
+  usize m_expansions_last{0};
+  usize m_expansions_total{0};
 
   EscapeMap m_escape_map;
+  bool      m_enable_path_expansion;
+
+  bool m_enable_echo;
+  bool m_enable_echo_expanded;
 
   /* clang-format off */
   std::vector<std::string>
   expand_path_once(std::string_view r,
                    usize source_position,
                    bool should_count_files);
-
   std::vector<std::string>
   expand_path_recurse(const std::vector<std::string> &vs,
                       usize source_position);
-
   std::vector<std::string>
   expand_path(std::string &&r, usize source_position);
   /* clang-format off */
 
   /* Returns an offset by which the string was shifted. */
-  usize expand_tilde(std::string &r, usize source_position);
+  usize expand_tilde(std::string &r, usize source_position) const;
 
-  usize m_expressions_executed_last{0};
-  usize m_expressions_executed_total{0};
-  usize m_expansions_last{0};
-  usize m_expansions_total{0};
 };
 
 /* Lower-level execution context. Path is the program path to execute, expanded

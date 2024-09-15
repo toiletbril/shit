@@ -6,6 +6,7 @@
 #include "Eval.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
+#include <iostream>
 
 namespace shit {
 
@@ -157,6 +158,9 @@ i64
 SimpleCommand::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_args.size() > 0);
+
+  if (cxt.should_echo())
+    std::cout << utils::merge_tokens_to_string(m_args) << std::endl;
 
   return utils::execute_context(
       ExecContext::make_from(source_location(), cxt.process_args(m_args)),
