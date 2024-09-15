@@ -258,7 +258,6 @@ Lexer::lex_number()
   return num;
 }
 
-/* TODO: Escaping looks terrible here, but I can't think of a better way. */
 Token *
 Lexer::lex_identifier()
 {
@@ -286,20 +285,23 @@ Lexer::lex_identifier()
 
     bool is_in_single_quotes = (quote_char == '\'');
 
-    if (lexer::is_expandable_char(ch)) {
+    /* Fill the EscapeMap. */
+    if (lexer::is_expandable_char(ch) && quote_char) {
       /* Escape all expandable chars inside quotes. */
-      if (quote_char) m_escape_map.add_escape(m_cursor_position + byte_count);
+      m_escape_map.add_escape(m_cursor_position + byte_count);
     } else if ((is_escape || is_dollar) && is_in_single_quotes) {
       /* Single quotes ignore escapes/variables. */
       m_escape_map.add_escape(m_cursor_position + byte_count);
     } else if (is_escape) {
-      m_escape_map.add_escape(m_cursor_position + byte_count);
-      should_append = false;
+      m_escape_map.add_escape(m_cursor_position + byte_count -
+                              amount_of_backslashes);
       amount_of_backslashes++;
+      should_append = false;
     }
 
     byte_count++;
 
+    /* Handle quotes. */
     if (!should_escape) {
       if (quote_char == ch) {
         quote_char = std::nullopt;
