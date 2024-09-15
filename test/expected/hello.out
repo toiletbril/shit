@@ -1,5 +1,0 @@
-[CompoundList]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo Hello World"]
-Hello World
-[Code 0]

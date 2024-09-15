@@ -19,6 +19,9 @@
     [SimpleCommand "echo data/*[^g]"]
   [CompoundListCondition, None]
     [SimpleCommand "echo data/.*"]
+[Escape Map
+  
+]
 data/abcd data/abcdefg data/fourth data/hello-d data/hello+K
 data/abcd/ data/abcdefg/
 data/abcd/first data/abcd/second data/abcdefg/hjkl data/abcdefg/third

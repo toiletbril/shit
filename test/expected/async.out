@@ -9,6 +9,9 @@
     [Pipeline, Async]
       [SimpleCommand "echo 1"]
       [SimpleCommand "cat"]
+[Escape Map
+  
+]
 
 1
 1

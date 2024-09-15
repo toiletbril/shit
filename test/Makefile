@@ -12,7 +12,7 @@ FAILED_LIST := failed.diff
 # TODO: Custom test runner?
 %: expected/%.out
 	cat input/$@.shit | \
-	$(BIN) -AE - 2>&1 | \
+	$(BIN) -AEM - 2>&1 | \
 	diff $(DFLAGS) $< - >> $(FAILED_LIST) && \
 	printf "	[%32s] ok.\n" $@ || \
 	printf "	[%32s] FAILED.\n" $@

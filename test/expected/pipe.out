@@ -19,6 +19,9 @@
       [SimpleCommand "false"]
   [CompoundListCondition, ||]
     [SimpleCommand "echo 4"]
+[Escape Map
+  
+]
 1
 2
 3

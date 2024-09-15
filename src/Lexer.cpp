@@ -280,8 +280,8 @@ Lexer::lex_identifier()
   {
     should_append = true;
 
-    bool is_escape = (ch == '\\' && !should_escape);
     bool is_dollar = (ch == '$');
+    bool is_escape = (ch == '\\' && !should_escape);
 
     bool is_in_single_quotes = (quote_char == '\'');
 

@@ -1,5 +1,8 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo"]
-
+    [SimpleCommand "echo string exec"]
+[Escape Map
+  
+]
+string exec
 [Code 0]

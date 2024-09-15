@@ -11,6 +11,9 @@
     [SimpleCommand "test -d ~"]
   [CompoundListCondition, &&]
     [SimpleCommand "echo 3"]
+[Escape Map
+  00000000 00000000 00000000 00000000 00000000 00000000 01000000 
+]
 1
 2
 [Code 1]

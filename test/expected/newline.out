@@ -5,6 +5,9 @@
     [SimpleCommand "echo 2"]
   [CompoundListCondition, None]
     [SimpleCommand "echo 3"]
+[Escape Map
+  
+]
 1
 2
 3
