@@ -306,6 +306,13 @@ Lexer::lex_identifier()
         escaped_count++;
         continue;
       } else if (!quote_char && lexer::is_string_quote(ch)) {
+        /* TODO: */
+        if (ch == '`')
+          throw ErrorWithLocation{
+              {m_cursor_position + byte_count - 1, 1},
+              "Not implemented (Lexer)"
+          };
+
         quote_char = ch;
         last_quote_char_pos = m_cursor_position + byte_count - 1;
         escaped_count++;
@@ -322,7 +329,8 @@ Lexer::lex_identifier()
 
   if (quote_char)
     throw ErrorWithLocationAndDetails{
-        {last_quote_char_pos, length - last_quote_char_pos},
+        /* TODO: This dies with unicode. */
+        {last_quote_char_pos, SHIT_SUB_SAT(length, last_quote_char_pos)},
         "Unterminated string literal",
         {m_cursor_position + length, 1},
         "expected a " + std::string{*quote_char}

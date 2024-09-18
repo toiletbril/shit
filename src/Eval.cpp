@@ -345,7 +345,8 @@ EvalContext::process_args(const std::vector<const Token *> &args)
       std::string r = t->raw_string();
       tilde_offset += expand_tilde(r, t->source_location().position());
       std::vector<std::string> e = expand_path(
-          std::move(r), t->source_location().position() - tilde_offset);
+          std::move(r),
+          SHIT_SUB_SAT(t->source_location().position(), tilde_offset));
       for (std::string &a : e)
         expanded_args.emplace_back(a);
     } catch (Error &e) {

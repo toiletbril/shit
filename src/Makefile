@@ -24,7 +24,7 @@ CXX := clang++
 endif
 
 ifeq ($(MODE), cosmo)
-OS_INFO := "cosmopolitan toolchain"
+OS_INFO := "cosmopolitan_toolchain"
 else
 OS_INFO := $(shell uname -rvom || echo "<no uname>")
 endif

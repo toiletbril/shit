@@ -47,7 +47,6 @@ FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
 FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
-FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
 FLAG(ESCAPE_MAP, Bool, 'M', "escape-map",
      "Print escape map after each command parsed.");
@@ -57,8 +56,9 @@ FLAG(DUMP_AST, Bool, 'A', "dump-ast",
      "Dump AST before executing each command.");
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
-FLAG(SHORT_VERSION, Bool, '\0', "short-version",
+FLAG(SHORT_VERSION, Bool, 'V', "short-version",
      "Display version in a short form.");
+FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
 int
 main(int argc, char **argv)

@@ -24,3 +24,5 @@ src/o
 test/failed.diff
 
 shit
+shit.aarch64.elf
+shit.com.dbg
