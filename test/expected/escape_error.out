@@ -1,0 +1,9 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo **"]
+[Escape Map
+  00000010 
+]
+shit: 1:6: Error: Could not expand path: No expansions found for '**'.
+     1 |  echo *\*
+       |       ^~~ here.

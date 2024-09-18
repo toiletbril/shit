@@ -173,11 +173,7 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
   usize s = 0;
   usize g = 0;
 
-  SHIT_TRACELN("glob: %.*s, sl: %zu", (int) glob.length(), glob.data(), source_position);
-
   while (g < glob.length() && s < str.length()) {
-    SHIT_TRACELN("%zu", source_position + g);
-
     if (em.is_escaped(source_position + g)) {
       if (glob[g++] != str[s++])
         return false;
@@ -192,7 +188,8 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
     } break;
 
     case '*': {
-      if (glob_matches(glob.substr(g + 1), str.substr(s), source_position, em))
+      if (glob_matches(glob.substr(g + 1), str.substr(s), source_position + 1,
+                       em))
       {
         return true;
       }
@@ -260,7 +257,9 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
   }
 
   if (s >= str.length()) {
-    while (g < glob.length() && glob[g] == '*') {
+    while (g < glob.length() && glob[g] == '*' &&
+           !em.is_escaped(source_position + g))
+    {
       g++;
     }
     if (g >= glob.length()) {

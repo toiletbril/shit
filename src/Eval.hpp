@@ -79,14 +79,18 @@ protected:
   bool m_enable_echo_expanded;
 
   /* clang-format off */
-  std::vector<std::string>
+  std::tuple<std::vector<std::string>, std::vector<usize>>
   expand_path_once(std::string_view r,
                    usize source_position,
+                   usize offset,
                    bool should_count_files);
   std::vector<std::string>
+
   expand_path_recurse(const std::vector<std::string> &vs,
+                      const std::vector<usize> &os,
                       usize source_position);
   std::vector<std::string>
+
   expand_path(std::string &&r, usize source_position);
   /* clang-format off */
 

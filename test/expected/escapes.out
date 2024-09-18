@@ -6,6 +6,8 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo \\"]
   [CompoundListCondition, None]
+    [SimpleCommand "echo data/*/*"]
+  [CompoundListCondition, None]
     [SimpleCommand "test -e ~/*"]
   [CompoundListCondition, &&]
     [SimpleCommand "no such file"]
@@ -16,10 +18,11 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo a\ hello  worldlol ""]
 [Escape Map
-  00000110 00000001 11000000 00011000 00000000 00100000 00000000 00000000 00000100 00000000 00000000 00000000 00000100 00000110 00000000 00000100 
+  00000110 00000000 11100000 00000110 00000000 00000001 00000000 00000100 00000000 00000000 00000000 01000000 00000000 00000000 00000000 00100000 00110000 00000000 00100000 
 ]
 **
 ~**
 \\
+data/abcd/* data/abcdefg/*
 a\ hello  worldlol "
 [Code 0]

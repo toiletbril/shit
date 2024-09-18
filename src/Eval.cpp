@@ -112,13 +112,16 @@ EvalContext::total_expansion_count() const
   return m_expansions_total + m_expansions_last;
 }
 
+#define SUB_SAT(a, b) ((a) > (b) ? (a) - (b) : 0)
+
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
-std::vector<std::string>
+std::tuple<std::vector<std::string>, std::vector<usize>>
 EvalContext::expand_path_once(std::string_view path, usize source_position,
-                              bool should_expand_files)
+                              usize offset, bool should_expand_files)
 {
   std::vector<std::string> expanded_paths{};
+  std::vector<usize>       expanded_offsets{};
 
   usize last_slash = path.rfind('/');
   bool  has_slashes = (last_slash != std::string::npos);
@@ -134,8 +137,6 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
   } else {
     parent_dir = ".";
   }
-
-  SHIT_TRACELN("p: %.*s", (int) path.length(), path.data());
 
   /* Stem of the glob after the last slash. */
   std::optional<std::string_view> glob{};
@@ -163,49 +164,63 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
   if (glob) {
     for (const std::filesystem::directory_entry &e : d) {
       if (!should_expand_files && !e.is_directory()) continue;
-      std::string f = e.path().filename().string();
+
+      std::string filename = e.path().filename().string();
 
       /* TODO: Figure the rules of hidden file expansion. */
-      if ((*glob)[0] != '.' && f[0] == '.') continue;
+      if ((*glob)[0] != '.' && filename[0] == '.') continue;
 
-      if (utils::glob_matches(*glob, f, source_position, escape_map())) {
+      if (utils::glob_matches(*glob, filename, SUB_SAT(source_position, offset),
+                              escape_map()))
+      {
         std::string expanded_path{};
+
         if (parent_dir != ".") {
           expanded_path += parent_dir;
           if (parent_dir != "/") expanded_path += '/';
         }
-        expanded_path += f;
+
+        expanded_path += filename;
         add_expansion();
+
         expanded_paths.emplace_back(expanded_path);
+
+        usize offset_difference =
+            SUB_SAT(expanded_path.length(), path.length());
+
+        expanded_offsets.emplace_back(offset_difference);
       }
     }
   } else {
     expanded_paths.emplace_back(path);
   }
 
-  return expanded_paths;
+  return {expanded_paths, expanded_offsets};
 }
 
-const EscapeMap &EvalContext::escape_map() const
+const EscapeMap &
+EvalContext::escape_map() const
 {
   return m_escape_map;
 }
 
 std::vector<std::string>
 EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
+                                 const std::vector<usize>       &offsets,
                                  usize source_position)
 {
   std::vector<std::string> resulting_expanded_paths{};
   std::optional<usize>     expand_ch{};
 
-  for (std::string_view original_path : paths) {
-    std::string_view path = original_path;
+  for (usize i = 0; i < paths.size(); i++) {
+    std::string_view original_path = paths[i];
+    std::string_view operating_path = original_path;
 
-    for (usize i = 0; i < path.length(); i++) {
-      if (lexer::is_expandable_char(path[i]) &&
-          !escape_map().is_escaped(source_position + i))
+    for (usize j = 0; j < operating_path.length(); j++) {
+      if (lexer::is_expandable_char(operating_path[j]) &&
+          !escape_map().is_escaped(SUB_SAT(source_position + j, offsets[i])))
       {
-        expand_ch = i;
+        expand_ch = j;
         break;
       }
     }
@@ -213,17 +228,19 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
     if (expand_ch) {
       std::optional<usize> slash_after{};
 
-      for (usize i = *expand_ch; i < path.length(); i++) {
-        if (path[i] == '/') {
-          slash_after = i;
+      for (usize k = *expand_ch; k < operating_path.length(); k++) {
+        if (operating_path[k] == '/') {
+          slash_after = k;
           break;
         }
       }
 
-      if (slash_after) path.remove_suffix(path.length() - *slash_after);
+      if (slash_after)
+        operating_path.remove_suffix(operating_path.length() - *slash_after);
 
-      std::vector<std::string> expanded_paths =
-          expand_path_once(path, source_position, !slash_after);
+      auto [expanded_paths, expanded_offsets] =
+          expand_path_once(operating_path, source_position, offsets[i],
+                           !slash_after /* directories only? */);
 
       if (slash_after) {
         /* Bring back the removed suffix. */
@@ -236,16 +253,17 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
 
         /* Call this function recursively on expanded entries. */
         std::vector<std::string> twice_expanded_paths =
-            expand_path_recurse(expanded_paths, source_position);
-        for (const std::string &twice_expanded_path : twice_expanded_paths) {
+            expand_path_recurse(expanded_paths, expanded_offsets,
+                                SUB_SAT(source_position, offsets[i]));
+
+        for (const std::string &twice_expanded_path : twice_expanded_paths)
           resulting_expanded_paths.emplace_back(twice_expanded_path);
-        }
       } else {
         for (const std::string &resulting_path : expanded_paths)
           resulting_expanded_paths.emplace_back(resulting_path);
       }
     } else {
-      resulting_expanded_paths.emplace_back(path);
+      resulting_expanded_paths.emplace_back(operating_path);
     }
   }
 
@@ -286,7 +304,7 @@ EvalContext::expand_path(std::string &&r, usize source_position)
   std::vector<std::string> values{};
 
   if (m_enable_path_expansion) {
-    values = expand_path_recurse({r}, source_position);
+    values = expand_path_recurse({r}, {0}, source_position);
   } else {
     values.emplace_back(r);
   }
