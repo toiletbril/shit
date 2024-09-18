@@ -27,7 +27,7 @@
 
 #define SHIT_VER_MAJOR 0
 #define SHIT_VER_MINOR 0
-#define SHIT_VER_PATCH 5
+#define SHIT_VER_PATCH 6
 #define SHIT_VER_EXTRA "alpha"
 
 #define SHIT_SHORT_LICENSE                                                     \
