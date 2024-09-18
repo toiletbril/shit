@@ -112,8 +112,6 @@ EvalContext::total_expansion_count() const
   return m_expansions_total + m_expansions_last;
 }
 
-#define SUB_SAT(a, b) ((a) > (b) ? (a) - (b) : 0)
-
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
 std::tuple<std::vector<std::string>, std::vector<usize>>
@@ -170,7 +168,8 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
       /* TODO: Figure the rules of hidden file expansion. */
       if ((*glob)[0] != '.' && filename[0] == '.') continue;
 
-      if (utils::glob_matches(*glob, filename, SUB_SAT(source_position, offset),
+      if (utils::glob_matches(*glob, filename,
+                              SHIT_SUB_SAT(source_position, offset),
                               escape_map()))
       {
         std::string expanded_path{};
@@ -186,7 +185,7 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
         expanded_paths.emplace_back(expanded_path);
 
         usize offset_difference =
-            SUB_SAT(expanded_path.length(), path.length());
+            SHIT_SUB_SAT(expanded_path.length(), path.length());
 
         expanded_offsets.emplace_back(offset_difference);
       }
@@ -218,7 +217,8 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
 
     for (usize j = 0; j < operating_path.length(); j++) {
       if (lexer::is_expandable_char(operating_path[j]) &&
-          !escape_map().is_escaped(SUB_SAT(source_position + j, offsets[i])))
+          !escape_map().is_escaped(
+              SHIT_SUB_SAT(source_position + j, offsets[i])))
       {
         expand_ch = j;
         break;
@@ -254,7 +254,7 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
         /* Call this function recursively on expanded entries. */
         std::vector<std::string> twice_expanded_paths =
             expand_path_recurse(expanded_paths, expanded_offsets,
-                                SUB_SAT(source_position, offsets[i]));
+                                SHIT_SUB_SAT(source_position, offsets[i]));
 
         for (const std::string &twice_expanded_path : twice_expanded_paths)
           resulting_expanded_paths.emplace_back(twice_expanded_path);

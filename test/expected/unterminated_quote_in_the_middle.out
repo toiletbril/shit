@@ -1,0 +1,6 @@
+shit: 1:6: Error: Unterminated string literal.
+     1 |  first"second
+       |       ^~~~~~~~ here.
+shit: 2:1: Note:
+     2 |  
+       |  ^~ expected a " here.

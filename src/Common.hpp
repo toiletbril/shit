@@ -111,6 +111,8 @@ struct t__exit_scope_help
 /* Silence enum warnings. */
 #define SHIT_ENUM(e) static_cast<int>(e)
 
+#define SHIT_SUB_SAT(a, b) ((a) > (b) ? (a) - (b) : 0)
+
 /* The length of statically allocated array. */
 #define countof(arr) (sizeof(arr) / sizeof(*(arr)))
 

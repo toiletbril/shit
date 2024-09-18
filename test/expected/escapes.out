@@ -17,12 +17,18 @@
     [SimpleCommand "echo no such dir"]
   [CompoundListCondition, None]
     [SimpleCommand "echo a\ hello  worldlol ""]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo *"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo *"]
 [Escape Map
-  00000110 00000000 11100000 00000110 00000000 00000001 00000000 00000100 00000000 00000000 00000000 01000000 00000000 00000000 00000000 00100000 00110000 00000000 00100000 
+  00000110 00000000 11100000 00000110 00000000 00000001 00000000 00000100 00000000 00000000 00000000 01000000 00000000 00000000 00000001 00000011 00000000 00000000 01000000 00001000 00000100 
 ]
 **
 ~**
 \\
 data/abcd/* data/abcdefg/*
 a\ hello  worldlol "
+*
+*
 [Code 0]

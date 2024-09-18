@@ -5,3 +5,5 @@ echo data/*/\*;
 test -e ~/\* && no such file;
 test -d \~ && echo no such dir;
 echo a'''\ hello'\ \ world"lol" "\"";
+echo "*"
+echo '*'

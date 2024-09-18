@@ -265,10 +265,9 @@ Lexer::lex_identifier()
   std::string ident_string{};
 
   usize byte_count = 0;
-  usize amount_of_backslashes = 0;
+  usize escaped_count = 0;
   usize last_quote_char_pos = m_cursor_position;
 
-  bool has_quotes = false;
   bool should_escape = false;
   bool should_append = false;
 
@@ -288,14 +287,13 @@ Lexer::lex_identifier()
     /* Fill the EscapeMap. */
     if (lexer::is_expandable_char(ch) && quote_char) {
       /* Escape all expandable chars inside quotes. */
-      m_escape_map.add_escape(m_cursor_position + byte_count);
+      m_escape_map.add_escape(m_cursor_position + byte_count - escaped_count);
     } else if ((is_escape || is_dollar) && is_in_single_quotes) {
       /* Single quotes ignore escapes/variables. */
-      m_escape_map.add_escape(m_cursor_position + byte_count);
+      m_escape_map.add_escape(m_cursor_position + byte_count - escaped_count);
     } else if (is_escape) {
-      m_escape_map.add_escape(m_cursor_position + byte_count -
-                              amount_of_backslashes);
-      amount_of_backslashes++;
+      m_escape_map.add_escape(m_cursor_position + byte_count - escaped_count);
+      escaped_count++;
       should_append = false;
     }
 
@@ -305,11 +303,12 @@ Lexer::lex_identifier()
     if (!should_escape) {
       if (quote_char == ch) {
         quote_char = std::nullopt;
+        escaped_count++;
         continue;
       } else if (!quote_char && lexer::is_string_quote(ch)) {
-        has_quotes = true;
         quote_char = ch;
         last_quote_char_pos = m_cursor_position + byte_count - 1;
+        escaped_count++;
         continue;
       }
     }
@@ -319,14 +318,13 @@ Lexer::lex_identifier()
     should_escape = (is_escape && !is_in_single_quotes);
   }
 
-  usize length = toiletline::utf8_strlen(ident_string.c_str()) +
-                 ((has_quotes) ? 2 : 0) + amount_of_backslashes;
+  usize length = toiletline::utf8_strlen(ident_string.c_str()) + escaped_count;
 
   if (quote_char)
     throw ErrorWithLocationAndDetails{
-        {last_quote_char_pos, length - 1},
+        {last_quote_char_pos, length - last_quote_char_pos},
         "Unterminated string literal",
-        {m_cursor_position + length - 1, 1},
+        {m_cursor_position + length, 1},
         "expected a " + std::string{*quote_char}
         + " here"
     };
