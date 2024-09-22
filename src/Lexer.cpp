@@ -9,6 +9,8 @@
 
 #include <string>
 
+/* TODO: Rewrite the lexer and parser to suit the shell language better. */
+
 namespace shit {
 
 namespace lexer {
@@ -201,7 +203,7 @@ Lexer::lex_shell_token()
     else
       throw ErrorWithLocation{
           {m_cursor_position, 1},
-          "unexpected character"
+          "Unexpected character"
       };
   }
 
@@ -333,7 +335,7 @@ Lexer::lex_identifier()
         {last_quote_char_pos, SHIT_SUB_SAT(length, last_quote_char_pos)},
         "Unterminated string literal",
         {m_cursor_position + length, 1},
-        "expected a " + std::string{*quote_char}
+        "expected " + std::string{*quote_char}
         + " here"
     };
 
@@ -407,196 +409,76 @@ Lexer::lex_sentinel()
   char  ch = chop_character();
   usize extra_length = 0;
 
-  Token *t{};
+  Token *tok{};
+
+  /* clang-format off */
+#define TOKEN_CASE_ONE(t)                                                      \
+  case Token::Kind::t:                                                         \
+    tok = new tokens::t{                                                       \
+        {m_cursor_position, 1}                                                 \
+    };                                                                         \
+    break;
+
+#define TOKEN_CASE_TWO(t, ch, t2)                                              \
+  case Token::Kind::t: {                                                       \
+    if (chop_character(1) == ch) {                                             \
+      tok = new tokens::t2{                                                    \
+          {m_cursor_position, 2}                                               \
+      };                                                                       \
+      extra_length++;                                                          \
+    } else {                                                                   \
+      tok = new tokens::t{                                                     \
+          {m_cursor_position, 1}                                               \
+      };                                                                       \
+    }                                                                          \
+  } break;
+
+#define TOKEN_CASE_THREE(t, ch2, t2, ch3, t3)                                  \
+  case Token::Kind::t: {                                                       \
+    if (chop_character(1) == ch2) {                                            \
+      tok = new tokens::t2{                                                    \
+          {m_cursor_position, 2}                                               \
+      };                                                                       \
+      extra_length++;                                                          \
+    } else if (chop_character(1) == ch3) {                                     \
+      tok = new tokens::t3{                                                    \
+          {m_cursor_position, 2}                                               \
+      };                                                                       \
+      extra_length++;                                                          \
+    } else {                                                                   \
+      tok = new tokens::t{                                                     \
+          {m_cursor_position, 1}                                               \
+      };                                                                       \
+    }                                                                          \
+  } break;
+  /* clang-format on */
 
   if (auto op = OPERATORS.find(ch); op != OPERATORS.end()) {
     switch (op->second) {
-    case Token::Kind::RightParen:
-      t = new tokens::RightParen{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::LeftParen:
-      t = new tokens::LeftParen{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::RightBracket:
-      t = new tokens::RightBracket{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::LeftBracket:
-      t = new tokens::LeftBracket{
-          {m_cursor_position, 1}
-      };
-      break;
+      TOKEN_CASE_ONE(RightParen);
+      TOKEN_CASE_ONE(LeftParen);
+      TOKEN_CASE_ONE(RightBracket);
+      TOKEN_CASE_ONE(LeftBracket);
+      TOKEN_CASE_ONE(Semicolon);
+      TOKEN_CASE_ONE(Dot);
+      TOKEN_CASE_ONE(Newline);
+      TOKEN_CASE_ONE(Plus);
+      TOKEN_CASE_ONE(Minus);
+      TOKEN_CASE_ONE(Asterisk);
+      TOKEN_CASE_ONE(Slash);
+      TOKEN_CASE_ONE(Percent);
+      TOKEN_CASE_ONE(Tilde);
+      TOKEN_CASE_ONE(Cap);
 
-    case Token::Kind::Semicolon:
-      t = new tokens::Semicolon{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Dot:
-      t = new tokens::Dot{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Newline:
-      t = new tokens::Newline{
-          {m_cursor_position, 1}
-      };
-      break;
+      TOKEN_CASE_TWO(RightSquareBracket, ']', DoubleRightSquareBracket);
+      TOKEN_CASE_TWO(LeftSquareBracket, '[', DoubleLeftSquareBracket);
+      TOKEN_CASE_TWO(ExclamationMark, '=', ExclamationEquals);
+      TOKEN_CASE_TWO(Ampersand, '&', DoubleAmpersand);
+      TOKEN_CASE_TWO(Pipe, '|', DoublePipe);
+      TOKEN_CASE_TWO(Equals, '=', DoubleEquals);
 
-    case Token::Kind::Plus:
-      t = new tokens::Plus{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Minus:
-      t = new tokens::Minus{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Asterisk:
-      t = new tokens::Asterisk{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Slash:
-      t = new tokens::Slash{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Percent:
-      t = new tokens::Percent{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Tilde:
-      t = new tokens::Tilde{
-          {m_cursor_position, 1}
-      };
-      break;
-    case Token::Kind::Cap:
-      t = new tokens::Cap{
-          {m_cursor_position, 1}
-      };
-      break;
-
-    case Token::Kind::RightSquareBracket: {
-      if (chop_character(1) == ']') {
-        t = new tokens::DoubleRightSquareBracket{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::RightSquareBracket{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
-
-    case Token::Kind::LeftSquareBracket: {
-      if (chop_character(1) == '[') {
-        t = new tokens::DoubleLeftSquareBracket{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::LeftSquareBracket{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
-
-    case Token::Kind::ExclamationMark: {
-      if (chop_character(1) == '=') {
-        t = new tokens::ExclamationEquals{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::ExclamationMark{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
-
-    case Token::Kind::Ampersand: {
-      if (chop_character(1) == '&') {
-        t = new tokens::DoubleAmpersand{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::Ampersand{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
-
-    case Token::Kind::Greater: {
-      if (chop_character(1) == '>') {
-        t = new tokens::DoubleGreater{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else if (chop_character(1) == '=') {
-        t = new tokens::GreaterEquals{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::Greater{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
-
-    case Token::Kind::Less: {
-      if (chop_character(1) == '<') {
-        t = new tokens::DoubleLess{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else if (chop_character(1) == '=') {
-        t = new tokens::LessEquals{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::Less{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
-
-    case Token::Kind::Pipe: {
-      if (chop_character(1) == '|') {
-        t = new tokens::DoublePipe{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::Pipe{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
-
-    case Token::Kind::Equals: {
-      if (chop_character(1) == '=') {
-        t = new tokens::DoubleEquals{
-            {m_cursor_position, 2}
-        };
-        extra_length++;
-      } else {
-        t = new tokens::Equals{
-            {m_cursor_position, 1}
-        };
-      }
-    } break;
+      TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
+      TOKEN_CASE_THREE(Less, '<', DoubleLess, '=', LessEquals);
 
     default:
       SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(op->second));
@@ -614,7 +496,7 @@ Lexer::lex_sentinel()
 
   m_cached_offset = 1 + extra_length;
 
-  return t;
+  return tok;
 }
 
 } /* namespace shit */

@@ -44,6 +44,8 @@ find_pos_in_vec(const std::vector<T> &v, const T &p)
   return std::string::npos;
 }
 
+bool does_exist(const std::filesystem::path &p);
+
 i32 execute_context(ExecContext &&ec, bool is_async);
 
 i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async);

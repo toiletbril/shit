@@ -256,8 +256,23 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
             expand_path_recurse(expanded_paths, expanded_offsets,
                                 SHIT_SUB_SAT(source_position, offsets[i]));
 
-        for (const std::string &twice_expanded_path : twice_expanded_paths)
+        for (const std::string &twice_expanded_path : twice_expanded_paths) {
+          /* Only expand to paths that actually exist. */
+          try {
+            if (!std::filesystem::exists(twice_expanded_path)) continue;
+          } catch (const std::filesystem::filesystem_error &e) {
+            std::string s{};
+            s += "Could not check whether '";
+            s += e.path1().string();
+            s += "' exists: ";
+            s += os::last_system_error_message();
+            throw ErrorWithLocation{
+                {source_position, original_path.length()},
+                s
+            };
+          }
           resulting_expanded_paths.emplace_back(twice_expanded_path);
+        }
       } else {
         for (const std::string &resulting_path : expanded_paths)
           resulting_expanded_paths.emplace_back(resulting_path);
@@ -324,6 +339,7 @@ EvalContext::expand_path(std::string &&r, usize source_position)
                 tolower(*x.first) < tolower(*x.second));
       });
 
+  /* Error out on bogus expansion. */
   if (values.empty()) {
     throw Error{"No expansions found for '" + r + "'"};
   }
@@ -349,7 +365,7 @@ EvalContext::process_args(const std::vector<const Token *> &args)
           SHIT_SUB_SAT(t->source_location().position(), tilde_offset));
       for (std::string &a : e)
         expanded_args.emplace_back(a);
-    } catch (Error &e) {
+    } catch (const Error &e) {
       throw ErrorWithLocation{t->source_location(),
                               "Could not expand path: " + e.message()};
     }

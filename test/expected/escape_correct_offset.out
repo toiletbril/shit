@@ -1,0 +1,9 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo [d]**"]
+[Escape Map
+  00000000 01000000 
+]
+shit: 1:6: Error: Could not expand path: No expansions found for '[d]**'.
+     1 |  echo [d]*\*
+       |       ^~~~~~ here.

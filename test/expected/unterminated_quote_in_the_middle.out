@@ -3,4 +3,4 @@ shit: 1:6: Error: Unterminated string literal.
        |       ^~~~~~~~ here.
 shit: 2:1: Note:
      2 |  
-       |  ^~ expected a " here.
+       |  ^~ expected " here.

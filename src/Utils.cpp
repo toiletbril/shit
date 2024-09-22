@@ -164,6 +164,7 @@ get_current_directory()
 }
 
 /* TODO: Make proper tests. */
+
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 bool
@@ -188,8 +189,8 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
     } break;
 
     case '*': {
-      if (glob_matches(glob.substr(g + 1), str.substr(s), source_position + 1,
-                       em))
+      if (glob_matches(glob.substr(g + 1), str.substr(s),
+                       source_position + g + 1, em))
       {
         return true;
       }
@@ -200,17 +201,24 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
       bool is_matched = false;
       bool should_negate = false;
 
+      /* clang-format off */
+#define GLOB_GROUP_ERR()                                                       \
+  throw ErrorWithLocationAndDetails{                                           \
+      {source_position + s, SHIT_SUB_SAT(g, s)},                               \
+      "Unclosed '[' group",                                                    \
+      {source_position + g, 1},                                                \
+      "expected ] here"                                                        \
+  };
+      /* clang-format on */
+
       g++; /* skip [ */
-      if (g >= glob.length()) {
-        throw Error{"Unclosed '[' group"};
-      }
+      if (g >= glob.length()) GLOB_GROUP_ERR();
 
       if (glob[g] == '^') {
         g++;
         should_negate = true;
-        if (g >= glob.length()) {
-          throw Error{"Unclosed '[' group"};
-        }
+
+        if (g >= glob.length()) GLOB_GROUP_ERR();
       }
 
       char prev_glob_ch = glob[g++];
@@ -219,9 +227,7 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
       while (glob[g] != ']' && g < glob.length()) {
         if (glob[g] == '-') {
           g++;
-          if (g >= glob.length()) {
-            throw Error{"Unclosed '[' group"};
-          }
+          if (g >= glob.length()) GLOB_GROUP_ERR();
 
           if (glob[g] == ']') {
             is_matched |= ('-' == str[s]);
@@ -235,24 +241,16 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
         }
       }
 
-      if (glob[g] != ']') {
-        throw Error{"Unclosed '[' group"};
-      }
-      if (should_negate) {
-        is_matched = !is_matched;
-      }
-      if (!is_matched) {
-        return false;
-      }
+      if (glob[g] != ']') GLOB_GROUP_ERR();
+      if (should_negate) is_matched = !is_matched;
+      if (!is_matched) return false;
 
       g++;
       s++;
     } break;
 
     default:
-      if (glob[g++] != str[s++]) {
-        return false;
-      }
+      if (glob[g++] != str[s++]) return false;
     }
   }
 
@@ -262,9 +260,8 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
     {
       g++;
     }
-    if (g >= glob.length()) {
-      return true;
-    }
+
+    if (g >= glob.length()) return true;
   }
 
   return false;
@@ -285,9 +282,7 @@ quit(i32 code, bool should_goodbye)
     }
   }
 
-  if (should_goodbye) {
-    show_message("Goodbye :c");
-  }
+  if (should_goodbye) show_message("Goodbye :c");
 
   std::exit(code);
 }

@@ -1,0 +1,9 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo data/*/*"]
+[Escape Map
+  00000000 00001000 
+]
+shit: 1:6: Error: Could not expand path: No expansions found for 'data/*/*'.
+     1 |  echo data/*/\*
+       |       ^~~~~~~~~ here.
