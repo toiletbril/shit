@@ -6,26 +6,35 @@ Revolutionary command-line interpreter, or an interactive shell based on
 [toiletline](https://github.com/toiletbril/toiletline) written in C++17.
 
 This software was made as a late april fools joke and literally everything is
-written from scratch. There's no guarantee that this project will come any close
-to being finished, so use it at your own risk.
+written from scratch.
+
+The author did not expect that the shell is so complicated for no reason and
+some parts have architecture that is not very suitable for the shell language.
+There's no guarantee that this project will come any close to being finished or
+will not instantly break your computer upon the first start, so use it at your
+own risk. 
 
 The goal is to be a native, interactive, `sh`-compatible shell without any bells
 and whistles, that can be used interchangeably on Windows and Linux and offer a
 good `sh` experience on Windows to avoid having to tolerate PowerShell or some
-other fancy crossplatform shells, while being faster than all of them. Later
-goal is to offer basic replacements of most common coreutils commands like
-`mkdir`, `rm`, `cat` and others as shell builtins (and for the moment,
-`busybox-w32` can be used instead).
+other fancy crossplatform shells, preferably while being faster than all of
+them. Later goal is to offer basic replacements of most common coreutils
+commands like `mkdir`, `rm`, `cat` and others as shell builtins (and for the
+moment, `busybox-w32` can be used instead).
 
 ## Development
 
 `staging` is the development branch. It may be broken at any time. `master` is
 more stable and should usually pass all tests.
 
+There may be unfinished goals, TODOs and FIXMEs scattered around the sources (in
+[toiletline](https://github.com/toiletbril/toiletline) as well). Feel free to
+help :3
+
 You need a C++17 compatible compiler (but currently only Clang is supported for
-Windows), GNU Make, `rm`, `mkdir` to build the executable; `cat`, `diff`,
-`printf` to run the tests; `clang-format`, `clang-tidy` (better 18 or newer) to
-check the code.
+Windows); GNU Make, some coreutils: `rm`, `mkdir` to build the executable;
+`cat`, `diff`, `printf` to run the tests; `clang-format`, `clang-tidy` (better
+18 or newer) to check the code.
 
 The `MODE` variable controls build type:
 * `rel` is the optimized build;
@@ -34,10 +43,10 @@ The `MODE` variable controls build type:
 * `cosmo` is an optimized build which will try to use `cosmoc++` from the
   Cosmopolitan toolchain.
 
-An example of the build process:
+An example of the excruciatingly complex build process:
 ```bash
-$ export MODE=rel/prof/dbg/cosmo
-$ make -j14
+$ export MODE=<rel/prof/dbg/cosmo>
+$ make -j`nproc`
 $ ./shit --help
 ```
 
