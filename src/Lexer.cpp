@@ -268,7 +268,7 @@ Lexer::lex_identifier()
 
   usize byte_count = 0;
   usize escaped_count = 0;
-  usize last_quote_char_pos = m_cursor_position;
+  usize last_quote_char_pos = 0;
 
   bool should_escape = false;
   bool should_append = false;
@@ -349,9 +349,10 @@ Lexer::lex_identifier()
 
   Token *t{};
 
-  /* An identifier may be a keyword. */
-  if (auto kw = KEYWORDS.find(shit::utils::lowercase_string(ident_string));
-      kw != KEYWORDS.end())
+  /* An identifier may be a keyword. Keyword also cannot contain quotes or
+   * backslashes. */
+  if (auto kw = KEYWORDS.find(ident_string);
+      escaped_count == 0 && last_quote_char_pos == 0 && kw != KEYWORDS.end())
   {
     switch (kw->second) {
       KW_SWITCH_CASES();

@@ -184,14 +184,6 @@ Parser::parse_simple_command()
       }
     }
     /* fallthrough */
-    case Token::Kind::Identifier:
-      m_lexer.advance_past_last_peek();
-      if (!source_location) {
-        source_location = token->source_location();
-      }
-      args_accumulator.emplace_back(std::move(token));
-      break;
-
     case Token::Kind::If:
     case Token::Kind::Do:
     case Token::Kind::For:
@@ -204,9 +196,21 @@ Parser::parse_simple_command()
     case Token::Kind::Then:
     case Token::Kind::Done:
     case Token::Kind::While:
+    case Token::Kind::Function:
     case Token::Kind::Redirection:
-      throw ErrorWithLocation{token->source_location(),
-                              "Not implemented (Parser)"};
+      /* These keyword are required to be first. Otherwise they are just
+       * identifiers. */
+      if (token->kind() != Token::Kind::String && args_accumulator.empty())
+        throw ErrorWithLocation{token->source_location(),
+                                "Not implemented (Parser)"};
+    /* fallthrough */
+    case Token::Kind::Identifier:
+      m_lexer.advance_past_last_peek();
+      if (!source_location) {
+        source_location = token->source_location();
+      }
+      args_accumulator.emplace_back(std::move(token));
+      break;
 
     default: {
       if (!source_location) return nullptr;

@@ -22,27 +22,27 @@ Token::to_ast_string() const
 
 namespace tokens {
 
-#define KEYWORD_TOKEN_DECLS(t)                                                 \
+#define KEYWORD_TOKEN_DECLS(t, s)                                              \
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind  t::kind() const { return Token::Kind::t; }                      \
   Token::Flags t::flags() const { return Token::Flag::Keyword; }               \
-  std::string  t::raw_string() const { return #t; }
+  std::string  t::raw_string() const { return s; }
 
-KEYWORD_TOKEN_DECLS(If);
-KEYWORD_TOKEN_DECLS(Then);
-KEYWORD_TOKEN_DECLS(Else);
-KEYWORD_TOKEN_DECLS(Elif);
-KEYWORD_TOKEN_DECLS(Fi);
-KEYWORD_TOKEN_DECLS(For);
-KEYWORD_TOKEN_DECLS(While);
-KEYWORD_TOKEN_DECLS(Until);
-KEYWORD_TOKEN_DECLS(Do);
-KEYWORD_TOKEN_DECLS(Done);
-KEYWORD_TOKEN_DECLS(Case);
-KEYWORD_TOKEN_DECLS(When);
-KEYWORD_TOKEN_DECLS(Esac);
-KEYWORD_TOKEN_DECLS(Time);
-KEYWORD_TOKEN_DECLS(Function);
+KEYWORD_TOKEN_DECLS(If, "if");
+KEYWORD_TOKEN_DECLS(Then, "then");
+KEYWORD_TOKEN_DECLS(Else, "else");
+KEYWORD_TOKEN_DECLS(Elif, "elif");
+KEYWORD_TOKEN_DECLS(Fi, "fi");
+KEYWORD_TOKEN_DECLS(For, "for");
+KEYWORD_TOKEN_DECLS(While, "while");
+KEYWORD_TOKEN_DECLS(Until, "until");
+KEYWORD_TOKEN_DECLS(Do, "do");
+KEYWORD_TOKEN_DECLS(Done, "done");
+KEYWORD_TOKEN_DECLS(Case, "case");
+KEYWORD_TOKEN_DECLS(When, "when");
+KEYWORD_TOKEN_DECLS(Esac, "esac");
+KEYWORD_TOKEN_DECLS(Time, "time");
+KEYWORD_TOKEN_DECLS(Function, "function");
 
 #define SENTINEL_TOKEN_DECLS(t)                                                \
   t::t(SourceLocation location) : Token(location) {}                           \

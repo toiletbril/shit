@@ -24,7 +24,7 @@ CXX := clang++
 endif
 
 ifeq ($(MODE), cosmo)
-OS_INFO := "cosmopolitan_toolchain"
+OS_INFO := "unknown-cosmo"
 else
 OS_INFO := $(shell uname -rvom || echo "<no uname>")
 endif
@@ -123,8 +123,8 @@ fmt:
 	$(CLANG_FORMAT) -i $(SOURCES) $(HEADERS)
 
 clean:
-	rm -rf ./o shit shit.exe
-	rm -rf ../*.ilk ../*.pdb ../*.lib    # Windows
-	rm -rf shit.com.dbg shit.aarch64.elf # Cosmopolitan
+	rm -rf ./o ../shit ../shit.exe
+	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
+	rm -rf ../shit.com.dbg ../shit.aarch64.elf # Cosmopolitan
 
 .PHONY: dirs shit install tidy fmt clean
