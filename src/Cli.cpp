@@ -236,7 +236,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
   if (argc == 0) return {};
 
-  SHIT_ASSERT(argv);
+  SHIT_ASSERT(argv != nullptr);
 
   u32                      position = 0;
   std::vector<std::string> args{};
@@ -247,7 +247,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
   bool  ignore_rest = false;
 
   for (int i = 0; i < argc; i++) {
-    SHIT_ASSERT(argv[i]);
+    SHIT_ASSERT(argv[i] != nullptr);
 
     if (next_arg_is_value) {
       next_arg_is_value = false;

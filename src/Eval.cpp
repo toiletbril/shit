@@ -259,6 +259,7 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
         for (const std::string &twice_expanded_path : twice_expanded_paths) {
           /* Only expand to paths that actually exist. */
           try {
+            /* FIXME: This is a massive slowdown. */
             if (!std::filesystem::exists(twice_expanded_path)) continue;
           } catch (const std::filesystem::filesystem_error &e) {
             std::string s{};
@@ -299,12 +300,9 @@ EvalContext::expand_tilde(std::string &p, usize source_position) const
     p.erase(0, 1);
 
     std::optional<std::filesystem::path> u = os::get_home_directory();
-    if (!u) {
-      throw Error{"Could not figure out home directory"};
-    }
+    if (!u) throw Error{"Could not figure out home directory"};
 
     std::string s{u->string()};
-
     p.insert(0, s);
 
     return s.size() - 1;
@@ -324,6 +322,7 @@ EvalContext::expand_path(std::string &&r, usize source_position)
     values.emplace_back(r);
   }
 
+#if 1
   /* Sort expansion in lexicographical order. Ignore punctuation to be somewhat
    * compatible with bash. */
   std::stable_sort(
@@ -338,6 +337,10 @@ EvalContext::expand_path(std::string &&r, usize source_position)
                (x.first == lhs.cend() ||
                 tolower(*x.first) < tolower(*x.second));
       });
+#else
+  /* Or don't be compatible. */
+  std::stable_sort(values.begin(), values.end());
+#endif
 
   /* Error out on bogus expansion. */
   if (values.empty()) {
@@ -414,11 +417,8 @@ ExecContext::is_builtin() const
 const std::filesystem::path &
 ExecContext::program_path() const
 {
-  if (!is_builtin()) {
-    return std::get<std::filesystem::path>(m_kind);
-  }
-
-  throw shit::Error{"program_path() call on a builtin"};
+  SHIT_ASSERT(!is_builtin());
+  return std::get<std::filesystem::path>(m_kind);
 }
 
 void
@@ -431,11 +431,8 @@ ExecContext::close_fds()
 const Builtin::Kind &
 ExecContext::builtin_kind() const
 {
-  if (is_builtin()) {
-    return std::get<shit::Builtin::Kind>(m_kind);
-  }
-
-  SHIT_UNREACHABLE("builtin_kind() call on a program");
+  SHIT_ASSERT(is_builtin());
+  return std::get<shit::Builtin::Kind>(m_kind);
 }
 
 void
@@ -453,6 +450,7 @@ ExecContext
 ExecContext::make_from(SourceLocation                  location,
                        const std::vector<std::string> &args)
 {
+  /* Make sure we always include at least one argument, the program path. */
   SHIT_ASSERT(args.size() > 0);
 
   std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
@@ -478,11 +476,12 @@ ExecContext::make_from(SourceLocation                  location,
 
   /* Builtins take precedence over programs. */
   if (!bk) {
-    if (p)
+    if (p) {
       kind = *p;
-    else
+    } else {
       throw ErrorWithLocation{location,
                               "Program '" + program + "' wasn't found"};
+    }
   } else {
     kind = *bk;
   }

@@ -39,15 +39,14 @@ FLAG(EXPORT_ALL, Bool, 'a', "export-all",
      "UNIMPLEMENTED: Export all variables assigned to.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
      "UNIMPLEMENTED: Don't overwrite existing files with '>'.");
+FLAG(LOGIN, Bool, 'l', "login", "UNIMPLEMENTED: Act as a login shell.");
 
 /* Total bullcrap. */
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
-FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell.");
 FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
-
 FLAG(ESCAPE_MAP, Bool, 'M', "escape-map",
      "Print escape map after each command parsed.");
 FLAG(STATS, Bool, 'S', "stats",
@@ -79,9 +78,8 @@ main(int argc, char **argv)
   if (file_names.size() > 0) {
     program_path = file_names[0];
     file_names.erase(file_names.begin());
-    if (program_path == "-") is_login_shell = true;
   } else {
-    program_path = "<unknown path>";
+    program_path = "<unknown>";
   }
 
   if (FLAG_HELP.is_enabled()) {
@@ -99,13 +97,22 @@ main(int argc, char **argv)
     return EXIT_SUCCESS;
   }
 
-  if (FLAG_LOGIN.is_enabled() || strcmp(argv[0], "-") == 0)
-    is_login_shell = true;
+  if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
 
+  /* Both stdin and interactive flags are enabled, but there will be only the
+   * last man standing. */
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
-    shit::show_message(
-        "Both '-s' and '-i' options are specified. Falling back to '-i'.");
-    FLAG_STDIN.toggle();
+    bool is_tty = shit::os::is_stdin_a_tty();
+
+    std::string s{};
+    s += "Both '-s' and '-i' options are specified. Falling back to ";
+    s += is_tty ? "'-i'" : "'-s' because stdin is not a tty'";
+    shit::show_message(s);
+
+    if (is_tty)
+      FLAG_STDIN.toggle();
+    else
+      FLAG_INTERACTIVE.toggle();
   }
 
   /* Figure out what to do. Note that "-c" can be specified multiple times.

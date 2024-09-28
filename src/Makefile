@@ -77,10 +77,8 @@ else
 $(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cosmo")
 endif
 
+# Missing Windows libraries.
 ifeq ($(OS), Windows_NT)
-CXXFLAGS += \
-	-Wno-unused-command-line-argument \
-	-Wno-deprecated-declarations
 CXXFLAGS += \
 	-luserenv \
 	-ladvapi32

@@ -287,12 +287,15 @@ quit(i32 code, bool should_goodbye)
   std::exit(code);
 }
 
+using DirIndex = usize;
+
 static std::vector<std::string> PATH_CACHE_DIRS{};
 
 /* Program name without extension maps into indexes i and j for
  * PATH_DIRS and PATH_EXTENSIONS, so the path can be recreated as:
  * `PATH_DIRS[i] / (program_name + PATH_EXTENSIONS[j])` */
-static std::unordered_map<std::string, std::tuple<usize, usize>> PATH_CACHE{};
+static std::unordered_map<std::string, std::tuple<DirIndex, os::ExtIndex>>
+    PATH_CACHE{};
 
 /* FIXME: Cosmopolitan sucks and does not support std::filesystem::path in
  * unordered_map :c. This would be better off std::string. */
@@ -414,7 +417,7 @@ search_and_cache(const std::string &program_name)
       std::string           full_path_str = full_path.string();
 
       /* This file already has an extesion specified? */
-      if (usize explicit_ext = os::sanitize_program_name(full_path_str);
+      if (os::ExtIndex explicit_ext = os::sanitize_program_name(full_path_str);
           explicit_ext == 0)
       {
         for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
@@ -446,18 +449,18 @@ search_program_path(const std::string &program_name)
 {
   std::string sp{program_name};
 
-  usize s_ext = os::sanitize_program_name(sp);
+  os::ExtIndex extension_used = os::sanitize_program_name(sp);
 
   if (auto p = PATH_CACHE.find(sp); p != PATH_CACHE.end()) {
     auto [dir, ext] = p->second;
     std::filesystem::path try_path = PATH_CACHE_DIRS[dir];
 
-    if (s_ext > 0) {
+    if (extension_used > 0) {
       try_path /= program_name;
     } else {
       std::filesystem::path file_name = p->first;
       /* If index is 0, there's no extension to omit. */
-      if (s_ext != 0) {
+      if (extension_used != 0) {
         file_name += '.';
       }
       try_path /= file_name.concat(os::OMITTED_SUFFIXES[ext]);

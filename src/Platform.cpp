@@ -73,7 +73,7 @@ is_stdin_a_tty()
 #if !PLATFORM_IS(COSMO)
 const std::vector<std::string> OMITTED_SUFFIXES = {""};
 
-usize
+ExtIndex
 sanitize_program_name(std::string &program_name)
 {
   /* POSIX does not really make use of extensions for executable files. */
@@ -533,7 +533,7 @@ const std::vector<std::string> OMITTED_SUFFIXES = {
 
 constexpr static usize MIN_SUFFIX_LEN = 3;
 
-usize
+ExtIndex
 sanitize_program_name(std::string &program_name)
 {
 #if PLATFORM_IS(COSMO)

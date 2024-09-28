@@ -13,6 +13,8 @@ namespace shit {
 
 namespace os {
 
+using ExtIndex = usize;
+
 struct Pipe
 {
   descriptor in{SHIT_INVALID_FD};
@@ -40,7 +42,7 @@ bool is_child_process();
 
 bool is_stdin_a_tty();
 
-usize sanitize_program_name(std::string &program_name);
+ExtIndex sanitize_program_name(std::string &program_name);
 
 std::optional<std::string> get_current_user();
 
