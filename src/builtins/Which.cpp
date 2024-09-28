@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
+#include "../Platform.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -30,26 +31,24 @@ Which::execute(ExecContext &ec) const
   }
 
   std::string buf{};
-  i32         ret = 1;
 
   for (usize i = 1; i < args.size(); i++) {
     if (search_builtin(args[i]).has_value()) {
       buf += args[i];
       buf += ": Shell builtin";
+      buf += '\n';
     } else if (std::optional<std::filesystem::path> p =
             utils::search_program_path(args[i]);
         p.has_value())
     {
       buf += p->string();
+      buf += '\n';
     }
-    buf += '\n';
-
-    ret = 0;
   }
 
   ec.print_to_stdout(buf);
 
-  return ret;
+  return (buf.empty()) ? 1 : 0;
 }
 
 } /* namespace shit */

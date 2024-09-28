@@ -41,6 +41,7 @@ std::optional<std::string> get_environment_variable(const std::string &key);
 bool is_child_process();
 
 bool is_stdin_a_tty();
+bool is_stdout_a_tty();
 
 ExtIndex sanitize_program_name(std::string &program_name);
 

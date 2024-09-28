@@ -40,7 +40,7 @@ search_builtin(std::string_view builtin_name)
 i32
 execute_builtin(ExecContext &&ec)
 {
-  std::unique_ptr<Builtin> b;
+  std::unique_ptr<Builtin> b{};
 
   switch (ec.builtin_kind()) {
     BUILTIN_SWITCH_CASES();
@@ -51,13 +51,7 @@ execute_builtin(ExecContext &&ec)
 
   SHIT_DEFER { ec.close_fds(); };
 
-  try {
-    i32 ret = b->execute(ec);
-    return ret;
-  } catch (Error &err) {
-    throw ErrorWithLocation{ec.source_location(), "Builtin \"" + ec.args()[0] +
-                                                      "\": " + err.message()};
-  }
+  return b->execute(ec);
 }
 
 /**

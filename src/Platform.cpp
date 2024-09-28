@@ -68,6 +68,12 @@ is_stdin_a_tty()
   return isatty(SHIT_STDIN);
 }
 
+bool
+is_stdout_a_tty()
+{
+  return isatty(SHIT_STDOUT);
+}
+
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
 #if !PLATFORM_IS(COSMO)
@@ -341,6 +347,12 @@ bool
 is_stdin_a_tty()
 {
   return _isatty(_fileno(stdin));
+}
+
+bool
+is_stdout_a_tty()
+{
+  return _isatty(_fileno(stdout));
 }
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
