@@ -175,6 +175,7 @@ SimpleCommand::to_string() const
 {
   std::string args{};
   std::string s = "SimpleCommand \"" + m_args[0]->raw_string();
+
   if (!m_args.empty()) {
     for (usize i = 1; i < m_args.size(); i++) {
       args += " ";
@@ -184,6 +185,7 @@ SimpleCommand::to_string() const
   }
   s += "\"";
   if (is_async()) s += ", Async";
+
   return s;
 }
 

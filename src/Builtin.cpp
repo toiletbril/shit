@@ -9,9 +9,24 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 namespace shit {
+
+void
+show_builtin_help_impl(std::string_view p,
+                       const ExecContext              &ec,
+                       const std::vector<std::string> &hs,
+                       const std::vector<Flag *>      &fl)
+{
+  std::string h{};
+  h += make_synopsis(p, hs);
+  h += '\n';
+  h += make_flag_help(fl);
+  h += '\n';
+  ec.print_to_stdout(h);
+}
 
 std::optional<Builtin::Kind>
 search_builtin(std::string_view builtin_name)

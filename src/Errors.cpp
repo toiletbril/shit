@@ -14,7 +14,8 @@ static std::tuple<usize, usize>
 calc_precise_position(std::string_view source, SourceLocation location)
 {
   SHIT_ASSERT(location.position() <= source.length(),
-              "location: %zu, length: %zu", location, source.length());
+              "location: %zu, length: %zu, source length: %zu",
+              location.position(), location.length(), source.length());
 
   usize line_number = 0;
   usize last_newline_location = 0;

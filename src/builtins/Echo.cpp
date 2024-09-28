@@ -25,16 +25,10 @@ Echo::kind() const
 i32
 Echo::execute(ExecContext &ec) const
 {
-  std::vector<std::string> args = parse_flags_vec(FLAG_LIST, ec.args());
-  SHIT_DEFER { reset_flags(FLAG_LIST); };
+  std::vector<std::string> args = BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) {
-    std::string h{};
-    h += make_synopsis("echo", HELP_SYNOPSIS);
-    h += '\n';
-    h += make_flag_help(FLAG_LIST);
-    h += '\n';
-    ec.print_to_stdout(h);
+    SHOW_BUILTIN_HELP("echo", ec);
     return 0;
   }
 

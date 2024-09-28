@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cli.hpp"
 #include "Common.hpp"
 #include "Os.hpp"
 
@@ -19,6 +20,7 @@ struct Builtin
     Cd,
     Exit,
     Pwd,
+    Which,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -34,10 +36,11 @@ protected:
 };
 
 const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
-    {"echo", Builtin::Kind::Echo},
-    {"exit", Builtin::Kind::Exit},
-    {"cd",   Builtin::Kind::Cd  },
-    {"pwd",  Builtin::Kind::Pwd },
+    {"echo",  Builtin::Kind::Echo },
+    {"exit",  Builtin::Kind::Exit },
+    {"cd",    Builtin::Kind::Cd   },
+    {"pwd",   Builtin::Kind::Pwd  },
+    {"which", Builtin::Kind::Which},
 };
 
 #define B_CASE(btin)                                                           \
@@ -47,23 +50,22 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Echo);                                                                \
   B_CASE(Cd);                                                                  \
   B_CASE(Exit);                                                                \
+  B_CASE(Which);                                                               \
   B_CASE(Pwd)
 
-struct Echo : public Builtin
-{
-  Echo();
+#define BUILTIN_STRUCT(b)                                                      \
+  struct b : public Builtin                                                    \
+  {                                                                            \
+    b();                                                                       \
+                                                                               \
+    Kind kind() const override;                                                \
+    i32  execute(ExecContext &ec) const override;                              \
+  };
 
-  Kind kind() const override;
-  i32  execute(ExecContext &ec) const override;
-};
-
-struct Cd : public Builtin
-{
-  Cd();
-
-  Kind kind() const override;
-  i32  execute(ExecContext &ec) const override;
-};
+BUILTIN_STRUCT(Echo);
+BUILTIN_STRUCT(Cd);
+BUILTIN_STRUCT(Pwd);
+BUILTIN_STRUCT(Which);
 
 struct Exit : public Builtin
 {
@@ -73,15 +75,19 @@ struct Exit : public Builtin
   [[noreturn]] i32 execute(ExecContext &ec) const override;
 };
 
-struct Pwd : public Builtin
-{
-  Pwd();
-
-  Kind kind() const override;
-  i32  execute(ExecContext &ec) const override;
-};
-
 std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
+
+void show_builtin_help_impl(std::string_view p,
+    const ExecContext              &ec,
+                            const std::vector<std::string> &hs,
+                            const std::vector<Flag *>      &fl);
+
+#define SHOW_BUILTIN_HELP(p, ec)                                                  \
+  show_builtin_help_impl(p, ec, HELP_SYNOPSIS, FLAG_LIST)
+
+#define BUILTIN_ARGS(ec)                                                       \
+  parse_flags_vec(FLAG_LIST, ec.args());                                       \
+  SHIT_DEFER { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec);
 

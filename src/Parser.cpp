@@ -10,20 +10,18 @@
 
 namespace shit {
 
-static expressions::CompoundListCondition::Kind
+using namespace expressions;
+
+static CompoundListCondition::Kind
 get_sequence_kind(Token::Kind tk)
 {
   switch (tk) {
   case Token::Kind::Newline:
   case Token::Kind::EndOfFile:
   case Token::Kind::Ampersand:
-  case Token::Kind::Semicolon:
-    return expressions::CompoundListCondition::Kind::None;
-  case Token::Kind::DoubleAmpersand:
-    return expressions::CompoundListCondition::Kind::And;
-  case Token::Kind::DoublePipe:
-    return expressions::CompoundListCondition::Kind::Or;
-    break;
+  case Token::Kind::Semicolon: return CompoundListCondition::Kind::None;
+  case Token::Kind::DoubleAmpersand: return CompoundListCondition::Kind::And;
+  case Token::Kind::DoublePipe: return CompoundListCondition::Kind::Or; break;
 
   default: SHIT_UNREACHABLE("Invalid shell sequence token: %d", SHIT_ENUM(tk));
   }
@@ -48,15 +46,13 @@ Parser::construct_ast()
 std::unique_ptr<Expression>
 Parser::parse_compound_command()
 {
-  std::unique_ptr<expressions::Command> lhs{};
+  std::unique_ptr<Command> lhs{};
   /* Sequence right at the start. */
-  std::unique_ptr<expressions::CompoundList> sequence =
-      std::make_unique<expressions::CompoundList>();
+  std::unique_ptr<CompoundList> sequence = std::make_unique<CompoundList>();
 
   bool should_parse_command = true;
 
-  expressions::CompoundListCondition::Kind next_cond =
-      expressions::CompoundListCondition::Kind::None;
+  CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
 
   for (;;) {
     if (should_parse_command)
@@ -88,16 +84,15 @@ Parser::parse_compound_command()
       m_lexer.advance_past_last_peek();
 
       if (lhs) {
-        expressions::CompoundListCondition *sn =
-            new expressions::CompoundListCondition{token->source_location(),
-                                                   next_cond, lhs.release()};
+        CompoundListCondition *sn = new CompoundListCondition{
+            token->source_location(), next_cond, lhs.release()};
         sequence->append_node(sn);
         next_cond = get_sequence_kind(token->kind());
       }
 
       /* Terminate the command. */
       if (token->kind() == Token::Kind::EndOfFile) {
-        if (next_cond != expressions::CompoundListCondition::Kind::None) {
+        if (next_cond != CompoundListCondition::Kind::None) {
           throw shit::ErrorWithLocation{token->source_location(),
                                         "Expected a command after an operator"};
         }
@@ -105,8 +100,7 @@ Parser::parse_compound_command()
         /* Empty input? */
         if (sequence->empty()) {
           SHIT_ASSERT(!lhs);
-          return std::make_unique<expressions::DummyExpression>(
-              token->source_location());
+          return std::make_unique<DummyExpression>(token->source_location());
         } else {
           return sequence;
         }
@@ -121,15 +115,15 @@ Parser::parse_compound_command()
 
       m_lexer.advance_past_last_peek();
 
-      std::vector<const expressions::SimpleCommand *> pipe_group = {
-          static_cast<expressions::SimpleCommand *>(lhs.get())};
+      std::vector<const SimpleCommand *> pipe_group = {
+          static_cast<SimpleCommand *>(lhs.get())};
       SourceLocation pipe_group_location = token->source_location();
 
       std::unique_ptr<Token> last_pipe_token = std::move(token);
 
       /* Collect a pipe group. */
       for (;;) {
-        std::unique_ptr<expressions::SimpleCommand> rhs{parse_simple_command()};
+        std::unique_ptr<SimpleCommand> rhs{parse_simple_command()};
 
         if (rhs) {
           pipe_group.emplace_back(rhs.release());
@@ -148,8 +142,7 @@ Parser::parse_compound_command()
       }
 
       std::ignore = lhs.release();
-      lhs = std::make_unique<expressions::Pipeline>(pipe_group_location,
-                                                    pipe_group);
+      lhs = std::make_unique<Pipeline>(pipe_group_location, pipe_group);
 
       should_parse_command = false;
     } break;
@@ -165,8 +158,8 @@ Parser::parse_compound_command()
   SHIT_UNREACHABLE();
 }
 
-/* return: expressions::Exec or nullptr if no shell command is present. */
-std::unique_ptr<expressions::SimpleCommand>
+/* return: Exec or nullptr if no shell command is present. */
+std::unique_ptr<SimpleCommand>
 Parser::parse_simple_command()
 {
   std::optional<SourceLocation>       source_location;
@@ -222,8 +215,7 @@ Parser::parse_simple_command()
         args.emplace_back(t.release());
       }
 
-      return std::make_unique<expressions::SimpleCommand>(*source_location,
-                                                          std::move(args));
+      return std::make_unique<SimpleCommand>(*source_location, std::move(args));
     }
     }
   }
@@ -252,13 +244,13 @@ Parser::parse_expression(u8 min_precedence)
   switch (t->kind()) {
   /* Values */
   case Token::Kind::Number:
-    lhs = std::make_unique<expressions::ConstantNumber>(
-        t->source_location(), std::atoll(t->raw_string().data()));
+    lhs = std::make_unique<ConstantNumber>(t->source_location(),
+                                           std::atoll(t->raw_string().data()));
     break;
 
   case Token::Kind::String:
-    lhs = std::make_unique<expressions::ConstantString>(t->source_location(),
-                                                        t->raw_string());
+    lhs =
+        std::make_unique<ConstantString>(t->source_location(), t->raw_string());
     break;
 
   /* Keywords */
@@ -306,9 +298,8 @@ Parser::parse_expression(u8 min_precedence)
 
     m_if_condition_depth--;
 
-    lhs = std::make_unique<expressions::If>(t->source_location(),
-                                            condition.release(), then.release(),
-                                            otherwise.release());
+    lhs = std::make_unique<If>(t->source_location(), condition.release(),
+                               then.release(), otherwise.release());
   } break;
 
   /* Blocks */

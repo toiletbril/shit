@@ -124,5 +124,6 @@ clean:
 	rm -rf ./o ../shit ../shit.exe
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
 	rm -rf ../shit.com.dbg ../shit.aarch64.elf # Cosmopolitan
+	rm -rf ../perf*
 
 .PHONY: dirs shit install tidy fmt clean
