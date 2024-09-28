@@ -33,13 +33,16 @@ Which::execute(ExecContext &ec) const
   i32         ret = 1;
 
   for (usize i = 1; i < args.size(); i++) {
-    if (std::optional<std::filesystem::path> p =
+    if (search_builtin(args[i]).has_value()) {
+      buf += args[i];
+      buf += ": Shell builtin";
+    } else if (std::optional<std::filesystem::path> p =
             utils::search_program_path(args[i]);
         p.has_value())
     {
       buf += p->string();
-      buf += '\n';
     }
+    buf += '\n';
 
     ret = 0;
   }

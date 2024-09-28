@@ -21,6 +21,7 @@ struct Builtin
     Exit,
     Pwd,
     Which,
+    WhoAmI,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -36,11 +37,12 @@ protected:
 };
 
 const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
-    {"echo",  Builtin::Kind::Echo },
-    {"exit",  Builtin::Kind::Exit },
-    {"cd",    Builtin::Kind::Cd   },
-    {"pwd",   Builtin::Kind::Pwd  },
-    {"which", Builtin::Kind::Which},
+    {"echo",   Builtin::Kind::Echo  },
+    {"exit",   Builtin::Kind::Exit  },
+    {"cd",     Builtin::Kind::Cd    },
+    {"pwd",    Builtin::Kind::Pwd   },
+    {"which",  Builtin::Kind::Which },
+    {"whoami", Builtin::Kind::WhoAmI},
 };
 
 #define B_CASE(btin)                                                           \
@@ -50,8 +52,9 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Echo);                                                                \
   B_CASE(Cd);                                                                  \
   B_CASE(Exit);                                                                \
-  B_CASE(Which);                                                               \
-  B_CASE(Pwd)
+  B_CASE(Pwd);                                                                 \
+  B_CASE(Which); \
+  B_CASE(WhoAmI)
 
 #define BUILTIN_STRUCT(b)                                                      \
   struct b : public Builtin                                                    \
@@ -66,6 +69,7 @@ BUILTIN_STRUCT(Echo);
 BUILTIN_STRUCT(Cd);
 BUILTIN_STRUCT(Pwd);
 BUILTIN_STRUCT(Which);
+BUILTIN_STRUCT(WhoAmI);
 
 struct Exit : public Builtin
 {
