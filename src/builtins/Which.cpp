@@ -38,8 +38,8 @@ Which::execute(ExecContext &ec) const
       buf += ": Shell builtin";
       buf += '\n';
     } else if (std::optional<std::filesystem::path> p =
-            utils::search_program_path(args[i]);
-        p.has_value())
+                   utils::search_program_path(args[i]);
+               p.has_value())
     {
       buf += p->string();
       buf += '\n';

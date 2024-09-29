@@ -13,8 +13,7 @@
 namespace shit {
 
 void
-show_builtin_help_impl(std::string_view p,
-                       const ExecContext              &ec,
+show_builtin_help_impl(std::string_view p, const ExecContext &ec,
                        const std::vector<std::string> &hs,
                        const std::vector<Flag *>      &fl)
 {

@@ -53,7 +53,7 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Cd);                                                                  \
   B_CASE(Exit);                                                                \
   B_CASE(Pwd);                                                                 \
-  B_CASE(Which); \
+  B_CASE(Which);                                                               \
   B_CASE(WhoAmI)
 
 #define BUILTIN_STRUCT(b)                                                      \
@@ -81,12 +81,11 @@ struct Exit : public Builtin
 
 std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
 
-void show_builtin_help_impl(std::string_view p,
-    const ExecContext              &ec,
+void show_builtin_help_impl(std::string_view p, const ExecContext &ec,
                             const std::vector<std::string> &hs,
                             const std::vector<Flag *>      &fl);
 
-#define SHOW_BUILTIN_HELP(p, ec)                                                  \
+#define SHOW_BUILTIN_HELP(p, ec)                                               \
   show_builtin_help_impl(p, ec, HELP_SYNOPSIS, FLAG_LIST)
 
 #define BUILTIN_ARGS(ec)                                                       \
