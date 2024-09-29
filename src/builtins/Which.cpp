@@ -35,6 +35,7 @@ Which::execute(ExecContext &ec) const
   for (usize i = 1; i < args.size(); i++) {
     if (search_builtin(args[i]).has_value()) {
       buf += args[i];
+      /* FIXME: Do not print this if stdout is not a tty. */
       buf += ": Shell builtin";
       buf += '\n';
     } else if (std::optional<std::filesystem::path> p =
