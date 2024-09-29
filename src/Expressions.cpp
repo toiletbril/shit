@@ -4,6 +4,7 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
@@ -163,9 +164,13 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   if (cxt.should_echo())
     std::cout << utils::merge_tokens_to_string(m_args) << std::endl;
 
+  std::vector<std::string> program_args = cxt.process_args(m_args);
+
+  if (cxt.shell_is_interactive())
+    toiletline::set_title(utils::merge_args_to_string(program_args));
+
   return utils::execute_context(
-      ExecContext::make_from(source_location(), cxt.process_args(m_args)),
-      is_async());
+      ExecContext::make_from(source_location(), program_args), is_async());
 
   SHIT_UNREACHABLE();
 }

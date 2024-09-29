@@ -18,9 +18,10 @@ namespace shit {
  * class: EvalContext
  */
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
-                         bool should_echo_expanded)
+                         bool should_echo_expanded, bool shell_is_interactive)
     : m_enable_path_expansion(!should_disable_path_expansion),
-      m_enable_echo(should_echo), m_enable_echo_expanded(should_echo_expanded)
+      m_enable_echo(should_echo), m_enable_echo_expanded(should_echo_expanded),
+      m_shell_is_interactive(shell_is_interactive)
 {}
 
 void
@@ -86,6 +87,12 @@ bool
 EvalContext::should_echo_expanded() const
 {
   return m_enable_echo_expanded;
+}
+
+bool
+EvalContext::shell_is_interactive() const
+{
+  return m_shell_is_interactive;
 }
 
 usize

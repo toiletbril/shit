@@ -106,7 +106,7 @@ main(int argc, char **argv)
 
     std::string s{};
     s += "Both '-s' and '-i' options are specified. Falling back to ";
-    s += is_tty ? "'-i'" : "'-s' because stdin is not a tty'";
+    s += is_tty ? "'-i'" : "'-s' because stdin is not a tty.";
     shit::show_message(s);
 
     if (is_tty)
@@ -121,8 +121,10 @@ main(int argc, char **argv)
   bool should_read_files = !file_names.empty();
   bool should_execute_commands = !FLAG_COMMAND.is_empty();
   bool should_be_interactive =
-      (!should_execute_commands && FLAG_INTERACTIVE.is_enabled()) ||
-      (!should_read_files && shit::os::is_stdin_a_tty());
+      ((!should_execute_commands && FLAG_INTERACTIVE.is_enabled()) ||
+       (!should_execute_commands && !should_read_files &&
+        shit::os::is_stdin_a_tty())) &&
+      !FLAG_STDIN.is_enabled();
   bool should_read_stdin =
       (!should_be_interactive && !should_read_files) || FLAG_STDIN.is_enabled();
 
@@ -131,9 +133,9 @@ main(int argc, char **argv)
   }
 
   /* Main loop state. */
-  shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
-                            FLAG_VERBOSE.is_enabled(),
-                            FLAG_EXPAND_VERBOSE.is_enabled()};
+  shit::EvalContext context{
+      FLAG_DISABLE_EXPANSION.is_enabled(), FLAG_VERBOSE.is_enabled(),
+      FLAG_EXPAND_VERBOSE.is_enabled(), should_be_interactive};
 
   usize arg_index = 0;
   bool  should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;

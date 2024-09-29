@@ -42,7 +42,7 @@ struct Token;
 struct EvalContext
 {
   EvalContext(bool should_disable_path_expansion, bool should_echo,
-              bool should_echo_expanded);
+              bool should_echo_expanded, bool shell_is_interactive);
 
   void add_expansion();
   void add_evaluated_expression();
@@ -57,6 +57,7 @@ struct EvalContext
 
   bool should_echo() const;
   bool should_echo_expanded() const;
+  bool shell_is_interactive() const;
 
   std::string make_stats_string() const;
 
@@ -77,6 +78,7 @@ protected:
 
   bool m_enable_echo;
   bool m_enable_echo_expanded;
+  bool m_shell_is_interactive;
 
   /* clang-format off */
   std::tuple<std::vector<std::string>, std::vector<usize>>
