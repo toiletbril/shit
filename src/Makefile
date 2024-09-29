@@ -61,11 +61,17 @@ CXXFLAGS += \
 	-O0
 ifneq ($(OS), Windows_NT)
 ifneq ($(MODE), cosmo)
-CXXFLAGS += -fsanitize=address -fsanitize=undefined
+CXXFLAGS += \
+	-fsanitize=address \
+	-fsanitize=undefined
 endif
 endif
 else ifeq ($(MODE), cosmo)
-CXXFLAGS += -fexceptions -g -O3
+CXXFLAGS += \
+	-fexceptions \
+	-s \
+	-DNDEBUG \
+	-O3
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
 endif
@@ -85,11 +91,11 @@ CXXFLAGS += \
 endif
 
 o/$(MODE)/%.o: %.cpp
-	printf "\t%-24s 🡲  $@\n" $<
+	printf "\t%-24s -> $@\n" $<
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
 $(OUT): $(OBJECTS)
-	printf "\t$(OBJECTS) 🡲  $(OUT)\n"
+	printf "\t$(OBJECTS) <-> $(OUT)\n"
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@
 
 dirs: $(DIRS)
