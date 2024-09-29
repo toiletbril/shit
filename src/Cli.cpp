@@ -11,6 +11,8 @@
 
 namespace shit {
 
+/* TODO: Make CLI tests. */
+
 /**
  * class: Flag
  */
