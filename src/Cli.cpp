@@ -12,6 +12,7 @@
 namespace shit {
 
 /* TODO: Make CLI tests. */
+/* TODO: Add descriptions to autogeneated --help. */
 
 /**
  * class: Flag

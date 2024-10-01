@@ -3,6 +3,8 @@
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
+/* No flags. */
+
 namespace shit {
 
 Cd::Cd() = default;
@@ -28,8 +30,7 @@ Cd::execute(ExecContext &ec) const
     /* Empty cd should go to the home directory. */
     std::optional<std::filesystem::path> p = os::get_home_directory();
     if (!p)
-      throw ErrorWithLocation{ec.source_location(),
-                              "Could not figure out home directory"};
+      throw Error{"Could not figure out home directory"};
     arg_path = p->string();
   }
 

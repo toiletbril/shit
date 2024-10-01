@@ -50,7 +50,12 @@ execute_builtin(ExecContext &&ec)
 
   SHIT_DEFER { ec.close_fds(); };
 
-  return b->execute(ec);
+  try {
+    return b->execute(ec);
+  } catch (const Error &e) {
+    throw ErrorWithLocation{ec.source_location(),
+                            "Builtin '" + ec.program() + "': " + e.message()};
+  }
 }
 
 /**

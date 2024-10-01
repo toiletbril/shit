@@ -1,6 +1,8 @@
 #include "../Builtin.hpp"
 #include "../Utils.hpp"
 
+/* No flags. */
+
 namespace shit {
 
 Exit::Exit() = default;

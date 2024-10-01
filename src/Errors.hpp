@@ -24,16 +24,12 @@ protected:
   std::string m_message;
 };
 
-/**
- * Empty ctor creates an instance that converts to false, other ctors convert to
- * true.
- */
 struct Error : public ErrorBase
 {
   Error();
   Error(const std::string &message);
 
-  std::string to_string();
+  std::string to_string() const;
 };
 
 /**
@@ -46,7 +42,7 @@ struct ErrorWithLocation : public ErrorBase
 
   ErrorWithLocation(SourceLocation location, const std::string &message);
 
-  virtual std::string to_string(std::string_view source);
+  virtual std::string to_string(std::string_view source) const;
 
 protected:
   SourceLocation m_location;
@@ -61,7 +57,7 @@ struct ErrorWithLocationAndDetails : public ErrorWithLocation
                               SourceLocation     details_location,
                               const std::string &details_message);
 
-  std::string details_to_string(std::string_view source);
+  std::string details_to_string(std::string_view source) const;
 
 protected:
   SourceLocation m_details_location;

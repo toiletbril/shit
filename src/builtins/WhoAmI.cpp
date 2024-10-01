@@ -20,6 +20,13 @@ WhoAmI::kind() const
 i32
 WhoAmI::execute(ExecContext &ec) const
 {
+  std::vector<std::string> args = BUILTIN_ARGS(ec);
+
+  if (FLAG_HELP.is_enabled()) {
+    SHOW_BUILTIN_HELP("whoami", ec);
+    return 0;
+  }
+
   std::string p{};
 
   if (std::optional<std::string> u = os::get_current_user(); u.has_value()) {

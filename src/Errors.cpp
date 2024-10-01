@@ -128,7 +128,7 @@ ErrorBase::message() const
 Error::Error(const std::string &message) : ErrorBase(message) {}
 
 std::string
-Error::to_string()
+Error::to_string() const
 {
   return "Error: " + message() + ".";
 }
@@ -142,7 +142,7 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation     location,
 {}
 
 std::string
-ErrorWithLocation::to_string(std::string_view source)
+ErrorWithLocation::to_string(std::string_view source) const
 {
   auto [line_number, last_newline_location] =
       calc_precise_position(source, m_location);
@@ -153,11 +153,10 @@ ErrorWithLocation::to_string(std::string_view source)
   usize line_location = (last_newline_location > 0)
                             ? m_location.position() - last_newline_location
                             : m_location.position() + 1;
-  m_message = std::to_string(line_number + 1) + ":" +
-              std::to_string(line_location) + ": Error: " + m_message + ".\n" +
-              get_context_pointing_to(source, m_location, line_number,
-                                      last_newline_location, "here");
-  return m_message;
+  return std::to_string(line_number + 1) + ":" + std::to_string(line_location) +
+         ": Error: " + m_message + ".\n" +
+         get_context_pointing_to(source, m_location, line_number,
+                                 last_newline_location, "here");
 }
 
 /**
@@ -171,7 +170,7 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
 {}
 
 std::string
-ErrorWithLocationAndDetails::details_to_string(std::string_view source)
+ErrorWithLocationAndDetails::details_to_string(std::string_view source) const
 {
   auto [details_line_number, details_last_newline_location] =
       calc_precise_position(source, m_details_location);
@@ -180,12 +179,11 @@ ErrorWithLocationAndDetails::details_to_string(std::string_view source)
       (details_last_newline_location > 0)
           ? m_details_location.position() - details_last_newline_location
           : m_details_location.position() + 1;
-  m_message =
-      std::to_string(details_line_number + 1) + ":" +
-      std::to_string(details_line_location) + ": Note:" + "\n" +
-      get_context_pointing_to(source, m_details_location, details_line_number,
-                              details_last_newline_location, m_details_message);
-  return m_message;
+  return std::to_string(details_line_number + 1) + ":" +
+         std::to_string(details_line_location) + ": Note:" + "\n" +
+         get_context_pointing_to(
+             source, m_details_location, details_line_number,
+             details_last_newline_location, m_details_message);
 }
 
 } /* namespace shit */
