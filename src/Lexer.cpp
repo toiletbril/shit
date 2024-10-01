@@ -268,7 +268,7 @@ Lexer::lex_identifier()
 
   usize byte_count = 0;
   usize escaped_count = 0;
-  usize last_quote_char_pos = 0;
+  usize relative_last_quote_char_pos = 0;
 
   bool should_escape = false;
   bool should_append = false;
@@ -316,7 +316,7 @@ Lexer::lex_identifier()
           };
 
         quote_char = ch;
-        last_quote_char_pos = m_cursor_position + byte_count - 1;
+        relative_last_quote_char_pos = byte_count - 1;
         escaped_count++;
         continue;
       }
@@ -332,7 +332,8 @@ Lexer::lex_identifier()
   if (quote_char)
     throw ErrorWithLocationAndDetails{
         /* TODO: This dies with unicode. */
-        {last_quote_char_pos, SHIT_SUB_SAT(length, last_quote_char_pos)},
+        {m_cursor_position + relative_last_quote_char_pos,
+         SHIT_SUB_SAT(length, relative_last_quote_char_pos)},
         "Unterminated string literal",
         {m_cursor_position + length, 1},
         "expected " + std::string{*quote_char}
@@ -352,7 +353,8 @@ Lexer::lex_identifier()
   /* An identifier may be a keyword. Keyword also cannot contain quotes or
    * backslashes. */
   if (auto kw = KEYWORDS.find(ident_string);
-      escaped_count == 0 && last_quote_char_pos == 0 && kw != KEYWORDS.end())
+      escaped_count == 0 && relative_last_quote_char_pos == 0 &&
+      kw != KEYWORDS.end())
   {
     switch (kw->second) {
       KW_SWITCH_CASES();

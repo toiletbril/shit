@@ -239,17 +239,21 @@ main(int argc, char **argv)
           auto [code, input] =
               toiletline::readline(TOILETLINE_BUFFER_SIZE, prompt);
 
-          if (code == TL_PRESSED_EOF) {
+          switch (code) {
+          case TL_PRESSED_EOF:
             /* Exit on CTRL-D. */
             std::cout << "^D" << std::flush;
             toiletline::emit_newlines(input);
             shit::utils::quit(exit_code, true);
-          } else if (code == TL_PRESSED_INTERRUPT) {
+            break;
+          case TL_PRESSED_INTERRUPT:
             /* Ignore Ctrl-C. */
             std::cout << "^C" << std::flush;
-          } else if (code == TL_PRESSED_SUSPEND) {
+            break;
+          case TL_PRESSED_SUSPEND:
             /* Ignore Ctrl-Z. */
             std::cout << "^Z" << std::flush;
+            break;
           }
 
           toiletline::emit_newlines(input);
