@@ -26,16 +26,18 @@ namespace toiletline {
 
 static const std::string SHIT_HISTORY_FILE = ".shit_history";
 
-bool
+void
 set_title(const std::string &title)
 {
-  return ::tl_set_title(title.c_str()) != -1;
+  if (::tl_set_title(title.c_str()) != TL_SUCCESS)
+    throw shit::Error{"Toiletline: Could not set the title for the terminal."};
 }
 
 usize
-utf8_strlen(const std::string &s)
+utf8_strlen(const std::string &s, usize count)
 {
-  return ::tl_utf8_strlen(s.c_str());
+  return ::tl_utf8_strlen_n(s.c_str(),
+                            (count == std::string::npos) ? s.length() : count);
 }
 
 bool

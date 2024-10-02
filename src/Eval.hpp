@@ -16,6 +16,7 @@ struct SourceLocation
   SourceLocation() = delete;
   SourceLocation(usize position, usize length);
 
+  /* Both variables are byte-offsets and do not account for unicode. */
   usize position() const;
   usize length() const;
 

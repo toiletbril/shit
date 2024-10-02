@@ -2,6 +2,7 @@
 
 #include "Debug.hpp"
 #include "Eval.hpp"
+#include "Toiletline.hpp"
 
 #include <optional>
 #include <tuple>
@@ -38,22 +39,22 @@ get_context_pointing_to(std::string_view source, SourceLocation location,
   usize size = 0;
   usize start_offset = 0;
 
-  const usize pos = location.position();
+  usize position = location.position();
 
-  while (pos - start_offset > last_newline_location) {
+  while (position - start_offset > last_newline_location) {
     start_offset++;
   }
 
-  while (pos + size < source.length() && source[pos + size] != '\n')
+  while (position + size < source.length() && source[position + size] != '\n')
     size++;
 
-  if (source[pos - start_offset] == '\n') start_offset--;
+  if (source[position - start_offset] == '\n') start_offset--;
 
-  SHIT_ASSERT(pos + size <= source.length(), "end: %zu, length: %zu",
-              pos + size, source.length());
-  SHIT_ASSERT(pos >= start_offset);
-  SHIT_ASSERT(pos - start_offset <= pos + size,
-              "location: %zu, start: %zu, size: %zu, ", pos, start_offset,
+  SHIT_ASSERT(position + size <= source.length(), "end: %zu, length: %zu",
+              position + size, source.length());
+  SHIT_ASSERT(position >= start_offset);
+  SHIT_ASSERT(position - start_offset <= position + size,
+              "location: %zu, start: %zu, size: %zu, ", position, start_offset,
               size);
 
   usize line_number_length = 0;
@@ -75,7 +76,7 @@ get_context_pointing_to(std::string_view source, SourceLocation location,
   msg += std::to_string(line_number + 1) + " |  ";
 
   std::string_view context =
-      source.substr(pos - start_offset, start_offset + size);
+      source.substr(position - start_offset, start_offset + size);
 
   /* We don't need accidental newlines in the middle of the context.
    * *pulls hair out* */
@@ -83,15 +84,27 @@ get_context_pointing_to(std::string_view source, SourceLocation location,
 
   msg += context;
 
+  /* Calculate proper unicode offsets and lengths for underline. */
+  usize unicode_start_offset_position =
+      toiletline::utf8_strlen(source.data(), position - start_offset);
+  usize unicode_position = toiletline::utf8_strlen(source.data(), position);
+  usize unicode_length = toiletline::utf8_strlen(
+      source.data() + location.position(), location.length());
+
+  /* Add spaces before the underline. */
   msg += '\n';
   msg += "       |  "; /* 10 chars */
-  if (start_offset + added_symbols > 10)
-    for (usize i = 0; i < start_offset + added_symbols - 10; i++)
-      msg += ' ';
+  for (usize i = 0; i < (unicode_position - unicode_start_offset_position) +
+                            added_symbols - 10;
+       i++)
+  {
+    msg += ' ';
+  }
 
+  /* The underline itself of some length. */
   msg += "^~";
   if (location.length() > 2)
-    for (usize i = 0; i < location.length() - 2; i++)
+    for (usize i = 0; i < unicode_length - 2; i++)
       msg += '~';
 
   if (message) {

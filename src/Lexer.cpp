@@ -327,24 +327,21 @@ Lexer::lex_identifier()
     should_escape = (is_escape && !is_in_single_quotes);
   }
 
-  usize length = toiletline::utf8_strlen(ident_string.c_str()) + escaped_count;
-
   if (quote_char)
     throw ErrorWithLocationAndDetails{
-        /* TODO: This dies with unicode. */
         {m_cursor_position + relative_last_quote_char_pos,
-         SHIT_SUB_SAT(length, relative_last_quote_char_pos)},
+         SHIT_SUB_SAT(byte_count, relative_last_quote_char_pos)},
         "Unterminated string literal",
-        {m_cursor_position + length, 1},
+        {m_cursor_position + byte_count, 1},
         "expected " + std::string{*quote_char}
         + " here"
     };
 
   if (should_escape)
     throw ErrorWithLocationAndDetails{
-        {m_cursor_position + length - 1, 1},
+        {m_cursor_position + byte_count - 1, 1},
         "Nothing to escape",
-        {m_cursor_position + length,     1},
+        {m_cursor_position + byte_count,     1},
         "expected a character here"
     };
 
@@ -363,7 +360,7 @@ Lexer::lex_identifier()
     }
   } else {
     t = new tokens::Identifier{
-        {m_cursor_position, length},
+        {m_cursor_position, byte_count},
         ident_string
     };
   }

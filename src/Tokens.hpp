@@ -144,7 +144,7 @@ const std::unordered_map<std::string, Token::Kind> KEYWORDS = {
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
     t = new tokens::k{                                                         \
-        {m_cursor_position, length}                                            \
+        {m_cursor_position, byte_count}                                        \
     };                                                                         \
     break
 /* clang-format on */
