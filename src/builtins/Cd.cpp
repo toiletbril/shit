@@ -29,8 +29,7 @@ Cd::execute(ExecContext &ec) const
   } else {
     /* Empty cd should go to the home directory. */
     std::optional<std::filesystem::path> p = os::get_home_directory();
-    if (!p)
-      throw Error{"Could not figure out home directory"};
+    if (!p) throw Error{"Could not figure out home directory"};
     arg_path = p->string();
   }
 
