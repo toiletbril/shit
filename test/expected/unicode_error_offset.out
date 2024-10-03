@@ -7,6 +7,6 @@
   
 ]
 юникод
-shit: 1:20: Error: Could not expand path: No expansions found for 'does_not_exist*'.
+shit: 1:14: Error: Could not expand path: No expansions found for 'does_not_exist*'.
      1 |  echo юникод; does_not_exist*
        |               ^~~~~~~~~~~~~~~ here.
