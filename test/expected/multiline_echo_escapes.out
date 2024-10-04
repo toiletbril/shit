@@ -1,0 +1,9 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo is_escaped* word does_not_exist*"]
+[Escape Map
+  00000100 00000000 10001000 00011000 
+]
+shit: 5:1: Error: Could not expand path: No expansions found for 'does_not_exist*'.
+     5 |  does_not_exist*
+       |  ^~~~~~~~~~~~~~~ here.

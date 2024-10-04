@@ -267,7 +267,8 @@ Lexer::lex_identifier()
   std::string ident_string{};
 
   usize byte_count = 0;
-  usize escaped_count = 0;
+  usize escaped_newline_count = 0;
+  usize backslash_escaped_count = 0;
   usize relative_last_quote_char_pos = 0;
 
   bool should_escape = false;
@@ -282,20 +283,26 @@ Lexer::lex_identifier()
     should_append = true;
 
     bool is_dollar = (ch == '$');
-    bool is_escape = (ch == '\\' && !should_escape);
+    bool is_backslash_escape = (ch == '\\' && !should_escape);
+    bool is_newline = (ch == '\n');
 
     bool is_in_single_quotes = (quote_char == '\'');
 
     /* Fill the EscapeMap. */
-    if (lexer::is_expandable_char(ch) && quote_char) {
+    if (should_escape && is_newline) {
+      should_append = false;
+      escaped_newline_count++;
+    } else if (lexer::is_expandable_char(ch) && quote_char) {
       /* Escape all expandable chars inside quotes. */
-      m_escape_map.add_escape(m_cursor_position + byte_count - escaped_count);
-    } else if ((is_escape || is_dollar) && is_in_single_quotes) {
+      m_escape_map.add_escape(m_cursor_position + byte_count -
+                              backslash_escaped_count);
+    } else if ((is_backslash_escape || is_dollar) && is_in_single_quotes) {
       /* Single quotes ignore escapes/variables. */
-      m_escape_map.add_escape(m_cursor_position + byte_count - escaped_count);
-    } else if (is_escape) {
-      m_escape_map.add_escape(m_cursor_position + byte_count - escaped_count);
-      escaped_count++;
+      m_escape_map.add_escape(m_cursor_position + byte_count -
+                              backslash_escaped_count);
+    } else if (is_backslash_escape) {
+      m_escape_map.add_escape(m_cursor_position + byte_count -
+                              backslash_escaped_count++);
       should_append = false;
     }
 
@@ -305,7 +312,7 @@ Lexer::lex_identifier()
     if (!should_escape) {
       if (quote_char == ch) {
         quote_char = std::nullopt;
-        escaped_count++;
+        backslash_escaped_count++;
         continue;
       } else if (!quote_char && lexer::is_string_quote(ch)) {
         /* TODO: */
@@ -317,14 +324,14 @@ Lexer::lex_identifier()
 
         quote_char = ch;
         relative_last_quote_char_pos = byte_count - 1;
-        escaped_count++;
+        backslash_escaped_count++;
         continue;
       }
     }
 
     if (should_append) ident_string += ch;
 
-    should_escape = (is_escape && !is_in_single_quotes);
+    should_escape = (is_backslash_escape && !is_in_single_quotes);
   }
 
   if (quote_char)
@@ -347,10 +354,12 @@ Lexer::lex_identifier()
 
   Token *t{};
 
+  usize actual_cursor_position = m_cursor_position + escaped_newline_count;
+
   /* An identifier may be a keyword. Keyword also cannot contain quotes or
    * backslashes. */
   if (auto kw = KEYWORDS.find(ident_string);
-      escaped_count == 0 && relative_last_quote_char_pos == 0 &&
+      backslash_escaped_count == 0 && relative_last_quote_char_pos == 0 &&
       kw != KEYWORDS.end())
   {
     switch (kw->second) {
@@ -360,7 +369,7 @@ Lexer::lex_identifier()
     }
   } else {
     t = new tokens::Identifier{
-        {m_cursor_position, byte_count},
+        {actual_cursor_position, byte_count},
         ident_string
     };
   }
