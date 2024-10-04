@@ -36,16 +36,19 @@ Windows); GNU Make, some coreutils: `rm`, `mkdir` to build the executable;
 `cat`, `diff`, `printf` to run the tests; `clang-format`, `clang-tidy` (better
 18 or newer) to check the code.
 
-The `MODE` variable controls build type:
+The `SHIT_MODE` variable controls build type:
 * `rel` is the optimized build;
 * `prof` is optimized build with debug symbols for profiling;
 * `dbg` includes all symbols and Asan with Ubsan;
 * `cosmo` is an optimized build which will try to use `cosmoc++` from the
   Cosmopolitan toolchain.
 
+`$CPPFLAGS` environment variable can be used to append new flags to the build
+commands.
+
 An example of the excruciatingly complex build process:
 ```bash
-$ export MODE=<rel/prof/dbg/cosmo>
+$ export SHIT_MODE=<rel/prof/dbg/cosmo>
 $ make -j`nproc`
 $ ./shit --help
 ```

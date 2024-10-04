@@ -1,5 +1,5 @@
-# make MODE=dbg/rel/prof/cosmo
-MODE ?= dbg
+# make SHIT_MODE=dbg/rel/prof/cosmo
+SHIT_MODE ?= dbg
 
 SOURCES := $(wildcard *.cpp)
 HEADERS := $(wildcard *.hpp)
@@ -9,7 +9,7 @@ DIRS := $(wildcard */.)
 SOURCES += $(wildcard */**.cpp)
 HEADERS += $(wildcard */**.hpp)
 
-OBJECTS := $(SOURCES:%.cpp=o/$(MODE)/%.o)
+OBJECTS := $(SOURCES:%.cpp=o/$(SHIT_MODE)/%.o)
 
 ifeq ($(OS), Windows_NT)
 OUT := ../shit.exe
@@ -17,13 +17,13 @@ else
 OUT := ../shit
 endif
 
-ifeq ($(MODE), cosmo)
+ifeq ($(SHIT_MODE), cosmo)
 CXX := cosmoc++
 else ifeq ($(OS), Windows_NT)
 CXX := clang++
 endif
 
-ifeq ($(MODE), cosmo)
+ifeq ($(SHIT_MODE), cosmo)
 OS_INFO := "unknown-cosmo"
 else
 OS_INFO := $(shell uname -rvom || echo "<no uname>")
@@ -32,11 +32,12 @@ endif
 COMMIT_HASH := $(shell git rev-parse HEAD || echo "<no git>")
 
 DEFINES := \
+	-DSHIT_COMPILER_COMMAND="\"$(CXX)\"" \
 	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
 	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
-	-DSHIT_BUILD_MODE="\"$(MODE)\""
+	-DSHIT_BUILD_MODE="\"$(SHIT_MODE)\"" \
+	-DSHIT_CPPFLAGS="\"$(CPPFLAGS)\""
 
-# Use $CPPFLAGS or $CFLAGS to append new flags on command line.
 CXXFLAGS := \
 	-Wall \
 	-Wextra \
@@ -46,41 +47,44 @@ CXXFLAGS := \
 	-Wno-unused-command-line-argument \
 	-Wno-deprecated \
 	-std=c++17 \
-	$(DEFINES) \
-	$(CPPFLAGS) \
-	$(CFLAGS)
+	$(DEFINES)
 
-ifeq ($(MODE), rel)
+# Use $CPPFLAGS to append new flags on command line.
+ifneq ($(CPPFLAGS),)
+CXXFLAGS += $(CPPFLAGS)
+endif
+
+ifeq ($(SHIT_MODE), rel)
 CXXFLAGS += \
 	-s \
 	-DNDEBUG \
 	-O3
-else ifeq ($(MODE), dbg)
+else ifeq ($(SHIT_MODE), dbg)
 CXXFLAGS += \
 	-g3 \
 	-O0
 ifneq ($(OS), Windows_NT)
-ifneq ($(MODE), cosmo)
+ifneq ($(SHIT_MODE), cosmo)
 CXXFLAGS += \
 	-fsanitize=address \
 	-fsanitize=undefined
 endif
 endif
-else ifeq ($(MODE), cosmo)
+else ifeq ($(SHIT_MODE), cosmo)
 CXXFLAGS += \
 	-fexceptions \
 	-s \
 	-DNDEBUG \
 	-O3
 ifneq ($(CXX), cosmoc++)
-$(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
+$(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo)
 endif
-else ifeq ($(MODE), prof)
+else ifeq ($(SHIT_MODE), prof)
 CXXFLAGS += \
 	-g3 \
 	-O3
 else
-$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cosmo")
+$(error Invalid SHIT_MODE=$(SHIT_MODE). Available modes are "dbg", "rel", "prof", "cosmo")
 endif
 
 # Missing Windows libraries.
@@ -90,7 +94,7 @@ CXXFLAGS += \
 	-ladvapi32
 endif
 
-o/$(MODE)/%.o: %.cpp
+o/$(SHIT_MODE)/%.o: %.cpp
 	printf "\t%-24s -> $@\n" $<
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
@@ -99,8 +103,8 @@ $(OUT): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@
 
 dirs: $(DIRS)
-	mkdir -p o/$(MODE)/
-	mkdir -p o/$(MODE)/$<
+	mkdir -p o/$(SHIT_MODE)/
+	mkdir -p o/$(SHIT_MODE)/$<
 
 shit: dirs
 	$(MAKE) $(OUT)

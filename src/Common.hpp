@@ -2,6 +2,18 @@
 
 /* Timestamp the build. */
 
+#if !defined SHIT_CPPFLAGS
+#warning SHIT_CPPFLAGS should be defined. Please use provided makefile \
+         for compilation!
+#define SHIT_CPPFLAGS "<unknown>"
+#endif
+
+#if !defined SHIT_COMPILER_COMMAND
+#warning SHIT_COMPILER_COMMAND should be defined. Please use provided makefile \
+         for compilation!
+#define SHIT_COMPILER_COMMAND "<unknown>"
+#endif
+
 #if !defined SHIT_COMMIT_HASH
 #warning SHIT_COMMIT_HASH should be defined. Please use provided makefile for \
          compilation!
@@ -21,7 +33,8 @@
 #endif
 
 #define SHIT_BUILD_DATE (__DATE__ " at " __TIME__)
-#define SHIT_COMPILER   __VERSION__
+
+#define SHIT_COMPILER SHIT_COMPILER_COMMAND " (" __VERSION__ ")"
 
 /* Constants for --help and --version. */
 
@@ -56,7 +69,6 @@ using uchar = u8;
 using ichar = i8;
 
 using usize = size_t;
-using isize = ptrdiff_t;
 using uintptr = uintptr_t;
 
 #if defined __GNUC__ || defined __clang__ || defined __COSMOCC__

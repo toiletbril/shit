@@ -17,6 +17,8 @@
 #include <optional>
 #include <unordered_map>
 
+/* FIXME: std::filesystem::exists() is VERY slow. */
+
 /* TODO: Support background processes. */
 /* TODO: Support setting environment variables. */
 
@@ -147,7 +149,7 @@ set_current_directory(const std::filesystem::path &path)
 {
   try {
     std::filesystem::current_path(path);
-  } catch (std::filesystem::filesystem_error &err) {
+  } catch (const std::filesystem::filesystem_error &err) {
     throw shit::Error{os::last_system_error_message()};
   }
 }
@@ -157,15 +159,13 @@ get_current_directory()
 {
   try {
     return std::filesystem::current_path();
-  } catch (std::filesystem::filesystem_error &err) {
+  } catch (const std::filesystem::filesystem_error &err) {
     throw shit::Error{os::last_system_error_message()};
   }
 }
 
-/* TODO: Make proper tests. */
-
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
- * MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
+ * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 bool
 glob_matches(std::string_view glob, std::string_view str, usize source_position,
              const EscapeMap &em)
@@ -274,7 +274,7 @@ quit(i32 code, bool should_goodbye)
     if (toiletline::is_active()) {
       try {
         toiletline::exit();
-      } catch (Error &e) {
+      } catch (const Error &e) {
         /* TODO: A wild bug appeared! */
         show_message(e.to_string());
       }
@@ -351,13 +351,10 @@ initialize_path_map()
           PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
         }
       }
-    } catch (std::filesystem::filesystem_error &e) {
-      std::string s;
-      s += "Unable to read '";
-      s += e.path1().string();
-      s += "' while reading PATH: ";
-      s += os::last_system_error_message();
-      shit::show_message(s);
+    } catch (const std::filesystem::filesystem_error &e) {
+      shit::show_message(
+          "Unable to read '" + e.path1().string() +
+          "' while reading PATH: " + os::last_system_error_message());
     }
 
     dir_string.clear();
@@ -383,13 +380,10 @@ search_and_cache(const std::string &program_name)
 
     try {
       is_valid_dir = std::filesystem::exists(dir_string);
-    } catch (std::filesystem::filesystem_error &e) {
-      std::string s;
-      s += "Unable to read '";
-      s += dir_string;
-      s += "' while reading PATH: ";
-      s += os::last_system_error_message();
-      shit::show_message(s);
+    } catch (const std::filesystem::filesystem_error &e) {
+      shit::show_message(
+          "Unable to read '" + dir_string +
+          "' while reading PATH: " + os::last_system_error_message());
     }
 
     if (is_valid_dir) {

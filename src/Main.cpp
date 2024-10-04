@@ -67,7 +67,7 @@ main(int argc, char **argv)
 
   try {
     file_names = shit::parse_flags(FLAG_LIST, argc, argv);
-  } catch (shit::Error &e) {
+  } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
     return EXIT_SUCCESS;
   }
@@ -105,7 +105,7 @@ main(int argc, char **argv)
     bool is_tty = shit::os::is_stdin_a_tty();
 
     std::string s{};
-    s += "Both '-s' and '-i' options are specified. Falling back to ";
+    s += "Both '-s' and '-i' options were specified. Falling back to ";
     s += is_tty ? "'-i'" : "'-s' because stdin is not a tty.";
     shit::show_message(s);
 
@@ -116,21 +116,36 @@ main(int argc, char **argv)
   }
 
   /* Figure out what to do. Note that "-c" can be specified multiple times.
-   * Option precedence should behave as follows: "-s", then files (arguments),
-   * then "-i" (or no arguments). */
-  bool should_read_files = !file_names.empty();
-  bool should_execute_commands = !FLAG_COMMAND.is_empty();
-  bool should_be_interactive =
-      ((!should_execute_commands && FLAG_INTERACTIVE.is_enabled()) ||
-       (!should_execute_commands && !should_read_files &&
-        shit::os::is_stdin_a_tty())) &&
-      !FLAG_STDIN.is_enabled();
+   * Option precedence should behave as follows: "-s", then "-c", then files
+   * (arguments), then "-i" (or no arguments). */
   bool should_read_stdin =
-      (!should_be_interactive && !should_read_files) || FLAG_STDIN.is_enabled();
+      FLAG_STDIN.is_enabled() || !shit::os::is_stdin_a_tty();
+  bool should_execute_commands = !should_read_stdin && !FLAG_COMMAND.is_empty();
+  bool should_read_files = !file_names.empty() && !should_execute_commands;
+  bool should_be_interactive =
+      !should_read_files &&
+      (FLAG_INTERACTIVE.is_enabled() || shit::os::is_stdin_a_tty());
 
-  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled()) {
-    shit::show_message("One or more unimplemented options were ignored.");
+  if (FLAG_STDIN.is_enabled() &&
+      (!FLAG_COMMAND.is_empty() || !file_names.empty() ||
+       FLAG_INTERACTIVE.is_enabled()))
+  {
+    shit::show_message("Incompatible options or arguments were specified along "
+                       "with '-s' option. "
+                       "Falling back to '-s'.");
+  } else if (!FLAG_COMMAND.is_empty() &&
+             (!file_names.empty() || FLAG_INTERACTIVE.is_enabled()))
+  {
+    shit::show_message("Incompatible options or arguments were specified along "
+                       "with '-c' options. "
+                       "Falling back to '-c'.");
+  } else if (!file_names.empty() && FLAG_INTERACTIVE.is_enabled()) {
+    shit::show_message("Both file argument and '-i' option were given. "
+                       "Falling back to reading files.");
   }
+
+  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled())
+    shit::show_message("One or more unimplemented options were ignored.");
 
   /* Main loop state. */
   shit::EvalContext context{
@@ -269,10 +284,10 @@ main(int argc, char **argv)
       } else {
         SHIT_UNREACHABLE();
       }
-    } catch (shit::Error &e) {
+    } catch (const shit::Error &e) {
       shit::show_message(e.to_string());
       shit::utils::quit(EXIT_FAILURE);
-    } catch (std::exception &e) {
+    } catch (const std::exception &e) {
       shit::show_message("Uncaught std::exception while getting the input.");
       shit::show_message("what(): " + std::string{e.what()});
       shit::utils::quit(EXIT_FAILURE);
@@ -313,14 +328,14 @@ main(int argc, char **argv)
         std::cout << context.make_stats_string() << std::endl;
 
       context.end_command();
-    } catch (shit::ErrorWithLocationAndDetails &e) {
+    } catch (const shit::ErrorWithLocationAndDetails &e) {
       shit::show_message(e.to_string(script_contents));
       shit::show_message(e.details_to_string(script_contents));
-    } catch (shit::ErrorWithLocation &e) {
+    } catch (const shit::ErrorWithLocation &e) {
       shit::show_message(e.to_string(script_contents));
-    } catch (shit::Error &e) {
+    } catch (const shit::Error &e) {
       shit::show_message(e.to_string());
-    } catch (std::exception &e) {
+    } catch (const std::exception &e) {
       shit::show_message("Uncaught std::exception while executing the AST.");
       shit::show_message("what(): " + std::string{e.what()});
     } catch (...) {
@@ -330,6 +345,9 @@ main(int argc, char **argv)
                          shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
+
+    /* TODO: Make ExecutionErrorWithLocation to distinguish execution errors?
+     * Or statically check commands before they are executed? */
 
     /* We can get here from child process if they didn't exec()
      * properly to print error. */

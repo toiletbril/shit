@@ -415,10 +415,12 @@ show_version()
             << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
             << "Built on " << SHIT_BUILD_DATE << '\n'
             << '\n'
-            << "MODE=" << SHIT_BUILD_MODE << '\n'
-            << "HEAD " << SHIT_COMMIT_HASH << '\n'
-            << "Compiler " << SHIT_COMPILER << '\n'
-            << "OS " << SHIT_OS_INFO << '\n'
+            << "SHIT_MODE=" << SHIT_BUILD_MODE << '\n'
+            << "HEAD=" << SHIT_COMMIT_HASH << '\n'
+            << "CXX=" << SHIT_COMPILER << '\n'
+            << "CPPFLAGS="
+            << (*SHIT_CPPFLAGS == '\0' ? "<none>" : SHIT_CPPFLAGS) << '\n'
+            << "OS=" << SHIT_OS_INFO << '\n'
             << '\n'
             << SHIT_SHORT_LICENSE << '\n'
             << "(c) toiletbril "

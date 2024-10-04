@@ -161,7 +161,7 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
 
   try {
     d = std::filesystem::directory_iterator{parent_dir};
-  } catch (std::filesystem::filesystem_error &e) {
+  } catch (const std::filesystem::filesystem_error &e) {
     throw Error{"Could not descend into '" + std::string{parent_dir} +
                 "': " + os::last_system_error_message()};
   }
@@ -209,6 +209,8 @@ EvalContext::escape_map() const
 {
   return m_escape_map;
 }
+
+#define EXISTS_ERROR(s)
 
 std::vector<std::string>
 EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
@@ -269,14 +271,10 @@ EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
             /* FIXME: This is a massive slowdown. */
             if (!std::filesystem::exists(twice_expanded_path)) continue;
           } catch (const std::filesystem::filesystem_error &e) {
-            std::string s{};
-            s += "Could not check whether '";
-            s += e.path1().string();
-            s += "' exists: ";
-            s += os::last_system_error_message();
             throw ErrorWithLocation{
                 {source_position, original_path.length()},
-                s
+                "Could not check whether '" + e.path1().string() +
+                    "' exists: " + os::last_system_error_message()
             };
           }
           resulting_expanded_paths.emplace_back(twice_expanded_path);
