@@ -1,0 +1,9 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo word*"]
+[Escape Map
+  00000100 
+]
+shit: 2:1: Error: Could not expand path: No expansions found for 'word*'.
+     2 |  word*
+       |  ^~~~~ here.

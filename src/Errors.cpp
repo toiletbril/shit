@@ -163,11 +163,15 @@ ErrorWithLocation::to_string(std::string_view source) const
   usize byte_position = m_location.position();
   usize byte_count = m_location.length();
 
-  /* Special case for escaped newlines. */
-  if (byte_position + 1 < source.length() && source[byte_position] == '\\' &&
+  /* FIXME: Below are two dirty hacks. */
+  if (byte_position + 2 < source.length() && source[byte_position] == '\\' &&
       source[byte_position + 1] == '\n')
   {
     byte_position += 2;
+  } else if (byte_position + 1 < source.length() &&
+             source[byte_position] == '\n')
+  {
+    byte_position++;
   }
 
   auto [line_number, last_newline_location] =
