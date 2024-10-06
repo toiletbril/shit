@@ -23,8 +23,9 @@ private:
   usize m_parentheses_depth{0};
 
   [[nodiscard]] std::unique_ptr<expressions::SimpleCommand>
-                                            parse_simple_command();
-  [[nodiscard]] std::unique_ptr<Expression> parse_compound_command();
+                                        parse_simple_command();
+  std::unique_ptr<expressions::Command> parse_compound_command(const Token *t);
+  [[nodiscard]] std::unique_ptr<Expression> parse();
   [[nodiscard]] std::unique_ptr<Expression>
   parse_expression(u8 min_precedence = 0);
 };

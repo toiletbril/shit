@@ -75,7 +75,6 @@ t__string_from_struct(const T &x)
 #endif
 
 #if !defined NDEBUG
-/* This code path is unreachable. */
 #define SHIT_UNREACHABLE(...)                                                  \
   do {                                                                         \
     SHIT_TRACELN("Reached an unreachable statement");                          \
@@ -96,7 +95,7 @@ t__string_from_struct(const T &x)
       if (!SHIT_VA_ARE_EMPTY(__VA_ARGS__)) {                                   \
         SHIT_TRACELN("Details: " __VA_ARGS__);                                 \
       }                                                                        \
-      SHIT_TRAP();                                                             \
+      t__debugtrap();                                                          \
     }                                                                          \
   } while (0)
 #else

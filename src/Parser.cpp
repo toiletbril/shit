@@ -40,28 +40,62 @@ Parser::escape_map()
 std::unique_ptr<Expression>
 Parser::construct_ast()
 {
-  return parse_compound_command();
+  return parse();
+}
+
+std::unique_ptr<Command>
+Parser::parse_compound_command(const Token *token)
+{
+  switch (token->kind()) {
+  case Token::Kind::If:
+
+  case Token::Kind::Do:
+  case Token::Kind::For:
+  case Token::Kind::Time:
+  case Token::Kind::When:
+  case Token::Kind::Elif:
+  case Token::Kind::Else:
+  case Token::Kind::Case:
+  case Token::Kind::Esac:
+  case Token::Kind::Then:
+  case Token::Kind::Done:
+  case Token::Kind::While:
+  case Token::Kind::Function:
+  case Token::Kind::Redirection:
+  /* fallthrough */
+  default:;
+  }
+
+  throw ErrorWithLocation{token->source_location(), "Not implemented (Parser)"};
 }
 
 std::unique_ptr<Expression>
-Parser::parse_compound_command()
+Parser::parse()
 {
   std::unique_ptr<Command> lhs{};
   /* Sequence right at the start. */
   std::unique_ptr<CompoundList> sequence = std::make_unique<CompoundList>();
+  CompoundListCondition::Kind   next_cond = CompoundListCondition::Kind::None;
 
   bool should_parse_command = true;
 
-  CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
+  /* Keywords aren't considered a keyword if they don't come as a first
+   * token. */
+  bool is_first = true;
 
   for (;;) {
-    if (should_parse_command)
+    /* Operator right after. */
+    std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
+
+    if (token->flags() & Token::Flag::Keyword && is_first)
+      lhs = parse_compound_command(token.get());
+    else if (should_parse_command)
       lhs = parse_simple_command();
     else
       should_parse_command = true;
 
     /* Operator right after. */
-    std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
+    token.reset(m_lexer.peek_shell_token());
 
     switch (token->kind()) {
     /* These operators require a command after them. */
@@ -152,6 +186,8 @@ Parser::parse_compound_command()
                               "Expected a keyword or identifier, found '" +
                                   token->to_ast_string() + "'"};
     }
+
+    is_first = false;
   }
 
   /* TODO: find a way to indroduce expressions and use parse_expression() */
@@ -162,11 +198,21 @@ Parser::parse_compound_command()
 std::unique_ptr<SimpleCommand>
 Parser::parse_simple_command()
 {
-  std::optional<SourceLocation>       source_location;
+  SourceLocation source_location{0, 0};
+
   std::vector<std::unique_ptr<Token>> args_accumulator{};
 
   for (;;) {
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
+
+    source_location = token->source_location();
+
+    /* Handle keywords as identifiers. */
+    if (token->flags() & Token::Flag::Keyword) {
+      m_lexer.advance_past_last_peek();
+      args_accumulator.emplace_back(std::move(token));
+      continue;
+    }
 
     switch (token->kind()) {
     case Token::Kind::String: {
@@ -177,37 +223,12 @@ Parser::parse_simple_command()
       }
     }
     /* fallthrough */
-    case Token::Kind::If:
-    case Token::Kind::Do:
-    case Token::Kind::For:
-    case Token::Kind::Time:
-    case Token::Kind::When:
-    case Token::Kind::Elif:
-    case Token::Kind::Else:
-    case Token::Kind::Case:
-    case Token::Kind::Esac:
-    case Token::Kind::Then:
-    case Token::Kind::Done:
-    case Token::Kind::While:
-    case Token::Kind::Function:
-    case Token::Kind::Redirection:
-      /* These keyword are required to be first. Otherwise they are just
-       * identifiers. */
-      if (token->kind() != Token::Kind::String && args_accumulator.empty())
-        throw ErrorWithLocation{token->source_location(),
-                                "Not implemented (Parser)"};
-    /* fallthrough */
     case Token::Kind::Identifier:
       m_lexer.advance_past_last_peek();
-      if (!source_location) {
-        source_location = token->source_location();
-      }
       args_accumulator.emplace_back(std::move(token));
       break;
 
     default: {
-      if (!source_location) return nullptr;
-
       std::vector<const Token *> args{};
       args.reserve(args_accumulator.size());
 
@@ -215,7 +236,7 @@ Parser::parse_simple_command()
         args.emplace_back(t.release());
       }
 
-      return std::make_unique<SimpleCommand>(*source_location, std::move(args));
+      return std::make_unique<SimpleCommand>(source_location, std::move(args));
     }
     }
   }
