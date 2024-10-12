@@ -59,9 +59,20 @@ FLAG(SHORT_VERSION, Bool, 'V', "short-version",
      "Display version in a short form.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
+#if SHIT_USING_COSMO
+FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", "Cosmopolitan: Trace functions.");
+FLAG(COSMO_STRACE, Bool, '\0', "trace", "Cosmopolitan: Trace system calls.");
+#endif
+
 int
 main(int argc, char **argv)
 {
+#if SHIT_USING_COSMO
+  ShowCrashReports();
+  SHIT_UNUSED(FLAG_COSMO_FTRACE);
+  SHIT_UNUSED(FLAG_COSMO_STRACE);
+#endif
+
   bool                     is_login_shell = false;
   std::vector<std::string> file_names{};
 

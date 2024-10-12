@@ -73,9 +73,10 @@ endif
 else ifeq ($(SHIT_MODE), cosmo)
 CXXFLAGS += \
 	-fexceptions \
-	-s \
+	-g \
 	-DNDEBUG \
-	-O3
+	-O3 \
+	-DSHIT_USING_COSMO=1
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo)
 endif

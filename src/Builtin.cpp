@@ -2,6 +2,7 @@
 
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 
@@ -48,7 +49,14 @@ execute_builtin(ExecContext &&ec)
                      SHIT_ENUM(ec.builtin_kind()));
   }
 
-  SHIT_DEFER { ec.close_fds(); };
+  os::reset_signal_handlers();
+
+  /* TODO: Figure signals for builtins. */
+  SHIT_DEFER
+  {
+    ec.close_fds();
+    os::set_default_signal_handlers();
+  };
 
   try {
     return b->execute(ec);

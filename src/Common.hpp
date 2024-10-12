@@ -26,6 +26,14 @@
 #define SHIT_BUILD_MODE "<unset>"
 #endif
 
+#if !defined SHIT_USING_COSMO
+#define SHIT_USING_COSMO 0
+#endif
+
+#if SHIT_USING_COSMO
+#include "cosmo.h"
+#endif
+
 #if !defined SHIT_OS_INFO
 #warning SHIT_OS_INFO should be defined. Please use provided makefile for \
          compilation!
