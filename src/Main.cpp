@@ -247,16 +247,19 @@ main(int argc, char **argv)
         static constexpr usize PWD_LENGTH = 24;
 
         std::string pwd = shit::utils::get_current_directory().string();
-        toiletline::set_title("shit % " + pwd);
+        toiletline::set_title("shit @ " + pwd);
 
         if (pwd.length() > PWD_LENGTH)
           pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
 
+        std::string u = shit::os::get_current_user().value_or("???");
+
         /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
         std::string prompt{};
-        prompt += "shit % ";
+        prompt += u;
+        prompt += ' ';
         prompt += pwd;
-        prompt += " $ ";
+        prompt += (u == "root") ? " # " : " $ ";
 
         static constexpr usize TOILETLINE_BUFFER_SIZE = 2048;
 
