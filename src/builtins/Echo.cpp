@@ -25,12 +25,8 @@ Echo::kind() const
 i32
 Echo::execute(ExecContext &ec) const
 {
-  std::vector<std::string> args = BUILTIN_ARGS(ec);
-
-  if (FLAG_HELP.is_enabled()) {
-    SHOW_BUILTIN_HELP("echo", ec);
-    return 0;
-  }
+  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   std::string buf{};
 

@@ -380,6 +380,7 @@ Lexer::lex_identifier()
 
 /* Only single-character operators are defined here. Further parsing is done in
  * related routines. */
+
 /* clang-format off */
 static const std::unordered_map<char, Token::Kind> OPERATORS = {
     /* Sentinels */

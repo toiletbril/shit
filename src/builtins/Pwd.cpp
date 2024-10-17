@@ -20,12 +20,9 @@ Pwd::kind() const
 i32
 Pwd::execute(ExecContext &ec) const
 {
-  std::vector<std::string> args = BUILTIN_ARGS(ec);
+  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
 
-  if (FLAG_HELP.is_enabled()) {
-    SHOW_BUILTIN_HELP("pwd", ec);
-    return 0;
-  }
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   std::string p{};
   p = utils::get_current_directory().string();

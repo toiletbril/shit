@@ -36,14 +36,14 @@ set_title(const std::string &title)
 usize
 utf8_strlen(const std::string &s, usize count)
 {
-  return ::tl_utf8_strlen_n(s.c_str(),
-                            (count == std::string::npos) ? s.length() : count);
+  return (count != std::string::npos) ? ::tl_utf8_strnlen(s.c_str(), count)
+                                      : ::tl_utf8_strlen(s.c_str());
 }
 
 bool
 is_active()
 {
-  return ::itl_global_is_active;
+  return ::itl_g_is_active;
 }
 
 void
