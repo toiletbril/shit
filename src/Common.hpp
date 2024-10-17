@@ -134,7 +134,7 @@ struct t__exit_scope_help
 #define SHIT_SUB_SAT(a, b) ((a) > (b) ? (a) - (b) : 0)
 
 /* The length of statically allocated array. */
-#define countof(arr) (sizeof(arr) / sizeof(*(arr)))
+#define COUNTOF(arr) (sizeof(arr) / sizeof(*(arr)))
 
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";

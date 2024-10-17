@@ -14,12 +14,12 @@
 namespace shit {
 
 void
-show_builtin_help_impl(std::string_view p, const ExecContext &ec,
+show_builtin_help_impl(const ExecContext              &ec,
                        const std::vector<std::string> &hs,
                        const std::vector<Flag *>      &fl)
 {
   std::string h{};
-  h += make_synopsis(p, hs);
+  h += make_synopsis(ec.args()[0], hs);
   h += '\n';
   h += make_flag_help(fl);
   h += '\n';
@@ -29,9 +29,7 @@ show_builtin_help_impl(std::string_view p, const ExecContext &ec,
 std::optional<Builtin::Kind>
 search_builtin(std::string_view builtin_name)
 {
-  std::string lower_builtin_name = utils::lowercase_string(builtin_name);
-
-  if (auto b = BUILTINS.find(lower_builtin_name.c_str()); b != BUILTINS.end())
+  if (auto b = BUILTINS.find(builtin_name.data()); b != BUILTINS.end())
     return b->second;
 
   return std::nullopt;
@@ -66,9 +64,6 @@ execute_builtin(ExecContext &&ec)
   }
 }
 
-/**
- * class: Builtin
- */
 Builtin::Builtin() = default;
 
 } /* namespace shit */

@@ -40,10 +40,9 @@ void
 EvalContext::end_command()
 {
   m_expansions_total += m_expansions_last;
-  m_expansions_last = 0;
-
   m_expressions_executed_total += m_expressions_executed_last;
-  m_expressions_executed_last = 0;
+
+  m_expansions_last = m_expressions_executed_last = 0;
 }
 
 void

@@ -81,14 +81,18 @@ struct Exit : public Builtin
 
 std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
 
-void show_builtin_help_impl(std::string_view p, const ExecContext &ec,
+void show_builtin_help_impl(const ExecContext              &ec,
                             const std::vector<std::string> &hs,
                             const std::vector<Flag *>      &fl);
 
-#define SHOW_BUILTIN_HELP(p, ec)                                               \
-  show_builtin_help_impl(p, ec, HELP_SYNOPSIS, FLAG_LIST)
+#define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \
+  do {                                                                         \
+    show_builtin_help_impl(ec, HELP_SYNOPSIS, FLAG_LIST);                      \
+    return 0;                                                                  \
+  } while (false)
 
-#define BUILTIN_ARGS(ec)                                                       \
+/* TODO: More granular error location for flags? */
+#define PARSE_BUILTIN_ARGS(ec)                                                 \
   parse_flags_vec(FLAG_LIST, ec.args());                                       \
   SHIT_DEFER { reset_flags(FLAG_LIST); }
 

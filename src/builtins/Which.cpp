@@ -23,12 +23,9 @@ Which::kind() const
 i32
 Which::execute(ExecContext &ec) const
 {
-  std::vector<std::string> args = BUILTIN_ARGS(ec);
+  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
 
-  if (FLAG_HELP.is_enabled()) {
-    SHOW_BUILTIN_HELP("which", ec);
-    return 0;
-  }
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   std::string buf{};
 

@@ -14,9 +14,6 @@ namespace shit {
 /* TODO: Make CLI tests. */
 /* TODO: Add descriptions to autogeneated --help. */
 
-/**
- * class: Flag
- */
 Flag::Flag(Flag::Kind kind, char short_name, const std::string &long_name,
            const std::string &description)
     : m_kind(kind), m_short_name(short_name), m_long_name(long_name),
@@ -59,9 +56,6 @@ Flag::description() const
   return m_description;
 }
 
-/**
- * class: FlagBool
- */
 FlagBool::FlagBool(char short_name, const std::string &long_name,
                    const std::string &description)
     : Flag(Flag::Kind::Bool, short_name, long_name, description)
@@ -86,9 +80,6 @@ FlagBool::reset()
   m_value = false;
 }
 
-/**
- * class: FlagString
- */
 FlagString::FlagString(char short_name, const std::string &long_name,
                        const std::string &description)
     : Flag(Flag::Kind::String, short_name, long_name, description)
@@ -121,9 +112,6 @@ FlagString::reset()
   m_is_set = false;
 }
 
-/**
- * class: FlagManyStrings
- */
 FlagManyStrings::FlagManyStrings(char short_name, const std::string &long_name,
                                  const std::string &description)
     : Flag(Flag::Kind::ManyStrings, short_name, long_name, description)
@@ -219,8 +207,10 @@ parse_flags_vec(const std::vector<Flag *>      &flags,
 {
   std::vector<const char *> os_argv;
   os_argv.reserve(args.size());
+
   for (const std::string &arg : args)
     os_argv.emplace_back(arg.c_str());
+
   return parse_flags(flags, os_argv.size(),
                      const_cast<char const *const *>(os_argv.data()));
 }

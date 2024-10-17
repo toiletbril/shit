@@ -18,17 +18,27 @@ calc_precise_position(std::string_view source, usize byte_position)
               "byte position: %zu, source length: %zu", byte_position,
               source.length());
 
-  usize line_number = 0;
-  usize last_newline_location = 0;
+  usize line_number = 0, last_newline_location = 0;
 
   for (usize i = 0; i < byte_position; i++) {
-    if (source[i] == '\n') {
-      last_newline_location = i;
-      line_number++;
-    }
+    if (source[i] != '\n') continue;
+    last_newline_location = i;
+    line_number++;
   }
 
   return {line_number, last_newline_location};
+}
+
+template <class T>
+static usize
+number_string_length(T n)
+{
+  usize len = 0;
+  while (n > 0) {
+    len++;
+    n /= 10;
+  }
+  return len;
 }
 
 static std::string
@@ -57,18 +67,9 @@ get_context_pointing_to(std::string_view source, usize byte_position,
               byte_position - start_offset + line_byte_count ==
                   source.length());
 
-  /* Calculate textual length of the line. */
-  usize line_number_length = 0;
-  usize line_number_copy = line_number + 1;
-
-  while (line_number_copy > 0) {
-    line_number_copy /= 10;
-    line_number_length++;
-  }
-
   /* Add spacer before line number. */
   std::string msg{};
-  for (usize i = 0; i < 6 - line_number_length; i++) {
+  for (usize i = 0; i < 6 - number_string_length(line_number + 1); i++) {
     msg += ' ';
   }
 
@@ -104,13 +105,12 @@ get_context_pointing_to(std::string_view source, usize byte_position,
   /* Starting amount of spaces before the error arrow beneath the context. */
   usize added_symbols = 10;
 
+  usize underline_padding_length =
+      (unicode_position - unicode_start_offset_position) + added_symbols - 10;
+
   /* Remaining spaces to pad the underline. */
-  for (usize i = 0; i < (unicode_position - unicode_start_offset_position) +
-                            added_symbols - 10;
-       i++)
-  {
+  for (usize i = 0; i < underline_padding_length; i++)
     msg += ' ';
-  }
 
   /* The underline itself of this token's length. */
   msg += "^~";
@@ -183,11 +183,12 @@ ErrorWithLocation::to_string(std::string_view source) const
   /* Our count starts from 0. If there's only a single line, we need to use the
    * raw location for the correct offset. Otherwise, newline counts as an extra
    * character. */
-  usize line_location = (last_newline_location > 0)
-                            ? unicode_position - last_newline_location
-                            : unicode_position + 1;
-  return std::to_string(line_number + 1) + ":" + std::to_string(line_location) +
-         ": Error: " + m_message + ".\n" +
+  usize line_byte_position = (last_newline_location > 0)
+                                 ? unicode_position - last_newline_location
+                                 : unicode_position + 1;
+
+  return std::to_string(line_number + 1) + ":" +
+         std::to_string(line_byte_position) + ": Error: " + m_message + ".\n" +
          get_context_pointing_to(source, byte_position, byte_count, line_number,
                                  last_newline_location, unicode_position,
                                  "here");

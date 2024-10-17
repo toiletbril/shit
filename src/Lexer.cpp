@@ -233,9 +233,8 @@ Lexer::advance_forward(usize offset)
 char
 Lexer::chop_character(usize offset)
 {
-  if (m_cursor_position + offset < m_source.length()) {
+  if (m_cursor_position + offset < m_source.length())
     return m_source[m_cursor_position + offset];
-  }
 
   return lexer::CEOF;
 }
@@ -308,24 +307,23 @@ Lexer::lex_identifier()
     byte_count++;
 
     /* Handle quotes. */
-    if (!should_escape) {
-      if (quote_char == ch) {
-        quote_char = std::nullopt;
-        removed_backslash_count++;
-        continue;
-      } else if (!quote_char && lexer::is_string_quote(ch)) {
-        /* TODO: */
-        if (ch == '`')
-          throw ErrorWithLocation{
-              {m_cursor_position + byte_count - 1, 1},
-              "Not implemented (Lexer)"
-          };
-
-        quote_char = ch;
-        relative_last_quote_char_pos = byte_count - 1;
-        removed_backslash_count++;
-        continue;
+    if (!should_escape && quote_char == ch) {
+      quote_char = std::nullopt;
+      should_append = false;
+      removed_backslash_count++;
+    } else if (!should_escape && !quote_char && lexer::is_string_quote(ch)) {
+      /* TODO: */
+      if (ch == '`') {
+        throw ErrorWithLocation{
+            {m_cursor_position + byte_count - 1, 1},
+            "Not implemented (Lexer)"
+        };
       }
+
+      quote_char = ch;
+      should_append = false;
+      removed_backslash_count++;
+      relative_last_quote_char_pos = byte_count - 1;
     }
 
     if (should_append) ident_string += ch;
@@ -380,6 +378,7 @@ Lexer::lex_identifier()
 
 /* Only single-character operators are defined here. Further parsing is done in
  * related routines. */
+
 /* clang-format off */
 static const std::unordered_map<char, Token::Kind> OPERATORS = {
     /* Sentinels */
