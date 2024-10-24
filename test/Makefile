@@ -14,8 +14,8 @@ FAILED_LIST := failed.diff
 	cat input/$@.shit | \
 	$(BIN) -AEM - 2>&1 | \
 	diff $(DFLAGS) $< - >> $(FAILED_LIST) && \
-	printf "	[%32s] ok.\n" $@ || \
-	printf "	[%32s] FAILED.\n" $@
+	printf "	%-36s ok\n" $@ || \
+	printf "	%-36s FAILED :c\n" $@
 
 clean:
 	@rm -f $(FAILED_LIST)

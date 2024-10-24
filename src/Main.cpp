@@ -368,7 +368,7 @@ main(int argc, char **argv)
     if (should_quit || shit::os::is_child_process() ||
         (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {
-      shit::utils::quit(exit_code);
+      shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled());
     }
   }
 

@@ -281,7 +281,11 @@ quit(i32 code, bool should_goodbye)
     }
   }
 
-  if (should_goodbye) show_message("Goodbye :c");
+  if (should_goodbye) {
+    std::string code_str =
+        (code != 0) ? " (Code " + std::to_string(code) + ")" : "";
+    show_message("Goodbye :c" + code_str);
+  }
 
   std::exit(code);
 }

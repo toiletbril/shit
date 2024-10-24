@@ -16,7 +16,7 @@ Exit::kind() const
 i32
 Exit::execute(ExecContext &ec) const
 {
-  utils::quit(ec.args().size() > 0 ? std::atoi(ec.args()[1].c_str()) : 0, true);
+  utils::quit(ec.args().size() > 1 ? std::atoi(ec.args()[1].c_str()) : 0, true);
 }
 
 } /* namespace shit */

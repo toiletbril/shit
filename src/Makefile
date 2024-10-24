@@ -96,7 +96,7 @@ CXXFLAGS += \
 endif
 
 o/$(SHIT_MODE)/%.o: %.cpp
-	printf "\t%-24s -> $@\n" $<
+	printf "\t%-36s $@\n" $<
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
 $(OUT): $(OBJECTS)
