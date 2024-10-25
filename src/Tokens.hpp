@@ -15,7 +15,7 @@ namespace shit {
  */
 struct Token
 {
-  enum class Kind : uint8_t
+  enum class Kind : u8
   {
     Invalid,
 

@@ -80,7 +80,7 @@ is_stdout_a_tty()
 const std::vector<std::string> OMITTED_SUFFIXES = {""};
 
 ExtIndex
-sanitize_program_name(std::string &program_name)
+erase_extension_and_get_its_index(std::string &program_name)
 {
   /* POSIX does not really make use of extensions for executable files. */
   SHIT_UNUSED(program_name);
@@ -546,7 +546,7 @@ const std::vector<std::string> OMITTED_SUFFIXES = {
 constexpr static usize MIN_SUFFIX_LEN = 3;
 
 ExtIndex
-sanitize_program_name(std::string &program_name)
+erase_extension_and_get_its_index(std::string &program_name)
 {
 #if PLATFORM_IS(COSMO)
   if (IsWindows())

@@ -20,6 +20,8 @@ struct SourceLocation
   usize position() const;
   usize length() const;
 
+  void add_length(usize n);
+
 private:
   usize m_position;
   usize m_length;

@@ -26,7 +26,7 @@ namespace shit {
 
 struct Flag
 {
-  enum class Kind : uint8_t
+  enum class Kind : u8
   {
     Bool,
     String,

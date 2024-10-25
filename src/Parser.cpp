@@ -47,12 +47,13 @@ std::unique_ptr<Expression>
 Parser::parse_compound_command()
 {
   std::unique_ptr<Command> lhs{};
+
   /* Sequence right at the start. */
-  std::unique_ptr<CompoundList> sequence = std::make_unique<CompoundList>();
+  std::unique_ptr<CompoundList> compound_list =
+      std::make_unique<CompoundList>();
+  CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
 
   bool should_parse_command = true;
-
-  CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
 
   for (;;) {
     if (should_parse_command)
@@ -67,17 +68,17 @@ Parser::parse_compound_command()
     /* These operators require a command after them. */
     case Token::Kind::Ampersand:
       if (lhs) lhs->make_async();
-      /* fallthrough */
+      [[fallthrough]];
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
         throw shit::ErrorWithLocation{
             token->source_location(),
             "Expected a command " +
-                std::string(sequence->empty() ? "before" : "after") +
+                std::string(compound_list->is_empty() ? "before" : "after") +
                 " operator, found '" + token->to_ast_string() + "'"};
       }
-      /* fallthrough */
+      [[fallthrough]];
     case Token::Kind::Newline:
     case Token::Kind::EndOfFile:
     case Token::Kind::Semicolon: {
@@ -86,7 +87,7 @@ Parser::parse_compound_command()
       if (lhs) {
         CompoundListCondition *sn = new CompoundListCondition{
             token->source_location(), next_cond, lhs.release()};
-        sequence->append_node(sn);
+        compound_list->append_node(sn);
         next_cond = get_sequence_kind(token->kind());
       }
 
@@ -98,11 +99,11 @@ Parser::parse_compound_command()
         }
 
         /* Empty input? */
-        if (sequence->empty()) {
+        if (compound_list->is_empty()) {
           SHIT_ASSERT(!lhs);
           return std::make_unique<DummyExpression>(token->source_location());
         } else {
-          return sequence;
+          return compound_list;
         }
       }
     } break;
@@ -115,9 +116,9 @@ Parser::parse_compound_command()
 
       m_lexer.advance_past_last_peek();
 
-      std::vector<const SimpleCommand *> pipe_group = {
-          static_cast<SimpleCommand *>(lhs.get())};
-      SourceLocation pipe_group_location = token->source_location();
+      std::unique_ptr<Pipeline> pipeline =
+          std::make_unique<Pipeline>(token->source_location());
+      pipeline->append_command(static_cast<SimpleCommand *>(lhs.release()));
 
       std::unique_ptr<Token> last_pipe_token = std::move(token);
 
@@ -126,9 +127,8 @@ Parser::parse_compound_command()
         std::unique_ptr<SimpleCommand> rhs{parse_simple_command()};
 
         if (rhs) {
-          pipe_group.emplace_back(rhs.release());
+          pipeline->append_command(static_cast<SimpleCommand *>(rhs.release()));
           last_pipe_token.reset(m_lexer.peek_shell_token());
-
           if (last_pipe_token->kind() == Token::Kind::Pipe) {
             m_lexer.advance_past_last_peek();
             continue;
@@ -141,8 +141,7 @@ Parser::parse_compound_command()
         break;
       }
 
-      std::ignore = lhs.release();
-      lhs = std::make_unique<Pipeline>(pipe_group_location, pipe_group);
+      lhs = std::move(pipeline);
 
       should_parse_command = false;
     } break;
@@ -169,14 +168,13 @@ Parser::parse_simple_command()
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
     switch (token->kind()) {
-    case Token::Kind::String: {
+    case Token::Kind::String:
       if (static_cast<const tokens::String *>(token.get())->quote_char() == '`')
       {
         throw ErrorWithLocation{token->source_location(),
                                 "Unimplemented quote type"};
       }
-    }
-    /* fallthrough */
+      [[fallthrough]];
     case Token::Kind::If:
     case Token::Kind::Do:
     case Token::Kind::For:
@@ -196,7 +194,7 @@ Parser::parse_simple_command()
       if (token->kind() != Token::Kind::String && args_accumulator.empty())
         throw ErrorWithLocation{token->source_location(),
                                 "Not implemented (Parser)"};
-    /* fallthrough */
+      [[fallthrough]];
     case Token::Kind::Identifier:
       m_lexer.advance_past_last_peek();
       if (!source_location) {

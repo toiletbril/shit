@@ -43,7 +43,7 @@ bool is_child_process();
 bool is_stdin_a_tty();
 bool is_stdout_a_tty();
 
-ExtIndex sanitize_program_name(std::string &program_name);
+ExtIndex erase_extension_and_get_its_index(std::string &program_name);
 
 std::optional<std::string> get_current_user();
 

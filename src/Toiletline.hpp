@@ -21,8 +21,7 @@ void initialize();
 
 void exit();
 
-std::tuple<i32, std::string> readline(usize            max_buffer_size,
-                                      std::string_view prompt);
+std::tuple<i32, std::string> readline(const std::string &prompt);
 
 void enter_raw_mode();
 

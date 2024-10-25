@@ -104,7 +104,7 @@ protected:
 
 struct CompoundListCondition : public Expression
 {
-  enum class Kind : uint8_t
+  enum class Kind : u8
   {
     None,
     And,
@@ -135,7 +135,7 @@ struct CompoundList : public Expression
 
   ~CompoundList() override;
 
-  bool empty() const;
+  bool is_empty() const;
   void append_node(const CompoundListCondition *node);
 
   std::string to_string() const override;
@@ -149,9 +149,14 @@ protected:
 
 struct Pipeline : public Command
 {
+  Pipeline(SourceLocation location);
   Pipeline(SourceLocation                            location,
            const std::vector<const SimpleCommand *> &commands);
+
   ~Pipeline() override;
+
+  bool is_empty() const;
+  void append_command(const SimpleCommand *node);
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;

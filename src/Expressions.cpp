@@ -238,7 +238,7 @@ CompoundList::~CompoundList()
 }
 
 bool
-CompoundList::empty() const
+CompoundList::is_empty() const
 {
   return m_nodes.empty();
 }
@@ -246,6 +246,7 @@ CompoundList::empty() const
 void
 CompoundList::append_node(const CompoundListCondition *node)
 {
+  m_location.add_length(node->source_location().length());
   m_nodes.emplace_back(node);
 }
 
@@ -351,11 +352,27 @@ Pipeline::Pipeline(SourceLocation                            location,
     : Command(location), m_commands(commands)
 {}
 
+Pipeline::Pipeline(SourceLocation location) : Command(location), m_commands({})
+{}
+
 Pipeline::~Pipeline()
 {
   for (const SimpleCommand *e : m_commands) {
     delete e;
   }
+}
+
+bool
+Pipeline::is_empty() const
+{
+  return m_commands.empty();
+}
+
+void
+Pipeline::append_command(const SimpleCommand *node)
+{
+  m_location.add_length(node->source_location().length());
+  m_commands.emplace_back(node);
 }
 
 std::string
@@ -464,9 +481,6 @@ BinaryExpression::to_ast_string(usize layer) const
   return s;
 }
 
-/**
- * class: ConstantNumber
- */
 ConstantNumber::ConstantNumber(SourceLocation location, i64 value)
     : Expression(location), m_value(value)
 {}
@@ -497,9 +511,6 @@ ConstantNumber::to_string() const
   return std::to_string(m_value);
 }
 
-/**
- * class: ConstantString
- */
 ConstantString::ConstantString(SourceLocation     location,
                                const std::string &value)
     : Expression(location), m_value(value)

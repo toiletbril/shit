@@ -4,6 +4,6 @@
 [Escape Map
   00000100 
 ]
-shit: 2:1: Error: Could not expand path: No expansions found for 'word*'.
+shit: 2:1: Error: No expansions found for 'word*'.
      2 |  word*
        |  ^~~~~ here.

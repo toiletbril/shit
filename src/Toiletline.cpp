@@ -10,12 +10,11 @@
 #include <tuple>
 #include <vector>
 
-/* TODO: Unexpected internal error :shrug: */
 namespace {
 
 #define TL_NO_SUSPEND
 #define TL_ASSERT           SHIT_ASSERT
-#define TL_HISTORY_MAX_SIZE 1024
+#define TL_HISTORY_MAX_SIZE 1024 * 4
 
 #define TOILETLINE_IMPLEMENTATION
 #include "toiletline/toiletline.h"
@@ -24,7 +23,9 @@ namespace {
 
 namespace toiletline {
 
-static const std::string SHIT_HISTORY_FILE = ".shit_history";
+static char TL_BUFFER[ITL_STRING_MAX_LEN];
+
+static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
 
 void
 set_title(const std::string &title)
@@ -99,16 +100,14 @@ exit()
 }
 
 std::tuple<i32, std::string>
-readline(usize max_buffer_size, std::string_view prompt)
+readline(const std::string &prompt)
 {
-  std::vector<char> b{};
-  b.reserve(max_buffer_size);
-
-  i32 code = ::tl_readline(b.data(), max_buffer_size, prompt.data());
-  if (code == TL_ERROR)
-    throw shit::Error{"Toiletline: Unexpected internal error"};
-
-  return {code, b.data()};
+  i32 code = ::tl_readline(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
+  if (code == TL_ERROR) {
+    throw shit::Error{
+        "Toiletline: Unexpected internal error while getting the input"};
+  }
+  return {code, TL_BUFFER};
 }
 
 void

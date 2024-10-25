@@ -41,7 +41,6 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
      "UNIMPLEMENTED: Don't overwrite existing files with '>'.");
 FLAG(LOGIN, Bool, 'l', "login", "UNIMPLEMENTED: Act as a login shell.");
 
-/* Total bullcrap. */
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
@@ -261,12 +260,9 @@ main(int argc, char **argv)
         prompt += pwd;
         prompt += (u == "root") ? " # " : " $ ";
 
-        static constexpr usize TOILETLINE_BUFFER_SIZE = 2048;
-
         /* Ask for input until we get one. */
         for (;;) {
-          auto [code, input] =
-              toiletline::readline(TOILETLINE_BUFFER_SIZE, prompt);
+          auto [code, input] = toiletline::readline(prompt);
 
           switch (code) {
           case TL_PRESSED_EOF:

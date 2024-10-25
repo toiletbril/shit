@@ -405,7 +405,7 @@ show_version()
             << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
             << "Built on " << SHIT_BUILD_DATE << '\n'
             << '\n'
-            << "SHIT_MODE=" << SHIT_BUILD_MODE << '\n'
+            << "MODE=" << SHIT_BUILD_MODE << '\n'
             << "HEAD=" << SHIT_COMMIT_HASH << '\n'
             << "CXX=" << SHIT_COMPILER << '\n'
             << "CPPFLAGS="

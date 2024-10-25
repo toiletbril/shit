@@ -150,6 +150,7 @@ set_current_directory(const std::filesystem::path &path)
   try {
     std::filesystem::current_path(path);
   } catch (const std::filesystem::filesystem_error &err) {
+    SHIT_UNUSED(err);
     throw shit::Error{os::last_system_error_message()};
   }
 }
@@ -160,6 +161,7 @@ get_current_directory()
   try {
     return std::filesystem::current_path();
   } catch (const std::filesystem::filesystem_error &err) {
+    SHIT_UNUSED(err);
     throw shit::Error{os::last_system_error_message()};
   }
 }
@@ -269,6 +271,8 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
 [[noreturn]] void
 quit(i32 code, bool should_goodbye)
 {
+  u8 actual_code = static_cast<u8>(code);
+
   /* Cleanup for main proccess. */
   if (!os::is_child_process()) {
     if (toiletline::is_active()) {
@@ -279,15 +283,15 @@ quit(i32 code, bool should_goodbye)
         show_message(e.to_string());
       }
     }
+
+    if (should_goodbye) {
+      std::string code_str =
+          (code != 0) ? " (Code " + std::to_string(actual_code) + ")" : "";
+      show_message("Goodbye :c" + code_str);
+    }
   }
 
-  if (should_goodbye) {
-    std::string code_str =
-        (code != 0) ? " (Code " + std::to_string(code) + ")" : "";
-    show_message("Goodbye :c" + code_str);
-  }
-
-  std::exit(code);
+  std::exit(actual_code);
 }
 
 using DirIndex = usize;
@@ -352,13 +356,18 @@ initialize_path_map()
         /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : di) {
           std::string fs = f.path().filename().string();
-          PATH_CACHE[fs] = {dir_index, os::sanitize_program_name(fs)};
+          PATH_CACHE[fs] = {dir_index,
+                            os::erase_extension_and_get_its_index(fs)};
         }
       }
     } catch (const std::filesystem::filesystem_error &e) {
+#if 0
       shit::show_message(
           "Unable to read '" + e.path1().string() +
           "' while reading PATH: " + os::last_system_error_message());
+#else
+      SHIT_UNUSED(e);
+#endif
     }
 
     dir_string.clear();
@@ -385,9 +394,13 @@ search_and_cache(const std::string &program_name)
     try {
       is_valid_dir = std::filesystem::exists(dir_string);
     } catch (const std::filesystem::filesystem_error &e) {
+#if 0
       shit::show_message(
           "Unable to read '" + dir_string +
           "' while reading PATH: " + os::last_system_error_message());
+#else
+      SHIT_UNUSED(e);
+#endif
     }
 
     if (is_valid_dir) {
@@ -414,7 +427,8 @@ search_and_cache(const std::string &program_name)
       std::string           full_path_str = full_path.string();
 
       /* This file already has an extesion specified? */
-      if (os::ExtIndex explicit_ext = os::sanitize_program_name(full_path_str);
+      if (os::ExtIndex explicit_ext =
+              os::erase_extension_and_get_its_index(full_path_str);
           explicit_ext == 0)
       {
         for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
@@ -446,28 +460,29 @@ search_program_path(const std::string &program_name)
 {
   std::string sp{program_name};
 
-  os::ExtIndex extension_used = os::sanitize_program_name(sp);
+  os::ExtIndex extension_used = os::erase_extension_and_get_its_index(sp);
 
   if (auto p = PATH_CACHE.find(sp); p != PATH_CACHE.end()) {
     auto [dir, ext] = p->second;
-    std::filesystem::path try_path = PATH_CACHE_DIRS[dir];
+
+    std::filesystem::path tp = PATH_CACHE_DIRS[dir];
 
     if (extension_used > 0) {
-      try_path /= program_name;
+      tp /= program_name;
     } else {
       std::filesystem::path file_name = p->first;
       /* If index is 0, there's no extension to omit. */
       if (extension_used != 0) {
         file_name += '.';
       }
-      try_path /= file_name.concat(os::OMITTED_SUFFIXES[ext]);
+      tp /= file_name.concat(os::OMITTED_SUFFIXES[ext]);
     }
 
-    /* Does this path still exist? */
-    if (!std::filesystem::exists(try_path)) {
-      PATH_CACHE.erase(program_name);
+    if (std::filesystem::exists(tp)) {
+      return tp;
     } else {
-      return try_path;
+      PATH_CACHE.erase(program_name);
+      /* Continue searching. */
     }
   }
 

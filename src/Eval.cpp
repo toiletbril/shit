@@ -14,9 +14,6 @@
 
 namespace shit {
 
-/**
- * class: EvalContext
- */
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive)
     : m_enable_path_expansion(!should_disable_path_expansion),
@@ -364,17 +361,16 @@ EvalContext::process_args(const std::vector<const Token *> &args)
   usize tilde_offset = 0;
 
   for (const Token *t : args) {
+    std::string    s = t->raw_string();
+    SourceLocation l = t->source_location();
     try {
-      std::string r = t->raw_string();
-      tilde_offset += expand_tilde(r, t->source_location().position());
-      std::vector<std::string> e = expand_path(
-          std::move(r),
-          SHIT_SUB_SAT(t->source_location().position(), tilde_offset));
+      tilde_offset += expand_tilde(s, l.position());
+      std::vector<std::string> e =
+          expand_path(std::move(s), SHIT_SUB_SAT(l.position(), tilde_offset));
       for (std::string &a : e)
         expanded_args.emplace_back(a);
     } catch (const Error &e) {
-      throw ErrorWithLocation{t->source_location(),
-                              "Could not expand path: " + e.message()};
+      throw ErrorWithLocation{l, e.message()};
     }
   }
 
@@ -507,6 +503,12 @@ usize
 SourceLocation::length() const
 {
   return m_length;
+}
+
+void
+SourceLocation::add_length(usize n)
+{
+  m_length += n;
 }
 
 EscapeMap::EscapeMap() : m_bitmap() {}
