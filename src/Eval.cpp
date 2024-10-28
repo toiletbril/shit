@@ -43,7 +43,7 @@ EvalContext::end_command()
 }
 
 void
-EvalContext::steal_escape_map(const EscapeMap &&em)
+EvalContext::steal_escape_map(const EscapeBitmap &&em)
 {
   m_escape_map = em;
 }
@@ -53,7 +53,7 @@ EvalContext::make_stats_string() const
 {
   std::string s{};
 
-  s += "[Statistics:\n";
+  s += "[Stats\n";
 
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Expansions: " + std::to_string(last_expansion_count());
@@ -200,13 +200,11 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
   return {expanded_paths, expanded_offsets};
 }
 
-const EscapeMap &
+const EscapeBitmap &
 EvalContext::escape_map() const
 {
   return m_escape_map;
 }
-
-#define EXISTS_ERROR(s)
 
 std::vector<std::string>
 EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
@@ -511,24 +509,30 @@ SourceLocation::add_length(usize n)
   m_length += n;
 }
 
-EscapeMap::EscapeMap() : m_bitmap() {}
+EscapeBitmap::EscapeBitmap() : m_bitmap() {}
 
 void
-EscapeMap::add_escape(usize position)
+EscapeBitmap::add_escape(usize position)
 {
   if (m_bitmap.size() * 8 <= position) m_bitmap.resize(position / 8 + 1);
   m_bitmap[position / 8] |= (1 << (position % 8));
 }
 
 bool
-EscapeMap::is_escaped(usize position) const
+EscapeBitmap::is_escaped(usize position) const
 {
   if (m_bitmap.size() * 8 <= position) return false;
   return m_bitmap[position / 8] & (1 << (position % 8));
 }
 
+bool
+EscapeBitmap::is_empty() const
+{
+  return m_bitmap.empty();
+}
+
 std::string
-EscapeMap::to_string() const
+EscapeBitmap::to_string() const
 {
   std::string s{};
   for (usize byte = 0; byte < m_bitmap.size(); byte++) {
@@ -537,6 +541,17 @@ EscapeMap::to_string() const
     }
     s += ' ';
   }
+  return s;
+}
+
+std::string
+EscapeBitmap::to_pretty_string() const
+{
+  std::string s{};
+  s += "[Escape Bitmap\n";
+  s += "  ";
+  s += (!is_empty()) ? to_string() : "<empty>";
+  s += "\n]";
   return s;
 }
 

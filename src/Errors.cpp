@@ -63,9 +63,9 @@ get_context_pointing_to(std::string_view source, usize byte_position,
     line_byte_count++;
   }
 
-  SHIT_ASSERT(source[byte_position - start_offset + line_byte_count] == '\n' ||
-              byte_position - start_offset + line_byte_count ==
-                  source.length());
+  SHIT_ASSERT(byte_position - start_offset + line_byte_count ==
+                  source.length() ||
+              source[byte_position - start_offset + line_byte_count] == '\n');
 
   /* Add spacer before line number. */
   std::string msg{};

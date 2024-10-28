@@ -27,7 +27,8 @@
 #endif
 /* clang-format on */
 
-#define PLATFORM_IS(os) (SHIT_SUPPORT_VECTOR & os)
+#define SHIT_PLATFORM_IS   (SHIT_SUPPORT_VECTOR) &
+#define SHIT_PLATFORM_ISNT (~SHIT_SUPPORT_VECTOR) &
 
 #include <string>
 #include <vector>
@@ -36,7 +37,7 @@ namespace shit {
 
 namespace os {
 
-#if PLATFORM_IS(WIN32)
+#if SHIT_PLATFORM_IS WIN32
 constexpr char PATH_DELIMITER = ';';
 
 using process = HANDLE;
@@ -49,7 +50,7 @@ using os_args = std::string;
 #define SHIT_STDIN  GetStdHandle(STD_INPUT_HANDLE)
 #define SHIT_STDOUT GetStdHandle(STD_OUTPUT_HANDLE)
 
-#elif PLATFORM_IS(POSIX)
+#elif SHIT_PLATFORM_IS POSIX
 constexpr char PATH_DELIMITER = ':';
 
 using process = pid_t;

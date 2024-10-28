@@ -24,9 +24,13 @@ test: shit
 	echo Launching tests...
 	$(MAKE) -C test test
 
+refill_tests: shit
+	echo Refilling tests...
+	$(MAKE) -C test refill
+
 clean:
 	echo Cleaning up...
 	$(MAKE) -C src clean
 	$(MAKE) -C test clean
 
-.PHONY: all shit install tidy fmt test clean
+.PHONY: all shit install tidy fmt test refill_tests clean

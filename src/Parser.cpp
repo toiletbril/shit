@@ -31,7 +31,7 @@ Parser::Parser(Lexer &&lexer) : m_lexer(lexer) {}
 
 Parser::~Parser() = default;
 
-EscapeMap &
+EscapeBitmap &
 Parser::escape_map()
 {
   return m_lexer.escape_map();

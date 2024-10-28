@@ -157,7 +157,7 @@ Lexer::source() const
   return m_source;
 }
 
-EscapeMap &
+EscapeBitmap &
 Lexer::escape_map()
 {
   return m_escape_map;
@@ -284,7 +284,7 @@ Lexer::lex_identifier()
 
     bool is_backslash_escape = (ch == '\\' && !should_escape);
 
-    /* Fill the EscapeMap. */
+    /* Fill the EscapeBitmap. */
     if (should_escape && ch == '\n') {
       should_append = false;
       escaped_newline_count++;

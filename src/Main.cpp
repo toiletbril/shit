@@ -4,6 +4,7 @@
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
+#include "Os.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
@@ -45,20 +46,20 @@ FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
-FLAG(EXIT_CODE, Bool, 'E', "exit-code", "Print exit code after each command.");
-FLAG(ESCAPE_MAP, Bool, 'M', "escape-map",
-     "Print escape map after each command parsed.");
+FLAG(AST, Bool, 'A', "ast", "Print AST before executing each command.");
+FLAG(ESCAPE_MAP, Bool, 'M', "escape-bitmap",
+     "Print escape bitmap after each parsed command.");
+FLAG(EXIT_CODE, Bool, 'E', "exit-code",
+     "Print exit code after each executed command.");
 FLAG(STATS, Bool, 'S', "stats",
-     "Print statistics after each command executed.");
-FLAG(DUMP_AST, Bool, 'A', "dump-ast",
-     "Dump AST before executing each command.");
+     "Print statistics after each executed command.");
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, 'V', "short-version",
      "Display version in a short form.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
-#if SHIT_USING_COSMO
+#if SHIT_PLATFORM_IS COSMO
 FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", "Cosmopolitan: Trace functions.");
 FLAG(COSMO_STRACE, Bool, '\0', "trace", "Cosmopolitan: Trace system calls.");
 #endif
@@ -66,7 +67,7 @@ FLAG(COSMO_STRACE, Bool, '\0', "trace", "Cosmopolitan: Trace system calls.");
 int
 main(int argc, char **argv)
 {
-#if SHIT_USING_COSMO
+#if SHIT_PLATFORM_IS COSMO
   ShowCrashReports();
   SHIT_UNUSED(FLAG_COSMO_FTRACE);
   SHIT_UNUSED(FLAG_COSMO_STRACE);
@@ -319,14 +320,10 @@ main(int argc, char **argv)
 
       std::unique_ptr<shit::Expression> ast = p.construct_ast();
 
-      if (FLAG_DUMP_AST.is_enabled()) {
-        std::cout << ast->to_ast_string() << std::endl;
-      }
+      if (FLAG_AST.is_enabled()) std::cout << ast->to_ast_string() << std::endl;
 
-      if (FLAG_ESCAPE_MAP.is_enabled()) {
-        std::cout << "[Escape Map\n  " << p.escape_map().to_string() << "\n]"
-                  << std::endl;
-      }
+      if (FLAG_ESCAPE_MAP.is_enabled())
+        std::cout << p.escape_map().to_pretty_string() << std::endl;
 
       context.steal_escape_map(std::move(p.escape_map()));
       exit_code = ast->evaluate(context);

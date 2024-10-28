@@ -11,7 +11,7 @@ struct Parser
   ~Parser();
 
   std::unique_ptr<Expression> construct_ast();
-  EscapeMap                  &escape_map();
+  EscapeBitmap               &escape_map();
 
 private:
   static constexpr usize MAX_RECURSION_DEPTH = 64;

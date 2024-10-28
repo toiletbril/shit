@@ -1,4 +1,4 @@
-# make SHIT_MODE=dbg/rel/prof/cosmo
+# make SHIT_MODE=dbg/rel/prof/cosmo/cosmo_dbg
 SHIT_MODE ?= dbg
 
 SOURCES := $(wildcard *.cpp)
@@ -19,12 +19,16 @@ endif
 
 ifeq ($(SHIT_MODE), cosmo)
 CXX := cosmoc++
+else ifeq ($(SHIT_MODE), cosmo_dbg)
+CXX := cosmoc++
 else ifeq ($(OS), Windows_NT)
 CXX := clang++
 endif
 
 ifeq ($(SHIT_MODE), cosmo)
 OS_INFO := "unknown-cosmo"
+else ifeq ($(SHIT_MODE), cosmo_dbg)
+OS_INFO := "unknown-cosmo-dbg"
 else
 OS_INFO := $(shell uname -rvom || echo "<no uname>")
 endif
@@ -72,13 +76,23 @@ endif
 endif
 else ifeq ($(SHIT_MODE), cosmo)
 CXXFLAGS += \
+	-mcosmo \
+	-mtiny \
 	-fexceptions \
 	-g \
 	-DNDEBUG \
-	-O3 \
-	-DSHIT_USING_COSMO=1
+	-O3
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo)
+endif
+else ifeq ($(SHIT_MODE), cosmo_dbg)
+CXXFLAGS += \
+	-mcosmo \
+	-mdbg \
+	-fexceptions \
+	-g3
+ifneq ($(CXX), cosmoc++)
+$(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo_dbg)
 endif
 else ifeq ($(SHIT_MODE), prof)
 CXXFLAGS += \
@@ -96,7 +110,7 @@ CXXFLAGS += \
 endif
 
 o/$(SHIT_MODE)/%.o: %.cpp
-	printf "\t%-36s $@\n" $<
+	printf "\t%-42s $@\n" $<
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
 $(OUT): $(OBJECTS)

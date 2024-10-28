@@ -179,16 +179,16 @@ std::string
 SimpleCommand::to_string() const
 {
   std::string args{};
-  std::string s = "SimpleCommand \"" + m_args[0]->raw_string();
+  std::string s = "SimpleCommand \"" + m_args[0]->raw_string() + "\"";
 
   if (!m_args.empty()) {
     for (usize i = 1; i < m_args.size(); i++) {
-      args += " ";
+      args += " \"";
       args += m_args[i]->raw_string();
+      args += "\"";
     }
     s += args;
   }
-  s += "\"";
   if (is_async()) s += ", Async";
 
   return s;
@@ -378,7 +378,9 @@ Pipeline::append_command(const SimpleCommand *node)
 std::string
 Pipeline::to_string() const
 {
-  return "Pipeline";
+  std::string s = "Pipeline";
+  if (is_async()) s += ", Async";
+  return s;
 }
 
 std::string
@@ -390,9 +392,7 @@ Pipeline::to_ast_string(usize layer) const
     pad += EXPRESSION_AST_INDENT;
   }
 
-  s += pad + "[" + to_string();
-  if (is_async()) s += ", Async";
-  s += "]";
+  s += pad + "[" + to_string() + "]";
   for (const SimpleCommand *e : m_commands) {
     s += '\n';
     s += pad + EXPRESSION_AST_INDENT + e->to_ast_string(layer + 1);

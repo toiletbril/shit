@@ -1,7 +1,7 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo word*"]
-[Escape Map
+    [SimpleCommand "echo" "word*"]
+[Escape Bitmap
   00000100 
 ]
 shit: 2:1: Error: No expansions found for 'word*'.

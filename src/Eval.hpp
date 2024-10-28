@@ -27,14 +27,16 @@ private:
   usize m_length;
 };
 
-struct EscapeMap
+struct EscapeBitmap
 {
-  EscapeMap();
+  EscapeBitmap();
 
   void add_escape(usize position);
   bool is_escaped(usize position) const;
+  bool is_empty() const;
 
   std::string to_string() const;
+  std::string to_pretty_string() const;
 
 private:
   std::vector<u8> m_bitmap;
@@ -52,8 +54,8 @@ struct EvalContext
 
   void end_command();
 
-  const EscapeMap &escape_map() const;
-  void             steal_escape_map(const EscapeMap &&em);
+  const EscapeBitmap &escape_map() const;
+  void                steal_escape_map(const EscapeBitmap &&em);
 
   /* Path-expand, tilde-expand and escape. */
   std::vector<std::string> process_args(const std::vector<const Token *> &args);
@@ -76,8 +78,8 @@ protected:
   usize m_expansions_last{0};
   usize m_expansions_total{0};
 
-  EscapeMap m_escape_map;
-  bool      m_enable_path_expansion;
+  EscapeBitmap m_escape_map;
+  bool         m_enable_path_expansion;
 
   bool m_enable_echo;
   bool m_enable_echo_expanded;

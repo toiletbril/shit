@@ -1,12 +1,12 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo 1"]
+    [SimpleCommand "echo" "1"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo 2"]
+    [SimpleCommand "echo" "2"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo 3"]
-[Escape Map
-  
+    [SimpleCommand "echo" "3"]
+[Escape Bitmap
+  <empty>
 ]
 1
 2

@@ -1,26 +1,26 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/*"]
+    [SimpleCommand "echo" "data/*"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/*/"]
+    [SimpleCommand "echo" "data/*/"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/*/*"]
+    [SimpleCommand "echo" "data/*/*"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/*/*/"]
+    [SimpleCommand "echo" "data/*/*/"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/*g"]
+    [SimpleCommand "echo" "data/*g"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/abcd*"]
+    [SimpleCommand "echo" "data/abcd*"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/??*fg"]
+    [SimpleCommand "echo" "data/??*fg"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/[a-b]*/"]
+    [SimpleCommand "echo" "data/[a-b]*/"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/*[^g]"]
+    [SimpleCommand "echo" "data/*[^g]"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/.*"]
-[Escape Map
-  
+    [SimpleCommand "echo" "data/.*"]
+[Escape Bitmap
+  <empty>
 ]
 data/abcd data/abcdefg data/fourth data/hello-d data/hello+K
 data/abcd/ data/abcdefg/

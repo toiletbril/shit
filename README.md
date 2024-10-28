@@ -37,11 +37,12 @@ Windows); GNU Make, some coreutils: `rm`, `mkdir` to build the executable;
 18 or newer) to check the code.
 
 The `SHIT_MODE` variable controls build type:
-* `rel` is the optimized build;
-* `prof` is optimized build with debug symbols for profiling;
+* `rel` is an optimized build;
+* `prof` is an optimized build with debug symbols for profiling;
 * `dbg` includes all symbols and Asan with Ubsan;
 * `cosmo` is an optimized build which will try to use `cosmoc++` from the
   Cosmopolitan toolchain.
+* `cosmo_dbg` is a debug Cosmopolitan build.
 
 `$CPPFLAGS` environment variable can be used to append new flags to the build
 commands.

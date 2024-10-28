@@ -1,7 +1,7 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo привет мир! hello sailor!"]
-[Escape Map
+    [SimpleCommand "echo" "привет" "мир!" "hello" "sailor!"]
+[Escape Bitmap
   00000100 00000000 00000000 00001000 
 ]
 привет мир! hello sailor!

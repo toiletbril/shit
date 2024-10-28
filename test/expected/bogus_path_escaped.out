@@ -1,7 +1,7 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo data/*/*"]
-[Escape Map
+    [SimpleCommand "echo" "data/*/*"]
+[Escape Bitmap
   00000000 00001000 
 ]
 shit: 1:6: Error: No expansions found for 'data/*/*'.

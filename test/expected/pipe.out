@@ -1,26 +1,26 @@
 [CompoundList]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "echo 1"]
+      [SimpleCommand "echo" "1"]
       [SimpleCommand "cat"]
       [SimpleCommand "cat"]
       [SimpleCommand "cat"]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "echo 2"]
+      [SimpleCommand "echo" "2"]
       [SimpleCommand "cat"]
   [CompoundListCondition, &&]
     [Pipeline]
-      [SimpleCommand "echo 3"]
+      [SimpleCommand "echo" "3"]
       [SimpleCommand "cat"]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "echo 4"]
+      [SimpleCommand "echo" "4"]
       [SimpleCommand "false"]
   [CompoundListCondition, ||]
-    [SimpleCommand "echo 4"]
-[Escape Map
-  
+    [SimpleCommand "echo" "4"]
+[Escape Bitmap
+  <empty>
 ]
 1
 2

@@ -1,7 +1,7 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "exit"]
-[Escape Map
-  
+[Escape Bitmap
+  <empty>
 ]
 shit: Goodbye :c

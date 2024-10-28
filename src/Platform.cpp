@@ -12,7 +12,7 @@
 #include <iostream>
 #include <optional>
 
-#if PLATFORM_IS(POSIX)
+#if SHIT_PLATFORM_IS POSIX
 
 namespace shit {
 
@@ -76,7 +76,7 @@ is_stdout_a_tty()
 
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
-#if !PLATFORM_IS(COSMO)
+#if SHIT_PLATFORM_ISNT COSMO
 const std::vector<std::string> OMITTED_SUFFIXES = {""};
 
 ExtIndex
@@ -86,7 +86,7 @@ erase_extension_and_get_its_index(std::string &program_name)
   SHIT_UNUSED(program_name);
   return false;
 }
-#endif
+#endif /* !COSMO */
 
 std::optional<std::string>
 get_environment_variable(const std::string &key)
@@ -283,7 +283,7 @@ set_default_signal_handlers()
 
 } /* namespace shit */
 
-#elif PLATFORM_IS(WIN32)
+#elif SHIT_PLATFORM_IS WIN32
 
 #include <io.h>
 
@@ -532,7 +532,7 @@ reset_signal_handlers()
 
 #endif /* PLATFORM_IS(WIN32) */
 
-#if PLATFORM_IS(COSMO) || PLATFORM_IS(WIN32)
+#if SHIT_PLATFORM_IS COSMO or SHIT_PLATFORM_IS WIN32
 
 namespace shit {
 
@@ -548,7 +548,7 @@ constexpr static usize MIN_SUFFIX_LEN = 3;
 ExtIndex
 erase_extension_and_get_its_index(std::string &program_name)
 {
-#if PLATFORM_IS(COSMO)
+#if SHIT_PLATFORM_IS COSMO
   if (IsWindows())
 #endif
   {
@@ -576,4 +576,4 @@ erase_extension_and_get_its_index(std::string &program_name)
 
 } /* namespace shit */
 
-#endif /* PLATFORM_IS(COSMO) || PLATFORM_IS(WIN32) */
+#endif /* COSMO || WIN32 */

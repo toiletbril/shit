@@ -68,7 +68,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
   for (ExecContext &ec : ecs) {
     std::optional<os::Pipe> pipe;
 
-    bool is_last = &ec == &ecs.back();
+    bool is_last = (&ec == &ecs.back());
 
     if (!is_last) {
       pipe = os::make_pipe();
@@ -81,6 +81,9 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
     if (!is_first) {
       ec.in_fd = last_stdin;
     }
+    if (!is_last) {
+      last_stdin = pipe->in;
+    }
 
     if (!ec.is_builtin())
       last_child = os::execute_program(std::move(ec));
@@ -88,7 +91,6 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
       ret = execute_builtin(std::move(ec));
 
     is_first = false;
-    last_stdin = pipe->in;
   }
 
   if (last_child != SHIT_INVALID_FD && !is_async)
@@ -170,7 +172,7 @@ get_current_directory()
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 bool
 glob_matches(std::string_view glob, std::string_view str, usize source_position,
-             const EscapeMap &em)
+             const EscapeBitmap &em)
 {
   usize s = 0;
   usize g = 0;

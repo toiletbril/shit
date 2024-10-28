@@ -2,15 +2,15 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo", Async]
   [CompoundListCondition, None]
-    [SimpleCommand "echo 1", Async]
+    [SimpleCommand "echo" "1", Async]
   [CompoundListCondition, None]
-    [SimpleCommand "echo 1"]
+    [SimpleCommand "echo" "1"]
   [CompoundListCondition, None]
     [Pipeline, Async]
-      [SimpleCommand "echo 1"]
+      [SimpleCommand "echo" "1"]
       [SimpleCommand "cat"]
-[Escape Map
-  
+[Escape Bitmap
+  <empty>
 ]
 
 1

@@ -1,17 +1,17 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "test -d ~"]
+    [SimpleCommand "test" "-d" "~"]
   [CompoundListCondition, &&]
-    [SimpleCommand "echo 1"]
+    [SimpleCommand "echo" "1"]
   [CompoundListCondition, None]
-    [SimpleCommand "test -d ~/"]
+    [SimpleCommand "test" "-d" "~/"]
   [CompoundListCondition, &&]
-    [SimpleCommand "echo 2"]
+    [SimpleCommand "echo" "2"]
   [CompoundListCondition, None]
-    [SimpleCommand "test -d ~"]
+    [SimpleCommand "test" "-d" "~"]
   [CompoundListCondition, &&]
-    [SimpleCommand "echo 3"]
-[Escape Map
+    [SimpleCommand "echo" "3"]
+[Escape Bitmap
   00000000 00000000 00000000 00000000 00000000 00000000 01000000 
 ]
 1
