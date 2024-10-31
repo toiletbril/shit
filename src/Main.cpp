@@ -61,7 +61,7 @@ FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
 #if SHIT_PLATFORM_IS COSMO
 FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", "Cosmopolitan: Trace functions.");
-FLAG(COSMO_STRACE, Bool, '\0', "trace", "Cosmopolitan: Trace system calls.");
+FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 #endif
 
 int
@@ -126,33 +126,38 @@ main(int argc, char **argv)
       FLAG_INTERACTIVE.toggle();
   }
 
+  bool should_read_stdin = false, should_execute_commands = false,
+       should_read_files = false, should_be_interactive = false;
+
   /* Figure out what to do. Note that "-c" can be specified multiple times.
    * Option precedence should behave as follows: "-s", then "-c", then files
    * (arguments), then "-i" (or no arguments). */
-  bool should_read_stdin =
-      FLAG_STDIN.is_enabled() || !shit::os::is_stdin_a_tty();
-  bool should_execute_commands = !should_read_stdin && !FLAG_COMMAND.is_empty();
-  bool should_read_files = !file_names.empty() && !should_execute_commands;
-  bool should_be_interactive =
-      !should_read_files &&
-      (FLAG_INTERACTIVE.is_enabled() || shit::os::is_stdin_a_tty());
-
-  if (FLAG_STDIN.is_enabled() &&
-      (!FLAG_COMMAND.is_empty() || !file_names.empty() ||
-       FLAG_INTERACTIVE.is_enabled()))
-  {
-    shit::show_message("Incompatible options or arguments were specified along "
-                       "with '-s' option. "
-                       "Falling back to '-s'.");
-  } else if (!FLAG_COMMAND.is_empty() &&
-             (!file_names.empty() || FLAG_INTERACTIVE.is_enabled()))
-  {
-    shit::show_message("Incompatible options or arguments were specified along "
-                       "with '-c' options. "
-                       "Falling back to '-c'.");
-  } else if (!file_names.empty() && FLAG_INTERACTIVE.is_enabled()) {
-    shit::show_message("Both file argument and '-i' option were given. "
-                       "Falling back to reading files.");
+  if (FLAG_STDIN.is_enabled()) {
+    if (!FLAG_COMMAND.is_empty() || !file_names.empty() ||
+        FLAG_INTERACTIVE.is_enabled())
+    {
+      shit::show_message(
+          "Incompatible options or arguments were specified along "
+          "with '-s' option. "
+          "Falling back to '-s'.");
+    }
+    should_read_stdin = true;
+  } else if (!FLAG_COMMAND.is_empty()) {
+    if (!file_names.empty() || FLAG_INTERACTIVE.is_enabled()) {
+      shit::show_message(
+          "Incompatible options or arguments were specified along "
+          "with '-c' options. "
+          "Falling back to '-c'.");
+    }
+    should_execute_commands = true;
+  } else if (!file_names.empty()) {
+    if (FLAG_INTERACTIVE.is_enabled()) {
+      shit::show_message("Both file argument and '-i' option were given. "
+                         "Falling back to reading files.");
+    }
+    should_read_files = true;
+  } else {
+    should_be_interactive = true;
   }
 
   if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled())

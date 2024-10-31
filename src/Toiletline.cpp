@@ -31,7 +31,7 @@ void
 set_title(const std::string &title)
 {
   if (::tl_set_title(title.c_str()) != TL_SUCCESS)
-    throw shit::Error{"Toiletline: Could not set the title for the terminal."};
+    throw shit::Error{"Toiletline: Could not set the title for the terminal"};
 }
 
 usize

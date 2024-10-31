@@ -51,6 +51,8 @@ CXXFLAGS := \
 	-Wno-unused-command-line-argument \
 	-Wno-deprecated \
 	-std=c++17 \
+	-Wno-unknown-warning-option \
+	-Wno-error=maybe-uninitialized \
 	$(DEFINES)
 
 # Use $CPPFLAGS to append new flags on command line.

@@ -274,7 +274,7 @@ Lexer::lex_identifier()
   bool should_escape = false;
   bool should_append = false;
 
-  std::optional<char> quote_char{};
+  std::optional<char> quote_char = std::nullopt;
 
   /* Handle quote escapes and strings. */
   while (lexer::is_part_of_identifier((ch = chop_character(byte_count))) ||
