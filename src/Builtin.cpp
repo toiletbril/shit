@@ -14,9 +14,9 @@
 namespace shit {
 
 void
-show_builtin_help_impl(const ExecContext              &ec,
+show_builtin_help_impl(const ExecContext &ec,
                        const std::vector<std::string> &hs,
-                       const std::vector<Flag *>      &fl)
+                       const std::vector<Flag *> &fl)
 {
   std::string h{};
   h += make_synopsis(ec.args()[0], hs);

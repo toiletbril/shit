@@ -242,9 +242,9 @@ Lexer::chop_character(usize offset)
 Token *
 Lexer::lex_number()
 {
-  char        ch;
+  char ch;
   std::string n{};
-  usize       length = 0;
+  usize length = 0;
 
   while (lexer::is_number((ch = chop_character(length)))) {
     n += ch;
@@ -263,16 +263,13 @@ Lexer::lex_number()
 Token *
 Lexer::lex_identifier()
 {
-  char        ch;
+  char ch;
   std::string ident_string{};
 
-  usize byte_count = 0;
-  usize escaped_newline_count = 0;
-  usize removed_backslash_count = 0;
-  usize relative_last_quote_char_pos = 0;
+  usize byte_count = 0, escaped_newline_count = 0, removed_backslash_count = 0,
+        relative_last_quote_char_pos = 0, assignment_equals_pos = 0;
 
-  bool should_escape = false;
-  bool should_append = false;
+  bool should_escape = false, should_append = false;
 
   std::optional<char> quote_char = std::nullopt;
 
@@ -280,12 +277,16 @@ Lexer::lex_identifier()
   while (lexer::is_part_of_identifier((ch = chop_character(byte_count))) ||
          ((quote_char || should_escape) && ch != lexer::CEOF))
   {
-    should_append = true;
-
     bool is_backslash_escape = (ch == '\\' && !should_escape);
 
-    /* Fill the EscapeBitmap. */
-    if (should_escape && ch == '\n') {
+    should_append = true;
+
+    /* Was this an assignment? */
+    if (ch == '=' && !should_escape && relative_last_quote_char_pos == 0 &&
+        removed_backslash_count == 0)
+    {
+      assignment_equals_pos = byte_count;
+    } else if (should_escape && ch == '\n') { /* Fill the EscapeBitmap. */
       should_append = false;
       escaped_newline_count++;
     } else if (lexer::is_expandable_char(ch) && quote_char) {
@@ -331,7 +332,7 @@ Lexer::lex_identifier()
     should_escape = (is_backslash_escape && quote_char != '\'');
   }
 
-  if (quote_char)
+  if (quote_char) {
     throw ErrorWithLocationAndDetails{
         {m_cursor_position + relative_last_quote_char_pos,
          SHIT_SUB_SAT(byte_count, relative_last_quote_char_pos)},
@@ -340,35 +341,49 @@ Lexer::lex_identifier()
         "expected " + std::string{*quote_char}
         + " here"
     };
+  }
 
-  if (should_escape)
+  if (should_escape) {
     throw ErrorWithLocationAndDetails{
         {m_cursor_position + byte_count - 1, 1},
         "Nothing to escape",
         {m_cursor_position + byte_count,     1},
         "expected a character here"
     };
+  }
 
   Token *t{};
 
   usize actual_cursor_position = m_cursor_position + escaped_newline_count;
 
-  /* An identifier may be a keyword. Keyword also cannot contain quotes or
-   * backslashes. */
-  if (auto kw = KEYWORDS.find(ident_string);
-      removed_backslash_count == 0 && relative_last_quote_char_pos == 0 &&
-      kw != KEYWORDS.end())
-  {
-    switch (kw->second) {
-      KW_SWITCH_CASES();
-    default:
-      SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(kw->second));
-    }
-  } else {
-    t = new tokens::Identifier{
+  if (assignment_equals_pos != 0) {
+    std::string_view k =
+        source().substr(m_cursor_position, assignment_equals_pos);
+    std::string_view v =
+        source().substr(m_cursor_position + assignment_equals_pos + 1,
+                        assignment_equals_pos - byte_count - 1);
+    t = new tokens::Assignment{
         {actual_cursor_position, byte_count},
-        ident_string
+        k, v
     };
+  } else {
+    /* An identifier may be a keyword. Keyword also cannot contain quotes or
+     * backslashes. */
+    if (auto kw = KEYWORDS.find(ident_string);
+        removed_backslash_count == 0 && relative_last_quote_char_pos == 0 &&
+        kw != KEYWORDS.end())
+    {
+      switch (kw->second) {
+        KW_SWITCH_CASES();
+      default:
+        SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(kw->second));
+      }
+    } else {
+      t = new tokens::Identifier{
+          {actual_cursor_position, byte_count},
+          ident_string
+      };
+    }
   }
 
   m_cached_offset = byte_count;
@@ -413,7 +428,7 @@ static const std::unordered_map<char, Token::Kind> OPERATORS = {
 Token *
 Lexer::lex_sentinel()
 {
-  char  ch = chop_character();
+  char ch = chop_character();
   usize extra_length = 0;
 
   Token *tok{};

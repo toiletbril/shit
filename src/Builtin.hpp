@@ -28,7 +28,7 @@ struct Builtin
   void print_to_stdout(const std::string &s) const;
 
   virtual Kind kind() const = 0;
-  virtual i32  execute(ExecContext &ec) const = 0;
+  virtual i32 execute(ExecContext &ec) const = 0;
 
   virtual ~Builtin() = default;
 
@@ -62,7 +62,7 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     b();                                                                       \
                                                                                \
     Kind kind() const override;                                                \
-    i32  execute(ExecContext &ec) const override;                              \
+    i32 execute(ExecContext &ec) const override;                               \
   };
 
 BUILTIN_STRUCT(Echo);
@@ -75,15 +75,15 @@ struct Exit : public Builtin
 {
   Exit();
 
-  Kind             kind() const override;
+  Kind kind() const override;
   [[noreturn]] i32 execute(ExecContext &ec) const override;
 };
 
 std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
 
-void show_builtin_help_impl(const ExecContext              &ec,
+void show_builtin_help_impl(const ExecContext &ec,
                             const std::vector<std::string> &hs,
-                            const std::vector<Flag *>      &fl);
+                            const std::vector<Flag *> &fl);
 
 #define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \
   do {                                                                         \

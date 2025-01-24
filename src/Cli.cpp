@@ -202,7 +202,7 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
 }
 
 std::vector<std::string>
-parse_flags_vec(const std::vector<Flag *>      &flags,
+parse_flags_vec(const std::vector<Flag *> &flags,
                 const std::vector<std::string> &args)
 {
   std::vector<const char *> os_argv;
@@ -231,13 +231,13 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
   SHIT_ASSERT(argv != nullptr);
 
-  u32                      position = 0;
+  u32 position = 0;
   std::vector<std::string> args{};
 
   Flag *prev_flag{};
-  bool  next_arg_is_value = false;
-  bool  prev_is_long = false;
-  bool  ignore_rest = false;
+  bool next_arg_is_value = false;
+  bool prev_is_long = false;
+  bool ignore_rest = false;
 
   for (int i = 0; i < argc; i++) {
     SHIT_ASSERT(argv[i] != nullptr);
@@ -258,7 +258,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
       continue;
     }
 
-    bool        is_long = false;
+    bool is_long = false;
     const char *flag_offset{};
 
     if (argv[i][1] != '-') {
@@ -280,7 +280,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
     bool repeat = true;
 
-    Flag       *flag{};
+    Flag *flag{};
     const char *value_offset{};
 
     while (repeat) {
@@ -363,7 +363,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
             s += "-";
 
             std::string_view flag_sv = flag_offset;
-            usize            equals_pos = flag_sv.find('=');
+            usize equals_pos = flag_sv.find('=');
 
             if (equals_pos != std::string::npos)
               s += flag_sv.substr(0, equals_pos);
@@ -426,7 +426,7 @@ show_short_version()
 }
 
 std::string
-make_synopsis(std::string_view                program_name,
+make_synopsis(std::string_view program_name,
               const std::vector<std::string> &lines)
 {
   std::string s{};

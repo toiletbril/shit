@@ -33,10 +33,10 @@ struct Flag
     ManyStrings,
   };
 
-  Kind             kind() const;
-  usize            position() const;
-  void             set_position(u32 n);
-  char             short_name() const;
+  Kind kind() const;
+  usize position() const;
+  void set_position(u32 n);
+  char short_name() const;
   std::string_view long_name() const;
   std::string_view description() const;
 
@@ -47,9 +47,9 @@ protected:
   Flag(Kind type, char short_name, const std::string &long_name,
        const std::string &description);
 
-  Kind        m_kind;
-  usize       m_position{0}; /* 0 if it wasn't specified. */
-  char        m_short_name;
+  Kind m_kind;
+  usize m_position{0}; /* 0 if it wasn't specified. */
+  char m_short_name;
   std::string m_long_name;
   std::string m_description;
 };
@@ -73,14 +73,14 @@ struct FlagString : public Flag
   FlagString(char short_name, const std::string &long_name,
              const std::string &description);
 
-  void             set(std::string_view v);
-  bool             is_set() const;
+  void set(std::string_view v);
+  bool is_set() const;
   std::string_view value() const;
 
   void reset() override;
 
 private:
-  bool        m_is_set{false};
+  bool m_is_set{false};
   std::string m_value{};
 };
 
@@ -89,25 +89,25 @@ struct FlagManyStrings : public Flag
   FlagManyStrings(char short_name, const std::string &long_name,
                   const std::string &description);
 
-  void  append(std::string_view v);
+  void append(std::string_view v);
   usize size() const;
-  bool  is_empty() const;
+  bool is_empty() const;
 
   std::string_view get(usize i) const;
 
   std::string_view next();
-  bool             at_end() const;
+  bool at_end() const;
 
   void reset() override;
 
 private:
   std::vector<std::string> m_values{};
-  usize                    m_value_position{0};
+  usize m_value_position{0};
 };
 
 /* These return arguments which are not flags. */
 
-std::vector<std::string> parse_flags_vec(const std::vector<Flag *>      &flags,
+std::vector<std::string> parse_flags_vec(const std::vector<Flag *> &flags,
                                          const std::vector<std::string> &args);
 std::vector<std::string> parse_flags(const std::vector<Flag *> &flags, int argc,
                                      const char *const *argv);
@@ -117,7 +117,7 @@ void reset_flags(const std::vector<Flag *> &flags);
 void show_version();
 void show_short_version();
 
-std::string make_synopsis(std::string_view                program_name,
+std::string make_synopsis(std::string_view program_name,
                           const std::vector<std::string> &lines);
 std::string make_flag_help(const std::vector<Flag *> &flags);
 

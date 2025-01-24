@@ -20,7 +20,7 @@ struct ErrorBase
   std::string message() const;
 
 protected:
-  bool        m_is_active{false};
+  bool m_is_active{false};
   std::string m_message;
 };
 
@@ -52,16 +52,16 @@ struct ErrorWithLocationAndDetails : public ErrorWithLocation
 {
   ErrorWithLocationAndDetails();
 
-  ErrorWithLocationAndDetails(SourceLocation     location,
+  ErrorWithLocationAndDetails(SourceLocation location,
                               const std::string &message,
-                              SourceLocation     details_location,
+                              SourceLocation details_location,
                               const std::string &details_message);
 
   std::string details_to_string(std::string_view source) const;
 
 protected:
   SourceLocation m_details_location;
-  std::string    m_details_message;
+  std::string m_details_message;
 };
 
 } /* namespace shit */

@@ -55,7 +55,7 @@ struct EvalContext
   void end_command();
 
   const EscapeBitmap &escape_map() const;
-  void                steal_escape_map(const EscapeBitmap &&em);
+  void steal_escape_map(const EscapeBitmap &&em);
 
   /* Path-expand, tilde-expand and escape. */
   std::vector<std::string> process_args(const std::vector<const Token *> &args);
@@ -79,7 +79,7 @@ protected:
   usize m_expansions_total{0};
 
   EscapeBitmap m_escape_map;
-  bool         m_enable_path_expansion;
+  bool m_enable_path_expansion;
 
   bool m_enable_echo;
   bool m_enable_echo_expanded;
@@ -139,7 +139,7 @@ private:
 
   std::variant<shit::Builtin::Kind, std::filesystem::path> m_kind;
 
-  SourceLocation           m_location;
+  SourceLocation m_location;
   std::vector<std::string> m_args;
 };
 

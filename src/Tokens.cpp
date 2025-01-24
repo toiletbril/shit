@@ -24,9 +24,9 @@ namespace tokens {
 
 #define KEYWORD_TOKEN_DECLS(t, s)                                              \
   t::t(SourceLocation location) : Token(location) {}                           \
-  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::Keyword; }               \
-  std::string  t::raw_string() const { return s; }
+  std::string t::raw_string() const { return s; }
 
 KEYWORD_TOKEN_DECLS(If, "if");
 KEYWORD_TOKEN_DECLS(Then, "then");
@@ -46,9 +46,9 @@ KEYWORD_TOKEN_DECLS(Function, "function");
 
 #define SENTINEL_TOKEN_DECLS(t)                                                \
   t::t(SourceLocation location) : Token(location) {}                           \
-  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::Sentinel; }              \
-  std::string  t::raw_string() const { return #t; }
+  std::string t::raw_string() const { return #t; }
 
 SENTINEL_TOKEN_DECLS(EndOfFile);
 SENTINEL_TOKEN_DECLS(Newline);
@@ -88,6 +88,41 @@ Token::Flags
 Number::flags() const
 {
   return Token::Flag::Value;
+}
+
+Assignment::Assignment(SourceLocation location, std::string_view k,
+                       std::string_view v)
+    : Token(location), m_key(k), m_value(v)
+{}
+
+Token::Kind
+Assignment::kind() const
+{
+  return Token::Kind::Assignment;
+}
+
+Token::Flags
+Assignment::flags() const
+{
+  return Token::Flag::Special;
+}
+
+std::string
+Assignment::raw_string() const
+{
+  return m_key + "=" + m_value;
+}
+
+const std::string &
+Assignment::key() const
+{
+  return m_key;
+}
+
+const std::string &
+Assignment::value() const
+{
+  return m_value;
 }
 
 String::String(SourceLocation location, char quote_char, std::string_view sv)
@@ -197,14 +232,14 @@ Operator::construct_unary_expression(const Expression *rhs) const
 
 #define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \
   t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const                                                \
   {                                                                            \
     return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;           \
   }                                                                            \
-  std::string                 t::raw_string() const { return s; }              \
-  u8                          t::left_precedence() const { return bp; }        \
-  u8                          t::unary_precedence() const { return up; }       \
+  std::string t::raw_string() const { return s; }                              \
+  u8 t::left_precedence() const { return bp; }                                 \
+  u8 t::unary_precedence() const { return up; }                                \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
       const Expression *lhs, const Expression *rhs) const                      \
   {                                                                            \
@@ -221,10 +256,10 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
 
 #define BINARY_OPERATOR_TOKEN_DECLS(t, s, bp, bexpr)                           \
   t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::BinaryOperator; }        \
-  std::string  t::raw_string() const { return s; }                             \
-  u8           t::left_precedence() const { return bp; }                       \
+  std::string t::raw_string() const { return s; }                              \
+  u8 t::left_precedence() const { return bp; }                                 \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
       const Expression *lhs, const Expression *rhs) const                      \
   {                                                                            \
@@ -251,10 +286,10 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
 
 #define UNARY_OPERATOR_TOKEN_DECLS(t, s, up, uexpr)                            \
   t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind  t::kind() const { return Token::Kind::t; }                      \
+  Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::UnaryOperator; }         \
-  std::string  t::raw_string() const { return s; }                             \
-  u8           t::unary_precedence() const { return up; }                      \
+  std::string t::raw_string() const { return s; }                              \
+  u8 t::unary_precedence() const { return up; }                                \
   std::unique_ptr<Expression> t::construct_unary_expression(                   \
       const Expression *rhs) const                                             \
   {                                                                            \

@@ -173,7 +173,7 @@ wait_and_monitor_process(process pid)
 
   /* Print appropriate message if the process was sent a signal. */
   if (WIFSIGNALED(status)) {
-    i32         sig = WTERMSIG(status);
+    i32 sig = WTERMSIG(status);
     const char *sig_str = strsignal(sig);
     std::string sig_desc =
         (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
@@ -188,7 +188,7 @@ wait_and_monitor_process(process pid)
 
     return status;
   } else if (WIFSTOPPED(status)) {
-    i32         sig = WSTOPSIG(status);
+    i32 sig = WSTOPSIG(status);
     const char *sig_str = strsignal(sig);
     std::string sig_desc =
         (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
@@ -373,7 +373,7 @@ execute_program(ExecContext &&ec)
   std::string command_line = make_os_args(ec.args());
 
   PROCESS_INFORMATION process_info{};
-  STARTUPINFOA        startup_info{};
+  STARTUPINFOA startup_info{};
 
   startup_info.cb = sizeof(startup_info);
 

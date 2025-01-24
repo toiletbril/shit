@@ -60,7 +60,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
 
   i32 ret = 0;
 
-  os::process    last_child = SHIT_INVALID_PROCESS;
+  os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
   bool is_first = true;
@@ -350,7 +350,7 @@ initialize_path_map()
        * user? */
       if (std::filesystem::exists(dir_string)) {
         std::filesystem::directory_iterator di{dir_string};
-        std::filesystem::path               dir_path{dir_string};
+        std::filesystem::path dir_path{dir_string};
 
         usize dir_index =
             cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
@@ -409,7 +409,7 @@ search_and_cache(const std::string &program_name)
       std::filesystem::path dir_path{dir_string};
 
       /* Cache the directory if it was not present before. */
-      bool  found = false;
+      bool found = false;
       usize dir_index = 0;
 
       for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
@@ -426,7 +426,7 @@ search_and_cache(const std::string &program_name)
 
       /* Actually try to find the file. */
       std::filesystem::path full_path = dir_path / program_name;
-      std::string           full_path_str = full_path.string();
+      std::string full_path_str = full_path.string();
 
       /* This file already has an extesion specified? */
       if (os::ExtIndex explicit_ext =

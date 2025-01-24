@@ -102,7 +102,7 @@ struct t__exit_scope
   t__exit_scope(const t__exit_scope &);
 
 private:
-  T              m_lambda;
+  T m_lambda;
   t__exit_scope &operator=(const t__exit_scope &);
 };
 

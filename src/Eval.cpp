@@ -122,10 +122,10 @@ EvalContext::expand_path_once(std::string_view path, usize source_position,
                               usize offset, bool should_expand_files)
 {
   std::vector<std::string> expanded_paths{};
-  std::vector<usize>       expanded_offsets{};
+  std::vector<usize> expanded_offsets{};
 
   usize last_slash = path.rfind('/');
-  bool  has_slashes = (last_slash != std::string::npos);
+  bool has_slashes = (last_slash != std::string::npos);
 
   /* Prefix is the parent directory. */
   std::string parent_dir{};
@@ -208,11 +208,11 @@ EvalContext::escape_map() const
 
 std::vector<std::string>
 EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
-                                 const std::vector<usize>       &offsets,
+                                 const std::vector<usize> &offsets,
                                  usize source_position)
 {
   std::vector<std::string> resulting_expanded_paths{};
-  std::optional<usize>     expand_ch{};
+  std::optional<usize> expand_ch{};
 
   for (usize i = 0; i < paths.size(); i++) {
     std::string_view original_path = paths[i];
@@ -349,6 +349,7 @@ EvalContext::expand_path(std::string &&r, usize source_position)
   return values;
 }
 
+/* TODO: Expand everything before the execution? */
 /* TODO: Command substitution. */
 std::vector<std::string>
 EvalContext::process_args(const std::vector<const Token *> &args)
@@ -359,7 +360,7 @@ EvalContext::process_args(const std::vector<const Token *> &args)
   usize tilde_offset = 0;
 
   for (const Token *t : args) {
-    std::string    s = t->raw_string();
+    std::string s = t->raw_string();
     SourceLocation l = t->source_location();
     try {
       tilde_offset += expand_tilde(s, l.position());
@@ -445,7 +446,7 @@ ExecContext::print_to_stdout(const std::string &s) const
 }
 
 ExecContext
-ExecContext::make_from(SourceLocation                  location,
+ExecContext::make_from(SourceLocation location,
                        const std::vector<std::string> &args)
 {
   /* Make sure we always include at least one argument, the program path. */
@@ -455,7 +456,7 @@ ExecContext::make_from(SourceLocation                  location,
 
   const std::string &program = args[0];
 
-  std::optional<Builtin::Kind>         bk;
+  std::optional<Builtin::Kind> bk;
   std::optional<std::filesystem::path> p;
 
   /* This isn't a path? */

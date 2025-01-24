@@ -14,7 +14,6 @@ BraceWrapping:
   SplitEmptyRecord: false
   SplitEmptyNamespace: false
 AlignArrayOfStructures: Left
-AlignConsecutiveDeclarations: true
 AlignConsecutiveMacros: true
 AllowShortBlocksOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: WithoutElse

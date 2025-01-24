@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
-#include "Expressions.hpp"
+#include "Eval.hpp"
 
 #include <memory>
 #include <string>
@@ -9,6 +9,8 @@
 #include <unordered_map>
 
 namespace shit {
+
+struct Expression;
 
 /**
  * Simple tokens
@@ -40,6 +42,7 @@ struct Token
     String,
     Identifier,
     Redirection,
+    Assignment,
 
     /* Operators */
     Plus,
@@ -107,8 +110,8 @@ struct Token
   Token &operator=(const Token &) = delete;
   Token &operator=(Token &&) noexcept = delete;
 
-  virtual Kind        kind() const = 0;
-  virtual Flags       flags() const = 0;
+  virtual Kind kind() const = 0;
+  virtual Flags flags() const = 0;
   virtual std::string raw_string() const = 0;
 
   virtual std::string to_ast_string() const;
@@ -173,8 +176,8 @@ namespace tokens {
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind        kind() const override;                                         \
-    Flags       flags() const override;                                        \
+    Kind kind() const override;                                                \
+    Flags flags() const override;                                              \
     std::string raw_string() const override;                                   \
   }
 
@@ -212,7 +215,7 @@ struct Redirection : Token
   Redirection(SourceLocation location, std::string_view what_fd,
               std::string_view to_file);
 
-  Kind  kind() const override;
+  Kind kind() const override;
   Flags flags() const override;
 
   const std::string &from_fd() const;
@@ -221,6 +224,23 @@ struct Redirection : Token
 protected:
   std::string m_from_fd{};
   std::string m_to_file{};
+};
+
+struct Assignment : public Token
+{
+  Assignment(SourceLocation location, std::string_view k, std::string_view v);
+
+  Kind kind() const override;
+  Flags flags() const override;
+
+  std::string raw_string() const override;
+
+  const std::string &key() const;
+  const std::string &value() const;
+
+protected:
+  std::string m_key;
+  std::string m_value;
 };
 
 /* Tokens with values. */
@@ -239,7 +259,7 @@ protected:
   {                                                                            \
     t(SourceLocation location, std::string_view sv);                           \
                                                                                \
-    Kind  kind() const override;                                               \
+    Kind kind() const override;                                                \
     Flags flags() const override;                                              \
   }
 
@@ -250,7 +270,7 @@ struct String : public Value
 {
   String(SourceLocation location, char quote_char, std::string_view sv);
 
-  Kind  kind() const override;
+  Kind kind() const override;
   Flags flags() const override;
 
   char quote_char() const;
@@ -280,8 +300,8 @@ struct Operator : public Token
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind        kind() const override;                                         \
-    Flags       flags() const override;                                        \
+    Kind kind() const override;                                                \
+    Flags flags() const override;                                              \
     std::string raw_string() const override;                                   \
                                                                                \
     u8 left_precedence() const override;                                       \
@@ -302,8 +322,8 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind        kind() const override;                                         \
-    Flags       flags() const override;                                        \
+    Kind kind() const override;                                                \
+    Flags flags() const override;                                              \
     std::string raw_string() const override;                                   \
                                                                                \
     u8 unary_precedence() const override;                                      \
@@ -319,8 +339,8 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind        kind() const override;                                         \
-    Flags       flags() const override;                                        \
+    Kind kind() const override;                                                \
+    Flags flags() const override;                                              \
     std::string raw_string() const override;                                   \
                                                                                \
     u8 left_precedence() const override;                                       \

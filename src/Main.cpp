@@ -73,7 +73,7 @@ main(int argc, char **argv)
   SHIT_UNUSED(FLAG_COSMO_STRACE);
 #endif
 
-  bool                     is_login_shell = false;
+  bool is_login_shell = false;
   std::vector<std::string> file_names{};
 
   try {
@@ -169,8 +169,8 @@ main(int argc, char **argv)
       FLAG_EXPAND_VERBOSE.is_enabled(), should_be_interactive};
 
   usize arg_index = 0;
-  bool  should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
-  int   exit_code = EXIT_SUCCESS;
+  bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
+  int exit_code = EXIT_SUCCESS;
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,
    * since it's only really noticeable in interactive mode. This way,
@@ -201,7 +201,7 @@ main(int argc, char **argv)
     try {
       if (should_read_files || should_read_stdin) {
         /* Were we given a list of files or "-s" flag? */
-        std::fstream  f{};
+        std::fstream f{};
         std::istream *file{};
 
         /* If "-s" is used, or when file name is "-", use stdin. */

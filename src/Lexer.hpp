@@ -34,21 +34,21 @@ struct Lexer
   [[nodiscard]] Token *next_shell_token();
 
   std::string_view source() const;
-  EscapeBitmap    &escape_map();
-  usize            advance_past_last_peek();
+  EscapeBitmap &escape_map();
+  usize advance_past_last_peek();
 
 protected:
-  std::string  m_source{};
-  usize        m_cursor_position{0};
-  usize        m_cached_offset{0};
+  std::string m_source{};
+  usize m_cursor_position{0};
+  usize m_cached_offset{0};
   EscapeBitmap m_escape_map{};
 
   Token *lex_expression_token();
   Token *lex_shell_token();
 
-  void  skip_whitespace();
+  void skip_whitespace();
   usize advance_forward(usize offset);
-  char  chop_character(usize offset = 0);
+  char chop_character(usize offset = 0);
 
   Token *lex_number();
   Token *lex_identifier();

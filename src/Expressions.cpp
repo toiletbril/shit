@@ -38,8 +38,8 @@ Expression::evaluate(EvalContext &cxt) const
 
 namespace expressions {
 
-If::If(SourceLocation location, const Expression *condition,
-       const Expression *then, const Expression *otherwise)
+IfStatement::IfStatement(SourceLocation location, const Expression *condition,
+                         const Expression *then, const Expression *otherwise)
     : Expression(location), m_condition(condition), m_then(then),
       m_otherwise(otherwise)
 {
@@ -48,7 +48,7 @@ If::If(SourceLocation location, const Expression *condition,
   /* And *otherwise may be NULL. */
 }
 
-If::~If()
+IfStatement::~IfStatement()
 {
   delete m_condition;
   delete m_then;
@@ -57,7 +57,7 @@ If::~If()
 }
 
 i64
-If::evaluate_impl(EvalContext &cxt) const
+IfStatement::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
@@ -70,13 +70,13 @@ If::evaluate_impl(EvalContext &cxt) const
 }
 
 std::string
-If::to_string() const
+IfStatement::to_string() const
 {
   return "If";
 }
 
 std::string
-If::to_ast_string(usize layer) const
+IfStatement::to_ast_string(usize layer) const
 {
   std::string s{};
   std::string pad{};
@@ -112,6 +112,12 @@ Command::is_async() const
   return m_is_async;
 }
 
+bool
+Command::is_assignment() const
+{
+  return false;
+}
+
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
 {}
 
@@ -138,7 +144,64 @@ DummyExpression::to_ast_string(usize layer) const
   return pad + "[" + to_string() + "]";
 }
 
-SimpleCommand::SimpleCommand(SourceLocation                     location,
+AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
+    : Command(location), m_assignment(a)
+{}
+
+AssignCommand::~AssignCommand() { delete m_assignment; }
+
+const Assignment *
+AssignCommand::assignment() const
+{
+  return m_assignment;
+}
+
+bool
+AssignCommand::is_assignment() const
+{
+  return true;
+}
+
+i64
+AssignCommand::evaluate_impl(EvalContext &cxt) const
+{
+  SHIT_UNUSED(cxt);
+  return 0;
+}
+
+std::string
+AssignCommand::to_string() const
+{
+  std::string s = "Assign " + m_assignment->to_ast_string();
+
+  return s;
+}
+
+std::string
+AssignCommand::to_ast_string(usize layer) const
+{
+  std::string pad{};
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+  return pad + "[" + to_string() + "]";
+}
+
+void
+AssignCommand::redirect_to(usize d, std::string &f, bool duplicate)
+{
+  SHIT_UNUSED(d);
+  SHIT_UNUSED(f);
+  SHIT_UNUSED(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+void
+AssignCommand::append_to(usize d, std::string &f, bool duplicate)
+{
+  redirect_to(d, f, duplicate);
+}
+
+SimpleCommand::SimpleCommand(SourceLocation location,
                              const std::vector<const Token *> &&args)
     : Command(location), m_args(args)
 {}
@@ -197,7 +260,6 @@ SimpleCommand::to_string() const
 std::string
 SimpleCommand::to_ast_string(usize layer) const
 {
-  SHIT_UNUSED(layer);
   std::string pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
@@ -225,7 +287,7 @@ SimpleCommand::redirect_to(usize d, std::string &f, bool duplicate)
 CompoundList::CompoundList() : Expression({0, 0}), m_nodes() {}
 
 CompoundList::CompoundList(
-    SourceLocation                                    location,
+    SourceLocation location,
     const std::vector<const CompoundListCondition *> &nodes)
     : Expression(location), m_nodes(nodes)
 {}
@@ -347,7 +409,7 @@ CompoundListCondition::evaluate_impl(EvalContext &cxt) const
   return m_cmd->evaluate(cxt);
 }
 
-Pipeline::Pipeline(SourceLocation                            location,
+Pipeline::Pipeline(SourceLocation location,
                    const std::vector<const SimpleCommand *> &commands)
     : Command(location), m_commands(commands)
 {}
@@ -455,7 +517,7 @@ UnaryExpression::to_ast_string(usize layer) const
   return s;
 }
 
-BinaryExpression::BinaryExpression(SourceLocation    location,
+BinaryExpression::BinaryExpression(SourceLocation location,
                                    const Expression *lhs, const Expression *rhs)
     : Expression(location), m_lhs(lhs), m_rhs(rhs)
 {}
@@ -511,7 +573,7 @@ ConstantNumber::to_string() const
   return std::to_string(m_value);
 }
 
-ConstantString::ConstantString(SourceLocation     location,
+ConstantString::ConstantString(SourceLocation location,
                                const std::string &value)
     : Expression(location), m_value(value)
 {}
@@ -547,7 +609,7 @@ ConstantString::to_string() const
       : UnaryExpression(location, rhs)                                         \
   {}                                                                           \
   std::string e::to_string() const { return #expr; }                           \
-  i64         e::evaluate_impl(EvalContext &cxt) const                         \
+  i64 e::evaluate_impl(EvalContext &cxt) const                                 \
   {                                                                            \
     return expr m_rhs->evaluate(cxt);                                          \
   }
@@ -557,7 +619,7 @@ UNARY_EXPRESSION_DECLS(Unnegate, +);
 UNARY_EXPRESSION_DECLS(LogicalNot, !);
 UNARY_EXPRESSION_DECLS(BinaryComplement, ~);
 
-BinaryDummyExpression::BinaryDummyExpression(SourceLocation    location,
+BinaryDummyExpression::BinaryDummyExpression(SourceLocation location,
                                              const Expression *lhs,
                                              const Expression *rhs)
     : BinaryExpression(location, lhs, rhs)
@@ -602,7 +664,7 @@ Divide::evaluate_impl(EvalContext &cxt) const
       : BinaryExpression(location, lhs, rhs)                                   \
   {}                                                                           \
   std::string e::to_string() const { return #expr; }                           \
-  i64         e::evaluate_impl(EvalContext &cxt) const                         \
+  i64 e::evaluate_impl(EvalContext &cxt) const                                 \
   {                                                                            \
     return m_lhs->evaluate(cxt) expr m_rhs->evaluate(cxt);                     \
   }

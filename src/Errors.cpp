@@ -152,7 +152,7 @@ Error::to_string() const
   return "Error: " + message() + ".";
 }
 
-ErrorWithLocation::ErrorWithLocation(SourceLocation     location,
+ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      const std::string &message)
     : ErrorBase(message), m_location(location)
 {}

@@ -10,6 +10,7 @@
 
 namespace shit {
 
+using namespace tokens;
 using namespace expressions;
 
 static CompoundListCondition::Kind
@@ -56,10 +57,18 @@ Parser::parse_compound_command()
   bool should_parse_command = true;
 
   for (;;) {
-    if (should_parse_command)
-      lhs = parse_simple_command();
-    else
-      should_parse_command = true;
+    do {
+      if (lhs && lhs->is_assignment()) {
+        CompoundListCondition *sn = new CompoundListCondition{
+            lhs->source_location(), CompoundListCondition::Kind::None,
+            lhs.release()};
+        compound_list->append_node(sn);
+      }
+
+      if (should_parse_command) lhs = parse_simple_command();
+    } while (lhs && lhs->is_assignment());
+
+    if (!should_parse_command) should_parse_command = true;
 
     /* Operator right after. */
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
@@ -124,7 +133,7 @@ Parser::parse_compound_command()
 
       /* Collect a pipe group. */
       for (;;) {
-        std::unique_ptr<SimpleCommand> rhs{parse_simple_command()};
+        std::unique_ptr<Command> rhs{parse_simple_command()};
 
         if (rhs) {
           pipeline->append_command(static_cast<SimpleCommand *>(rhs.release()));
@@ -158,10 +167,10 @@ Parser::parse_compound_command()
 }
 
 /* return: Exec or nullptr if no shell command is present. */
-std::unique_ptr<SimpleCommand>
+std::unique_ptr<Command>
 Parser::parse_simple_command()
 {
-  std::optional<SourceLocation>       source_location;
+  std::optional<SourceLocation> source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
 
   for (;;) {
@@ -202,6 +211,13 @@ Parser::parse_simple_command()
       }
       args_accumulator.emplace_back(std::move(token));
       break;
+
+    case Token::Kind::Assignment: {
+      SHIT_TRACELN("Assignment!");
+      m_lexer.advance_past_last_peek();
+      return std::make_unique<AssignCommand>(
+          *source_location, static_cast<Assignment *>(token.release()));
+    } break;
 
     default: {
       if (!source_location) return nullptr;
@@ -296,8 +312,9 @@ Parser::parse_expression(u8 min_precedence)
 
     m_if_condition_depth--;
 
-    lhs = std::make_unique<If>(t->source_location(), condition.release(),
-                               then.release(), otherwise.release());
+    lhs =
+        std::make_unique<IfStatement>(t->source_location(), condition.release(),
+                                      then.release(), otherwise.release());
   } break;
 
   /* Blocks */

@@ -2,11 +2,14 @@
 
 #include "Common.hpp"
 #include "Eval.hpp"
+#include "Tokens.hpp"
 
 #include <string>
 #include <vector>
 
 namespace shit {
+
+using namespace tokens;
 
 struct Token;
 
@@ -39,12 +42,12 @@ protected:
 
 namespace expressions {
 
-struct If : public Expression
+struct IfStatement : public Expression
 {
-  If(SourceLocation location, const Expression *condition,
-     const Expression *then, const Expression *otherwise);
+  IfStatement(SourceLocation location, const Expression *condition,
+              const Expression *then, const Expression *otherwise);
 
-  ~If() override;
+  ~IfStatement() override;
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -75,6 +78,8 @@ struct Command : public Expression
   void make_async();
   bool is_async() const;
 
+  virtual bool is_assignment() const;
+
   virtual void append_to(usize d, std::string &f, bool duplicate) = 0;
   virtual void redirect_to(usize d, std::string &f, bool duplicate) = 0;
 
@@ -82,9 +87,30 @@ protected:
   bool m_is_async{false};
 };
 
+struct AssignCommand : public Command
+{
+  AssignCommand(SourceLocation location, const Assignment *a);
+  ~AssignCommand() override;
+
+  const Assignment *assignment() const;
+
+  bool is_assignment() const override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+
+  void append_to(usize d, std::string &f, bool duplicate) override;
+  void redirect_to(usize d, std::string &f, bool duplicate) override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  const Assignment *m_assignment;
+};
+
 struct SimpleCommand : public Command
 {
-  SimpleCommand(SourceLocation                     location,
+  SimpleCommand(SourceLocation location,
                 const std::vector<const Token *> &&args);
   ~SimpleCommand() override;
 
@@ -123,14 +149,14 @@ struct CompoundListCondition : public Expression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  Kind           m_kind;
+  Kind m_kind;
   const Command *m_cmd;
 };
 
 struct CompoundList : public Expression
 {
   CompoundList();
-  CompoundList(SourceLocation                                    location,
+  CompoundList(SourceLocation location,
                const std::vector<const CompoundListCondition *> &nodes);
 
   ~CompoundList() override;
@@ -150,7 +176,7 @@ protected:
 struct Pipeline : public Command
 {
   Pipeline(SourceLocation location);
-  Pipeline(SourceLocation                            location,
+  Pipeline(SourceLocation location,
            const std::vector<const SimpleCommand *> &commands);
 
   ~Pipeline() override;
