@@ -7,7 +7,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-OPTIONS] <program> [program, ...]");
 
-FLAG(ALL, Bool, 'a', "all", "UNIMPLEMENTED: Show all matches.");
+FLAG(ALL, Bool, 'a', "all", "Show all matches.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -35,12 +35,19 @@ Which::execute(ExecContext &ec) const
       /* FIXME: Do not print this if stdout is not a tty. */
       buf += ": Shell builtin";
       buf += '\n';
-    } else if (std::optional<std::filesystem::path> p =
+    } else if (std::list<std::filesystem::path> ps =
                    utils::search_program_path(args[i]);
-               p.has_value())
+               ps.size() != 0)
     {
-      buf += p->string();
-      buf += '\n';
+      if (FLAG_ALL.is_enabled()) {
+        for (const auto &p : ps) {
+          buf += p.string();
+          buf += '\n';
+        }
+      } else {
+        buf += ps.front().string();
+        buf += '\n';
+      }
     }
   }
 

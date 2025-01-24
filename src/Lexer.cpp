@@ -281,6 +281,12 @@ Lexer::lex_identifier()
 
     should_append = true;
 
+    /* FIXME:
+     * echo "test \
+     * test"
+     * results in "test \test"
+     */
+
     /* Was this an assignment? */
     if (ch == '=' && !should_escape && relative_last_quote_char_pos == 0 &&
         removed_backslash_count == 0)
@@ -293,7 +299,7 @@ Lexer::lex_identifier()
       /* Escape all expandable chars inside quotes. */
       m_escape_map.add_escape(m_cursor_position + byte_count -
                               removed_backslash_count);
-    } else if ((is_backslash_escape && quote_char && quote_char != '`') ||
+    } else if ((is_backslash_escape && quote_char == '\'') ||
                (ch == '$' && quote_char == '\''))
     {
       /* Single quotes ignore escapes/variables. */
@@ -361,7 +367,7 @@ Lexer::lex_identifier()
         source().substr(m_cursor_position, assignment_equals_pos);
     std::string_view v =
         source().substr(m_cursor_position + assignment_equals_pos + 1,
-                        assignment_equals_pos - byte_count - 1);
+                        byte_count - assignment_equals_pos - 1);
     t = new tokens::Assignment{
         {actual_cursor_position, byte_count},
         k, v

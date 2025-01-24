@@ -21,7 +21,9 @@ void initialize();
 
 void exit();
 
-std::tuple<i32, std::string> readline(const std::string &prompt);
+std::tuple<i32, std::string> get_input(const std::string &prompt);
+
+void set_input(const std::string &input);
 
 void enter_raw_mode();
 

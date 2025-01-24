@@ -19,6 +19,7 @@ private:
   static constexpr usize MAX_RECURSION_DEPTH = 64;
 
   Lexer m_lexer;
+  std::unordered_map<std::string, std::string> m_shell_vars;
 
   usize m_recursion_depth{0};
   usize m_if_condition_depth{0};

@@ -112,6 +112,12 @@ Command::is_async() const
   return m_is_async;
 }
 
+void
+Command::set_local_vars(std::unordered_map<std::string, std::string> &&vars)
+{
+  m_local_vars = vars;
+}
+
 bool
 Command::is_assignment() const
 {

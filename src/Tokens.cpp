@@ -44,6 +44,18 @@ KEYWORD_TOKEN_DECLS(Esac, "esac");
 KEYWORD_TOKEN_DECLS(Time, "time");
 KEYWORD_TOKEN_DECLS(Function, "function");
 
+#define SENTINEL_TOKEN_DECLS_COMPOUND(t)                                       \
+  t::t(SourceLocation location) : Token(location) {}                           \
+  Token::Kind t::kind() const { return Token::Kind::t; }                       \
+  Token::Flags t::flags() const                                                \
+  {                                                                            \
+    return Token::Flag::Sentinel | Token::Flag::CompoundList;                  \
+  }                                                                            \
+  std::string t::raw_string() const { return #t; }
+
+SENTINEL_TOKEN_DECLS_COMPOUND(Newline);
+SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon);
+
 #define SENTINEL_TOKEN_DECLS(t)                                                \
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
@@ -51,8 +63,6 @@ KEYWORD_TOKEN_DECLS(Function, "function");
   std::string t::raw_string() const { return #t; }
 
 SENTINEL_TOKEN_DECLS(EndOfFile);
-SENTINEL_TOKEN_DECLS(Newline);
-SENTINEL_TOKEN_DECLS(Semicolon);
 SENTINEL_TOKEN_DECLS(Dot);
 
 SENTINEL_TOKEN_DECLS(LeftParen);
@@ -254,6 +264,21 @@ Operator::construct_unary_expression(const Expression *rhs) const
 BINARY_UNARY_OPERATOR_TOKEN_DECLS(Plus, "+", 13, 11, Unnegate, Add);
 BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
 
+#define BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(t, s, bp, bexpr)                  \
+  t::t(SourceLocation location) : Operator(location) {}                        \
+  Token::Kind t::kind() const { return Token::Kind::t; }                       \
+  Token::Flags t::flags() const                                                \
+  {                                                                            \
+    return Token::Flag::BinaryOperator | Token::Flag::CompoundList;            \
+  }                                                                            \
+  std::string t::raw_string() const { return s; }                              \
+  u8 t::left_precedence() const { return bp; }                                 \
+  std::unique_ptr<Expression> t::construct_binary_expression(                  \
+      const Expression *lhs, const Expression *rhs) const                      \
+  {                                                                            \
+    return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
+  }
+
 #define BINARY_OPERATOR_TOKEN_DECLS(t, s, bp, bexpr)                           \
   t::t(SourceLocation location) : Operator(location) {}                        \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
@@ -266,11 +291,13 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
     return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
   }
 
+BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(DoublePipe, "||", 4, LogicalOr);
+BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(Ampersand, "&", 7, BinaryAnd);
+BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(DoubleAmpersand, "&&", 4, LogicalAnd);
+
 BINARY_OPERATOR_TOKEN_DECLS(Slash, "/", 12, Divide);
 BINARY_OPERATOR_TOKEN_DECLS(Asterisk, "*", 12, Multiply);
 BINARY_OPERATOR_TOKEN_DECLS(Percent, "%", 12, Module);
-BINARY_OPERATOR_TOKEN_DECLS(Ampersand, "&", 7, BinaryAnd);
-BINARY_OPERATOR_TOKEN_DECLS(DoubleAmpersand, "&&", 4, LogicalAnd);
 BINARY_OPERATOR_TOKEN_DECLS(Greater, ">", 8, GreaterThan);
 BINARY_OPERATOR_TOKEN_DECLS(DoubleGreater, ">>", 8, RightShift);
 BINARY_OPERATOR_TOKEN_DECLS(GreaterEquals, ">=", 8, GreaterOrEqual);
@@ -278,7 +305,6 @@ BINARY_OPERATOR_TOKEN_DECLS(Less, "<", 8, LessThan);
 BINARY_OPERATOR_TOKEN_DECLS(DoubleLess, "<<", 8, LeftShift);
 BINARY_OPERATOR_TOKEN_DECLS(LessEquals, "<=", 8, LessOrEqual);
 BINARY_OPERATOR_TOKEN_DECLS(Pipe, "|", 5, BinaryOr);
-BINARY_OPERATOR_TOKEN_DECLS(DoublePipe, "||", 4, LogicalOr);
 BINARY_OPERATOR_TOKEN_DECLS(Cap, "^", 9, Xor);
 BINARY_OPERATOR_TOKEN_DECLS(Equals, "=", 3, BinaryDummyExpression);
 BINARY_OPERATOR_TOKEN_DECLS(DoubleEquals, "==", 3, Equal);

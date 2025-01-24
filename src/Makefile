@@ -55,6 +55,15 @@ CXXFLAGS := \
 	-Wno-error=maybe-uninitialized \
 	$(DEFINES)
 
+# Speed up the linking a bit.
+ifneq ($(shell which mold),)
+USE_LD := -fuse-ld=mold
+else ifneq ($(shell which lld),)
+USE_LD := -fuse-ld=lld
+else
+USE_LD :=
+endif
+
 # Use $CPPFLAGS to append new flags on command line.
 ifneq ($(CPPFLAGS),)
 CXXFLAGS += $(CPPFLAGS)
@@ -67,6 +76,7 @@ CXXFLAGS += \
 	-O3
 else ifeq ($(SHIT_MODE), dbg)
 CXXFLAGS += \
+	-fno-omit-frame-pointer \
 	-g3 \
 	-O0
 ifneq ($(OS), Windows_NT)
@@ -117,7 +127,7 @@ o/$(SHIT_MODE)/%.o: %.cpp
 
 $(OUT): $(OBJECTS)
 	printf "\t$(OBJECTS) <-> $(OUT)\n"
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@
+	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) -o $@
 
 dirs: $(DIRS)
 	mkdir -p o/$(SHIT_MODE)/

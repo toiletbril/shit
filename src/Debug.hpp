@@ -29,7 +29,9 @@ t__strprintf(std::string &s, const char *fmt, ...)
 {
   va_list a;
   va_start(a, fmt);
-  usize n = vsnprintf(nullptr, 0, fmt, a);
+  va_list ac;
+  va_copy(ac, a);
+  usize n = vsnprintf(nullptr, 0, fmt, ac);
   char *b = new char[n];
   SHIT_UNUSED(vsnprintf(b, n, fmt, a));
   s.append(b);
@@ -45,20 +47,20 @@ t__string_from_struct(const T &x)
 }
 #define SHIT_STRUCT_STRING(x) t__string_from_struct(x)
 #endif
-#else                     /* !NDEBUG */
-#define SHIT_TRACE(...)   /* nothing */
-#define SHIT_TRACELN(...) /* nothing */
+#else /* !NDEBUG */
+#define SHIT_STRUCT_STRING(...) std::string{"<optimized out>"}
+#define SHIT_TRACE(...)         /* nothing */
+#define SHIT_TRACELN(...)       /* nothing */
 #endif
 
 #if !defined SHIT_STRUCT_STRING
-#define SHIT_STRUCT_STRING(...)                                                \
-  std::string { "<could not dump>" }
+#define SHIT_STRUCT_STRING(...) std::string{"<not supported>"}
 #endif
 
-#define t__va_is_empty(...) (sizeof((char[]){#__VA_ARGS__}) == 1)
+#define t__va_are_empty(...) (sizeof((char[]) {#__VA_ARGS__}) == 1)
 
 /* True if __VA_ARGS__ passed as an argument is empty. */
-#define SHIT_VA_ARE_EMPTY(...) t__va_is_empty(__VA_ARGS__)
+#define SHIT_VA_ARE_EMPTY(...) t__va_are_empty(__VA_ARGS__)
 
 #if !defined NDEBUG
 /* Cause the debugger to break on this call. */

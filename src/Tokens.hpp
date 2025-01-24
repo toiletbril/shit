@@ -97,6 +97,7 @@ struct Token
     UnaryOperator  = 1 << 1,
     BinaryOperator = 1 << 2,
     Special        = 1 << 3,
+    CompoundList   = 1 << 3,
     Keyword        = 1 << 4,
     /* clang-format on */
   };
@@ -198,8 +199,10 @@ TOKEN_STRUCT(Time);
 TOKEN_STRUCT(Function);
 
 TOKEN_STRUCT(EndOfFile);
+
 TOKEN_STRUCT(Newline);
 TOKEN_STRUCT(Semicolon);
+
 TOKEN_STRUCT(Dot);
 TOKEN_STRUCT(LeftParen);
 TOKEN_STRUCT(RightParen);
@@ -349,11 +352,13 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
                                 const Expression *rhs) const override;         \
   }
 
+BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);
+BINARY_OPERATOR_TOKEN_STRUCT(DoubleAmpersand);
+BINARY_OPERATOR_TOKEN_STRUCT(DoublePipe);
+
 BINARY_OPERATOR_TOKEN_STRUCT(Slash);
 BINARY_OPERATOR_TOKEN_STRUCT(Percent);
 BINARY_OPERATOR_TOKEN_STRUCT(Asterisk);
-BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);
-BINARY_OPERATOR_TOKEN_STRUCT(DoubleAmpersand);
 BINARY_OPERATOR_TOKEN_STRUCT(Greater);
 BINARY_OPERATOR_TOKEN_STRUCT(DoubleGreater);
 BINARY_OPERATOR_TOKEN_STRUCT(GreaterEquals);
@@ -361,7 +366,6 @@ BINARY_OPERATOR_TOKEN_STRUCT(Less);
 BINARY_OPERATOR_TOKEN_STRUCT(DoubleLess);
 BINARY_OPERATOR_TOKEN_STRUCT(LessEquals);
 BINARY_OPERATOR_TOKEN_STRUCT(Pipe);
-BINARY_OPERATOR_TOKEN_STRUCT(DoublePipe);
 BINARY_OPERATOR_TOKEN_STRUCT(Cap);
 BINARY_OPERATOR_TOKEN_STRUCT(Equals);
 BINARY_OPERATOR_TOKEN_STRUCT(DoubleEquals);

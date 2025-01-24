@@ -14,6 +14,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <list>
 #include <optional>
 #include <unordered_map>
 
@@ -135,15 +136,26 @@ lowercase_string(std::string_view s)
 std::optional<std::filesystem::path>
 canonicalize_path(const std::string &path)
 {
-  std::filesystem::path actual_path{path};
+  std::filesystem::path p{path};
 
-  if (actual_path.is_relative() &&
-      actual_path.string().find('/') != std::string::npos)
-  {
-    actual_path = std::filesystem::absolute(actual_path);
+  if (p.is_relative() && p.string().find('/') != std::string::npos) {
+    p = std::filesystem::absolute(p);
   }
 
-  return actual_path.lexically_normal();
+  p = p.lexically_normal();
+
+  /* If there's no extension, we may have to add it ourselves. */
+  if (p.extension().empty() &&
+      path.back() != '.' /* fs::path strips the ending dot. TODO: test */)
+  {
+    size_t i = 0;
+    while (!std::filesystem::exists(p) && i < os::OMITTED_SUFFIXES.size())
+      p.replace_extension(os::OMITTED_SUFFIXES[i++]);
+  }
+
+  if (!std::filesystem::exists(p)) return std::nullopt;
+
+  return p;
 }
 
 void
@@ -303,11 +315,10 @@ static std::vector<std::string> PATH_CACHE_DIRS{};
 /* Program name without extension maps into indexes i and j for
  * PATH_DIRS and PATH_EXTENSIONS, so the path can be recreated as:
  * `PATH_DIRS[i] / (program_name + PATH_EXTENSIONS[j])` */
-static std::unordered_map<std::string, std::tuple<DirIndex, os::ExtIndex>>
+static std::unordered_map<std::string,
+                          std::list<std::tuple<DirIndex, os::ExtIndex>>>
     PATH_CACHE{};
 
-/* FIXME: Cosmopolitan sucks and does not support std::filesystem::path in
- * unordered_map :c. This would be better off std::string. */
 static std::optional<std::string> MAYBE_PATH =
     os::get_environment_variable("PATH");
 
@@ -346,8 +357,8 @@ initialize_path_map()
     }
 
     try {
-      /* What the heck? A path in PATH that does not exist? Are you a Windows
-       * user? */
+      /* What the heck? A path in PATH that does not exist? Are you a
+       * Windows user? */
       if (std::filesystem::exists(dir_string)) {
         std::filesystem::directory_iterator di{dir_string};
         std::filesystem::path dir_path{dir_string};
@@ -358,8 +369,8 @@ initialize_path_map()
         /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : di) {
           std::string fs = f.path().filename().string();
-          PATH_CACHE[fs] = {dir_index,
-                            os::erase_extension_and_get_its_index(fs)};
+          PATH_CACHE[fs].push_back(
+              {dir_index, os::erase_extension_and_get_its_index(fs)});
         }
       }
     } catch (const std::filesystem::filesystem_error &e) {
@@ -376,14 +387,15 @@ initialize_path_map()
   }
 }
 
-std::optional<std::filesystem::path>
+std::list<std::filesystem::path>
 search_and_cache(const std::string &program_name)
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
-  if (!MAYBE_PATH) return std::nullopt;
+  if (!MAYBE_PATH) return {};
 
   std::string dir_string{};
   std::string path_var = *MAYBE_PATH;
+  std::list<std::filesystem::path> result{};
 
   for (const char &ch : path_var) {
     if (ch != os::PATH_DELIMITER) {
@@ -440,63 +452,66 @@ search_and_cache(const std::string &program_name)
               full_path.string() + os::OMITTED_SUFFIXES[ext_index];
 
           if (std::filesystem::exists(try_path)) {
-            PATH_CACHE[program_name] = {dir_index, ext_index};
-            return try_path;
+            PATH_CACHE[program_name].push_back({dir_index, ext_index});
+            result.emplace_back(try_path);
           }
         }
       } else if (std::filesystem::exists(full_path)) {
-        PATH_CACHE[program_name] = {dir_index, explicit_ext};
-        return full_path;
+        PATH_CACHE[program_name].push_back({dir_index, explicit_ext});
+        result.emplace_back(full_path);
       }
     }
 
     dir_string.clear();
   }
 
-  return std::nullopt;
+  return result;
 }
 
+std::filesystem::path
+make_absolute_path_from_cache(const std::filesystem::path &program_name,
+                              DirIndex d, os::ExtIndex e)
+{
+  std::filesystem::path full_path = PATH_CACHE_DIRS[d] / program_name;
+  if (e != 0)
+    full_path.replace_extension(os::OMITTED_SUFFIXES[e]);
+  return full_path;
+}
+
+/* TODO: Optimization. */
 /* TODO: Some directories have precedence over the others. */
-std::optional<std::filesystem::path>
+std::list<std::filesystem::path>
 search_program_path(const std::string &program_name)
 {
   std::string sp{program_name};
+  std::list<std::filesystem::path> result{};
 
-  os::ExtIndex extension_used = os::erase_extension_and_get_its_index(sp);
+  os::ExtIndex ext = os::erase_extension_and_get_its_index(sp);
 
-  if (auto p = PATH_CACHE.find(sp); p != PATH_CACHE.end()) {
-    auto [dir, ext] = p->second;
+  if (auto cache_entry = PATH_CACHE.find(sp); cache_entry != PATH_CACHE.end()) {
+    auto prefixes = cache_entry->second;
+    auto p = prefixes.begin();
 
-    std::filesystem::path tp = PATH_CACHE_DIRS[dir];
+    while (p != prefixes.end()) {
+      auto &[dir, cache_ext] = *p;
 
-    if (extension_used > 0) {
-      tp /= program_name;
-    } else {
-      std::filesystem::path file_name = p->first;
-      /* If index is 0, there's no extension to omit. */
-      if (extension_used != 0) {
-        file_name += '.';
+      std::filesystem::path tp = make_absolute_path_from_cache(
+          program_name, dir, (ext == 0) ? cache_ext : ext);
+
+      if (std::filesystem::exists(tp)) {
+        result.emplace_back(tp);
+        ++p;
+      } else {
+        p = prefixes.erase(p);
       }
-      tp /= file_name.concat(os::OMITTED_SUFFIXES[ext]);
-    }
-
-    if (std::filesystem::exists(tp)) {
-      return tp;
-    } else {
-      PATH_CACHE.erase(program_name);
-      /* Continue searching. */
     }
   }
 
-  /* We don't have cache? Newly added file? PATH changed? Try to search and
-   * cache the program. */
-  if (std::optional<std::filesystem::path> p = search_and_cache(program_name);
-      p.has_value())
-  {
-    return p.value();
+  if (result.empty()) {
+    result = search_and_cache(program_name);
   }
 
-  return std::nullopt;
+  return result;
 }
 
 } /* namespace utils */

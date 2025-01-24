@@ -1,0 +1,7 @@
+echo "\""
+echo '\'
+echo "\$?"
+echo "'"
+echo a'''\ hello'\ \ world"lol" "\"";
+echo "*"
+echo '*'

@@ -322,8 +322,8 @@ EvalContext::expand_path(std::string &&r, usize source_position)
   }
 
 #if 1
-  /* Sort expansion in lexicographical order. Ignore punctuation to be somewhat
-   * compatible with bash. */
+  /* Sort expansion in lexicographical order. Ignore punctuation to be
+   * somewhat compatible with bash. */
   std::stable_sort(
       values.begin(), values.end(), [](const auto &lhs, const auto &rhs) {
         const auto x =
@@ -465,7 +465,8 @@ ExecContext::make_from(SourceLocation location,
 
     if (!bk) {
       /* Not a builtin, try to search PATH. */
-      p = utils::search_program_path(program);
+      std::list<std::filesystem::path> ps = utils::search_program_path(program);
+      if (ps.size() > 0) p = ps.front();
     }
   } else {
     /* This is a path. */
@@ -475,7 +476,7 @@ ExecContext::make_from(SourceLocation location,
 
   /* Builtins take precedence over programs. */
   if (!bk) {
-    if (p) {
+    if (p.has_value()) {
       kind = *p;
     } else {
       throw ErrorWithLocation{location,

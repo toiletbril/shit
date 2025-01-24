@@ -1,0 +1,26 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" """]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "\"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "'"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a\ hello  worldlol" """]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "*"]
+[Escape Bitmap
+  00000100 00000001 00000000 11000000 00000000 00000100 00001100 00000000 00000001 00000000 00100000 00010000 
+]
+"
+\
+$?
+'
+a\ hello  worldlol "
+*
+*
+[Code 0]

@@ -77,6 +77,7 @@ struct Command : public Expression
 
   void make_async();
   bool is_async() const;
+  void set_local_vars(std::unordered_map<std::string, std::string> &&vars);
 
   virtual bool is_assignment() const;
 
@@ -85,6 +86,7 @@ struct Command : public Expression
 
 protected:
   bool m_is_async{false};
+  std::optional<std::unordered_map<std::string, std::string>> m_local_vars;
 };
 
 struct AssignCommand : public Command

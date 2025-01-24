@@ -100,14 +100,20 @@ exit()
 }
 
 std::tuple<i32, std::string>
-readline(const std::string &prompt)
+get_input(const std::string &prompt)
 {
-  i32 code = ::tl_readline(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
+  i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   if (code == TL_ERROR) {
     throw shit::Error{
         "Toiletline: Unexpected internal error while getting the input"};
   }
   return {code, TL_BUFFER};
+}
+
+void
+set_input(const std::string &input)
+{
+  ::tl_set_predefined_input(input.c_str());
 }
 
 void

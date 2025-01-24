@@ -134,7 +134,8 @@ execute_program(ExecContext &&ec)
 
     reset_signal_handlers();
 
-    /* TODO: If execv() failed, try to execute the path as a shell script. */
+    /* TODO: If execv() failed, try to execute the path as a shell script.
+     */
     if (execv(ec.program_path().c_str(),
               const_cast<char *const *>(os_args.data())) == -1)
     {

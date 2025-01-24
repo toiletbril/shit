@@ -57,18 +57,11 @@ Parser::parse_compound_command()
   bool should_parse_command = true;
 
   for (;;) {
-    do {
-      if (lhs && lhs->is_assignment()) {
-        CompoundListCondition *sn = new CompoundListCondition{
-            lhs->source_location(), CompoundListCondition::Kind::None,
-            lhs.release()};
-        compound_list->append_node(sn);
-      }
-
-      if (should_parse_command) lhs = parse_simple_command();
-    } while (lhs && lhs->is_assignment());
-
-    if (!should_parse_command) should_parse_command = true;
+    if (should_parse_command) {
+      lhs = parse_simple_command();
+    } else {
+      should_parse_command = true;
+    }
 
     /* Operator right after. */
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
@@ -94,9 +87,8 @@ Parser::parse_compound_command()
       m_lexer.advance_past_last_peek();
 
       if (lhs) {
-        CompoundListCondition *sn = new CompoundListCondition{
-            token->source_location(), next_cond, lhs.release()};
-        compound_list->append_node(sn);
+        compound_list->append_node(new CompoundListCondition{
+            token->source_location(), next_cond, lhs.release()});
         next_cond = get_sequence_kind(token->kind());
       }
 
@@ -172,6 +164,7 @@ Parser::parse_simple_command()
 {
   std::optional<SourceLocation> source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
+  std::unordered_map<std::string, std::string> local_vars{};
 
   for (;;) {
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
@@ -212,11 +205,22 @@ Parser::parse_simple_command()
       args_accumulator.emplace_back(std::move(token));
       break;
 
+    /* TODO: test */
     case Token::Kind::Assignment: {
-      SHIT_TRACELN("Assignment!");
+      const Assignment *a = static_cast<const Assignment *>(token.get());
+      SHIT_TRACELN("Assignment: %s", a->raw_string().c_str());
+      SHIT_UNUSED(a);
       m_lexer.advance_past_last_peek();
-      return std::make_unique<AssignCommand>(
-          *source_location, static_cast<Assignment *>(token.release()));
+      /* Peek next token. If it's one of the compound list conditions, assign
+       * for the current shell. */
+      token.reset(m_lexer.peek_shell_token());
+      if (token->flags() & Token::Flag::CompoundList || token->kind() == Token::Kind::EndOfFile) {
+        return std::make_unique<AssignCommand>(
+            *source_location, static_cast<Assignment *>(token.release()));
+      } else {
+        /* Single-command variable. */
+        local_vars[a->key()] = a->value();
+      }
     } break;
 
     default: {
@@ -229,7 +233,12 @@ Parser::parse_simple_command()
         args.emplace_back(t.release());
       }
 
-      return std::make_unique<SimpleCommand>(*source_location, std::move(args));
+      auto c =
+          std::make_unique<SimpleCommand>(*source_location, std::move(args));
+      if (!local_vars.empty())
+        c->set_local_vars(std::move(local_vars));
+
+      return c;
     }
     }
   }

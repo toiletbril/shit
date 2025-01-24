@@ -181,8 +181,8 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
       }
     } else {
       if (!flags[i]->long_name().empty()) {
-        /* There might be flags that are prefixes of other flags. Go through all
-           flags first and pick the longest match. */
+        /* There might be flags that are prefixes of other flags. Go
+           through all flags first and pick the longest match. */
         size_t flag_length = flags[i]->long_name().length();
 
         if (flag_length > longest_length &&
@@ -307,13 +307,15 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
         case Flag::Kind::String:
         case Flag::Kind::ManyStrings: {
           if (*value_offset == '\0') {
-            /* There is nothing after the flag. Expect next argument to be the
-             * value. */
+            /* There is nothing after the flag. Expect next argument
+             * to be the value. */
             next_arg_is_value = true;
           } else {
-            /* Check for a separator. Short flags do not require a separator
-               between the flag and the value, but long flags require a space or
-               '='. Treat missing separator for long flags as an error. */
+            /* Check for a separator. Short flags do not require a
+               separator between the flag and the value, but long
+               flags require a space or
+               '='. Treat missing separator for long flags as an
+               error. */
             if (*value_offset == '=') {
               value_offset++;
 
@@ -330,7 +332,8 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
                             flag_name(flag, is_long) + "' flag"};
               }
             } else if (!is_long) {
-              /* Flag is short, value is provided without a separator. */
+              /* Flag is short, value is provided without a
+               * separator. */
               if (flag->kind() == Flag::Kind::String)
                 static_cast<FlagString *>(flag)->set(value_offset);
               else
@@ -338,10 +341,10 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 
               flag->set_position(++position);
             } else {
-              throw Error{
-                  "Long flags require a separator between the flag and the "
-                  "value. Try using '" +
-                  flag_name(flag, is_long) + "=" + value_offset + "'"};
+              throw Error{"Long flags require a separator "
+                          "between the flag and the "
+                          "value. Try using '" +
+                          flag_name(flag, is_long) + "=" + value_offset + "'"};
             }
           }
         } break;

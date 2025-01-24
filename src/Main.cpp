@@ -2,6 +2,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Os.hpp"
@@ -174,18 +175,18 @@ main(int argc, char **argv)
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,
    * since it's only really noticeable in interactive mode. This way,
-   * subsequent calls to the same program will still be cached in any mode, but
-   * we won't waste any milliseconds traversing directories for very simple
-   * scripts! */
+   * subsequent calls to the same program will still be cached in any mode,
+   * but we won't waste any milliseconds traversing directories for very
+   * simple scripts! */
   shit::utils::clear_path_map();
   shit::os::set_default_signal_handlers();
 
   if (is_login_shell) {
     /* TODO: We can't really execute complex scripts yet. From 'man dash':
      * A login shell first reads commands from the files /etc/profile and
-     * .profile if they exist.  If the environment variable ENV is set on entry
-     * to an interactive shell, or is set in the .profile of a login shell, the
-     * shell next reads commands from the file named in ENV. */
+     * .profile if they exist.  If the environment variable ENV is set on
+     * entry to an interactive shell, or is set in the .profile of a login
+     * shell, the shell next reads commands from the file named in ENV. */
     shit::show_message("Acting as a login shell is not supported yet. "
                        "Please bear with me!");
   }
@@ -268,9 +269,14 @@ main(int argc, char **argv)
 
         /* Ask for input until we get one. */
         for (;;) {
-          auto [code, input] = toiletline::readline(prompt);
+          auto [code, input] = toiletline::get_input(prompt);
 
           switch (code) {
+          case TL_PRESSED_TAB:
+            /* TODO. */
+            std::cout << "^I" << std::flush;
+            toiletline::set_input(input);
+            break;
           case TL_PRESSED_EOF:
             /* Exit on CTRL-D. */
             std::cout << "^D" << std::flush;
@@ -304,12 +310,13 @@ main(int argc, char **argv)
       shit::show_message(e.to_string());
       shit::utils::quit(EXIT_FAILURE);
     } catch (const std::exception &e) {
-      shit::show_message("Uncaught std::exception while getting the input.");
-      shit::show_message("what(): " + std::string{e.what()});
+      shit::show_message(
+          "Uncaught exception while getting the input. Exiting.");
+      shit::show_message("Context: '" + std::string{e.what()} + "'.");
       shit::utils::quit(EXIT_FAILURE);
     } catch (...) {
       shit::show_message(
-          "Unexpected system explosion while getting the input.");
+          "Unexpected system explosion while getting the input. Exiting.");
       shit::show_message("Last system message: " +
                          shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
@@ -321,8 +328,9 @@ main(int argc, char **argv)
 
     /* Execute the contents. */
     try {
-      shit::Parser p{shit::Lexer{script_contents}};
+      SHIT_DEFER { context.end_command(); };
 
+      shit::Parser p{shit::Lexer{script_contents}};
       std::unique_ptr<shit::Expression> ast = p.construct_ast();
 
       if (FLAG_AST.is_enabled()) std::cout << ast->to_ast_string() << std::endl;
@@ -338,8 +346,6 @@ main(int argc, char **argv)
 
       if (FLAG_STATS.is_enabled())
         std::cout << context.make_stats_string() << std::endl;
-
-      context.end_command();
     } catch (const shit::ErrorWithLocationAndDetails &e) {
       shit::show_message(e.to_string(script_contents));
       shit::show_message(e.details_to_string(script_contents));
@@ -348,18 +354,22 @@ main(int argc, char **argv)
     } catch (const shit::Error &e) {
       shit::show_message(e.to_string());
     } catch (const std::exception &e) {
-      shit::show_message("Uncaught std::exception while executing the AST.");
-      shit::show_message("what(): " + std::string{e.what()});
+      shit::show_message(
+          "Uncaught exception while executing the AST. Aborting the command.");
+      shit::show_message("Last system message: '" +
+                         shit::os::last_system_error_message() +
+                         "'.");
+      shit::show_message("Context: '" + std::string{e.what()} + "'.");
     } catch (...) {
       shit::show_message(
-          "Unexpected system explosion while executing the AST.");
+          "Unexpected system explosion while executing the AST. Exiting.");
       shit::show_message("Last system message: " +
                          shit::os::last_system_error_message());
       shit::utils::quit(EXIT_FAILURE);
     }
 
-    /* TODO: Make ExecutionErrorWithLocation to distinguish execution errors?
-     * Or statically check commands before they are executed? */
+    /* TODO: Make ExecutionErrorWithLocation to distinguish execution
+     * errors? Or statically check commands before they are executed? */
 
     /* We can get here from child process if they didn't exec()
      * properly to print error. */
