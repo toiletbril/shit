@@ -411,8 +411,8 @@ show_version()
             << "MODE=" << SHIT_BUILD_MODE << '\n'
             << "HEAD=" << SHIT_COMMIT_HASH << '\n'
             << "CXX=" << SHIT_COMPILER << '\n'
-            << "CPPFLAGS="
-            << (*SHIT_CPPFLAGS == '\0' ? "<none>" : SHIT_CPPFLAGS) << '\n'
+            << "ENVCXXFLAGS="
+            << (*SHIT_ENVCXXFLAGS == '\0' ? "<none>" : SHIT_ENVCXXFLAGS) << '\n'
             << "OS=" << SHIT_OS_INFO << '\n'
             << '\n'
             << SHIT_SHORT_LICENSE << '\n'

@@ -2,10 +2,10 @@
 
 /* Timestamp the build. */
 
-#if !defined SHIT_CPPFLAGS
-#warning SHIT_CPPFLAGS should be defined. Please use provided makefile \
+#if !defined SHIT_ENVCXXFLAGS
+#warning SHIT_ENVCXXFLAGS should be defined. Please use provided makefile \
          for compilation!
-#define SHIT_CPPFLAGS "<unknown>"
+#define SHIT_ENVCXXFLAGS "<unknown>"
 #endif
 
 #if !defined SHIT_COMPILER_COMMAND

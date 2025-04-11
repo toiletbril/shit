@@ -44,7 +44,7 @@ The `SHIT_MODE` variable controls build type:
   Cosmopolitan toolchain.
 * `cosmo_dbg` is a debug Cosmopolitan build.
 
-`$CPPFLAGS` environment variable can be used to append new flags to the build
+`$CXXFLAGS` environment variable can be used to append new flags to the build
 commands.
 
 An example of the excruciatingly complex build process:

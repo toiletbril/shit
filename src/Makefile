@@ -9,12 +9,16 @@ DIRS := $(wildcard */.)
 SOURCES += $(wildcard */**.cpp)
 HEADERS += $(wildcard */**.hpp)
 
+# Translate a list of <...>.cpp files to a list of paths like
+# o/$SHIT_MODE/<...>.o.
 OBJECTS := $(SOURCES:%.cpp=o/$(SHIT_MODE)/%.o)
 
 ifeq ($(OS), Windows_NT)
 OUT := ../shit.exe
+DEVNULL := "NUL"
 else
 OUT := ../shit
+DEVNULL := "/dev/null"
 endif
 
 ifeq ($(SHIT_MODE), cosmo)
@@ -35,12 +39,16 @@ endif
 
 COMMIT_HASH := $(shell git rev-parse HEAD || echo "<no git>")
 
+# Remember CXXFLAGS passed to us from CLI.
+ENVCXXFLAGS := $(CXXFLAGS)
+override undefine CXXFLAGS
+
 DEFINES := \
 	-DSHIT_COMPILER_COMMAND="\"$(CXX)\"" \
 	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
 	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
 	-DSHIT_BUILD_MODE="\"$(SHIT_MODE)\"" \
-	-DSHIT_CPPFLAGS="\"$(CPPFLAGS)\""
+	-DSHIT_ENVCXXFLAGS="\"$(ENVCXXFLAGS)\""
 
 CXXFLAGS := \
 	-Wall \
@@ -53,20 +61,16 @@ CXXFLAGS := \
 	-std=c++17 \
 	-Wno-unknown-warning-option \
 	-Wno-error=maybe-uninitialized \
-	$(DEFINES)
+	$(DEFINES) \
+	$(ENVCXXFLAGS)
 
 # Speed up the linking a bit.
-ifneq ($(shell which mold),)
+ifneq ($(shell which mold > $(DEVNULL) 2>&1),)
 USE_LD := -fuse-ld=mold
-else ifneq ($(shell which lld),)
+else ifneq ($(shell which lld > $(DEVNULL) 2>&1),)
 USE_LD := -fuse-ld=lld
 else
 USE_LD :=
-endif
-
-# Use $CPPFLAGS to append new flags on command line.
-ifneq ($(CPPFLAGS),)
-CXXFLAGS += $(CPPFLAGS)
 endif
 
 ifeq ($(SHIT_MODE), rel)
@@ -121,10 +125,12 @@ CXXFLAGS += \
 	-ladvapi32
 endif
 
+# Making objects in o/$SHIT_MODE/<...>.o
 o/$(SHIT_MODE)/%.o: %.cpp
 	printf "\t%-42s $@\n" $<
 	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
 
+# Linking.
 $(OUT): $(OBJECTS)
 	printf "\t$(OBJECTS) <-> $(OUT)\n"
 	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) -o $@
