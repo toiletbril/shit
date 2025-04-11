@@ -366,6 +366,15 @@ initialize_path_map()
         usize dir_index =
             cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
 
+        /* Allocate the memory only once. */
+        size_t file_count = 0;
+
+        for (const std::filesystem::directory_entry &f : di) {
+          if (f.is_regular_file())
+            ++file_count;
+        }
+        PATH_CACHE.reserve(PATH_CACHE.size() + file_count);
+
         /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : di) {
           std::string fs = f.path().filename().string();
