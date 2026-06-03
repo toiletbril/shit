@@ -1,8 +1,11 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "word*"]
-[Escape Bitmap
-  00000100 
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "word*"
 ]
 shit: 2:1: Error: No expansions found for 'word*'.
      2 |  word*

@@ -1,7 +1,13 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "exit" "hello world" "hello world"]
-[Escape Bitmap
-  <empty>
+[Word
+  Unquoted "exit"
+]
+[Word
+  DoubleQuoted "hello world"
+]
+[Word
+  DoubleQuoted "hello world"
 ]
 shit: Goodbye :c

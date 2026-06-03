@@ -14,8 +14,9 @@ Exit::kind() const
 }
 
 i32
-Exit::execute(ExecContext &ec) const
+Exit::execute(ExecContext &ec, EvalContext &cxt) const
 {
+  SHIT_UNUSED(cxt);
   utils::quit(ec.args().size() > 1 ? std::atoi(ec.args()[1].c_str()) : 0, true);
 }
 

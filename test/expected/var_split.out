@@ -1,29 +1,26 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "1"]
+    [Assign X=a  b   c]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "2"]
+    [SimpleCommand "echo" "$X"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "3"]
+    [SimpleCommand "echo" "$X"]
 [Word
-  Unquoted "echo"
-]
-[Word
-  Unquoted "1"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  Unquoted "2"
+  Unquoted "X="
+  DoubleQuoted "a  b   c"
 ]
 [Word
   Unquoted "echo"
 ]
 [Word
-  Unquoted "3"
+  Variable "X"
 ]
-1
-2
-3
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "X"
+]
+a b c
+a  b   c
 [Code 0]

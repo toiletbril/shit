@@ -1,0 +1,37 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$NOPE" "end"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$NOPE" "end"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a$NOPEb"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "NOPE"
+]
+[Word
+  Unquoted "end"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "NOPE"
+]
+[Word
+  Unquoted "end"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+  Variable "NOPE"
+  Unquoted "b"
+]
+end
+ end
+ab
+[Code 0]

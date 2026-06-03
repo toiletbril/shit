@@ -9,8 +9,29 @@
     [Pipeline, Async]
       [SimpleCommand "echo" "1"]
       [SimpleCommand "cat"]
-[Escape Bitmap
-  <empty>
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "cat"
 ]
 
 1

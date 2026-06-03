@@ -1,8 +1,11 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "string exec"]
-[Escape Bitmap
-  <empty>
+[Word
+  DoubleQuoted "echo"
+]
+[Word
+  DoubleQuoted "string exec"
 ]
 string exec
 [Code 0]

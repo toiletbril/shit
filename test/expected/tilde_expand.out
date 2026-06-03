@@ -11,8 +11,50 @@
     [SimpleCommand "test" "-d" "~"]
   [CompoundListCondition, &&]
     [SimpleCommand "echo" "3"]
-[Escape Bitmap
-  00000000 00000000 00000000 00000000 00000000 00000000 01000000 
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "~"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "~/"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "~"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "3"
 ]
 1
 2

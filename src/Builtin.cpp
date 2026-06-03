@@ -29,14 +29,14 @@ show_builtin_help_impl(const ExecContext &ec,
 std::optional<Builtin::Kind>
 search_builtin(std::string_view builtin_name)
 {
-  if (auto b = BUILTINS.find(builtin_name.data()); b != BUILTINS.end())
+  if (auto b = BUILTINS.find(std::string{builtin_name}); b != BUILTINS.end())
     return b->second;
 
   return std::nullopt;
 }
 
 i32
-execute_builtin(ExecContext &&ec)
+execute_builtin(ExecContext &&ec, EvalContext &cxt)
 {
   std::unique_ptr<Builtin> b{};
 
@@ -47,17 +47,14 @@ execute_builtin(ExecContext &&ec)
                      SHIT_ENUM(ec.builtin_kind()));
   }
 
-  os::reset_signal_handlers();
-
-  /* TODO: Figure signals for builtins. */
-  SHIT_DEFER
-  {
-    ec.close_fds();
-    os::set_default_signal_handlers();
-  };
+  /* A builtin runs inside the shell process, so it keeps the shell's own signal
+     handlers. Resetting them to the default here would let a Ctrl-C during a
+     builtin terminate the whole shell, and it cost two extra syscalls on every
+     builtin command. */
+  SHIT_DEFER { ec.close_fds(); };
 
   try {
-    return b->execute(ec);
+    return b->execute(ec, cxt);
   } catch (const Error &e) {
     throw ErrorWithLocation{ec.source_location(),
                             "Builtin '" + ec.program() + "': " + e.message()};

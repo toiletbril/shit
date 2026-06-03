@@ -17,7 +17,17 @@ namespace {
 #define TL_HISTORY_MAX_SIZE 1024 * 4
 
 #define TOILETLINE_IMPLEMENTATION
+/* A release build makes TL_ASSERT a no-op, which leaves a few of the vendored
+   helpers unused. The dependency is not ours to edit, so the warning is
+   silenced only around its include. */
+#if defined __clang__ || defined __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
 #include "toiletline/toiletline.h"
+#if defined __clang__ || defined __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 } /* namespace */
 

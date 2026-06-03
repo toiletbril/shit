@@ -1,5 +1,6 @@
 #include "Parser.hpp"
 
+#include "Arena.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
@@ -32,10 +33,10 @@ Parser::Parser(Lexer &&lexer) : m_lexer(lexer) {}
 
 Parser::~Parser() = default;
 
-EscapeBitmap &
-Parser::escape_map()
+const std::vector<Word> &
+Parser::debug_words() const
 {
-  return m_lexer.escape_map();
+  return m_lexer.debug_words();
 }
 
 std::unique_ptr<Expression>
@@ -50,8 +51,8 @@ Parser::parse_compound_command()
   std::unique_ptr<Command> lhs{};
 
   /* Sequence right at the start. */
-  std::unique_ptr<CompoundList> compound_list =
-      std::make_unique<CompoundList>();
+  std::unique_ptr<CompoundList> compound_list{
+      m_lexer.arena().create<CompoundList>()};
   CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
 
   bool should_parse_command = true;
@@ -87,8 +88,9 @@ Parser::parse_compound_command()
       m_lexer.advance_past_last_peek();
 
       if (lhs) {
-        compound_list->append_node(new CompoundListCondition{
-            token->source_location(), next_cond, lhs.release()});
+        compound_list->append_node(
+            m_lexer.arena().create<CompoundListCondition>(
+                token->source_location(), next_cond, lhs.release()));
         next_cond = get_sequence_kind(token->kind());
       }
 
@@ -102,7 +104,9 @@ Parser::parse_compound_command()
         /* Empty input? */
         if (compound_list->is_empty()) {
           SHIT_ASSERT(!lhs);
-          return std::make_unique<DummyExpression>(token->source_location());
+          return std::unique_ptr<DummyExpression>{
+              m_lexer.arena().create<DummyExpression>(
+                  token->source_location())};
         } else {
           return compound_list;
         }
@@ -117,8 +121,8 @@ Parser::parse_compound_command()
 
       m_lexer.advance_past_last_peek();
 
-      std::unique_ptr<Pipeline> pipeline =
-          std::make_unique<Pipeline>(token->source_location());
+      std::unique_ptr<Pipeline> pipeline{
+          m_lexer.arena().create<Pipeline>(token->source_location())};
       pipeline->append_command(static_cast<SimpleCommand *>(lhs.release()));
 
       std::unique_ptr<Token> last_pipe_token = std::move(token);
@@ -164,19 +168,12 @@ Parser::parse_simple_command()
 {
   std::optional<SourceLocation> source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
-  std::unordered_map<std::string, std::string> local_vars{};
+  std::unordered_map<std::string, Word> local_vars{};
 
   for (;;) {
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
     switch (token->kind()) {
-    case Token::Kind::String:
-      if (static_cast<const tokens::String *>(token.get())->quote_char() == '`')
-      {
-        throw ErrorWithLocation{token->source_location(),
-                                "Unimplemented quote type"};
-      }
-      [[fallthrough]];
     case Token::Kind::If:
     case Token::Kind::Do:
     case Token::Kind::For:
@@ -191,13 +188,13 @@ Parser::parse_simple_command()
     case Token::Kind::While:
     case Token::Kind::Function:
     case Token::Kind::Redirection:
-      /* These keyword are required to be first. Otherwise they are just
-       * identifiers. */
-      if (token->kind() != Token::Kind::String && args_accumulator.empty())
+      /* These keywords are required to be first. Otherwise they are just
+       * ordinary words. */
+      if (args_accumulator.empty())
         throw ErrorWithLocation{token->source_location(),
                                 "Not implemented (Parser)"};
       [[fallthrough]];
-    case Token::Kind::Identifier:
+    case Token::Kind::Word:
       m_lexer.advance_past_last_peek();
       if (!source_location) {
         source_location = token->source_location();
@@ -207,19 +204,30 @@ Parser::parse_simple_command()
 
     /* TODO: test */
     case Token::Kind::Assignment: {
-      const Assignment *a = static_cast<const Assignment *>(token.get());
-      SHIT_TRACELN("Assignment: %s", a->raw_string().c_str());
-      SHIT_UNUSED(a);
       m_lexer.advance_past_last_peek();
-      /* Peek next token. If it's one of the compound list conditions, assign
-       * for the current shell. */
-      token.reset(m_lexer.peek_shell_token());
-      if (token->flags() & Token::Flag::CompoundList || token->kind() == Token::Kind::EndOfFile) {
-        return std::make_unique<AssignCommand>(
-            *source_location, static_cast<Assignment *>(token.release()));
+      if (!source_location) source_location = token->source_location();
+
+      /* Once a command word is present, an assignment-looking token is just an
+       * ordinary argument. */
+      if (!args_accumulator.empty()) {
+        args_accumulator.emplace_back(std::move(token));
+        break;
+      }
+
+      std::unique_ptr<Assignment> a{static_cast<Assignment *>(token.release())};
+
+      /* Peek the next token. A compound list condition or the end of input
+       * means the assignment stands alone and applies to the shell. */
+      std::unique_ptr<Token> next{m_lexer.peek_shell_token()};
+      if (next->flags() & Token::Flag::CompoundList ||
+          next->kind() == Token::Kind::EndOfFile)
+      {
+        return std::unique_ptr<AssignCommand>{
+            m_lexer.arena().create<AssignCommand>(*source_location,
+                                                  a.release())};
       } else {
         /* Single-command variable. */
-        local_vars[a->key()] = a->value();
+        local_vars[a->key()] = a->value_word();
       }
     } break;
 
@@ -233,10 +241,9 @@ Parser::parse_simple_command()
         args.emplace_back(t.release());
       }
 
-      auto c =
-          std::make_unique<SimpleCommand>(*source_location, std::move(args));
-      if (!local_vars.empty())
-        c->set_local_vars(std::move(local_vars));
+      std::unique_ptr<SimpleCommand> c{m_lexer.arena().create<SimpleCommand>(
+          *source_location, std::move(args))};
+      if (!local_vars.empty()) c->set_local_vars(std::move(local_vars));
 
       return c;
     }
@@ -267,13 +274,9 @@ Parser::parse_expression(u8 min_precedence)
   switch (t->kind()) {
   /* Values */
   case Token::Kind::Number:
-    lhs = std::make_unique<ConstantNumber>(t->source_location(),
-                                           std::atoll(t->raw_string().data()));
-    break;
-
-  case Token::Kind::String:
     lhs =
-        std::make_unique<ConstantString>(t->source_location(), t->raw_string());
+        std::unique_ptr<ConstantNumber>{m_lexer.arena().create<ConstantNumber>(
+            t->source_location(), std::atoll(t->raw_string().data()))};
     break;
 
   /* Keywords */
@@ -321,9 +324,9 @@ Parser::parse_expression(u8 min_precedence)
 
     m_if_condition_depth--;
 
-    lhs =
-        std::make_unique<IfStatement>(t->source_location(), condition.release(),
-                                      then.release(), otherwise.release());
+    lhs = std::unique_ptr<IfStatement>{m_lexer.arena().create<IfStatement>(
+        t->source_location(), condition.release(), then.release(),
+        otherwise.release())};
   } break;
 
   /* Blocks */

@@ -23,8 +23,10 @@ Echo::kind() const
 }
 
 i32
-Echo::execute(ExecContext &ec) const
+Echo::execute(ExecContext &ec, EvalContext &cxt) const
 {
+  SHIT_UNUSED(cxt);
+
   std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 

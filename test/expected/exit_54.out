@@ -1,7 +1,10 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "exit" "54"]
-[Escape Bitmap
-  <empty>
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "54"
 ]
 shit: Goodbye :c (Code 54)

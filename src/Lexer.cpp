@@ -1,5 +1,6 @@
 #include "Lexer.hpp"
 
+#include "Arena.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -88,10 +89,12 @@ is_part_of_identifier(char ch)
 bool
 is_string_quote(char ch)
 {
+  /* A backtick is intentionally not a quote here. It stays a literal character
+     so the prepass can warn and point at $(...), rather than failing the lex.
+   */
   switch (ch) {
   case '"':
-  case '\'':
-  case '`': return true;
+  case '\'': return true;
   default: return false;
   }
 }
@@ -99,7 +102,7 @@ is_string_quote(char ch)
 bool
 is_ascii_char(char ch)
 {
-  return (ch >= 'A' && ch <= 'A') || (ch >= 'a' && ch <= 'z');
+  return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
 
 bool
@@ -113,9 +116,25 @@ is_expandable_char(char ch)
   }
 }
 
+bool
+is_variable_name_start(char ch)
+{
+  return is_ascii_char(ch) || ch == '_';
+}
+
+bool
+is_variable_name(char ch)
+{
+  return is_variable_name_start(ch) || is_number(ch);
+}
+
 } /* namespace lexer */
 
-Lexer::Lexer(std::string source) : m_source(std::move(source)) {}
+Lexer::Lexer(std::string source, BumpArena &arena,
+             bool should_collect_debug_words)
+    : m_source(std::move(source)), m_arena(arena),
+      m_should_collect_debug_words(should_collect_debug_words)
+{}
 
 Lexer::~Lexer() = default;
 
@@ -157,10 +176,16 @@ Lexer::source() const
   return m_source;
 }
 
-EscapeBitmap &
-Lexer::escape_map()
+const std::vector<Word> &
+Lexer::debug_words() const
 {
-  return m_escape_map;
+  return m_debug_words;
+}
+
+BumpArena &
+Lexer::arena() const
+{
+  return m_arena;
 }
 
 usize
@@ -188,9 +213,8 @@ Lexer::lex_expression_token()
       };
   }
 
-  return new tokens::EndOfFile{
-      {m_cursor_position, 1}
-  };
+  return m_arena.create<tokens::EndOfFile>(
+      SourceLocation{m_cursor_position, 1});
 }
 
 Token *
@@ -208,9 +232,8 @@ Lexer::lex_shell_token()
       };
   }
 
-  return new tokens::EndOfFile{
-      {m_cursor_position, 1}
-  };
+  return m_arena.create<tokens::EndOfFile>(
+      SourceLocation{m_cursor_position, 1});
 }
 
 void
@@ -251,10 +274,8 @@ Lexer::lex_number()
     length++;
   }
 
-  Token *num = new tokens::Number{
-      {m_cursor_position, length},
-      n
-  };
+  Token *num = m_arena.create<tokens::Number>(
+      SourceLocation{m_cursor_position, length}, n);
   m_cached_offset = length;
 
   return num;
@@ -263,79 +284,135 @@ Lexer::lex_number()
 Token *
 Lexer::lex_identifier()
 {
-  char ch;
-  std::string ident_string{};
+  Word word{};
 
-  usize byte_count = 0, escaped_newline_count = 0, removed_backslash_count = 0,
-        relative_last_quote_char_pos = 0, assignment_equals_pos = 0;
+  usize byte_count = 0, escaped_newline_count = 0,
+        relative_last_quote_char_pos = 0;
 
-  bool should_escape = false, should_append = false;
+  bool should_escape = false;
 
   std::optional<char> quote_char = std::nullopt;
 
-  /* Handle quote escapes and strings. */
-  while (lexer::is_part_of_identifier((ch = chop_character(byte_count))) ||
-         ((quote_char || should_escape) && ch != lexer::CEOF))
-  {
-    bool is_backslash_escape = (ch == '\\' && !should_escape);
-
-    should_append = true;
-
-    /* FIXME:
-     * echo "test \
-     * test"
-     * results in "test \test"
-     */
-
-    /* Was this an assignment? */
-    if (ch == '=' && !should_escape && relative_last_quote_char_pos == 0 &&
-        removed_backslash_count == 0)
+  /* Append a character to the open segment, starting a new one when the kind
+     changes. A variable reference never merges, since each one carries its own
+     name. */
+  auto append_char = [&word](WordSegment::Kind kind, char ch) {
+    if (!word.segments.empty() && word.segments.back().kind == kind &&
+        kind != WordSegment::Kind::VariableReference)
     {
-      assignment_equals_pos = byte_count;
-    } else if (should_escape && ch == '\n') { /* Fill the EscapeBitmap. */
-      should_append = false;
-      escaped_newline_count++;
-    } else if (lexer::is_expandable_char(ch) && quote_char) {
-      /* Escape all expandable chars inside quotes. */
-      m_escape_map.add_escape(m_cursor_position + byte_count -
-                              removed_backslash_count);
-    } else if ((is_backslash_escape && quote_char == '\'') ||
-               (ch == '$' && quote_char == '\''))
+      word.segments.back().text += ch;
+    } else {
+      word.segments.push_back(WordSegment{kind, std::string{ch}, false});
+    }
+  };
+
+  for (;;) {
+    char ch = chop_character(byte_count);
+
+    bool is_inside_quote_or_escape = quote_char.has_value() || should_escape;
+    if (!lexer::is_part_of_identifier(ch) &&
+        !(is_inside_quote_or_escape && ch != lexer::CEOF))
     {
-      /* Single quotes ignore escapes/variables. */
-      m_escape_map.add_escape(m_cursor_position + byte_count -
-                              removed_backslash_count);
-    } else if (is_backslash_escape) {
-      m_escape_map.add_escape(m_cursor_position + byte_count -
-                              removed_backslash_count++);
-      should_append = false;
+      break;
     }
 
-    byte_count++;
+    if (should_escape) {
+      /* The previous character was a backslash. A backslash before a newline
+         continues the line and leaves nothing behind. */
+      should_escape = false;
+      if (ch == '\n')
+        escaped_newline_count++;
+      else
+        append_char(WordSegment::Kind::LiteralText, ch);
+      byte_count++;
+      continue;
+    }
 
-    /* Handle quotes. */
-    if (!should_escape && quote_char == ch) {
+    if (quote_char == '\'') {
+      /* Single quotes take everything literally up to the closing quote. */
+      if (ch == '\'')
+        quote_char = std::nullopt;
+      else
+        append_char(WordSegment::Kind::LiteralText, ch);
+      byte_count++;
+      continue;
+    }
+
+    if (ch == '\\') {
+      should_escape = true;
+      byte_count++;
+      continue;
+    }
+
+    bool is_in_double_quotes = quote_char == '"';
+
+    if (is_in_double_quotes && ch == '"') {
       quote_char = std::nullopt;
-      should_append = false;
-      removed_backslash_count++;
-    } else if (!should_escape && !quote_char && lexer::is_string_quote(ch)) {
-      /* TODO: */
-      if (ch == '`') {
-        throw ErrorWithLocation{
-            {m_cursor_position + byte_count - 1, 1},
-            "Not implemented (Lexer)"
-        };
-      }
-
-      quote_char = ch;
-      should_append = false;
-      removed_backslash_count++;
-      relative_last_quote_char_pos = byte_count - 1;
+      byte_count++;
+      continue;
     }
 
-    if (should_append) ident_string += ch;
+    if (!quote_char && lexer::is_string_quote(ch)) {
+      relative_last_quote_char_pos = byte_count;
+      quote_char = ch;
+      byte_count++;
+      continue;
+    }
 
-    should_escape = (is_backslash_escape && quote_char != '\'');
+    if (ch == '$') {
+      byte_count++;
+      char next = chop_character(byte_count);
+
+      if (next == '{') {
+        byte_count++;
+        std::string name{};
+        for (;;) {
+          char c = chop_character(byte_count);
+          if (c == lexer::CEOF) {
+            throw ErrorWithLocationAndDetails{
+                {m_cursor_position + byte_count, 1},
+                "Unterminated variable expansion",
+                {m_cursor_position + byte_count, 1},
+                "expected } here"
+            };
+          }
+          byte_count++;
+          if (c == '}') break;
+          name += c;
+        }
+        word.segments.push_back(
+            WordSegment{WordSegment::Kind::VariableReference, std::move(name),
+                        is_in_double_quotes});
+      } else if (lexer::is_variable_name_start(next)) {
+        std::string name{};
+        while (lexer::is_variable_name(next = chop_character(byte_count))) {
+          name += next;
+          byte_count++;
+        }
+        word.segments.push_back(
+            WordSegment{WordSegment::Kind::VariableReference, std::move(name),
+                        is_in_double_quotes});
+      } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
+                 next == '$' || next == '!' || next == '-' ||
+                 lexer::is_number(next))
+      {
+        byte_count++;
+        word.segments.push_back(
+            WordSegment{WordSegment::Kind::VariableReference, std::string{next},
+                        is_in_double_quotes});
+      } else {
+        /* A dollar sign that names nothing stays a literal dollar sign. */
+        append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
+                                        : WordSegment::Kind::UnquotedText,
+                    '$');
+      }
+      continue;
+    }
+
+    append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
+                                    : WordSegment::Kind::UnquotedText,
+                ch);
+    byte_count++;
   }
 
   if (quote_char) {
@@ -358,38 +435,35 @@ Lexer::lex_identifier()
     };
   }
 
-  Token *t{};
-
   usize actual_cursor_position = m_cursor_position + escaped_newline_count;
 
-  if (assignment_equals_pos != 0) {
-    std::string_view k =
-        source().substr(m_cursor_position, assignment_equals_pos);
-    std::string_view v =
-        source().substr(m_cursor_position + assignment_equals_pos + 1,
-                        byte_count - assignment_equals_pos - 1);
-    t = new tokens::Assignment{
-        {actual_cursor_position, byte_count},
-        k, v
-    };
-  } else {
-    /* An identifier may be a keyword. Keyword also cannot contain quotes or
-     * backslashes. */
-    if (auto kw = KEYWORDS.find(ident_string);
-        removed_backslash_count == 0 && relative_last_quote_char_pos == 0 &&
-        kw != KEYWORDS.end())
-    {
+  if (m_should_collect_debug_words) m_debug_words.push_back(word);
+
+  Token *t{};
+
+  if (auto assignment_split = word.get_assignment_split();
+      assignment_split.has_value())
+  {
+    t = m_arena.create<tokens::Assignment>(
+        SourceLocation{actual_cursor_position, byte_count},
+        assignment_split->first, std::move(assignment_split->second));
+  } else if (word.segments.size() == 1 &&
+             word.segments[0].kind == WordSegment::Kind::UnquotedText)
+  {
+    /* A bare word may name a keyword. A quoted or escaped word never does, so
+       only a single unquoted segment qualifies. */
+    if (auto kw = KEYWORDS.find(word.segments[0].text); kw != KEYWORDS.end()) {
       switch (kw->second) {
         KW_SWITCH_CASES();
       default:
         SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(kw->second));
       }
-    } else {
-      t = new tokens::Identifier{
-          {actual_cursor_position, byte_count},
-          ident_string
-      };
     }
+  }
+
+  if (t == nullptr) {
+    t = m_arena.create<tokens::WordToken>(
+        SourceLocation{actual_cursor_position, byte_count}, std::move(word));
   }
 
   m_cached_offset = byte_count;

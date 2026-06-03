@@ -1,0 +1,35 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign FOO=bar]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$FOO"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$FOO"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$FOO and more"]
+[Word
+  Unquoted "FOO=bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "FOO"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "FOO"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "FOO"
+  DoubleQuoted " and more"
+]
+bar
+bar
+bar and more
+[Code 0]

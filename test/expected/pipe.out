@@ -19,8 +19,53 @@
       [SimpleCommand "false"]
   [CompoundListCondition, ||]
     [SimpleCommand "echo" "4"]
-[Escape Bitmap
-  <empty>
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "4"
 ]
 1
 2

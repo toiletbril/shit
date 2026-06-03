@@ -1,0 +1,3 @@
+echo $NOPE end
+echo "$NOPE" end
+echo a${NOPE}b

@@ -69,7 +69,9 @@ get_context_pointing_to(std::string_view source, usize byte_position,
 
   /* Add spacer before line number. */
   std::string msg{};
-  for (usize i = 0; i < 6 - number_string_length(line_number + 1); i++) {
+  for (usize i = 0; i < SHIT_SUB_SAT(6, number_string_length(line_number + 1));
+       i++)
+  {
     msg += ' ';
   }
 
@@ -136,7 +138,11 @@ ErrorBase::ErrorBase(const std::string &message)
 
 ErrorBase::~ErrorBase() = default;
 
-ErrorBase::operator bool &() { return m_is_active; }
+ErrorBase::
+operator bool &()
+{
+  return m_is_active;
+}
 
 std::string
 ErrorBase::message() const
@@ -158,7 +164,8 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
 {}
 
 std::string
-ErrorWithLocation::to_string(std::string_view source) const
+ErrorWithLocation::to_string(std::string_view source,
+                             std::string_view severity) const
 {
   usize byte_position = m_location.position();
   usize byte_count = m_location.length();
@@ -188,7 +195,8 @@ ErrorWithLocation::to_string(std::string_view source) const
                                  : unicode_position + 1;
 
   return std::to_string(line_number + 1) + ":" +
-         std::to_string(line_byte_position) + ": Error: " + m_message + ".\n" +
+         std::to_string(line_byte_position) + ": " + std::string{severity} +
+         ": " + m_message + ".\n" +
          get_context_pointing_to(source, byte_position, byte_count, line_number,
                                  last_newline_location, unicode_position,
                                  "here");
@@ -207,7 +215,8 @@ ErrorWithLocationAndDetails::details_to_string(std::string_view source) const
   usize byte_position = m_details_location.position();
   usize byte_count = m_details_location.length();
 
-  if (byte_position == source.length() && source[byte_position - 1] == '\n')
+  if (byte_position > 0 && byte_position == source.length() &&
+      source[byte_position - 1] == '\n')
     byte_position--;
 
   auto [details_line_number, details_last_newline_location] =

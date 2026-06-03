@@ -42,7 +42,10 @@ struct ErrorWithLocation : public ErrorBase
 
   ErrorWithLocation(SourceLocation location, const std::string &message);
 
-  virtual std::string to_string(std::string_view source) const;
+  /* The severity is the word printed before the message, Error by default. The
+     prepass passes Warning to reuse the same caret for a non-fatal report. */
+  virtual std::string to_string(std::string_view source,
+                                std::string_view severity = "Error") const;
 
 protected:
   SourceLocation m_location;

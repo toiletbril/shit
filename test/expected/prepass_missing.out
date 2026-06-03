@@ -1,0 +1,18 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "nosuchcmd_xyz"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "nosuchcmd_xyz"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 1:1: Error: Command 'nosuchcmd_xyz' was not found.
+     1 |  nosuchcmd_xyz
+       |  ^~~~~~~~~~~~~ here.
+[Code 1]

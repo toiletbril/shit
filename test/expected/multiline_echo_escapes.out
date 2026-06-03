@@ -1,8 +1,18 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "is_escaped*" "word" "does_not_exist*"]
-[Escape Bitmap
-  00000100 00000000 10001000 00011000 
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "is_escaped"
+  Literal "*"
+]
+[Word
+  Unquoted "word"
+]
+[Word
+  Unquoted "does_not_exist*"
 ]
 shit: 5:1: Error: No expansions found for 'does_not_exist*'.
      5 |  does_not_exist*

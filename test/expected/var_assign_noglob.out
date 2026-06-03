@@ -1,29 +1,25 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "1"]
+    [Assign Y=data/*]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "2"]
+    [SimpleCommand "echo" "$Y"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "3"]
+    [SimpleCommand "echo" "$Y"]
 [Word
-  Unquoted "echo"
-]
-[Word
-  Unquoted "1"
+  Unquoted "Y=data/*"
 ]
 [Word
   Unquoted "echo"
 ]
 [Word
-  Unquoted "2"
+  Variable "Y"
 ]
 [Word
   Unquoted "echo"
 ]
 [Word
-  Unquoted "3"
+  Variable "Y"
 ]
-1
-2
-3
+data/*
+data/*
 [Code 0]

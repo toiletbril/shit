@@ -19,8 +19,65 @@
     [SimpleCommand "echo" "data/*[^g]"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "data/.*"]
-[Escape Bitmap
-  <empty>
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/*/"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/*/*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/*/*/"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/*g"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/abcd*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/??*fg"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/[a-b]*/"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/*[^g]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/.*"
 ]
 data/abcd data/abcdefg data/fourth data/hello-d data/hello+K
 data/abcd/ data/abcdefg/

@@ -1,14 +1,20 @@
 #include "Expressions.hpp"
 
+#include "Arena.hpp"
 #include "Builtin.hpp"
+#include "Cli.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "Lexer.hpp"
+#include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
 #include <iostream>
+#include <optional>
+#include <utility>
 
 namespace shit {
 
@@ -34,6 +40,93 @@ Expression::evaluate(EvalContext &cxt) const
 {
   cxt.add_evaluated_expression();
   return evaluate_impl(cxt);
+}
+
+void
+Expression::operator delete(void *pointer)
+{
+  if (g_ast_arena != nullptr && g_ast_arena->owns(pointer)) return;
+  ::operator delete(pointer);
+}
+
+void
+AnalysisContext::warn(SourceLocation location, const std::string &message)
+{
+  ErrorWithLocation located{location, message};
+  show_message(located.to_string(source, "Warning"));
+}
+
+void
+AnalysisContext::fail(SourceLocation location, const std::string &message)
+{
+  ErrorWithLocation located{location, message};
+  show_message(located.to_string(source, "Error"));
+  has_fatal = true;
+}
+
+void
+Expression::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  SHIT_UNUSED(actx);
+  SHIT_UNUSED(is_unconditional);
+}
+
+namespace {
+
+/* The literal name of a command when it is statically known. A word that holds
+   a variable reference or a live glob metacharacter is dynamic, so its target
+   cannot be checked before run time. */
+std::optional<std::string>
+static_command_name(const Token *token)
+{
+  if (token->kind() != Token::Kind::Word) return std::nullopt;
+
+  const Word &word = static_cast<const tokens::WordToken *>(token)->word();
+
+  std::string name{};
+  for (const WordSegment &segment : word.segments) {
+    if (segment.kind == WordSegment::Kind::VariableReference)
+      return std::nullopt;
+    if (segment.kind == WordSegment::Kind::UnquotedText) {
+      for (char ch : segment.text) {
+        if (lexer::is_expandable_char(ch)) return std::nullopt;
+      }
+    }
+    name += segment.text;
+  }
+  return name;
+}
+
+/* A command resolves when it is a builtin, a program on PATH, or an existing
+   path. This shares the PATH cache with execution, so an unconditional command
+   is resolved only once. */
+bool
+command_resolves(const std::string &name)
+{
+  if (name.empty()) return false;
+  if (search_builtin(name).has_value()) return true;
+  if (name.find('/') != std::string::npos)
+    return utils::canonicalize_path(name).has_value();
+  return !utils::search_program_path(name).empty();
+}
+
+bool
+word_has_backtick(const Word &word)
+{
+  for (const WordSegment &segment : word.segments) {
+    if (segment.text.find('`') != std::string::npos) return true;
+  }
+  return false;
+}
+
+} /* namespace */
+
+bool
+analyze_ast(const Expression *root, std::string_view source)
+{
+  AnalysisContext actx{source};
+  root->analyze(actx, true);
+  return !actx.has_fatal;
 }
 
 namespace expressions {
@@ -113,9 +206,9 @@ Command::is_async() const
 }
 
 void
-Command::set_local_vars(std::unordered_map<std::string, std::string> &&vars)
+Command::set_local_vars(std::unordered_map<std::string, Word> &&vars)
 {
-  m_local_vars = vars;
+  m_local_vars = std::move(vars);
 }
 
 bool
@@ -171,7 +264,9 @@ AssignCommand::is_assignment() const
 i64
 AssignCommand::evaluate_impl(EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  cxt.set_shell_variable(m_assignment->key(), cxt.expand_word_for_assignment(
+                                                  m_assignment->value_word()));
+  cxt.set_last_exit_status(0);
   return 0;
 }
 
@@ -235,13 +330,39 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
 
   std::vector<std::string> program_args = cxt.process_args(m_args);
 
+  /* An expansion may drop every word, for example an unset $x used as the whole
+     command. There is nothing to run then. */
+  if (program_args.empty()) {
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
   if (cxt.shell_is_interactive())
     toiletline::set_title(utils::merge_args_to_string(program_args));
 
-  return utils::execute_context(
-      ExecContext::make_from(source_location(), program_args), is_async());
+  /* Per-command assignments apply to the environment around this command, so
+     the child inherits them. The previous values are restored afterwards. */
+  std::vector<std::pair<std::string, std::optional<std::string>>> saved_env{};
+  if (m_local_vars) {
+    for (const auto &[name, value_word] : *m_local_vars) {
+      saved_env.emplace_back(name, os::get_environment_variable(name));
+      os::set_environment_variable(name,
+                                   cxt.expand_word_for_assignment(value_word));
+    }
+  }
 
-  SHIT_UNREACHABLE();
+  i64 ret = utils::execute_context(
+      ExecContext::make_from(source_location(), program_args), cxt, is_async());
+
+  for (const auto &[name, old_value] : saved_env) {
+    if (old_value)
+      os::set_environment_variable(name, *old_value);
+    else
+      os::unset_environment_variable(name);
+  }
+
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
 }
 
 std::string
@@ -483,7 +604,7 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
                                             cxt.process_args(e->args())));
   }
 
-  return utils::execute_contexts_with_pipes(std::move(ecs), is_async());
+  return utils::execute_contexts_with_pipes(std::move(ecs), cxt, is_async());
 }
 
 void
@@ -692,6 +813,123 @@ BINARY_EXPRESSION_DECLS(LogicalOr, ||);
 BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
+
+void
+SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  if (m_args.empty()) return;
+
+  std::optional<std::string> name = static_command_name(m_args[0]);
+
+  /* The literal command text, used for the test recognition. A name like [
+     holds a glob metacharacter, so static_command_name rejects it, but the test
+     check still needs to see it. */
+  std::string command_literal =
+      m_args[0]->kind() == Token::Kind::Word
+          ? static_cast<const tokens::WordToken *>(m_args[0])
+                ->word()
+                .to_literal_string()
+          : m_args[0]->raw_string();
+
+  /* A backtick anywhere in the command is an unsupported substitution. */
+  for (const Token *t : m_args) {
+    if (t->kind() != Token::Kind::Word) continue;
+    const Word &word = static_cast<const tokens::WordToken *>(t)->word();
+    if (word_has_backtick(word)) {
+      actx.warn(t->source_location(),
+                "Backquote command substitution is not supported, use $(...) "
+                "instead");
+    }
+  }
+
+  /* An unquoted variable inside a test silently breaks when it is empty or
+     splits into several words. */
+  if (command_literal == "[" || command_literal == "test" ||
+      command_literal == "[[")
+  {
+    for (usize i = 1; i < m_args.size(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      const Word &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      for (const WordSegment &segment : word.segments) {
+        if (segment.kind == WordSegment::Kind::VariableReference &&
+            segment.is_split_eligible())
+        {
+          actx.warn(
+              m_args[i]->source_location(),
+              "Unquoted variable in a test, quote it to avoid an empty or "
+              "split argument");
+          break;
+        }
+      }
+    }
+  }
+
+  /* A prefix assignment does not affect the expansion on the same command, so a
+     reference to one of its names reads the old value. */
+  if (m_local_vars) {
+    for (usize i = 1; i < m_args.size(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      const Word &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      for (const WordSegment &segment : word.segments) {
+        if (segment.kind == WordSegment::Kind::VariableReference &&
+            m_local_vars->find(segment.text) != m_local_vars->end())
+        {
+          actx.warn(m_args[i]->source_location(),
+                    "The assignment prefix does not affect this command, '" +
+                        segment.text + "' is read before it is set");
+          break;
+        }
+      }
+    }
+  }
+
+  if (name && !command_resolves(*name)) {
+    std::string message = "Command '" + *name + "' was not found";
+    /* Point at the command word, not at the whole command. With an assignment
+       prefix the command location is the assignment, not the program name. */
+    if (is_unconditional)
+      actx.fail(m_args[0]->source_location(), message);
+    else
+      actx.warn(m_args[0]->source_location(), message);
+  }
+}
+
+void
+Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  for (const SimpleCommand *command : m_commands)
+    command->analyze(actx, is_unconditional);
+}
+
+void
+CompoundListCondition::analyze(AnalysisContext &actx,
+                               bool is_unconditional) const
+{
+  m_cmd->analyze(actx, is_unconditional);
+}
+
+void
+CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  for (const CompoundListCondition *node : m_nodes) {
+    /* A semicolon or newline node runs whenever the list runs. An && or || node
+       runs only depending on the previous command, so it is conditional. */
+    bool node_unconditional =
+        is_unconditional && node->kind() == CompoundListCondition::Kind::None;
+    node->analyze(actx, node_unconditional);
+  }
+}
+
+void
+IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  /* The condition always runs to decide the branch. The branches do not. */
+  m_condition->analyze(actx, is_unconditional);
+  m_then->analyze(actx, false);
+  if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
+}
 
 } /* namespace expressions */
 

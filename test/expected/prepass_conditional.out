@@ -1,0 +1,24 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "nosuchcmd_xyz"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "nosuchcmd_xyz"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+shit: 1:10: Warning: Command 'nosuchcmd_xyz' was not found.
+     1 |  false && nosuchcmd_xyz
+       |           ^~~~~~~~~~~~~ here.
+done
+[Code 0]

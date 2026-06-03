@@ -1,8 +1,11 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "data/*/doesnotexist"]
-[Escape Bitmap
-  <empty>
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/*/doesnotexist"
 ]
 shit: 1:6: Error: No expansions found for 'data/*/doesnotexist'.
      1 |  echo data/*/doesnotexist

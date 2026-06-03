@@ -45,9 +45,10 @@ find_pos_in_vec(const std::vector<T> &v, const T &p)
   return std::string::npos;
 }
 
-i32 execute_context(ExecContext &&ec, bool is_async);
+i32 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async);
 
-i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async);
+i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs,
+                                EvalContext &cxt, bool is_async);
 
 void string_replace(std::string &s, std::string_view to_replace,
                     std::string_view replace_with);
@@ -69,7 +70,7 @@ void set_current_directory(const std::filesystem::path &path);
 std::filesystem::path get_current_directory();
 
 bool glob_matches(std::string_view glob, std::string_view str,
-                  usize source_position, const EscapeBitmap &em);
+                  const std::vector<bool> &glob_active, usize mask_offset);
 
 /* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] void quit(i32 code, bool should_goodbye = false);

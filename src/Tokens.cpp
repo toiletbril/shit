@@ -1,8 +1,10 @@
 #include "Tokens.hpp"
 
+#include "Arena.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
+#include "Lexer.hpp"
 
 namespace shit {
 
@@ -14,10 +16,104 @@ Token::source_location() const
   return m_location;
 }
 
+void
+Token::operator delete(void *pointer)
+{
+  if (g_ast_arena != nullptr && g_ast_arena->owns(pointer)) return;
+  ::operator delete(pointer);
+}
+
 std::string
 Token::to_ast_string() const
 {
   return raw_string();
+}
+
+bool
+WordSegment::is_split_eligible() const
+{
+  return kind == Kind::UnquotedText ||
+         (kind == Kind::VariableReference && !is_in_double_quotes);
+}
+
+bool
+WordSegment::has_live_glob_chars() const
+{
+  return kind == Kind::UnquotedText;
+}
+
+bool
+WordSegment::is_tilde_candidate() const
+{
+  return kind == Kind::UnquotedText;
+}
+
+bool
+Word::is_empty() const
+{
+  return segments.empty();
+}
+
+std::string
+Word::to_literal_string() const
+{
+  std::string result{};
+  for (const WordSegment &segment : segments) {
+    if (segment.kind == WordSegment::Kind::VariableReference) result += '$';
+    result += segment.text;
+  }
+  return result;
+}
+
+std::string
+Word::to_pretty_string() const
+{
+  std::string result{"[Word"};
+  for (const WordSegment &segment : segments) {
+    result += "\n  ";
+    switch (segment.kind) {
+    case WordSegment::Kind::LiteralText: result += "Literal"; break;
+    case WordSegment::Kind::UnquotedText: result += "Unquoted"; break;
+    case WordSegment::Kind::DoubleQuotedText: result += "DoubleQuoted"; break;
+    case WordSegment::Kind::VariableReference: result += "Variable"; break;
+    }
+    result += " \"";
+    result += segment.text;
+    result += '"';
+  }
+  result += "\n]";
+  return result;
+}
+
+std::optional<std::pair<std::string, Word>>
+Word::get_assignment_split() const
+{
+  if (segments.empty()) return std::nullopt;
+
+  const WordSegment &first = segments[0];
+  if (first.kind != WordSegment::Kind::UnquotedText) return std::nullopt;
+
+  usize equals_position = first.text.find('=');
+  if (equals_position == std::string::npos || equals_position == 0)
+    return std::nullopt;
+
+  if (!lexer::is_variable_name_start(first.text[0])) return std::nullopt;
+  for (usize i = 1; i < equals_position; i++) {
+    if (!lexer::is_variable_name(first.text[i])) return std::nullopt;
+  }
+
+  std::string name = first.text.substr(0, equals_position);
+
+  Word value{};
+  /* The value always begins with an unquoted segment, even when empty, so that
+     FOO= produces one empty field rather than no field at all. */
+  value.segments.push_back(WordSegment{WordSegment::Kind::UnquotedText,
+                                       first.text.substr(equals_position + 1),
+                                       false});
+  for (usize i = 1; i < segments.size(); i++)
+    value.segments.push_back(segments[i]);
+
+  return std::make_pair(std::move(name), std::move(value));
 }
 
 namespace tokens {
@@ -100,9 +196,9 @@ Number::flags() const
   return Token::Flag::Value;
 }
 
-Assignment::Assignment(SourceLocation location, std::string_view k,
-                       std::string_view v)
-    : Token(location), m_key(k), m_value(v)
+Assignment::Assignment(SourceLocation location, std::string_view key,
+                       Word value)
+    : Token(location), m_key(key), m_value(std::move(value))
 {}
 
 Token::Kind
@@ -120,7 +216,7 @@ Assignment::flags() const
 std::string
 Assignment::raw_string() const
 {
-  return m_key + "=" + m_value;
+  return m_key + "=" + m_value.to_literal_string();
 }
 
 const std::string &
@@ -129,32 +225,34 @@ Assignment::key() const
   return m_key;
 }
 
-const std::string &
-Assignment::value() const
+const Word &
+Assignment::value_word() const
 {
   return m_value;
 }
 
-String::String(SourceLocation location, char quote_char, std::string_view sv)
-    : Value(location, sv), m_quote_char(quote_char)
-{}
+WordToken::WordToken(SourceLocation location, Word word)
+    : Value(location, ""), m_word(std::move(word))
+{
+  m_value = m_word.to_literal_string();
+}
 
 Token::Kind
-String::kind() const
+WordToken::kind() const
 {
-  return Token::Kind::String;
+  return Token::Kind::Word;
 }
 
 Token::Flags
-String::flags() const
+WordToken::flags() const
 {
   return Token::Flag::Value;
 }
 
-char
-String::quote_char() const
+const Word &
+WordToken::word() const
 {
-  return m_quote_char;
+  return m_word;
 }
 
 Identifier::Identifier(SourceLocation location, std::string_view sv)

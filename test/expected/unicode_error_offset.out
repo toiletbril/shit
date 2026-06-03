@@ -3,8 +3,14 @@
     [SimpleCommand "echo" "юникод"]
   [CompoundListCondition, None]
     [SimpleCommand "does_not_exist*"]
-[Escape Bitmap
-  <empty>
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "юникод"
+]
+[Word
+  Unquoted "does_not_exist*"
 ]
 юникод
 shit: 1:14: Error: No expansions found for 'does_not_exist*'.

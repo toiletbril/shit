@@ -41,21 +41,25 @@ merge_tokens_to_string(const std::vector<const Token *> &v)
 }
 
 i32
-execute_context(ExecContext &&ec, bool is_async)
+execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
 {
   if (!ec.is_builtin()) {
     os::process p = os::execute_program(std::move(ec));
-    if (is_async) return 0;
+    if (is_async) {
+      cxt.set_last_background_pid(os::process_id_of(p));
+      return 0;
+    }
     return os::wait_and_monitor_process(p);
   } else {
-    return execute_builtin(std::move(ec));
+    return execute_builtin(std::move(ec), cxt);
   }
 
   SHIT_UNREACHABLE();
 }
 
 i32
-execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
+execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
+                            bool is_async)
 {
   SHIT_ASSERT(ecs.size() > 1);
 
@@ -89,13 +93,15 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, bool is_async)
     if (!ec.is_builtin())
       last_child = os::execute_program(std::move(ec));
     else
-      ret = execute_builtin(std::move(ec));
+      ret = execute_builtin(std::move(ec), cxt);
 
     is_first = false;
   }
 
   if (last_child != SHIT_INVALID_FD && !is_async)
     ret = os::wait_and_monitor_process(last_child);
+  else if (last_child != SHIT_INVALID_FD && is_async)
+    cxt.set_last_background_pid(os::process_id_of(last_child));
 
   return ret;
 }
@@ -182,15 +188,21 @@ get_current_directory()
 
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
+static bool
+is_glob_char_active(const std::vector<bool> &glob_active, usize index)
+{
+  return index < glob_active.size() && glob_active[index];
+}
+
 bool
-glob_matches(std::string_view glob, std::string_view str, usize source_position,
-             const EscapeBitmap &em)
+glob_matches(std::string_view glob, std::string_view str,
+             const std::vector<bool> &glob_active, usize mask_offset)
 {
   usize s = 0;
   usize g = 0;
 
   while (g < glob.length() && s < str.length()) {
-    if (em.is_escaped(source_position + g)) {
+    if (!is_glob_char_active(glob_active, mask_offset + g)) {
       if (glob[g++] != str[s++])
         return false;
       else
@@ -204,8 +216,8 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
     } break;
 
     case '*': {
-      if (glob_matches(glob.substr(g + 1), str.substr(s),
-                       source_position + g + 1, em))
+      if (glob_matches(glob.substr(g + 1), str.substr(s), glob_active,
+                       mask_offset + g + 1))
       {
         return true;
       }
@@ -219,9 +231,9 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
       /* clang-format off */
 #define GLOB_GROUP_ERR()                                                       \
   throw ErrorWithLocationAndDetails{                                           \
-      {source_position + s, SHIT_SUB_SAT(g, s)},                               \
+      {0, 0},                               \
       "Unclosed '[' group",                                                    \
-      {source_position + g, 1},                                                \
+      {0, 1},                                                \
       "expected ] here"                                                        \
   };
       /* clang-format on */
@@ -239,7 +251,7 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
       char prev_glob_ch = glob[g++];
       is_matched |= (prev_glob_ch == str[s]);
 
-      while (glob[g] != ']' && g < glob.length()) {
+      while (g < glob.length() && glob[g] != ']') {
         if (glob[g] == '-') {
           g++;
           if (g >= glob.length()) GLOB_GROUP_ERR();
@@ -256,7 +268,7 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
         }
       }
 
-      if (glob[g] != ']') GLOB_GROUP_ERR();
+      if (g >= glob.length() || glob[g] != ']') GLOB_GROUP_ERR();
       if (should_negate) is_matched = !is_matched;
       if (!is_matched) return false;
 
@@ -271,7 +283,7 @@ glob_matches(std::string_view glob, std::string_view str, usize source_position,
 
   if (s >= str.length()) {
     while (g < glob.length() && glob[g] == '*' &&
-           !em.is_escaped(source_position + g))
+           is_glob_char_active(glob_active, mask_offset + g))
     {
       g++;
     }
@@ -342,38 +354,42 @@ clear_path_map()
   PATH_CACHE_DIRS.clear();
 }
 
+/* Split PATH into its directory components. The last component carries no
+   trailing delimiter, so a plain delimiter scan drops it and the directory is
+   never searched. POSIX treats an empty component as the current directory. */
+static std::vector<std::string>
+split_path_dirs(const std::string &path_var)
+{
+  std::vector<std::string> dirs{};
+  std::string current{};
+
+  for (const char &ch : path_var) {
+    if (ch == os::PATH_DELIMITER) {
+      dirs.push_back(current.empty() ? "." : current);
+      current.clear();
+    } else {
+      current += ch;
+    }
+  }
+  dirs.push_back(current.empty() ? "." : current);
+
+  return dirs;
+}
+
 void
 initialize_path_map()
 {
   if (!MAYBE_PATH) return;
 
-  std::string dir_string{};
-  std::string path_var = *MAYBE_PATH;
-
-  for (const char &ch : path_var) {
-    if (ch != os::PATH_DELIMITER) {
-      dir_string += ch;
-      continue;
-    }
-
+  for (std::string &dir_string : split_path_dirs(*MAYBE_PATH)) {
     try {
       /* What the heck? A path in PATH that does not exist? Are you a
        * Windows user? */
       if (std::filesystem::exists(dir_string)) {
         std::filesystem::directory_iterator di{dir_string};
-        std::filesystem::path dir_path{dir_string};
 
         usize dir_index =
             cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-
-        /* Allocate the memory only once. */
-        size_t file_count = 0;
-
-        for (const std::filesystem::directory_entry &f : di) {
-          if (f.is_regular_file())
-            ++file_count;
-        }
-        PATH_CACHE.reserve(PATH_CACHE.size() + file_count);
 
         /* Initialize every file in the directory. */
         for (const std::filesystem::directory_entry &f : di) {
@@ -391,8 +407,6 @@ initialize_path_map()
       SHIT_UNUSED(e);
 #endif
     }
-
-    dir_string.clear();
   }
 }
 
@@ -402,16 +416,9 @@ search_and_cache(const std::string &program_name)
   MAYBE_PATH = os::get_environment_variable("PATH");
   if (!MAYBE_PATH) return {};
 
-  std::string dir_string{};
-  std::string path_var = *MAYBE_PATH;
   std::list<std::filesystem::path> result{};
 
-  for (const char &ch : path_var) {
-    if (ch != os::PATH_DELIMITER) {
-      dir_string += ch;
-      continue;
-    }
-
+  for (std::string &dir_string : split_path_dirs(*MAYBE_PATH)) {
     bool is_valid_dir = false;
 
     try {
@@ -426,52 +433,50 @@ search_and_cache(const std::string &program_name)
 #endif
     }
 
-    if (is_valid_dir) {
-      std::filesystem::path dir_path{dir_string};
+    if (!is_valid_dir) continue;
 
-      /* Cache the directory if it was not present before. */
-      bool found = false;
-      usize dir_index = 0;
+    std::filesystem::path dir_path{dir_string};
 
-      for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
-        if (PATH_CACHE_DIRS[dir_i] == dir_string) {
-          found = true;
-          dir_index = dir_i;
-          break;
-        }
-      }
+    /* Cache the directory if it was not present before. */
+    bool found = false;
+    usize dir_index = 0;
 
-      if (!found) {
-        dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-      }
-
-      /* Actually try to find the file. */
-      std::filesystem::path full_path = dir_path / program_name;
-      std::string full_path_str = full_path.string();
-
-      /* This file already has an extesion specified? */
-      if (os::ExtIndex explicit_ext =
-              os::erase_extension_and_get_its_index(full_path_str);
-          explicit_ext == 0)
-      {
-        for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
-             ext_index++)
-        {
-          std::string try_path =
-              full_path.string() + os::OMITTED_SUFFIXES[ext_index];
-
-          if (std::filesystem::exists(try_path)) {
-            PATH_CACHE[program_name].push_back({dir_index, ext_index});
-            result.emplace_back(try_path);
-          }
-        }
-      } else if (std::filesystem::exists(full_path)) {
-        PATH_CACHE[program_name].push_back({dir_index, explicit_ext});
-        result.emplace_back(full_path);
+    for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
+      if (PATH_CACHE_DIRS[dir_i] == dir_string) {
+        found = true;
+        dir_index = dir_i;
+        break;
       }
     }
 
-    dir_string.clear();
+    if (!found) {
+      dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
+    }
+
+    /* Actually try to find the file. */
+    std::filesystem::path full_path = dir_path / program_name;
+    std::string full_path_str = full_path.string();
+
+    /* This file already has an extesion specified? */
+    if (os::ExtIndex explicit_ext =
+            os::erase_extension_and_get_its_index(full_path_str);
+        explicit_ext == 0)
+    {
+      for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
+           ext_index++)
+      {
+        std::string try_path =
+            full_path.string() + os::OMITTED_SUFFIXES[ext_index];
+
+        if (std::filesystem::exists(try_path)) {
+          PATH_CACHE[program_name].push_back({dir_index, ext_index});
+          result.emplace_back(try_path);
+        }
+      }
+    } else if (std::filesystem::exists(full_path)) {
+      PATH_CACHE[program_name].push_back({dir_index, explicit_ext});
+      result.emplace_back(full_path);
+    }
   }
 
   return result;
@@ -482,13 +487,11 @@ make_absolute_path_from_cache(const std::filesystem::path &program_name,
                               DirIndex d, os::ExtIndex e)
 {
   std::filesystem::path full_path = PATH_CACHE_DIRS[d] / program_name;
-  if (e != 0)
-    full_path.replace_extension(os::OMITTED_SUFFIXES[e]);
+  if (e != 0) full_path.replace_extension(os::OMITTED_SUFFIXES[e]);
   return full_path;
 }
 
 /* TODO: Optimization. */
-/* TODO: Some directories have precedence over the others. */
 std::list<std::filesystem::path>
 search_program_path(const std::string &program_name)
 {
@@ -498,7 +501,7 @@ search_program_path(const std::string &program_name)
   os::ExtIndex ext = os::erase_extension_and_get_its_index(sp);
 
   if (auto cache_entry = PATH_CACHE.find(sp); cache_entry != PATH_CACHE.end()) {
-    auto prefixes = cache_entry->second;
+    auto &prefixes = cache_entry->second;
     auto p = prefixes.begin();
 
     while (p != prefixes.end()) {

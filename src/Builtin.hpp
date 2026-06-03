@@ -13,6 +13,7 @@
 namespace shit {
 
 struct ExecContext;
+struct EvalContext;
 
 struct Builtin
 {
@@ -24,13 +25,14 @@ struct Builtin
     Pwd,
     Which,
     WhoAmI,
+    Export,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
   void print_to_stdout(const std::string &s) const;
 
   virtual Kind kind() const = 0;
-  virtual i32 execute(ExecContext &ec) const = 0;
+  virtual i32 execute(ExecContext &ec, EvalContext &cxt) const = 0;
 
   virtual ~Builtin() = default;
 
@@ -45,6 +47,7 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"pwd",    Builtin::Kind::Pwd   },
     {"which",  Builtin::Kind::Which },
     {"whoami", Builtin::Kind::WhoAmI},
+    {"export", Builtin::Kind::Export},
 };
 
 #define B_CASE(btin)                                                           \
@@ -56,7 +59,8 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Exit);                                                                \
   B_CASE(Pwd);                                                                 \
   B_CASE(Which);                                                               \
-  B_CASE(WhoAmI)
+  B_CASE(WhoAmI);                                                              \
+  B_CASE(Export)
 
 #define BUILTIN_STRUCT(b)                                                      \
   struct b : public Builtin                                                    \
@@ -64,7 +68,7 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     b();                                                                       \
                                                                                \
     Kind kind() const override;                                                \
-    i32 execute(ExecContext &ec) const override;                               \
+    i32 execute(ExecContext &ec, EvalContext &cxt) const override;             \
   };
 
 BUILTIN_STRUCT(Echo);
@@ -72,13 +76,14 @@ BUILTIN_STRUCT(Cd);
 BUILTIN_STRUCT(Pwd);
 BUILTIN_STRUCT(Which);
 BUILTIN_STRUCT(WhoAmI);
+BUILTIN_STRUCT(Export);
 
 struct Exit : public Builtin
 {
   Exit();
 
   Kind kind() const override;
-  [[noreturn]] i32 execute(ExecContext &ec) const override;
+  [[noreturn]] i32 execute(ExecContext &ec, EvalContext &cxt) const override;
 };
 
 std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
@@ -98,6 +103,6 @@ void show_builtin_help_impl(const ExecContext &ec,
   parse_flags_vec(FLAG_LIST, ec.args());                                       \
   SHIT_DEFER { reset_flags(FLAG_LIST); }
 
-i32 execute_builtin(ExecContext &&ec);
+i32 execute_builtin(ExecContext &&ec, EvalContext &cxt);
 
 } /* namespace shit */

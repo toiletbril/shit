@@ -4,13 +4,56 @@
 #include "Eval.hpp"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace shit {
 
 struct Expression;
+
+struct WordSegment
+{
+  /* The kind records how the evaluator may expand this segment. LiteralText is
+     final and the evaluator leaves it alone. UnquotedText expands a leading
+     tilde, splits on IFS after variable expansion, and globs. DoubleQuotedText
+     expands variables but never splits or globs. VariableReference holds a
+     variable name that the evaluator resolves at run time. */
+  enum class Kind : u8
+  {
+    LiteralText,
+    UnquotedText,
+    DoubleQuotedText,
+    VariableReference,
+  };
+
+  Kind kind;
+  std::string text;
+  bool is_in_double_quotes{false};
+
+  bool is_split_eligible() const;
+  bool has_live_glob_chars() const;
+  bool is_tilde_candidate() const;
+};
+
+/* A lexed word carries its quoting structure as ordered segments. The evaluator
+   expands the segments instead of consulting a source-position escape map, so
+   the byte offsets never drift apart from the produced text. */
+struct Word
+{
+  std::vector<WordSegment> segments;
+
+  bool is_empty() const;
+  std::string to_literal_string() const;
+  std::string to_pretty_string() const;
+
+  /* A word is an assignment when its first segment is unquoted text holding an
+     unescaped NAME= prefix. The returned word is the right hand side. */
+  std::optional<std::pair<std::string, Word>> get_assignment_split() const;
+};
 
 /**
  * Simple tokens
@@ -39,7 +82,7 @@ struct Token
 
     /* Values */
     Number,
-    String,
+    Word,
     Identifier,
     Redirection,
     Assignment,
@@ -97,8 +140,8 @@ struct Token
     UnaryOperator  = 1 << 1,
     BinaryOperator = 1 << 2,
     Special        = 1 << 3,
-    CompoundList   = 1 << 3,
     Keyword        = 1 << 4,
+    CompoundList   = 1 << 5,
     /* clang-format on */
   };
 
@@ -118,6 +161,11 @@ struct Token
   virtual std::string to_ast_string() const;
 
   SourceLocation source_location() const;
+
+  /* A token lives in the parse arena, so its storage is reclaimed in bulk. This
+     no-ops for arena storage and frees an ordinary heap token otherwise. The
+     destructor still runs through the normal delete. */
+  static void operator delete(void *pointer);
 
 protected:
   Token(SourceLocation location);
@@ -231,7 +279,7 @@ protected:
 
 struct Assignment : public Token
 {
-  Assignment(SourceLocation location, std::string_view k, std::string_view v);
+  Assignment(SourceLocation location, std::string_view key, Word value);
 
   Kind kind() const override;
   Flags flags() const override;
@@ -239,11 +287,11 @@ struct Assignment : public Token
   std::string raw_string() const override;
 
   const std::string &key() const;
-  const std::string &value() const;
+  const Word &value_word() const;
 
 protected:
   std::string m_key;
-  std::string m_value;
+  Word m_value;
 };
 
 /* Tokens with values. */
@@ -269,17 +317,17 @@ protected:
 VALUE_TOKEN_STRUCT(Number);
 VALUE_TOKEN_STRUCT(Identifier);
 
-struct String : public Value
+struct WordToken : public Value
 {
-  String(SourceLocation location, char quote_char, std::string_view sv);
+  WordToken(SourceLocation location, Word word);
 
   Kind kind() const override;
   Flags flags() const override;
 
-  char quote_char() const;
+  const Word &word() const;
 
 protected:
-  char m_quote_char;
+  Word m_word;
 };
 
 struct Operator : public Token

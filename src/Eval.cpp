@@ -8,6 +8,7 @@
 #include "Utils.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -15,10 +16,15 @@
 namespace shit {
 
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
-                         bool should_echo_expanded, bool shell_is_interactive)
-    : m_enable_path_expansion(!should_disable_path_expansion),
+                         bool should_echo_expanded, bool shell_is_interactive,
+                         bool should_error_exit, std::string shell_name,
+                         std::vector<std::string> positional_params)
+    : m_shell_name(std::move(shell_name)),
+      m_positional_params(std::move(positional_params)),
+      m_enable_path_expansion(!should_disable_path_expansion),
       m_enable_echo(should_echo), m_enable_echo_expanded(should_echo_expanded),
-      m_shell_is_interactive(shell_is_interactive)
+      m_shell_is_interactive(shell_is_interactive),
+      m_error_exit(should_error_exit)
 {}
 
 void
@@ -43,9 +49,144 @@ EvalContext::end_command()
 }
 
 void
-EvalContext::steal_escape_map(const EscapeBitmap &&em)
+EvalContext::set_shell_variable(const std::string &name, std::string value)
 {
-  m_escape_map = em;
+  m_shell_variables[name] = std::move(value);
+}
+
+void
+EvalContext::unset_shell_variable(const std::string &name)
+{
+  m_shell_variables.erase(name);
+}
+
+std::optional<std::string>
+EvalContext::get_variable_value(const std::string &name) const
+{
+  if (name == "?") return std::to_string(m_last_exit_status);
+  if (name == "$") return std::to_string(os::get_shell_process_id());
+  if (name == "!")
+    return m_last_background_pid ? std::to_string(*m_last_background_pid)
+                                 : std::string{};
+  if (name == "-") return option_flags_string();
+  if (name == "#") return std::to_string(m_positional_params.size());
+  if (name == "0") return m_shell_name;
+
+  /* A purely numeric name selects a positional parameter, $1 upward. */
+  if (!name.empty() &&
+      std::all_of(name.begin(), name.end(),
+                  [](unsigned char c) { return std::isdigit(c) != 0; }))
+  {
+    usize index = std::stoul(name);
+    if (index >= 1 && index <= m_positional_params.size())
+      return m_positional_params[index - 1];
+    return std::string{};
+  }
+
+  /* $* and $@ outside the special quoted handling join into a single word. $*
+     joins with the first IFS character, $@ joins with a space. */
+  if (name == "*" || name == "@") {
+    std::string separator = " ";
+    if (name == "*") {
+      std::string ifs = get_variable_value("IFS").value_or(" \t\n");
+      separator = ifs.empty() ? std::string{} : std::string{ifs.front()};
+    }
+    std::string joined{};
+    for (usize i = 0; i < m_positional_params.size(); i++) {
+      if (i > 0) joined += separator;
+      joined += m_positional_params[i];
+    }
+    return joined;
+  }
+
+  if (auto it = m_shell_variables.find(name); it != m_shell_variables.end())
+    return it->second;
+
+  return os::get_environment_variable(name);
+}
+
+const std::vector<std::string> &
+EvalContext::positional_params() const
+{
+  return m_positional_params;
+}
+
+void
+EvalContext::set_positional_params(std::vector<std::string> params)
+{
+  m_positional_params = std::move(params);
+}
+
+void
+EvalContext::set_last_background_pid(i64 pid)
+{
+  m_last_background_pid = pid;
+}
+
+void
+EvalContext::register_function(const std::string &name, const Expression *body)
+{
+  m_functions[name] = body;
+}
+
+const Expression *
+EvalContext::find_function(const std::string &name) const
+{
+  if (auto it = m_functions.find(name); it != m_functions.end())
+    return it->second;
+  return nullptr;
+}
+
+void
+EvalContext::clear_functions()
+{
+  m_functions.clear();
+}
+
+EvalStateSnapshot
+EvalContext::snapshot_state() const
+{
+  return EvalStateSnapshot{m_shell_variables, m_positional_params,
+                           m_last_exit_status, utils::get_current_directory()};
+}
+
+void
+EvalContext::restore_state(EvalStateSnapshot snapshot)
+{
+  m_shell_variables = std::move(snapshot.shell_variables);
+  m_positional_params = std::move(snapshot.positional_params);
+  m_last_exit_status = snapshot.last_exit_status;
+  utils::set_current_directory(snapshot.working_directory);
+}
+
+std::string
+EvalContext::option_flags_string() const
+{
+  std::string flags{};
+  if (m_error_exit) flags += 'e';
+  if (!m_enable_path_expansion) flags += 'f';
+  if (m_enable_echo) flags += 'v';
+  if (m_enable_echo_expanded) flags += 'x';
+  if (m_shell_is_interactive) flags += 'i';
+  return flags;
+}
+
+void
+EvalContext::set_last_exit_status(i32 status)
+{
+  m_last_exit_status = status;
+}
+
+i32
+EvalContext::last_exit_status() const
+{
+  return m_last_exit_status;
+}
+
+std::string
+EvalContext::expand_variable(const std::string &name) const
+{
+  return get_variable_value(name).value_or("");
 }
 
 std::string
@@ -117,239 +258,332 @@ EvalContext::total_expansion_count() const
 
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
-std::tuple<std::vector<std::string>, std::vector<usize>>
-EvalContext::expand_path_once(std::string_view path, usize source_position,
-                              usize offset, bool should_expand_files)
+std::vector<GlobField>
+EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
 {
-  std::vector<std::string> expanded_paths{};
-  std::vector<usize> expanded_offsets{};
+  std::vector<GlobField> expanded{};
+
+  const std::string &path = field.text;
 
   usize last_slash = path.rfind('/');
   bool has_slashes = (last_slash != std::string::npos);
 
   /* Prefix is the parent directory. */
   std::string parent_dir{};
-
-  if (has_slashes) {
-    if (last_slash != 0)
-      parent_dir = path.substr(0, last_slash);
-    else
-      parent_dir = path.substr(0, 1);
-  } else {
+  if (has_slashes)
+    parent_dir =
+        (last_slash != 0) ? path.substr(0, last_slash) : path.substr(0, 1);
+  else
     parent_dir = ".";
-  }
 
-  /* Stem of the glob after the last slash. */
-  std::optional<std::string_view> glob{};
-
-  if (has_slashes) {
-    if (last_slash + 1 < path.length()) {
-      glob = path;
-      glob->remove_prefix(last_slash + 1);
-    } else {
-      /* glob is empty. */
-    }
-  } else {
-    glob = path;
-  }
+  /* Stem of the glob after the last slash. Its mask starts at stem_start in the
+     field, so glob_matches reads field.glob_active from there. */
+  usize stem_start = has_slashes ? last_slash + 1 : 0;
+  bool has_glob = stem_start < path.length();
+  std::string_view glob{};
+  if (has_glob) glob = std::string_view{path}.substr(stem_start);
 
   std::filesystem::directory_iterator d{};
-
   try {
     d = std::filesystem::directory_iterator{parent_dir};
   } catch (const std::filesystem::filesystem_error &e) {
-    throw Error{"Could not descend into '" + std::string{parent_dir} +
+    SHIT_UNUSED(e);
+    throw Error{"Could not descend into '" + parent_dir +
                 "': " + os::last_system_error_message()};
   }
 
-  if (glob) {
-    for (const std::filesystem::directory_entry &e : d) {
-      if (!should_expand_files && !e.is_directory()) continue;
-
-      std::string filename = e.path().filename().string();
-
-      /* TODO: Figure the rules of hidden file expansion. */
-      if ((*glob)[0] != '.' && filename[0] == '.') continue;
-
-      if (utils::glob_matches(*glob, filename,
-                              SHIT_SUB_SAT(source_position, offset),
-                              escape_map()))
-      {
-        std::string expanded_path{};
-
-        if (parent_dir != ".") {
-          expanded_path += parent_dir;
-          if (parent_dir != "/") expanded_path += '/';
-        }
-
-        expanded_path += filename;
-        add_expansion();
-
-        expanded_paths.emplace_back(expanded_path);
-
-        usize offset_difference =
-            SHIT_SUB_SAT(expanded_path.length(), path.length());
-
-        expanded_offsets.emplace_back(offset_difference);
-      }
-    }
-  } else {
-    expanded_paths.emplace_back(path);
+  if (!has_glob) {
+    expanded.push_back(field);
+    return expanded;
   }
 
-  return {expanded_paths, expanded_offsets};
+  for (const std::filesystem::directory_entry &e : d) {
+    if (!should_expand_files && !e.is_directory()) continue;
+
+    std::string filename = e.path().filename().string();
+
+    /* TODO: Figure the rules of hidden file expansion. */
+    if (glob[0] != '.' && filename[0] == '.') continue;
+
+    if (utils::glob_matches(glob, filename, field.glob_active, stem_start)) {
+      std::string expanded_path{};
+
+      if (parent_dir != ".") {
+        expanded_path += parent_dir;
+        if (parent_dir != "/") expanded_path += '/';
+      }
+      expanded_path += filename;
+
+      add_expansion();
+
+      /* A real filename is literal, so the resulting field never globs again.
+       */
+      GlobField result_field{};
+      result_field.glob_active.assign(expanded_path.length(), false);
+      result_field.text = std::move(expanded_path);
+      expanded.push_back(std::move(result_field));
+    }
+  }
+
+  return expanded;
 }
 
-const EscapeBitmap &
-EvalContext::escape_map() const
+std::vector<GlobField>
+EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
 {
-  return m_escape_map;
-}
+  std::vector<GlobField> result{};
 
-std::vector<std::string>
-EvalContext::expand_path_recurse(const std::vector<std::string> &paths,
-                                 const std::vector<usize> &offsets,
-                                 usize source_position)
-{
-  std::vector<std::string> resulting_expanded_paths{};
-  std::optional<usize> expand_ch{};
+  for (const GlobField &field : fields) {
+    const std::string &text = field.text;
 
-  for (usize i = 0; i < paths.size(); i++) {
-    std::string_view original_path = paths[i];
-    std::string_view operating_path = original_path;
-
-    for (usize j = 0; j < operating_path.length(); j++) {
-      if (lexer::is_expandable_char(operating_path[j]) &&
-          !escape_map().is_escaped(
-              SHIT_SUB_SAT(source_position + j, offsets[i])))
-      {
+    std::optional<usize> expand_ch{};
+    for (usize j = 0; j < text.length(); j++) {
+      if (field.glob_active[j] && lexer::is_expandable_char(text[j])) {
         expand_ch = j;
         break;
       }
     }
 
-    if (expand_ch) {
-      std::optional<usize> slash_after{};
+    if (!expand_ch) {
+      result.push_back(field);
+      continue;
+    }
 
-      for (usize k = *expand_ch; k < operating_path.length(); k++) {
-        if (operating_path[k] == '/') {
-          slash_after = k;
-          break;
-        }
+    std::optional<usize> slash_after{};
+    for (usize k = *expand_ch; k < text.length(); k++) {
+      if (text[k] == '/') {
+        slash_after = k;
+        break;
       }
+    }
 
-      if (slash_after)
-        operating_path.remove_suffix(operating_path.length() - *slash_after);
+    GlobField operating = field;
+    GlobField removed_suffix{};
+    if (slash_after) {
+      std::ptrdiff_t slash_offset = static_cast<std::ptrdiff_t>(*slash_after);
+      removed_suffix.text = text.substr(*slash_after);
+      removed_suffix.glob_active.assign(
+          field.glob_active.begin() + slash_offset, field.glob_active.end());
+      operating.text = text.substr(0, *slash_after);
+      operating.glob_active.assign(field.glob_active.begin(),
+                                   field.glob_active.begin() + slash_offset);
+    }
 
-      auto [expanded_paths, expanded_offsets] =
-          expand_path_once(operating_path, source_position, offsets[i],
-                           !slash_after /* directories only? */);
+    std::vector<GlobField> once =
+        expand_path_once(operating, !slash_after.has_value());
 
-      if (slash_after) {
-        /* Bring back the removed suffix. */
-        std::string_view removed_suffix = original_path;
-        removed_suffix.remove_prefix(*slash_after);
+    if (!slash_after) {
+      for (GlobField &f : once)
+        result.emplace_back(std::move(f));
+      continue;
+    }
 
-        for (std::string &expanded_path : expanded_paths) {
-          expanded_path += removed_suffix;
-        }
+    /* Bring back the removed suffix and recurse on the expanded entries. */
+    for (GlobField &f : once) {
+      f.text += removed_suffix.text;
+      f.glob_active.insert(f.glob_active.end(),
+                           removed_suffix.glob_active.begin(),
+                           removed_suffix.glob_active.end());
+    }
 
-        /* Call this function recursively on expanded entries. */
-        std::vector<std::string> twice_expanded_paths =
-            expand_path_recurse(expanded_paths, expanded_offsets,
-                                SHIT_SUB_SAT(source_position, offsets[i]));
-
-        for (const std::string &twice_expanded_path : twice_expanded_paths) {
-          /* Only expand to paths that actually exist. */
-          try {
-            /* FIXME: This is a massive slowdown. */
-            if (!std::filesystem::exists(twice_expanded_path)) continue;
-          } catch (const std::filesystem::filesystem_error &e) {
-            throw ErrorWithLocation{
-                {source_position, original_path.length()},
-                "Could not check whether '" + e.path1().string() +
-                    "' exists: " + os::last_system_error_message()
-            };
-          }
-          resulting_expanded_paths.emplace_back(twice_expanded_path);
-        }
-      } else {
-        for (const std::string &resulting_path : expanded_paths)
-          resulting_expanded_paths.emplace_back(resulting_path);
+    std::vector<GlobField> twice = expand_path_recurse(once);
+    for (GlobField &f : twice) {
+      try {
+        /* FIXME: This is a massive slowdown. */
+        if (!std::filesystem::exists(f.text)) continue;
+      } catch (const std::filesystem::filesystem_error &e) {
+        throw Error{"Could not check whether '" + e.path1().string() +
+                    "' exists: " + os::last_system_error_message()};
       }
-    } else {
-      resulting_expanded_paths.emplace_back(operating_path);
+      result.emplace_back(std::move(f));
     }
   }
 
-  return resulting_expanded_paths;
+  return result;
 }
 
-usize
-EvalContext::expand_tilde(std::string &p, usize source_position) const
+void
+EvalContext::expand_tilde(WordSegment &leading_segment) const
 {
-  if (p[0] == '~' && !escape_map().is_escaped(source_position)) {
-    /* TODO: There may be several separators supported. */
-    if (p.length() > 1 && p[1] != '/') {
-      /* TODO: Expand different users. */
-      return 0;
-    }
+  /* A tilde only expands when it is unquoted. An escaped or quoted tilde is a
+     literal segment and stays as is. */
+  if (!leading_segment.is_tilde_candidate()) return;
 
-    /* Remove the tilde. */
-    p.erase(0, 1);
+  std::string &text = leading_segment.text;
+  if (text.empty() || text[0] != '~') return;
 
-    std::optional<std::filesystem::path> u = os::get_home_directory();
-    if (!u) throw Error{"Could not figure out home directory"};
+  /* TODO: There may be several separators supported. */
+  /* Only a bare ~ or a ~/ prefix expands. ~user is left alone for now. */
+  if (text.length() > 1 && text[1] != '/') return;
 
-    std::string s{u->string()};
-    p.insert(0, s);
+  std::optional<std::filesystem::path> home = os::get_home_directory();
+  if (!home) throw Error{"Could not figure out home directory"};
 
-    return s.size() - 1;
-  }
-
-  return 0;
+  text.erase(0, 1);
+  text.insert(0, home->string());
 }
 
 std::vector<std::string>
-EvalContext::expand_path(std::string &&r, usize source_position)
+EvalContext::expand_path(GlobField field)
 {
-  std::vector<std::string> values{};
-
+  /* Fast path. A field with no live glob metacharacter is its own single
+     result, so it skips the recursion and every copy. */
+  bool has_glob = false;
   if (m_enable_path_expansion) {
-    values = expand_path_recurse({r}, {0}, source_position);
-  } else {
-    values.emplace_back(r);
+    for (usize i = 0; i < field.text.length(); i++) {
+      if (field.glob_active[i] && lexer::is_expandable_char(field.text[i])) {
+        has_glob = true;
+        break;
+      }
+    }
   }
 
-#if 1
-  /* Sort expansion in lexicographical order. Ignore punctuation to be
-   * somewhat compatible with bash. */
+  if (!has_glob) {
+    std::vector<std::string> single{};
+    single.emplace_back(std::move(field.text));
+    return single;
+  }
+
+  /* The pattern is kept for the error, since the field moves into the recurse.
+   */
+  std::string pattern = field.text;
+
+  std::vector<GlobField> fields = expand_path_recurse({std::move(field)});
+  std::vector<std::string> values{};
+  values.reserve(fields.size());
+  for (GlobField &f : fields)
+    values.emplace_back(std::move(f.text));
+
+  /* Sort expansion in lexicographical order. Ignore punctuation to be somewhat
+     compatible with bash. */
   std::stable_sort(
       values.begin(), values.end(), [](const auto &lhs, const auto &rhs) {
         const auto x =
             mismatch(lhs.cbegin(), lhs.cend(), rhs.cbegin(), rhs.cend(),
-                     [](const auto &lhs, const auto &rhs) {
-                       return tolower(lhs) == tolower(rhs) ||
-                              (ispunct(lhs) && ispunct(rhs));
+                     [](const auto &lhs_ch, const auto &rhs_ch) {
+                       return tolower(static_cast<unsigned char>(lhs_ch)) ==
+                                  tolower(static_cast<unsigned char>(rhs_ch)) ||
+                              (ispunct(static_cast<unsigned char>(lhs_ch)) &&
+                               ispunct(static_cast<unsigned char>(rhs_ch)));
                      });
         return x.second != rhs.cend() &&
                (x.first == lhs.cend() ||
-                tolower(*x.first) < tolower(*x.second));
+                tolower(static_cast<unsigned char>(*x.first)) <
+                    tolower(static_cast<unsigned char>(*x.second)));
       });
-#else
-  /* Or don't be compatible. */
-  std::stable_sort(values.begin(), values.end());
-#endif
 
   /* Error out on bogus expansion. */
-  if (values.empty()) {
-    throw Error{"No expansions found for '" + r + "'"};
-  }
+  if (values.empty()) throw Error{"No expansions found for '" + pattern + "'"};
 
   return values;
 }
 
-/* TODO: Expand everything before the execution? */
+std::vector<GlobField>
+EvalContext::expand_word(const Word &word) const
+{
+  /* Only copy the segments when a leading tilde must be rewritten. The common
+     word has no tilde and reads its segments in place. */
+  const std::vector<WordSegment> *segments = &word.segments;
+  std::vector<WordSegment> tilde_expanded_segments;
+  if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
+      !word.segments.front().text.empty() &&
+      word.segments.front().text.front() == '~')
+  {
+    tilde_expanded_segments = word.segments;
+    expand_tilde(tilde_expanded_segments.front());
+    segments = &tilde_expanded_segments;
+  }
+
+  /* The field separator defaults to whitespace when IFS is unset. */
+  std::string ifs = get_variable_value("IFS").value_or(" \t\n");
+
+  std::vector<GlobField> fields{};
+  GlobField current{};
+  bool has_current = false;
+
+  auto flush = [&fields, &current, &has_current]() {
+    if (has_current) {
+      fields.emplace_back(std::move(current));
+      current = GlobField{};
+      has_current = false;
+    }
+  };
+
+  auto append_run = [&current, &has_current](const std::string &text,
+                                             bool glob_active) {
+    current.text += text;
+    current.glob_active.insert(current.glob_active.end(), text.length(),
+                               glob_active);
+    has_current = true;
+  };
+
+  /* A split run breaks into fields on every IFS run. Leading and trailing IFS
+     leave no empty field behind, since flush only emits a started field. */
+  auto append_split_run = [&](const std::string &text, bool glob_active) {
+    usize i = 0;
+    while (i < text.length()) {
+      if (ifs.find(text[i]) != std::string::npos) {
+        flush();
+        while (i < text.length() && ifs.find(text[i]) != std::string::npos)
+          i++;
+        continue;
+      }
+      usize start = i;
+      while (i < text.length() && ifs.find(text[i]) == std::string::npos)
+        i++;
+      append_run(text.substr(start, i - start), glob_active);
+    }
+  };
+
+  for (const WordSegment &segment : *segments) {
+    switch (segment.kind) {
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::DoubleQuotedText:
+      append_run(segment.text, false);
+      break;
+    case WordSegment::Kind::UnquotedText:
+      append_split_run(segment.text, true);
+      break;
+    case WordSegment::Kind::VariableReference: {
+      /* "$@" expands to one field per positional parameter. The first joins any
+         preceding text, the last leaves its field open for following text. */
+      if (segment.text == "@" && segment.is_in_double_quotes) {
+        for (usize i = 0; i < m_positional_params.size(); i++) {
+          if (i > 0) flush();
+          append_run(m_positional_params[i], false);
+        }
+        break;
+      }
+      std::string value = expand_variable(segment.text);
+      if (segment.is_in_double_quotes)
+        append_run(value, false);
+      else
+        append_split_run(value, false);
+    } break;
+    }
+  }
+
+  flush();
+
+  return fields;
+}
+
+std::string
+EvalContext::expand_word_for_assignment(const Word &word) const
+{
+  std::vector<WordSegment> segments = word.segments;
+  if (!segments.empty()) expand_tilde(segments[0]);
+
+  std::string result{};
+  for (const WordSegment &segment : segments) {
+    if (segment.kind == WordSegment::Kind::VariableReference)
+      result += expand_variable(segment.text);
+    else
+      result += segment.text;
+  }
+  return result;
+}
+
 /* TODO: Command substitution. */
 std::vector<std::string>
 EvalContext::process_args(const std::vector<const Token *> &args)
@@ -357,17 +591,40 @@ EvalContext::process_args(const std::vector<const Token *> &args)
   std::vector<std::string> expanded_args{};
   expanded_args.reserve(args.size());
 
-  usize tilde_offset = 0;
-
   for (const Token *t : args) {
-    std::string s = t->raw_string();
     SourceLocation l = t->source_location();
     try {
-      tilde_offset += expand_tilde(s, l.position());
-      std::vector<std::string> e =
-          expand_path(std::move(s), SHIT_SUB_SAT(l.position(), tilde_offset));
-      for (std::string &a : e)
-        expanded_args.emplace_back(a);
+      /* A word token is expanded in place. Any other token is wrapped as one
+         unquoted literal word, which is the only case that needs a temporary.
+       */
+      Word fallback_word{};
+      const Word *word = nullptr;
+      if (t->kind() == Token::Kind::Word) {
+        word = &static_cast<const tokens::WordToken *>(t)->word();
+      } else if (t->kind() == Token::Kind::Assignment) {
+        /* An assignment that appears as an argument, like echo k=$v, is an
+           ordinary word. Rebuild it as the literal key, an equals sign, and the
+           value segments, so the value still expands instead of staying
+           literal. */
+        const tokens::Assignment *a =
+            static_cast<const tokens::Assignment *>(t);
+        fallback_word.segments.push_back(
+            WordSegment{WordSegment::Kind::LiteralText, a->key() + "=", false});
+        const Word &value = a->value_word();
+        fallback_word.segments.insert(fallback_word.segments.end(),
+                                      value.segments.begin(),
+                                      value.segments.end());
+        word = &fallback_word;
+      } else {
+        fallback_word.segments.push_back(WordSegment{
+            WordSegment::Kind::UnquotedText, t->raw_string(), false});
+        word = &fallback_word;
+      }
+
+      for (GlobField &field : expand_word(*word)) {
+        for (std::string &g : expand_path(std::move(field)))
+          expanded_args.emplace_back(std::move(g));
+      }
     } catch (const Error &e) {
       throw ErrorWithLocation{l, e.message()};
     }
@@ -423,8 +680,14 @@ ExecContext::program_path() const
 void
 ExecContext::close_fds()
 {
-  if (in_fd) os::close_fd(*in_fd);
-  if (out_fd) os::close_fd(*out_fd);
+  if (in_fd) {
+    os::close_fd(*in_fd);
+    in_fd.reset();
+  }
+  if (out_fd) {
+    os::close_fd(*out_fd);
+    out_fd.reset();
+  }
 }
 
 const Builtin::Kind &
@@ -509,52 +772,6 @@ void
 SourceLocation::add_length(usize n)
 {
   m_length += n;
-}
-
-EscapeBitmap::EscapeBitmap() : m_bitmap() {}
-
-void
-EscapeBitmap::add_escape(usize position)
-{
-  if (m_bitmap.size() * 8 <= position) m_bitmap.resize(position / 8 + 1);
-  m_bitmap[position / 8] |= (1 << (position % 8));
-}
-
-bool
-EscapeBitmap::is_escaped(usize position) const
-{
-  if (m_bitmap.size() * 8 <= position) return false;
-  return m_bitmap[position / 8] & (1 << (position % 8));
-}
-
-bool
-EscapeBitmap::is_empty() const
-{
-  return m_bitmap.empty();
-}
-
-std::string
-EscapeBitmap::to_string() const
-{
-  std::string s{};
-  for (usize byte = 0; byte < m_bitmap.size(); byte++) {
-    for (usize bit = 0; bit < 8; bit++) {
-      s += std::to_string((m_bitmap[byte] >> bit) & 1);
-    }
-    s += ' ';
-  }
-  return s;
-}
-
-std::string
-EscapeBitmap::to_pretty_string() const
-{
-  std::string s{};
-  s += "[Escape Bitmap\n";
-  s += "  ";
-  s += (!is_empty()) ? to_string() : "<empty>";
-  s += "\n]";
-  return s;
 }
 
 } /* namespace shit */

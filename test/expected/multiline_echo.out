@@ -1,8 +1,20 @@
 [CompoundList]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "привет" "мир!" "hello" "sailor!"]
-[Escape Bitmap
-  00000100 00000000 00000000 00001000 
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "привет"
+]
+[Word
+  Unquoted "мир!"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "sailor!"
 ]
 привет мир! hello sailor!
 [Code 0]

@@ -78,6 +78,13 @@ CXXFLAGS += \
 	-s \
 	-DNDEBUG \
 	-O3
+# Link the runtime statically so a -c invocation or a script launch does not
+# pay the dynamic linker on every startup. This nearly halves the startup time
+# and brings it close to dash.
+ifneq ($(OS), Windows_NT)
+CXXFLAGS += \
+	-static
+endif
 else ifeq ($(SHIT_MODE), dbg)
 CXXFLAGS += \
 	-fno-omit-frame-pointer \

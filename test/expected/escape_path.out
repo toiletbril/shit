@@ -15,9 +15,76 @@
     [SimpleCommand "test" "-d" "~"]
   [CompoundListCondition, &&]
     [SimpleCommand "echo" "no" "such" "dir"]
-[Escape Bitmap
-  00000110 00000000 11100000 00000110 00000000 00000101 00000000 00000010 00000000 00000000 00000000 00100000 
+[Word
+  Unquoted "echo"
 ]
+[Word
+  Literal "**"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "~**"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "\\"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "data/"
+  Literal "*"
+  Unquoted "/"
+  Literal "*"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "~/"
+  Literal "*"
+]
+[Word
+  Unquoted "no"
+]
+[Word
+  Unquoted "such"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "~"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "no"
+]
+[Word
+  Unquoted "such"
+]
+[Word
+  Unquoted "dir"
+]
+shit: 5:17: Warning: Command 'no' was not found.
+     5 |  test -e ~/\* && no such file;
+       |                  ^~ here.
 **
 ~**
 \\

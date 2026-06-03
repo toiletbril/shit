@@ -1,0 +1,30 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "$?"]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+1
+0
+[Code 0]

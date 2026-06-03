@@ -21,8 +21,10 @@ Which::kind() const
 }
 
 i32
-Which::execute(ExecContext &ec) const
+Which::execute(ExecContext &ec, EvalContext &cxt) const
 {
+  SHIT_UNUSED(cxt);
+
   std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
@@ -32,8 +34,9 @@ Which::execute(ExecContext &ec) const
   for (usize i = 1; i < args.size(); i++) {
     if (search_builtin(args[i]).has_value()) {
       buf += args[i];
-      /* FIXME: Do not print this if stdout is not a tty. */
-      buf += ": Shell builtin";
+      /* The descriptive suffix is for a human at a terminal. A pipe gets just
+         the name, which stays machine readable. */
+      if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
     } else if (std::list<std::filesystem::path> ps =
                    utils::search_program_path(args[i]);

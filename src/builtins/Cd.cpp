@@ -16,7 +16,7 @@ Cd::kind() const
 }
 
 i32
-Cd::execute(ExecContext &ec) const
+Cd::execute(ExecContext &ec, EvalContext &cxt) const
 {
   std::string arg_path{};
 
@@ -37,7 +37,12 @@ Cd::execute(ExecContext &ec) const
   np = std::filesystem::absolute(np).lexically_normal();
 
   if (std::filesystem::exists(np)) {
+    /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. */
+    std::error_code cwd_error{};
+    std::filesystem::path old = std::filesystem::current_path(cwd_error);
     utils::set_current_directory(np);
+    if (!cwd_error) cxt.set_shell_variable("OLDPWD", old.string());
+    cxt.set_shell_variable("PWD", np.string());
     return 0;
   }
 

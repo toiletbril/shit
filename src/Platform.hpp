@@ -37,8 +37,16 @@ std::optional<usize> read_fd(os::descriptor fd, void *buf, usize size);
 bool close_fd(os::descriptor fd);
 
 std::optional<std::string> get_environment_variable(const std::string &key);
+void set_environment_variable(const std::string &key, const std::string &value);
+void unset_environment_variable(const std::string &key);
 
 bool is_child_process();
+
+/* The process id of the shell itself, for $$. */
+i64 get_shell_process_id();
+
+/* The numeric process id of a spawned process, for $!. */
+i64 process_id_of(process p);
 
 bool is_stdin_a_tty();
 bool is_stdout_a_tty();

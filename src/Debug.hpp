@@ -32,8 +32,8 @@ t__strprintf(std::string &s, const char *fmt, ...)
   va_list ac;
   va_copy(ac, a);
   usize n = vsnprintf(nullptr, 0, fmt, ac);
-  char *b = new char[n];
-  SHIT_UNUSED(vsnprintf(b, n, fmt, a));
+  char *b = new char[n + 1];
+  SHIT_UNUSED(vsnprintf(b, n + 1, fmt, a));
   s.append(b);
   delete[] b;
 }

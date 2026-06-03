@@ -8,6 +8,8 @@
 
 namespace shit {
 
+struct BumpArena;
+
 namespace lexer {
 
 bool is_whitespace(char ch);
@@ -17,6 +19,8 @@ bool is_shell_sentinel(char ch);
 bool is_part_of_identifier(char ch);
 bool is_string_quote(char ch);
 bool is_expandable_char(char ch);
+bool is_variable_name_start(char ch);
+bool is_variable_name(char ch);
 
 } /* namespace lexer */
 
@@ -25,7 +29,8 @@ bool is_expandable_char(char ch);
  * internal cursor. */
 struct Lexer
 {
-  Lexer(std::string source);
+  Lexer(std::string source, BumpArena &arena,
+        bool should_collect_debug_words = false);
   ~Lexer();
 
   [[nodiscard]] Token *peek_expression_token();
@@ -34,14 +39,20 @@ struct Lexer
   [[nodiscard]] Token *next_shell_token();
 
   std::string_view source() const;
-  EscapeBitmap &escape_map();
+  const std::vector<Word> &debug_words() const;
+  BumpArena &arena() const;
   usize advance_past_last_peek();
 
 protected:
   std::string m_source{};
+  BumpArena &m_arena;
   usize m_cursor_position{0};
   usize m_cached_offset{0};
-  EscapeBitmap m_escape_map{};
+
+  /* The lexer keeps a copy of every word it produces only when the segment
+     dump is requested, so the common path stays allocation free. */
+  bool m_should_collect_debug_words{false};
+  std::vector<Word> m_debug_words{};
 
   Token *lex_expression_token();
   Token *lex_shell_token();

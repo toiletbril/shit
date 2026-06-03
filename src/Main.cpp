@@ -1,3 +1,4 @@
+#include "Arena.hpp"
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
@@ -13,8 +14,10 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 
 FLAG_LIST_DECL();
@@ -64,6 +67,87 @@ FLAG(HELP, Bool, '\0', "help", "Display help message.");
 FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", "Cosmopolitan: Trace functions.");
 FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 #endif
+
+/* Lex, parse, validate, and evaluate one chunk of shell source in the given
+   context. The main loop and source_file share this so a sourced file runs the
+   same pipeline as an interactive line. Returns the resulting exit code. */
+static int
+run_script_contents(const std::string &script_contents,
+                    shit::EvalContext &context, shit::BumpArena &ast_arena)
+{
+  int exit_code = EXIT_FAILURE;
+
+  try {
+    SHIT_DEFER { context.end_command(); };
+
+    /* The previous command's tree was destroyed at the end of the last
+       iteration, so its arena storage is reclaimed here before the next
+       parse. */
+    ast_arena.reset();
+
+    shit::Parser p{
+        shit::Lexer{script_contents, ast_arena, FLAG_ESCAPE_MAP.is_enabled()}
+    };
+    std::unique_ptr<shit::Expression> ast = p.construct_ast();
+
+    if (FLAG_AST.is_enabled()) std::cout << ast->to_ast_string() << std::endl;
+
+    if (FLAG_ESCAPE_MAP.is_enabled()) {
+      for (const auto &word : p.debug_words())
+        std::cout << word.to_pretty_string() << std::endl;
+    }
+
+    /* Validate the whole tree before running anything. An unconditional
+       problem stops execution, a conditional one only warns. */
+    if (!shit::analyze_ast(ast.get(), script_contents)) {
+      exit_code = EXIT_FAILURE;
+    } else {
+      exit_code = static_cast<int>(ast->evaluate(context));
+    }
+    context.set_last_exit_status(static_cast<i32>(exit_code));
+
+    if (FLAG_EXIT_CODE.is_enabled())
+      std::cout << "[Code " << exit_code << ']' << std::endl;
+
+    if (FLAG_STATS.is_enabled())
+      std::cout << context.make_stats_string() << std::endl;
+  } catch (const shit::ErrorWithLocationAndDetails &e) {
+    shit::show_message(e.to_string(script_contents));
+    shit::show_message(e.details_to_string(script_contents));
+  } catch (const shit::ErrorWithLocation &e) {
+    shit::show_message(e.to_string(script_contents));
+  } catch (const shit::Error &e) {
+    shit::show_message(e.to_string());
+  } catch (const std::exception &e) {
+    shit::show_message(
+        "Uncaught exception while executing the AST. Aborting the command.");
+    shit::show_message("Last system message: '" +
+                       shit::os::last_system_error_message() + "'.");
+    shit::show_message("Context: '" + std::string{e.what()} + "'.");
+  } catch (...) {
+    shit::show_message(
+        "Unexpected system explosion while executing the AST. Exiting.");
+    shit::show_message("Last system message: " +
+                       shit::os::last_system_error_message());
+    shit::utils::quit(EXIT_FAILURE);
+  }
+
+  return exit_code;
+}
+
+/* Read a whole file and run it in the given context. A missing file is not an
+   error, since a login shell sources profiles that may not exist. */
+static void
+source_file(const std::filesystem::path &path, shit::EvalContext &context,
+            shit::BumpArena &ast_arena)
+{
+  std::fstream f{path, std::fstream::in | std::fstream::binary};
+  if (!f.is_open()) return;
+
+  std::string contents{std::istreambuf_iterator<char>(f),
+                       std::istreambuf_iterator<char>()};
+  run_script_contents(contents, context, ast_arena);
+}
 
 int
 main(int argc, char **argv)
@@ -164,10 +248,15 @@ main(int argc, char **argv)
   if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled())
     shit::show_message("One or more unimplemented options were ignored.");
 
-  /* Main loop state. */
-  shit::EvalContext context{
-      FLAG_DISABLE_EXPANSION.is_enabled(), FLAG_VERBOSE.is_enabled(),
-      FLAG_EXPAND_VERBOSE.is_enabled(), should_be_interactive};
+  /* Main loop state. The program name is $0 and the remaining arguments are the
+     positional parameters $1 upward. */
+  shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
+                            FLAG_VERBOSE.is_enabled(),
+                            FLAG_EXPAND_VERBOSE.is_enabled(),
+                            should_be_interactive,
+                            FLAG_ERROR_EXIT.is_enabled(),
+                            program_path,
+                            file_names};
 
   usize arg_index = 0;
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
@@ -181,14 +270,26 @@ main(int argc, char **argv)
   shit::utils::clear_path_map();
   shit::os::set_default_signal_handlers();
 
+  /* The parse arena holds the AST and its tokens for one command, and is reset
+     between commands. It outlives each tree it builds. */
+  shit::BumpArena ast_arena{};
+  shit::g_ast_arena = &ast_arena;
+
+  /* A login shell reads /etc/profile and ~/.profile if they exist, then the
+     file named by ENV when that is set. A missing file is silently skipped. */
   if (is_login_shell) {
-    /* TODO: We can't really execute complex scripts yet. From 'man dash':
-     * A login shell first reads commands from the files /etc/profile and
-     * .profile if they exist.  If the environment variable ENV is set on
-     * entry to an interactive shell, or is set in the .profile of a login
-     * shell, the shell next reads commands from the file named in ENV. */
-    shit::show_message("Acting as a login shell is not supported yet. "
-                       "Please bear with me!");
+    source_file("/etc/profile", context, ast_arena);
+    if (std::optional<std::filesystem::path> home =
+            shit::os::get_home_directory();
+        home.has_value())
+    {
+      source_file(*home / ".profile", context, ast_arena);
+    }
+    if (std::optional<std::string> env = context.get_variable_value("ENV");
+        env.has_value() && !env->empty())
+    {
+      source_file(*env, context, ast_arena);
+    }
   }
 
   /* A simple return cannot be used after this point, since we need a special
@@ -262,10 +363,17 @@ main(int argc, char **argv)
 
         /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
         std::string prompt{};
-        prompt += u;
-        prompt += ' ';
-        prompt += pwd;
-        prompt += (u == "root") ? " # " : " $ ";
+        if (std::optional<std::string> ps1 = context.get_variable_value("PS1");
+            ps1.has_value() && !ps1->empty())
+        {
+          /* A user-set PS1 replaces the default prompt verbatim. */
+          prompt = *ps1;
+        } else {
+          prompt += u;
+          prompt += ' ';
+          prompt += pwd;
+          prompt += (u == "root") ? " # " : " $ ";
+        }
 
         /* Ask for input until we get one. */
         for (;;) {
@@ -322,51 +430,8 @@ main(int argc, char **argv)
       shit::utils::quit(EXIT_FAILURE);
     }
 
-    exit_code = EXIT_FAILURE;
-    /* Shut up the compiler. */
-    SHIT_UNUSED(exit_code);
-
-    /* Execute the contents. */
-    try {
-      SHIT_DEFER { context.end_command(); };
-
-      shit::Parser p{shit::Lexer{script_contents}};
-      std::unique_ptr<shit::Expression> ast = p.construct_ast();
-
-      if (FLAG_AST.is_enabled()) std::cout << ast->to_ast_string() << std::endl;
-
-      if (FLAG_ESCAPE_MAP.is_enabled())
-        std::cout << p.escape_map().to_pretty_string() << std::endl;
-
-      context.steal_escape_map(std::move(p.escape_map()));
-      exit_code = ast->evaluate(context);
-
-      if (FLAG_EXIT_CODE.is_enabled())
-        std::cout << "[Code " << exit_code << ']' << std::endl;
-
-      if (FLAG_STATS.is_enabled())
-        std::cout << context.make_stats_string() << std::endl;
-    } catch (const shit::ErrorWithLocationAndDetails &e) {
-      shit::show_message(e.to_string(script_contents));
-      shit::show_message(e.details_to_string(script_contents));
-    } catch (const shit::ErrorWithLocation &e) {
-      shit::show_message(e.to_string(script_contents));
-    } catch (const shit::Error &e) {
-      shit::show_message(e.to_string());
-    } catch (const std::exception &e) {
-      shit::show_message(
-          "Uncaught exception while executing the AST. Aborting the command.");
-      shit::show_message("Last system message: '" +
-                         shit::os::last_system_error_message() +
-                         "'.");
-      shit::show_message("Context: '" + std::string{e.what()} + "'.");
-    } catch (...) {
-      shit::show_message(
-          "Unexpected system explosion while executing the AST. Exiting.");
-      shit::show_message("Last system message: " +
-                         shit::os::last_system_error_message());
-      shit::utils::quit(EXIT_FAILURE);
-    }
+    /* Execute the contents through the shared pipeline. */
+    exit_code = run_script_contents(script_contents, context, ast_arena);
 
     /* TODO: Make ExecutionErrorWithLocation to distinguish execution
      * errors? Or statically check commands before they are executed? */

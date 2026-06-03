@@ -62,6 +62,18 @@ is_child_process()
   return getpid() != PARENT_SHELL_PID;
 }
 
+i64
+get_shell_process_id()
+{
+  return static_cast<i64>(PARENT_SHELL_PID);
+}
+
+i64
+process_id_of(process p)
+{
+  return static_cast<i64>(p);
+}
+
 bool
 is_stdin_a_tty()
 {
@@ -93,6 +105,18 @@ get_environment_variable(const std::string &key)
 {
   const char *e = std::getenv(key.c_str());
   return (e != nullptr) ? std::optional(e) : std::nullopt;
+}
+
+void
+set_environment_variable(const std::string &key, const std::string &value)
+{
+  setenv(key.c_str(), value.c_str(), 1);
+}
+
+void
+unset_environment_variable(const std::string &key)
+{
+  unsetenv(key.c_str());
 }
 
 i32
@@ -139,8 +163,13 @@ execute_program(ExecContext &&ec)
     if (execv(ec.program_path().c_str(),
               const_cast<char *const *>(os_args.data())) == -1)
     {
-      throw ErrorWithLocation{ec.source_location(),
-                              last_system_error_message()};
+      /* We are the forked child. Report the failure and terminate the child
+       * directly. Throwing here would unwind back into the parent's evaluator
+       * inside the duplicated process. */
+      std::string msg = ec.program_path().string() + ": " +
+                        last_system_error_message() + "\n";
+      write_fd(STDERR_FILENO, msg.data(), msg.size());
+      _exit(127);
     }
   }
 
@@ -168,8 +197,11 @@ wait_and_monitor_process(process pid)
 
   i32 status{};
 
-  while (check_syscall(waitpid(pid, &status, 0) != pid)) {
-    /* Waiting... */
+  for (;;) {
+    pid_t w = waitpid(pid, &status, 0);
+    /* A signal interrupted the wait. Retry instead of failing. */
+    if (w == -1 && errno == EINTR) continue;
+    if (check_syscall(w) == pid) break;
   }
 
   /* Print appropriate message if the process was sent a signal. */
@@ -187,7 +219,7 @@ wait_and_monitor_process(process pid)
       std::cout << std::endl;
     }
 
-    return status;
+    return 128 + sig;
   } else if (WIFSTOPPED(status)) {
     i32 sig = WSTOPSIG(status);
     const char *sig_str = strsignal(sig);
@@ -199,6 +231,8 @@ wait_and_monitor_process(process pid)
 
     /* We can't handle suspended processes yet, so goodbye. */
     check_syscall(kill(pid, SIGKILL));
+
+    return 128 + SIGKILL;
   } else if (!WIFEXITED(status)) {
     /* Process was destroyed by otherworldly forces. */
     throw shit::Error{"???: " + last_system_error_message()};
@@ -323,7 +357,7 @@ get_current_user()
   GetUserNameA(nullptr, &size);
   if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
     std::vector<char> buffer;
-    buffer.reserve(size);
+    buffer.resize(size);
     if (GetUserNameA(buffer.data(), &size))
       return std::string{buffer.data(), size - 1};
   }
@@ -342,6 +376,18 @@ bool
 is_child_process()
 {
   return GetCurrentProcessId() != PARENT_SHELL_PID;
+}
+
+i64
+get_shell_process_id()
+{
+  return static_cast<i64>(PARENT_SHELL_PID);
+}
+
+i64
+process_id_of(process p)
+{
+  return static_cast<i64>(GetProcessId(p));
 }
 
 bool
@@ -367,6 +413,18 @@ get_environment_variable(const std::string &key)
   return std::string{buffer};
 }
 
+void
+set_environment_variable(const std::string &key, const std::string &value)
+{
+  SetEnvironmentVariableA(key.c_str(), value.c_str());
+}
+
+void
+unset_environment_variable(const std::string &key)
+{
+  SetEnvironmentVariableA(key.c_str(), nullptr);
+}
+
 process
 execute_program(ExecContext &&ec)
 {
@@ -384,6 +442,7 @@ execute_program(ExecContext &&ec)
 
   startup_info.hStdInput = ec.in_fd.value_or(SHIT_STDIN);
   startup_info.hStdOutput = ec.out_fd.value_or(SHIT_STDOUT);
+  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 
   SHIT_DEFER
   {
@@ -482,7 +541,7 @@ last_system_error_message()
   LocalFree(errno_str);
 
   /* Remove stupid inserts. I can't stand Windows */
-  for (usize i = 0; i < err.length() - 1; i++) {
+  for (usize i = 0; i + 1 < err.length(); i++) {
     if (err[i] == '%' && isdigit(err[i + 1])) {
       err.erase(i, 2);
       /* Replace %N bullshit with just "Input". */

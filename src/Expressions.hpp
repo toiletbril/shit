@@ -5,6 +5,9 @@
 #include "Tokens.hpp"
 
 #include <string>
+#include <string_view>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace shit {
@@ -12,6 +15,28 @@ namespace shit {
 using namespace tokens;
 
 struct Token;
+
+/* The prepass walks the whole tree once before any command runs. It carries the
+   source for the caret, and a fatal flag that stops execution. A warning is a
+   located message that does not stop execution, a failure does. */
+struct AnalysisContext
+{
+  std::string_view source;
+  bool has_fatal{false};
+  /* Names of functions seen so far. A call to one of these resolves, so a
+     function defined before its use is not reported as a missing command. */
+  std::unordered_set<std::string> defined_functions{};
+
+  explicit AnalysisContext(std::string_view source_view) : source(source_view)
+  {}
+
+  void warn(SourceLocation location, const std::string &message);
+  void fail(SourceLocation location, const std::string &message);
+};
+
+/* Walk the tree and report. Returns true when execution may proceed, false when
+   an unconditional command failed to resolve. */
+bool analyze_ast(const Expression *root, std::string_view source);
 
 struct Expression
 {
@@ -34,6 +59,16 @@ struct Expression
   virtual std::string to_string() const = 0;
   virtual std::string to_ast_string(usize layer = 0) const;
 
+  /* A node lives in the parse arena, so its storage is reclaimed in bulk. This
+     no-ops for arena storage and frees an ordinary heap node otherwise. The
+     destructor still runs through the normal delete. */
+  static void operator delete(void *pointer);
+
+  /* The prepass entry per node. The base does nothing, the command and the
+     control flow nodes override it. is_unconditional says whether this node is
+     reached on every run, which decides a failure from a warning. */
+  virtual void analyze(AnalysisContext &actx, bool is_unconditional) const;
+
 protected:
   virtual i64 evaluate_impl(EvalContext &cxt) const = 0;
 
@@ -51,6 +86,8 @@ struct IfStatement : public Expression
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
+
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -77,7 +114,7 @@ struct Command : public Expression
 
   void make_async();
   bool is_async() const;
-  void set_local_vars(std::unordered_map<std::string, std::string> &&vars);
+  void set_local_vars(std::unordered_map<std::string, Word> &&vars);
 
   virtual bool is_assignment() const;
 
@@ -86,7 +123,7 @@ struct Command : public Expression
 
 protected:
   bool m_is_async{false};
-  std::optional<std::unordered_map<std::string, std::string>> m_local_vars;
+  std::optional<std::unordered_map<std::string, Word>> m_local_vars;
 };
 
 struct AssignCommand : public Command
@@ -121,6 +158,8 @@ struct SimpleCommand : public Command
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
   void append_to(usize d, std::string &f, bool duplicate) override;
   void redirect_to(usize d, std::string &f, bool duplicate) override;
 
@@ -148,6 +187,8 @@ struct CompoundListCondition : public Expression
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
@@ -169,6 +210,8 @@ struct CompoundList : public Expression
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
@@ -189,6 +232,8 @@ struct Pipeline : public Command
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
 
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
   void append_to(usize d, std::string &f, bool duplicate) override;
   void redirect_to(usize d, std::string &f, bool duplicate) override;
 
@@ -196,6 +241,153 @@ protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
   std::vector<const SimpleCommand *> m_commands;
+};
+
+/* A compound command groups one or more command lists, like a loop body or an
+   if branch. It slots into a CompoundListCondition as an ordinary command.
+   Redirections on a compound command are not supported yet. */
+struct CompoundCommand : public Command
+{
+  CompoundCommand(SourceLocation location);
+
+  void append_to(usize d, std::string &f, bool duplicate) override;
+  void redirect_to(usize d, std::string &f, bool duplicate) override;
+};
+
+struct IfClause : public CompoundCommand
+{
+  /* Each branch pairs a condition list with the body to run when it succeeds.
+     The plain if and every elif share this list. The else body has no
+     condition and is held separately. */
+  IfClause(
+      SourceLocation location,
+      std::vector<std::pair<const Expression *, const Expression *>> &&branches,
+      const Expression *otherwise);
+  ~IfClause() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  std::vector<std::pair<const Expression *, const Expression *>> m_branches;
+  const Expression *m_otherwise;
+};
+
+struct WhileLoop : public CompoundCommand
+{
+  WhileLoop(SourceLocation location, const Expression *condition,
+            const Expression *body, bool is_until);
+  ~WhileLoop() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  const Expression *m_condition;
+  const Expression *m_body;
+  /* An until loop runs the body while the condition is non-zero. */
+  bool m_is_until;
+};
+
+struct ForLoop : public CompoundCommand
+{
+  ForLoop(SourceLocation location, std::string variable_name,
+          std::vector<const Token *> &&words, bool has_in_clause,
+          const Expression *body);
+  ~ForLoop() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  std::string m_variable_name;
+  std::vector<const Token *> m_words;
+  /* Without an in clause, a for loop iterates the positional parameters. */
+  bool m_has_in_clause;
+  const Expression *m_body;
+};
+
+/* One arm of a case, a set of patterns and the body that runs on a match. */
+struct CaseItem
+{
+  std::vector<const Token *> patterns;
+  const Expression *body;
+};
+
+struct CaseClause : public CompoundCommand
+{
+  CaseClause(SourceLocation location, const Token *word,
+             std::vector<CaseItem> &&items);
+  ~CaseClause() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  const Token *m_word;
+  std::vector<CaseItem> m_items;
+};
+
+struct BraceGroup : public CompoundCommand
+{
+  BraceGroup(SourceLocation location, const Expression *body);
+  ~BraceGroup() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  const Expression *m_body;
+};
+
+struct Subshell : public CompoundCommand
+{
+  Subshell(SourceLocation location, const Expression *body);
+  ~Subshell() override;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  const Expression *m_body;
+};
+
+struct FunctionDefinition : public CompoundCommand
+{
+  FunctionDefinition(SourceLocation location, std::string name,
+                     const Expression *body);
+  ~FunctionDefinition() override;
+
+  const std::string &name() const;
+  const Expression *body() const;
+
+  std::string to_string() const override;
+  std::string to_ast_string(usize layer = 0) const override;
+  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+
+protected:
+  i64 evaluate_impl(EvalContext &cxt) const override;
+
+  std::string m_name;
+  const Expression *m_body;
 };
 
 struct ConstantNumber : public Expression
