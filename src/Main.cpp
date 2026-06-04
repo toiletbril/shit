@@ -515,6 +515,7 @@ main(int argc, char **argv)
     if (should_quit || shit::os::is_child_process() ||
         (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {
+      if (!shit::os::is_child_process()) context.run_exit_trap();
       shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled());
     }
   }

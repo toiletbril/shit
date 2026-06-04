@@ -166,6 +166,34 @@ EvalContext::function_names() const
 }
 
 void
+EvalContext::set_trap(const std::string &condition, const std::string &action)
+{
+  m_traps[condition] = action;
+}
+
+void
+EvalContext::remove_trap(const std::string &condition)
+{
+  m_traps.erase(condition);
+}
+
+const std::unordered_map<std::string, std::string> &
+EvalContext::traps() const
+{
+  return m_traps;
+}
+
+void
+EvalContext::run_exit_trap()
+{
+  if (m_exit_trap_ran) return;
+  m_exit_trap_ran = true;
+
+  auto it = m_traps.find("EXIT");
+  if (it != m_traps.end() && !it->second.empty()) run_source(it->second);
+}
+
+void
 EvalContext::enter_subshell()
 {
   m_subshell_depth++;
@@ -229,6 +257,30 @@ bool
 EvalContext::in_condition() const
 {
   return m_condition_depth > 0;
+}
+
+usize
+EvalContext::getopts_char_index() const
+{
+  return m_getopts_char_index;
+}
+
+void
+EvalContext::set_getopts_char_index(usize index)
+{
+  m_getopts_char_index = index;
+}
+
+i64
+EvalContext::getopts_last_optind() const
+{
+  return m_getopts_last_optind;
+}
+
+void
+EvalContext::set_getopts_last_optind(i64 optind)
+{
+  m_getopts_last_optind = optind;
 }
 
 std::vector<std::string>

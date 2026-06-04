@@ -40,6 +40,9 @@ struct Builtin
     Unset,
     Read,
     Printf,
+    Umask,
+    Getopts,
+    Trap,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -78,6 +81,9 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"unset",    Builtin::Kind::Unset   },
     {"read",     Builtin::Kind::Read    },
     {"printf",   Builtin::Kind::Printf  },
+    {"umask",    Builtin::Kind::Umask   },
+    {"getopts",  Builtin::Kind::Getopts },
+    {"trap",     Builtin::Kind::Trap    },
 };
 
 #define B_CASE(btin)                                                           \
@@ -104,7 +110,10 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Shift);                                                               \
   B_CASE(Unset);                                                               \
   B_CASE(Read);                                                                \
-  B_CASE(Printf)
+  B_CASE(Printf);                                                              \
+  B_CASE(Umask);                                                               \
+  B_CASE(Getopts);                                                             \
+  B_CASE(Trap)
 
 #define BUILTIN_STRUCT(b)                                                      \
   struct b : public Builtin                                                    \
@@ -135,6 +144,9 @@ BUILTIN_STRUCT(Shift);
 BUILTIN_STRUCT(Unset);
 BUILTIN_STRUCT(Read);
 BUILTIN_STRUCT(Printf);
+BUILTIN_STRUCT(Umask);
+BUILTIN_STRUCT(Getopts);
+BUILTIN_STRUCT(Trap);
 
 struct Exit : public Builtin
 {

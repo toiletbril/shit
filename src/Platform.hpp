@@ -40,6 +40,11 @@ std::optional<descriptor> open_file_descriptor(const std::string &path,
    positioned at its start, for feeding a heredoc body to a command's input. */
 std::optional<descriptor> write_to_temp_file(const std::string &content);
 
+/* Read the file-creation mask without changing it, and set a new one. The umask
+   builtin reads and writes the process mask through these. */
+u32 get_file_creation_mask();
+void set_file_creation_mask(u32 mask);
+
 os_args make_os_args(const std::vector<std::string> &args);
 
 std::string last_system_error_message();

@@ -14,6 +14,7 @@
 
 #if SHIT_PLATFORM_IS POSIX
 #include <fcntl.h>
+#include <sys/stat.h>
 #endif
 
 #if SHIT_PLATFORM_IS POSIX
@@ -274,6 +275,21 @@ write_to_temp_file(const std::string &content)
 
   lseek(fd, 0, SEEK_SET);
   return fd;
+}
+
+u32
+get_file_creation_mask()
+{
+  /* umask only reads through a set, so the old value is read and put back. */
+  mode_t old = umask(0);
+  umask(old);
+  return static_cast<u32>(old);
+}
+
+void
+set_file_creation_mask(u32 mask)
+{
+  umask(static_cast<mode_t>(mask));
 }
 
 i32
@@ -660,6 +676,20 @@ write_to_temp_file(const std::string &content)
 
   SetFilePointer(handle, 0, NULL, FILE_BEGIN);
   return handle;
+}
+
+u32
+get_file_creation_mask()
+{
+  int old = _umask(0);
+  _umask(old);
+  return static_cast<u32>(old);
+}
+
+void
+set_file_creation_mask(u32 mask)
+{
+  _umask(static_cast<int>(mask));
 }
 
 i32

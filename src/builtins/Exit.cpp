@@ -26,6 +26,7 @@ Exit::execute(ExecContext &ec, EvalContext &cxt) const
   /* Inside a subshell or a command substitution, exit ends only that scope. */
   if (cxt.in_subshell()) throw ShellExit{status};
 
+  cxt.run_exit_trap();
   utils::quit(static_cast<i32>(status), true);
 }
 

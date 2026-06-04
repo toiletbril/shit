@@ -124,6 +124,13 @@ struct EvalContext
      knows a function defined earlier resolves. */
   std::unordered_set<std::string> function_names() const;
 
+  /* trap stores an action to run for a condition, keyed by the condition name
+     such as EXIT or INT. The EXIT action runs once when the shell ends. */
+  void set_trap(const std::string &condition, const std::string &action);
+  void remove_trap(const std::string &condition);
+  const std::unordered_map<std::string, std::string> &traps() const;
+  void run_exit_trap();
+
   /* Save and restore the mutable state around a subshell or a command
      substitution, so changes inside do not leak to the parent. */
   EvalStateSnapshot snapshot_state() const;
@@ -166,6 +173,14 @@ struct EvalContext
      capturing output or snapshotting state. The eval and dot builtins use this,
      so a break, a return, or an assignment inside acts on the caller. */
   i32 run_source(const std::string &source);
+
+  /* getopts keeps the position inside the current argument here, so a grouped
+     option such as -abc is parsed one letter per call. last_optind detects when
+     the script reset OPTIND to start a fresh scan. */
+  usize getopts_char_index() const;
+  void set_getopts_char_index(usize index);
+  i64 getopts_last_optind() const;
+  void set_getopts_last_optind(i64 optind);
 
   /* Destroy the ASTs retained from eval and dot. The caller does this before it
      resets the parse arena, so a function those sources defined stays valid for
@@ -214,6 +229,10 @@ protected:
   std::vector<Expression *> m_retained_source_asts{};
 
   bool m_error_unset{false};
+  usize m_getopts_char_index{1};
+  i64 m_getopts_last_optind{0};
+  std::unordered_map<std::string, std::string> m_traps{};
+  bool m_exit_trap_ran{false};
   bool m_enable_path_expansion;
   bool m_enable_echo;
   bool m_enable_echo_expanded;
