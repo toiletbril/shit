@@ -1146,8 +1146,14 @@ ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
 
 CaseClause::CaseClause(SourceLocation location, const Token *word,
                        std::vector<CaseItem> &&items)
-    : CompoundCommand(location), m_word(word), m_items(std::move(items))
-{}
+    : CompoundCommand(location), m_word(word)
+{
+  for (CaseItem &item : items)
+    m_items.push(std::move(item));
+  /* The node now owns the items. Empty the source so the parser's cleanup guard
+     does not also free the bodies. */
+  items.clear();
+}
 
 CaseClause::~CaseClause()
 {

@@ -372,7 +372,7 @@ protected:
 /* One arm of a case, a set of patterns and the body that runs on a match. */
 struct CaseItem
 {
-  std::vector<const Token *> patterns;
+  ArrayList<const Token *> patterns;
   const Expression *body;
 };
 
@@ -390,7 +390,7 @@ protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
   const Token *m_word;
-  std::vector<CaseItem> m_items;
+  ArrayList<CaseItem> m_items{heap_allocator()};
 };
 
 struct BraceGroup : public CompoundCommand

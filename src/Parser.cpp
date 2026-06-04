@@ -798,7 +798,7 @@ Parser::parse_case()
     /* An optional opening parenthesis before the first pattern. */
     if (t->kind() == Token::Kind::LeftParen) m_lexer.advance_past_last_peek();
 
-    std::vector<const Token *> patterns{};
+    ArrayList<const Token *> patterns{heap_allocator()};
     SHIT_DEFER
     {
       for (const Token *pattern : patterns)
@@ -812,7 +812,7 @@ Parser::parse_case()
             location, "Unterminated case", pattern->source_location(),
             "expected a pattern to start an arm, or 'esac' to end the case"};
       }
-      patterns.emplace_back(pattern.release());
+      patterns.push(pattern.release());
 
       std::unique_ptr<Token> separator{m_lexer.next_shell_token()};
       if (separator->kind() == Token::Kind::Pipe) continue;
