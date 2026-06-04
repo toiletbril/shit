@@ -46,6 +46,8 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
           cxt.set_error_exit(enable);
         else if (arg[c] == 'x')
           cxt.set_echo_expanded(enable);
+        else if (arg[c] == 'u')
+          cxt.set_error_unset(enable);
       }
       i++;
       continue;

@@ -135,11 +135,13 @@ struct EvalContext
   void leave_subshell();
   bool in_subshell() const;
 
-  /* The set builtin toggles these options at run time. error_exit is set -e and
-     echo_expanded is set -x. */
+  /* The set builtin toggles these options at run time. error_exit is set -e,
+     echo_expanded is set -x, and error_unset is set -u. */
   void set_error_exit(bool enabled);
   bool error_exit() const;
   void set_echo_expanded(bool enabled);
+  void set_error_unset(bool enabled);
+  bool error_unset() const;
 
   /* A condition, such as an if test or an && operand, suppresses set -e while it
      runs, since its failure is expected. */
@@ -211,6 +213,7 @@ protected:
      function they define survives the rest of the current one. */
   std::vector<Expression *> m_retained_source_asts{};
 
+  bool m_error_unset{false};
   bool m_enable_path_expansion;
   bool m_enable_echo;
   bool m_enable_echo_expanded;

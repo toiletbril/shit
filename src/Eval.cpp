@@ -202,6 +202,18 @@ EvalContext::set_echo_expanded(bool enabled)
 }
 
 void
+EvalContext::set_error_unset(bool enabled)
+{
+  m_error_unset = enabled;
+}
+
+bool
+EvalContext::error_unset() const
+{
+  return m_error_unset;
+}
+
+void
 EvalContext::enter_condition()
 {
   m_condition_depth++;
@@ -429,7 +441,10 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
     std::string name = spec.substr(1);
     if (name == "@" || name == "*")
       return std::to_string(m_positional_params.size());
-    return std::to_string(get_variable_value(name).value_or("").length());
+    std::optional<std::string> value = get_variable_value(name);
+    if (m_error_unset && !value.has_value())
+      throw Error{name + ": parameter not set"};
+    return std::to_string(value.value_or("").length());
   }
 
   /* Split the parameter name from an optional operator and its word. */
@@ -447,7 +462,14 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
 
   std::string name = spec.substr(0, name_end);
   std::string rest = spec.substr(name_end);
-  if (rest.empty()) return expand_variable(name);
+  if (rest.empty()) {
+    /* Under set -u a plain reference to a variable that is not set is an error,
+       while a form with a modifier such as ${x:-w} handles the unset case
+       itself. */
+    if (m_error_unset && !get_variable_value(name).has_value())
+      throw Error{name + ": parameter not set"};
+    return expand_variable(name);
+  }
 
   /* A leading colon makes the default, assign, alternate, and error forms treat
      an empty value as unset. */
