@@ -1,8 +1,10 @@
 #include "Errors.hpp"
 
 #include "Debug.hpp"
+#include "ErrorOr.hpp"
 #include "Eval.hpp"
 #include "Toiletline.hpp"
+#include "Trace.hpp"
 
 #include <optional>
 #include <tuple>
@@ -150,12 +152,31 @@ ErrorBase::message() const
   return m_message;
 }
 
+std::string
+ErrorBase::severity_word() const
+{
+  return "Error";
+}
+
 Error::Error(const std::string &message) : ErrorBase(message) {}
 
 std::string
 Error::to_string() const
 {
-  return "Error: " + message() + ".";
+  return severity_word() + ": " + message() + ".";
+}
+
+Error::operator std::string() const
+{
+  return to_string();
+}
+
+Warning::Warning(const std::string &message) : Error(message) {}
+
+std::string
+Warning::severity_word() const
+{
+  return "Warning";
 }
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
@@ -164,11 +185,13 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
 {}
 
 std::string
-ErrorWithLocation::to_string(std::string_view source,
-                             std::string_view severity) const
+ErrorWithLocation::to_string(std::string_view source) const
 {
   usize byte_position = m_location.position();
   usize byte_count = m_location.length();
+
+  SHIT_LOG_VARS(Verbosity::Debug, byte_position, byte_count);
+  SHIT_LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
 
   /* FIXME: Below are two dirty hacks. */
   if (byte_position + 2 < source.length() && source[byte_position] == '\\' &&
@@ -195,11 +218,22 @@ ErrorWithLocation::to_string(std::string_view source,
                                  : unicode_position + 1;
 
   return std::to_string(line_number + 1) + ":" +
-         std::to_string(line_byte_position) + ": " + std::string{severity} +
+         std::to_string(line_byte_position) + ": " + severity_word() +
          ": " + m_message + ".\n" +
          get_context_pointing_to(source, byte_position, byte_count, line_number,
                                  last_newline_location, unicode_position,
                                  "here");
+}
+
+WarningWithLocation::WarningWithLocation(SourceLocation location,
+                                         const std::string &message)
+    : ErrorWithLocation(location, message)
+{}
+
+std::string
+WarningWithLocation::severity_word() const
+{
+  return "Warning";
 }
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(

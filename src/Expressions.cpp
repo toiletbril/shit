@@ -52,15 +52,15 @@ Expression::operator delete(void *pointer)
 void
 AnalysisContext::warn(SourceLocation location, const std::string &message)
 {
-  ErrorWithLocation located{location, message};
-  show_message(located.to_string(source, "Warning"));
+  WarningWithLocation located{location, message};
+  show_message(located.to_string(source));
 }
 
 void
 AnalysisContext::fail(SourceLocation location, const std::string &message)
 {
   ErrorWithLocation located{location, message};
-  show_message(located.to_string(source, "Error"));
+  show_message(located.to_string(source));
   has_fatal = true;
 }
 

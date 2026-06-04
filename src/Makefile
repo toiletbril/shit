@@ -61,7 +61,7 @@ CXXFLAGS := \
 	-Werror \
 	-Wno-unused-command-line-argument \
 	-Wno-deprecated \
-	-std=c++17 \
+	-std=c++23 \
 	-Wno-unknown-warning-option \
 	-Wno-error=maybe-uninitialized \
 	-pthread \

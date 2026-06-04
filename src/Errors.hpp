@@ -19,6 +19,11 @@ struct ErrorBase
 
   std::string message() const;
 
+  /* The word printed before the message, Error by default. A warning subclass
+     overrides it to Warning, so the reporting code reads the severity from the
+     object rather than taking it as an argument. */
+  virtual std::string severity_word() const;
+
 protected:
   bool m_is_active{false};
   std::string m_message;
@@ -30,6 +35,18 @@ struct Error : public ErrorBase
   Error(const std::string &message);
 
   std::string to_string() const;
+
+  /* Convert to the formatted message, so a call site passes an Error where a
+     string is expected without spelling out to_string. */
+  operator std::string() const;
+};
+
+/* An Error that prints as a warning and is shown rather than thrown. */
+struct Warning : public Error
+{
+  Warning(const std::string &message);
+
+  std::string severity_word() const override;
 };
 
 /**
@@ -42,13 +59,21 @@ struct ErrorWithLocation : public ErrorBase
 
   ErrorWithLocation(SourceLocation location, const std::string &message);
 
-  /* The severity is the word printed before the message, Error by default. The
-     prepass passes Warning to reuse the same caret for a non-fatal report. */
-  virtual std::string to_string(std::string_view source,
-                                std::string_view severity = "Error") const;
+  /* The severity word comes from severity_word, so a warning subclass prints
+     Warning over the same caret without passing the word in. */
+  virtual std::string to_string(std::string_view source) const;
 
 protected:
   SourceLocation m_location;
+};
+
+/* An ErrorWithLocation that prints as a warning and is shown rather than
+   thrown. The prepass builds it to point a caret at a non-fatal issue. */
+struct WarningWithLocation : public ErrorWithLocation
+{
+  WarningWithLocation(SourceLocation location, const std::string &message);
+
+  std::string severity_word() const override;
 };
 
 struct ErrorWithLocationAndDetails : public ErrorWithLocation
