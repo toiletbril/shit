@@ -201,7 +201,7 @@ struct SimpleCommand : public Command
 
   bool is_simple_command() const override;
 
-  const std::vector<const Token *> &args() const;
+  const ArrayList<const Token *> &args() const;
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -214,7 +214,7 @@ struct SimpleCommand : public Command
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::vector<const Token *> m_args;
+  ArrayList<const Token *> m_args{heap_allocator()};
 
   /* The resolution of the command word, memoized so a command run repeatedly in
      a loop body does not search PATH on every iteration. The name guards the
@@ -363,7 +363,7 @@ protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
   std::string m_variable_name;
-  std::vector<const Token *> m_words;
+  ArrayList<const Token *> m_words{heap_allocator()};
   /* Without an in clause, a for loop iterates the positional parameters. */
   bool m_has_in_clause;
   const Expression *m_body;

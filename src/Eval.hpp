@@ -101,7 +101,7 @@ struct EvalContext
   void end_command();
 
   /* Variable expand, tilde expand, field split, and glob each token. */
-  std::vector<std::string> process_args(const std::vector<const Token *> &args);
+  std::vector<std::string> process_args(const ArrayList<const Token *> &args);
 
   /* The allocator for transient expansion data, which a bump arena hands out
      and reclaims whole when the command ends. */

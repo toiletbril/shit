@@ -340,8 +340,11 @@ AssignCommand::append_to(usize d, std::string &f, bool duplicate)
 
 SimpleCommand::SimpleCommand(SourceLocation location,
                              const std::vector<const Token *> &&args)
-    : Command(location), m_args(args)
-{}
+    : Command(location)
+{
+  for (const Token *arg : args)
+    m_args.push(arg);
+}
 
 SimpleCommand::~SimpleCommand()
 {
@@ -384,7 +387,9 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
       continue;
     }
 
-    std::vector<std::string> target = cxt.process_args({redirection.target});
+    ArrayList<const Token *> target_tokens{heap_allocator()};
+    target_tokens.push(redirection.target);
+    std::vector<std::string> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Redirection target is not a single file"};
@@ -423,7 +428,7 @@ SimpleCommand::is_simple_command() const
   return true;
 }
 
-const std::vector<const Token *> &
+const ArrayList<const Token *> &
 SimpleCommand::args() const
 {
   return m_args;
@@ -485,7 +490,9 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
       continue;
     }
 
-    std::vector<std::string> target = cxt.process_args({redirection.target});
+    ArrayList<const Token *> target_tokens{heap_allocator()};
+    target_tokens.push(redirection.target);
+    std::vector<std::string> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Redirection target is not a single file"};
@@ -1075,8 +1082,14 @@ ForLoop::ForLoop(SourceLocation location, std::string variable_name,
                  std::vector<const Token *> &&words, bool has_in_clause,
                  const Expression *body)
     : CompoundCommand(location), m_variable_name(std::move(variable_name)),
-      m_words(std::move(words)), m_has_in_clause(has_in_clause), m_body(body)
-{}
+      m_has_in_clause(has_in_clause), m_body(body)
+{
+  for (const Token *word : words)
+    m_words.push(word);
+  /* The node now references the word tokens. Empty the source so the parser's
+     cleanup guard does not also free them. */
+  words.clear();
+}
 
 ForLoop::~ForLoop()
 {

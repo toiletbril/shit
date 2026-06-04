@@ -28,7 +28,7 @@ namespace shit {
 namespace utils {
 
 std::string
-merge_tokens_to_string(const std::vector<const Token *> &v)
+merge_tokens_to_string(const ArrayList<const Token *> &v)
 {
   std::string r{};
   for (const shit::Token *t : v) {

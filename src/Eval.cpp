@@ -1527,7 +1527,7 @@ EvalContext::expand_heredoc_body(const std::string &body)
 }
 
 std::vector<std::string>
-EvalContext::process_args(const std::vector<const Token *> &args)
+EvalContext::process_args(const ArrayList<const Token *> &args)
 {
   /* The expansion fields live on the scratch arena only until the heap argument
      vector is built, so the arena is released back to here on return. The mark

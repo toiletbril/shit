@@ -17,7 +17,7 @@ namespace shit {
 
 namespace utils {
 
-std::string merge_tokens_to_string(const std::vector<const Token *> &v);
+std::string merge_tokens_to_string(const ArrayList<const Token *> &v);
 
 template <class T>
 std::string
