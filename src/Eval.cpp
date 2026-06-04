@@ -1220,6 +1220,12 @@ EvalContext::clear_retained_sources()
   m_retained_source_asts.clear();
 }
 
+std::string
+EvalContext::expand_heredoc_body(const std::string &body)
+{
+  return expand_modifier_word(body);
+}
+
 std::vector<std::string>
 EvalContext::process_args(const std::vector<const Token *> &args)
 {

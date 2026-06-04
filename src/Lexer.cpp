@@ -195,7 +195,56 @@ Lexer::advance_past_last_peek()
 {
   usize r = advance_forward(m_cached_offset);
   m_cached_offset = 0;
+
+  /* Consuming the newline that ends a line with a pending heredoc is where the
+     body is collected, since the body sits on the following lines. */
+  if (m_last_shell_token_was_newline && !m_pending_heredocs.empty()) {
+    m_last_shell_token_was_newline = false;
+    collect_pending_heredocs();
+  }
+
   return r;
+}
+
+const std::string *
+Lexer::register_heredoc(std::string delimiter, bool strip_tabs)
+{
+  m_heredoc_bodies.emplace_back();
+  std::string *body = &m_heredoc_bodies.back();
+  m_pending_heredocs.push_back({std::move(delimiter), strip_tabs, body});
+  return body;
+}
+
+void
+Lexer::collect_pending_heredocs()
+{
+  for (HeredocPending &pending : m_pending_heredocs) {
+    std::string collected{};
+    for (;;) {
+      if (m_cursor_position >= m_source.length()) break;
+
+      usize line_start = m_cursor_position;
+      usize i = line_start;
+      while (i < m_source.length() && m_source[i] != '\n')
+        i++;
+      bool has_newline = (i < m_source.length());
+      m_cursor_position = has_newline ? i + 1 : i;
+
+      std::string line = m_source.substr(line_start, i - line_start);
+      if (pending.strip_tabs) {
+        usize tabs = 0;
+        while (tabs < line.length() && line[tabs] == '\t')
+          tabs++;
+        line.erase(0, tabs);
+      }
+
+      if (line == pending.delimiter) break;
+      collected += line;
+      collected += '\n';
+    }
+    *pending.body = std::move(collected);
+  }
+  m_pending_heredocs.clear();
 }
 
 Token *
@@ -222,20 +271,24 @@ Lexer::lex_expression_token()
 Token *
 Lexer::lex_shell_token()
 {
+  Token *t{};
   if (char ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_shell_sentinel(ch))
-      return lex_sentinel();
+      t = lex_sentinel();
     else if (lexer::is_part_of_identifier(ch))
-      return lex_identifier();
+      t = lex_identifier();
     else
       throw ErrorWithLocation{
           {m_cursor_position, 1},
           "Unexpected character"
       };
+  } else {
+    t = m_arena.create<tokens::EndOfFile>(
+        SourceLocation{m_cursor_position, 1});
   }
 
-  return m_arena.create<tokens::EndOfFile>(
-      SourceLocation{m_cursor_position, 1});
+  m_last_shell_token_was_newline = (t->kind() == Token::Kind::Newline);
+  return t;
 }
 
 void

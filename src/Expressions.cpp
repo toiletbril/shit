@@ -359,6 +359,16 @@ void
 SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
 {
   for (const Redirection &redirection : m_redirections) {
+    if (redirection.kind == Redirection::Kind::Heredoc) {
+      std::string body = *redirection.heredoc_body;
+      if (redirection.heredoc_expand) body = cxt.expand_heredoc_body(body);
+      std::optional<os::descriptor> opened = os::write_to_temp_file(body);
+      if (!opened) throw Error{"Could not stage the heredoc body"};
+      if (ec.in_fd) os::close_fd(*ec.in_fd);
+      ec.in_fd = opened;
+      continue;
+    }
+
     if (redirection.kind == Redirection::Kind::DuplicateOutput) {
       if (redirection.fd == 2 && redirection.dup_fd == 1)
         ec.dup_err_to_out = true;
@@ -444,6 +454,18 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   };
 
   for (const Redirection &redirection : m_redirections) {
+    /* A heredoc body becomes the standard input through an anonymous temp
+       file, expanded when the delimiter was unquoted. */
+    if (redirection.kind == Redirection::Kind::Heredoc) {
+      std::string body = *redirection.heredoc_body;
+      if (redirection.heredoc_expand) body = cxt.expand_heredoc_body(body);
+      std::optional<os::descriptor> opened = os::write_to_temp_file(body);
+      if (!opened) throw Error{"Could not stage the heredoc body"};
+      if (redirect_in_fd) os::close_fd(*redirect_in_fd);
+      redirect_in_fd = opened;
+      continue;
+    }
+
     /* A duplication like 2>&1 routes one descriptor to another without a file.
      */
     if (redirection.kind == Redirection::Kind::DuplicateOutput) {

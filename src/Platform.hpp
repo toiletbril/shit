@@ -36,6 +36,10 @@ enum class FileOpenMode : u8
 std::optional<descriptor> open_file_descriptor(const std::string &path,
                                                FileOpenMode mode);
 
+/* Write content to an anonymous temporary file and return a descriptor
+   positioned at its start, for feeding a heredoc body to a command's input. */
+std::optional<descriptor> write_to_temp_file(const std::string &content);
+
 os_args make_os_args(const std::vector<std::string> &args);
 
 std::string last_system_error_message();

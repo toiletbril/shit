@@ -251,6 +251,31 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   return fd;
 }
 
+std::optional<descriptor>
+write_to_temp_file(const std::string &content)
+{
+  char path_template[] = "/tmp/shit_heredoc_XXXXXX";
+  int fd = mkstemp(path_template);
+  if (fd < 0) return std::nullopt;
+
+  /* Unlink at once, so the file is anonymous and is freed when closed. */
+  unlink(path_template);
+
+  usize offset = 0;
+  while (offset < content.size()) {
+    ssize_t written =
+        ::write(fd, content.data() + offset, content.size() - offset);
+    if (written <= 0) {
+      close(fd);
+      return std::nullopt;
+    }
+    offset += static_cast<usize>(written);
+  }
+
+  lseek(fd, 0, SEEK_SET);
+  return fd;
+}
+
 i32
 wait_and_monitor_process(process pid)
 {
@@ -583,6 +608,34 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   if (mode == FileOpenMode::Append)
     SetFilePointer(handle, 0, NULL, FILE_END);
 
+  return handle;
+}
+
+std::optional<descriptor>
+write_to_temp_file(const std::string &content)
+{
+  char temp_dir[MAX_PATH];
+  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return std::nullopt;
+
+  char temp_path[MAX_PATH];
+  if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0)
+    return std::nullopt;
+
+  HANDLE handle = CreateFileA(temp_path, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                              CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
+                              NULL);
+  if (handle == INVALID_HANDLE_VALUE) return std::nullopt;
+
+  DWORD written = 0;
+  if (WriteFile(handle, content.data(), static_cast<DWORD>(content.size()),
+                &written, NULL) == 0)
+  {
+    close_fd(handle);
+    return std::nullopt;
+  }
+
+  SetFilePointer(handle, 0, NULL, FILE_BEGIN);
   return handle;
 }
 

@@ -539,6 +539,50 @@ Parser::parse_simple_command()
                       op_location);
     } break;
 
+    case Token::Kind::DoubleLess: {
+      SourceLocation op_location = token->source_location();
+      m_lexer.advance_past_last_peek();
+      if (!source_location) source_location = op_location;
+
+      std::unique_ptr<Token> delimiter_token{m_lexer.next_shell_token()};
+      if (delimiter_token->kind() != Token::Kind::Word) {
+        throw ErrorWithLocation{delimiter_token->source_location(),
+                                "Expected a heredoc delimiter"};
+      }
+      const Word &delimiter_word =
+          static_cast<tokens::WordToken *>(delimiter_token.get())->word();
+
+      std::string delimiter = delimiter_word.to_literal_string();
+      bool strip_tabs = false;
+      /* <<- strips leading tabs, the dash touching the operator. */
+      if (!delimiter.empty() && delimiter[0] == '-' &&
+          delimiter_token->source_location().position() ==
+              op_location.position() + op_location.length())
+      {
+        strip_tabs = true;
+        delimiter.erase(0, 1);
+      }
+
+      /* A quoted delimiter, such as <<'EOF', keeps the body literal. */
+      bool should_expand = true;
+      for (const WordSegment &segment : delimiter_word.segments) {
+        if (segment.kind != WordSegment::Kind::UnquotedText) {
+          should_expand = false;
+          break;
+        }
+      }
+
+      expressions::Redirection redirection{};
+      redirection.fd = 0;
+      redirection.kind = expressions::Redirection::Kind::Heredoc;
+      redirection.target = nullptr;
+      redirection.dup_fd = -1;
+      redirection.heredoc_body =
+          m_lexer.register_heredoc(delimiter, strip_tabs);
+      redirection.heredoc_expand = should_expand;
+      redirections.push_back(redirection);
+    } break;
+
     /* A separator, an operator, or a list terminator ends the command. */
     default: return build_command();
     }

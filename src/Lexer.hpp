@@ -3,12 +3,24 @@
 #include "Common.hpp"
 #include "Tokens.hpp"
 
+#include <list>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace shit {
 
 struct BumpArena;
+
+/* A heredoc whose body is collected when the line that introduced it ends. The
+   body buffer has a stable address, so a parsed redirection points at it and
+   reads it once the lexer fills it. */
+struct HeredocPending
+{
+  std::string delimiter;
+  bool strip_tabs;
+  std::string *body;
+};
 
 namespace lexer {
 
@@ -43,6 +55,10 @@ struct Lexer
   BumpArena &arena() const;
   usize advance_past_last_peek();
 
+  /* Reserve a heredoc body for the given delimiter, returning the stable buffer
+     the lexer fills when the current line ends. */
+  const std::string *register_heredoc(std::string delimiter, bool strip_tabs);
+
 protected:
   std::string m_source{};
   BumpArena &m_arena;
@@ -56,6 +72,13 @@ protected:
   bool m_should_collect_debug_words{false};
   std::vector<Word> m_debug_words{};
   usize m_last_collected_word_position{static_cast<usize>(-1)};
+
+  /* Heredoc bodies are filled once the line ends, so the last shell token kind
+     is tracked to detect that the consumed token was a newline. */
+  bool m_last_shell_token_was_newline{false};
+  std::list<std::string> m_heredoc_bodies{};
+  std::vector<HeredocPending> m_pending_heredocs{};
+  void collect_pending_heredocs();
 
   Token *lex_expression_token();
   Token *lex_shell_token();

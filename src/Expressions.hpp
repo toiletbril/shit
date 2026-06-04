@@ -168,18 +168,22 @@ struct Redirection
 {
   enum class Kind : u8
   {
-    TruncateOutput, /* >  */
-    AppendOutput,   /* >> */
-    ReadInput,      /* <  */
-    DuplicateOutput /* >& */
+    TruncateOutput,  /* >    */
+    AppendOutput,    /* >>   */
+    ReadInput,       /* <    */
+    DuplicateOutput, /* >&   */
+    Heredoc          /* <<   */
   };
 
   i32 fd;
   Kind kind;
-  /* The filename word for a file redirection, or null for a duplication. */
+  /* The filename word for a file redirection, or null otherwise. */
   const Token *target;
   /* For a duplication, the descriptor to copy from, as in 2>&1. */
   i32 dup_fd;
+  /* For a heredoc, the lexer-owned body and whether it is expanded. */
+  const std::string *heredoc_body;
+  bool heredoc_expand;
 };
 
 struct SimpleCommand : public Command

@@ -150,6 +150,10 @@ struct EvalContext
      the rest of the current top-level command. */
   void clear_retained_sources();
 
+  /* Expand a heredoc body, its $name and ${...} references, keeping the literal
+     text and newlines. */
+  std::string expand_heredoc_body(const std::string &body);
+
   bool should_echo() const;
   bool should_echo_expanded() const;
   bool shell_is_interactive() const;
