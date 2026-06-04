@@ -165,7 +165,7 @@ Maybe<Builtin::Kind> search_builtin(std::string_view builtin_name);
 
 void show_builtin_help_impl(const ExecContext &ec,
                             const std::vector<std::string> &hs,
-                            const std::vector<Flag *> &fl);
+                            const ArrayList<Flag *> &fl);
 
 #define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \
   do {                                                                         \

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Containers.hpp"
 #include "Common.hpp"
 
 #include <string>
@@ -14,13 +15,13 @@
   static std::vector<std::string> HELP_SYNOPSIS { __VA_ARGS__ }
 
 #define FLAG_LIST_DECL()                                                       \
-  static std::vector<shit::Flag *> FLAG_LIST {}
+  static shit::ArrayList<shit::Flag *> FLAG_LIST { shit::heap_allocator() }
 
 #define FLAG(var_name, kind, short_name, long_name, description)               \
   static shit::Flag##kind concat_literal(FLAG_, var_name){                     \
       short_name, long_name, description};                                     \
   static uchar concat_literal(t__flag_dummy_, __LINE__) =                      \
-      (FLAG_LIST.emplace_back(&concat_literal(FLAG_, var_name)), 0)
+      (FLAG_LIST.push(&concat_literal(FLAG_, var_name)), 0)
 
 namespace shit {
 
@@ -107,19 +108,19 @@ private:
 
 /* These return arguments which are not flags. */
 
-std::vector<std::string> parse_flags_vec(const std::vector<Flag *> &flags,
+std::vector<std::string> parse_flags_vec(const ArrayList<Flag *> &flags,
                                          const std::vector<std::string> &args);
-std::vector<std::string> parse_flags(const std::vector<Flag *> &flags, int argc,
+std::vector<std::string> parse_flags(const ArrayList<Flag *> &flags, int argc,
                                      const char *const *argv);
 
-void reset_flags(const std::vector<Flag *> &flags);
+void reset_flags(const ArrayList<Flag *> &flags);
 
 void show_version();
 void show_short_version();
 
 std::string make_synopsis(std::string_view program_name,
                           const std::vector<std::string> &lines);
-std::string make_flag_help(const std::vector<Flag *> &flags);
+std::string make_flag_help(const ArrayList<Flag *> &flags);
 
 void show_message(std::string_view err);
 

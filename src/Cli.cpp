@@ -162,7 +162,7 @@ FlagManyStrings::reset()
 }
 
 static bool
-find_flag(const std::vector<Flag *> &flags, const char *flag_start,
+find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
           bool is_long, Flag **result_flag, const char **value_start)
 {
   size_t longest_length = 0;
@@ -202,7 +202,7 @@ find_flag(const std::vector<Flag *> &flags, const char *flag_start,
 }
 
 std::vector<std::string>
-parse_flags_vec(const std::vector<Flag *> &flags,
+parse_flags_vec(const ArrayList<Flag *> &flags,
                 const std::vector<std::string> &args)
 {
   std::vector<const char *> os_argv;
@@ -223,7 +223,7 @@ flag_name(const Flag *f, bool is_long)
 }
 
 std::vector<std::string>
-parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
+parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
 {
   SHIT_ASSERT(argc >= 0);
 
@@ -394,7 +394,7 @@ parse_flags(const std::vector<Flag *> &flags, int argc, const char *const *argv)
 }
 
 void
-reset_flags(const std::vector<Flag *> &flags)
+reset_flags(const ArrayList<Flag *> &flags)
 {
   for (Flag *f : flags) {
     f->reset();
@@ -448,7 +448,7 @@ make_synopsis(std::string_view program_name,
 }
 
 std::string
-make_flag_help(const std::vector<Flag *> &flags)
+make_flag_help(const ArrayList<Flag *> &flags)
 {
   std::string s{};
 
