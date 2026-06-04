@@ -742,10 +742,10 @@ namespace {
    without a later ']' is a literal bracket, not a glob, so a field such as the
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
-std::optional<usize>
+Maybe<usize>
 first_active_glob(const std::string &text, const std::vector<bool> &mask)
 {
-  std::optional<usize> open_bracket{};
+  Maybe<usize> open_bracket{};
   for (usize i = 0; i < mask.size(); i++) {
     if (!mask[i]) continue;
     char ch = text[i];
@@ -756,7 +756,7 @@ first_active_glob(const std::string &text, const std::vector<bool> &mask)
       return open_bracket;
     }
   }
-  return std::nullopt;
+  return shit::nothing;
 }
 
 } /* namespace */
@@ -772,7 +772,7 @@ EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
 
     /* An empty mask is the all-literal convention, so a field without one holds
        no live glob metacharacter. */
-    std::optional<usize> expand_ch = first_active_glob(text, field.glob_active);
+    Maybe<usize> expand_ch = first_active_glob(text, field.glob_active);
 
     if (!expand_ch) {
       /* No glob remains. This field is a literal suffix appended after an
@@ -785,7 +785,7 @@ EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
       continue;
     }
 
-    std::optional<usize> slash_after{};
+    Maybe<usize> slash_after{};
     for (usize k = *expand_ch; k < text.length(); k++) {
       if (text[k] == '/') {
         slash_after = k;

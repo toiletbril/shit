@@ -139,7 +139,7 @@ struct Command : public Expression
 protected:
   bool m_is_async{false};
   bool m_is_negated{false};
-  std::optional<std::unordered_map<std::string, Word>> m_local_vars;
+  Maybe<std::unordered_map<std::string, Word>> m_local_vars;
 };
 
 struct AssignCommand : public Command
@@ -220,7 +220,7 @@ protected:
      a loop body does not search PATH on every iteration. The name guards the
      cache, since an expanded name from a variable may differ between runs. */
   mutable std::string m_resolved_name{};
-  mutable std::optional<std::variant<Builtin::Kind, std::filesystem::path>>
+  mutable Maybe<std::variant<Builtin::Kind, std::filesystem::path>>
       m_resolved_kind{};
 
   std::vector<Redirection> m_redirections{};

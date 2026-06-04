@@ -584,10 +584,11 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
                      : ExecContext::make_from(source_location(), program_args);
 
   if (!is_cache_valid) {
+    using ResolvedKind = std::variant<Builtin::Kind, std::filesystem::path>;
     if (ec.is_builtin())
-      m_resolved_kind = ec.builtin_kind();
+      m_resolved_kind = ResolvedKind{ec.builtin_kind()};
     else
-      m_resolved_kind = ec.program_path();
+      m_resolved_kind = ResolvedKind{ec.program_path()};
     m_resolved_name = program_args[0];
   }
 

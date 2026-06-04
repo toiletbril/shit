@@ -71,6 +71,7 @@ struct [[nodiscard]] Maybe
   [[nodiscard]] T &operator*() { return value(); }
   [[nodiscard]] const T &operator*() const { return value(); }
   [[nodiscard]] T *operator->() { return &reference(); }
+  [[nodiscard]] const T *operator->() const { return &reference(); }
 
   /* Move the value out, leaving the Maybe empty. */
   [[nodiscard]] T take()
