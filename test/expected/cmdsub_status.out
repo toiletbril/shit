@@ -1,0 +1,34 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=$(false)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_false=$?"]
+  [CompoundListCondition, None]
+    [Assign y=$(true)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_true=$?"]
+[Word
+  Unquoted "x="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_false="
+  Variable "?"
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_true="
+  Variable "?"
+]
+after_false=1
+after_true=0
+[Code 0]

@@ -1,0 +1,3 @@
+shit: 1:6: Error: Arithmetic expansion $((...)) is not supported.
+     1 |  echo $((1+2))
+       |       ^~~ here.

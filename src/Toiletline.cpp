@@ -10,6 +10,8 @@
 #include <tuple>
 #include <vector>
 
+#if !defined(SHIT_NO_TOILETLINE)
+
 namespace {
 
 #define TL_NO_SUSPEND
@@ -150,3 +152,71 @@ emit_newlines(std::string_view buffer)
 }
 
 } /* namespace toiletline */
+
+#else /* SHIT_NO_TOILETLINE */
+
+/* The line editor is compiled out, so interactive input is unavailable. These
+   stubs keep the rest of the shell linking for profiling and debugging, where
+   the raw terminal handling would otherwise perturb the run. */
+namespace toiletline {
+
+void
+set_title(const std::string &title)
+{
+  SHIT_UNUSED(title);
+}
+
+usize
+utf8_strlen(const std::string &s, usize count)
+{
+  return (count != std::string::npos && count < s.length()) ? count
+                                                            : s.length();
+}
+
+bool
+is_active()
+{
+  return false;
+}
+
+void
+initialize()
+{
+  throw shit::Error{
+      "This build has no line editor, use '-c', '-s', or a file argument"};
+}
+
+void
+exit()
+{}
+
+std::tuple<i32, std::string>
+get_input(const std::string &prompt)
+{
+  SHIT_UNUSED(prompt);
+  throw shit::Error{"This build has no line editor"};
+}
+
+void
+set_input(const std::string &input)
+{
+  SHIT_UNUSED(input);
+}
+
+void
+enter_raw_mode()
+{}
+
+void
+exit_raw_mode()
+{}
+
+void
+emit_newlines(std::string_view buffer)
+{
+  SHIT_UNUSED(buffer);
+}
+
+} /* namespace toiletline */
+
+#endif /* SHIT_NO_TOILETLINE */

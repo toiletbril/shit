@@ -1,0 +1,62 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "no"]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "fi"
+]
+yes
+[Code 0]

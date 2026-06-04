@@ -64,7 +64,7 @@ Is it usable?
 - [ ] Redirections. (`>`/`<`)
 - [x] Shell expansion. (`?`, `[...]`, `*`, `~`)
 - [x] Escaping.
-- [ ] Environment variables.
+- [x] Environment variables.
 - [ ] Numeric expressions.
 
 Is it good?

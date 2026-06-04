@@ -1,0 +1,14 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand]
+      [SimpleCommand "cat"]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "cat"
+]
+shit: 1:1: Error: A pipeline stage expanded to no command to run.
+     1 |  x=1 | cat
+       |  ^~~ here.

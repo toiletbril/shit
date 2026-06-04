@@ -1,0 +1,3 @@
+f() { echo parent; }
+( f() { echo child; }; f )
+f

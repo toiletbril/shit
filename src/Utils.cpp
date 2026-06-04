@@ -216,6 +216,10 @@ glob_matches(std::string_view glob, std::string_view str,
     } break;
 
     case '*': {
+      /* A star at the end of the glob matches the entire rest of the string, so
+         there is no need to try every split. This keeps a plain * component,
+         the common case, linear in the string instead of quadratic. */
+      if (g + 1 >= glob.length()) return true;
       if (glob_matches(glob.substr(g + 1), str.substr(s), glob_active,
                        mask_offset + g + 1))
       {

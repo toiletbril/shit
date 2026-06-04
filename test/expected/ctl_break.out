@@ -1,0 +1,55 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ForLoop "x"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$x"]
+        [CompoundListCondition, None]
+          [SimpleCommand "break"]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "done"
+]
+1
+[Code 0]

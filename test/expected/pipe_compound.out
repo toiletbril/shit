@@ -1,0 +1,3 @@
+shit: 1:1: Error: A compound command in a pipeline is not supported.
+     1 |  { echo a; } | cat
+       |  ^~ here.

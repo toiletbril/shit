@@ -13,6 +13,10 @@
 #include <optional>
 
 #if SHIT_PLATFORM_IS POSIX
+#include <fcntl.h>
+#endif
+
+#if SHIT_PLATFORM_IS POSIX
 
 namespace shit {
 
@@ -38,6 +42,29 @@ bool
 close_fd(os::descriptor fd)
 {
   return close(fd) != -1;
+}
+
+os::descriptor
+redirect_stdout(os::descriptor target)
+{
+  /* The saved copy of the real stdout is close-on-exec, so a forked command
+     does not inherit it and hold the shell's own output open. An immortal
+     pipeline stage like yes would otherwise keep a downstream reader from ever
+     seeing end of input. */
+  os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
+  dup2(target, STDOUT_FILENO);
+  /* The original write end is close-on-exec for the same reason. The duplicate
+     now living on STDOUT_FILENO stays open for the command to write to. */
+  if (int flags = fcntl(target, F_GETFD); flags != -1)
+    fcntl(target, F_SETFD, flags | FD_CLOEXEC);
+  return saved;
+}
+
+void
+restore_stdout(os::descriptor saved)
+{
+  dup2(saved, STDOUT_FILENO);
+  close(saved);
 }
 
 std::optional<std::string>
@@ -348,6 +375,20 @@ bool
 close_fd(os::descriptor fd)
 {
   return CloseHandle(fd);
+}
+
+os::descriptor
+redirect_stdout(os::descriptor target)
+{
+  os::descriptor saved = GetStdHandle(STD_OUTPUT_HANDLE);
+  SetStdHandle(STD_OUTPUT_HANDLE, target);
+  return saved;
+}
+
+void
+restore_stdout(os::descriptor saved)
+{
+  SetStdHandle(STD_OUTPUT_HANDLE, saved);
 }
 
 std::optional<std::string>

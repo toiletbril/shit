@@ -1,0 +1,4 @@
+echo before
+v=$(exit 5)
+echo after=$?
+echo alive

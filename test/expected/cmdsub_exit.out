@@ -1,0 +1,36 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "before"]
+  [CompoundListCondition, None]
+    [Assign v=$(exit 5)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "alive"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "before"
+]
+[Word
+  Unquoted "v="
+  CommandSubstitution "exit 5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "alive"
+]
+before
+after=5
+alive
+[Code 0]

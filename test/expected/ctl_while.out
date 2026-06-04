@@ -1,0 +1,52 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "no"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "no"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+after
+[Code 0]

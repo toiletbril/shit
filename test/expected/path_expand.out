@@ -79,7 +79,7 @@
 [Word
   Unquoted "data/.*"
 ]
-data/abcd data/abcdefg data/fourth data/hello-d data/hello+K
+data/abcd data/abcdefg data/fourth data/hello+K data/hello-d
 data/abcd/ data/abcdefg/
 data/abcd/first data/abcd/second data/abcdefg/hjkl data/abcdefg/third
 data/abcdefg/hjkl/
@@ -87,6 +87,6 @@ data/abcdefg
 data/abcd data/abcdefg
 data/abcdefg
 data/abcd/ data/abcdefg/
-data/abcd data/fourth data/hello-d data/hello+K
+data/abcd data/fourth data/hello+K data/hello-d
 data/.fifth
 [Code 0]

@@ -59,6 +59,11 @@ struct Expression
   virtual std::string to_string() const = 0;
   virtual std::string to_ast_string(usize layer = 0) const;
 
+  /* Lightweight kind tags so a caller can recognize a node without RTTI or a
+     string compare. The base returns false, the concrete node overrides. */
+  virtual bool is_simple_command() const;
+  virtual bool is_dummy() const;
+
   /* A node lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap node otherwise. The
      destructor still runs through the normal delete. */
@@ -100,6 +105,8 @@ protected:
 struct DummyExpression : public Expression
 {
   DummyExpression(SourceLocation location);
+
+  bool is_dummy() const override;
 
   std::string to_string() const override;
   std::string to_ast_string(usize layer = 0) const override;
@@ -153,6 +160,8 @@ struct SimpleCommand : public Command
                 const std::vector<const Token *> &&args);
   ~SimpleCommand() override;
 
+  bool is_simple_command() const override;
+
   const std::vector<const Token *> &args() const;
 
   std::string to_string() const override;
@@ -167,6 +176,13 @@ protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
   std::vector<const Token *> m_args;
+
+  /* The resolution of the command word, memoized so a command run repeatedly in
+     a loop body does not search PATH on every iteration. The name guards the
+     cache, since an expanded name from a variable may differ between runs. */
+  mutable std::string m_resolved_name{};
+  mutable std::optional<std::variant<Builtin::Kind, std::filesystem::path>>
+      m_resolved_kind{};
 };
 
 struct CompoundListCondition : public Expression

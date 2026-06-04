@@ -1,0 +1,11 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo $(echo deep))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo $(echo deep)"
+]
+deep
+[Code 0]

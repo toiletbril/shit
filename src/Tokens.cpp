@@ -59,6 +59,10 @@ Word::to_literal_string() const
 {
   std::string result{};
   for (const WordSegment &segment : segments) {
+    if (segment.kind == WordSegment::Kind::CommandSubstitution) {
+      result += "$(" + segment.text + ")";
+      continue;
+    }
     if (segment.kind == WordSegment::Kind::VariableReference) result += '$';
     result += segment.text;
   }
@@ -76,6 +80,9 @@ Word::to_pretty_string() const
     case WordSegment::Kind::UnquotedText: result += "Unquoted"; break;
     case WordSegment::Kind::DoubleQuotedText: result += "DoubleQuoted"; break;
     case WordSegment::Kind::VariableReference: result += "Variable"; break;
+    case WordSegment::Kind::CommandSubstitution:
+      result += "CommandSubstitution";
+      break;
     }
     result += " \"";
     result += segment.text;
@@ -140,35 +147,38 @@ KEYWORD_TOKEN_DECLS(Esac, "esac");
 KEYWORD_TOKEN_DECLS(Time, "time");
 KEYWORD_TOKEN_DECLS(Function, "function");
 
-#define SENTINEL_TOKEN_DECLS_COMPOUND(t)                                       \
+/* The raw string is the literal symbol, so an error shows ')' rather than the
+   internal token name. */
+#define SENTINEL_TOKEN_DECLS_COMPOUND(t, s)                                    \
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const                                                \
   {                                                                            \
     return Token::Flag::Sentinel | Token::Flag::CompoundList;                  \
   }                                                                            \
-  std::string t::raw_string() const { return #t; }
+  std::string t::raw_string() const { return s; }
 
-SENTINEL_TOKEN_DECLS_COMPOUND(Newline);
-SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon);
+SENTINEL_TOKEN_DECLS_COMPOUND(Newline, "newline");
+SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
 
-#define SENTINEL_TOKEN_DECLS(t)                                                \
+#define SENTINEL_TOKEN_DECLS(t, s)                                             \
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::Sentinel; }              \
-  std::string t::raw_string() const { return #t; }
+  std::string t::raw_string() const { return s; }
 
-SENTINEL_TOKEN_DECLS(EndOfFile);
-SENTINEL_TOKEN_DECLS(Dot);
+SENTINEL_TOKEN_DECLS(EndOfFile, "end of input");
+SENTINEL_TOKEN_DECLS(DoubleSemicolon, ";;");
+SENTINEL_TOKEN_DECLS(Dot, ".");
 
-SENTINEL_TOKEN_DECLS(LeftParen);
-SENTINEL_TOKEN_DECLS(RightParen);
-SENTINEL_TOKEN_DECLS(LeftSquareBracket);
-SENTINEL_TOKEN_DECLS(DoubleLeftSquareBracket);
-SENTINEL_TOKEN_DECLS(RightSquareBracket);
-SENTINEL_TOKEN_DECLS(DoubleRightSquareBracket);
-SENTINEL_TOKEN_DECLS(LeftBracket);
-SENTINEL_TOKEN_DECLS(RightBracket);
+SENTINEL_TOKEN_DECLS(LeftParen, "(");
+SENTINEL_TOKEN_DECLS(RightParen, ")");
+SENTINEL_TOKEN_DECLS(LeftSquareBracket, "[");
+SENTINEL_TOKEN_DECLS(DoubleLeftSquareBracket, "[[");
+SENTINEL_TOKEN_DECLS(RightSquareBracket, "]");
+SENTINEL_TOKEN_DECLS(DoubleRightSquareBracket, "]]");
+SENTINEL_TOKEN_DECLS(LeftBracket, "{");
+SENTINEL_TOKEN_DECLS(RightBracket, "}");
 
 Value::Value(SourceLocation location, std::string_view sv)
     : Token(location), m_value(sv)

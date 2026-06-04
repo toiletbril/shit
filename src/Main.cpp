@@ -82,8 +82,9 @@ run_script_contents(const std::string &script_contents,
 
     /* The previous command's tree was destroyed at the end of the last
        iteration, so its arena storage is reclaimed here before the next
-       parse. */
+       parse. Functions point into that storage, so drop them too. */
     ast_arena.reset();
+    context.clear_functions();
 
     shit::Parser p{
         shit::Lexer{script_contents, ast_arena, FLAG_ESCAPE_MAP.is_enabled()}
@@ -111,6 +112,12 @@ run_script_contents(const std::string &script_contents,
 
     if (FLAG_STATS.is_enabled())
       std::cout << context.make_stats_string() << std::endl;
+  } catch (const shit::LoopControl &) {
+    /* A break or continue that escaped every loop. */
+    shit::show_message("shit: 'break' or 'continue' used outside of a loop");
+  } catch (const shit::FunctionReturn &) {
+    /* A return that escaped every function. */
+    shit::show_message("shit: 'return' used outside of a function");
   } catch (const shit::ErrorWithLocationAndDetails &e) {
     shit::show_message(e.to_string(script_contents));
     shit::show_message(e.details_to_string(script_contents));

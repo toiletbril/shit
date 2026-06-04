@@ -1,0 +1,47 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ForLoop "w"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "i=$w"]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "w"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  CommandSubstitution "echo x y z"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "i="
+  Variable "w"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "done"
+]
+i=x
+i=y
+i=z
+[Code 0]

@@ -1,0 +1,31 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "inside"]
+        [CompoundListCondition, None]
+          [SimpleCommand "cd" "/tmp"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "outside"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "inside"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "outside"
+]
+inside
+outside
+[Code 0]

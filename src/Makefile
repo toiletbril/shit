@@ -61,6 +61,7 @@ CXXFLAGS := \
 	-std=c++17 \
 	-Wno-unknown-warning-option \
 	-Wno-error=maybe-uninitialized \
+	-pthread \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
@@ -118,8 +119,14 @@ ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo_dbg)
 endif
 else ifeq ($(SHIT_MODE), prof)
+# Optimized like rel, but keep frame pointers and symbols so a profiler can
+# unwind, and drop the line editor so the terminal handling does not perturb
+# the measurement.
 CXXFLAGS += \
 	-g3 \
+	-DNDEBUG \
+	-DSHIT_NO_TOILETLINE \
+	-fno-omit-frame-pointer \
 	-O3
 else
 $(error Invalid SHIT_MODE=$(SHIT_MODE). Available modes are "dbg", "rel", "prof", "cosmo")

@@ -1,0 +1,40 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "x is $X"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after=$X"]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "x is "
+  Variable "X"
+]
+[Word
+  Unquoted "X=hi"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after="
+  Variable "X"
+]
+x is hi
+after=
+[Code 0]

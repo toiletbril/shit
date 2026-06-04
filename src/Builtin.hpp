@@ -26,6 +26,9 @@ struct Builtin
     Which,
     WhoAmI,
     Export,
+    Break,
+    Continue,
+    Return,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -41,13 +44,16 @@ protected:
 };
 
 const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
-    {"echo",   Builtin::Kind::Echo  },
-    {"exit",   Builtin::Kind::Exit  },
-    {"cd",     Builtin::Kind::Cd    },
-    {"pwd",    Builtin::Kind::Pwd   },
-    {"which",  Builtin::Kind::Which },
-    {"whoami", Builtin::Kind::WhoAmI},
-    {"export", Builtin::Kind::Export},
+    {"echo",     Builtin::Kind::Echo    },
+    {"exit",     Builtin::Kind::Exit    },
+    {"cd",       Builtin::Kind::Cd      },
+    {"pwd",      Builtin::Kind::Pwd     },
+    {"which",    Builtin::Kind::Which   },
+    {"whoami",   Builtin::Kind::WhoAmI  },
+    {"export",   Builtin::Kind::Export  },
+    {"break",    Builtin::Kind::Break   },
+    {"continue", Builtin::Kind::Continue},
+    {"return",   Builtin::Kind::Return  },
 };
 
 #define B_CASE(btin)                                                           \
@@ -60,7 +66,10 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Pwd);                                                                 \
   B_CASE(Which);                                                               \
   B_CASE(WhoAmI);                                                              \
-  B_CASE(Export)
+  B_CASE(Export);                                                              \
+  B_CASE(Break);                                                               \
+  B_CASE(Continue);                                                            \
+  B_CASE(Return)
 
 #define BUILTIN_STRUCT(b)                                                      \
   struct b : public Builtin                                                    \
@@ -77,6 +86,9 @@ BUILTIN_STRUCT(Pwd);
 BUILTIN_STRUCT(Which);
 BUILTIN_STRUCT(WhoAmI);
 BUILTIN_STRUCT(Export);
+BUILTIN_STRUCT(Break);
+BUILTIN_STRUCT(Continue);
+BUILTIN_STRUCT(Return);
 
 struct Exit : public Builtin
 {

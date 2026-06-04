@@ -1,0 +1,47 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "parent"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [FunctionDefinition "f"]
+            [BraceGroup]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [SimpleCommand "echo" "child"]
+        [CompoundListCondition, None]
+          [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "parent"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "child"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "f"
+]
+child
+parent
+[Code 0]

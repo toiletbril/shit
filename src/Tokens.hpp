@@ -28,6 +28,9 @@ struct WordSegment
     UnquotedText,
     DoubleQuotedText,
     VariableReference,
+    /* The text holds the source inside $(...). The evaluator runs it and
+       splices the captured output. */
+    CommandSubstitution,
   };
 
   Kind kind;
@@ -77,6 +80,7 @@ struct Token
     EndOfFile,
     Newline,
     Semicolon,
+    DoubleSemicolon,
     Dot,
     Dollar,
 
@@ -250,6 +254,7 @@ TOKEN_STRUCT(EndOfFile);
 
 TOKEN_STRUCT(Newline);
 TOKEN_STRUCT(Semicolon);
+TOKEN_STRUCT(DoubleSemicolon);
 
 TOKEN_STRUCT(Dot);
 TOKEN_STRUCT(LeftParen);

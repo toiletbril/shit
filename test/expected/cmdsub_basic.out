@@ -1,0 +1,17 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a" "$(echo b)" "c"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  CommandSubstitution "echo b"
+]
+[Word
+  Unquoted "c"
+]
+a b c
+[Code 0]

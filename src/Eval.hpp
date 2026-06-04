@@ -56,13 +56,27 @@ struct LoopControl
   i64 level;
 };
 
+/* The return builtin throws this to unwind to the enclosing function call. */
+struct FunctionReturn
+{
+  i64 status;
+};
+
+/* The exit builtin throws this inside a subshell or a command substitution, so
+   it ends only that and not the whole shell. At the top level exit really
+   exits. */
+struct ShellExit
+{
+  i64 status;
+};
+
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. */
 struct EvalStateSnapshot
 {
   std::unordered_map<std::string, std::string> shell_variables;
+  std::unordered_map<std::string, const Expression *> functions;
   std::vector<std::string> positional_params;
-  i32 last_exit_status;
   std::filesystem::path working_directory;
 };
 
@@ -101,6 +115,7 @@ struct EvalContext
      a builtin and a program of the same name. */
   void register_function(const std::string &name, const Expression *body);
   const Expression *find_function(const std::string &name) const;
+  bool has_functions() const;
   void clear_functions();
 
   /* Save and restore the mutable state around a subshell or a command
@@ -108,9 +123,21 @@ struct EvalContext
   EvalStateSnapshot snapshot_state() const;
   void restore_state(EvalStateSnapshot snapshot);
 
-  /* Expand a word in assignment context, with variable and tilde expansion but
-     no field splitting and no globbing. */
-  std::string expand_word_for_assignment(const Word &word) const;
+  /* Track whether evaluation is inside a subshell or a command substitution, so
+     the exit builtin ends only that scope instead of the whole shell. */
+  void enter_subshell();
+  void leave_subshell();
+  bool in_subshell() const;
+
+  /* Expand a word in assignment context, with variable, tilde, and command
+     substitution but no field splitting and no globbing. */
+  std::string expand_word_for_assignment(const Word &word);
+
+  /* Run the source of a $(...) and return its standard output with trailing
+     newlines stripped. The inner command runs in-process with the working
+     directory and variables snapshotted, so a cd or an assignment inside does
+     not leak to the parent. */
+  std::string capture_command_substitution(const std::string &source);
 
   bool should_echo() const;
   bool should_echo_expanded() const;
@@ -137,6 +164,7 @@ protected:
   std::vector<std::string> m_positional_params{};
   std::optional<i64> m_last_background_pid{};
   std::unordered_map<std::string, const Expression *> m_functions{};
+  usize m_subshell_depth{0};
 
   bool m_enable_path_expansion;
   bool m_enable_echo;
@@ -149,9 +177,9 @@ protected:
 
   std::string expand_variable(const std::string &name) const;
 
-  /* Turn a word into fields, applying tilde, variable expansion, and IFS field
-     splitting, but not globbing. */
-  std::vector<GlobField> expand_word(const Word &word) const;
+  /* Turn a word into fields, applying tilde, variable expansion, command
+     substitution, and IFS field splitting, but not globbing. */
+  std::vector<GlobField> expand_word(const Word &word);
 
   std::vector<GlobField> expand_path_once(const GlobField &field,
                                           bool should_expand_files);
@@ -168,6 +196,14 @@ struct ExecContext
 {
   static ExecContext make_from(SourceLocation location,
                                const std::vector<std::string> &args);
+
+  /* Build directly from an already resolved builtin kind or program path,
+     skipping the PATH search. A simple command memoizes its resolution and
+     reuses it across the iterations of a loop. */
+  static ExecContext
+  from_resolved(SourceLocation location,
+                std::variant<shit::Builtin::Kind, std::filesystem::path> kind,
+                const std::vector<std::string> &args);
 
   std::optional<os::descriptor> in_fd{std::nullopt};
   std::optional<os::descriptor> out_fd{std::nullopt};

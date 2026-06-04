@@ -1,0 +1,76 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "return" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "got=$?"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "g"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a"]
+          [CompoundListCondition, None]
+            [SimpleCommand "return"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "g"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "got2=$?"]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "got="
+  Variable "?"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "return"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "got2="
+  Variable "?"
+]
+got=3
+a
+got2=0
+[Code 0]

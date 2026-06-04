@@ -72,6 +72,8 @@ is_shell_sentinel(char ch)
   case '|':
   case '{':
   case '}':
+  case '(':
+  case ')':
   case '&':
   case ';':
   case '<':
@@ -363,7 +365,65 @@ Lexer::lex_identifier()
       byte_count++;
       char next = chop_character(byte_count);
 
-      if (next == '{') {
+      if (next == '(') {
+        /* Command substitution. Scan to the matching close paren, honoring
+           quotes and nesting so an inner ) does not end it early. */
+        byte_count++;
+
+        /* $(( starts arithmetic expansion, which is a different feature. A
+           subshell substitution is written with a space, $( (cmd) ). */
+        if (chop_character(byte_count) == '(') {
+          throw ErrorWithLocation{
+              {m_cursor_position, byte_count + 1},
+              "Arithmetic expansion $((...)) is not supported"};
+        }
+
+        std::string inner{};
+        usize depth = 1;
+        char quote = 0;
+        for (;;) {
+          char c = chop_character(byte_count);
+          if (c == lexer::CEOF) {
+            throw ErrorWithLocationAndDetails{
+                {m_cursor_position,              byte_count},
+                "Unterminated command substitution",
+                {m_cursor_position + byte_count, 1         },
+                "expected ) here"
+            };
+          }
+          byte_count++;
+
+          if (quote != 0) {
+            if (c == quote) quote = 0;
+            inner += c;
+            continue;
+          }
+          if (c == '\\') {
+            inner += c;
+            char escaped = chop_character(byte_count);
+            if (escaped != lexer::CEOF) {
+              byte_count++;
+              inner += escaped;
+            }
+            continue;
+          }
+          if (c == '\'' || c == '"') {
+            quote = c;
+            inner += c;
+            continue;
+          }
+          if (c == '(') {
+            depth++;
+          } else if (c == ')') {
+            depth--;
+            if (depth == 0) break;
+          }
+          inner += c;
+        }
+        word.segments.push_back(
+            WordSegment{WordSegment::Kind::CommandSubstitution,
+                        std::move(inner), is_in_double_quotes});
+      } else if (next == '{') {
         byte_count++;
         std::string name{};
         for (;;) {
@@ -561,7 +621,7 @@ Lexer::lex_sentinel()
       TOKEN_CASE_ONE(LeftParen);
       TOKEN_CASE_ONE(RightBracket);
       TOKEN_CASE_ONE(LeftBracket);
-      TOKEN_CASE_ONE(Semicolon);
+      TOKEN_CASE_TWO(Semicolon, ';', DoubleSemicolon);
       TOKEN_CASE_ONE(Dot);
       TOKEN_CASE_ONE(Newline);
       TOKEN_CASE_ONE(Plus);

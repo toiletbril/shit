@@ -1,0 +1,23 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "greet"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "hi"]
+  [CompoundListCondition, None]
+    [SimpleCommand "greet"]
+[Word
+  Unquoted "greet"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "greet"
+]
+hi
+[Code 0]

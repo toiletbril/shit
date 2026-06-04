@@ -36,6 +36,12 @@ std::optional<usize> read_fd(os::descriptor fd, void *buf, usize size);
 
 bool close_fd(os::descriptor fd);
 
+/* Point the process standard output at target and return a handle to the
+   previous output, so a command substitution can capture everything written.
+   restore_stdout puts the previous output back. */
+os::descriptor redirect_stdout(os::descriptor target);
+void restore_stdout(os::descriptor saved);
+
 std::optional<std::string> get_environment_variable(const std::string &key);
 void set_environment_variable(const std::string &key, const std::string &value);
 void unset_environment_variable(const std::string &key);

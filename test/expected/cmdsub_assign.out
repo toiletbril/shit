@@ -1,0 +1,18 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign v=$(echo hello)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "got=$v"]
+[Word
+  Unquoted "v="
+  CommandSubstitution "echo hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "got="
+  Variable "v"
+]
+got=hello
+[Code 0]

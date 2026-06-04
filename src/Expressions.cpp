@@ -71,6 +71,18 @@ Expression::analyze(AnalysisContext &actx, bool is_unconditional) const
   SHIT_UNUSED(is_unconditional);
 }
 
+bool
+Expression::is_simple_command() const
+{
+  return false;
+}
+
+bool
+Expression::is_dummy() const
+{
+  return false;
+}
+
 namespace {
 
 /* The literal name of a command when it is statically known. A word that holds
@@ -220,6 +232,12 @@ Command::is_assignment() const
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
 {}
 
+bool
+DummyExpression::is_dummy() const
+{
+  return true;
+}
+
 i64
 DummyExpression::evaluate_impl(EvalContext &cxt) const
 {
@@ -264,10 +282,12 @@ AssignCommand::is_assignment() const
 i64
 AssignCommand::evaluate_impl(EvalContext &cxt) const
 {
+  /* The status defaults to 0, but a command substitution in the value sets it
+     to the status of that substitution, which the assignment then reports. */
+  cxt.set_last_exit_status(0);
   cxt.set_shell_variable(m_assignment->key(), cxt.expand_word_for_assignment(
                                                   m_assignment->value_word()));
-  cxt.set_last_exit_status(0);
-  return 0;
+  return cxt.last_exit_status();
 }
 
 std::string
@@ -314,6 +334,12 @@ SimpleCommand::~SimpleCommand()
   }
 }
 
+bool
+SimpleCommand::is_simple_command() const
+{
+  return true;
+}
+
 const std::vector<const Token *> &
 SimpleCommand::args() const
 {
@@ -337,11 +363,9 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     return 0;
   }
 
-  if (cxt.shell_is_interactive())
-    toiletline::set_title(utils::merge_args_to_string(program_args));
-
-  /* Per-command assignments apply to the environment around this command, so
-     the child inherits them. The previous values are restored afterwards. */
+  /* Per-command assignments apply to the environment for this command, a
+     function call included, so a child inherits them and a function sees them.
+     The previous values are restored on every exit path. */
   std::vector<std::pair<std::string, std::optional<std::string>>> saved_env{};
   if (m_local_vars) {
     for (const auto &[name, value_word] : *m_local_vars) {
@@ -350,16 +374,61 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
                                    cxt.expand_word_for_assignment(value_word));
     }
   }
+  SHIT_DEFER
+  {
+    for (const auto &[name, old_value] : saved_env) {
+      if (old_value)
+        os::set_environment_variable(name, *old_value);
+      else
+        os::unset_environment_variable(name);
+    }
+  };
 
-  i64 ret = utils::execute_context(
-      ExecContext::make_from(source_location(), program_args), cxt, is_async());
+  /* A function shadows a builtin and a program. Run its body with the call
+     words as the positional parameters, restoring them afterwards. A return
+     builtin unwinds here and supplies the function exit status. */
+  if (const Expression *function_body =
+          cxt.has_functions() ? cxt.find_function(program_args[0]) : nullptr;
+      function_body != nullptr)
+  {
+    std::vector<std::string> saved_params = cxt.positional_params();
+    cxt.set_positional_params(
+        std::vector<std::string>{program_args.begin() + 1, program_args.end()});
+    SHIT_DEFER { cxt.set_positional_params(std::move(saved_params)); };
 
-  for (const auto &[name, old_value] : saved_env) {
-    if (old_value)
-      os::set_environment_variable(name, *old_value);
-    else
-      os::unset_environment_variable(name);
+    i64 function_ret = 0;
+    try {
+      function_ret = function_body->evaluate(cxt);
+    } catch (const FunctionReturn &returned) {
+      function_ret = returned.status;
+    }
+
+    cxt.set_last_exit_status(static_cast<i32>(function_ret));
+    return function_ret;
   }
+
+  if (cxt.shell_is_interactive())
+    toiletline::set_title(utils::merge_args_to_string(program_args));
+
+  /* Reuse a memoized resolution when the command word is unchanged, otherwise
+     search PATH once and remember the result for the next run. */
+  bool is_cache_valid =
+      m_resolved_kind.has_value() && m_resolved_name == program_args[0];
+
+  ExecContext ec =
+      is_cache_valid ? ExecContext::from_resolved(
+                           source_location(), *m_resolved_kind, program_args)
+                     : ExecContext::make_from(source_location(), program_args);
+
+  if (!is_cache_valid) {
+    if (ec.is_builtin())
+      m_resolved_kind = ec.builtin_kind();
+    else
+      m_resolved_kind = ec.program_path();
+    m_resolved_name = program_args[0];
+  }
+
+  i64 ret = utils::execute_context(std::move(ec), cxt, is_async());
 
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -368,16 +437,17 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
 std::string
 SimpleCommand::to_string() const
 {
-  std::string args{};
-  std::string s = "SimpleCommand \"" + m_args[0]->raw_string() + "\"";
+  std::string s = "SimpleCommand";
 
+  /* A pipeline stage that is a bare assignment carries the assignment in the
+     local variables and has no command word, so the argument list is empty. */
   if (!m_args.empty()) {
+    s += " \"" + m_args[0]->raw_string() + "\"";
     for (usize i = 1; i < m_args.size(); i++) {
-      args += " \"";
-      args += m_args[i]->raw_string();
-      args += "\"";
+      s += " \"";
+      s += m_args[i]->raw_string();
+      s += "\"";
     }
-    s += args;
   }
   if (is_async()) s += ", Async";
 
@@ -600,8 +670,21 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
 
   for (const SimpleCommand *e : m_commands) {
     cxt.add_evaluated_expression();
-    ecs.emplace_back(ExecContext::make_from(e->source_location(),
-                                            cxt.process_args(e->args())));
+
+    std::vector<std::string> stage_args = cxt.process_args(e->args());
+
+    /* A stage that expands to no command word, such as a bare assignment or an
+       unset variable, has no program to run. Report it instead of building an
+       exec context from an empty argument list, which would read past the
+       arguments. */
+    if (stage_args.empty()) {
+      throw ErrorWithLocation{
+          e->source_location(),
+          "A pipeline stage expanded to no command to run"};
+    }
+
+    ecs.emplace_back(
+        ExecContext::make_from(e->source_location(), std::move(stage_args)));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs), cxt, is_async());
@@ -623,6 +706,424 @@ Pipeline::redirect_to(usize d, std::string &f, bool duplicate)
   SHIT_UNUSED(f);
   SHIT_UNUSED(duplicate);
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
+
+void
+CompoundCommand::append_to(usize d, std::string &f, bool duplicate)
+{
+  SHIT_UNUSED(d);
+  SHIT_UNUSED(f);
+  SHIT_UNUSED(duplicate);
+  throw ErrorWithLocation{source_location(),
+                          "Redirection on a compound command is not supported"};
+}
+
+void
+CompoundCommand::redirect_to(usize d, std::string &f, bool duplicate)
+{
+  SHIT_UNUSED(d);
+  SHIT_UNUSED(f);
+  SHIT_UNUSED(duplicate);
+  throw ErrorWithLocation{source_location(),
+                          "Redirection on a compound command is not supported"};
+}
+
+static std::string
+indent_for_layer(usize layer)
+{
+  std::string pad{};
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+  return pad;
+}
+
+IfClause::IfClause(
+    SourceLocation location,
+    std::vector<std::pair<const Expression *, const Expression *>> &&branches,
+    const Expression *otherwise)
+    : CompoundCommand(location), m_branches(std::move(branches)),
+      m_otherwise(otherwise)
+{}
+
+IfClause::~IfClause()
+{
+  for (const auto &[condition, body] : m_branches) {
+    delete condition;
+    delete body;
+  }
+  delete m_otherwise;
+}
+
+std::string
+IfClause::to_string() const
+{
+  return "IfClause";
+}
+
+std::string
+IfClause::to_ast_string(usize layer) const
+{
+  std::string pad = indent_for_layer(layer);
+  std::string child_pad = pad + EXPRESSION_AST_INDENT;
+  std::string s = pad + "[" + to_string() + "]";
+  for (const auto &[condition, body] : m_branches) {
+    s += '\n' + child_pad + condition->to_ast_string(layer + 1);
+    s += '\n' + child_pad + body->to_ast_string(layer + 1);
+  }
+  if (m_otherwise != nullptr)
+    s += '\n' + child_pad + m_otherwise->to_ast_string(layer + 1);
+  return s;
+}
+
+i64
+IfClause::evaluate_impl(EvalContext &cxt) const
+{
+  for (const auto &[condition, body] : m_branches) {
+    if (condition->evaluate(cxt) == 0) return body->evaluate(cxt);
+  }
+  if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+  return 0;
+}
+
+void
+IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  /* The first condition runs whenever the if runs. The elif conditions and all
+     bodies are conditional, since a branch may not be reached. */
+  bool is_first_branch = true;
+  for (const auto &[condition, body] : m_branches) {
+    condition->analyze(actx, is_unconditional && is_first_branch);
+    body->analyze(actx, false);
+    is_first_branch = false;
+  }
+  if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
+}
+
+WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
+                     const Expression *body, bool is_until)
+    : CompoundCommand(location), m_condition(condition), m_body(body),
+      m_is_until(is_until)
+{}
+
+WhileLoop::~WhileLoop()
+{
+  delete m_condition;
+  delete m_body;
+}
+
+std::string
+WhileLoop::to_string() const
+{
+  return m_is_until ? "UntilLoop" : "WhileLoop";
+}
+
+std::string
+WhileLoop::to_ast_string(usize layer) const
+{
+  std::string pad = indent_for_layer(layer);
+  std::string child_pad = pad + EXPRESSION_AST_INDENT;
+  std::string s = pad + "[" + to_string() + "]";
+  s += '\n' + child_pad + m_condition->to_ast_string(layer + 1);
+  s += '\n' + child_pad + m_body->to_ast_string(layer + 1);
+  return s;
+}
+
+i64
+WhileLoop::evaluate_impl(EvalContext &cxt) const
+{
+  i64 ret = 0;
+  for (;;) {
+    i64 condition_status = m_condition->evaluate(cxt);
+    bool should_run_body =
+        m_is_until ? (condition_status != 0) : (condition_status == 0);
+    if (!should_run_body) break;
+
+    try {
+      ret = m_body->evaluate(cxt);
+    } catch (LoopControl &control) {
+      /* A break or continue aimed at an outer loop keeps unwinding. */
+      if (control.level > 1) {
+        control.level--;
+        throw;
+      }
+      if (control.kind == LoopControl::Kind::Break) break;
+      /* A continue falls through to the next iteration. */
+    }
+  }
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
+void
+WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  /* The condition runs at least once, the body may run zero times. */
+  m_condition->analyze(actx, is_unconditional);
+  m_body->analyze(actx, false);
+}
+
+ForLoop::ForLoop(SourceLocation location, std::string variable_name,
+                 std::vector<const Token *> &&words, bool has_in_clause,
+                 const Expression *body)
+    : CompoundCommand(location), m_variable_name(std::move(variable_name)),
+      m_words(std::move(words)), m_has_in_clause(has_in_clause), m_body(body)
+{}
+
+ForLoop::~ForLoop()
+{
+  for (const Token *t : m_words)
+    delete t;
+  delete m_body;
+}
+
+std::string
+ForLoop::to_string() const
+{
+  return "ForLoop \"" + m_variable_name + "\"";
+}
+
+std::string
+ForLoop::to_ast_string(usize layer) const
+{
+  std::string pad = indent_for_layer(layer);
+  std::string s = pad + "[" + to_string() + "]";
+  s += '\n' + pad + EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
+  return s;
+}
+
+i64
+ForLoop::evaluate_impl(EvalContext &cxt) const
+{
+  /* Without an in clause the loop walks the positional parameters. */
+  std::vector<std::string> values =
+      m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
+
+  i64 ret = 0;
+  for (const std::string &value : values) {
+    cxt.set_shell_variable(m_variable_name, value);
+    try {
+      ret = m_body->evaluate(cxt);
+    } catch (LoopControl &control) {
+      if (control.level > 1) {
+        control.level--;
+        throw;
+      }
+      if (control.kind == LoopControl::Kind::Break) break;
+    }
+  }
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
+void
+ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  SHIT_UNUSED(is_unconditional);
+  m_body->analyze(actx, false);
+}
+
+CaseClause::CaseClause(SourceLocation location, const Token *word,
+                       std::vector<CaseItem> &&items)
+    : CompoundCommand(location), m_word(word), m_items(std::move(items))
+{}
+
+CaseClause::~CaseClause()
+{
+  delete m_word;
+  for (const CaseItem &item : m_items) {
+    for (const Token *pattern : item.patterns)
+      delete pattern;
+    delete item.body;
+  }
+}
+
+std::string
+CaseClause::to_string() const
+{
+  return "CaseClause";
+}
+
+std::string
+CaseClause::to_ast_string(usize layer) const
+{
+  std::string pad = indent_for_layer(layer);
+  std::string child_pad = pad + EXPRESSION_AST_INDENT;
+  std::string s = pad + "[" + to_string() + "]";
+  for (const CaseItem &item : m_items)
+    s += '\n' + child_pad + item.body->to_ast_string(layer + 1);
+  return s;
+}
+
+i64
+CaseClause::evaluate_impl(EvalContext &cxt) const
+{
+  /* A case word and its patterns expand with variables and tilde but no field
+     splitting and no pathname globbing, so a pattern keeps its metacharacters
+     for matching. */
+  auto expand_no_glob = [&cxt](const Token *t) -> std::string {
+    if (t->kind() == Token::Kind::Word)
+      return cxt.expand_word_for_assignment(
+          static_cast<const tokens::WordToken *>(t)->word());
+    return t->raw_string();
+  };
+
+  std::string subject = expand_no_glob(m_word);
+
+  for (const CaseItem &item : m_items) {
+    for (const Token *pattern_token : item.patterns) {
+      std::string pattern = expand_no_glob(pattern_token);
+      std::vector<bool> all_active(pattern.size(), true);
+      if (utils::glob_matches(pattern, subject, all_active, 0)) {
+        i64 ret = item.body->evaluate(cxt);
+        cxt.set_last_exit_status(static_cast<i32>(ret));
+        return ret;
+      }
+    }
+  }
+
+  cxt.set_last_exit_status(0);
+  return 0;
+}
+
+void
+CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  SHIT_UNUSED(is_unconditional);
+  for (const CaseItem &item : m_items)
+    item.body->analyze(actx, false);
+}
+
+BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
+    : CompoundCommand(location), m_body(body)
+{}
+
+BraceGroup::~BraceGroup() { delete m_body; }
+
+std::string
+BraceGroup::to_string() const
+{
+  return "BraceGroup";
+}
+
+std::string
+BraceGroup::to_ast_string(usize layer) const
+{
+  std::string pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
+}
+
+i64
+BraceGroup::evaluate_impl(EvalContext &cxt) const
+{
+  return m_body->evaluate(cxt);
+}
+
+void
+BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  m_body->analyze(actx, is_unconditional);
+}
+
+Subshell::Subshell(SourceLocation location, const Expression *body)
+    : CompoundCommand(location), m_body(body)
+{}
+
+Subshell::~Subshell() { delete m_body; }
+
+std::string
+Subshell::to_string() const
+{
+  return "Subshell";
+}
+
+std::string
+Subshell::to_ast_string(usize layer) const
+{
+  std::string pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
+}
+
+i64
+Subshell::evaluate_impl(EvalContext &cxt) const
+{
+  /* This shell has no process-level subshell, so isolate by snapshot. A cd or
+     an assignment inside does not leak, but the exit status propagates. An exit
+     inside ends only the subshell. */
+  EvalStateSnapshot snapshot = cxt.snapshot_state();
+  cxt.enter_subshell();
+  i64 ret = 0;
+  try {
+    ret = m_body->evaluate(cxt);
+  } catch (const ShellExit &exited) {
+    ret = exited.status;
+  } catch (...) {
+    cxt.leave_subshell();
+    cxt.restore_state(std::move(snapshot));
+    throw;
+  }
+  cxt.leave_subshell();
+  cxt.restore_state(std::move(snapshot));
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
+void
+Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  m_body->analyze(actx, is_unconditional);
+}
+
+FunctionDefinition::FunctionDefinition(SourceLocation location,
+                                       std::string name, const Expression *body)
+    : CompoundCommand(location), m_name(std::move(name)), m_body(body)
+{}
+
+FunctionDefinition::~FunctionDefinition() { delete m_body; }
+
+const std::string &
+FunctionDefinition::name() const
+{
+  return m_name;
+}
+
+const Expression *
+FunctionDefinition::body() const
+{
+  return m_body;
+}
+
+std::string
+FunctionDefinition::to_string() const
+{
+  return "FunctionDefinition \"" + m_name + "\"";
+}
+
+std::string
+FunctionDefinition::to_ast_string(usize layer) const
+{
+  std::string pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
+}
+
+i64
+FunctionDefinition::evaluate_impl(EvalContext &cxt) const
+{
+  cxt.register_function(m_name, m_body);
+  cxt.set_last_exit_status(0);
+  return 0;
+}
+
+void
+FunctionDefinition::analyze(AnalysisContext &actx, bool is_unconditional) const
+{
+  SHIT_UNUSED(is_unconditional);
+  actx.defined_functions.insert(m_name);
+  m_body->analyze(actx, false);
 }
 
 UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
@@ -885,7 +1386,9 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
     }
   }
 
-  if (name && !command_resolves(*name)) {
+  if (name && !command_resolves(*name) &&
+      actx.defined_functions.find(*name) == actx.defined_functions.end())
+  {
     std::string message = "Command '" + *name + "' was not found";
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. */
