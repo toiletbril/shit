@@ -45,7 +45,7 @@ Expression::evaluate(EvalContext &cxt) const
 void
 Expression::operator delete(void *pointer)
 {
-  if (g_ast_arena != nullptr && g_ast_arena->owns(pointer)) return;
+  if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);
 }
 
@@ -1290,7 +1290,9 @@ FunctionDefinition::FunctionDefinition(SourceLocation location,
     : CompoundCommand(location), m_name(std::move(name)), m_body(body)
 {}
 
-FunctionDefinition::~FunctionDefinition() { delete m_body; }
+/* The body lives in the persistent function arena, owned by the function table
+   rather than this node, so it is not deleted here. */
+FunctionDefinition::~FunctionDefinition() = default;
 
 const std::string &
 FunctionDefinition::name() const

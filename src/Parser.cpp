@@ -898,7 +898,13 @@ Parser::parse_function_definition(std::unique_ptr<Token> name_token)
     m_lexer.advance_past_last_peek();
   }
 
+  /* The body is parsed into the persistent function arena, so it outlives the
+     command that defined it once the per-command arena resets. */
+  BumpArena &per_command_arena = m_lexer.arena();
+  if (g_function_arena != nullptr) m_lexer.set_arena(*g_function_arena);
   std::unique_ptr<Command> body{parse_simple_command()};
+  m_lexer.set_arena(per_command_arena);
+
   if (!body) {
     throw ErrorWithLocation{location,
                             "Expected a compound command as the function body"};

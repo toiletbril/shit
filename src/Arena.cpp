@@ -5,6 +5,14 @@
 namespace shit {
 
 BumpArena *g_ast_arena = nullptr;
+BumpArena *g_function_arena = nullptr;
+
+bool
+is_arena_pointer(const void *pointer)
+{
+  return (g_ast_arena != nullptr && g_ast_arena->owns(pointer)) ||
+         (g_function_arena != nullptr && g_function_arena->owns(pointer));
+}
 
 BumpArena::BumpArena() = default;
 

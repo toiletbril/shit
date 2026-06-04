@@ -81,15 +81,11 @@ run_script_contents(const std::string &script_contents,
     SHIT_DEFER { context.end_command(); };
 
     /* Reclaim the previous command's arena storage before the next parse, and
-       drop the functions and eval ASTs that point into it. Once a function is
-       defined, its body lives in this arena, so the reset is skipped and the
-       arena keeps growing, which is how a function defined on one interactive
-       line stays callable on the next. */
-    if (!context.has_functions()) {
-      context.clear_retained_sources();
-      ast_arena.reset();
-      context.clear_functions();
-    }
+       destroy the eval and dot ASTs that point into it. Function bodies live in
+       the separate function arena, so they survive this reset and a function
+       defined on one command stays callable on the next. */
+    context.clear_retained_sources();
+    ast_arena.reset();
 
     shit::Parser p{
         shit::Lexer{script_contents, ast_arena, FLAG_ESCAPE_MAP.is_enabled()}
@@ -112,10 +108,6 @@ run_script_contents(const std::string &script_contents,
       exit_code = static_cast<int>(ast->evaluate(context));
     }
     context.set_last_exit_status(static_cast<i32>(exit_code));
-
-    /* Keep this command's tree alive when a function is in scope, so its body
-       stays valid for the next command. Otherwise let it be destroyed here. */
-    if (context.has_functions()) context.retain_ast(ast.release());
 
     if (FLAG_EXIT_CODE.is_enabled())
       std::cout << "[Code " << exit_code << ']' << std::endl;
@@ -349,6 +341,11 @@ main(int argc, char **argv)
      between commands. It outlives each tree it builds. */
   shit::BumpArena ast_arena{};
   shit::g_ast_arena = &ast_arena;
+
+  /* The function arena holds function bodies, which outlive the command that
+     defined them, so it is never reset during the run. */
+  shit::BumpArena function_arena{};
+  shit::g_function_arena = &function_arena;
 
   /* A login shell reads /etc/profile and ~/.profile if they exist, then the
      file named by ENV when that is set. A missing file is silently skipped. */

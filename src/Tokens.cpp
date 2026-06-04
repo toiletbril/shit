@@ -19,7 +19,7 @@ Token::source_location() const
 void
 Token::operator delete(void *pointer)
 {
-  if (g_ast_arena != nullptr && g_ast_arena->owns(pointer)) return;
+  if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);
 }
 

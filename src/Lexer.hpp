@@ -53,6 +53,9 @@ struct Lexer
   std::string_view source() const;
   const std::vector<Word> &debug_words() const;
   BumpArena &arena() const;
+  /* Redirect node allocation to another arena, so a function body can be parsed
+     into the persistent function arena and restored afterward. */
+  void set_arena(BumpArena &arena);
   usize advance_past_last_peek();
 
   /* Reserve a heredoc body for the given delimiter, returning the stable buffer
@@ -61,7 +64,7 @@ struct Lexer
 
 protected:
   std::string m_source{};
-  BumpArena &m_arena;
+  BumpArena *m_arena;
   usize m_cursor_position{0};
   usize m_cached_offset{0};
 

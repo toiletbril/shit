@@ -134,7 +134,7 @@ is_variable_name(char ch)
 
 Lexer::Lexer(std::string source, BumpArena &arena,
              bool should_collect_debug_words)
-    : m_source(std::move(source)), m_arena(arena),
+    : m_source(std::move(source)), m_arena(&arena),
       m_should_collect_debug_words(should_collect_debug_words)
 {}
 
@@ -187,7 +187,13 @@ Lexer::debug_words() const
 BumpArena &
 Lexer::arena() const
 {
-  return m_arena;
+  return *m_arena;
+}
+
+void
+Lexer::set_arena(BumpArena &arena)
+{
+  m_arena = &arena;
 }
 
 usize
@@ -264,7 +270,7 @@ Lexer::lex_expression_token()
       };
   }
 
-  return m_arena.create<tokens::EndOfFile>(
+  return m_arena->create<tokens::EndOfFile>(
       SourceLocation{m_cursor_position, 1});
 }
 
@@ -283,7 +289,7 @@ Lexer::lex_shell_token()
           "Unexpected character"
       };
   } else {
-    t = m_arena.create<tokens::EndOfFile>(
+    t = m_arena->create<tokens::EndOfFile>(
         SourceLocation{m_cursor_position, 1});
   }
 
@@ -340,7 +346,7 @@ Lexer::lex_number()
     length++;
   }
 
-  Token *num = m_arena.create<tokens::Number>(
+  Token *num = m_arena->create<tokens::Number>(
       SourceLocation{m_cursor_position, length}, n);
   m_cached_offset = length;
 
@@ -620,7 +626,7 @@ Lexer::lex_identifier()
   if (auto assignment_split = word.get_assignment_split();
       assignment_split.has_value())
   {
-    t = m_arena.create<tokens::Assignment>(
+    t = m_arena->create<tokens::Assignment>(
         SourceLocation{actual_cursor_position, byte_count},
         assignment_split->first, std::move(assignment_split->second));
   } else if (word.segments.size() == 1 &&
@@ -638,7 +644,7 @@ Lexer::lex_identifier()
   }
 
   if (t == nullptr) {
-    t = m_arena.create<tokens::WordToken>(
+    t = m_arena->create<tokens::WordToken>(
         SourceLocation{actual_cursor_position, byte_count}, std::move(word));
   }
 
