@@ -1,11 +1,19 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Eval.hpp"
 
 #include <iostream>
 #include <string>
 
 /* Reads one line from standard input and splits it on IFS into the named
-   variables, the last variable taking the remainder. */
+   variables, the last variable taking the remainder. The flag parser rejects
+   an unknown option. */
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("read [-r] [name ...]");
+
+FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
 
 namespace shit {
 
@@ -20,11 +28,12 @@ Read::kind() const
 i32
 Read::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> names{ec.args().begin() + 1, ec.args().end()};
-
   /* -r is accepted, and since backslash processing is not done here the read is
      raw either way. */
-  if (!names.empty() && names.front() == "-r") names.erase(names.begin());
+  std::vector<std::string> names =
+      parse_flags_vec(FLAG_LIST, {ec.args().begin() + 1, ec.args().end()});
+  SHIT_DEFER { reset_flags(FLAG_LIST); };
+
   if (names.empty()) names.emplace_back("REPLY");
 
   std::string line{};
