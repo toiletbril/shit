@@ -2,7 +2,8 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 
-/* No flags. shift drops the first n positional parameters, n defaulting to 1. */
+/* No flags. shift drops the first n positional parameters, n defaulting to 1.
+ */
 
 namespace shit {
 

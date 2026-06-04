@@ -405,8 +405,8 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     Maybe<os::descriptor> opened = os::open_file_descriptor(target[0], mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
-                              "Could not open '" + target[0] + "': " +
-                                  os::last_system_error_message()};
+                              "Could not open '" + target[0] +
+                                  "': " + os::last_system_error_message()};
     }
     os::descriptor file_fd = opened.take();
 
@@ -508,8 +508,8 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     Maybe<os::descriptor> opened = os::open_file_descriptor(target[0], mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
-                              "Could not open '" + target[0] + "': " +
-                                  os::last_system_error_message()};
+                              "Could not open '" + target[0] +
+                                  "': " + os::last_system_error_message()};
     }
     os::descriptor file_fd = opened.take();
 
@@ -538,7 +538,8 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   /* Per-command assignments apply to the environment for this command, a
      function call included, so a child inherits them and a function sees them.
      The previous values are restored on every exit path. */
-  ArrayList<std::pair<std::string, std::optional<std::string>>> saved_env{heap_allocator()};
+  ArrayList<std::pair<std::string, std::optional<std::string>>> saved_env{
+      heap_allocator()};
   m_local_vars.for_each([&](StringView name, const Word &value_word) {
     std::string name_str{name.data, name.length};
     saved_env.push({name_str, os::get_environment_variable(name_str)});
@@ -871,9 +872,8 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
        exec context from an empty argument list, which would read past the
        arguments. */
     if (stage_args.empty()) {
-      throw ErrorWithLocation{
-          e->source_location(),
-          "A pipeline stage expanded to no command to run"};
+      throw ErrorWithLocation{e->source_location(),
+                              "A pipeline stage expanded to no command to run"};
     }
 
     ExecContext ec =

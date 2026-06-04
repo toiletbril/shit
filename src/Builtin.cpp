@@ -68,10 +68,8 @@ builtin_help(Builtin::Kind kind)
             "Return from a function or a sourced file with status n."};
   case Builtin::Kind::Colon:
     return {":", "Do nothing and return a successful status."};
-  case Builtin::Kind::True:
-    return {"true", "Return a successful status."};
-  case Builtin::Kind::False:
-    return {"false", "Return a failing status."};
+  case Builtin::Kind::True: return {"true", "Return a successful status."};
+  case Builtin::Kind::False: return {"false", "Return a failing status."};
   case Builtin::Kind::Test:
     return {"test expression, or [ expression ]",
             "Evaluate a conditional expression and return its status."};
@@ -79,8 +77,7 @@ builtin_help(Builtin::Kind kind)
     return {". file, or source file",
             "Read and run a file in the current shell."};
   case Builtin::Kind::Eval:
-    return {"eval [arg ...]",
-            "Join the arguments and run them as a command."};
+    return {"eval [arg ...]", "Join the arguments and run them as a command."};
   case Builtin::Kind::Set:
     return {"set [-/+eux] [--] [arg ...]",
             "Set shell options and the positional parameters, or list "

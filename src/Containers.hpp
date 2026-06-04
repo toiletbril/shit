@@ -10,8 +10,8 @@
 
 namespace shit {
 
-/* A non-owning view of bytes, the form a function takes when it does not own the
-   characters. It points into a String, a literal, or a slice. */
+/* A non-owning view of bytes, the form a function takes when it does not own
+   the characters. It points into a String, a literal, or a slice. */
 struct StringView
 {
   const char *data{nullptr};
@@ -23,16 +23,30 @@ struct StringView
       : data(cstr), length(cstr != nullptr ? std::strlen(cstr) : 0)
   {}
 
-  [[nodiscard]] usize size() const { return length; }
-  [[nodiscard]] bool empty() const { return length == 0; }
-  [[nodiscard]] char operator[](usize i) const { return data[i]; }
+  [[nodiscard]] usize
+  size() const
+  {
+    return length;
+  }
+  [[nodiscard]] bool
+  empty() const
+  {
+    return length == 0;
+  }
+  [[nodiscard]] char
+  operator[](usize i) const
+  {
+    return data[i];
+  }
 
-  [[nodiscard]] bool operator==(StringView other) const
+  [[nodiscard]] bool
+  operator==(StringView other) const
   {
     return length == other.length &&
            (length == 0 || std::memcmp(data, other.data, length) == 0);
   }
-  [[nodiscard]] bool operator!=(StringView other) const
+  [[nodiscard]] bool
+  operator!=(StringView other) const
   {
     return !(*this == other);
   }
@@ -77,7 +91,8 @@ struct String
     other.m_capacity = 0;
   }
 
-  String &operator=(const String &other)
+  String &
+  operator=(const String &other)
   {
     if (this != &other) {
       clear();
@@ -85,7 +100,8 @@ struct String
     }
     return *this;
   }
-  String &operator=(String &&other) noexcept
+  String &
+  operator=(String &&other) noexcept
   {
     if (this != &other) {
       free_storage();
@@ -102,24 +118,48 @@ struct String
 
   ~String() { free_storage(); }
 
-  [[nodiscard]] usize size() const { return m_length; }
-  [[nodiscard]] bool empty() const { return m_length == 0; }
-  [[nodiscard]] char operator[](usize i) const { return m_data[i]; }
-  [[nodiscard]] StringView view() const { return StringView{m_data, m_length}; }
-  [[nodiscard]] const char *c_str() const
+  [[nodiscard]] usize
+  size() const
+  {
+    return m_length;
+  }
+  [[nodiscard]] bool
+  empty() const
+  {
+    return m_length == 0;
+  }
+  [[nodiscard]] char
+  operator[](usize i) const
+  {
+    return m_data[i];
+  }
+  [[nodiscard]] StringView
+  view() const
+  {
+    return StringView{m_data, m_length};
+  }
+  [[nodiscard]] const char *
+  c_str() const
   {
     return m_data != nullptr ? m_data : "";
   }
 
-  void clear() { m_length = 0; if (m_data != nullptr) m_data[0] = '\0'; }
+  void
+  clear()
+  {
+    m_length = 0;
+    if (m_data != nullptr) m_data[0] = '\0';
+  }
 
-  void push(char c)
+  void
+  push(char c)
   {
     reserve(m_length + 1);
     m_data[m_length++] = c;
     m_data[m_length] = '\0';
   }
-  void append(StringView other)
+  void
+  append(StringView other)
   {
     if (other.length == 0) return;
     reserve(m_length + other.length);
@@ -128,7 +168,8 @@ struct String
     m_data[m_length] = '\0';
   }
 
-  void reserve(usize needed)
+  void
+  reserve(usize needed)
   {
     if (needed + 1 <= m_capacity) return;
     usize new_capacity = m_capacity == 0 ? 16 : m_capacity * 2;
@@ -142,13 +183,15 @@ struct String
     m_capacity = new_capacity;
   }
 
-  [[nodiscard]] bool operator==(StringView other) const
+  [[nodiscard]] bool
+  operator==(StringView other) const
   {
     return view() == other;
   }
 
   /* Byte order, so a sort matches the C locale collating order. */
-  [[nodiscard]] bool operator<(const String &other) const
+  [[nodiscard]] bool
+  operator<(const String &other) const
   {
     usize shared = m_length < other.m_length ? m_length : other.m_length;
     int order = shared == 0 ? 0 : std::memcmp(c_str(), other.c_str(), shared);
@@ -157,7 +200,8 @@ struct String
   }
 
 private:
-  void free_storage()
+  void
+  free_storage()
   {
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
     m_data = nullptr;
@@ -192,7 +236,8 @@ struct ArrayList
     other.m_capacity = 0;
   }
 
-  ArrayList &operator=(ArrayList &&other) noexcept
+  ArrayList &
+  operator=(ArrayList &&other) noexcept
   {
     if (this != &other) {
       destroy_all();
@@ -206,7 +251,8 @@ struct ArrayList
     }
     return *this;
   }
-  ArrayList &operator=(const ArrayList &other)
+  ArrayList &
+  operator=(const ArrayList &other)
   {
     if (this != &other) {
       ArrayList copy{other};
@@ -217,16 +263,49 @@ struct ArrayList
 
   ~ArrayList() { destroy_all(); }
 
-  [[nodiscard]] usize size() const { return m_length; }
-  [[nodiscard]] bool empty() const { return m_length == 0; }
-  [[nodiscard]] T &operator[](usize i) { return m_data[i]; }
-  [[nodiscard]] const T &operator[](usize i) const { return m_data[i]; }
-  [[nodiscard]] T *begin() { return m_data; }
-  [[nodiscard]] T *end() { return m_data + m_length; }
-  [[nodiscard]] const T *begin() const { return m_data; }
-  [[nodiscard]] const T *end() const { return m_data + m_length; }
+  [[nodiscard]] usize
+  size() const
+  {
+    return m_length;
+  }
+  [[nodiscard]] bool
+  empty() const
+  {
+    return m_length == 0;
+  }
+  [[nodiscard]] T &
+  operator[](usize i)
+  {
+    return m_data[i];
+  }
+  [[nodiscard]] const T &
+  operator[](usize i) const
+  {
+    return m_data[i];
+  }
+  [[nodiscard]] T *
+  begin()
+  {
+    return m_data;
+  }
+  [[nodiscard]] T *
+  end()
+  {
+    return m_data + m_length;
+  }
+  [[nodiscard]] const T *
+  begin() const
+  {
+    return m_data;
+  }
+  [[nodiscard]] const T *
+  end() const
+  {
+    return m_data + m_length;
+  }
 
-  void push(T value)
+  void
+  push(T value)
   {
     reserve(m_length + 1);
     new (&m_data[m_length]) T(std::move(value));
@@ -235,19 +314,37 @@ struct ArrayList
 
   /* Destroy the elements but keep the storage, so a reused list does not
      reallocate. */
-  void clear()
+  void
+  clear()
   {
     for (usize i = 0; i < m_length; i++)
       m_data[i].~T();
     m_length = 0;
   }
 
-  [[nodiscard]] T &back() { return m_data[m_length - 1]; }
-  [[nodiscard]] const T &back() const { return m_data[m_length - 1]; }
-  [[nodiscard]] T &front() { return m_data[0]; }
-  [[nodiscard]] const T &front() const { return m_data[0]; }
+  [[nodiscard]] T &
+  back()
+  {
+    return m_data[m_length - 1];
+  }
+  [[nodiscard]] const T &
+  back() const
+  {
+    return m_data[m_length - 1];
+  }
+  [[nodiscard]] T &
+  front()
+  {
+    return m_data[0];
+  }
+  [[nodiscard]] const T &
+  front() const
+  {
+    return m_data[0];
+  }
 
-  void reserve(usize needed)
+  void
+  reserve(usize needed)
   {
     if (needed <= m_capacity) return;
     usize new_capacity = m_capacity == 0 ? 8 : m_capacity * 2;
@@ -264,7 +361,8 @@ struct ArrayList
   }
 
 private:
-  void destroy_all()
+  void
+  destroy_all()
   {
     for (usize i = 0; i < m_length; i++)
       m_data[i].~T();
@@ -309,7 +407,8 @@ struct HashMap
     other.m_count = 0;
     other.m_tombstones = 0;
   }
-  HashMap &operator=(HashMap &&other) noexcept
+  HashMap &
+  operator=(HashMap &&other) noexcept
   {
     if (this != &other) {
       destroy_all();
@@ -325,7 +424,8 @@ struct HashMap
     }
     return *this;
   }
-  HashMap &operator=(const HashMap &other)
+  HashMap &
+  operator=(const HashMap &other)
   {
     if (this != &other) {
       HashMap copy{other};
@@ -336,11 +436,16 @@ struct HashMap
 
   ~HashMap() { destroy_all(); }
 
-  [[nodiscard]] usize size() const { return m_count; }
+  [[nodiscard]] usize
+  size() const
+  {
+    return m_count;
+  }
 
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */
-  [[nodiscard]] const Value *find(StringView key) const
+  [[nodiscard]] const Value *
+  find(StringView key) const
   {
     if (m_capacity == 0) return nullptr;
     usize mask = m_capacity - 1;
@@ -355,16 +460,22 @@ struct HashMap
   }
 
   /* Store a value the table owns by move. */
-  void set(StringView key, Value value) { set_value(key, std::move(value)); }
+  void
+  set(StringView key, Value value)
+  {
+    set_value(key, std::move(value));
+  }
 
   /* Store a String value built from a view, the form the variable store and the
      traps use. Only instantiated when Value is String. */
-  void set(StringView key, StringView value)
+  void
+  set(StringView key, StringView value)
   {
     set_value(key, String{m_allocator, value});
   }
 
-  void erase(StringView key)
+  void
+  erase(StringView key)
   {
     if (m_capacity == 0) return;
     usize mask = m_capacity - 1;
@@ -389,7 +500,8 @@ struct HashMap
 
   /* Visit each key and value in unspecified order. */
   template <class Fn>
-  void for_each(Fn fn) const
+  void
+  for_each(Fn fn) const
   {
     for (usize i = 0; i < m_capacity; i++) {
       if (m_slots[i].state == Slot::Occupied)
@@ -397,7 +509,11 @@ struct HashMap
     }
   }
 
-  void clear() { destroy_all(); }
+  void
+  clear()
+  {
+    destroy_all();
+  }
 
 private:
   struct Slot
@@ -413,7 +529,8 @@ private:
     Value value{};
   };
 
-  void set_value(StringView key, Value value)
+  void
+  set_value(StringView key, Value value)
   {
     /* Tombstones count toward the load, so the table rehashes before a probe
        chain fills with deleted slots. That keeps an Empty slot reachable on
@@ -449,7 +566,8 @@ private:
     }
   }
 
-  void place(usize index, StringView key, Value value)
+  void
+  place(usize index, StringView key, Value value)
   {
     Slot &slot = m_slots[index];
     slot.key = String{m_allocator, key};
@@ -458,7 +576,8 @@ private:
     m_count++;
   }
 
-  void rehash(usize new_capacity)
+  void
+  rehash(usize new_capacity)
   {
     Slot *old_slots = m_slots;
     usize old_capacity = m_capacity;
@@ -478,7 +597,8 @@ private:
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);
   }
 
-  void destroy_all()
+  void
+  destroy_all()
   {
     for (usize i = 0; i < m_capacity; i++)
       m_slots[i].~Slot();

@@ -41,16 +41,26 @@ struct TestEvaluator
   usize pos;
   bool had_error;
 
-  const std::string &current() const { return args[pos]; }
-  bool at_end() const { return pos >= args.size(); }
+  const std::string &
+  current() const
+  {
+    return args[pos];
+  }
+  bool
+  at_end() const
+  {
+    return pos >= args.size();
+  }
 
-  void fail(const std::string &message)
+  void
+  fail(const std::string &message)
   {
     if (!had_error) std::cerr << "test: " << message << '\n';
     had_error = true;
   }
 
-  bool evaluate_unary(const std::string &op, const std::string &operand)
+  bool
+  evaluate_unary(const std::string &op, const std::string &operand)
   {
     if (op == "-z") return operand.empty();
     if (op == "-n") return !operand.empty();
@@ -71,8 +81,9 @@ struct TestEvaluator
     return false;
   }
 
-  bool evaluate_binary(const std::string &left, const std::string &op,
-                       const std::string &right)
+  bool
+  evaluate_binary(const std::string &left, const std::string &op,
+                  const std::string &right)
   {
     if (op == "=") return left == right;
     if (op == "!=") return left != right;
@@ -95,19 +106,22 @@ struct TestEvaluator
     return false;
   }
 
-  bool is_unary_operator(const std::string &s)
+  bool
+  is_unary_operator(const std::string &s)
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
            s == "-s" || s == "-r" || s == "-w" || s == "-x";
   }
 
-  bool is_binary_operator(const std::string &s)
+  bool
+  is_binary_operator(const std::string &s)
   {
     return s == "=" || s == "!=" || s == "-eq" || s == "-ne" || s == "-lt" ||
            s == "-le" || s == "-gt" || s == "-ge";
   }
 
-  bool parse_factor()
+  bool
+  parse_factor()
   {
     if (at_end()) {
       fail("argument expected");
@@ -151,7 +165,8 @@ struct TestEvaluator
     return result;
   }
 
-  bool parse_term()
+  bool
+  parse_term()
   {
     bool result = parse_factor();
     while (!at_end() && current() == "-a") {
@@ -162,7 +177,8 @@ struct TestEvaluator
     return result;
   }
 
-  bool parse_expression()
+  bool
+  parse_expression()
   {
     bool result = parse_term();
     while (!at_end() && current() == "-o") {

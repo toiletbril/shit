@@ -110,9 +110,17 @@ struct EvalContext
 
   /* The allocator for transient expansion data, which a bump arena hands out
      and reclaims whole when the command ends. */
-  Allocator scratch_allocator() { return bump_allocator(m_scratch_arena); }
+  Allocator
+  scratch_allocator()
+  {
+    return bump_allocator(m_scratch_arena);
+  }
   /* Reclaim the scratch arena, called between top-level commands. */
-  void reset_scratch_arena() { m_scratch_arena.reset(); }
+  void
+  reset_scratch_arena()
+  {
+    m_scratch_arena.reset();
+  }
 
   void set_shell_variable(const std::string &name, std::string value);
   void unset_shell_variable(const std::string &name);
@@ -121,7 +129,8 @@ struct EvalContext
   /* The stored value of a plain shell variable, or nullptr when the name is
      unset or names a special parameter. The pointer reads the value without a
      copy and stays valid until the next assignment to that name. */
-  const String *lookup_shell_variable(StringView name) const
+  const String *
+  lookup_shell_variable(StringView name) const
   {
     return m_shell_variables.find(name);
   }
@@ -176,8 +185,8 @@ struct EvalContext
   void set_error_unset(bool enabled);
   bool error_unset() const;
 
-  /* A condition, such as an if test or an && operand, suppresses set -e while it
-     runs, since its failure is expected. */
+  /* A condition, such as an if test or an && operand, suppresses set -e while
+     it runs, since its failure is expected. */
   void enter_condition();
   void leave_condition();
   bool in_condition() const;
@@ -214,9 +223,9 @@ struct EvalContext
      the rest of the current top-level command. */
   void clear_retained_sources();
 
-  /* Keep a top-level command's tree alive past its run, so a function it defined
-     stays callable on the next command. The retained trees are destroyed by
-     clear_retained_sources while the arena is still valid. */
+  /* Keep a top-level command's tree alive past its run, so a function it
+     defined stays callable on the next command. The retained trees are
+     destroyed by clear_retained_sources while the arena is still valid. */
   void retain_ast(Expression *ast);
 
   /* Expand a heredoc body, its $name and ${...} references, keeping the literal

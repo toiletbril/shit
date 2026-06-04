@@ -122,8 +122,8 @@ Word::get_assignment_split() const
   /* The value always begins with an unquoted segment, even when empty, so that
      FOO= produces one empty field rather than no field at all. */
   value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
-                                       first.text.substr(equals_position + 1),
-                                       false});
+                                  first.text.substr(equals_position + 1),
+                                  false});
   for (usize i = 1; i < segments.size(); i++)
     value.segments.push(segments[i]);
 

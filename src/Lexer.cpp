@@ -417,8 +417,8 @@ Lexer::lex_identifier()
          backslash escapes the next character. */
       if (quote_char == '"') {
         char escaped_next = chop_character(byte_count + 1);
-        if (escaped_next == '$' || escaped_next == '`' ||
-            escaped_next == '"' || escaped_next == '\\' || escaped_next == '\n')
+        if (escaped_next == '$' || escaped_next == '`' || escaped_next == '"' ||
+            escaped_next == '\\' || escaped_next == '\n')
         {
           should_escape = true;
         } else {
@@ -489,9 +489,9 @@ Lexer::lex_identifier()
               byte_count++;
             }
           }
-          word.segments.push(
-              WordSegment{WordSegment::Kind::ArithmeticExpansion,
-                          std::move(arithmetic), is_in_double_quotes});
+          word.segments.push(WordSegment{WordSegment::Kind::ArithmeticExpansion,
+                                         std::move(arithmetic),
+                                         is_in_double_quotes});
           continue;
         }
 
@@ -537,9 +537,8 @@ Lexer::lex_identifier()
           }
           inner += c;
         }
-        word.segments.push(
-            WordSegment{WordSegment::Kind::CommandSubstitution,
-                        std::move(inner), is_in_double_quotes});
+        word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
+                                       std::move(inner), is_in_double_quotes});
       } else if (next == '{') {
         byte_count++;
         std::string name{};
@@ -557,26 +556,23 @@ Lexer::lex_identifier()
           if (c == '}') break;
           name += c;
         }
-        word.segments.push(
-            WordSegment{WordSegment::Kind::VariableReference, std::move(name),
-                        is_in_double_quotes});
+        word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
+                                       std::move(name), is_in_double_quotes});
       } else if (lexer::is_variable_name_start(next)) {
         std::string name{};
         while (lexer::is_variable_name(next = chop_character(byte_count))) {
           name += next;
           byte_count++;
         }
-        word.segments.push(
-            WordSegment{WordSegment::Kind::VariableReference, std::move(name),
-                        is_in_double_quotes});
+        word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
+                                       std::move(name), is_in_double_quotes});
       } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                  next == '$' || next == '!' || next == '-' ||
                  lexer::is_number(next))
       {
         byte_count++;
-        word.segments.push(
-            WordSegment{WordSegment::Kind::VariableReference, std::string{next},
-                        is_in_double_quotes});
+        word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
+                                       std::string{next}, is_in_double_quotes});
       } else {
         /* A dollar sign that names nothing stays a literal dollar sign. */
         append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText

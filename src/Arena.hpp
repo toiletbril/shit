@@ -70,8 +70,8 @@ extern BumpArena *g_ast_arena;
    resets after every command. It is never reset during a run. */
 extern BumpArena *g_function_arena;
 
-/* True when the pointer belongs to either arena, so a node delete knows to leave
-   the storage to the arena. */
+/* True when the pointer belongs to either arena, so a node delete knows to
+   leave the storage to the arena. */
 bool is_arena_pointer(const void *pointer);
 
 } /* namespace shit */

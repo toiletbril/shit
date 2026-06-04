@@ -49,14 +49,15 @@ append_conversion(std::string &out, const std::string &spec, char conv,
     out += arg.empty() ? '\0' : arg[0];
   } else if (conv == 'd' || conv == 'i') {
     std::string with_ll = spec + "lld";
-    std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
-                  static_cast<long long>(std::strtoll(arg.c_str(), nullptr, 0)));
+    std::snprintf(
+        buffer, sizeof(buffer), with_ll.c_str(),
+        static_cast<long long>(std::strtoll(arg.c_str(), nullptr, 0)));
     out += buffer;
   } else if (conv == 'x' || conv == 'X' || conv == 'o' || conv == 'u') {
     std::string with_ll = spec + "ll" + conv;
-    std::snprintf(
-        buffer, sizeof(buffer), with_ll.c_str(),
-        static_cast<unsigned long long>(std::strtoull(arg.c_str(), nullptr, 0)));
+    std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
+                  static_cast<unsigned long long>(
+                      std::strtoull(arg.c_str(), nullptr, 0)));
     out += buffer;
   } else {
     /* An unknown conversion is emitted verbatim. */

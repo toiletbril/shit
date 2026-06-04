@@ -162,8 +162,8 @@ FlagManyStrings::reset()
 }
 
 static bool
-find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
-          bool is_long, Flag **result_flag, const char **value_start)
+find_flag(const ArrayList<Flag *> &flags, const char *flag_start, bool is_long,
+          Flag **result_flag, const char **value_start)
 {
   size_t longest_length = 0;
 

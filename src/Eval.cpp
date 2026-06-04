@@ -205,8 +205,7 @@ EvalContext::run_exit_trap()
 
   if (const String *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->size() > 0)
-      run_source(std::string{action->c_str(), action->size()},
-                 "the EXIT trap");
+      run_source(std::string{action->c_str(), action->size()}, "the EXIT trap");
 }
 
 void
@@ -496,7 +495,8 @@ EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
         } else if (word[j] == ')' && depth > 0) {
           depth--;
         } else if (word[j] == ')' && j + 1 < word.length() &&
-                   word[j + 1] == ')') {
+                   word[j + 1] == ')')
+        {
           j += 2;
           break;
         }
@@ -581,8 +581,8 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
   if (op_index >= rest.length()) return expand_variable(name);
 
   char op = rest[op_index];
-  bool is_doubled = (op_index + 1 < rest.length() &&
-                     rest[op_index + 1] == op && (op == '#' || op == '%'));
+  bool is_doubled = (op_index + 1 < rest.length() && rest[op_index + 1] == op &&
+                     (op == '#' || op == '%'));
   std::string word = rest.substr(op_index + (is_doubled ? 2 : 1));
 
   Maybe<std::string> current = get_variable_value(name);
@@ -591,8 +591,7 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
   bool treat_as_unset = is_colon_form ? is_empty : !is_set;
 
   switch (op) {
-  case '-':
-    return treat_as_unset ? expand_modifier_word(word) : *current;
+  case '-': return treat_as_unset ? expand_modifier_word(word) : *current;
   case '=':
     if (treat_as_unset) {
       std::string assigned = expand_modifier_word(word);
@@ -600,8 +599,7 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
       return assigned;
     }
     return *current;
-  case '+':
-    return treat_as_unset ? std::string{} : expand_modifier_word(word);
+  case '+': return treat_as_unset ? std::string{} : expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {
       throw Error{word.empty() ? name + ": parameter not set or empty"
@@ -614,8 +612,7 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
   case '%':
     return trim_matching_suffix(current.value_or(""),
                                 expand_modifier_word(word), is_doubled);
-  default:
-    return expand_variable(name);
+  default: return expand_variable(name);
   }
 }
 
@@ -949,12 +946,14 @@ struct ArithmeticParser
   const std::string &source;
   usize pos;
 
-  [[noreturn]] void fail(const std::string &message)
+  [[noreturn]] void
+  fail(const std::string &message)
   {
     throw Error{"Arithmetic: " + message};
   }
 
-  void skip_spaces()
+  void
+  skip_spaces()
   {
     while (pos < source.length() &&
            (source[pos] == ' ' || source[pos] == '\t' || source[pos] == '\n' ||
@@ -962,27 +961,31 @@ struct ArithmeticParser
       pos++;
   }
 
-  bool starts_with(std::string_view op)
+  bool
+  starts_with(std::string_view op)
   {
     skip_spaces();
     return pos + op.size() <= source.length() &&
            std::string_view{source}.substr(pos, op.size()) == op;
   }
 
-  bool consume(std::string_view op)
+  bool
+  consume(std::string_view op)
   {
     if (!starts_with(op)) return false;
     pos += op.size();
     return true;
   }
 
-  i64 read_variable_value(const std::string &name)
+  i64
+  read_variable_value(const std::string &name)
   {
-    /* A plain shell variable, the common operand, reads its digits straight from
-       the stored value with no copy. strtoll stops at the first non-digit and
-       returns zero on a non-numeric value, which matches the old stoll path. */
-    if (const String *stored = context.lookup_shell_variable(
-            StringView{name.data(), name.size()}))
+    /* A plain shell variable, the common operand, reads its digits straight
+       from the stored value with no copy. strtoll stops at the first non-digit
+       and returns zero on a non-numeric value, which matches the old stoll
+       path. */
+    if (const String *stored =
+            context.lookup_shell_variable(StringView{name.data(), name.size()}))
     {
       if (stored->size() == 0) return 0;
       errno = 0;
@@ -1002,7 +1005,8 @@ struct ArithmeticParser
     }
   }
 
-  i64 parse()
+  i64
+  parse()
   {
     i64 result = parse_assignment();
     skip_spaces();
@@ -1010,7 +1014,8 @@ struct ArithmeticParser
     return result;
   }
 
-  i64 apply_compound(i64 lhs, i64 rhs, char kind)
+  i64
+  apply_compound(i64 lhs, i64 rhs, char kind)
   {
     switch (kind) {
     case '+': return lhs + rhs;
@@ -1031,7 +1036,8 @@ struct ArithmeticParser
     }
   }
 
-  i64 parse_assignment()
+  i64
+  parse_assignment()
   {
     /* An assignment has a bare variable name on the left, so try it and rewind
        when the name is not followed by an assignment operator. */
@@ -1043,9 +1049,16 @@ struct ArithmeticParser
         name += source[pos++];
 
       static const std::pair<std::string_view, char> compound_operators[] = {
-          {"<<=", 'L'}, {">>=", 'R'}, {"+=", '+'}, {"-=", '-'},
-          {"*=", '*'},  {"/=", '/'},  {"%=", '%'}, {"&=", '&'},
-          {"|=", '|'},  {"^=", '^'},
+          {"<<=", 'L'},
+          {">>=", 'R'},
+          {"+=",  '+'},
+          {"-=",  '-'},
+          {"*=",  '*'},
+          {"/=",  '/'},
+          {"%=",  '%'},
+          {"&=",  '&'},
+          {"|=",  '|'},
+          {"^=",  '^'},
       };
       for (const auto &[op, kind] : compound_operators) {
         if (consume(op)) {
@@ -1066,7 +1079,8 @@ struct ArithmeticParser
     return parse_ternary();
   }
 
-  i64 parse_ternary()
+  i64
+  parse_ternary()
   {
     i64 condition = parse_logical_or();
     if (consume("?")) {
@@ -1078,7 +1092,8 @@ struct ArithmeticParser
     return condition;
   }
 
-  i64 parse_logical_or()
+  i64
+  parse_logical_or()
   {
     i64 lhs = parse_logical_and();
     while (consume("||"))
@@ -1086,7 +1101,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_logical_and()
+  i64
+  parse_logical_and()
   {
     i64 lhs = parse_bitwise_or();
     while (consume("&&"))
@@ -1094,7 +1110,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_bitwise_or()
+  i64
+  parse_bitwise_or()
   {
     i64 lhs = parse_bitwise_xor();
     while (starts_with("|") && !starts_with("||")) {
@@ -1104,7 +1121,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_bitwise_xor()
+  i64
+  parse_bitwise_xor()
   {
     i64 lhs = parse_bitwise_and();
     while (consume("^"))
@@ -1112,7 +1130,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_bitwise_and()
+  i64
+  parse_bitwise_and()
   {
     i64 lhs = parse_equality();
     while (starts_with("&") && !starts_with("&&")) {
@@ -1122,7 +1141,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_equality()
+  i64
+  parse_equality()
   {
     i64 lhs = parse_relational();
     for (;;) {
@@ -1136,7 +1156,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_relational()
+  i64
+  parse_relational()
   {
     i64 lhs = parse_shift();
     for (;;) {
@@ -1156,7 +1177,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_shift()
+  i64
+  parse_shift()
   {
     i64 lhs = parse_additive();
     for (;;) {
@@ -1170,7 +1192,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_additive()
+  i64
+  parse_additive()
   {
     i64 lhs = parse_multiplicative();
     for (;;) {
@@ -1184,7 +1207,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_multiplicative()
+  i64
+  parse_multiplicative()
   {
     i64 lhs = parse_unary();
     for (;;) {
@@ -1204,7 +1228,8 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_unary()
+  i64
+  parse_unary()
   {
     if (consume("!")) return parse_unary() == 0 ? 1 : 0;
     if (consume("~")) return ~parse_unary();
@@ -1213,7 +1238,8 @@ struct ArithmeticParser
     return parse_primary();
   }
 
-  i64 parse_primary()
+  i64
+  parse_primary()
   {
     skip_spaces();
     if (consume("(")) {
@@ -1324,10 +1350,9 @@ EvalContext::expand_word(const Word &word)
       if (segment.text == "@" && segment.is_in_double_quotes) {
         for (usize i = 0; i < m_positional_params.size(); i++) {
           if (i > 0) flush();
-          append_run(
-              StringView{m_positional_params[i].data(),
-                         m_positional_params[i].size()},
-              false);
+          append_run(StringView{m_positional_params[i].data(),
+                                m_positional_params[i].size()},
+                     false);
         }
         break;
       }
@@ -1367,8 +1392,8 @@ EvalContext::expand_word(const Word &word)
 std::string
 EvalContext::expand_word_for_assignment(const Word &word)
 {
-  /* Only copy the segments when a leading tilde must be rewritten, so the common
-     assignment reads its segments in place with no per-command copy. */
+  /* Only copy the segments when a leading tilde must be rewritten, so the
+     common assignment reads its segments in place with no per-command copy. */
   const ArrayList<WordSegment> *segments = &word.segments;
   ArrayList<WordSegment> tilde_expanded_segments{heap_allocator()};
   if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
@@ -1537,8 +1562,8 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
 {
   /* The expansion fields live on the scratch arena only until the heap argument
      vector is built, so the arena is released back to here on return. The mark
-     nests, so a command substitution inside one of these words reclaims only its
-     own fields and leaves this word's in-progress fields alone. */
+     nests, so a command substitution inside one of these words reclaims only
+     its own fields and leaves this word's in-progress fields alone. */
   BumpArena::Mark scratch_mark = m_scratch_arena.mark();
   SHIT_DEFER { m_scratch_arena.release(scratch_mark); };
 
@@ -1569,8 +1594,8 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
           fallback_word.segments.push(value_segment);
         word = &fallback_word;
       } else {
-        fallback_word.segments.push(WordSegment{
-            WordSegment::Kind::UnquotedText, t->raw_string(), false});
+        fallback_word.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
+                                                t->raw_string(), false});
         word = &fallback_word;
       }
 

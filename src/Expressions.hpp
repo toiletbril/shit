@@ -325,7 +325,8 @@ struct IfClause : public CompoundCommand
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  ArrayList<std::pair<const Expression *, const Expression *>> m_branches{heap_allocator()};
+  ArrayList<std::pair<const Expression *, const Expression *>> m_branches{
+      heap_allocator()};
   const Expression *m_otherwise;
 };
 

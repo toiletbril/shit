@@ -21,13 +21,11 @@ Source::kind() const
 i32
 Source::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  if (ec.args().size() < 2)
-    throw Error{"filename argument is required"};
+  if (ec.args().size() < 2) throw Error{"filename argument is required"};
 
   const std::string &path = ec.args()[1];
   std::ifstream file{path, std::ios::binary};
-  if (!file)
-    throw Error{"could not open '" + path + "'"};
+  if (!file) throw Error{"could not open '" + path + "'"};
 
   std::ostringstream contents{};
   contents << file.rdbuf();

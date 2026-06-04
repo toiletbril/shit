@@ -206,7 +206,7 @@ execute_program(ExecContext &&ec)
        * inside the duplicated process. */
       std::string msg = ec.program_path().string() + ": " +
                         last_system_error_message() + "\n";
-      (void)write_fd(STDERR_FILENO, msg.data(), msg.size());
+      (void) write_fd(STDERR_FILENO, msg.data(), msg.size());
       _exit(127);
     }
   }
@@ -631,8 +631,8 @@ execute_program(ExecContext &&ec)
   }
 
   if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
-                     nullptr, needs_handles, 0, nullptr, nullptr,
-                     &startup_info, &process_info) == 0)
+                     nullptr, needs_handles, 0, nullptr, nullptr, &startup_info,
+                     &process_info) == 0)
   {
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
   }
@@ -713,15 +713,13 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   att.bInheritHandle = FALSE;
   att.lpSecurityDescriptor = NULL; /* NOLINT */
 
-  HANDLE handle = CreateFileA(path.c_str(), access,
-                              FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
-                              disposition, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (handle == INVALID_HANDLE_VALUE)
-    return shit::nothing;
+  HANDLE handle =
+      CreateFileA(path.c_str(), access, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                  &att, disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (handle == INVALID_HANDLE_VALUE) return shit::nothing;
 
   /* Append moves the write position to the end of the file. */
-  if (mode == FileOpenMode::Append)
-    SetFilePointer(handle, 0, NULL, FILE_END);
+  if (mode == FileOpenMode::Append) SetFilePointer(handle, 0, NULL, FILE_END);
 
   return handle;
 }
@@ -730,19 +728,16 @@ Maybe<descriptor>
 write_to_temp_file(const std::string &content)
 {
   char temp_dir[MAX_PATH];
-  if (GetTempPathA(MAX_PATH, temp_dir) == 0)
-    return shit::nothing;
+  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::nothing;
 
   char temp_path[MAX_PATH];
   if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0)
     return shit::nothing;
 
-  HANDLE handle = CreateFileA(temp_path, GENERIC_READ | GENERIC_WRITE, 0, NULL,
-                              CREATE_ALWAYS,
-                              FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
-                              NULL);
-  if (handle == INVALID_HANDLE_VALUE)
-    return shit::nothing;
+  HANDLE handle = CreateFileA(
+      temp_path, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+      FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+  if (handle == INVALID_HANDLE_VALUE) return shit::nothing;
 
   DWORD written = 0;
   if (WriteFile(handle, content.data(), static_cast<DWORD>(content.size()),

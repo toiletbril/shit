@@ -27,27 +27,32 @@ struct Allocator
   void *context;
   const VTable *vtable;
 
-  void *raw_alloc(usize length, usize alignment) const
+  void *
+  raw_alloc(usize length, usize alignment) const
   {
     return vtable->alloc(context, length, alignment);
   }
-  bool raw_resize(void *pointer, usize old_length, usize new_length,
-                  usize alignment) const
+  bool
+  raw_resize(void *pointer, usize old_length, usize new_length,
+             usize alignment) const
   {
     return vtable->resize(context, pointer, old_length, new_length, alignment);
   }
-  void raw_free(void *pointer, usize length, usize alignment) const
+  void
+  raw_free(void *pointer, usize length, usize alignment) const
   {
     vtable->free(context, pointer, length, alignment);
   }
 
   template <class T>
-  T *alloc_array(usize count) const
+  T *
+  alloc_array(usize count) const
   {
     return static_cast<T *>(raw_alloc(count * sizeof(T), alignof(T)));
   }
   template <class T>
-  void free_array(T *pointer, usize count) const
+  void
+  free_array(T *pointer, usize count) const
   {
     raw_free(pointer, count * sizeof(T), alignof(T));
   }

@@ -80,8 +80,7 @@ throw_unterminated(SourceLocation opener, const std::string &what,
                    std::string_view source, const std::string &keyword,
                    SourceLocation fallback)
 {
-  if (Maybe<SourceLocation> found =
-          find_standalone_keyword(source, keyword);
+  if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
   {
     throw ErrorWithLocationAndDetails{
@@ -372,12 +371,11 @@ Parser::parse_simple_command()
       {
         m_lexer.advance_past_last_peek();
         std::unique_ptr<Token> from{m_lexer.next_shell_token()};
-        std::string digits =
-            from->kind() == Token::Kind::Word
-                ? static_cast<tokens::WordToken *>(from.get())
-                      ->word()
-                      .to_literal_string()
-                : std::string{};
+        std::string digits = from->kind() == Token::Kind::Word
+                                 ? static_cast<tokens::WordToken *>(from.get())
+                                       ->word()
+                                       .to_literal_string()
+                                 : std::string{};
         i32 from_fd = -1;
         try {
           if (!digits.empty()) from_fd = std::stoi(digits);
@@ -461,8 +459,9 @@ Parser::parse_simple_command()
       /* A run of digits touching a redirection operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
-        std::string literal =
-            static_cast<tokens::WordToken *>(token.get())->word().to_literal_string();
+        std::string literal = static_cast<tokens::WordToken *>(token.get())
+                                  ->word()
+                                  .to_literal_string();
         bool is_all_digits =
             !literal.empty() &&
             literal.find_first_not_of("0123456789") == std::string::npos;
