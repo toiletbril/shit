@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Containers.hpp"
 #include "Maybe.hpp"
 #include "Common.hpp"
 #include "Eval.hpp"
@@ -51,7 +52,7 @@ struct WordSegment
    the byte offsets never drift apart from the produced text. */
 struct Word
 {
-  std::vector<WordSegment> segments;
+  ArrayList<WordSegment> segments{heap_allocator()};
 
   bool is_empty() const;
   std::string to_literal_string() const;

@@ -374,7 +374,7 @@ Lexer::lex_identifier()
     {
       word.segments.back().text += ch;
     } else {
-      word.segments.push_back(WordSegment{kind, std::string{ch}, false});
+      word.segments.push(WordSegment{kind, std::string{ch}, false});
     }
   };
 
@@ -489,7 +489,7 @@ Lexer::lex_identifier()
               byte_count++;
             }
           }
-          word.segments.push_back(
+          word.segments.push(
               WordSegment{WordSegment::Kind::ArithmeticExpansion,
                           std::move(arithmetic), is_in_double_quotes});
           continue;
@@ -537,7 +537,7 @@ Lexer::lex_identifier()
           }
           inner += c;
         }
-        word.segments.push_back(
+        word.segments.push(
             WordSegment{WordSegment::Kind::CommandSubstitution,
                         std::move(inner), is_in_double_quotes});
       } else if (next == '{') {
@@ -557,7 +557,7 @@ Lexer::lex_identifier()
           if (c == '}') break;
           name += c;
         }
-        word.segments.push_back(
+        word.segments.push(
             WordSegment{WordSegment::Kind::VariableReference, std::move(name),
                         is_in_double_quotes});
       } else if (lexer::is_variable_name_start(next)) {
@@ -566,7 +566,7 @@ Lexer::lex_identifier()
           name += next;
           byte_count++;
         }
-        word.segments.push_back(
+        word.segments.push(
             WordSegment{WordSegment::Kind::VariableReference, std::move(name),
                         is_in_double_quotes});
       } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
@@ -574,7 +574,7 @@ Lexer::lex_identifier()
                  lexer::is_number(next))
       {
         byte_count++;
-        word.segments.push_back(
+        word.segments.push(
             WordSegment{WordSegment::Kind::VariableReference, std::string{next},
                         is_in_double_quotes});
       } else {

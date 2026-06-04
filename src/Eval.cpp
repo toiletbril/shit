@@ -1251,8 +1251,8 @@ EvalContext::expand_word(const Word &word)
 
   /* Only copy the segments when a leading tilde must be rewritten. The common
      word has no tilde and reads its segments in place. */
-  const std::vector<WordSegment> *segments = &word.segments;
-  std::vector<WordSegment> tilde_expanded_segments;
+  const ArrayList<WordSegment> *segments = &word.segments;
+  ArrayList<WordSegment> tilde_expanded_segments{heap_allocator()};
   if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.empty() &&
       word.segments.front().text.front() == '~')
@@ -1363,8 +1363,8 @@ EvalContext::expand_word_for_assignment(const Word &word)
 {
   /* Only copy the segments when a leading tilde must be rewritten, so the common
      assignment reads its segments in place with no per-command copy. */
-  const std::vector<WordSegment> *segments = &word.segments;
-  std::vector<WordSegment> tilde_expanded_segments;
+  const ArrayList<WordSegment> *segments = &word.segments;
+  ArrayList<WordSegment> tilde_expanded_segments{heap_allocator()};
   if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.empty() &&
       word.segments.front().text.front() == '~')
@@ -1556,15 +1556,14 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
            literal. */
         const tokens::Assignment *a =
             static_cast<const tokens::Assignment *>(t);
-        fallback_word.segments.push_back(
+        fallback_word.segments.push(
             WordSegment{WordSegment::Kind::LiteralText, a->key() + "=", false});
         const Word &value = a->value_word();
-        fallback_word.segments.insert(fallback_word.segments.end(),
-                                      value.segments.begin(),
-                                      value.segments.end());
+        for (const WordSegment &value_segment : value.segments)
+          fallback_word.segments.push(value_segment);
         word = &fallback_word;
       } else {
-        fallback_word.segments.push_back(WordSegment{
+        fallback_word.segments.push(WordSegment{
             WordSegment::Kind::UnquotedText, t->raw_string(), false});
         word = &fallback_word;
       }

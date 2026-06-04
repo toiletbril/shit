@@ -244,6 +244,8 @@ struct ArrayList
 
   [[nodiscard]] T &back() { return m_data[m_length - 1]; }
   [[nodiscard]] const T &back() const { return m_data[m_length - 1]; }
+  [[nodiscard]] T &front() { return m_data[0]; }
+  [[nodiscard]] const T &front() const { return m_data[0]; }
 
   void reserve(usize needed)
   {
