@@ -43,8 +43,13 @@ Trap::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (args.size() == 1) {
     std::string out{};
-    for (const auto &[condition, action] : cxt.traps())
-      out += "trap -- '" + action + "' " + condition + "\n";
+    cxt.traps().for_each([&](StringView condition, const String &action) {
+      out += "trap -- '";
+      out.append(action.c_str(), action.size());
+      out += "' ";
+      out.append(condition.data, condition.length);
+      out += '\n';
+    });
     ec.print_to_stdout(out);
     return 0;
   }

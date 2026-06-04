@@ -143,51 +143,55 @@ EvalContext::set_last_background_pid(i64 pid)
 void
 EvalContext::register_function(const std::string &name, const Expression *body)
 {
-  m_functions[name] = body;
+  m_functions.set(StringView{name.data(), name.size()}, body);
 }
 
 const Expression *
 EvalContext::find_function(const std::string &name) const
 {
-  if (auto it = m_functions.find(name); it != m_functions.end())
-    return it->second;
+  if (const Expression *const *slot =
+          m_functions.find(StringView{name.data(), name.size()}))
+    return *slot;
   return nullptr;
 }
 
 bool
 EvalContext::has_functions() const
 {
-  return !m_functions.empty();
+  return m_functions.size() != 0;
 }
 
 void
 EvalContext::unset_function(const std::string &name)
 {
-  m_functions.erase(name);
+  m_functions.erase(StringView{name.data(), name.size()});
 }
 
 std::unordered_set<std::string>
 EvalContext::function_names() const
 {
   std::unordered_set<std::string> names{};
-  for (const auto &[name, body] : m_functions)
-    names.insert(name);
+  m_functions.for_each([&](StringView name, const Expression *body) {
+    SHIT_UNUSED(body);
+    names.insert(std::string{name.data, name.length});
+  });
   return names;
 }
 
 void
 EvalContext::set_trap(const std::string &condition, const std::string &action)
 {
-  m_traps[condition] = action;
+  m_traps.set(StringView{condition.data(), condition.size()},
+              StringView{action.data(), action.size()});
 }
 
 void
 EvalContext::remove_trap(const std::string &condition)
 {
-  m_traps.erase(condition);
+  m_traps.erase(StringView{condition.data(), condition.size()});
 }
 
-const std::unordered_map<std::string, std::string> &
+const HashMap<String> &
 EvalContext::traps() const
 {
   return m_traps;
@@ -199,9 +203,10 @@ EvalContext::run_exit_trap()
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
 
-  auto it = m_traps.find("EXIT");
-  if (it != m_traps.end() && !it->second.empty())
-    run_source(it->second, "the EXIT trap");
+  if (const String *action = m_traps.find(StringView{"EXIT", 4}))
+    if (action->size() > 0)
+      run_source(std::string{action->c_str(), action->size()},
+                 "the EXIT trap");
 }
 
 void

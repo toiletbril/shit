@@ -83,7 +83,7 @@ struct ShellExit
 struct EvalStateSnapshot
 {
   HashMap<String> shell_variables;
-  std::unordered_map<std::string, const Expression *> functions;
+  HashMap<const Expression *> functions;
   std::vector<std::string> positional_params;
   std::filesystem::path working_directory;
 };
@@ -149,7 +149,7 @@ struct EvalContext
      such as EXIT or INT. The EXIT action runs once when the shell ends. */
   void set_trap(const std::string &condition, const std::string &action);
   void remove_trap(const std::string &condition);
-  const std::unordered_map<std::string, std::string> &traps() const;
+  const HashMap<String> &traps() const;
   void run_exit_trap();
 
   /* Save and restore the mutable state around a subshell or a command
@@ -249,7 +249,7 @@ protected:
   std::string m_shell_name{};
   std::vector<std::string> m_positional_params{};
   Maybe<i64> m_last_background_pid{};
-  std::unordered_map<std::string, const Expression *> m_functions{};
+  HashMap<const Expression *> m_functions{heap_allocator()};
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
 
@@ -260,7 +260,7 @@ protected:
   bool m_error_unset{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
-  std::unordered_map<std::string, std::string> m_traps{};
+  HashMap<String> m_traps{heap_allocator()};
   bool m_exit_trap_ran{false};
   bool m_enable_path_expansion;
   bool m_enable_echo;
