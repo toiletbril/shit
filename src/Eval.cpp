@@ -1341,11 +1341,21 @@ EvalContext::expand_word(const Word &word)
 std::string
 EvalContext::expand_word_for_assignment(const Word &word)
 {
-  std::vector<WordSegment> segments = word.segments;
-  if (!segments.empty()) expand_tilde(segments[0]);
+  /* Only copy the segments when a leading tilde must be rewritten, so the common
+     assignment reads its segments in place with no per-command copy. */
+  const std::vector<WordSegment> *segments = &word.segments;
+  std::vector<WordSegment> tilde_expanded_segments;
+  if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
+      !word.segments.front().text.empty() &&
+      word.segments.front().text.front() == '~')
+  {
+    tilde_expanded_segments = word.segments;
+    expand_tilde(tilde_expanded_segments.front());
+    segments = &tilde_expanded_segments;
+  }
 
   std::string result{};
-  for (const WordSegment &segment : segments) {
+  for (const WordSegment &segment : *segments) {
     if (segment.kind == WordSegment::Kind::VariableReference)
       result += apply_parameter_expansion(segment.text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
