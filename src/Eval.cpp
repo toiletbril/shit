@@ -56,13 +56,18 @@ EvalContext::end_command()
 void
 EvalContext::set_shell_variable(const std::string &name, std::string value)
 {
-  m_shell_variables[name] = std::move(value);
+  std::string &slot = m_shell_variables[name];
+  slot = std::move(value);
+  /* The field separators are read once per expanded word, so the live value is
+     cached here to keep that path off the map and the environment. */
+  if (name == "IFS") m_field_separators = slot;
 }
 
 void
 EvalContext::unset_shell_variable(const std::string &name)
 {
   m_shell_variables.erase(name);
+  if (name == "IFS") m_field_separators = " \t\n";
 }
 
 std::optional<std::string>
@@ -95,7 +100,7 @@ EvalContext::get_variable_value(const std::string &name) const
   if (name == "*" || name == "@") {
     std::string separator = " ";
     if (name == "*") {
-      std::string ifs = get_variable_value("IFS").value_or(" \t\n");
+      const std::string &ifs = m_field_separators;
       separator = ifs.empty() ? std::string{} : std::string{ifs.front()};
     }
     std::string joined{};
@@ -729,6 +734,31 @@ EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
   return expanded;
 }
 
+namespace {
+
+/* The index of the first active metacharacter that actually forms a glob. A '['
+   without a later ']' is a literal bracket, not a glob, so a field such as the
+   command word '[' needs no directory scan at all. Returns nullopt when the
+   field is all literal. */
+std::optional<usize>
+first_active_glob(const std::string &text, const std::vector<bool> &mask)
+{
+  std::optional<usize> open_bracket{};
+  for (usize i = 0; i < mask.size(); i++) {
+    if (!mask[i]) continue;
+    char ch = text[i];
+    if (ch == '*' || ch == '?') return i;
+    if (ch == '[') {
+      if (!open_bracket) open_bracket = i;
+    } else if (ch == ']' && open_bracket) {
+      return open_bracket;
+    }
+  }
+  return std::nullopt;
+}
+
+} /* namespace */
+
 std::vector<GlobField>
 EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
 {
@@ -740,13 +770,7 @@ EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
 
     /* An empty mask is the all-literal convention, so a field without one holds
        no live glob metacharacter. */
-    std::optional<usize> expand_ch{};
-    for (usize j = 0; j < field.glob_active.size(); j++) {
-      if (field.glob_active[j] && lexer::is_expandable_char(text[j])) {
-        expand_ch = j;
-        break;
-      }
-    }
+    std::optional<usize> expand_ch = first_active_glob(text, field.glob_active);
 
     if (!expand_ch) {
       /* No glob remains. This field is a literal suffix appended after an
@@ -838,17 +862,12 @@ EvalContext::expand_tilde(WordSegment &leading_segment) const
 std::vector<std::string>
 EvalContext::expand_path(GlobField field)
 {
-  /* Fast path. A field with no live glob metacharacter is its own single
-     result, so it skips the recursion and every copy. */
-  bool has_glob = false;
-  if (m_enable_path_expansion) {
-    for (usize i = 0; i < field.glob_active.size(); i++) {
-      if (field.glob_active[i] && lexer::is_expandable_char(field.text[i])) {
-        has_glob = true;
-        break;
-      }
-    }
-  }
+  /* Fast path. A field with no glob that actually matches paths is its own
+     single result, so it skips the recursion, the directory scan, and every
+     copy. A bare command word such as '[' lands here instead of scanning the
+     current directory. */
+  bool has_glob = m_enable_path_expansion &&
+                  first_active_glob(field.text, field.glob_active).has_value();
 
   if (!has_glob) {
     std::vector<std::string> single{};
@@ -1191,7 +1210,7 @@ EvalContext::expand_word(const Word &word)
   }
 
   /* The field separator defaults to whitespace when IFS is unset. */
-  std::string ifs = get_variable_value("IFS").value_or(" \t\n");
+  const std::string &ifs = m_field_separators;
 
   std::vector<GlobField> fields{};
   GlobField current{};

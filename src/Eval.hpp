@@ -219,6 +219,9 @@ protected:
   usize m_expansions_total{0};
 
   std::unordered_map<std::string, std::string> m_shell_variables{};
+  /* The cached value of IFS, kept current by set_shell_variable, so word
+     splitting does not look it up in the map or the environment per word. */
+  std::string m_field_separators{" \t\n"};
   i32 m_last_exit_status{0};
 
   std::string m_shell_name{};
