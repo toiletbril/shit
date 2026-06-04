@@ -1,9 +1,29 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
+#include "../Errors.hpp"
 #include "../Eval.hpp"
 
-/* No flag parsing through the generic machinery, since set treats -- and the
-   operands specially. The option letters -e and -x take effect, the rest are
-   accepted but not yet enforced. */
+/* The minus form of the options goes through the standard flag parser, which
+   rejects an unknown option and understands -- and grouped letters. The plus
+   form turns an option off and the flag parser does not model it, so it is
+   handled directly. Only e, x, and u take effect, the other POSIX letters are
+   accepted without effect. */
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("set [-eux] [+eux] [--] [arg ...]");
+
+FLAG(SET_ERROR_EXIT, Bool, 'e', "", "Exit immediately when a command fails.");
+FLAG(SET_XTRACE, Bool, 'x', "", "Print each command before it runs.");
+FLAG(SET_NOUNSET, Bool, 'u', "", "Treat an unset variable as an error.");
+FLAG(SET_ALLEXPORT, Bool, 'a', "", "Accepted with no effect.");
+FLAG(SET_NOTIFY, Bool, 'b', "", "Accepted with no effect.");
+FLAG(SET_NOCLOBBER, Bool, 'C', "", "Accepted with no effect.");
+FLAG(SET_NOGLOB, Bool, 'f', "", "Accepted with no effect.");
+FLAG(SET_HASHALL, Bool, 'h', "", "Accepted with no effect.");
+FLAG(SET_MONITOR, Bool, 'm', "", "Accepted with no effect.");
+FLAG(SET_NOEXEC, Bool, 'n', "", "Accepted with no effect.");
+FLAG(SET_VERBOSE, Bool, 'v', "", "Accepted with no effect.");
 
 namespace shit {
 
@@ -29,39 +49,54 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  usize i = 1;
+  bool disable_error_exit = false;
+  bool disable_xtrace = false;
+  bool disable_nounset = false;
   bool saw_end_of_options = false;
-  while (i < args.size()) {
+
+  /* The parser treats its first entry as a value, not the builtin name, so the
+     name is left out. */
+  std::vector<std::string> for_parser{};
+  for (usize i = 1; i < args.size(); i++) {
     const std::string &arg = args[i];
-    if (arg == "--") {
-      saw_end_of_options = true;
-      i++;
-      break;
-    }
-    /* A -letters group turns options on, a +letters group turns them off. */
-    if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {
-      bool enable = arg[0] == '-';
+    if (arg == "--") saw_end_of_options = true;
+
+    if (arg.length() > 1 && arg[0] == '+') {
       for (usize c = 1; c < arg.length(); c++) {
-        if (arg[c] == 'e')
-          cxt.set_error_exit(enable);
-        else if (arg[c] == 'x')
-          cxt.set_echo_expanded(enable);
-        else if (arg[c] == 'u')
-          cxt.set_error_unset(enable);
+        char option = arg[c];
+        bool is_known = false;
+        for (const Flag *flag : FLAG_LIST)
+          if (flag->short_name() == option) is_known = true;
+        if (!is_known)
+          throw Error{"set: +" + std::string{option} + ": invalid option"};
+
+        if (option == 'e')
+          disable_error_exit = true;
+        else if (option == 'x')
+          disable_xtrace = true;
+        else if (option == 'u')
+          disable_nounset = true;
       }
-      i++;
       continue;
     }
-    break;
+
+    for_parser.push_back(arg);
   }
 
-  /* Only rebind the positional parameters when operands or -- were given, so a
+  std::vector<std::string> operands = parse_flags_vec(FLAG_LIST, for_parser);
+  SHIT_DEFER { reset_flags(FLAG_LIST); };
+
+  if (FLAG_SET_ERROR_EXIT.is_enabled()) cxt.set_error_exit(true);
+  if (FLAG_SET_XTRACE.is_enabled()) cxt.set_echo_expanded(true);
+  if (FLAG_SET_NOUNSET.is_enabled()) cxt.set_error_unset(true);
+  if (disable_error_exit) cxt.set_error_exit(false);
+  if (disable_xtrace) cxt.set_echo_expanded(false);
+  if (disable_nounset) cxt.set_error_unset(false);
+
+  /* Rebind the positional parameters only when operands or -- were given, so a
      bare set -e leaves them alone. */
-  if (saw_end_of_options || i < args.size()) {
-    std::vector<std::string> params{
-        args.begin() + static_cast<std::ptrdiff_t>(i), args.end()};
-    cxt.set_positional_params(std::move(params));
-  }
+  if (!operands.empty() || saw_end_of_options)
+    cxt.set_positional_params(std::move(operands));
 
   return 0;
 }

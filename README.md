@@ -8,8 +8,6 @@ Revolutionary command-line interpreter, or an interactive shell based on
 This software was made as a late april fools joke and literally everything is
 written from scratch.
 
-The author did not expect that the shell is so complicated for no reason and
-some parts have architecture that is not very suitable for the shell language.
 There's no guarantee that this project will come any close to being finished or
 will not instantly break your computer upon the first start, so use it at your
 own risk. 
@@ -61,16 +59,16 @@ Is it usable?
 - [x] Work on Linux and Windows.
 - [x] Logical sequences. (`&&`, `||`, `;`)
 - [x] Pipes.
-- [ ] Redirections. (`>`/`<`)
+- [x] Redirections. (`>`/`<`)
 - [x] Shell expansion. (`?`, `[...]`, `*`, `~`)
 - [x] Escaping.
 - [x] Environment variables.
-- [ ] Numeric expressions.
+- [x] Numeric expressions.
 
 Is it good?
 - [ ] Background jobs.
-- [ ] Scripting capabilities. (flow control keywords)
-- [ ] Blocks and functions.
+- [x] Scripting capabilities. (flow control keywords)
+- [x] Blocks and functions.
 - [ ] `sh`-compatible.
 
 Is is exceptional? 
