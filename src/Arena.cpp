@@ -64,6 +64,25 @@ BumpArena::owns(const void *pointer) const
   return false;
 }
 
+BumpArena::Mark
+BumpArena::mark() const
+{
+  if (m_blocks.empty()) return Mark{0, 0};
+  return Mark{m_blocks.size(), m_blocks.back().used};
+}
+
+void
+BumpArena::release(Mark saved)
+{
+  /* Reset the bump pointer to the marked position, keeping the blocks so a loop
+     body reuses the same storage each turn instead of asking the system again.
+     The blocks past the mark stay allocated but become free space. */
+  for (usize i = saved.block_count; i < m_blocks.size(); i++)
+    m_blocks[i].used = 0;
+  if (saved.block_count > 0)
+    m_blocks[saved.block_count - 1].used = saved.used_in_last;
+}
+
 void
 BumpArena::reset()
 {

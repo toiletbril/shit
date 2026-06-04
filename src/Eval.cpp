@@ -1488,6 +1488,13 @@ EvalContext::expand_heredoc_body(const std::string &body)
 std::vector<std::string>
 EvalContext::process_args(const std::vector<const Token *> &args)
 {
+  /* The expansion fields live on the scratch arena only until the heap argument
+     vector is built, so the arena is released back to here on return. The mark
+     nests, so a command substitution inside one of these words reclaims only its
+     own fields and leaves this word's in-progress fields alone. */
+  BumpArena::Mark scratch_mark = m_scratch_arena.mark();
+  SHIT_DEFER { m_scratch_arena.release(scratch_mark); };
+
   std::vector<std::string> expanded_args{};
   expanded_args.reserve(args.size());
 

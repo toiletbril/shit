@@ -25,6 +25,17 @@ struct BumpArena
   bool owns(const void *pointer) const;
   void reset();
 
+  /* A saved bump position, so a scope can reclaim everything it allocated above
+     the mark while leaving earlier allocations alone. The marks nest, so a
+     command substitution inside an expansion releases only its own region. */
+  struct Mark
+  {
+    usize block_count;
+    usize used_in_last;
+  };
+  Mark mark() const;
+  void release(Mark saved);
+
   template <class T, class... Args>
   T *
   create(Args &&...args)
