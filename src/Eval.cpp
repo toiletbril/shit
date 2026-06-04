@@ -314,6 +314,41 @@ EvalContext::expand_modifier_word(const std::string &word)
         name += word[j++];
       out += expand_variable(name);
       i = j - 1;
+    } else if (next == '(' && i + 2 < word.length() && word[i + 2] == '(') {
+      /* Arithmetic $((...)), scanned to the matching )). */
+      std::string inner{};
+      usize j = i + 3;
+      usize depth = 0;
+      for (; j < word.length(); j++) {
+        if (word[j] == '(') {
+          depth++;
+        } else if (word[j] == ')' && depth > 0) {
+          depth--;
+        } else if (word[j] == ')' && j + 1 < word.length() &&
+                   word[j + 1] == ')') {
+          j += 2;
+          break;
+        }
+        inner += word[j];
+      }
+      out += std::to_string(evaluate_arithmetic(inner));
+      i = j - 1;
+    } else if (next == '(') {
+      /* Command substitution $(...), scanned to the matching ). */
+      std::string inner{};
+      usize j = i + 2;
+      usize depth = 1;
+      for (; j < word.length(); j++) {
+        if (word[j] == '(') {
+          depth++;
+        } else if (word[j] == ')') {
+          depth--;
+          if (depth == 0) break;
+        }
+        inner += word[j];
+      }
+      out += capture_command_substitution(inner);
+      i = j;
     } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                next == '$' || next == '!' || next == '-' ||
                lexer::is_number(next))
