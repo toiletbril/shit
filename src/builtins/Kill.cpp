@@ -60,8 +60,18 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
         continue;
       }
       pid = job->pid;
-    } else {
+    } else if (!target.empty() &&
+               target.find_first_not_of("0123456789") == std::string::npos)
+    {
       pid = os::process_from_pid(std::atoll(target.c_str()));
+    } else {
+      /* A non-numeric target must not fall through to kill(0), which would
+         signal the whole process group including this shell. */
+      show_message(
+          Error{"kill: '" + target + "' is not a valid job or process id"}
+              .to_string());
+      status = 1;
+      continue;
     }
 
     if (!os::signal_process(pid, signal_number)) {

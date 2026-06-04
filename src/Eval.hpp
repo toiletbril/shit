@@ -421,6 +421,11 @@ protected:
 
   std::string expand_variable(const std::string &name) const;
 
+  /* Write a variable without the read-only check, for restoring a shadowed
+     local on function return where a throw from a noexcept defer would
+     terminate the shell. */
+  void assign_variable(const std::string &name, const std::string &value);
+
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
   std::string apply_parameter_expansion(const std::string &spec);

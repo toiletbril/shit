@@ -170,9 +170,11 @@ IfStatement::~IfStatement()
 i64
 IfStatement::evaluate_impl(EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  i64 condition = m_condition->evaluate(cxt);
+  /* A jump set while evaluating the condition stops the if and stays pending. */
+  if (cxt.has_pending_control_flow()) return condition;
 
-  if (m_condition->evaluate(cxt))
+  if (condition)
     return m_then->evaluate(cxt);
   else if (m_otherwise != nullptr)
     return m_otherwise->evaluate(cxt);
@@ -307,15 +309,13 @@ AssignCommand::evaluate_impl(EvalContext &cxt) const
   std::string value =
       cxt.expand_word_for_assignment(m_assignment->value_word());
 
-  /* Under allexport the assignment marks the variable for the environment, the
-     same move the export builtin makes, so a child process inherits it while a
-     later lookup still falls back to the environment copy. */
-  if (cxt.export_all()) {
-    cxt.unset_shell_variable(m_assignment->key());
+  /* The assignment goes through set_shell_variable first, so it still rejects a
+     readonly name and refreshes the cached IFS. Under allexport it is then
+     marked for the environment so a child inherits it, while a later lookup
+     still finds the shell copy. */
+  cxt.set_shell_variable(m_assignment->key(), value);
+  if (cxt.export_all())
     os::set_environment_variable(m_assignment->key(), value);
-  } else {
-    cxt.set_shell_variable(m_assignment->key(), value);
-  }
   return cxt.last_exit_status();
 }
 
@@ -641,14 +641,20 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
 
     i64 function_ret = function_body->evaluate(cxt);
 
-    /* A return inside the body unwinds to here and supplies the status. A
-       break, a continue, or an exit is not ours, so it stays pending for an
-       outer loop or the shell. */
-    if (cxt.has_pending_control_flow() &&
-        cxt.pending_control_flow().kind == ControlFlow::Kind::Return)
-    {
-      function_ret = cxt.pending_control_flow().value;
-      cxt.clear_control_flow();
+    /* A return inside the body unwinds to here and supplies the status. A break
+       or a continue is scoped to a loop inside this function, so it does not
+       escape into a caller's loop and is consumed here. An exit is not ours and
+       stays pending for the shell. */
+    if (cxt.has_pending_control_flow()) {
+      ControlFlow::Kind kind = cxt.pending_control_flow().kind;
+      if (kind == ControlFlow::Kind::Return) {
+        function_ret = cxt.pending_control_flow().value;
+        cxt.clear_control_flow();
+      } else if (kind == ControlFlow::Kind::Break ||
+                 kind == ControlFlow::Kind::Continue)
+      {
+        cxt.clear_control_flow();
+      }
     }
 
     cxt.set_last_exit_status(static_cast<i32>(function_ret));
@@ -1398,7 +1404,17 @@ Subshell::evaluate_impl(EvalContext &cxt) const
      inside ends only the subshell. */
   EvalStateSnapshot snapshot = cxt.snapshot_state();
   cxt.enter_subshell();
-  i64 ret = m_body->evaluate(cxt);
+  i64 ret = 0;
+  /* A diagnostic thrown by the body, such as a readonly violation or a missing
+     command, must still restore the snapshot and leave the subshell, otherwise
+     the parent stays stuck in subshell mode with the inner state leaked. */
+  try {
+    ret = m_body->evaluate(cxt);
+  } catch (...) {
+    cxt.leave_subshell();
+    cxt.restore_state(std::move(snapshot));
+    throw;
+  }
 
   /* An exit inside the subshell ends only the subshell and supplies its status.
      A break, a continue, or a return stays pending and propagates after the

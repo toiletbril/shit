@@ -57,6 +57,16 @@ EvalContext::end_command()
 }
 
 void
+EvalContext::assign_variable(const std::string &name, const std::string &value)
+{
+  /* The field separators are read once per expanded word, so the live value is
+     cached here to keep that path off the map and the environment. */
+  if (name == "IFS") m_field_separators = value;
+  m_shell_variables.set(StringView{name.data(), name.size()},
+                        StringView{value.data(), value.size()});
+}
+
+void
 EvalContext::set_shell_variable(const std::string &name, std::string value)
 {
   /* A read-only variable rejects the assignment. The common case has no
@@ -64,11 +74,7 @@ EvalContext::set_shell_variable(const std::string &name, std::string value)
   if (is_readonly(name))
     throw Error{"'" + name + "' is read only and cannot be assigned"};
 
-  /* The field separators are read once per expanded word, so the live value is
-     cached here to keep that path off the map and the environment. */
-  if (name == "IFS") m_field_separators = value;
-  m_shell_variables.set(StringView{name.data(), name.size()},
-                        StringView{value.data(), value.size()});
+  assign_variable(name, value);
 }
 
 void
@@ -195,8 +201,11 @@ EvalContext::find_job(int id)
 Job *
 EvalContext::most_recent_job()
 {
-  if (m_jobs.empty()) return nullptr;
-  return &m_jobs.back();
+  /* Skip a finished job, so a bare fg or bg acts on a job that is still
+     running or stopped rather than a dead pid. */
+  for (auto it = m_jobs.rbegin(); it != m_jobs.rend(); ++it)
+    if (it->state != Job::State::Done) return &*it;
+  return nullptr;
 }
 
 void
@@ -333,8 +342,12 @@ EvalContext::leave_function_scope()
      ends with the value it held before the function ran. */
   std::vector<LocalBinding> &scope = m_local_scopes.back();
   for (auto it = scope.rbegin(); it != scope.rend(); ++it) {
+    /* Restore through assign_variable, not set_shell_variable, since this runs
+       inside a noexcept defer and a readonly name would otherwise throw from a
+       destructor and terminate the shell. A local marked readonly in the body
+       is being torn down here, so the restore of the outer value is valid. */
     if (it->previous_value.has_value())
-      set_shell_variable(it->name, *it->previous_value);
+      assign_variable(it->name, *it->previous_value);
     else
       unset_shell_variable(it->name);
   }

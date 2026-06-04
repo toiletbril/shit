@@ -153,6 +153,9 @@ run_script_contents(const std::string &script_contents,
       context.set_current_source(&script_contents, "the script");
       exit_code = static_cast<int>(ast->evaluate(context));
       report_escaped_control_flow(context, script_contents);
+      /* script_contents is local to this call, so drop the frame before it goes
+         out of scope and leaves a dangling pointer behind. */
+      context.set_current_source(nullptr, "");
     }
     context.set_last_exit_status(static_cast<i32>(exit_code));
 

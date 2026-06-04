@@ -57,10 +57,14 @@ Wait::execute(ExecContext &ec, EvalContext &cxt) const
       int id = static_cast<int>(std::atoll(target.c_str() + 1));
       if (Job *job = cxt.find_job(id))
         status = wait_for_job(*job);
-    } else {
+    } else if (!target.empty() &&
+               target.find_first_not_of("0123456789") == std::string::npos)
+    {
       os::process pid = os::process_from_pid(std::atoll(target.c_str()));
       status = os::wait_and_monitor_process(pid);
     }
+    /* A non-numeric operand is ignored rather than waiting on waitpid(0), which
+       would block on the whole process group. */
   }
 
   cxt.forget_done_jobs();
