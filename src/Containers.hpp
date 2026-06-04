@@ -233,6 +233,18 @@ struct ArrayList
     m_length++;
   }
 
+  /* Destroy the elements but keep the storage, so a reused list does not
+     reallocate. */
+  void clear()
+  {
+    for (usize i = 0; i < m_length; i++)
+      m_data[i].~T();
+    m_length = 0;
+  }
+
+  [[nodiscard]] T &back() { return m_data[m_length - 1]; }
+  [[nodiscard]] const T &back() const { return m_data[m_length - 1]; }
+
   void reserve(usize needed)
   {
     if (needed <= m_capacity) return;

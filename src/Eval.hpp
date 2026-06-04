@@ -255,7 +255,7 @@ protected:
 
   /* ASTs from eval and dot, kept alive until the next top-level command so a
      function they define survives the rest of the current one. */
-  std::vector<Expression *> m_retained_source_asts{};
+  ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
 
   bool m_error_unset{false};
   usize m_getopts_char_index{1};

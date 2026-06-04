@@ -1486,7 +1486,7 @@ EvalContext::run_source(const std::string &source, const std::string &origin)
        The destructor runs at the next top-level command, freeing the node
        members while the arena storage is reclaimed by the reset. */
     Expression *ast = parser.construct_ast().release();
-    m_retained_source_asts.push_back(ast);
+    m_retained_source_asts.push(ast);
     ast->evaluate(*this);
     return last_exit_status();
   } catch (const ErrorWithLocationAndDetails &e) {
@@ -1516,7 +1516,7 @@ EvalContext::clear_retained_sources()
 void
 EvalContext::retain_ast(Expression *ast)
 {
-  m_retained_source_asts.push_back(ast);
+  m_retained_source_asts.push(ast);
 }
 
 std::string
