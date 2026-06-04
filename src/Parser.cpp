@@ -53,7 +53,7 @@ kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
 /* The byte location of the keyword as a whole word somewhere in the source. A
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
-static std::optional<SourceLocation>
+static Maybe<SourceLocation>
 find_standalone_keyword(std::string_view source, std::string_view keyword)
 {
   auto is_boundary = [](char c) {
@@ -69,7 +69,7 @@ find_standalone_keyword(std::string_view source, std::string_view keyword)
     if (left_ok && right_ok) return SourceLocation{pos, keyword.size()};
     pos = end;
   }
-  return std::nullopt;
+  return shit::nothing;
 }
 
 /* Report a missing terminator. When the keyword is found earlier in the source,
@@ -80,7 +80,7 @@ throw_unterminated(SourceLocation opener, const std::string &what,
                    std::string_view source, const std::string &keyword,
                    SourceLocation fallback)
 {
-  if (std::optional<SourceLocation> found =
+  if (Maybe<SourceLocation> found =
           find_standalone_keyword(source, keyword);
       found.has_value())
   {
@@ -332,7 +332,7 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
 std::unique_ptr<Command>
 Parser::parse_simple_command()
 {
-  std::optional<SourceLocation> source_location;
+  Maybe<SourceLocation> source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
   std::unordered_map<std::string, Word> local_vars{};
   std::vector<expressions::Redirection> redirections{};
