@@ -654,13 +654,7 @@ SimpleCommand::redirect_to(usize d, std::string &f, bool duplicate)
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-CompoundList::CompoundList() : Expression({0, 0}), m_nodes() {}
-
-CompoundList::CompoundList(
-    SourceLocation location,
-    const std::vector<const CompoundListCondition *> &nodes)
-    : Expression(location), m_nodes(nodes)
-{}
+CompoundList::CompoundList() : Expression({0, 0}) {}
 
 CompoundList::~CompoundList()
 {
@@ -679,7 +673,7 @@ void
 CompoundList::append_node(const CompoundListCondition *node)
 {
   m_location.add_length(node->source_location().length());
-  m_nodes.emplace_back(node);
+  m_nodes.push(node);
 }
 
 std::string
@@ -803,13 +797,7 @@ CompoundListCondition::evaluate_impl(EvalContext &cxt) const
   return status;
 }
 
-Pipeline::Pipeline(SourceLocation location,
-                   const std::vector<const SimpleCommand *> &commands)
-    : Command(location), m_commands(commands)
-{}
-
-Pipeline::Pipeline(SourceLocation location) : Command(location), m_commands({})
-{}
+Pipeline::Pipeline(SourceLocation location) : Command(location) {}
 
 Pipeline::~Pipeline()
 {
@@ -828,7 +816,7 @@ void
 Pipeline::append_command(const SimpleCommand *node)
 {
   m_location.add_length(node->source_location().length());
-  m_commands.emplace_back(node);
+  m_commands.push(node);
 }
 
 std::string

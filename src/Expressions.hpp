@@ -256,8 +256,6 @@ protected:
 struct CompoundList : public Expression
 {
   CompoundList();
-  CompoundList(SourceLocation location,
-               const std::vector<const CompoundListCondition *> &nodes);
 
   ~CompoundList() override;
 
@@ -272,14 +270,12 @@ struct CompoundList : public Expression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::vector<const CompoundListCondition *> m_nodes;
+  ArrayList<const CompoundListCondition *> m_nodes{heap_allocator()};
 };
 
 struct Pipeline : public Command
 {
   Pipeline(SourceLocation location);
-  Pipeline(SourceLocation location,
-           const std::vector<const SimpleCommand *> &commands);
 
   ~Pipeline() override;
 
@@ -297,7 +293,7 @@ struct Pipeline : public Command
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::vector<const SimpleCommand *> m_commands;
+  ArrayList<const SimpleCommand *> m_commands{heap_allocator()};
 };
 
 /* A compound command groups one or more command lists, like a loop body or an
