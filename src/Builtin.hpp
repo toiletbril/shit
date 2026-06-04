@@ -158,7 +158,7 @@ struct Exit : public Builtin
   Exit();
 
   Kind kind() const override;
-  [[noreturn]] i32 execute(ExecContext &ec, EvalContext &cxt) const override;
+  i32 execute(ExecContext &ec, EvalContext &cxt) const override;
 };
 
 Maybe<Builtin::Kind> search_builtin(std::string_view builtin_name);

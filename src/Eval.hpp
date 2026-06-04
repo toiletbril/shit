@@ -55,32 +55,31 @@ struct Word;
 struct WordSegment;
 struct Expression;
 
-/* The break and continue builtins throw this to unwind to the enclosing loop.
-   The level counts how many loops to act on, so break 2 leaves two loops. */
-struct LoopControl
+/* A pending non-local jump the evaluator carries instead of throwing. The break
+   and continue builtins request a loop jump, return requests a function jump,
+   and exit inside a subshell requests an exit. The tree-walk checks for a
+   pending request after each child and either consumes it at the matching
+   boundary or leaves it pending so an outer node consumes it. */
+struct ControlFlow
 {
   enum class Kind : u8
   {
+    /* No jump is pending, so evaluation proceeds normally. */
+    Normal,
     Break,
     Continue,
+    Return,
+    Exit,
   };
 
-  Kind kind;
-  i64 level;
-};
-
-/* The return builtin throws this to unwind to the enclosing function call. */
-struct FunctionReturn
-{
-  i64 status;
-};
-
-/* The exit builtin throws this inside a subshell or a command substitution, so
-   it ends only that and not the whole shell. At the top level exit really
-   exits. */
-struct ShellExit
-{
-  i64 status;
+  Kind kind{Kind::Normal};
+  /* The loop level for break and continue, or the status for return and exit. */
+  i64 value{0};
+  /* Where the requesting builtin sits, so an escaped jump points a caret at it.
+     The source the offset indexes lives in source, set when the jump is made. */
+  SourceLocation location{0, 0};
+  const std::string *source{nullptr};
+  std::string origin{};
 };
 
 /* A snapshot of the mutable shell state, taken around a subshell or a command
@@ -177,6 +176,28 @@ struct EvalContext
   void leave_subshell();
   bool in_subshell() const;
 
+  /* The control-flow channel the break, continue, return, and exit builtins
+     write instead of throwing. A request records where it was made against the
+     current source, so an escaped jump points a caret at the builtin. The
+     tree-walk checks has_pending_control_flow after each child and consumes the
+     request at the matching loop, function, or subshell boundary. */
+  void request_break(i64 level, SourceLocation location);
+  void request_continue(i64 level, SourceLocation location);
+  void request_return(i64 status, SourceLocation location);
+  void request_exit(i64 status, SourceLocation location);
+  bool has_pending_control_flow() const;
+  ControlFlow &pending_control_flow();
+  const ControlFlow &pending_control_flow() const;
+  void clear_control_flow();
+
+  /* The source currently being evaluated and its human name, so a control-flow
+     request or a deferred report formats a caret against the right text. Set
+     around a top-level run and around a sourced run, restoring the previous
+     frame afterwards. */
+  void set_current_source(const std::string *source, std::string origin);
+  const std::string *current_source() const;
+  const std::string &current_origin() const;
+
   /* The set builtin toggles these options at run time. error_exit is set -e,
      echo_expanded is set -x, and error_unset is set -u. */
   void set_error_exit(bool enabled);
@@ -267,9 +288,20 @@ protected:
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
 
+  /* The pending non-local jump, Normal when none is pending. */
+  ControlFlow m_control_flow{};
+  /* The source and name of the text being evaluated, for caret formatting. */
+  const std::string *m_current_source{nullptr};
+  std::string m_current_origin{};
+
   /* ASTs from eval and dot, kept alive until the next top-level command so a
      function they define survives the rest of the current one. */
   ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
+
+  /* The source text of each eval and dot run, kept alive for as long as the
+     ASTs above. A control-flow jump made inside one points its caret at this
+     text, so the pointer must outlive the run that escaped it. */
+  ArrayList<std::string *> m_retained_sources{heap_allocator()};
 
   bool m_error_unset{false};
   usize m_getopts_char_index{1};

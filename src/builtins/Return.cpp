@@ -22,7 +22,8 @@ Return::execute(ExecContext &ec, EvalContext &cxt) const
   i64 status = ec.args().size() > 1 ? std::atoll(ec.args()[1].c_str())
                                     : cxt.last_exit_status();
 
-  throw FunctionReturn{status};
+  cxt.request_return(status, ec.source_location());
+  return static_cast<i32>(status);
 }
 
 } /* namespace shit */

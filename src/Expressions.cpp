@@ -568,11 +568,16 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
         std::vector<std::string>{program_args.begin() + 1, program_args.end()});
     SHIT_DEFER { cxt.set_positional_params(std::move(saved_params)); };
 
-    i64 function_ret = 0;
-    try {
-      function_ret = function_body->evaluate(cxt);
-    } catch (const FunctionReturn &returned) {
-      function_ret = returned.status;
+    i64 function_ret = function_body->evaluate(cxt);
+
+    /* A return inside the body unwinds to here and supplies the status. A
+       break, a continue, or an exit is not ours, so it stays pending for an
+       outer loop or the shell. */
+    if (cxt.has_pending_control_flow() &&
+        cxt.pending_control_flow().kind == ControlFlow::Kind::Return)
+    {
+      function_ret = cxt.pending_control_flow().value;
+      cxt.clear_control_flow();
     }
 
     cxt.set_last_exit_status(static_cast<i32>(function_ret));
@@ -731,6 +736,10 @@ CompoundList::evaluate_impl(EvalContext &cxt) const
       break;
     }
 
+    /* A break, continue, return, or exit inside a node stops the rest of the
+       list and unwinds to the boundary that consumes it. */
+    if (cxt.has_pending_control_flow()) break;
+
     /* Under set -e the shell exits once a command at the end of its and-or
        chain fails, unless this list is the condition of an if, a while, or an
        and-or operand. */
@@ -741,7 +750,10 @@ CompoundList::evaluate_impl(EvalContext &cxt) const
         ret != 0 && ret != NOTHING_WAS_EXECUTED)
     {
       cxt.set_last_exit_status(static_cast<i32>(ret));
-      if (cxt.in_subshell()) throw ShellExit{ret};
+      if (cxt.in_subshell()) {
+        cxt.request_exit(ret, source_location());
+        break;
+      }
       utils::quit(static_cast<i32>(ret), true);
     }
   }
@@ -990,6 +1002,8 @@ IfClause::evaluate_impl(EvalContext &cxt) const
       SHIT_DEFER { cxt.leave_condition(); };
       condition_status = condition->evaluate(cxt);
     }
+    /* A jump inside the condition stops the if and stays pending. */
+    if (cxt.has_pending_control_flow()) return condition_status;
     if (condition_status == 0) return body->evaluate(cxt);
   }
   if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
@@ -1039,6 +1053,48 @@ WhileLoop::to_ast_string(usize layer) const
   return s;
 }
 
+namespace {
+
+/* What a loop does with the control flow pending after its body ran. */
+enum class LoopDisposition
+{
+  /* No jump, or a continue aimed here, so run the next iteration. */
+  RunNext,
+  /* A break aimed here, or a jump aimed at an outer loop that is now left
+     pending, so this loop stops. */
+  StopLoop,
+};
+
+LoopDisposition
+resolve_loop_control(EvalContext &cxt)
+{
+  if (!cxt.has_pending_control_flow()) return LoopDisposition::RunNext;
+
+  ControlFlow &control = cxt.pending_control_flow();
+  if (control.kind != ControlFlow::Kind::Break &&
+      control.kind != ControlFlow::Kind::Continue)
+  {
+    /* A return or an exit is not a loop's to consume, so this loop stops and
+       leaves it pending for the function or the shell. */
+    return LoopDisposition::StopLoop;
+  }
+
+  /* A jump aimed at an outer loop decrements and stays pending, stopping this
+     loop so the outer one consumes it. */
+  if (control.value > 1) {
+    control.value -= 1;
+    return LoopDisposition::StopLoop;
+  }
+
+  /* The jump targets this loop. A break stops it, a continue runs the next
+     iteration. Either way the request is consumed here. */
+  bool is_break = control.kind == ControlFlow::Kind::Break;
+  cxt.clear_control_flow();
+  return is_break ? LoopDisposition::StopLoop : LoopDisposition::RunNext;
+}
+
+} /* namespace */
+
 i64
 WhileLoop::evaluate_impl(EvalContext &cxt) const
 {
@@ -1050,21 +1106,16 @@ WhileLoop::evaluate_impl(EvalContext &cxt) const
       SHIT_DEFER { cxt.leave_condition(); };
       condition_status = m_condition->evaluate(cxt);
     }
+    /* A jump inside the condition, such as an exit from a substitution, stops
+       the loop and stays pending for the caller. */
+    if (cxt.has_pending_control_flow()) break;
+
     bool should_run_body =
         m_is_until ? (condition_status != 0) : (condition_status == 0);
     if (!should_run_body) break;
 
-    try {
-      ret = m_body->evaluate(cxt);
-    } catch (LoopControl &control) {
-      /* A break or continue aimed at an outer loop keeps unwinding. */
-      if (control.level > 1) {
-        control.level--;
-        throw;
-      }
-      if (control.kind == LoopControl::Kind::Break) break;
-      /* A continue falls through to the next iteration. */
-    }
+    ret = m_body->evaluate(cxt);
+    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
   }
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -1123,15 +1174,8 @@ ForLoop::evaluate_impl(EvalContext &cxt) const
   i64 ret = 0;
   for (const std::string &value : values) {
     cxt.set_shell_variable(m_variable_name, value);
-    try {
-      ret = m_body->evaluate(cxt);
-    } catch (LoopControl &control) {
-      if (control.level > 1) {
-        control.level--;
-        throw;
-      }
-      if (control.kind == LoopControl::Kind::Break) break;
-    }
+    ret = m_body->evaluate(cxt);
+    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
   }
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -1283,16 +1327,18 @@ Subshell::evaluate_impl(EvalContext &cxt) const
      inside ends only the subshell. */
   EvalStateSnapshot snapshot = cxt.snapshot_state();
   cxt.enter_subshell();
-  i64 ret = 0;
-  try {
-    ret = m_body->evaluate(cxt);
-  } catch (const ShellExit &exited) {
-    ret = exited.status;
-  } catch (...) {
-    cxt.leave_subshell();
-    cxt.restore_state(std::move(snapshot));
-    throw;
+  i64 ret = m_body->evaluate(cxt);
+
+  /* An exit inside the subshell ends only the subshell and supplies its status.
+     A break, a continue, or a return stays pending and propagates after the
+     state is restored, the same as the old re-throw did. */
+  if (cxt.has_pending_control_flow() &&
+      cxt.pending_control_flow().kind == ControlFlow::Kind::Exit)
+  {
+    ret = cxt.pending_control_flow().value;
+    cxt.clear_control_flow();
   }
+
   cxt.leave_subshell();
   cxt.restore_state(std::move(snapshot));
   cxt.set_last_exit_status(static_cast<i32>(ret));

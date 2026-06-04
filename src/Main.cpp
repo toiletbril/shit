@@ -68,6 +68,45 @@ FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", "Cosmopolitan: Trace functions.");
 FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 #endif
 
+/* Report a break, continue, or return that reached the top with no loop,
+   function, or sourced script to consume it. The jump carries the source and
+   the origin it was made in, so the caret points at the exact builtin and the
+   note names where it ran. */
+static void
+report_escaped_control_flow(shit::EvalContext &context,
+                            const std::string &fallback_source)
+{
+  if (!context.has_pending_control_flow()) return;
+
+  const shit::ControlFlow &control = context.pending_control_flow();
+  std::string what;
+  switch (control.kind) {
+  case shit::ControlFlow::Kind::Break:
+    what = "'break' used outside of a loop";
+    break;
+  case shit::ControlFlow::Kind::Continue:
+    what = "'continue' used outside of a loop";
+    break;
+  case shit::ControlFlow::Kind::Return:
+    what = "'return' used outside of a function or a sourced script";
+    break;
+  case shit::ControlFlow::Kind::Exit:
+  case shit::ControlFlow::Kind::Normal:
+    context.clear_control_flow();
+    return;
+  }
+
+  const std::string *source =
+      control.source != nullptr ? control.source : &fallback_source;
+  shit::ErrorWithLocation located{control.location, what};
+  shit::show_message(located.to_string(*source));
+  if (!control.origin.empty())
+    shit::show_message("This jump was reached while running " + control.origin +
+                       ".");
+
+  context.clear_control_flow();
+}
+
 /* Lex, parse, validate, and evaluate one chunk of shell source in the given
    context. The main loop and source_file share this so a sourced file runs the
    same pipeline as an interactive line. Returns the resulting exit code. */
@@ -107,7 +146,9 @@ run_script_contents(const std::string &script_contents,
     {
       exit_code = EXIT_FAILURE;
     } else {
+      context.set_current_source(&script_contents, "the script");
       exit_code = static_cast<int>(ast->evaluate(context));
+      report_escaped_control_flow(context, script_contents);
     }
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
@@ -116,16 +157,6 @@ run_script_contents(const std::string &script_contents,
 
     if (FLAG_STATS.is_enabled())
       std::cout << context.make_stats_string() << std::endl;
-  } catch (const shit::LoopControl &) {
-    /* A break or continue that escaped every loop. The Error formats the label
-       and show_message adds the shit prefix, matching every other error. */
-    shit::show_message(
-        shit::Error{"'break' or 'continue' used outside of a loop"}
-            .to_string());
-  } catch (const shit::FunctionReturn &) {
-    /* A return that escaped every function. */
-    shit::show_message(
-        shit::Error{"'return' used outside of a function"}.to_string());
   } catch (const shit::ErrorWithLocationAndDetails &e) {
     shit::show_message(e.to_string(script_contents));
     shit::show_message(e.details_to_string(script_contents));

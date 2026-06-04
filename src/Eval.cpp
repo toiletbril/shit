@@ -8,6 +8,7 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
+#include "Trace.hpp"
 #include "Utils.hpp"
 
 #include <algorithm>
@@ -224,6 +225,83 @@ bool
 EvalContext::in_subshell() const
 {
   return m_subshell_depth > 0;
+}
+
+void
+EvalContext::request_break(i64 level, SourceLocation location)
+{
+  SHIT_LOG(Verbosity::Debug, "break requested, level %lld", (long long)level);
+  m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
+                               m_current_source, m_current_origin};
+}
+
+void
+EvalContext::request_continue(i64 level, SourceLocation location)
+{
+  SHIT_LOG(Verbosity::Debug, "continue requested, level %lld",
+           (long long)level);
+  m_control_flow = ControlFlow{ControlFlow::Kind::Continue, level, location,
+                               m_current_source, m_current_origin};
+}
+
+void
+EvalContext::request_return(i64 status, SourceLocation location)
+{
+  SHIT_LOG(Verbosity::Debug, "return requested, status %lld",
+           (long long)status);
+  m_control_flow = ControlFlow{ControlFlow::Kind::Return, status, location,
+                               m_current_source, m_current_origin};
+}
+
+void
+EvalContext::request_exit(i64 status, SourceLocation location)
+{
+  SHIT_LOG(Verbosity::Debug, "exit requested, status %lld", (long long)status);
+  m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
+                               m_current_source, m_current_origin};
+}
+
+bool
+EvalContext::has_pending_control_flow() const
+{
+  return m_control_flow.kind != ControlFlow::Kind::Normal;
+}
+
+ControlFlow &
+EvalContext::pending_control_flow()
+{
+  return m_control_flow;
+}
+
+const ControlFlow &
+EvalContext::pending_control_flow() const
+{
+  return m_control_flow;
+}
+
+void
+EvalContext::clear_control_flow()
+{
+  m_control_flow.kind = ControlFlow::Kind::Normal;
+}
+
+void
+EvalContext::set_current_source(const std::string *source, std::string origin)
+{
+  m_current_source = source;
+  m_current_origin = std::move(origin);
+}
+
+const std::string *
+EvalContext::current_source() const
+{
+  return m_current_source;
+}
+
+const std::string &
+EvalContext::current_origin() const
+{
+  return m_current_origin;
 }
 
 void
@@ -1469,12 +1547,15 @@ EvalContext::capture_command_substitution(const std::string &source)
   std::exception_ptr error;
   try {
     ast->evaluate(*this);
-  } catch (const ShellExit &exited) {
-    set_last_exit_status(static_cast<i32>(exited.status));
-  } catch (const LoopControl &) {
-  } catch (const FunctionReturn &) {
   } catch (...) {
     error = std::current_exception();
+  }
+  /* A break, continue, return, or exit inside the substitution acts only within
+     it, so consume any pending jump here. An exit supplies the status. */
+  if (has_pending_control_flow()) {
+    if (pending_control_flow().kind == ControlFlow::Kind::Exit)
+      set_last_exit_status(static_cast<i32>(pending_control_flow().value));
+    clear_control_flow();
   }
   leave_subshell();
 
@@ -1518,6 +1599,18 @@ EvalContext::run_source(const std::string &source, const std::string &origin)
        members while the arena storage is reclaimed by the reset. */
     Expression *ast = parser.construct_ast().release();
     m_retained_source_asts.push(ast);
+
+    /* Keep a copy of the source alive for as long as the AST, so a control-flow
+       jump made inside it can point a caret at the right text even after this
+       call returns and the jump propagates to the caller. */
+    std::string *retained_source = new std::string{source};
+    m_retained_sources.push(retained_source);
+
+    const std::string *previous_source = m_current_source;
+    std::string previous_origin = m_current_origin;
+    set_current_source(retained_source, origin);
+    SHIT_DEFER { set_current_source(previous_source, previous_origin); };
+
     ast->evaluate(*this);
     return last_exit_status();
   } catch (const ErrorWithLocationAndDetails &e) {
@@ -1542,6 +1635,15 @@ EvalContext::clear_retained_sources()
   for (Expression *ast : m_retained_source_asts)
     delete ast;
   m_retained_source_asts.clear();
+
+  for (std::string *source : m_retained_sources)
+    delete source;
+  m_retained_sources.clear();
+
+  /* The current source frame may point at a retained copy just freed, so reset
+     it to nothing until the next run sets it. */
+  m_current_source = nullptr;
+  m_current_origin.clear();
 }
 
 void
