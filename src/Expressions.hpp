@@ -223,7 +223,7 @@ protected:
   mutable Maybe<std::variant<Builtin::Kind, std::filesystem::path>>
       m_resolved_kind{};
 
-  std::vector<Redirection> m_redirections{};
+  ArrayList<Redirection> m_redirections{heap_allocator()};
 };
 
 struct CompoundListCondition : public Expression

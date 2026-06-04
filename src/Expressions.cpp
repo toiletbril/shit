@@ -356,7 +356,8 @@ SimpleCommand::~SimpleCommand()
 void
 SimpleCommand::set_redirections(std::vector<Redirection> &&redirections)
 {
-  m_redirections = std::move(redirections);
+  for (const Redirection &redirection : redirections)
+    m_redirections.push(redirection);
 }
 
 void
