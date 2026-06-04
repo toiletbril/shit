@@ -175,6 +175,53 @@ EvalContext::in_subshell() const
 }
 
 void
+EvalContext::set_error_exit(bool enabled)
+{
+  m_error_exit = enabled;
+}
+
+bool
+EvalContext::error_exit() const
+{
+  return m_error_exit;
+}
+
+void
+EvalContext::set_echo_expanded(bool enabled)
+{
+  m_enable_echo_expanded = enabled;
+}
+
+void
+EvalContext::enter_condition()
+{
+  m_condition_depth++;
+}
+
+void
+EvalContext::leave_condition()
+{
+  m_condition_depth--;
+}
+
+bool
+EvalContext::in_condition() const
+{
+  return m_condition_depth > 0;
+}
+
+std::vector<std::string>
+EvalContext::sorted_variable_assignments() const
+{
+  std::vector<std::string> assignments{};
+  assignments.reserve(m_shell_variables.size());
+  for (const auto &[name, value] : m_shell_variables)
+    assignments.push_back(name + "=" + value);
+  std::sort(assignments.begin(), assignments.end());
+  return assignments;
+}
+
+void
 EvalContext::clear_functions()
 {
   m_functions.clear();

@@ -2,7 +2,8 @@
 #include "../Eval.hpp"
 
 /* No flag parsing through the generic machinery, since set treats -- and the
-   operands specially. The option letters are accepted but not yet enforced. */
+   operands specially. The option letters -e and -x take effect, the rest are
+   accepted but not yet enforced. */
 
 namespace shit {
 
@@ -19,9 +20,14 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const std::vector<std::string> &args = ec.args();
 
-  /* set with no arguments lists the shell variables. That listing is not
-     implemented yet, so it is a no-op rather than an error. */
-  if (args.size() == 1) return 0;
+  /* set with no arguments lists the shell variables. */
+  if (args.size() == 1) {
+    std::string out{};
+    for (const std::string &assignment : cxt.sorted_variable_assignments())
+      out += assignment + "\n";
+    ec.print_to_stdout(out);
+    return 0;
+  }
 
   usize i = 1;
   bool saw_end_of_options = false;
@@ -32,9 +38,15 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
       i++;
       break;
     }
-    /* An option group like -e or +x is accepted and skipped. A lone - or a
-       plain word begins the operands. */
+    /* A -letters group turns options on, a +letters group turns them off. */
     if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {
+      bool enable = arg[0] == '-';
+      for (usize c = 1; c < arg.length(); c++) {
+        if (arg[c] == 'e')
+          cxt.set_error_exit(enable);
+        else if (arg[c] == 'x')
+          cxt.set_echo_expanded(enable);
+      }
       i++;
       continue;
     }

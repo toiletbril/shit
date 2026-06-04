@@ -130,6 +130,21 @@ struct EvalContext
   void leave_subshell();
   bool in_subshell() const;
 
+  /* The set builtin toggles these options at run time. error_exit is set -e and
+     echo_expanded is set -x. */
+  void set_error_exit(bool enabled);
+  bool error_exit() const;
+  void set_echo_expanded(bool enabled);
+
+  /* A condition, such as an if test or an && operand, suppresses set -e while it
+     runs, since its failure is expected. */
+  void enter_condition();
+  void leave_condition();
+  bool in_condition() const;
+
+  /* The name=value lines that set with no argument prints, sorted. */
+  std::vector<std::string> sorted_variable_assignments() const;
+
   /* Expand a word in assignment context, with variable, tilde, and command
      substitution but no field splitting and no globbing. */
   std::string expand_word_for_assignment(const Word &word);
@@ -180,6 +195,7 @@ protected:
   std::optional<i64> m_last_background_pid{};
   std::unordered_map<std::string, const Expression *> m_functions{};
   usize m_subshell_depth{0};
+  usize m_condition_depth{0};
 
   /* ASTs from eval and dot, kept alive until the next top-level command so a
      function they define survives the rest of the current one. */

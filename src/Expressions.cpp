@@ -705,7 +705,8 @@ CompoundList::evaluate_impl(EvalContext &cxt) const
 
   i64 ret = NOTHING_WAS_EXECUTED;
 
-  for (const CompoundListCondition *n : m_nodes) {
+  for (usize index = 0; index < m_nodes.size(); index++) {
+    const CompoundListCondition *n = m_nodes[index];
     switch (n->kind()) {
     case CompoundListCondition::Kind::None: ret = n->evaluate(cxt); break;
 
@@ -716,6 +717,20 @@ CompoundList::evaluate_impl(EvalContext &cxt) const
     case CompoundListCondition::Kind::And:
       if (ret == 0) ret = n->evaluate(cxt);
       break;
+    }
+
+    /* Under set -e the shell exits once a command at the end of its and-or
+       chain fails, unless this list is the condition of an if, a while, or an
+       and-or operand. */
+    bool ends_and_or_chain =
+        index + 1 >= m_nodes.size() ||
+        m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
+    if (cxt.error_exit() && !cxt.in_condition() && ends_and_or_chain &&
+        ret != 0 && ret != NOTHING_WAS_EXECUTED)
+    {
+      cxt.set_last_exit_status(static_cast<i32>(ret));
+      if (cxt.in_subshell()) throw ShellExit{ret};
+      utils::quit(static_cast<i32>(ret), true);
     }
   }
 
@@ -959,7 +974,13 @@ i64
 IfClause::evaluate_impl(EvalContext &cxt) const
 {
   for (const auto &[condition, body] : m_branches) {
-    if (condition->evaluate(cxt) == 0) return body->evaluate(cxt);
+    i64 condition_status;
+    {
+      cxt.enter_condition();
+      SHIT_DEFER { cxt.leave_condition(); };
+      condition_status = condition->evaluate(cxt);
+    }
+    if (condition_status == 0) return body->evaluate(cxt);
   }
   if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
   return 0;
@@ -1013,7 +1034,12 @@ WhileLoop::evaluate_impl(EvalContext &cxt) const
 {
   i64 ret = 0;
   for (;;) {
-    i64 condition_status = m_condition->evaluate(cxt);
+    i64 condition_status;
+    {
+      cxt.enter_condition();
+      SHIT_DEFER { cxt.leave_condition(); };
+      condition_status = m_condition->evaluate(cxt);
+    }
     bool should_run_body =
         m_is_until ? (condition_status != 0) : (condition_status == 0);
     if (!should_run_body) break;
