@@ -26,13 +26,13 @@ show_builtin_help_impl(const ExecContext &ec,
   ec.print_to_stdout(h);
 }
 
-std::optional<Builtin::Kind>
+Maybe<Builtin::Kind>
 search_builtin(std::string_view builtin_name)
 {
   if (auto b = BUILTINS.find(std::string{builtin_name}); b != BUILTINS.end())
     return b->second;
 
-  return std::nullopt;
+  return shit::nothing;
 }
 
 /* A one-line synopsis and a sentence of explanation for each builtin, shown by

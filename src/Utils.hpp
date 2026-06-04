@@ -55,7 +55,7 @@ void string_replace(std::string &s, std::string_view to_replace,
 
 std::string lowercase_string(std::string_view s);
 
-std::optional<std::filesystem::path> canonicalize_path(const std::string &path);
+Maybe<std::filesystem::path> canonicalize_path(const std::string &path);
 
 void initialize_path_map();
 

@@ -2,6 +2,7 @@
 
 #include "Cli.hpp"
 #include "Common.hpp"
+#include "Maybe.hpp"
 #include "Os.hpp"
 
 #include <optional>
@@ -156,7 +157,7 @@ struct Exit : public Builtin
   [[noreturn]] i32 execute(ExecContext &ec, EvalContext &cxt) const override;
 };
 
-std::optional<Builtin::Kind> search_builtin(std::string_view builtin_name);
+Maybe<Builtin::Kind> search_builtin(std::string_view builtin_name);
 
 void show_builtin_help_impl(const ExecContext &ec,
                             const std::vector<std::string> &hs,

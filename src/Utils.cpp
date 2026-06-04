@@ -164,7 +164,7 @@ lowercase_string(std::string_view s)
   return l;
 }
 
-std::optional<std::filesystem::path>
+Maybe<std::filesystem::path>
 canonicalize_path(const std::string &path)
 {
   std::filesystem::path p{path};
@@ -184,7 +184,7 @@ canonicalize_path(const std::string &path)
       p.replace_extension(os::OMITTED_SUFFIXES[i++]);
   }
 
-  if (!std::filesystem::exists(p)) return std::nullopt;
+  if (!std::filesystem::exists(p)) return shit::nothing;
 
   return p;
 }

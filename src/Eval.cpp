@@ -1603,8 +1603,8 @@ ExecContext::make_from(SourceLocation location,
 
   const std::string &program = args[0];
 
-  std::optional<Builtin::Kind> bk;
-  std::optional<std::filesystem::path> p;
+  Maybe<Builtin::Kind> bk;
+  Maybe<std::filesystem::path> p;
 
   /* This isn't a path? */
   if (program.find('/') == std::string::npos) {
