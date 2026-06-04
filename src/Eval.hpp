@@ -40,10 +40,13 @@ private:
 struct GlobField
 {
   explicit GlobField(Allocator allocator)
-      : text(allocator), glob_active(allocator)
+      : text(allocator), glob_active(heap_allocator())
   {}
 
   String text;
+  /* The mask grows by repeated push, so it stays on the heap allocator where a
+     grow frees the old buffer, rather than the bump arena where every grow
+     would leak. */
   ArrayList<bool> glob_active;
 };
 
