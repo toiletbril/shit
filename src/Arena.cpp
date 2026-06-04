@@ -1,5 +1,7 @@
 #include "Arena.hpp"
 
+#include "Allocator.hpp"
+
 #include <cstdlib>
 
 namespace shit {
