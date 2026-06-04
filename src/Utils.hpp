@@ -70,7 +70,7 @@ void set_current_directory(const std::filesystem::path &path);
 std::filesystem::path get_current_directory();
 
 bool glob_matches(std::string_view glob, std::string_view str,
-                  const std::vector<bool> &glob_active, usize mask_offset);
+                  const ArrayList<bool> &glob_active, usize mask_offset);
 
 /* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] void quit(i32 code, bool should_goodbye = false);

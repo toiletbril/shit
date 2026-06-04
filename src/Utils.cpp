@@ -1,3 +1,4 @@
+#include "Containers.hpp"
 #include "Utils.hpp"
 
 #include "Builtin.hpp"
@@ -214,14 +215,14 @@ get_current_directory()
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 static bool
-is_glob_char_active(const std::vector<bool> &glob_active, usize index)
+is_glob_char_active(const ArrayList<bool> &glob_active, usize index)
 {
   return index < glob_active.size() && glob_active[index];
 }
 
 bool
 glob_matches(std::string_view glob, std::string_view str,
-             const std::vector<bool> &glob_active, usize mask_offset)
+             const ArrayList<bool> &glob_active, usize mask_offset)
 {
   usize s = 0;
   usize g = 0;

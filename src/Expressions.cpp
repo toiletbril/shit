@@ -1200,7 +1200,9 @@ CaseClause::evaluate_impl(EvalContext &cxt) const
   for (const CaseItem &item : m_items) {
     for (const Token *pattern_token : item.patterns) {
       std::string pattern = expand_no_glob(pattern_token);
-      std::vector<bool> all_active(pattern.size(), true);
+      ArrayList<bool> all_active{heap_allocator()};
+      for (usize k = 0; k < pattern.size(); k++)
+        all_active.push(true);
       if (utils::glob_matches(pattern, subject, all_active, 0)) {
         i64 ret = item.body->evaluate(cxt);
         cxt.set_last_exit_status(static_cast<i32>(ret));

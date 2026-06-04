@@ -39,10 +39,12 @@ private:
    unchanged. */
 struct GlobField
 {
-  explicit GlobField(Allocator allocator) : text(allocator) {}
+  explicit GlobField(Allocator allocator)
+      : text(allocator), glob_active(allocator)
+  {}
 
   String text;
-  std::vector<bool> glob_active{};
+  ArrayList<bool> glob_active;
 };
 
 struct Token;

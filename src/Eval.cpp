@@ -385,7 +385,9 @@ std::string
 trim_matching_prefix(const std::string &value, const std::string &pattern,
                      bool longest)
 {
-  std::vector<bool> active(pattern.length(), true);
+  ArrayList<bool> active{heap_allocator()};
+  for (usize k = 0; k < pattern.length(); k++)
+    active.push(true);
   if (longest) {
     for (usize length = value.length();; length--) {
       if (utils::glob_matches(pattern, value.substr(0, length), active, 0))
@@ -407,7 +409,9 @@ std::string
 trim_matching_suffix(const std::string &value, const std::string &pattern,
                      bool longest)
 {
-  std::vector<bool> active(pattern.length(), true);
+  ArrayList<bool> active{heap_allocator()};
+  for (usize k = 0; k < pattern.length(); k++)
+    active.push(true);
   if (longest) {
     for (usize start = 0; start <= value.length(); start++) {
       if (utils::glob_matches(pattern, value.substr(start), active, 0))
@@ -770,7 +774,7 @@ namespace {
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
 Maybe<usize>
-first_active_glob(StringView text, const std::vector<bool> &mask)
+first_active_glob(StringView text, const ArrayList<bool> &mask)
 {
   Maybe<usize> open_bracket{};
   for (usize i = 0; i < mask.size(); i++) {
@@ -835,13 +839,14 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
     std::ptrdiff_t slash_offset = static_cast<std::ptrdiff_t>(*slash_after);
     GlobField operating{scratch};
     operating.text.append(StringView{text.data, *slash_after});
-    operating.glob_active.assign(field.glob_active.begin(),
-                                 field.glob_active.begin() + slash_offset);
+    for (std::ptrdiff_t k = 0; k < slash_offset; k++)
+      operating.glob_active.push(field.glob_active[static_cast<usize>(k)]);
     GlobField removed_suffix{scratch};
     removed_suffix.text.append(
         StringView{text.data + *slash_after, text.length - *slash_after});
-    removed_suffix.glob_active.assign(field.glob_active.begin() + slash_offset,
-                                      field.glob_active.end());
+    for (usize k = static_cast<usize>(slash_offset);
+         k < field.glob_active.size(); k++)
+      removed_suffix.glob_active.push(field.glob_active[k]);
 
     ArrayList<GlobField> once = expand_path_once(operating, false);
 
@@ -851,10 +856,11 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
     for (GlobField &f : once) {
       usize matched_length = f.text.size();
       f.text.append(removed_suffix.text.view());
-      f.glob_active.assign(matched_length, false);
-      f.glob_active.insert(f.glob_active.end(),
-                           removed_suffix.glob_active.begin(),
-                           removed_suffix.glob_active.end());
+      f.glob_active.clear();
+      for (usize k = 0; k < matched_length; k++)
+        f.glob_active.push(false);
+      for (usize k = 0; k < removed_suffix.glob_active.size(); k++)
+        f.glob_active.push(removed_suffix.glob_active[k]);
     }
 
     /* The recurse validates each level through the directory read or, for a
@@ -1279,8 +1285,8 @@ EvalContext::expand_word(const Word &word)
 
   auto append_run = [&](StringView text, bool glob_active) {
     current.text.append(text);
-    current.glob_active.insert(current.glob_active.end(), text.length,
-                               glob_active);
+    for (usize k = 0; k < text.length; k++)
+      current.glob_active.push(glob_active);
     has_current = true;
   };
 
