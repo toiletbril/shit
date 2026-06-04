@@ -88,20 +88,20 @@ namespace {
 /* The literal name of a command when it is statically known. A word that holds
    a variable reference or a live glob metacharacter is dynamic, so its target
    cannot be checked before run time. */
-std::optional<std::string>
+Maybe<std::string>
 static_command_name(const Token *token)
 {
-  if (token->kind() != Token::Kind::Word) return std::nullopt;
+  if (token->kind() != Token::Kind::Word) return shit::nothing;
 
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
 
   std::string name{};
   for (const WordSegment &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::VariableReference)
-      return std::nullopt;
+      return shit::nothing;
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       for (char ch : segment.text) {
-        if (lexer::is_expandable_char(ch)) return std::nullopt;
+        if (lexer::is_expandable_char(ch)) return shit::nothing;
       }
     }
     name += segment.text;
@@ -1534,7 +1534,7 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   if (m_args.empty()) return;
 
-  std::optional<std::string> name = static_command_name(m_args[0]);
+  Maybe<std::string> name = static_command_name(m_args[0]);
 
   /* The literal command text, used for the test recognition. A name like [
      holds a glob metacharacter, so static_command_name rejects it, but the test
