@@ -236,7 +236,8 @@ Command::is_negated() const
 void
 Command::set_local_vars(std::unordered_map<std::string, Word> &&vars)
 {
-  m_local_vars = std::move(vars);
+  for (auto &[name, word] : vars)
+    m_local_vars.set(StringView{name.data(), name.size()}, std::move(word));
 }
 
 bool
@@ -538,13 +539,12 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
      function call included, so a child inherits them and a function sees them.
      The previous values are restored on every exit path. */
   std::vector<std::pair<std::string, std::optional<std::string>>> saved_env{};
-  if (m_local_vars) {
-    for (const auto &[name, value_word] : *m_local_vars) {
-      saved_env.emplace_back(name, os::get_environment_variable(name));
-      os::set_environment_variable(name,
-                                   cxt.expand_word_for_assignment(value_word));
-    }
-  }
+  m_local_vars.for_each([&](StringView name, const Word &value_word) {
+    std::string name_str{name.data, name.length};
+    saved_env.emplace_back(name_str, os::get_environment_variable(name_str));
+    os::set_environment_variable(name_str,
+                                 cxt.expand_word_for_assignment(value_word));
+  });
   SHIT_DEFER
   {
     for (const auto &[name, old_value] : saved_env) {
@@ -1604,14 +1604,15 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
 
   /* A prefix assignment does not affect the expansion on the same command, so a
      reference to one of its names reads the old value. */
-  if (m_local_vars) {
+  if (m_local_vars.size() > 0) {
     for (usize i = 1; i < m_args.size(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       const Word &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
       for (const WordSegment &segment : word.segments) {
         if (segment.kind == WordSegment::Kind::VariableReference &&
-            m_local_vars->find(segment.text) != m_local_vars->end())
+            m_local_vars.find(StringView{segment.text.data(),
+                                         segment.text.size()}) != nullptr)
         {
           actx.warn(m_args[i]->source_location(),
                     "The assignment prefix does not affect this command, '" +

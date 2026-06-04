@@ -139,7 +139,7 @@ struct Command : public Expression
 protected:
   bool m_is_async{false};
   bool m_is_negated{false};
-  Maybe<std::unordered_map<std::string, Word>> m_local_vars;
+  HashMap<Word> m_local_vars{heap_allocator()};
 };
 
 struct AssignCommand : public Command
