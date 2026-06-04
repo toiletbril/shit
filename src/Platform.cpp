@@ -283,6 +283,11 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   int flags = 0;
   switch (mode) {
   case FileOpenMode::Truncate: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
+  case FileOpenMode::TruncateNoClobber:
+    /* O_EXCL makes the create fail atomically when the file already exists, the
+       way noclobber requires. */
+    flags = O_WRONLY | O_CREAT | O_EXCL;
+    break;
   case FileOpenMode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
   case FileOpenMode::Read: flags = O_RDONLY; break;
   }
@@ -702,6 +707,8 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   DWORD disposition = OPEN_EXISTING;
   switch (mode) {
   case FileOpenMode::Truncate: disposition = CREATE_ALWAYS; break;
+  /* CREATE_NEW fails when the file already exists, the way noclobber wants. */
+  case FileOpenMode::TruncateNoClobber: disposition = CREATE_NEW; break;
   case FileOpenMode::Append: disposition = OPEN_ALWAYS; break;
   case FileOpenMode::Read: disposition = OPEN_EXISTING; break;
   }

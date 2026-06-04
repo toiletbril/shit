@@ -12,7 +12,6 @@
 namespace shit {
 
 /* TODO: Make CLI tests. */
-/* TODO: Add descriptions to autogeneated --help. */
 
 Flag::Flag(Flag::Kind kind, char short_name, const std::string &long_name,
            const std::string &description)

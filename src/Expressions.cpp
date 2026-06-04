@@ -302,8 +302,18 @@ AssignCommand::evaluate_impl(EvalContext &cxt) const
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  cxt.set_shell_variable(m_assignment->key(), cxt.expand_word_for_assignment(
-                                                  m_assignment->value_word()));
+  std::string value =
+      cxt.expand_word_for_assignment(m_assignment->value_word());
+
+  /* Under allexport the assignment marks the variable for the environment, the
+     same move the export builtin makes, so a child process inherits it while a
+     later lookup still falls back to the environment copy. */
+  if (cxt.export_all()) {
+    cxt.unset_shell_variable(m_assignment->key());
+    os::set_environment_variable(m_assignment->key(), value);
+  } else {
+    cxt.set_shell_variable(m_assignment->key(), value);
+  }
   return cxt.last_exit_status();
 }
 
@@ -398,7 +408,8 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
 
     os::FileOpenMode mode = os::FileOpenMode::Read;
     if (redirection.kind == Redirection::Kind::TruncateOutput)
-      mode = os::FileOpenMode::Truncate;
+      mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
+                              : os::FileOpenMode::Truncate;
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
@@ -501,7 +512,8 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
 
     os::FileOpenMode mode = os::FileOpenMode::Read;
     if (redirection.kind == Redirection::Kind::TruncateOutput)
-      mode = os::FileOpenMode::Truncate;
+      mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
+                              : os::FileOpenMode::Truncate;
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 

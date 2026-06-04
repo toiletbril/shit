@@ -3,29 +3,81 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 
-/* The minus form of the options goes through the standard flag parser, which
-   rejects an unknown option and understands -- and grouped letters. The plus
-   form turns an option off and the flag parser does not model it, so it is
-   handled directly. Only e, x, and u take effect, the other POSIX letters are
-   accepted without effect. */
+/* set toggles the shell options and rebinds the positional parameters. An
+   option is named by a single letter after a minus to enable it or a plus to
+   disable it, or by its long name after -o or +o. The letters and names that
+   have no backing behavior yet are accepted without effect. */
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("set [-eux] [+eux] [--] [arg ...]");
-
-FLAG(SET_ERROR_EXIT, Bool, 'e', "", "Exit immediately when a command fails.");
-FLAG(SET_XTRACE, Bool, 'x', "", "Print each command before it runs.");
-FLAG(SET_NOUNSET, Bool, 'u', "", "Treat an unset variable as an error.");
-FLAG(SET_ALLEXPORT, Bool, 'a', "", "Accepted with no effect.");
-FLAG(SET_NOTIFY, Bool, 'b', "", "Accepted with no effect.");
-FLAG(SET_NOCLOBBER, Bool, 'C', "", "Accepted with no effect.");
-FLAG(SET_NOGLOB, Bool, 'f', "", "Accepted with no effect.");
-FLAG(SET_HASHALL, Bool, 'h', "", "Accepted with no effect.");
-FLAG(SET_MONITOR, Bool, 'm', "", "Accepted with no effect.");
-FLAG(SET_NOEXEC, Bool, 'n', "", "Accepted with no effect.");
-FLAG(SET_VERBOSE, Bool, 'v', "", "Accepted with no effect.");
+HELP_SYNOPSIS_DECL("set [-abCefhmnuvx] [+abCefhmnuvx] [-o name] [+o name] "
+                   "[--] [arg ...]");
 
 namespace shit {
+
+namespace {
+
+/* One shell option, named by its letter and its long name. set and get are the
+   accessors on EvalContext, both null for an option accepted without effect. */
+struct SetOption
+{
+  char letter;
+  std::string_view name;
+  void (EvalContext::*set)(bool);
+  bool (EvalContext::*get)() const;
+};
+
+const SetOption SET_OPTIONS[] = {
+    {'e', "errexit", &EvalContext::set_error_exit, &EvalContext::error_exit},
+    {'x', "xtrace", &EvalContext::set_echo_expanded,
+     &EvalContext::should_echo_expanded},
+    {'u', "nounset", &EvalContext::set_error_unset, &EvalContext::error_unset},
+    {'a', "allexport", &EvalContext::set_export_all, &EvalContext::export_all},
+    {'C', "noclobber", &EvalContext::set_no_clobber, &EvalContext::no_clobber},
+    {'f', "noglob", &EvalContext::set_no_glob, &EvalContext::no_glob},
+    {'n', "noexec", &EvalContext::set_no_exec, &EvalContext::no_exec},
+    {'m', "monitor", nullptr, nullptr},
+    {'b', "notify", nullptr, nullptr},
+    {'h', "hashall", nullptr, nullptr},
+    {'v', "verbose", nullptr, nullptr},
+};
+
+const SetOption *
+find_option_by_letter(char letter)
+{
+  for (const SetOption &option : SET_OPTIONS)
+    if (option.letter == letter) return &option;
+  return nullptr;
+}
+
+const SetOption *
+find_option_by_name(std::string_view name)
+{
+  for (const SetOption &option : SET_OPTIONS)
+    if (option.name == name) return &option;
+  return nullptr;
+}
+
+bool
+option_is_on(const EvalContext &cxt, const SetOption &option)
+{
+  return option.get != nullptr ? (cxt.*(option.get))() : false;
+}
+
+/* The reusable command form that set -o and set +o print, one line each. */
+std::string
+list_options(const EvalContext &cxt)
+{
+  std::string out{};
+  for (const SetOption &option : SET_OPTIONS) {
+    out += option_is_on(cxt, option) ? "set -o " : "set +o ";
+    out += option.name;
+    out += '\n';
+  }
+  return out;
+}
+
+} /* namespace */
 
 Set::Set() = default;
 
@@ -49,54 +101,63 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  bool disable_error_exit = false;
-  bool disable_xtrace = false;
-  bool disable_nounset = false;
-  bool saw_end_of_options = false;
+  std::vector<std::string> operands{};
+  bool collecting_operands = false;
+  bool should_rebind = false;
 
-  /* The parser treats its first entry as a value, not the builtin name, so the
-     name is left out. */
-  std::vector<std::string> for_parser{};
   for (usize i = 1; i < args.size(); i++) {
     const std::string &arg = args[i];
-    if (arg == "--") saw_end_of_options = true;
 
-    if (arg.length() > 1 && arg[0] == '+') {
+    if (collecting_operands) {
+      operands.push_back(arg);
+      continue;
+    }
+
+    if (arg == "--") {
+      collecting_operands = true;
+      should_rebind = true;
+      continue;
+    }
+
+    /* The long form -o name and +o name names one option, or lists them all
+       when no name follows. */
+    if (arg == "-o" || arg == "+o") {
+      bool enable = arg[0] == '-';
+      if (i + 1 >= args.size()) {
+        ec.print_to_stdout(list_options(cxt));
+        continue;
+      }
+      const std::string &name = args[++i];
+      const SetOption *option = find_option_by_name(name);
+      if (option == nullptr)
+        throw Error{"set: '" + name + "' is not a valid option name"};
+      if (option->set != nullptr) (cxt.*(option->set))(enable);
+      continue;
+    }
+
+    /* A minus enables each following letter, a plus disables each one. */
+    if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {
+      bool enable = arg[0] == '-';
       for (usize c = 1; c < arg.length(); c++) {
-        char option = arg[c];
-        bool is_known = false;
-        for (const Flag *flag : FLAG_LIST)
-          if (flag->short_name() == option) is_known = true;
-        if (!is_known)
-          throw Error{"set: +" + std::string{option} + ": invalid option"};
-
-        if (option == 'e')
-          disable_error_exit = true;
-        else if (option == 'x')
-          disable_xtrace = true;
-        else if (option == 'u')
-          disable_nounset = true;
+        char letter = arg[c];
+        const SetOption *option = find_option_by_letter(letter);
+        if (option == nullptr) {
+          throw Error{"set: '" + std::string{arg[0]} + std::string{letter} +
+                      "' is not a valid option"};
+        }
+        if (option->set != nullptr) (cxt.*(option->set))(enable);
       }
       continue;
     }
 
-    for_parser.push_back(arg);
+    /* The first non-option argument and everything after it rebinds the
+       positional parameters. */
+    collecting_operands = true;
+    should_rebind = true;
+    operands.push_back(arg);
   }
 
-  std::vector<std::string> operands = parse_flags_vec(FLAG_LIST, for_parser);
-  SHIT_DEFER { reset_flags(FLAG_LIST); };
-
-  if (FLAG_SET_ERROR_EXIT.is_enabled()) cxt.set_error_exit(true);
-  if (FLAG_SET_XTRACE.is_enabled()) cxt.set_echo_expanded(true);
-  if (FLAG_SET_NOUNSET.is_enabled()) cxt.set_error_unset(true);
-  if (disable_error_exit) cxt.set_error_exit(false);
-  if (disable_xtrace) cxt.set_echo_expanded(false);
-  if (disable_nounset) cxt.set_error_unset(false);
-
-  /* Rebind the positional parameters only when operands or -- were given, so a
-     bare set -e leaves them alone. */
-  if (!operands.empty() || saw_end_of_options)
-    cxt.set_positional_params(std::move(operands));
+  if (should_rebind) cxt.set_positional_params(std::move(operands));
 
   return 0;
 }

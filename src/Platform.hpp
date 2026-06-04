@@ -27,9 +27,10 @@ Maybe<Pipe> make_pipe();
 /* How a redirection target file is opened. */
 enum class FileOpenMode : u8
 {
-  Truncate, /* >  create or truncate for writing */
-  Append,   /* >> create or append for writing */
-  Read,     /* <  open an existing file for reading */
+  Truncate,           /* >  create or truncate for writing */
+  TruncateNoClobber,  /* >  under noclobber, fail if the file exists */
+  Append,             /* >> create or append for writing */
+  Read,               /* <  open an existing file for reading */
 };
 
 /* Open path for the given mode and return its descriptor, or nothing on error

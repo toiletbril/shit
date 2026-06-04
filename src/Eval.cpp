@@ -335,6 +335,54 @@ EvalContext::error_unset() const
 }
 
 void
+EvalContext::set_no_clobber(bool enabled)
+{
+  m_no_clobber = enabled;
+}
+
+bool
+EvalContext::no_clobber() const
+{
+  return m_no_clobber;
+}
+
+void
+EvalContext::set_export_all(bool enabled)
+{
+  m_export_all = enabled;
+}
+
+bool
+EvalContext::export_all() const
+{
+  return m_export_all;
+}
+
+void
+EvalContext::set_no_glob(bool enabled)
+{
+  m_enable_path_expansion = !enabled;
+}
+
+bool
+EvalContext::no_glob() const
+{
+  return !m_enable_path_expansion;
+}
+
+void
+EvalContext::set_no_exec(bool enabled)
+{
+  m_no_exec = enabled;
+}
+
+bool
+EvalContext::no_exec() const
+{
+  return m_no_exec;
+}
+
+void
 EvalContext::enter_condition()
 {
   m_condition_depth++;

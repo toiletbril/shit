@@ -206,6 +206,22 @@ struct EvalContext
   void set_error_unset(bool enabled);
   bool error_unset() const;
 
+  /* noclobber rejects an overwrite of an existing file through a plain >, set by
+     -C and set -o noclobber. */
+  void set_no_clobber(bool enabled);
+  bool no_clobber() const;
+  /* allexport marks every later assignment for the environment, set by -a and
+     set -o allexport. */
+  void set_export_all(bool enabled);
+  bool export_all() const;
+  /* noglob disables pathname expansion, set by -f and set -o noglob, and shares
+     the path-expansion flag the field splitting already reads. */
+  void set_no_glob(bool enabled);
+  bool no_glob() const;
+  /* noexec parses without running, set by -n and set -o noexec. */
+  void set_no_exec(bool enabled);
+  bool no_exec() const;
+
   /* A condition, such as an if test or an && operand, suppresses set -e while
      it runs, since its failure is expected. */
   void enter_condition();
@@ -304,6 +320,9 @@ protected:
   ArrayList<std::string *> m_retained_sources{heap_allocator()};
 
   bool m_error_unset{false};
+  bool m_no_clobber{false};
+  bool m_export_all{false};
+  bool m_no_exec{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
   HashMap<String> m_traps{heap_allocator()};

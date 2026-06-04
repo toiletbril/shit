@@ -39,16 +39,16 @@ FLAG(VERBOSE, Bool, 'v', "verbose",
 FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
      "Write expanded input to standard error as it is read.");
 
-/* TODO: */
 FLAG(EXPORT_ALL, Bool, 'a', "export-all",
-     "UNIMPLEMENTED: Export all variables assigned to.");
+     "Mark every assigned variable for the environment.");
 FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
-     "UNIMPLEMENTED: Don't overwrite existing files with '>'.");
-FLAG(LOGIN, Bool, 'l', "login", "UNIMPLEMENTED: Act as a login shell.");
+     "Refuse to overwrite an existing file through '>'.");
+FLAG(NO_EXEC, Bool, 'n', "no-exec", "Read and parse commands but do not run them.");
+FLAG(NOUNSET, Bool, 'u', "nounset", "Treat an unset variable as an error.");
+FLAG(LOGIN, Bool, 'l', "login", "Act as a login shell and source the profiles.");
 
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
-FLAG(IGNORED3, Bool, 'u', "\0", "Ignored, left for compatibility.");
 
 FLAG(AST, Bool, 'A', "ast", "Print AST before executing each command.");
 FLAG(ESCAPE_MAP, Bool, 'M', "escape-bitmap",
@@ -146,6 +146,9 @@ run_script_contents(const std::string &script_contents,
                            context.function_names()))
     {
       exit_code = EXIT_FAILURE;
+    } else if (context.no_exec()) {
+      /* Under -n the tree is parsed and validated but never run. */
+      exit_code = EXIT_SUCCESS;
     } else {
       context.set_current_source(&script_contents, "the script");
       exit_code = static_cast<int>(ast->evaluate(context));
@@ -333,9 +336,6 @@ main(int argc, char **argv)
     should_be_interactive = true;
   }
 
-  if (FLAG_EXPORT_ALL.is_enabled() || FLAG_NO_CLOBBER.is_enabled())
-    shit::show_message("One or more unimplemented options were ignored.");
-
   /* Main loop state. The program name is $0 and the remaining arguments are the
      positional parameters $1 upward. */
   shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
@@ -345,6 +345,12 @@ main(int argc, char **argv)
                             FLAG_ERROR_EXIT.is_enabled(),
                             program_path,
                             file_names};
+
+  /* Apply the remaining option flags that the constructor does not take. */
+  context.set_error_unset(FLAG_NOUNSET.is_enabled());
+  context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
+  context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
+  context.set_no_exec(FLAG_NO_EXEC.is_enabled());
 
   /* Seed the standard and shell-specific variables a script may read. The
      version and runtime values come from the build. */
