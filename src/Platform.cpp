@@ -302,12 +302,23 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
 Maybe<descriptor>
 write_to_temp_file(const std::string &content)
 {
-  char path_template[] = "/tmp/shit_heredoc_XXXXXX";
-  int fd = mkstemp(path_template);
+  /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
+     so a cosmo binary running on Windows writes to the Windows temp directory
+     where /tmp does not exist. */
+  std::error_code path_error;
+  std::filesystem::path temp_dir =
+      std::filesystem::temp_directory_path(path_error);
+  if (path_error) temp_dir = "/tmp";
+
+  std::string templ = (temp_dir / "shit_heredoc_XXXXXX").string();
+  std::vector<char> path_template{templ.begin(), templ.end()};
+  path_template.push_back('\0');
+
+  int fd = mkstemp(path_template.data());
   if (fd < 0) return shit::nothing;
 
   /* Unlink at once, so the file is anonymous and is freed when closed. */
-  unlink(path_template);
+  unlink(path_template.data());
 
   usize offset = 0;
   while (offset < content.size()) {
@@ -421,6 +432,12 @@ bool
 signal_process(process p, i32 signal_number)
 {
   return kill(p, signal_number) == 0;
+}
+
+process
+process_from_pid(i64 pid)
+{
+  return static_cast<process>(pid);
 }
 
 Maybe<i32>
@@ -862,6 +879,14 @@ signal_process(process p, i32 signal_number)
   if (signal_number == 9 || signal_number == 15)
     return TerminateProcess(p, 1) != 0;
   return false;
+}
+
+process
+process_from_pid(i64 pid)
+{
+  return OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE |
+                         PROCESS_QUERY_INFORMATION,
+                     FALSE, static_cast<DWORD>(pid));
 }
 
 Maybe<i32>

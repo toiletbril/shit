@@ -61,7 +61,7 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
       }
       pid = job->pid;
     } else {
-      pid = static_cast<os::process>(std::atoll(target.c_str()));
+      pid = os::process_from_pid(std::atoll(target.c_str()));
     }
 
     if (!os::signal_process(pid, signal_number)) {

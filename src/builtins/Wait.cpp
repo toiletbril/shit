@@ -58,7 +58,7 @@ Wait::execute(ExecContext &ec, EvalContext &cxt) const
       if (Job *job = cxt.find_job(id))
         status = wait_for_job(*job);
     } else {
-      os::process pid = static_cast<os::process>(std::atoll(target.c_str()));
+      os::process pid = os::process_from_pid(std::atoll(target.c_str()));
       status = os::wait_and_monitor_process(pid);
     }
   }

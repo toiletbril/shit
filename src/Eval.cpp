@@ -1052,9 +1052,15 @@ EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
     if (!should_expand_files && !e.is_directory()) continue;
 
     /* The entry already holds the full path it built. On POSIX native() is a
-       reference, so the filename is a view into it with no allocation. */
+       std::string reference, so the filename is a view into it with no
+       allocation. On Windows native() is a std::wstring, so the path is
+       converted to a std::string for the byte-oriented matching below. */
+#if SHIT_PLATFORM_IS WIN32
+    std::string full = e.path().string();
+#else
     const std::string &full = e.path().native();
-    usize slash = full.rfind('/');
+#endif
+    usize slash = full.find_last_of("/\\");
     std::string_view filename = (slash == std::string::npos)
                                     ? std::string_view{full}
                                     : std::string_view{full}.substr(slash + 1);

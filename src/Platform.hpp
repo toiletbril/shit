@@ -75,6 +75,11 @@ bool signal_process(process p, i32 signal_number);
    nothing when the name is not known. */
 Maybe<i32> signal_number_from_name(const std::string &name);
 
+/* Turn a numeric process id into the process handle the os layer uses. On POSIX
+   the id is the handle. On Windows a handle is opened for it, which may be the
+   invalid handle when the process is gone or not permitted. */
+process process_from_pid(i64 pid);
+
 extern const std::vector<std::string> OMITTED_SUFFIXES;
 
 Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size);
