@@ -20,6 +20,6 @@
 [Word
   Variable "Y"
 ]
-data/*
+data/abcd data/abcdefg data/fourth data/hello+K data/hello-d
 data/*
 [Code 0]

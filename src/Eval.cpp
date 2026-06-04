@@ -1253,14 +1253,16 @@ EvalContext::expand_word(const Word &word)
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
-        append_split_run(value, false);
+        /* An unquoted expansion undergoes field splitting and then pathname
+           expansion, so a * or ? from the value is an active glob. */
+        append_split_run(value, true);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
       std::string output = capture_command_substitution(segment.text);
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
-        append_split_run(output, false);
+        append_split_run(output, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
       std::string value = std::to_string(evaluate_arithmetic(segment.text));
