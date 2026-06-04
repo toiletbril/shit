@@ -55,6 +55,9 @@ hash_bytes(StringView view)
    bump arena makes cheap. The buffer keeps a trailing null so c_str is free. */
 struct String
 {
+  /* A default String is heap-backed and empty, so it can serve as a container
+     slot before its real allocator and value are assigned. */
+  String() : m_allocator(heap_allocator()) {}
   explicit String(Allocator allocator) : m_allocator(allocator) {}
   String(Allocator allocator, StringView initial) : m_allocator(allocator)
   {
@@ -263,10 +266,13 @@ private:
   usize m_capacity{0};
 };
 
-/* An open-addressing hash table from a string key to a String value over an
-   explicit allocator, the std::unordered_map replacement for the variable
-   store. Linear probing, power-of-two capacity, grows past a load of three
-   quarters. */
+/* An open-addressing hash table from a string key to a Value over an explicit
+   allocator, the std::unordered_map replacement. The value defaults to String
+   for the variable store and the traps, and takes a pointer for the function
+   table. Linear probing, power-of-two capacity, grows past a load of three
+   quarters, and counts tombstones toward the load so an insert is never
+   dropped. */
+template <class Value = String>
 struct HashMap
 {
   explicit HashMap(Allocator allocator) : m_allocator(allocator) {}
@@ -276,7 +282,7 @@ struct HashMap
     rehash(other.m_capacity == 0 ? 16 : other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
       if (other.m_slots[i].state == Slot::Occupied)
-        set(other.m_slots[i].key.view(), other.m_slots[i].value.view());
+        set_value(other.m_slots[i].key.view(), Value{other.m_slots[i].value});
     }
   }
   HashMap(HashMap &&other) noexcept
@@ -320,7 +326,7 @@ struct HashMap
 
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */
-  [[nodiscard]] const String *find(StringView key) const
+  [[nodiscard]] const Value *find(StringView key) const
   {
     if (m_capacity == 0) return nullptr;
     usize mask = m_capacity - 1;
@@ -334,43 +340,14 @@ struct HashMap
     return nullptr;
   }
 
+  /* Store a value the table owns by move. */
+  void set(StringView key, Value value) { set_value(key, std::move(value)); }
+
+  /* Store a String value built from a view, the form the variable store and the
+     traps use. Only instantiated when Value is String. */
   void set(StringView key, StringView value)
   {
-    /* Tombstones count toward the load, so the table rehashes before a probe
-       chain fills with deleted slots. That keeps an Empty slot reachable on
-       every chain and an insert is never dropped. */
-    if (m_count + m_tombstones + 1 > (m_capacity >> 1) + (m_capacity >> 2))
-      rehash(m_capacity == 0 ? 16 : m_capacity * 2);
-
-    usize mask = m_capacity - 1;
-    usize i = hash_bytes(key) & mask;
-    usize first_tombstone = m_capacity;
-    for (usize probe = 0; probe < m_capacity; probe++) {
-      Slot &slot = m_slots[i];
-      if (slot.state == Slot::Occupied && slot.key == key) {
-        slot.value = String{m_allocator, value};
-        return;
-      }
-      if (slot.state == Slot::Empty) {
-        if (first_tombstone != m_capacity) {
-          place(first_tombstone, key, value);
-          m_tombstones--;
-        } else {
-          place(i, key, value);
-        }
-        return;
-      }
-      if (slot.state == Slot::Tombstone && first_tombstone == m_capacity)
-        first_tombstone = i;
-      i = (i + 1) & mask;
-    }
-
-    /* The chain held no Empty slot. The tombstone-aware load above prevents
-       this, but reuse a found tombstone rather than lose the insertion. */
-    if (first_tombstone != m_capacity) {
-      place(first_tombstone, key, value);
-      m_tombstones--;
-    }
+    set_value(key, String{m_allocator, value});
   }
 
   void erase(StringView key)
@@ -382,11 +359,11 @@ struct HashMap
       Slot &slot = m_slots[i];
       if (slot.state == Slot::Empty) return;
       if (slot.state == Slot::Occupied && slot.key == key) {
-        /* Free the stored strings but keep the slot's String objects alive and
-           empty, so a later place into this tombstone assigns into a live
-           object rather than one whose lifetime already ended. */
+        /* Free the stored key and value but keep the slot objects alive, so a
+           later place into this tombstone assigns into a live object rather
+           than one whose lifetime already ended. */
         slot.key = String{m_allocator};
-        slot.value = String{m_allocator};
+        slot.value = Value{};
         slot.state = Slot::Tombstone;
         m_count--;
         m_tombstones++;
@@ -402,14 +379,11 @@ struct HashMap
   {
     for (usize i = 0; i < m_capacity; i++) {
       if (m_slots[i].state == Slot::Occupied)
-        fn(m_slots[i].key.view(), m_slots[i].value.view());
+        fn(m_slots[i].key.view(), m_slots[i].value);
     }
   }
 
-  void clear()
-  {
-    destroy_all();
-  }
+  void clear() { destroy_all(); }
 
 private:
   struct Slot
@@ -421,15 +395,51 @@ private:
       Tombstone,
     };
     State state{Empty};
-    String key{heap_allocator()};
-    String value{heap_allocator()};
+    String key{};
+    Value value{};
   };
 
-  void place(usize index, StringView key, StringView value)
+  void set_value(StringView key, Value value)
+  {
+    /* Tombstones count toward the load, so the table rehashes before a probe
+       chain fills with deleted slots. That keeps an Empty slot reachable on
+       every chain and an insert is never dropped. */
+    if (m_count + m_tombstones + 1 > (m_capacity >> 1) + (m_capacity >> 2))
+      rehash(m_capacity == 0 ? 16 : m_capacity * 2);
+
+    usize mask = m_capacity - 1;
+    usize i = hash_bytes(key) & mask;
+    usize first_tombstone = m_capacity;
+    for (usize probe = 0; probe < m_capacity; probe++) {
+      Slot &slot = m_slots[i];
+      if (slot.state == Slot::Occupied && slot.key == key) {
+        slot.value = std::move(value);
+        return;
+      }
+      if (slot.state == Slot::Empty) {
+        usize target = first_tombstone != m_capacity ? first_tombstone : i;
+        if (first_tombstone != m_capacity) m_tombstones--;
+        place(target, key, std::move(value));
+        return;
+      }
+      if (slot.state == Slot::Tombstone && first_tombstone == m_capacity)
+        first_tombstone = i;
+      i = (i + 1) & mask;
+    }
+
+    /* The chain held no Empty slot. The tombstone-aware load above prevents
+       this, but reuse a found tombstone rather than lose the insertion. */
+    if (first_tombstone != m_capacity) {
+      m_tombstones--;
+      place(first_tombstone, key, std::move(value));
+    }
+  }
+
+  void place(usize index, StringView key, Value value)
   {
     Slot &slot = m_slots[index];
     slot.key = String{m_allocator, key};
-    slot.value = String{m_allocator, value};
+    slot.value = std::move(value);
     slot.state = Slot::Occupied;
     m_count++;
   }
@@ -448,7 +458,7 @@ private:
 
     for (usize i = 0; i < old_capacity; i++) {
       if (old_slots[i].state == Slot::Occupied)
-        set(old_slots[i].key.view(), old_slots[i].value.view());
+        set_value(old_slots[i].key.view(), std::move(old_slots[i].value));
       old_slots[i].~Slot();
     }
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);

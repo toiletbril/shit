@@ -299,10 +299,10 @@ EvalContext::sorted_variable_assignments() const
 {
   std::vector<std::string> assignments{};
   assignments.reserve(m_shell_variables.size());
-  m_shell_variables.for_each([&](StringView name, StringView value) {
+  m_shell_variables.for_each([&](StringView name, const String &value) {
     std::string entry{name.data, name.length};
     entry += '=';
-    entry.append(value.data, value.length);
+    entry.append(value.c_str(), value.size());
     assignments.push_back(std::move(entry));
   });
   std::sort(assignments.begin(), assignments.end());
