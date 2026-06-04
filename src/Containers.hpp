@@ -144,6 +144,15 @@ struct String
     return view() == other;
   }
 
+  /* Byte order, so a sort matches the C locale collating order. */
+  [[nodiscard]] bool operator<(const String &other) const
+  {
+    usize shared = m_length < other.m_length ? m_length : other.m_length;
+    int order = shared == 0 ? 0 : std::memcmp(c_str(), other.c_str(), shared);
+    if (order != 0) return order < 0;
+    return m_length < other.m_length;
+  }
+
 private:
   void free_storage()
   {

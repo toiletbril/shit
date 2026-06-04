@@ -86,6 +86,7 @@ run_script_contents(const std::string &script_contents,
        defined on one command stays callable on the next. */
     context.clear_retained_sources();
     ast_arena.reset();
+    context.reset_scratch_arena();
 
     shit::Parser p{
         shit::Lexer{script_contents, ast_arena, FLAG_ESCAPE_MAP.is_enabled()}

@@ -33,11 +33,16 @@ private:
 
 /* A field is a candidate argument after variable expansion and field splitting.
    It carries a parallel mask that marks which characters may act as glob
-   metacharacters, so globbing needs no source-position arithmetic. */
+   metacharacters, so globbing needs no source-position arithmetic. The text
+   lives on the scratch arena, since it lasts only as long as one command's
+   expansion, while the mask stays a heap bit vector so glob_matches reads it
+   unchanged. */
 struct GlobField
 {
-  std::string text;
-  std::vector<bool> glob_active;
+  explicit GlobField(Allocator allocator) : text(allocator) {}
+
+  String text;
+  std::vector<bool> glob_active{};
 };
 
 struct Token;
@@ -97,6 +102,12 @@ struct EvalContext
 
   /* Variable expand, tilde expand, field split, and glob each token. */
   std::vector<std::string> process_args(const std::vector<const Token *> &args);
+
+  /* The allocator for transient expansion data, which a bump arena hands out
+     and reclaims whole when the command ends. */
+  Allocator scratch_allocator() { return bump_allocator(m_scratch_arena); }
+  /* Reclaim the scratch arena, called between top-level commands. */
+  void reset_scratch_arena() { m_scratch_arena.reset(); }
 
   void set_shell_variable(const std::string &name, std::string value);
   void unset_shell_variable(const std::string &name);
@@ -220,6 +231,7 @@ protected:
   usize m_expansions_last{0};
   usize m_expansions_total{0};
 
+  BumpArena m_scratch_arena{};
   HashMap m_shell_variables{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
@@ -263,13 +275,12 @@ protected:
 
   /* Turn a word into fields, applying tilde, variable expansion, command
      substitution, and IFS field splitting, but not globbing. */
-  std::vector<GlobField> expand_word(const Word &word);
+  ArrayList<GlobField> expand_word(const Word &word);
 
-  std::vector<GlobField> expand_path_once(const GlobField &field,
-                                          bool should_expand_files);
-  std::vector<GlobField>
-  expand_path_recurse(const std::vector<GlobField> &fields);
-  std::vector<std::string> expand_path(GlobField field);
+  ArrayList<GlobField> expand_path_once(const GlobField &field,
+                                        bool should_expand_files);
+  ArrayList<GlobField> expand_path_recurse(ArrayList<GlobField> fields);
+  ArrayList<String> expand_path(GlobField field);
 
   void expand_tilde(WordSegment &leading_segment) const;
 };

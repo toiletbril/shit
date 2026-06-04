@@ -668,12 +668,15 @@ EvalContext::total_expansion_count() const
 
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
-std::vector<GlobField>
+ArrayList<GlobField>
 EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
 {
-  std::vector<GlobField> expanded{};
+  Allocator scratch = scratch_allocator();
+  ArrayList<GlobField> expanded{scratch};
 
-  const std::string &path = field.text;
+  /* This runs only for a field that holds a real glob, which is rare, so a
+     local std::string keeps the directory and pattern arithmetic plain. */
+  std::string path{field.text.c_str(), field.text.size()};
 
   usize last_slash = path.rfind('/');
   bool has_slashes = (last_slash != std::string::npos);
@@ -703,7 +706,10 @@ EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
   }
 
   if (!has_glob) {
-    expanded.push_back(field);
+    GlobField copy{scratch};
+    copy.text.append(field.text.view());
+    copy.glob_active = field.glob_active;
+    expanded.push(std::move(copy));
     return expanded;
   }
 
@@ -729,12 +735,12 @@ EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
          per-result allocation. The iterator built the full path already, so
          reuse it instead of joining the parent and filename again. A parent of
          "." is dropped to keep the result relative. */
-      GlobField result_field{};
+      GlobField result_field{scratch};
       if (parent_dir == ".")
-        result_field.text = std::string{filename};
+        result_field.text.append(StringView{filename.data(), filename.size()});
       else
-        result_field.text = full;
-      expanded.push_back(std::move(result_field));
+        result_field.text.append(StringView{full.data(), full.size()});
+      expanded.push(std::move(result_field));
     }
   }
 
@@ -748,12 +754,12 @@ namespace {
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
 Maybe<usize>
-first_active_glob(const std::string &text, const std::vector<bool> &mask)
+first_active_glob(StringView text, const std::vector<bool> &mask)
 {
   Maybe<usize> open_bracket{};
   for (usize i = 0; i < mask.size(); i++) {
     if (!mask[i]) continue;
-    char ch = text[i];
+    char ch = text.data[i];
     if (ch == '*' || ch == '?') return i;
     if (ch == '[') {
       if (!open_bracket) open_bracket = i;
@@ -766,14 +772,14 @@ first_active_glob(const std::string &text, const std::vector<bool> &mask)
 
 } /* namespace */
 
-std::vector<GlobField>
-EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
+ArrayList<GlobField>
+EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
 {
-  std::vector<GlobField> result{};
-  result.reserve(fields.size());
+  Allocator scratch = scratch_allocator();
+  ArrayList<GlobField> result{scratch};
 
-  for (const GlobField &field : fields) {
-    const std::string &text = field.text;
+  for (GlobField &field : fields) {
+    StringView text = field.text.view();
 
     /* An empty mask is the all-literal convention, so a field without one holds
        no live glob metacharacter. */
@@ -785,25 +791,25 @@ EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
          purely by globbing came from a directory read and always exists, so it
          never reaches here and pays no stat. */
       std::error_code exists_error{};
-      if (std::filesystem::exists(field.text, exists_error))
-        result.push_back(field);
+      if (std::filesystem::exists(field.text.c_str(), exists_error))
+        result.push(std::move(field));
       continue;
     }
 
     Maybe<usize> slash_after{};
-    for (usize k = *expand_ch; k < text.length(); k++) {
-      if (text[k] == '/') {
+    for (usize k = *expand_ch; k < text.length; k++) {
+      if (text.data[k] == '/') {
         slash_after = k;
         break;
       }
     }
 
     /* The glob is the last component, so expand it against files and emit the
-       matches as is. The field passes by reference with no copy. */
+       matches as is. */
     if (!slash_after) {
-      std::vector<GlobField> once = expand_path_once(field, true);
+      ArrayList<GlobField> once = expand_path_once(field, true);
       for (GlobField &f : once)
-        result.emplace_back(std::move(f));
+        result.push(std::move(f));
       continue;
     }
 
@@ -811,23 +817,24 @@ EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
        suffix after it, building each from a substring rather than copying the
        whole field. */
     std::ptrdiff_t slash_offset = static_cast<std::ptrdiff_t>(*slash_after);
-    GlobField operating{};
-    operating.text = text.substr(0, *slash_after);
+    GlobField operating{scratch};
+    operating.text.append(StringView{text.data, *slash_after});
     operating.glob_active.assign(field.glob_active.begin(),
                                  field.glob_active.begin() + slash_offset);
-    GlobField removed_suffix{};
-    removed_suffix.text = text.substr(*slash_after);
+    GlobField removed_suffix{scratch};
+    removed_suffix.text.append(
+        StringView{text.data + *slash_after, text.length - *slash_after});
     removed_suffix.glob_active.assign(field.glob_active.begin() + slash_offset,
                                       field.glob_active.end());
 
-    std::vector<GlobField> once = expand_path_once(operating, false);
+    ArrayList<GlobField> once = expand_path_once(operating, false);
 
     /* Bring back the removed suffix and recurse on the expanded entries. Each
        match came back all-literal with an empty mask, so restore its false
        entries before the suffix mask to keep the mask aligned with the text. */
     for (GlobField &f : once) {
-      usize matched_length = f.text.length();
-      f.text += removed_suffix.text;
+      usize matched_length = f.text.size();
+      f.text.append(removed_suffix.text.view());
       f.glob_active.assign(matched_length, false);
       f.glob_active.insert(f.glob_active.end(),
                            removed_suffix.glob_active.begin(),
@@ -837,9 +844,9 @@ EvalContext::expand_path_recurse(const std::vector<GlobField> &fields)
     /* The recurse validates each level through the directory read or, for a
        literal suffix, the existence check above, so no extra stat is needed
        here. */
-    std::vector<GlobField> twice = expand_path_recurse(once);
+    ArrayList<GlobField> twice = expand_path_recurse(std::move(once));
     for (GlobField &f : twice)
-      result.emplace_back(std::move(f));
+      result.push(std::move(f));
   }
 
   return result;
@@ -866,31 +873,37 @@ EvalContext::expand_tilde(WordSegment &leading_segment) const
   text.insert(0, home->string());
 }
 
-std::vector<std::string>
+ArrayList<String>
 EvalContext::expand_path(GlobField field)
 {
+  Allocator scratch = scratch_allocator();
+
   /* Fast path. A field with no glob that actually matches paths is its own
      single result, so it skips the recursion, the directory scan, and every
      copy. A bare command word such as '[' lands here instead of scanning the
      current directory. */
-  bool has_glob = m_enable_path_expansion &&
-                  first_active_glob(field.text, field.glob_active).has_value();
+  bool has_glob =
+      m_enable_path_expansion &&
+      first_active_glob(field.text.view(), field.glob_active).has_value();
 
   if (!has_glob) {
-    std::vector<std::string> single{};
-    single.emplace_back(std::move(field.text));
+    ArrayList<String> single{scratch};
+    single.push(std::move(field.text));
     return single;
   }
 
   /* The pattern is kept so a glob that matches nothing falls back to it, since
      the field moves into the recurse. */
-  std::string pattern = field.text;
+  String pattern{scratch};
+  pattern.append(field.text.view());
 
-  std::vector<GlobField> fields = expand_path_recurse({std::move(field)});
-  std::vector<std::string> values{};
-  values.reserve(fields.size());
+  ArrayList<GlobField> input{scratch};
+  input.push(std::move(field));
+  ArrayList<GlobField> fields = expand_path_recurse(std::move(input));
+
+  ArrayList<String> values{scratch};
   for (GlobField &f : fields)
-    values.emplace_back(std::move(f.text));
+    values.push(std::move(f.text));
 
   /* Sort the matches in byte order, which is the POSIX collating order in the C
      locale and what dash produces. A plain compare also keeps a large expansion
@@ -899,7 +912,7 @@ EvalContext::expand_path(GlobField field)
 
   /* A pattern that matches no file expands to itself, the POSIX behavior dash
      follows, rather than being dropped or raising an error. */
-  if (values.empty()) values.emplace_back(std::move(pattern));
+  if (values.size() == 0) values.push(std::move(pattern));
 
   return values;
 }
@@ -1200,9 +1213,11 @@ EvalContext::evaluate_arithmetic(const std::string &expression)
   return parser.parse();
 }
 
-std::vector<GlobField>
+ArrayList<GlobField>
 EvalContext::expand_word(const Word &word)
 {
+  Allocator scratch = scratch_allocator();
+
   /* Only copy the segments when a leading tilde must be rewritten. The common
      word has no tilde and reads its segments in place. */
   const std::vector<WordSegment> *segments = &word.segments;
@@ -1219,52 +1234,52 @@ EvalContext::expand_word(const Word &word)
   /* The field separator defaults to whitespace when IFS is unset. */
   const std::string &ifs = m_field_separators;
 
-  std::vector<GlobField> fields{};
-  GlobField current{};
+  ArrayList<GlobField> fields{scratch};
+  GlobField current{scratch};
   bool has_current = false;
 
-  auto flush = [&fields, &current, &has_current]() {
+  auto flush = [&]() {
     if (has_current) {
-      fields.emplace_back(std::move(current));
-      current = GlobField{};
+      fields.push(std::move(current));
+      current = GlobField{scratch};
       has_current = false;
     }
   };
 
-  auto append_run = [&current, &has_current](const std::string &text,
-                                             bool glob_active) {
-    current.text += text;
-    current.glob_active.insert(current.glob_active.end(), text.length(),
+  auto append_run = [&](StringView text, bool glob_active) {
+    current.text.append(text);
+    current.glob_active.insert(current.glob_active.end(), text.length,
                                glob_active);
     has_current = true;
   };
 
   /* A split run breaks into fields on every IFS run. Leading and trailing IFS
      leave no empty field behind, since flush only emits a started field. */
-  auto append_split_run = [&](const std::string &text, bool glob_active) {
+  auto append_split_run = [&](StringView text, bool glob_active) {
     usize i = 0;
-    while (i < text.length()) {
-      if (ifs.find(text[i]) != std::string::npos) {
+    while (i < text.length) {
+      if (ifs.find(text.data[i]) != std::string::npos) {
         flush();
-        while (i < text.length() && ifs.find(text[i]) != std::string::npos)
+        while (i < text.length && ifs.find(text.data[i]) != std::string::npos)
           i++;
         continue;
       }
       usize start = i;
-      while (i < text.length() && ifs.find(text[i]) == std::string::npos)
+      while (i < text.length && ifs.find(text.data[i]) == std::string::npos)
         i++;
-      append_run(text.substr(start, i - start), glob_active);
+      append_run(StringView{text.data + start, i - start}, glob_active);
     }
   };
 
   for (const WordSegment &segment : *segments) {
+    StringView segment_text{segment.text.data(), segment.text.size()};
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
-      append_run(segment.text, false);
+      append_run(segment_text, false);
       break;
     case WordSegment::Kind::UnquotedText:
-      append_split_run(segment.text, true);
+      append_split_run(segment_text, true);
       break;
     case WordSegment::Kind::VariableReference: {
       /* "$@" expands to one field per positional parameter. The first joins any
@@ -1272,31 +1287,37 @@ EvalContext::expand_word(const Word &word)
       if (segment.text == "@" && segment.is_in_double_quotes) {
         for (usize i = 0; i < m_positional_params.size(); i++) {
           if (i > 0) flush();
-          append_run(m_positional_params[i], false);
+          append_run(
+              StringView{m_positional_params[i].data(),
+                         m_positional_params[i].size()},
+              false);
         }
         break;
       }
       std::string value = apply_parameter_expansion(segment.text);
+      StringView value_view{value.data(), value.size()};
       if (segment.is_in_double_quotes)
-        append_run(value, false);
+        append_run(value_view, false);
       else
         /* An unquoted expansion undergoes field splitting and then pathname
            expansion, so a * or ? from the value is an active glob. */
-        append_split_run(value, true);
+        append_split_run(value_view, true);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
       std::string output = capture_command_substitution(segment.text);
+      StringView output_view{output.data(), output.size()};
       if (segment.is_in_double_quotes)
-        append_run(output, false);
+        append_run(output_view, false);
       else
-        append_split_run(output, true);
+        append_split_run(output_view, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
       std::string value = std::to_string(evaluate_arithmetic(segment.text));
+      StringView value_view{value.data(), value.size()};
       if (segment.is_in_double_quotes)
-        append_run(value, false);
+        append_run(value_view, false);
       else
-        append_split_run(value, false);
+        append_split_run(value_view, false);
     } break;
     }
   }
@@ -1501,8 +1522,8 @@ EvalContext::process_args(const std::vector<const Token *> &args)
       }
 
       for (GlobField &field : expand_word(*word)) {
-        for (std::string &g : expand_path(std::move(field)))
-          expanded_args.emplace_back(std::move(g));
+        for (String &g : expand_path(std::move(field)))
+          expanded_args.emplace_back(g.c_str(), g.size());
       }
     } catch (const Error &e) {
       throw ErrorWithLocation{l, e.message()};
