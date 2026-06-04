@@ -75,7 +75,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
   bool is_first = true;
 
   for (ExecContext &ec : ecs) {
-    std::optional<os::Pipe> pipe;
+    Maybe<os::Pipe> pipe;
 
     bool is_last = (&ec == &ecs.back());
 

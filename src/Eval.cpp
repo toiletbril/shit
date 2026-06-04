@@ -852,7 +852,7 @@ EvalContext::expand_tilde(WordSegment &leading_segment) const
   /* Only a bare ~ or a ~/ prefix expands. ~user is left alone for now. */
   if (text.length() > 1 && text[1] != '/') return;
 
-  std::optional<std::filesystem::path> home = os::get_home_directory();
+  Maybe<std::filesystem::path> home = os::get_home_directory();
   if (!home) throw Error{"Could not figure out home directory"};
 
   text.erase(0, 1);
@@ -1335,7 +1335,7 @@ EvalContext::capture_command_substitution(const std::string &source)
   /* A cd or an assignment inside the substitution must not leak. */
   EvalStateSnapshot snapshot = snapshot_state();
 
-  std::optional<os::Pipe> pipe = os::make_pipe();
+  Maybe<os::Pipe> pipe = os::make_pipe();
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
 
   /* Drain the read end on a thread so output larger than the pipe buffer cannot
@@ -1347,7 +1347,7 @@ EvalContext::capture_command_substitution(const std::string &source)
     try {
       char buffer[4096];
       for (;;) {
-        std::optional<usize> n = os::read_fd(read_fd, buffer, sizeof(buffer));
+        Maybe<usize> n = os::read_fd(read_fd, buffer, sizeof(buffer));
         if (!n.has_value() || *n == 0) break;
         captured.append(buffer, *n);
       }

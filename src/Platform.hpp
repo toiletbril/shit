@@ -22,7 +22,7 @@ struct Pipe
   descriptor out{SHIT_INVALID_FD};
 };
 
-std::optional<Pipe> make_pipe();
+Maybe<Pipe> make_pipe();
 
 /* How a redirection target file is opened. */
 enum class FileOpenMode : u8
@@ -54,8 +54,8 @@ i32 wait_and_monitor_process(process p);
 
 extern const std::vector<std::string> OMITTED_SUFFIXES;
 
-std::optional<usize> write_fd(os::descriptor fd, const void *buf, usize size);
-std::optional<usize> read_fd(os::descriptor fd, void *buf, usize size);
+Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size);
+Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size);
 
 bool close_fd(os::descriptor fd);
 
@@ -82,9 +82,9 @@ bool is_stdout_a_tty();
 
 ExtIndex erase_extension_and_get_its_index(std::string &program_name);
 
-std::optional<std::string> get_current_user();
+Maybe<std::string> get_current_user();
 
-std::optional<std::filesystem::path> get_home_directory();
+Maybe<std::filesystem::path> get_home_directory();
 
 void set_default_signal_handlers();
 

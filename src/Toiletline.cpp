@@ -63,7 +63,7 @@ void
 initialize()
 {
   /* Load history. */
-  if (std::optional<std::filesystem::path> h = shit::os::get_home_directory();
+  if (shit::Maybe<std::filesystem::path> h = shit::os::get_home_directory();
       h.has_value())
   {
     std::filesystem::path shit_history = *h / SHIT_HISTORY_FILE;
@@ -93,7 +93,7 @@ void
 exit()
 {
   /* Dump history. */
-  if (std::optional<std::filesystem::path> h = shit::os::get_home_directory();
+  if (shit::Maybe<std::filesystem::path> h = shit::os::get_home_directory();
       h.has_value())
   {
     std::filesystem::path shit_history = *h / SHIT_HISTORY_FILE;

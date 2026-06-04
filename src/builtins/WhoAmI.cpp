@@ -28,7 +28,7 @@ WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
 
   std::string p{};
 
-  if (std::optional<std::string> u = os::get_current_user(); u.has_value()) {
+  if (Maybe<std::string> u = os::get_current_user(); u.has_value()) {
     p += *u;
     p += '\n';
     ec.print_to_stdout(p);

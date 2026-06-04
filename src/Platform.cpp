@@ -23,19 +23,19 @@ namespace shit {
 
 namespace os {
 
-std::optional<usize>
+Maybe<usize>
 write_fd(os::descriptor fd, const void *buf, usize size)
 {
   ssize_t w = write(fd, buf, size);
-  if (w == -1) return std::nullopt;
+  if (w == -1) return shit::nothing;
   return static_cast<usize>(w);
 }
 
-std::optional<usize>
+Maybe<usize>
 read_fd(os::descriptor fd, void *buf, usize size)
 {
   ssize_t r = read(fd, buf, size);
-  if (r == -1) return std::nullopt;
+  if (r == -1) return shit::nothing;
   return static_cast<usize>(r);
 }
 
@@ -68,18 +68,20 @@ restore_stdout(os::descriptor saved)
   close(saved);
 }
 
-std::optional<std::string>
+Maybe<std::string>
 get_current_user()
 {
   struct passwd *pw = getpwuid(getuid());
-  if (pw != nullptr) return pw->pw_name;
-  return std::nullopt;
+  if (pw != nullptr) return std::string{pw->pw_name};
+  return shit::nothing;
 }
 
-std::optional<std::filesystem::path>
+Maybe<std::filesystem::path>
 get_home_directory()
 {
-  return get_environment_variable("HOME");
+  if (std::optional<std::string> home = get_environment_variable("HOME"))
+    return std::filesystem::path{*home};
+  return shit::nothing;
 }
 
 static const pid_t PARENT_SHELL_PID = getpid();
@@ -204,7 +206,7 @@ execute_program(ExecContext &&ec)
        * inside the duplicated process. */
       std::string msg = ec.program_path().string() + ": " +
                         last_system_error_message() + "\n";
-      write_fd(STDERR_FILENO, msg.data(), msg.size());
+      (void)write_fd(STDERR_FILENO, msg.data(), msg.size());
       _exit(127);
     }
   }
@@ -214,13 +216,13 @@ execute_program(ExecContext &&ec)
   return child_pid;
 }
 
-std::optional<Pipe>
+Maybe<Pipe>
 make_pipe()
 {
   descriptor p[2] = {SHIT_INVALID_FD, SHIT_INVALID_FD};
 
   if (pipe(p) != 0) {
-    return std::nullopt;
+    return shit::nothing;
   }
 
   /* Close the pipe ends on exec, so a stage that dups one end onto its stdin or
@@ -428,21 +430,21 @@ namespace shit {
 
 namespace os {
 
-std::optional<usize>
+Maybe<usize>
 write_fd(os::descriptor fd, const void *buf, usize size)
 {
   DWORD w = -1;
   if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
-    return std::nullopt;
+    return shit::nothing;
   return static_cast<usize>(w);
 }
 
-std::optional<usize>
+Maybe<usize>
 read_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD r = -1;
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
-    return std::nullopt;
+    return shit::nothing;
   return static_cast<usize>(r);
 }
 
@@ -466,7 +468,7 @@ restore_stdout(os::descriptor saved)
   SetStdHandle(STD_OUTPUT_HANDLE, saved);
 }
 
-std::optional<std::string>
+Maybe<std::string>
 get_current_user()
 {
   DWORD size = 0;
@@ -477,13 +479,15 @@ get_current_user()
     if (GetUserNameA(buffer.data(), &size))
       return std::string{buffer.data(), size - 1};
   }
-  return std::nullopt;
+  return shit::nothing;
 }
 
-std::optional<std::filesystem::path>
+Maybe<std::filesystem::path>
 get_home_directory()
 {
-  return get_environment_variable("USERPROFILE");
+  if (std::optional<std::string> home = get_environment_variable("USERPROFILE"))
+    return std::filesystem::path{*home};
+  return shit::nothing;
 }
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
@@ -596,7 +600,7 @@ execute_program(ExecContext &&ec)
   return process_info.hProcess;
 }
 
-std::optional<Pipe>
+Maybe<Pipe>
 make_pipe()
 {
   SECURITY_ATTRIBUTES att{};
@@ -614,7 +618,7 @@ make_pipe()
     if (in != INVALID_HANDLE_VALUE) close_fd(in);
     if (out != INVALID_HANDLE_VALUE) close_fd(out);
 
-    return std::nullopt;
+    return shit::nothing;
   }
 
   return Pipe{in, out};

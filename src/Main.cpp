@@ -182,7 +182,7 @@ expand_prompt_escapes(const std::string &prompt, const std::string &user,
       break;
     case 'w': {
       std::string shown = working_directory;
-      std::optional<std::filesystem::path> home = shit::os::get_home_directory();
+      shit::Maybe<std::filesystem::path> home = shit::os::get_home_directory();
       if (home && shown.rfind(home->string(), 0) == 0)
         shown = "~" + shown.substr(home->string().length());
       out += shown;
@@ -351,7 +351,7 @@ main(int argc, char **argv)
      file named by ENV when that is set. A missing file is silently skipped. */
   if (is_login_shell) {
     source_file("/etc/profile", context, ast_arena);
-    if (std::optional<std::filesystem::path> home =
+    if (shit::Maybe<std::filesystem::path> home =
             shit::os::get_home_directory();
         home.has_value())
     {
