@@ -56,17 +56,17 @@ EvalContext::end_command()
 void
 EvalContext::set_shell_variable(const std::string &name, std::string value)
 {
-  std::string &slot = m_shell_variables[name];
-  slot = std::move(value);
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
-  if (name == "IFS") m_field_separators = slot;
+  if (name == "IFS") m_field_separators = value;
+  m_shell_variables.set(StringView{name.data(), name.size()},
+                        StringView{value.data(), value.size()});
 }
 
 void
 EvalContext::unset_shell_variable(const std::string &name)
 {
-  m_shell_variables.erase(name);
+  m_shell_variables.erase(StringView{name.data(), name.size()});
   if (name == "IFS") m_field_separators = " \t\n";
 }
 
@@ -111,8 +111,9 @@ EvalContext::get_variable_value(const std::string &name) const
     return joined;
   }
 
-  if (auto it = m_shell_variables.find(name); it != m_shell_variables.end())
-    return it->second;
+  if (const String *stored =
+          m_shell_variables.find(StringView{name.data(), name.size()}))
+    return std::string{stored->c_str(), stored->size()};
 
   if (std::optional<std::string> env = os::get_environment_variable(name))
     return *env;
@@ -296,8 +297,12 @@ EvalContext::sorted_variable_assignments() const
 {
   std::vector<std::string> assignments{};
   assignments.reserve(m_shell_variables.size());
-  for (const auto &[name, value] : m_shell_variables)
-    assignments.push_back(name + "=" + value);
+  m_shell_variables.for_each([&](StringView name, StringView value) {
+    std::string entry{name.data, name.length};
+    entry += '=';
+    entry.append(value.data, value.length);
+    assignments.push_back(std::move(entry));
+  });
   std::sort(assignments.begin(), assignments.end());
   return assignments;
 }

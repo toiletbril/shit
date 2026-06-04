@@ -2,6 +2,7 @@
 
 #include "Builtin.hpp"
 #include "Common.hpp"
+#include "Containers.hpp"
 #include "Maybe.hpp"
 
 #include <filesystem>
@@ -76,7 +77,7 @@ struct ShellExit
    substitution so a cd or an assignment inside does not leak to the parent. */
 struct EvalStateSnapshot
 {
-  std::unordered_map<std::string, std::string> shell_variables;
+  HashMap shell_variables;
   std::unordered_map<std::string, const Expression *> functions;
   std::vector<std::string> positional_params;
   std::filesystem::path working_directory;
@@ -219,7 +220,7 @@ protected:
   usize m_expansions_last{0};
   usize m_expansions_total{0};
 
-  std::unordered_map<std::string, std::string> m_shell_variables{};
+  HashMap m_shell_variables{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
   std::string m_field_separators{" \t\n"};
