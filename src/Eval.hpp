@@ -172,7 +172,8 @@ struct EvalContext
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
      so a break, a return, or an assignment inside acts on the caller. */
-  i32 run_source(const std::string &source);
+  i32 run_source(const std::string &source,
+                 const std::string &origin = "a sourced command");
 
   /* getopts keeps the position inside the current argument here, so a grouped
      option such as -abc is parsed one letter per call. last_optind detects when

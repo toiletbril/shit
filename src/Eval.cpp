@@ -190,7 +190,8 @@ EvalContext::run_exit_trap()
   m_exit_trap_ran = true;
 
   auto it = m_traps.find("EXIT");
-  if (it != m_traps.end() && !it->second.empty()) run_source(it->second);
+  if (it != m_traps.end() && !it->second.empty())
+    run_source(it->second, "the EXIT trap");
 }
 
 void
@@ -1375,7 +1376,7 @@ EvalContext::capture_command_substitution(const std::string &source)
 }
 
 i32
-EvalContext::run_source(const std::string &source)
+EvalContext::run_source(const std::string &source, const std::string &origin)
 {
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
@@ -1383,18 +1384,37 @@ EvalContext::run_source(const std::string &source)
   if (g_ast_arena == nullptr)
     throw Error{"Cannot run source outside of a parse"};
 
-  Parser parser{
-      Lexer{source, *g_ast_arena}
-  };
+  /* A located error from the sourced text carries an offset into that text, not
+     into the caller's command, so it is formatted here against the source and
+     marked with its origin. Otherwise the caller would print the caret against
+     the wrong line. */
+  try {
+    Parser parser{
+        Lexer{source, *g_ast_arena}
+    };
 
-  /* Retain the AST before evaluating, so a function it defines outlives this
-     call and a control-flow exception thrown inside still leaves it owned. The
-     destructor runs at the next top-level command, freeing the node members
-     while the arena storage is reclaimed by the reset. */
-  Expression *ast = parser.construct_ast().release();
-  m_retained_source_asts.push_back(ast);
-  ast->evaluate(*this);
-  return last_exit_status();
+    /* Retain the AST before evaluating, so a function it defines outlives this
+       call and a control-flow exception thrown inside still leaves it owned.
+       The destructor runs at the next top-level command, freeing the node
+       members while the arena storage is reclaimed by the reset. */
+    Expression *ast = parser.construct_ast().release();
+    m_retained_source_asts.push_back(ast);
+    ast->evaluate(*this);
+    return last_exit_status();
+  } catch (const ErrorWithLocationAndDetails &e) {
+    show_message(e.to_string(source));
+    show_message(e.details_to_string(source));
+    show_message("This error was raised while running " + origin + ".");
+    return 1;
+  } catch (const ErrorWithLocation &e) {
+    show_message(e.to_string(source));
+    show_message("This error was raised while running " + origin + ".");
+    return 1;
+  } catch (const Error &e) {
+    show_message(e.to_string());
+    show_message("This error was raised while running " + origin + ".");
+    return 1;
+  }
 }
 
 void

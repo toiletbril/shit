@@ -32,7 +32,7 @@ Source::execute(ExecContext &ec, EvalContext &cxt) const
   std::ostringstream contents{};
   contents << file.rdbuf();
 
-  return cxt.run_source(contents.str());
+  return cxt.run_source(contents.str(), "the file '" + path + "'");
 }
 
 } /* namespace shit */

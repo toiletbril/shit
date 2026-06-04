@@ -25,7 +25,7 @@ Eval::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (joined.empty()) return 0;
 
-  return cxt.run_source(joined);
+  return cxt.run_source(joined, "eval");
 }
 
 } /* namespace shit */
