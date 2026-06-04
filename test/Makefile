@@ -56,4 +56,28 @@ dashdiff: $(BIN)
 	done; \
 	rm -f /tmp/shit_dd_s /tmp/shit_dd_d
 
-.PHONY: test clean run_tests refill dashdiff
+# Time the builtin-only configure script through each shell, after checking that
+# the output is identical. Use the optimized shit build, SHIT_MODE=rel, for a
+# fair comparison. SCALE scales the work, the default keeps dash near 0.1s.
+BASH ?= bash
+BENCH := bench/configure.shit
+SCALE ?= 40
+
+bench: $(BIN)
+	@SCALE=$(SCALE) $(DASH) $(BENCH) >/tmp/shit_bench_d 2>&1; \
+	SCALE=$(SCALE) $(BIN) $(BENCH) >/tmp/shit_bench_s 2>&1; \
+	if cmp -s /tmp/shit_bench_d /tmp/shit_bench_s; then \
+		echo "output matches dash"; \
+	else \
+		echo "output differs from dash:"; \
+		diff /tmp/shit_bench_d /tmp/shit_bench_s | head -20; \
+	fi; \
+	echo "wall-clock seconds at SCALE=$(SCALE), lower is better:"; \
+	$(BASH) -c 'export TIMEFORMAT="  %R"; \
+		for sh in "$(DASH)" "$(BASH)" "$(BIN)"; do \
+			printf "  %-10s" "$$sh"; \
+			( time SCALE=$(SCALE) $$sh $(BENCH) >/dev/null 2>&1 ) 2>&1; \
+		done'; \
+	rm -f /tmp/shit_bench_d /tmp/shit_bench_s
+
+.PHONY: test clean run_tests refill dashdiff bench
