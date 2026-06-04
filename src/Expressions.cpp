@@ -355,6 +355,51 @@ SimpleCommand::set_redirections(std::vector<Redirection> &&redirections)
   m_redirections = std::move(redirections);
 }
 
+void
+SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
+{
+  for (const Redirection &redirection : m_redirections) {
+    if (redirection.kind == Redirection::Kind::DuplicateOutput) {
+      if (redirection.fd == 2 && redirection.dup_fd == 1)
+        ec.dup_err_to_out = true;
+      else if (redirection.fd == 1 && redirection.dup_fd == 2)
+        ec.dup_out_to_err = true;
+      continue;
+    }
+
+    std::vector<std::string> target = cxt.process_args({redirection.target});
+    if (target.size() != 1) {
+      throw ErrorWithLocation{redirection.target->source_location(),
+                              "Redirection target is not a single file"};
+    }
+
+    os::FileOpenMode mode = os::FileOpenMode::Read;
+    if (redirection.kind == Redirection::Kind::TruncateOutput)
+      mode = os::FileOpenMode::Truncate;
+    else if (redirection.kind == Redirection::Kind::AppendOutput)
+      mode = os::FileOpenMode::Append;
+
+    std::optional<os::descriptor> opened =
+        os::open_file_descriptor(target[0], mode);
+    if (!opened) {
+      throw ErrorWithLocation{redirection.target->source_location(),
+                              "Could not open '" + target[0] + "': " +
+                                  os::last_system_error_message()};
+    }
+
+    if (redirection.fd == 0) {
+      if (ec.in_fd) os::close_fd(*ec.in_fd);
+      ec.in_fd = opened;
+    } else if (redirection.fd == 2) {
+      if (ec.err_fd) os::close_fd(*ec.err_fd);
+      ec.err_fd = opened;
+    } else {
+      if (ec.out_fd) os::close_fd(*ec.out_fd);
+      ec.out_fd = opened;
+    }
+  }
+}
+
 bool
 SimpleCommand::is_simple_command() const
 {
@@ -789,8 +834,13 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
           "A pipeline stage expanded to no command to run"};
     }
 
-    ecs.emplace_back(
-        ExecContext::make_from(e->source_location(), std::move(stage_args)));
+    ExecContext ec =
+        ExecContext::make_from(e->source_location(), std::move(stage_args));
+    /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
+       its descriptors. The pipe only sets stdin and stdout, so a stderr
+       redirection composes with it. */
+    e->redirect_exec_context(ec, cxt);
+    ecs.emplace_back(std::move(ec));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs), cxt, is_async());

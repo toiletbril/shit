@@ -84,11 +84,19 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
       if (!pipe) {
         throw ErrorWithLocation{ec.source_location(), "Could not open a pipe"};
       }
-      ec.out_fd = pipe->out;
+      /* An explicit > redirect on the stage takes its standard output, so the
+         pipe end goes unused and closes at once. */
+      if (!ec.out_fd)
+        ec.out_fd = pipe->out;
+      else
+        os::close_fd(pipe->out);
     }
 
     if (!is_first) {
-      ec.in_fd = last_stdin;
+      if (!ec.in_fd)
+        ec.in_fd = last_stdin;
+      else
+        os::close_fd(last_stdin);
     }
     if (!is_last) {
       last_stdin = pipe->in;

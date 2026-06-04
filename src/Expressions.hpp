@@ -190,6 +190,10 @@ struct SimpleCommand : public Command
 
   void set_redirections(std::vector<Redirection> &&redirections);
 
+  /* Open this command's redirections into an exec context, for a pipeline stage
+     that does not go through evaluate_impl. */
+  void redirect_exec_context(ExecContext &ec, EvalContext &cxt) const;
+
   bool is_simple_command() const override;
 
   const std::vector<const Token *> &args() const;
