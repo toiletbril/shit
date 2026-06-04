@@ -101,8 +101,9 @@ report_escaped_control_flow(shit::EvalContext &context,
   shit::ErrorWithLocation located{control.location, what};
   shit::show_message(located.to_string(*source));
   if (!control.origin.empty())
-    shit::show_message("This jump was reached while running " + control.origin +
-                       ".");
+    shit::show_message(
+        shit::Note{"this jump was reached while running " + control.origin}
+            .to_string());
 
   context.clear_control_flow();
 }

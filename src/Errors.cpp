@@ -179,6 +179,14 @@ Warning::severity_word() const
   return "Warning";
 }
 
+Note::Note(const std::string &message) : Error(message) {}
+
+std::string
+Note::severity_word() const
+{
+  return "Note";
+}
+
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      const std::string &message)
     : ErrorBase(message), m_location(location)

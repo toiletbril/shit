@@ -49,6 +49,15 @@ struct Warning : public Error
   std::string severity_word() const override;
 };
 
+/* An Error that prints as a note and is shown rather than thrown. It carries no
+   location, so it adds plain context under a primary error. */
+struct Note : public Error
+{
+  Note(const std::string &message);
+
+  std::string severity_word() const override;
+};
+
 /**
  * An error with location in the source code. The source must be supplied to
  * resolve context.
