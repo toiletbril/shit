@@ -146,6 +146,81 @@ EvalContext::set_last_background_pid(i64 pid)
   m_last_background_pid = pid;
 }
 
+int
+EvalContext::register_job(os::process pid, const std::string &command)
+{
+  Job job{};
+  job.id = m_next_job_id++;
+  job.pid = pid;
+  job.command = command;
+  job.state = Job::State::Running;
+  m_jobs.push_back(std::move(job));
+  SHIT_LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
+  return m_jobs.back().id;
+}
+
+void
+EvalContext::update_jobs()
+{
+  for (Job &job : m_jobs) {
+    if (job.state == Job::State::Done) continue;
+
+    i32 status = 0;
+    os::ProcessState state = os::poll_process(job.pid, status);
+    if (state == os::ProcessState::Exited) {
+      job.state = Job::State::Done;
+      job.last_status = status;
+    } else if (state == os::ProcessState::Stopped) {
+      job.state = Job::State::Stopped;
+    } else {
+      job.state = Job::State::Running;
+    }
+  }
+}
+
+std::vector<Job> &
+EvalContext::jobs()
+{
+  return m_jobs;
+}
+
+Job *
+EvalContext::find_job(int id)
+{
+  for (Job &job : m_jobs)
+    if (job.id == id) return &job;
+  return nullptr;
+}
+
+Job *
+EvalContext::most_recent_job()
+{
+  if (m_jobs.empty()) return nullptr;
+  return &m_jobs.back();
+}
+
+void
+EvalContext::forget_done_jobs()
+{
+  m_jobs.erase(std::remove_if(m_jobs.begin(), m_jobs.end(),
+                              [](const Job &job) {
+                                return job.state == Job::State::Done;
+                              }),
+               m_jobs.end());
+}
+
+void
+EvalContext::set_monitor(bool enabled)
+{
+  m_monitor = enabled;
+}
+
+bool
+EvalContext::monitor() const
+{
+  return m_monitor;
+}
+
 void
 EvalContext::register_function(const std::string &name, const Expression *body)
 {

@@ -45,9 +45,16 @@ i32
 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
 {
   if (!ec.is_builtin()) {
+    /* The command word is kept for the job table before the context is moved
+       into the spawn. */
+    std::string command = is_async ? ec.program() : std::string{};
+
     os::process p = os::execute_program(std::move(ec));
     if (is_async) {
       cxt.set_last_background_pid(os::process_id_of(p));
+      int id = cxt.register_job(p, command);
+      if (cxt.shell_is_interactive())
+        std::cerr << "[" << id << "] " << os::process_id_of(p) << std::endl;
       return 0;
     }
     return os::wait_and_monitor_process(p);
@@ -117,8 +124,13 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
   }
 
   if (is_async) {
-    if (last_child != SHIT_INVALID_PROCESS)
+    if (last_child != SHIT_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
+      int id = cxt.register_job(last_child, "pipeline");
+      if (cxt.shell_is_interactive())
+        std::cerr << "[" << id << "] " << os::process_id_of(last_child)
+                  << std::endl;
+    }
     return ret;
   }
 

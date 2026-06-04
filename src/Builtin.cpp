@@ -131,6 +131,16 @@ builtin_help(Builtin::Kind kind)
             "Define a command alias, or list the defined aliases."};
   case Builtin::Kind::Unalias:
     return {"unalias name [name ...]", "Remove a command alias."};
+  case Builtin::Kind::Jobs:
+    return {"jobs", "List the background jobs and their state."};
+  case Builtin::Kind::Fg:
+    return {"fg [%job]", "Bring a job to the foreground and wait for it."};
+  case Builtin::Kind::Bg:
+    return {"bg [%job]", "Resume a stopped job in the background."};
+  case Builtin::Kind::Wait:
+    return {"wait [%job|pid ...]", "Wait for jobs to finish."};
+  case Builtin::Kind::Kill:
+    return {"kill [-signal] %job|pid ...", "Send a signal to a job or pid."};
   }
   return {"", ""};
 }

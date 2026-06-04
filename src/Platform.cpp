@@ -393,6 +393,61 @@ wait_and_monitor_process(process pid)
   SHIT_UNREACHABLE();
 }
 
+ProcessState
+poll_process(process p, i32 &status_out)
+{
+  i32 status = 0;
+  pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
+
+  /* Still running, or already reaped, which the job table also treats as done.
+   */
+  if (result == 0) return ProcessState::Running;
+  if (result == -1) {
+    status_out = 0;
+    return ProcessState::Exited;
+  }
+
+  if (WIFSTOPPED(status)) return ProcessState::Stopped;
+  if (WIFCONTINUED(status)) return ProcessState::Running;
+  if (WIFSIGNALED(status)) {
+    status_out = 128 + WTERMSIG(status);
+    return ProcessState::Exited;
+  }
+  status_out = WEXITSTATUS(status);
+  return ProcessState::Exited;
+}
+
+bool
+signal_process(process p, i32 signal_number)
+{
+  return kill(p, signal_number) == 0;
+}
+
+Maybe<i32>
+signal_number_from_name(const std::string &name)
+{
+  /* A bare number names the signal directly. */
+  if (!name.empty() &&
+      std::all_of(name.begin(), name.end(),
+                  [](unsigned char c) { return std::isdigit(c) != 0; }))
+  {
+    return static_cast<i32>(std::strtol(name.c_str(), nullptr, 10));
+  }
+
+  std::string bare = name;
+  if (bare.rfind("SIG", 0) == 0) bare = bare.substr(3);
+
+  static const std::unordered_map<std::string, i32> NAMES = {
+      {"HUP", SIGHUP},   {"INT", SIGINT},   {"QUIT", SIGQUIT},
+      {"KILL", SIGKILL}, {"TERM", SIGTERM}, {"STOP", SIGSTOP},
+      {"TSTP", SIGTSTP}, {"CONT", SIGCONT}, {"USR1", SIGUSR1},
+      {"USR2", SIGUSR2}, {"ABRT", SIGABRT}, {"ALRM", SIGALRM},
+      {"PIPE", SIGPIPE},
+  };
+  if (auto it = NAMES.find(bare); it != NAMES.end()) return it->second;
+  return nothing;
+}
+
 os_args
 make_os_args(const std::vector<std::string> &args)
 {
@@ -783,6 +838,48 @@ wait_and_monitor_process(process p)
     throw Error{"GetExitCodeProcess() failed: " + last_system_error_message()};
 
   return code;
+}
+
+ProcessState
+poll_process(process p, i32 &status_out)
+{
+  /* Windows has no stopped state, so a process is either alive or finished. */
+  DWORD code = 0;
+  if (GetExitCodeProcess(p, &code) == 0) {
+    status_out = 0;
+    return ProcessState::Exited;
+  }
+  if (code == STILL_ACTIVE) return ProcessState::Running;
+  status_out = static_cast<i32>(code);
+  return ProcessState::Exited;
+}
+
+bool
+signal_process(process p, i32 signal_number)
+{
+  /* Windows cannot deliver a POSIX signal, so only a terminate is honored and a
+     resume or a stop is a no-op the caller treats as unsupported. */
+  if (signal_number == 9 || signal_number == 15)
+    return TerminateProcess(p, 1) != 0;
+  return false;
+}
+
+Maybe<i32>
+signal_number_from_name(const std::string &name)
+{
+  if (!name.empty() &&
+      std::all_of(name.begin(), name.end(),
+                  [](unsigned char c) { return std::isdigit(c) != 0; }))
+  {
+    return static_cast<i32>(std::strtol(name.c_str(), nullptr, 10));
+  }
+
+  std::string bare = name;
+  if (bare.rfind("SIG", 0) == 0) bare = bare.substr(3);
+  if (bare == "KILL") return 9;
+  if (bare == "TERM") return 15;
+  if (bare == "INT") return 2;
+  return nothing;
 }
 
 os_args

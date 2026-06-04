@@ -53,6 +53,28 @@ std::string last_system_error_message();
 
 i32 wait_and_monitor_process(process p);
 
+/* The live state of a process, polled without blocking for the job table. */
+enum class ProcessState : u8
+{
+  Running,
+  Exited,
+  Stopped,
+};
+
+/* Check a process without blocking. Returns Running while it is alive, Exited
+   with the status placed in status_out once it ends, and Stopped while it is
+   suspended. */
+ProcessState poll_process(process p, i32 &status_out);
+
+/* Send a signal to a process by its numeric signal, for the kill builtin and
+   for fg and bg to resume a stopped job with SIGCONT. Returns false on
+   failure. */
+bool signal_process(process p, i32 signal_number);
+
+/* Resolve a signal name such as TERM, SIGTERM, or KILL to its number, or
+   nothing when the name is not known. */
+Maybe<i32> signal_number_from_name(const std::string &name);
+
 extern const std::vector<std::string> OMITTED_SUFFIXES;
 
 Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size);

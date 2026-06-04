@@ -36,7 +36,7 @@ const SetOption SET_OPTIONS[] = {
     {'C', "noclobber", &EvalContext::set_no_clobber, &EvalContext::no_clobber},
     {'f', "noglob", &EvalContext::set_no_glob, &EvalContext::no_glob},
     {'n', "noexec", &EvalContext::set_no_exec, &EvalContext::no_exec},
-    {'m', "monitor", nullptr, nullptr},
+    {'m', "monitor", &EvalContext::set_monitor, &EvalContext::monitor},
     {'b', "notify", nullptr, nullptr},
     {'h', "hashall", nullptr, nullptr},
     {'v', "verbose", nullptr, nullptr},

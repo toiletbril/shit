@@ -351,6 +351,9 @@ main(int argc, char **argv)
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
+  /* Monitor mode is on by default in an interactive shell, the way job control
+     is enabled at a prompt. */
+  context.set_monitor(should_be_interactive);
 
   /* Seed the standard and shell-specific variables a script may read. The
      version and runtime values come from the build. */

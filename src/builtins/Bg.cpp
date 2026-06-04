@@ -1,0 +1,50 @@
+#include "../Builtin.hpp"
+#include "../Cli.hpp"
+#include "../Errors.hpp"
+#include "../Eval.hpp"
+#include "../Platform.hpp"
+
+#include <cstdlib>
+
+/* bg resumes a stopped job in the background. With no operand it acts on the
+   most recent job. */
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("bg [%job]");
+
+namespace shit {
+
+Bg::Bg() = default;
+
+Builtin::Kind
+Bg::kind() const
+{
+  return Kind::Bg;
+}
+
+i32
+Bg::execute(ExecContext &ec, EvalContext &cxt) const
+{
+  const std::vector<std::string> &args = ec.args();
+
+  Job *job = nullptr;
+  if (args.size() > 1 && !args[1].empty() && args[1][0] == '%')
+    job = cxt.find_job(static_cast<int>(std::atoll(args[1].c_str() + 1)));
+  else
+    job = cxt.most_recent_job();
+
+  if (job == nullptr)
+    throw Error{"bg: there is no such job"};
+
+  if (Maybe<i32> cont = os::signal_number_from_name("CONT"))
+    os::signal_process(job->pid, *cont);
+  job->state = Job::State::Running;
+
+  ec.print_to_stdout("[" + std::to_string(job->id) + "] " + job->command +
+                     " &\n");
+
+  return 0;
+}
+
+} /* namespace shit */

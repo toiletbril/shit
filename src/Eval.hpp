@@ -91,6 +91,25 @@ struct LocalBinding
   Maybe<std::string> previous_value;
 };
 
+/* A background job, one entry in the job table. The id is the number jobs and
+   fg name with a percent, such as %1. The pid is the process group leader so a
+   signal reaches every stage of a pipeline. */
+struct Job
+{
+  enum class State : u8
+  {
+    Running,
+    Stopped,
+    Done,
+  };
+
+  int id;
+  os::process pid;
+  std::string command;
+  State state{State::Running};
+  i32 last_status{0};
+};
+
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. */
 struct EvalStateSnapshot
@@ -153,6 +172,23 @@ struct EvalContext
 
   /* The process id of the most recent background command, for $!. */
   void set_last_background_pid(i64 pid);
+
+  /* The job table tracks the background commands started with the & operator so
+     jobs, fg, bg, wait, and kill can act on them. register_job adds a running
+     job and returns its id. update_jobs polls every job without blocking and
+     marks the ones that finished or stopped. */
+  int register_job(os::process pid, const std::string &command);
+  void update_jobs();
+  std::vector<Job> &jobs();
+  Job *find_job(int id);
+  Job *most_recent_job();
+  void forget_done_jobs();
+
+  /* monitor mode is set -m. It is on by default in an interactive shell, and it
+     gates the terminal handoff so a non-interactive run never touches the
+     controlling terminal. */
+  void set_monitor(bool enabled);
+  bool monitor() const;
 
   /* Shell functions live in the parse arena, so the table is cleared before
      each top-level parse to avoid pointing at freed storage. A function shadows
@@ -369,6 +405,11 @@ protected:
   /* One entry per active function call, holding the bindings a local shadowed
      so leaving the call restores them. */
   std::vector<std::vector<LocalBinding>> m_local_scopes{};
+
+  /* The background jobs and the id to give the next one. */
+  std::vector<Job> m_jobs{};
+  int m_next_job_id{1};
+  bool m_monitor{false};
   bool m_enable_path_expansion;
   bool m_enable_echo;
   bool m_enable_echo_expanded;

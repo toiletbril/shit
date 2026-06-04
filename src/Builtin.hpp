@@ -54,6 +54,11 @@ struct Builtin
     Hash,
     Alias,
     Unalias,
+    Jobs,
+    Fg,
+    Bg,
+    Wait,
+    Kill,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -105,6 +110,11 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"hash",     Builtin::Kind::Hash    },
     {"alias",    Builtin::Kind::Alias   },
     {"unalias",  Builtin::Kind::Unalias },
+    {"jobs",     Builtin::Kind::Jobs    },
+    {"fg",       Builtin::Kind::Fg      },
+    {"bg",       Builtin::Kind::Bg      },
+    {"wait",     Builtin::Kind::Wait    },
+    {"kill",     Builtin::Kind::Kill    },
 };
 
 #define B_CASE(btin)                                                           \
@@ -144,7 +154,12 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Ulimit);                                                              \
   B_CASE(Hash);                                                                \
   B_CASE(Alias);                                                               \
-  B_CASE(Unalias)
+  B_CASE(Unalias);                                                             \
+  B_CASE(Jobs);                                                                \
+  B_CASE(Fg);                                                                  \
+  B_CASE(Bg);                                                                  \
+  B_CASE(Wait);                                                                \
+  B_CASE(Kill)
 
 #define BUILTIN_STRUCT(b)                                                      \
   struct b : public Builtin                                                    \
@@ -188,6 +203,11 @@ BUILTIN_STRUCT(Ulimit);
 BUILTIN_STRUCT(Hash);
 BUILTIN_STRUCT(Alias);
 BUILTIN_STRUCT(Unalias);
+BUILTIN_STRUCT(Jobs);
+BUILTIN_STRUCT(Fg);
+BUILTIN_STRUCT(Bg);
+BUILTIN_STRUCT(Wait);
+BUILTIN_STRUCT(Kill);
 
 struct Exit : public Builtin
 {
