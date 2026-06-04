@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "Containers.hpp"
 #include "Tokens.hpp"
 
 #include <list>
@@ -80,7 +81,7 @@ protected:
      is tracked to detect that the consumed token was a newline. */
   bool m_last_shell_token_was_newline{false};
   std::list<std::string> m_heredoc_bodies{};
-  std::vector<HeredocPending> m_pending_heredocs{};
+  ArrayList<HeredocPending> m_pending_heredocs{heap_allocator()};
   void collect_pending_heredocs();
 
   Token *lex_expression_token();

@@ -217,7 +217,7 @@ Lexer::register_heredoc(std::string delimiter, bool strip_tabs)
 {
   m_heredoc_bodies.emplace_back();
   std::string *body = &m_heredoc_bodies.back();
-  m_pending_heredocs.push_back({std::move(delimiter), strip_tabs, body});
+  m_pending_heredocs.push({std::move(delimiter), strip_tabs, body});
   return body;
 }
 
