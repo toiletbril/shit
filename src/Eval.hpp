@@ -196,6 +196,9 @@ struct EvalContext
      text and newlines. */
   std::string expand_heredoc_body(const std::string &body);
 
+  std::string expand_modifier_word(const std::string &word,
+                                   bool remove_quotes = true);
+
   bool should_echo() const;
   bool should_echo_expanded() const;
   bool shell_is_interactive() const;
@@ -247,10 +250,6 @@ protected:
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
   std::string apply_parameter_expansion(const std::string &spec);
-
-  /* Expand the word inside a parameter expansion, its $name and ${...}
-     references, keeping literal text and spaces intact. */
-  std::string expand_modifier_word(const std::string &word);
 
   /* Compute the integer value of a $((...)) expression, resolving shell
      variables and applying any assignments inside it. */

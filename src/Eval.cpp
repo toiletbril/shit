@@ -397,10 +397,28 @@ trim_matching_suffix(const std::string &value, const std::string &pattern,
 } /* namespace */
 
 std::string
-EvalContext::expand_modifier_word(const std::string &word)
+EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
 {
   std::string out{};
+  bool in_single_quote = false;
+  bool in_double_quote = false;
   for (usize i = 0; i < word.length(); i++) {
+    /* In a default or a pattern word the quotes are removed, so a quoted
+       expansion such as ${x%"$suffix"} matches the value of suffix literally.
+       Heredoc bodies keep their quotes and pass remove_quotes as false. */
+    if (remove_quotes && !in_single_quote && word[i] == '"') {
+      in_double_quote = !in_double_quote;
+      continue;
+    }
+    if (remove_quotes && !in_double_quote && word[i] == '\'') {
+      in_single_quote = !in_single_quote;
+      continue;
+    }
+    if (in_single_quote) {
+      out += word[i];
+      continue;
+    }
+
     if (word[i] != '$') {
       out += word[i];
       continue;
@@ -1394,7 +1412,8 @@ EvalContext::retain_ast(Expression *ast)
 std::string
 EvalContext::expand_heredoc_body(const std::string &body)
 {
-  return expand_modifier_word(body);
+  /* A heredoc body keeps its quote characters literally. */
+  return expand_modifier_word(body, false);
 }
 
 std::vector<std::string>
