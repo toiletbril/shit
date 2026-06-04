@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -119,6 +120,10 @@ struct EvalContext
   void unset_function(const std::string &name);
   void clear_functions();
 
+  /* The names of every defined function, so the prepass of a later command
+     knows a function defined earlier resolves. */
+  std::unordered_set<std::string> function_names() const;
+
   /* Save and restore the mutable state around a subshell or a command
      substitution, so changes inside do not leak to the parent. */
   EvalStateSnapshot snapshot_state() const;
@@ -164,6 +169,11 @@ struct EvalContext
      resets the parse arena, so a function those sources defined stays valid for
      the rest of the current top-level command. */
   void clear_retained_sources();
+
+  /* Keep a top-level command's tree alive past its run, so a function it defined
+     stays callable on the next command. The retained trees are destroyed by
+     clear_retained_sources while the arena is still valid. */
+  void retain_ast(Expression *ast);
 
   /* Expand a heredoc body, its $name and ${...} references, keeping the literal
      text and newlines. */

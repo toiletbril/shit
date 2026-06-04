@@ -39,7 +39,8 @@ struct AnalysisContext
 
 /* Walk the tree and report. Returns true when execution may proceed, false when
    an unconditional command failed to resolve. */
-bool analyze_ast(const Expression *root, std::string_view source);
+bool analyze_ast(const Expression *root, std::string_view source,
+                 const std::unordered_set<std::string> &known_functions = {});
 
 struct Expression
 {

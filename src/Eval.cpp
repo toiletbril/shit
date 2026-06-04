@@ -156,6 +156,15 @@ EvalContext::unset_function(const std::string &name)
   m_functions.erase(name);
 }
 
+std::unordered_set<std::string>
+EvalContext::function_names() const
+{
+  std::unordered_set<std::string> names{};
+  for (const auto &[name, body] : m_functions)
+    names.insert(name);
+  return names;
+}
+
 void
 EvalContext::enter_subshell()
 {
@@ -1300,6 +1309,12 @@ EvalContext::clear_retained_sources()
   for (Expression *ast : m_retained_source_asts)
     delete ast;
   m_retained_source_asts.clear();
+}
+
+void
+EvalContext::retain_ast(Expression *ast)
+{
+  m_retained_source_asts.push_back(ast);
 }
 
 std::string

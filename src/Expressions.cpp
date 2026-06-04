@@ -134,9 +134,13 @@ word_has_backtick(const Word &word)
 } /* namespace */
 
 bool
-analyze_ast(const Expression *root, std::string_view source)
+analyze_ast(const Expression *root, std::string_view source,
+            const std::unordered_set<std::string> &known_functions)
 {
   AnalysisContext actx{source};
+  /* A function defined by an earlier command resolves, so seed the prepass with
+     the names already registered. */
+  actx.defined_functions = known_functions;
   root->analyze(actx, true);
   return !actx.has_fatal;
 }

@@ -80,13 +80,16 @@ run_script_contents(const std::string &script_contents,
   try {
     SHIT_DEFER { context.end_command(); };
 
-    /* The previous command's tree was destroyed at the end of the last
-       iteration, so its arena storage is reclaimed here before the next
-       parse. Functions point into that storage, so drop them too, and destroy
-       any eval or dot ASTs while their arena storage is still valid. */
-    context.clear_retained_sources();
-    ast_arena.reset();
-    context.clear_functions();
+    /* Reclaim the previous command's arena storage before the next parse, and
+       drop the functions and eval ASTs that point into it. Once a function is
+       defined, its body lives in this arena, so the reset is skipped and the
+       arena keeps growing, which is how a function defined on one interactive
+       line stays callable on the next. */
+    if (!context.has_functions()) {
+      context.clear_retained_sources();
+      ast_arena.reset();
+      context.clear_functions();
+    }
 
     shit::Parser p{
         shit::Lexer{script_contents, ast_arena, FLAG_ESCAPE_MAP.is_enabled()}
@@ -102,12 +105,17 @@ run_script_contents(const std::string &script_contents,
 
     /* Validate the whole tree before running anything. An unconditional
        problem stops execution, a conditional one only warns. */
-    if (!shit::analyze_ast(ast.get(), script_contents)) {
+    if (!shit::analyze_ast(ast.get(), script_contents,
+                           context.function_names())) {
       exit_code = EXIT_FAILURE;
     } else {
       exit_code = static_cast<int>(ast->evaluate(context));
     }
     context.set_last_exit_status(static_cast<i32>(exit_code));
+
+    /* Keep this command's tree alive when a function is in scope, so its body
+       stays valid for the next command. Otherwise let it be destroyed here. */
+    if (context.has_functions()) context.retain_ast(ast.release());
 
     if (FLAG_EXIT_CODE.is_enabled())
       std::cout << "[Code " << exit_code << ']' << std::endl;
