@@ -385,16 +385,30 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
      and the guard closes them on any path that does not hand them off. */
   std::optional<os::descriptor> redirect_in_fd;
   std::optional<os::descriptor> redirect_out_fd;
+  std::optional<os::descriptor> redirect_err_fd;
+  bool dup_err_to_out = false;
+  bool dup_out_to_err = false;
   bool redirect_fds_handed_off = false;
   SHIT_DEFER
   {
     if (!redirect_fds_handed_off) {
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
       if (redirect_out_fd) os::close_fd(*redirect_out_fd);
+      if (redirect_err_fd) os::close_fd(*redirect_err_fd);
     }
   };
 
   for (const Redirection &redirection : m_redirections) {
+    /* A duplication like 2>&1 routes one descriptor to another without a file.
+     */
+    if (redirection.kind == Redirection::Kind::DuplicateOutput) {
+      if (redirection.fd == 2 && redirection.dup_fd == 1)
+        dup_err_to_out = true;
+      else if (redirection.fd == 1 && redirection.dup_fd == 2)
+        dup_out_to_err = true;
+      continue;
+    }
+
     std::vector<std::string> target = cxt.process_args({redirection.target});
     if (target.size() != 1) {
       throw ErrorWithLocation{redirection.target->source_location(),
@@ -420,6 +434,9 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     if (redirection.fd == 0) {
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
       redirect_in_fd = opened;
+    } else if (redirection.fd == 2) {
+      if (redirect_err_fd) os::close_fd(*redirect_err_fd);
+      redirect_err_fd = opened;
     } else {
       if (redirect_out_fd) os::close_fd(*redirect_out_fd);
       redirect_out_fd = opened;
@@ -503,6 +520,9 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
      exec context now owns the opened files and closes them. */
   if (redirect_in_fd) ec.in_fd = redirect_in_fd;
   if (redirect_out_fd) ec.out_fd = redirect_out_fd;
+  if (redirect_err_fd) ec.err_fd = redirect_err_fd;
+  ec.dup_err_to_out = dup_err_to_out;
+  ec.dup_out_to_err = dup_out_to_err;
   redirect_fds_handed_off = true;
 
   i64 ret = utils::execute_context(std::move(ec), cxt, is_async());

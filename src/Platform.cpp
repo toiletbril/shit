@@ -182,6 +182,14 @@ execute_program(ExecContext &&ec)
       check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
       check_syscall(close(*ec.out_fd));
     }
+    if (ec.err_fd) {
+      check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
+      check_syscall(close(*ec.err_fd));
+    }
+    /* The descriptor duplications come after the files are placed, so 2>&1 sees
+       the final standard output. */
+    if (ec.dup_err_to_out) check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
+    if (ec.dup_out_to_err) check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
 
     reset_signal_handlers();
 

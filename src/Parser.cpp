@@ -352,6 +352,64 @@ Parser::parse_simple_command()
     return c;
   };
 
+  /* Build one redirection for descriptor fd. The operator is already consumed,
+     and op_location is its position. A & touching the operator means a
+     descriptor duplication, n>&m, otherwise a filename word follows. */
+  auto add_redirection = [&](i32 fd, Token::Kind op_kind,
+                             SourceLocation op_location) {
+    if (!source_location) source_location = op_location;
+
+    expressions::Redirection redirection{};
+    redirection.fd = fd;
+    redirection.target = nullptr;
+    redirection.dup_fd = -1;
+
+    if (op_kind != Token::Kind::Less) {
+      std::unique_ptr<Token> after{m_lexer.peek_shell_token()};
+      if (after->kind() == Token::Kind::Ampersand &&
+          after->source_location().position() ==
+              op_location.position() + op_location.length())
+      {
+        m_lexer.advance_past_last_peek();
+        std::unique_ptr<Token> from{m_lexer.next_shell_token()};
+        std::string digits =
+            from->kind() == Token::Kind::Word
+                ? static_cast<tokens::WordToken *>(from.get())
+                      ->word()
+                      .to_literal_string()
+                : std::string{};
+        i32 from_fd = -1;
+        try {
+          if (!digits.empty()) from_fd = std::stoi(digits);
+        } catch (...) {
+          from_fd = -1;
+        }
+        if (from_fd < 0) {
+          throw ErrorWithLocation{from->source_location(),
+                                  "Expected a descriptor after '&'"};
+        }
+        redirection.kind = expressions::Redirection::Kind::DuplicateOutput;
+        redirection.dup_fd = from_fd;
+        redirections.push_back(redirection);
+        return;
+      }
+    }
+
+    std::unique_ptr<Token> target{m_lexer.next_shell_token()};
+    if (target->kind() != Token::Kind::Word) {
+      throw ErrorWithLocation{target->source_location(),
+                              "Expected a filename after the redirection"};
+    }
+    if (op_kind == Token::Kind::Greater)
+      redirection.kind = expressions::Redirection::Kind::TruncateOutput;
+    else if (op_kind == Token::Kind::DoubleGreater)
+      redirection.kind = expressions::Redirection::Kind::AppendOutput;
+    else
+      redirection.kind = expressions::Redirection::Kind::ReadInput;
+    redirection.target = target.release();
+    redirections.push_back(redirection);
+  };
+
   for (;;) {
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
 
@@ -399,11 +457,39 @@ Parser::parse_simple_command()
     case Token::Kind::Esac:
     case Token::Kind::Time:
     case Token::Kind::When:
-    case Token::Kind::Function:
+    case Token::Kind::Function: {
+      /* A run of digits touching a redirection operator is a descriptor prefix,
+         such as the 2 in 2>file or 2>&1, not an argument. */
+      if (token->kind() == Token::Kind::Word) {
+        std::string literal =
+            static_cast<tokens::WordToken *>(token.get())->word().to_literal_string();
+        bool is_all_digits =
+            !literal.empty() &&
+            literal.find_first_not_of("0123456789") == std::string::npos;
+        if (is_all_digits) {
+          SourceLocation word_location = token->source_location();
+          m_lexer.advance_past_last_peek();
+          std::unique_ptr<Token> next{m_lexer.peek_shell_token()};
+          Token::Kind nk = next->kind();
+          if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
+               nk == Token::Kind::Less) &&
+              next->source_location().position() ==
+                  word_location.position() + word_location.length())
+          {
+            SourceLocation op_location = next->source_location();
+            m_lexer.advance_past_last_peek();
+            add_redirection(std::stoi(literal), nk, op_location);
+            break;
+          }
+          if (!source_location) source_location = word_location;
+          args_accumulator.emplace_back(std::move(token));
+          break;
+        }
+      }
       m_lexer.advance_past_last_peek();
       if (!source_location) source_location = token->source_location();
       args_accumulator.emplace_back(std::move(token));
-      break;
+    } break;
 
     case Token::Kind::LeftParen:
       /* A single word followed by () is a function definition. */
@@ -446,29 +532,11 @@ Parser::parse_simple_command()
     case Token::Kind::Greater:
     case Token::Kind::DoubleGreater:
     case Token::Kind::Less: {
-      Token::Kind redirection_kind = token->kind();
+      Token::Kind op_kind = token->kind();
+      SourceLocation op_location = token->source_location();
       m_lexer.advance_past_last_peek();
-      if (!source_location) source_location = token->source_location();
-
-      std::unique_ptr<Token> target{m_lexer.next_shell_token()};
-      if (target->kind() != Token::Kind::Word) {
-        throw ErrorWithLocation{target->source_location(),
-                                "Expected a filename after the redirection"};
-      }
-
-      expressions::Redirection redirection{};
-      if (redirection_kind == Token::Kind::Greater) {
-        redirection.fd = 1;
-        redirection.kind = expressions::Redirection::Kind::TruncateOutput;
-      } else if (redirection_kind == Token::Kind::DoubleGreater) {
-        redirection.fd = 1;
-        redirection.kind = expressions::Redirection::Kind::AppendOutput;
-      } else {
-        redirection.fd = 0;
-        redirection.kind = expressions::Redirection::Kind::ReadInput;
-      }
-      redirection.target = target.release();
-      redirections.push_back(redirection);
+      add_redirection((op_kind == Token::Kind::Less) ? 0 : 1, op_kind,
+                      op_location);
     } break;
 
     /* A separator, an operator, or a list terminator ends the command. */

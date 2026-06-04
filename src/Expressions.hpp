@@ -176,7 +176,10 @@ struct Redirection
 
   i32 fd;
   Kind kind;
+  /* The filename word for a file redirection, or null for a duplication. */
   const Token *target;
+  /* For a duplication, the descriptor to copy from, as in 2>&1. */
+  i32 dup_fd;
 };
 
 struct SimpleCommand : public Command

@@ -1323,6 +1323,10 @@ ExecContext::close_fds()
     os::close_fd(*out_fd);
     out_fd.reset();
   }
+  if (err_fd) {
+    os::close_fd(*err_fd);
+    err_fd.reset();
+  }
 }
 
 const Builtin::Kind &

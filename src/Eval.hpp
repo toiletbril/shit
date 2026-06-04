@@ -234,6 +234,12 @@ struct ExecContext
 
   std::optional<os::descriptor> in_fd{std::nullopt};
   std::optional<os::descriptor> out_fd{std::nullopt};
+  std::optional<os::descriptor> err_fd{std::nullopt};
+
+  /* 2>&1 routes the standard error to wherever the standard output goes, and
+     1>&2 the reverse. Applied after the file descriptors are placed. */
+  bool dup_err_to_out{false};
+  bool dup_out_to_err{false};
 
   bool is_builtin() const;
 
