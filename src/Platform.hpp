@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "Os.hpp"
 #include "Utils.hpp"
+#include "Maybe.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -31,14 +32,14 @@ enum class FileOpenMode : u8
   Read,     /* <  open an existing file for reading */
 };
 
-/* Open path for the given mode and return its descriptor, or nullopt on error
-   with the reason in last_system_error_message. */
-std::optional<descriptor> open_file_descriptor(const std::string &path,
-                                               FileOpenMode mode);
+/* Open path for the given mode and return its descriptor, or nothing on error
+   with the reason left in last_system_error_message. */
+Maybe<descriptor> open_file_descriptor(const std::string &path,
+                                       FileOpenMode mode);
 
 /* Write content to an anonymous temporary file and return a descriptor
    positioned at its start, for feeding a heredoc body to a command's input. */
-std::optional<descriptor> write_to_temp_file(const std::string &content);
+Maybe<descriptor> write_to_temp_file(const std::string &content);
 
 /* Read the file-creation mask without changing it, and set a new one. The umask
    builtin reads and writes the process mask through these. */

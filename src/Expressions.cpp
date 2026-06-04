@@ -366,10 +366,12 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     if (redirection.kind == Redirection::Kind::Heredoc) {
       std::string body = *redirection.heredoc_body;
       if (redirection.heredoc_expand) body = cxt.expand_heredoc_body(body);
-      std::optional<os::descriptor> opened = os::write_to_temp_file(body);
-      if (!opened) throw Error{"Could not stage the heredoc body"};
+      Maybe<os::descriptor> opened = os::write_to_temp_file(body);
+      if (!opened)
+        throw Error{"could not stage the heredoc body: " +
+                    os::last_system_error_message()};
       if (ec.in_fd) os::close_fd(*ec.in_fd);
-      ec.in_fd = opened;
+      ec.in_fd = opened.take();
       continue;
     }
 
@@ -393,23 +395,23 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    std::optional<os::descriptor> opened =
-        os::open_file_descriptor(target[0], mode);
+    Maybe<os::descriptor> opened = os::open_file_descriptor(target[0], mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Could not open '" + target[0] + "': " +
                                   os::last_system_error_message()};
     }
+    os::descriptor file_fd = opened.take();
 
     if (redirection.fd == 0) {
       if (ec.in_fd) os::close_fd(*ec.in_fd);
-      ec.in_fd = opened;
+      ec.in_fd = file_fd;
     } else if (redirection.fd == 2) {
       if (ec.err_fd) os::close_fd(*ec.err_fd);
-      ec.err_fd = opened;
+      ec.err_fd = file_fd;
     } else {
       if (ec.out_fd) os::close_fd(*ec.out_fd);
-      ec.out_fd = opened;
+      ec.out_fd = file_fd;
     }
   }
 }
@@ -463,10 +465,12 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     if (redirection.kind == Redirection::Kind::Heredoc) {
       std::string body = *redirection.heredoc_body;
       if (redirection.heredoc_expand) body = cxt.expand_heredoc_body(body);
-      std::optional<os::descriptor> opened = os::write_to_temp_file(body);
-      if (!opened) throw Error{"Could not stage the heredoc body"};
+      Maybe<os::descriptor> opened = os::write_to_temp_file(body);
+      if (!opened)
+        throw Error{"could not stage the heredoc body: " +
+                    os::last_system_error_message()};
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
-      redirect_in_fd = opened;
+      redirect_in_fd = opened.take();
       continue;
     }
 
@@ -492,25 +496,25 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    std::optional<os::descriptor> opened =
-        os::open_file_descriptor(target[0], mode);
+    Maybe<os::descriptor> opened = os::open_file_descriptor(target[0], mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Could not open '" + target[0] + "': " +
                                   os::last_system_error_message()};
     }
+    os::descriptor file_fd = opened.take();
 
     /* The last redirection of a descriptor wins, so a superseded open closes
        at once. */
     if (redirection.fd == 0) {
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
-      redirect_in_fd = opened;
+      redirect_in_fd = file_fd;
     } else if (redirection.fd == 2) {
       if (redirect_err_fd) os::close_fd(*redirect_err_fd);
-      redirect_err_fd = opened;
+      redirect_err_fd = file_fd;
     } else {
       if (redirect_out_fd) os::close_fd(*redirect_out_fd);
-      redirect_out_fd = opened;
+      redirect_out_fd = file_fd;
     }
   }
 
