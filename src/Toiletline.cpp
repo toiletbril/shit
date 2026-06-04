@@ -18,40 +18,71 @@
 namespace {
 
 /* The line editor allocates its history and line buffers through these hooks,
-   which draw from one arena that lives for the whole interactive session and is
-   never reset, since the history persists across lines. A non-interactive run
-   never starts the editor, so it pays nothing. The arena does not resize a
-   block in place, so a realloc allocates a fresh block and copies, which leaves
-   the old block as free space the arena reclaims only at exit. A size header
-   before each block lets the realloc copy the right number of bytes. */
+   which draw from one arena that lives for the whole interactive session, since
+   the history persists across lines. A non-interactive run never starts the
+   editor, so it pays nothing. The bump arena cannot resize or free a single
+   block, so a free or a grown realloc returns the old block to a free list that
+   the next allocation reuses. That bounds memory to the working set rather than
+   growing it on every keystroke. A header before each block records the block's
+   capacity, used both to copy the right bytes on realloc and to size a reused
+   block. Each free block links to the next through its own payload. */
 shit::BumpArena g_interactive_arena{};
 
 constexpr usize TL_ALLOC_HEADER = 16;
 
+struct TlFreeBlock
+{
+  TlFreeBlock *next;
+};
+TlFreeBlock *g_tl_free_list = nullptr;
+
+usize &
+tl_block_capacity(void *payload)
+{
+  return *reinterpret_cast<usize *>(static_cast<char *>(payload) -
+                                    TL_ALLOC_HEADER);
+}
+
 void *
 tl_arena_malloc(usize length)
 {
+  /* Reuse the first free block large enough, so repeated same-size line-buffer
+     allocations do not keep growing the arena. */
+  for (TlFreeBlock **link = &g_tl_free_list; *link != nullptr;
+       link = &(*link)->next)
+  {
+    void *payload = *link;
+    if (tl_block_capacity(payload) >= length) {
+      *link = (*link)->next;
+      return payload;
+    }
+  }
+
   char *base = static_cast<char *>(
       g_interactive_arena.allocate(length + TL_ALLOC_HEADER, TL_ALLOC_HEADER));
   *reinterpret_cast<usize *>(base) = length;
   return base + TL_ALLOC_HEADER;
 }
 
+void
+tl_arena_free(void *pointer)
+{
+  if (pointer == NULL) return;
+  TlFreeBlock *block = static_cast<TlFreeBlock *>(pointer);
+  block->next = g_tl_free_list;
+  g_tl_free_list = block;
+}
+
 void *
 tl_arena_realloc(void *pointer, usize length)
 {
   if (pointer == NULL) return tl_arena_malloc(length);
-  usize old_length =
-      *reinterpret_cast<usize *>(static_cast<char *>(pointer) - TL_ALLOC_HEADER);
+  usize old_capacity = tl_block_capacity(pointer);
+  if (old_capacity >= length) return pointer;
   void *fresh = tl_arena_malloc(length);
-  std::memcpy(fresh, pointer, old_length < length ? old_length : length);
+  std::memcpy(fresh, pointer, old_capacity);
+  tl_arena_free(pointer);
   return fresh;
-}
-
-void
-tl_arena_free(void *pointer)
-{
-  SHIT_UNUSED(pointer);
 }
 
 #define TL_MALLOC  tl_arena_malloc
