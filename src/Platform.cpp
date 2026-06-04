@@ -536,22 +536,42 @@ execute_program(ExecContext &&ec)
 
   startup_info.cb = sizeof(startup_info);
 
-  BOOL should_use_pipe = ec.in_fd || ec.out_fd;
+  BOOL needs_handles = ec.in_fd || ec.out_fd || ec.err_fd ||
+                       ec.dup_err_to_out || ec.dup_out_to_err;
 
-  if (should_use_pipe) startup_info.dwFlags |= STARTF_USESTDHANDLES;
+  if (needs_handles) startup_info.dwFlags |= STARTF_USESTDHANDLES;
 
-  startup_info.hStdInput = ec.in_fd.value_or(SHIT_STDIN);
-  startup_info.hStdOutput = ec.out_fd.value_or(SHIT_STDOUT);
-  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  startup_info.hStdInput = ec.in_fd.value_or(GetStdHandle(STD_INPUT_HANDLE));
+  startup_info.hStdOutput = ec.out_fd.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
+  startup_info.hStdError = ec.err_fd.value_or(GetStdHandle(STD_ERROR_HANDLE));
+
+  /* Apply the descriptor duplications in the same order as the POSIX path, so
+     2>&1 routes stderr to the current stdout and 1>&2 the reverse. */
+  if (ec.dup_err_to_out) startup_info.hStdError = startup_info.hStdOutput;
+  if (ec.dup_out_to_err) startup_info.hStdOutput = startup_info.hStdError;
 
   SHIT_DEFER
   {
     if (ec.in_fd) CloseHandle(*ec.in_fd);
     if (ec.out_fd) CloseHandle(*ec.out_fd);
+    if (ec.err_fd) CloseHandle(*ec.err_fd);
   };
 
+  /* Pipe and file handles are created non-inheritable, so a capture pipe the
+     parent keeps does not leak into the child and hang the read. Only the
+     handles the child actually receives are made inheritable here, mirroring
+     how the POSIX path clears close-on-exec on just the dup targets. */
+  if (needs_handles) {
+    SetHandleInformation(startup_info.hStdInput, HANDLE_FLAG_INHERIT,
+                         HANDLE_FLAG_INHERIT);
+    SetHandleInformation(startup_info.hStdOutput, HANDLE_FLAG_INHERIT,
+                         HANDLE_FLAG_INHERIT);
+    SetHandleInformation(startup_info.hStdError, HANDLE_FLAG_INHERIT,
+                         HANDLE_FLAG_INHERIT);
+  }
+
   if (CreateProcessA(program_path.c_str(), command_line.data(), nullptr,
-                     nullptr, should_use_pipe, 0, nullptr, nullptr,
+                     nullptr, needs_handles, 0, nullptr, nullptr,
                      &startup_info, &process_info) == 0)
   {
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
@@ -566,7 +586,9 @@ make_pipe()
   SECURITY_ATTRIBUTES att{};
 
   att.nLength = sizeof(SECURITY_ATTRIBUTES);
-  att.bInheritHandle = TRUE;
+  /* Both ends are non-inheritable, so a child only receives the end execute
+     handles explicitly through STARTF_USESTDHANDLES, like close-on-exec. */
+  att.bInheritHandle = FALSE;
   att.lpSecurityDescriptor = NULL; /* NOLINT */
 
   HANDLE in = INVALID_HANDLE_VALUE;
@@ -593,10 +615,11 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   case FileOpenMode::Read: disposition = OPEN_EXISTING; break;
   }
 
-  /* The handle is inheritable so a spawned child receives the redirection. */
+  /* The handle is created non-inheritable. execute_program marks it inheritable
+     only while it spawns the child that the redirection feeds. */
   SECURITY_ATTRIBUTES att{};
   att.nLength = sizeof(SECURITY_ATTRIBUTES);
-  att.bInheritHandle = TRUE;
+  att.bInheritHandle = FALSE;
   att.lpSecurityDescriptor = NULL; /* NOLINT */
 
   HANDLE handle = CreateFileA(path.c_str(), access,
