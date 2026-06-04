@@ -934,9 +934,14 @@ IfClause::IfClause(
     SourceLocation location,
     std::vector<std::pair<const Expression *, const Expression *>> &&branches,
     const Expression *otherwise)
-    : CompoundCommand(location), m_branches(std::move(branches)),
-      m_otherwise(otherwise)
-{}
+    : CompoundCommand(location), m_otherwise(otherwise)
+{
+  for (const auto &branch : branches)
+    m_branches.push(branch);
+  /* The node now owns the branch nodes. Empty the source so the parser's
+     cleanup guard does not also free them. */
+  branches.clear();
+}
 
 IfClause::~IfClause()
 {
