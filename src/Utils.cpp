@@ -242,6 +242,26 @@ glob_matches(std::string_view glob, std::string_view str,
   };
       /* clang-format on */
 
+      /* A bracket with no closing ] is not a character class, so the [ is a
+         literal character, as POSIX specifies. A ] right after [ or [^ is a
+         member, so the scan for the closing ] starts past it. */
+      usize close_scan = g + 1;
+      if (close_scan < glob.length() && glob[close_scan] == '^') close_scan++;
+      if (close_scan < glob.length() && glob[close_scan] == ']') close_scan++;
+      bool has_closing_bracket = false;
+      for (; close_scan < glob.length(); close_scan++) {
+        if (glob[close_scan] == ']') {
+          has_closing_bracket = true;
+          break;
+        }
+      }
+      if (!has_closing_bracket) {
+        if (glob[g] != str[s]) return false;
+        g++;
+        s++;
+        break;
+      }
+
       g++; /* skip [ */
       if (g >= glob.length()) GLOB_GROUP_ERR();
 

@@ -12,9 +12,6 @@
   Unquoted "for"
 ]
 [Word
-  Unquoted "for"
-]
-[Word
   Unquoted "x"
 ]
 [Word
@@ -33,9 +30,6 @@
   Unquoted "do"
 ]
 [Word
-  Unquoted "do"
-]
-[Word
   Unquoted "v="
   CommandSubstitution "break"
 ]
@@ -44,12 +38,6 @@
 ]
 [Word
   Variable "x"
-]
-[Word
-  Unquoted "done"
-]
-[Word
-  Unquoted "done"
 ]
 [Word
   Unquoted "done"

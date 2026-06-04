@@ -8,9 +8,6 @@
   Unquoted "for"
 ]
 [Word
-  Unquoted "for"
-]
-[Word
   Unquoted "w"
 ]
 [Word
@@ -23,20 +20,11 @@
   Unquoted "do"
 ]
 [Word
-  Unquoted "do"
-]
-[Word
   Unquoted "echo"
 ]
 [Word
   Unquoted "i="
   Variable "w"
-]
-[Word
-  Unquoted "done"
-]
-[Word
-  Unquoted "done"
 ]
 [Word
   Unquoted "done"

@@ -7,6 +7,5 @@
 [Word
   Unquoted "word*"
 ]
-shit: 2:1: Error: No expansions found for 'word*'.
-     2 |  word*
-       |  ^~~~~ here.
+word*
+[Code 0]

@@ -8,6 +8,5 @@
   Unquoted "*"
   Literal "*"
 ]
-shit: 1:6: Error: No expansions found for '**'.
-     1 |  echo *\*
-       |       ^~~ here.
+**
+[Code 0]

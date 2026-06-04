@@ -14,6 +14,5 @@
 [Word
   Unquoted "does_not_exist*"
 ]
-shit: 5:1: Error: No expansions found for 'does_not_exist*'.
-     5 |  does_not_exist*
-       |  ^~~~~~~~~~~~~~~ here.
+is_escaped* word does_not_exist*
+[Code 0]

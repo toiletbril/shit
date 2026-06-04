@@ -8,6 +8,5 @@
   Unquoted "[d]*"
   Literal "*"
 ]
-shit: 1:6: Error: No expansions found for '[d]**'.
-     1 |  echo [d]*\*
-       |       ^~~~~~ here.
+[d]**
+[Code 0]

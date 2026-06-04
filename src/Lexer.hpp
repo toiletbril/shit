@@ -50,9 +50,12 @@ protected:
   usize m_cached_offset{0};
 
   /* The lexer keeps a copy of every word it produces only when the segment
-     dump is requested, so the common path stays allocation free. */
+     dump is requested, so the common path stays allocation free. A word is
+     recorded by its start position, so peeking the same token twice, which the
+     parser does to look ahead, records it only once. */
   bool m_should_collect_debug_words{false};
   std::vector<Word> m_debug_words{};
+  usize m_last_collected_word_position{static_cast<usize>(-1)};
 
   Token *lex_expression_token();
   Token *lex_shell_token();

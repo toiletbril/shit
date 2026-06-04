@@ -8,6 +8,5 @@
   Unquoted "data/*/"
   Literal "*"
 ]
-shit: 1:6: Error: No expansions found for 'data/*/*'.
-     1 |  echo data/*/\*
-       |       ^~~~~~~~~ here.
+data/*/*
+[Code 0]

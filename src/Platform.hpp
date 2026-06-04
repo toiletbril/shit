@@ -23,6 +23,19 @@ struct Pipe
 
 std::optional<Pipe> make_pipe();
 
+/* How a redirection target file is opened. */
+enum class FileOpenMode : u8
+{
+  Truncate, /* >  create or truncate for writing */
+  Append,   /* >> create or append for writing */
+  Read,     /* <  open an existing file for reading */
+};
+
+/* Open path for the given mode and return its descriptor, or nullopt on error
+   with the reason in last_system_error_message. */
+std::optional<descriptor> open_file_descriptor(const std::string &path,
+                                               FileOpenMode mode);
+
 os_args make_os_args(const std::vector<std::string> &args);
 
 std::string last_system_error_message();

@@ -151,6 +151,12 @@ EvalContext::has_functions() const
 }
 
 void
+EvalContext::unset_function(const std::string &name)
+{
+  m_functions.erase(name);
+}
+
+void
 EvalContext::enter_subshell()
 {
   m_subshell_depth++;
@@ -491,8 +497,8 @@ EvalContext::expand_path(GlobField field)
     return single;
   }
 
-  /* The pattern is kept for the error, since the field moves into the recurse.
-   */
+  /* The pattern is kept so a glob that matches nothing falls back to it, since
+     the field moves into the recurse. */
   std::string pattern = field.text;
 
   std::vector<GlobField> fields = expand_path_recurse({std::move(field)});
@@ -506,8 +512,9 @@ EvalContext::expand_path(GlobField field)
      from spending most of its time in the sort comparator. */
   std::sort(values.begin(), values.end());
 
-  /* Error out on bogus expansion. */
-  if (values.empty()) throw Error{"No expansions found for '" + pattern + "'"};
+  /* A pattern that matches no file expands to itself, the POSIX behavior dash
+     follows, rather than being dropped or raising an error. */
+  if (values.empty()) values.emplace_back(std::move(pattern));
 
   return values;
 }
@@ -700,6 +707,37 @@ EvalContext::capture_command_substitution(const std::string &source)
   while (!captured.empty() && captured.back() == '\n')
     captured.pop_back();
   return captured;
+}
+
+i32
+EvalContext::run_source(const std::string &source)
+{
+  /* Parse into the active arena, coexisting with the outer tree, the same way a
+     command substitution does. The control-flow exceptions are not caught here,
+     so a return or a break inside the evaluated source reaches the caller. */
+  if (g_ast_arena == nullptr)
+    throw Error{"Cannot run source outside of a parse"};
+
+  Parser parser{
+      Lexer{source, *g_ast_arena}
+  };
+
+  /* Retain the AST before evaluating, so a function it defines outlives this
+     call and a control-flow exception thrown inside still leaves it owned. The
+     destructor runs at the next top-level command, freeing the node members
+     while the arena storage is reclaimed by the reset. */
+  Expression *ast = parser.construct_ast().release();
+  m_retained_source_asts.push_back(ast);
+  ast->evaluate(*this);
+  return last_exit_status();
+}
+
+void
+EvalContext::clear_retained_sources()
+{
+  for (Expression *ast : m_retained_source_asts)
+    delete ast;
+  m_retained_source_asts.clear();
 }
 
 std::vector<std::string>

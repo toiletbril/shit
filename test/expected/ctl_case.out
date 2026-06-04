@@ -11,9 +11,6 @@
   Unquoted "case"
 ]
 [Word
-  Unquoted "case"
-]
-[Word
   Unquoted "foo"
 ]
 [Word
@@ -23,16 +20,10 @@
   Unquoted "f*"
 ]
 [Word
-  Unquoted "f*"
-]
-[Word
   Unquoted "echo"
 ]
 [Word
   Unquoted "match"
-]
-[Word
-  Unquoted "*"
 ]
 [Word
   Unquoted "*"

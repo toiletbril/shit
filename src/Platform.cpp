@@ -217,6 +217,23 @@ make_pipe()
   return Pipe{p[0], p[1]};
 }
 
+std::optional<descriptor>
+open_file_descriptor(const std::string &path, FileOpenMode mode)
+{
+  int flags = 0;
+  switch (mode) {
+  case FileOpenMode::Truncate: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
+  case FileOpenMode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
+  case FileOpenMode::Read: flags = O_RDONLY; break;
+  }
+
+  /* 0666 lets the umask decide the final permissions, as a shell redirection
+     does. */
+  int fd = ::open(path.c_str(), flags, 0666);
+  if (fd < 0) return std::nullopt;
+  return fd;
+}
+
 i32
 wait_and_monitor_process(process pid)
 {
@@ -521,6 +538,35 @@ make_pipe()
   }
 
   return Pipe{in, out};
+}
+
+std::optional<descriptor>
+open_file_descriptor(const std::string &path, FileOpenMode mode)
+{
+  DWORD access = (mode == FileOpenMode::Read) ? GENERIC_READ : GENERIC_WRITE;
+  DWORD disposition = OPEN_EXISTING;
+  switch (mode) {
+  case FileOpenMode::Truncate: disposition = CREATE_ALWAYS; break;
+  case FileOpenMode::Append: disposition = OPEN_ALWAYS; break;
+  case FileOpenMode::Read: disposition = OPEN_EXISTING; break;
+  }
+
+  /* The handle is inheritable so a spawned child receives the redirection. */
+  SECURITY_ATTRIBUTES att{};
+  att.nLength = sizeof(SECURITY_ATTRIBUTES);
+  att.bInheritHandle = TRUE;
+  att.lpSecurityDescriptor = NULL; /* NOLINT */
+
+  HANDLE handle = CreateFileA(path.c_str(), access,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
+                              disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (handle == INVALID_HANDLE_VALUE) return std::nullopt;
+
+  /* Append moves the write position to the end of the file. */
+  if (mode == FileOpenMode::Append)
+    SetFilePointer(handle, 0, NULL, FILE_END);
+
+  return handle;
 }
 
 i32

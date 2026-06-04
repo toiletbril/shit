@@ -99,6 +99,18 @@ is_empty_list(const Expression *expression)
   return expression->is_dummy();
 }
 
+/* The reserved word ! is a single unquoted exclamation mark standing alone in
+   command position. It is distinct from a != comparison or a quoted literal. */
+static bool
+is_negation_token(const Token *token)
+{
+  if (token->kind() != Token::Kind::Word) return false;
+  const Word &word = static_cast<const tokens::WordToken *>(token)->word();
+  return word.segments.size() == 1 &&
+         word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+         word.segments[0].text == "!";
+}
+
 /* A friendly message for a token that cannot start a command. A stray control
    keyword almost always means its opener is missing. */
 static std::string
@@ -176,9 +188,16 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
   CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
 
   bool should_parse_command = true;
+  bool negate_pending = false;
 
   for (;;) {
     if (should_parse_command) {
+      /* A leading ! negates the pipeline that follows. */
+      std::unique_ptr<Token> maybe_negation{m_lexer.peek_shell_token()};
+      if (is_negation_token(maybe_negation.get())) {
+        m_lexer.advance_past_last_peek();
+        negate_pending = true;
+      }
       lhs = parse_simple_command();
     } else {
       should_parse_command = true;
@@ -191,6 +210,10 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
        the terminator for the caller to consume. */
     if (kind_in(token->kind(), terminators)) {
       if (lhs) {
+        if (negate_pending) {
+          lhs->set_negated();
+          negate_pending = false;
+        }
         compound_list->append_node(
             m_lexer.arena().create<CompoundListCondition>(
                 token->source_location(), next_cond, lhs.release()));
@@ -227,6 +250,10 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
       m_lexer.advance_past_last_peek();
 
       if (lhs) {
+        if (negate_pending) {
+          lhs->set_negated();
+          negate_pending = false;
+        }
         compound_list->append_node(
             m_lexer.arena().create<CompoundListCondition>(
                 token->source_location(), next_cond, lhs.release()));
@@ -308,6 +335,7 @@ Parser::parse_simple_command()
   std::optional<SourceLocation> source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
   std::unordered_map<std::string, Word> local_vars{};
+  std::vector<expressions::Redirection> redirections{};
 
   auto build_command = [&]() -> std::unique_ptr<Command> {
     if (!source_location) return nullptr;
@@ -320,6 +348,7 @@ Parser::parse_simple_command()
     std::unique_ptr<SimpleCommand> c{m_lexer.arena().create<SimpleCommand>(
         *source_location, std::move(args))};
     if (!local_vars.empty()) c->set_local_vars(std::move(local_vars));
+    if (!redirections.empty()) c->set_redirections(std::move(redirections));
     return c;
   };
 
@@ -412,6 +441,34 @@ Parser::parse_simple_command()
         /* Single-command variable. */
         local_vars[a->key()] = a->value_word();
       }
+    } break;
+
+    case Token::Kind::Greater:
+    case Token::Kind::DoubleGreater:
+    case Token::Kind::Less: {
+      Token::Kind redirection_kind = token->kind();
+      m_lexer.advance_past_last_peek();
+      if (!source_location) source_location = token->source_location();
+
+      std::unique_ptr<Token> target{m_lexer.next_shell_token()};
+      if (target->kind() != Token::Kind::Word) {
+        throw ErrorWithLocation{target->source_location(),
+                                "Expected a filename after the redirection"};
+      }
+
+      expressions::Redirection redirection{};
+      if (redirection_kind == Token::Kind::Greater) {
+        redirection.fd = 1;
+        redirection.kind = expressions::Redirection::Kind::TruncateOutput;
+      } else if (redirection_kind == Token::Kind::DoubleGreater) {
+        redirection.fd = 1;
+        redirection.kind = expressions::Redirection::Kind::AppendOutput;
+      } else {
+        redirection.fd = 0;
+        redirection.kind = expressions::Redirection::Kind::ReadInput;
+      }
+      redirection.target = target.release();
+      redirections.push_back(redirection);
     } break;
 
     /* A separator, an operator, or a list terminator ends the command. */

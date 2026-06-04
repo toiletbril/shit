@@ -87,6 +87,6 @@ shit: 5:17: Warning: Command 'no' was not found.
        |                  ^~ here.
 **
 ~**
-\\
+\
 data/*/*
 [Code 1]

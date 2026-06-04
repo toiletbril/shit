@@ -242,8 +242,19 @@ void
 Lexer::skip_whitespace()
 {
   usize i = 0;
-  while (lexer::is_whitespace(chop_character(i)))
-    i++;
+  for (;;) {
+    while (lexer::is_whitespace(chop_character(i)))
+      i++;
+    /* A '#' at a token boundary begins a comment that runs to the end of the
+       line. The newline is left in place so it still terminates the command,
+       and a leading '#!' shebang is just the first such comment. */
+    if (chop_character(i) == '#') {
+      while (chop_character(i) != '\n' && chop_character(i) != lexer::CEOF)
+        i++;
+      continue;
+    }
+    break;
+  }
   advance_forward(i);
 }
 
@@ -341,6 +352,22 @@ Lexer::lex_identifier()
     }
 
     if (ch == '\\') {
+      /* Inside double quotes a backslash only escapes $, `, ", \, and a
+         newline. Before any other character it stays a literal backslash, so
+         "\n" is a backslash and an n, not an escape. Outside double quotes a
+         backslash escapes the next character. */
+      if (quote_char == '"') {
+        char escaped_next = chop_character(byte_count + 1);
+        if (escaped_next == '$' || escaped_next == '`' ||
+            escaped_next == '"' || escaped_next == '\\' || escaped_next == '\n')
+        {
+          should_escape = true;
+        } else {
+          append_char(WordSegment::Kind::DoubleQuotedText, '\\');
+        }
+        byte_count++;
+        continue;
+      }
       should_escape = true;
       byte_count++;
       continue;
@@ -497,7 +524,12 @@ Lexer::lex_identifier()
 
   usize actual_cursor_position = m_cursor_position + escaped_newline_count;
 
-  if (m_should_collect_debug_words) m_debug_words.push_back(word);
+  if (m_should_collect_debug_words &&
+      m_cursor_position != m_last_collected_word_position)
+  {
+    m_debug_words.push_back(word);
+    m_last_collected_word_position = m_cursor_position;
+  }
 
   Token *t{};
 

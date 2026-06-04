@@ -23,6 +23,9 @@ struct AnalysisContext
 {
   std::string_view source;
   bool has_fatal{false};
+  /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
+     see, so a later unresolved command is a warning rather than a failure. */
+  bool saw_runtime_definer{false};
   /* Names of functions seen so far. A call to one of these resolves, so a
      function defined before its use is not reported as a missing command. */
   std::unordered_set<std::string> defined_functions{};
@@ -123,6 +126,10 @@ struct Command : public Expression
   bool is_async() const;
   void set_local_vars(std::unordered_map<std::string, Word> &&vars);
 
+  /* The ! reserved word in front of a pipeline inverts its exit status. */
+  void set_negated();
+  bool is_negated() const;
+
   virtual bool is_assignment() const;
 
   virtual void append_to(usize d, std::string &f, bool duplicate) = 0;
@@ -130,6 +137,7 @@ struct Command : public Expression
 
 protected:
   bool m_is_async{false};
+  bool m_is_negated{false};
   std::optional<std::unordered_map<std::string, Word>> m_local_vars;
 };
 
@@ -154,11 +162,30 @@ protected:
   const Assignment *m_assignment;
 };
 
+/* One redirection attached to a simple command. The target word is expanded to
+   a filename at evaluation, or for a duplication it names a file descriptor. */
+struct Redirection
+{
+  enum class Kind : u8
+  {
+    TruncateOutput, /* >  */
+    AppendOutput,   /* >> */
+    ReadInput,      /* <  */
+    DuplicateOutput /* >& */
+  };
+
+  i32 fd;
+  Kind kind;
+  const Token *target;
+};
+
 struct SimpleCommand : public Command
 {
   SimpleCommand(SourceLocation location,
                 const std::vector<const Token *> &&args);
   ~SimpleCommand() override;
+
+  void set_redirections(std::vector<Redirection> &&redirections);
 
   bool is_simple_command() const override;
 
@@ -183,6 +210,8 @@ protected:
   mutable std::string m_resolved_name{};
   mutable std::optional<std::variant<Builtin::Kind, std::filesystem::path>>
       m_resolved_kind{};
+
+  std::vector<Redirection> m_redirections{};
 };
 
 struct CompoundListCondition : public Expression

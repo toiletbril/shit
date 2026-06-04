@@ -82,7 +82,9 @@ run_script_contents(const std::string &script_contents,
 
     /* The previous command's tree was destroyed at the end of the last
        iteration, so its arena storage is reclaimed here before the next
-       parse. Functions point into that storage, so drop them too. */
+       parse. Functions point into that storage, so drop them too, and destroy
+       any eval or dot ASTs while their arena storage is still valid. */
+    context.clear_retained_sources();
     ast_arena.reset();
     context.clear_functions();
 
@@ -113,11 +115,15 @@ run_script_contents(const std::string &script_contents,
     if (FLAG_STATS.is_enabled())
       std::cout << context.make_stats_string() << std::endl;
   } catch (const shit::LoopControl &) {
-    /* A break or continue that escaped every loop. */
-    shit::show_message("shit: 'break' or 'continue' used outside of a loop");
+    /* A break or continue that escaped every loop. The Error formats the label
+       and show_message adds the shit prefix, matching every other error. */
+    shit::show_message(
+        shit::Error{"'break' or 'continue' used outside of a loop"}
+            .to_string());
   } catch (const shit::FunctionReturn &) {
     /* A return that escaped every function. */
-    shit::show_message("shit: 'return' used outside of a function");
+    shit::show_message(
+        shit::Error{"'return' used outside of a function"}.to_string());
   } catch (const shit::ErrorWithLocationAndDetails &e) {
     shit::show_message(e.to_string(script_contents));
     shit::show_message(e.details_to_string(script_contents));

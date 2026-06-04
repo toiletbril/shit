@@ -116,6 +116,7 @@ struct EvalContext
   void register_function(const std::string &name, const Expression *body);
   const Expression *find_function(const std::string &name) const;
   bool has_functions() const;
+  void unset_function(const std::string &name);
   void clear_functions();
 
   /* Save and restore the mutable state around a subshell or a command
@@ -138,6 +139,16 @@ struct EvalContext
      directory and variables snapshotted, so a cd or an assignment inside does
      not leak to the parent. */
   std::string capture_command_substitution(const std::string &source);
+
+  /* Lex, parse, and evaluate a source string in the current context, without
+     capturing output or snapshotting state. The eval and dot builtins use this,
+     so a break, a return, or an assignment inside acts on the caller. */
+  i32 run_source(const std::string &source);
+
+  /* Destroy the ASTs retained from eval and dot. The caller does this before it
+     resets the parse arena, so a function those sources defined stays valid for
+     the rest of the current top-level command. */
+  void clear_retained_sources();
 
   bool should_echo() const;
   bool should_echo_expanded() const;
@@ -165,6 +176,10 @@ protected:
   std::optional<i64> m_last_background_pid{};
   std::unordered_map<std::string, const Expression *> m_functions{};
   usize m_subshell_depth{0};
+
+  /* ASTs from eval and dot, kept alive until the next top-level command so a
+     function they define survives the rest of the current one. */
+  std::vector<Expression *> m_retained_source_asts{};
 
   bool m_enable_path_expansion;
   bool m_enable_echo;

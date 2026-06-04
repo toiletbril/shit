@@ -218,6 +218,18 @@ Command::is_async() const
 }
 
 void
+Command::set_negated()
+{
+  m_is_negated = true;
+}
+
+bool
+Command::is_negated() const
+{
+  return m_is_negated;
+}
+
+void
 Command::set_local_vars(std::unordered_map<std::string, Word> &&vars)
 {
   m_local_vars = std::move(vars);
@@ -332,6 +344,15 @@ SimpleCommand::~SimpleCommand()
   for (const Token *t : m_args) {
     delete t;
   }
+  for (const Redirection &redirection : m_redirections) {
+    delete redirection.target;
+  }
+}
+
+void
+SimpleCommand::set_redirections(std::vector<Redirection> &&redirections)
+{
+  m_redirections = std::move(redirections);
 }
 
 bool
@@ -349,15 +370,65 @@ SimpleCommand::args() const
 i64
 SimpleCommand::evaluate_impl(EvalContext &cxt) const
 {
-  SHIT_ASSERT(m_args.size() > 0);
+  /* A command may have no words when it is only a redirection, such as > file,
+     so the redirections still run below. */
+  SHIT_ASSERT(m_args.size() > 0 || !m_redirections.empty());
 
   if (cxt.should_echo())
     std::cout << utils::merge_tokens_to_string(m_args) << std::endl;
 
   std::vector<std::string> program_args = cxt.process_args(m_args);
 
+  /* Open the redirection targets. A redirection takes effect even when the
+     command expands to nothing, so > file with no command still creates the
+     file. The final descriptors pass to the exec context, which closes them,
+     and the guard closes them on any path that does not hand them off. */
+  std::optional<os::descriptor> redirect_in_fd;
+  std::optional<os::descriptor> redirect_out_fd;
+  bool redirect_fds_handed_off = false;
+  SHIT_DEFER
+  {
+    if (!redirect_fds_handed_off) {
+      if (redirect_in_fd) os::close_fd(*redirect_in_fd);
+      if (redirect_out_fd) os::close_fd(*redirect_out_fd);
+    }
+  };
+
+  for (const Redirection &redirection : m_redirections) {
+    std::vector<std::string> target = cxt.process_args({redirection.target});
+    if (target.size() != 1) {
+      throw ErrorWithLocation{redirection.target->source_location(),
+                              "Redirection target is not a single file"};
+    }
+
+    os::FileOpenMode mode = os::FileOpenMode::Read;
+    if (redirection.kind == Redirection::Kind::TruncateOutput)
+      mode = os::FileOpenMode::Truncate;
+    else if (redirection.kind == Redirection::Kind::AppendOutput)
+      mode = os::FileOpenMode::Append;
+
+    std::optional<os::descriptor> opened =
+        os::open_file_descriptor(target[0], mode);
+    if (!opened) {
+      throw ErrorWithLocation{redirection.target->source_location(),
+                              "Could not open '" + target[0] + "': " +
+                                  os::last_system_error_message()};
+    }
+
+    /* The last redirection of a descriptor wins, so a superseded open closes
+       at once. */
+    if (redirection.fd == 0) {
+      if (redirect_in_fd) os::close_fd(*redirect_in_fd);
+      redirect_in_fd = opened;
+    } else {
+      if (redirect_out_fd) os::close_fd(*redirect_out_fd);
+      redirect_out_fd = opened;
+    }
+  }
+
   /* An expansion may drop every word, for example an unset $x used as the whole
-     command. There is nothing to run then. */
+     command. There is nothing to run then, but the redirections above already
+     took effect. */
   if (program_args.empty()) {
     cxt.set_last_exit_status(0);
     return 0;
@@ -427,6 +498,12 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
       m_resolved_kind = ec.program_path();
     m_resolved_name = program_args[0];
   }
+
+  /* The redirections override the inherited descriptors for this command. The
+     exec context now owns the opened files and closes them. */
+  if (redirect_in_fd) ec.in_fd = redirect_in_fd;
+  if (redirect_out_fd) ec.out_fd = redirect_out_fd;
+  redirect_fds_handed_off = true;
 
   i64 ret = utils::execute_context(std::move(ec), cxt, is_async());
 
@@ -603,7 +680,16 @@ CompoundListCondition::to_ast_string(usize layer) const
 i64
 CompoundListCondition::evaluate_impl(EvalContext &cxt) const
 {
-  return m_cmd->evaluate(cxt);
+  i64 status = m_cmd->evaluate(cxt);
+
+  /* A pipeline prefixed with ! reports the inverse of its status, and that
+     inverse is what $? sees. */
+  if (m_cmd->is_negated()) {
+    status = (status == 0) ? 1 : 0;
+    cxt.set_last_exit_status(static_cast<i32>(status));
+  }
+
+  return status;
 }
 
 Pipeline::Pipeline(SourceLocation location,
@@ -1332,6 +1418,14 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
                 .to_literal_string()
           : m_args[0]->raw_string();
 
+  /* A dot, source, or eval runs code the prepass cannot see, so any later
+     unresolved command must not be a hard failure. */
+  if (command_literal == "." || command_literal == "source" ||
+      command_literal == "eval")
+  {
+    actx.saw_runtime_definer = true;
+  }
+
   /* A backtick anywhere in the command is an unsupported substitution. */
   for (const Token *t : m_args) {
     if (t->kind() != Token::Kind::Word) continue;
@@ -1391,8 +1485,10 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   {
     std::string message = "Command '" + *name + "' was not found";
     /* Point at the command word, not at the whole command. With an assignment
-       prefix the command location is the assignment, not the program name. */
-    if (is_unconditional)
+       prefix the command location is the assignment, not the program name. A
+       command after a dot, source, or eval may be defined at runtime, so it is
+       only a warning. */
+    if (is_unconditional && !actx.saw_runtime_definer)
       actx.fail(m_args[0]->source_location(), message);
     else
       actx.warn(m_args[0]->source_location(), message);

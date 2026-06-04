@@ -29,6 +29,17 @@ struct Builtin
     Break,
     Continue,
     Return,
+    Colon,
+    True,
+    False,
+    Test,
+    Source,
+    Eval,
+    Set,
+    Shift,
+    Unset,
+    Read,
+    Printf,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -54,6 +65,19 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"break",    Builtin::Kind::Break   },
     {"continue", Builtin::Kind::Continue},
     {"return",   Builtin::Kind::Return  },
+    {":",        Builtin::Kind::Colon   },
+    {"true",     Builtin::Kind::True    },
+    {"false",    Builtin::Kind::False   },
+    {"test",     Builtin::Kind::Test    },
+    {"[",        Builtin::Kind::Test    },
+    {".",        Builtin::Kind::Source  },
+    {"source",   Builtin::Kind::Source  },
+    {"eval",     Builtin::Kind::Eval    },
+    {"set",      Builtin::Kind::Set     },
+    {"shift",    Builtin::Kind::Shift   },
+    {"unset",    Builtin::Kind::Unset   },
+    {"read",     Builtin::Kind::Read    },
+    {"printf",   Builtin::Kind::Printf  },
 };
 
 #define B_CASE(btin)                                                           \
@@ -69,7 +93,18 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Export);                                                              \
   B_CASE(Break);                                                               \
   B_CASE(Continue);                                                            \
-  B_CASE(Return)
+  B_CASE(Return);                                                              \
+  B_CASE(Colon);                                                               \
+  B_CASE(True);                                                                \
+  B_CASE(False);                                                               \
+  B_CASE(Test);                                                                \
+  B_CASE(Source);                                                              \
+  B_CASE(Eval);                                                                \
+  B_CASE(Set);                                                                 \
+  B_CASE(Shift);                                                               \
+  B_CASE(Unset);                                                               \
+  B_CASE(Read);                                                                \
+  B_CASE(Printf)
 
 #define BUILTIN_STRUCT(b)                                                      \
   struct b : public Builtin                                                    \
@@ -89,6 +124,17 @@ BUILTIN_STRUCT(Export);
 BUILTIN_STRUCT(Break);
 BUILTIN_STRUCT(Continue);
 BUILTIN_STRUCT(Return);
+BUILTIN_STRUCT(Colon);
+BUILTIN_STRUCT(True);
+BUILTIN_STRUCT(False);
+BUILTIN_STRUCT(Test);
+BUILTIN_STRUCT(Source);
+BUILTIN_STRUCT(Eval);
+BUILTIN_STRUCT(Set);
+BUILTIN_STRUCT(Shift);
+BUILTIN_STRUCT(Unset);
+BUILTIN_STRUCT(Read);
+BUILTIN_STRUCT(Printf);
 
 struct Exit : public Builtin
 {

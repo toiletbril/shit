@@ -12,6 +12,9 @@ HEADERS += $(wildcard */**.hpp)
 # Translate a list of <...>.cpp files to a list of paths like
 # o/$SHIT_MODE/<...>.o.
 OBJECTS := $(SOURCES:%.cpp=o/$(SHIT_MODE)/%.o)
+# One dependency file per object, written by the compiler, so a header edit
+# rebuilds every source that includes it.
+DEPS := $(OBJECTS:.o=.d)
 
 ifeq ($(OS), Windows_NT)
 OUT := ../shit.exe
@@ -139,10 +142,11 @@ CXXFLAGS += \
 	-ladvapi32
 endif
 
-# Making objects in o/$SHIT_MODE/<...>.o
+# Making objects in o/$SHIT_MODE/<...>.o. -MMD writes the header dependency
+# list next to each object, and -MP guards against a removed header.
 o/$(SHIT_MODE)/%.o: %.cpp
 	printf "\t%-42s $@\n" $<
-	$(CXX) $(CXXFLAGS) -c $< -o $(CWD)$@
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
 
 # Linking.
 $(OUT): $(OBJECTS)
@@ -184,3 +188,7 @@ clean:
 	rm -rf ../perf*
 
 .PHONY: dirs shit install tidy fmt clean
+
+# Pull in the generated header dependencies. Missing on the first build, which
+# is fine since every object is compiled then anyway.
+-include $(DEPS)
