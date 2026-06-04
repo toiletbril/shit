@@ -1390,9 +1390,15 @@ EvalContext::process_args(const std::vector<const Token *> &args)
     }
   }
 
-  if (should_echo_expanded())
-    std::cout << "+ " << utils::merge_args_to_string(expanded_args)
-              << std::endl;
+  /* The trace goes to standard error, the way bash does it, so it stays out of
+     a command substitution's captured output. The plus is repeated once per
+     enclosing subshell, so the top shell shows '+', a substitution '++', and a
+     nested one '+++'. */
+  if (should_echo_expanded()) {
+    std::string prefix(m_subshell_depth + 1, '+');
+    std::cerr << prefix << ' ' << utils::merge_args_to_string(expanded_args)
+              << '\n';
+  }
 
   return expanded_args;
 }
