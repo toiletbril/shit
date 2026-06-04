@@ -221,9 +221,21 @@ replace_process(ExecContext &&ec)
 {
   std::vector<const char *> os_args = make_os_args(ec.args());
 
-  if (ec.in_fd) check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
-  if (ec.out_fd) check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
-  if (ec.err_fd) check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
+  /* Place each redirected file and close the original descriptor, the way the
+     forked child does, so the opened file does not leak into the exec'd
+     program. */
+  if (ec.in_fd) {
+    check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
+    if (*ec.in_fd != STDIN_FILENO) check_syscall(close(*ec.in_fd));
+  }
+  if (ec.out_fd) {
+    check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
+    if (*ec.out_fd != STDOUT_FILENO) check_syscall(close(*ec.out_fd));
+  }
+  if (ec.err_fd) {
+    check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
+    if (*ec.err_fd != STDERR_FILENO) check_syscall(close(*ec.err_fd));
+  }
   if (ec.dup_err_to_out) check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
   if (ec.dup_out_to_err) check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
 
@@ -643,9 +655,20 @@ replace_process(ExecContext &&ec)
 void
 redirect_self(const ExecContext &ec)
 {
-  if (ec.in_fd) SetStdHandle(STD_INPUT_HANDLE, *ec.in_fd);
-  if (ec.out_fd) SetStdHandle(STD_OUTPUT_HANDLE, *ec.out_fd);
-  if (ec.err_fd) SetStdHandle(STD_ERROR_HANDLE, *ec.err_fd);
+  /* Duplicate each redirect handle into the standard slot, so the caller's
+     close of the original handles leaves the shell's new standard handles
+     valid for the rest of the session. */
+  HANDLE self = GetCurrentProcess();
+  HANDLE duplicate = nullptr;
+  if (ec.in_fd && DuplicateHandle(self, *ec.in_fd, self, &duplicate, 0, TRUE,
+                                  DUPLICATE_SAME_ACCESS))
+    SetStdHandle(STD_INPUT_HANDLE, duplicate);
+  if (ec.out_fd && DuplicateHandle(self, *ec.out_fd, self, &duplicate, 0, TRUE,
+                                   DUPLICATE_SAME_ACCESS))
+    SetStdHandle(STD_OUTPUT_HANDLE, duplicate);
+  if (ec.err_fd && DuplicateHandle(self, *ec.err_fd, self, &duplicate, 0, TRUE,
+                                   DUPLICATE_SAME_ACCESS))
+    SetStdHandle(STD_ERROR_HANDLE, duplicate);
 }
 
 Maybe<Pipe>

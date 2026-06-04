@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
@@ -328,6 +329,15 @@ EvalContext::restore_state(EvalStateSnapshot snapshot)
   m_functions = std::move(snapshot.functions);
   m_positional_params = std::move(snapshot.positional_params);
   utils::set_current_directory(snapshot.working_directory);
+
+  /* The cached field separators track the restored map, so an IFS change inside
+     the subshell or the command substitution does not leak its split behavior
+     to the parent. */
+  if (const String *ifs = m_shell_variables.find(StringView{"IFS", 3}))
+    m_field_separators.assign(ifs->c_str(), ifs->size());
+  else
+    m_field_separators = " \t\n";
+
   /* The exit status is intentionally not restored. A subshell and a command
      substitution propagate the status of their last command to the parent. */
 }
@@ -964,7 +974,12 @@ struct ArithmeticParser
             StringView{name.data(), name.size()}))
     {
       if (stored->size() == 0) return 0;
-      return std::strtoll(stored->c_str(), nullptr, 0);
+      errno = 0;
+      i64 parsed = std::strtoll(stored->c_str(), nullptr, 0);
+      /* An out-of-range value reads as zero, the same as the old stoll path
+         which threw and was caught. */
+      if (errno == ERANGE) return 0;
+      return parsed;
     }
 
     std::string value = context.get_variable_value(name).value_or("");

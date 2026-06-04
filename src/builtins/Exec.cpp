@@ -68,12 +68,14 @@ Exec::execute(ExecContext &ec, EvalContext &cxt) const
   command.dup_out_to_err = ec.dup_out_to_err;
 
   /* An external command replaces the shell. replace_process returns only by
-     throwing, when the program cannot be run, which also ends the shell. */
+     throwing, when the program was found but could not be executed, which ends
+     the shell with 126, the status reserved for a command that is present but
+     not executable. A name that resolves to nothing exited 127 above. */
   try {
     os::replace_process(std::move(command));
   } catch (const Error &error) {
     show_message(error.to_string());
-    utils::quit(127, true);
+    utils::quit(126, true);
   }
 }
 
