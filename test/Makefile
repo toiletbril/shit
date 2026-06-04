@@ -38,4 +38,22 @@ refill:
 		$(BIN) $(BIN_FLAGS) input/$$f.shit > expected/$$f.out 2>&1; \
 	done || true
 
-.PHONY: test clean run_tests refill
+# Run each everything_*.shit through the shell and through dash, then compare
+# their standard output and exit status. The goal is byte-identical behavior.
+DASH ?= dash
+EVERYTHING := $(wildcard everything/*.shit)
+
+dashdiff: $(BIN)
+	@for f in $(EVERYTHING); do \
+		$(BIN) "$$f" >/tmp/shit_dd_s 2>/dev/null; shit_rc=$$?; \
+		$(DASH) "$$f" >/tmp/shit_dd_d 2>/dev/null; dash_rc=$$?; \
+		if cmp -s /tmp/shit_dd_s /tmp/shit_dd_d && [ "$$shit_rc" = "$$dash_rc" ]; then \
+			printf "	%-42s ok\n" "$$f"; \
+		else \
+			printf "	%-42s DIFF (shit rc=%s dash rc=%s)\n" "$$f" "$$shit_rc" "$$dash_rc"; \
+			diff /tmp/shit_dd_d /tmp/shit_dd_s | head -20; \
+		fi; \
+	done; \
+	rm -f /tmp/shit_dd_s /tmp/shit_dd_d
+
+.PHONY: test clean run_tests refill dashdiff

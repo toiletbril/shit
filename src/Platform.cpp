@@ -214,6 +214,15 @@ make_pipe()
     return std::nullopt;
   }
 
+  /* Close the pipe ends on exec, so a stage that dups one end onto its stdin or
+     stdout does not also inherit the other end. Otherwise a producer like yes
+     keeps a read end open and never sees the pipe close. The dup2 onto a
+     standard descriptor clears the flag there, so the redirection survives. */
+  for (descriptor end : p) {
+    int flags = fcntl(end, F_GETFD);
+    if (flags != -1) fcntl(end, F_SETFD, flags | FD_CLOEXEC);
+  }
+
   return Pipe{p[0], p[1]};
 }
 

@@ -65,6 +65,10 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
 
   i32 ret = 0;
 
+  /* Every external stage is collected so all of them are reaped, not only the
+     last. Otherwise a first stage like yes is left a zombie when the last stage
+     exits. */
+  std::vector<os::process> children{};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
@@ -90,18 +94,31 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
       last_stdin = pipe->in;
     }
 
-    if (!ec.is_builtin())
-      last_child = os::execute_program(std::move(ec));
-    else
+    if (!ec.is_builtin()) {
+      os::process child = os::execute_program(std::move(ec));
+      children.push_back(child);
+      last_child = child;
+    } else {
+      /* A builtin runs in this process, so its status stands in for the stage.
+       */
       ret = execute_builtin(std::move(ec), cxt);
+    }
 
     is_first = false;
   }
 
-  if (last_child != SHIT_INVALID_FD && !is_async)
-    ret = os::wait_and_monitor_process(last_child);
-  else if (last_child != SHIT_INVALID_FD && is_async)
-    cxt.set_last_background_pid(os::process_id_of(last_child));
+  if (is_async) {
+    if (last_child != SHIT_INVALID_PROCESS)
+      cxt.set_last_background_pid(os::process_id_of(last_child));
+    return ret;
+  }
+
+  /* Wait for every stage. The pipeline status is the last stage's, so a stage
+     that is the last external child sets the result. */
+  for (os::process child : children) {
+    i32 status = os::wait_and_monitor_process(child);
+    if (child == last_child) ret = status;
+  }
 
   return ret;
 }

@@ -982,7 +982,11 @@ struct ArithmeticParser
 i64
 EvalContext::evaluate_arithmetic(const std::string &expression)
 {
-  ArithmeticParser parser{*this, expression, 0};
+  /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
+     arithmetic becomes its value before the expression is parsed. A bare name
+     is still resolved during evaluation. */
+  std::string expanded = expand_modifier_word(expression);
+  ArithmeticParser parser{*this, expanded, 0};
   return parser.parse();
 }
 
