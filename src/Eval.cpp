@@ -1372,7 +1372,12 @@ struct ArithmeticParser
       while (pos < source.length() && lexer::is_variable_name(source[pos]))
         name += source[pos++];
 
-      static const std::pair<std::string_view, char> compound_operators[] = {
+      struct CompoundOperator
+      {
+        std::string_view token;
+        char kind;
+      };
+      static const CompoundOperator compound_operators[] = {
           {"<<=", 'L'},
           {">>=", 'R'},
           {"+=",  '+'},

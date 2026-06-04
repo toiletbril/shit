@@ -111,6 +111,12 @@ tl_arena_realloc(void *pointer, usize length)
 
 namespace toiletline {
 
+struct InputResult
+{
+  i32 code;
+  std::string text;
+};
+
 static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
 static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
@@ -187,7 +193,7 @@ exit()
   }
 }
 
-std::tuple<i32, std::string>
+InputResult
 get_input(const std::string &prompt)
 {
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
@@ -195,7 +201,7 @@ get_input(const std::string &prompt)
     throw shit::Error{
         "Toiletline: Unexpected internal error while getting the input"};
   }
-  return {code, TL_BUFFER};
+  return InputResult{code, TL_BUFFER};
 }
 
 void
@@ -235,6 +241,12 @@ emit_newlines(std::string_view buffer)
    stubs keep the rest of the shell linking for profiling and debugging, where
    the raw terminal handling would otherwise perturb the run. */
 namespace toiletline {
+
+struct InputResult
+{
+  i32 code;
+  std::string text;
+};
 
 void
 set_title(const std::string &title)

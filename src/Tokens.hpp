@@ -59,7 +59,9 @@ struct Word
   std::string to_pretty_string() const;
 
   /* A word is an assignment when its first segment is unquoted text holding an
-     unescaped NAME= prefix. The returned word is the right hand side. */
+     unescaped NAME= prefix. The returned word is the right hand side. The pair
+     stays std::pair here, since a named struct holding a Word by value cannot
+     complete inside Word's own definition. */
   Maybe<std::pair<std::string, Word>> get_assignment_split() const;
 };
 

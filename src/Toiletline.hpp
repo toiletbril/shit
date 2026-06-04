@@ -1,7 +1,6 @@
 #include "Common.hpp"
 
 #include <string>
-#include <tuple>
 
 namespace {
 
@@ -21,7 +20,15 @@ void initialize();
 
 void exit();
 
-std::tuple<i32, std::string> get_input(const std::string &prompt);
+/* The outcome of one line read. The code is the toiletline status, such as
+   enter, end of file, or an interrupt, and text is the bytes the user typed. */
+struct InputResult
+{
+  i32 code;
+  std::string text;
+};
+
+InputResult get_input(const std::string &prompt);
 
 void set_input(const std::string &input);
 

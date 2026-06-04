@@ -7,13 +7,19 @@
 #include "Trace.hpp"
 
 #include <optional>
-#include <tuple>
 
 /* TODO: Print proper offset and context for UTF-8. */
 
 namespace shit {
 
-static std::tuple<usize, usize>
+/* The line a byte falls on and the offset of the newline that starts it. */
+struct PreciseLocation
+{
+  usize line_number;
+  usize last_newline_location;
+};
+
+static PreciseLocation
 calc_precise_position(std::string_view source, usize byte_position)
 {
   SHIT_ASSERT(byte_position <= source.length(),
@@ -28,7 +34,7 @@ calc_precise_position(std::string_view source, usize byte_position)
     line_number++;
   }
 
-  return {line_number, last_newline_location};
+  return PreciseLocation{line_number, last_newline_location};
 }
 
 template <class T>

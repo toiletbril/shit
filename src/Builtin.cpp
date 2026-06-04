@@ -37,7 +37,14 @@ search_builtin(std::string_view builtin_name)
 
 /* A one-line synopsis and a sentence of explanation for each builtin, shown by
    --help. */
-static std::pair<std::string, std::string>
+/* The one-line synopsis and the sentence of explanation a builtin shows. */
+struct BuiltinHelp
+{
+  std::string synopsis;
+  std::string description;
+};
+
+static BuiltinHelp
 builtin_help(Builtin::Kind kind)
 {
   switch (kind) {

@@ -598,11 +598,17 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   /* Per-command assignments apply to the environment for this command, a
      function call included, so a child inherits them and a function sees them.
      The previous values are restored on every exit path. */
-  ArrayList<std::pair<std::string, std::optional<std::string>>> saved_env{
-      heap_allocator()};
+  /* The environment value a prefix assignment shadowed, restored on exit. */
+  struct SavedEnvVar
+  {
+    std::string name;
+    std::optional<std::string> previous_value;
+  };
+  ArrayList<SavedEnvVar> saved_env{heap_allocator()};
   m_local_vars.for_each([&](StringView name, const Word &value_word) {
     std::string name_str{name.data, name.length};
-    saved_env.push({name_str, os::get_environment_variable(name_str)});
+    saved_env.push(
+        SavedEnvVar{name_str, os::get_environment_variable(name_str)});
     os::set_environment_variable(name_str,
                                  cxt.expand_word_for_assignment(value_word));
   });
