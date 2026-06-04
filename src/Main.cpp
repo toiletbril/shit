@@ -162,6 +162,47 @@ source_file(const std::filesystem::path &path, shit::EvalContext &context,
   run_script_contents(contents, context, ast_arena);
 }
 
+/* Expand the common prompt escapes in PS1 and PS2. */
+static std::string
+expand_prompt_escapes(const std::string &prompt, const std::string &user,
+                      const std::string &working_directory)
+{
+  std::string out{};
+  for (usize i = 0; i < prompt.length(); i++) {
+    if (prompt[i] != '\\' || i + 1 >= prompt.length()) {
+      out += prompt[i];
+      continue;
+    }
+    char escaped = prompt[++i];
+    switch (escaped) {
+    case 'u': out += user; break;
+    case 'h':
+      out +=
+          shit::os::get_environment_variable("HOSTNAME").value_or("localhost");
+      break;
+    case 'w': {
+      std::string shown = working_directory;
+      std::optional<std::filesystem::path> home = shit::os::get_home_directory();
+      if (home && shown.rfind(home->string(), 0) == 0)
+        shown = "~" + shown.substr(home->string().length());
+      out += shown;
+    } break;
+    case 'W':
+      out += std::filesystem::path{working_directory}.filename().string();
+      break;
+    case '$': out += (user == "root") ? '#' : '$'; break;
+    case 'n': out += '\n'; break;
+    case 't': out += '\t'; break;
+    case '\\': out += '\\'; break;
+    default:
+      out += '\\';
+      out += escaped;
+      break;
+    }
+  }
+  return out;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -271,6 +312,19 @@ main(int argc, char **argv)
                             program_path,
                             file_names};
 
+  /* Seed the standard and shell-specific variables a script may read. The
+     version and runtime values come from the build. */
+  context.set_shell_variable("SHELL", program_path);
+  context.set_shell_variable("PWD",
+                             shit::utils::get_current_directory().string());
+  context.set_shell_variable(
+      "SHIT_VERSION", std::to_string(SHIT_VER_MAJOR) + "." +
+                          std::to_string(SHIT_VER_MINOR) + "." +
+                          std::to_string(SHIT_VER_PATCH) + "-" SHIT_VER_EXTRA);
+  context.set_shell_variable("SHIT_COMMIT", SHIT_COMMIT_HASH);
+  context.set_shell_variable("SHIT_BUILD_MODE", SHIT_BUILD_MODE);
+  context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);
+
   usize arg_index = 0;
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
   int exit_code = EXIT_SUCCESS;
@@ -366,9 +420,10 @@ main(int argc, char **argv)
 
         static constexpr usize PWD_LENGTH = 24;
 
-        std::string pwd = shit::utils::get_current_directory().string();
-        toiletline::set_title("shit @ " + pwd);
+        std::string full_pwd = shit::utils::get_current_directory().string();
+        toiletline::set_title("shit @ " + full_pwd);
 
+        std::string pwd = full_pwd;
         if (pwd.length() > PWD_LENGTH)
           pwd = "..." + pwd.substr(pwd.length() - PWD_LENGTH + 3);
 
@@ -379,8 +434,9 @@ main(int argc, char **argv)
         if (std::optional<std::string> ps1 = context.get_variable_value("PS1");
             ps1.has_value() && !ps1->empty())
         {
-          /* A user-set PS1 replaces the default prompt verbatim. */
-          prompt = *ps1;
+          /* A user-set PS1 expands its escape sequences, \u \h \w \W \$ and
+             the like. */
+          prompt = expand_prompt_escapes(*ps1, u, full_pwd);
         } else {
           prompt += u;
           prompt += ' ';

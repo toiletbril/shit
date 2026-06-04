@@ -31,6 +31,9 @@ struct WordSegment
     /* The text holds the source inside $(...). The evaluator runs it and
        splices the captured output. */
     CommandSubstitution,
+    /* The text holds the source inside $((...)). The evaluator computes it and
+       splices the decimal result. */
+    ArithmeticExpansion,
   };
 
   Kind kind;

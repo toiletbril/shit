@@ -192,6 +192,18 @@ protected:
 
   std::string expand_variable(const std::string &name) const;
 
+  /* Expand a ${...} body, which is a plain name or a name with a length, a
+     default, an alternate, an assign, an error, or a prefix or suffix trim. */
+  std::string apply_parameter_expansion(const std::string &spec);
+
+  /* Expand the word inside a parameter expansion, its $name and ${...}
+     references, keeping literal text and spaces intact. */
+  std::string expand_modifier_word(const std::string &word);
+
+  /* Compute the integer value of a $((...)) expression, resolving shell
+     variables and applying any assignments inside it. */
+  i64 evaluate_arithmetic(const std::string &expression);
+
   /* Turn a word into fields, applying tilde, variable expansion, command
      substitution, and IFS field splitting, but not globbing. */
   std::vector<GlobField> expand_word(const Word &word);

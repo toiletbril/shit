@@ -1,0 +1,52 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1 + 2 * 3))"]
+  [CompoundListCondition, None]
+    [Assign x=5]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x * x))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((10 % 3))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((y = 7))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$y"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 + 2 * 3"
+]
+[Word
+  Unquoted "x=5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x * x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "10 % 3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "y = 7"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "y"
+]
+7
+25
+1
+7
+7
+[Code 0]

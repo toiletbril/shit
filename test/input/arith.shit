@@ -1,0 +1,5 @@
+echo $((1 + 2 * 3))
+x=5
+echo $((x * x))
+echo $((10 % 3))
+echo $((y = 7)); echo $y

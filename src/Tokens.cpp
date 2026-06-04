@@ -63,6 +63,10 @@ Word::to_literal_string() const
       result += "$(" + segment.text + ")";
       continue;
     }
+    if (segment.kind == WordSegment::Kind::ArithmeticExpansion) {
+      result += "$((" + segment.text + "))";
+      continue;
+    }
     if (segment.kind == WordSegment::Kind::VariableReference) result += '$';
     result += segment.text;
   }
@@ -82,6 +86,9 @@ Word::to_pretty_string() const
     case WordSegment::Kind::VariableReference: result += "Variable"; break;
     case WordSegment::Kind::CommandSubstitution:
       result += "CommandSubstitution";
+      break;
+    case WordSegment::Kind::ArithmeticExpansion:
+      result += "ArithmeticExpansion";
       break;
     }
     result += " \"";

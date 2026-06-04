@@ -397,12 +397,43 @@ Lexer::lex_identifier()
            quotes and nesting so an inner ) does not end it early. */
         byte_count++;
 
-        /* $(( starts arithmetic expansion, which is a different feature. A
-           subshell substitution is written with a space, $( (cmd) ). */
+        /* $(( starts arithmetic expansion. Scan to the matching )), allowing
+           grouping parens inside. A subshell substitution is written with a
+           space, $( (cmd) ). */
         if (chop_character(byte_count) == '(') {
-          throw ErrorWithLocation{
-              {m_cursor_position, byte_count + 1},
-              "Arithmetic expansion $((...)) is not supported"};
+          byte_count++;
+          std::string arithmetic{};
+          usize group_depth = 0;
+          for (;;) {
+            char c = chop_character(byte_count);
+            if (c == lexer::CEOF) {
+              throw ErrorWithLocationAndDetails{
+                  {m_cursor_position,              byte_count},
+                  "Unterminated arithmetic expansion",
+                  {m_cursor_position + byte_count, 1         },
+                  "expected )) here"
+              };
+            }
+            if (c == '(') {
+              group_depth++;
+              arithmetic += c;
+              byte_count++;
+            } else if (c == ')' && group_depth > 0) {
+              group_depth--;
+              arithmetic += c;
+              byte_count++;
+            } else if (c == ')' && chop_character(byte_count + 1) == ')') {
+              byte_count += 2;
+              break;
+            } else {
+              arithmetic += c;
+              byte_count++;
+            }
+          }
+          word.segments.push_back(
+              WordSegment{WordSegment::Kind::ArithmeticExpansion,
+                          std::move(arithmetic), is_in_double_quotes});
+          continue;
         }
 
         std::string inner{};

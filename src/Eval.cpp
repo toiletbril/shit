@@ -228,6 +228,181 @@ EvalContext::expand_variable(const std::string &name) const
   return get_variable_value(name).value_or("");
 }
 
+namespace {
+
+/* Remove the shortest or longest prefix of value that matches pattern as a
+   glob, returning the remainder. */
+std::string
+trim_matching_prefix(const std::string &value, const std::string &pattern,
+                     bool longest)
+{
+  std::vector<bool> active(pattern.length(), true);
+  if (longest) {
+    for (usize length = value.length();; length--) {
+      if (utils::glob_matches(pattern, value.substr(0, length), active, 0))
+        return value.substr(length);
+      if (length == 0) break;
+    }
+  } else {
+    for (usize length = 0; length <= value.length(); length++) {
+      if (utils::glob_matches(pattern, value.substr(0, length), active, 0))
+        return value.substr(length);
+    }
+  }
+  return value;
+}
+
+/* Remove the shortest or longest suffix of value that matches pattern as a
+   glob, returning the head. */
+std::string
+trim_matching_suffix(const std::string &value, const std::string &pattern,
+                     bool longest)
+{
+  std::vector<bool> active(pattern.length(), true);
+  if (longest) {
+    for (usize start = 0; start <= value.length(); start++) {
+      if (utils::glob_matches(pattern, value.substr(start), active, 0))
+        return value.substr(0, start);
+    }
+  } else {
+    for (usize start = value.length();; start--) {
+      if (utils::glob_matches(pattern, value.substr(start), active, 0))
+        return value.substr(0, start);
+      if (start == 0) break;
+    }
+  }
+  return value;
+}
+
+} /* namespace */
+
+std::string
+EvalContext::expand_modifier_word(const std::string &word)
+{
+  std::string out{};
+  for (usize i = 0; i < word.length(); i++) {
+    if (word[i] != '$') {
+      out += word[i];
+      continue;
+    }
+    if (i + 1 >= word.length()) {
+      out += '$';
+      break;
+    }
+
+    char next = word[i + 1];
+    if (next == '{') {
+      std::string inner{};
+      usize j = i + 2;
+      i32 depth = 1;
+      while (j < word.length()) {
+        if (word[j] == '{') {
+          depth++;
+        } else if (word[j] == '}') {
+          depth--;
+          if (depth == 0) break;
+        }
+        inner += word[j];
+        j++;
+      }
+      out += apply_parameter_expansion(inner);
+      i = j;
+    } else if (lexer::is_variable_name_start(next)) {
+      std::string name{};
+      usize j = i + 1;
+      while (j < word.length() && lexer::is_variable_name(word[j]))
+        name += word[j++];
+      out += expand_variable(name);
+      i = j - 1;
+    } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
+               next == '$' || next == '!' || next == '-' ||
+               lexer::is_number(next))
+    {
+      out += expand_variable(std::string{next});
+      i++;
+    } else {
+      out += '$';
+    }
+  }
+  return out;
+}
+
+std::string
+EvalContext::apply_parameter_expansion(const std::string &spec)
+{
+  if (spec.empty()) return std::string{};
+
+  /* ${#name} is the length of the value, distinct from $# which is the count of
+     positional parameters. */
+  if (spec.length() > 1 && spec[0] == '#') {
+    std::string name = spec.substr(1);
+    if (name == "@" || name == "*")
+      return std::to_string(m_positional_params.size());
+    return std::to_string(get_variable_value(name).value_or("").length());
+  }
+
+  /* Split the parameter name from an optional operator and its word. */
+  usize name_end = 0;
+  if (lexer::is_variable_name_start(spec[0])) {
+    while (name_end < spec.length() && lexer::is_variable_name(spec[name_end]))
+      name_end++;
+  } else if (lexer::is_number(spec[0])) {
+    while (name_end < spec.length() && lexer::is_number(spec[name_end]))
+      name_end++;
+  } else {
+    /* A special single-character parameter, such as ? or @. */
+    name_end = 1;
+  }
+
+  std::string name = spec.substr(0, name_end);
+  std::string rest = spec.substr(name_end);
+  if (rest.empty()) return expand_variable(name);
+
+  /* A leading colon makes the default, assign, alternate, and error forms treat
+     an empty value as unset. */
+  bool is_colon_form = rest[0] == ':';
+  usize op_index = is_colon_form ? 1 : 0;
+  if (op_index >= rest.length()) return expand_variable(name);
+
+  char op = rest[op_index];
+  bool is_doubled = (op_index + 1 < rest.length() &&
+                     rest[op_index + 1] == op && (op == '#' || op == '%'));
+  std::string word = rest.substr(op_index + (is_doubled ? 2 : 1));
+
+  std::optional<std::string> current = get_variable_value(name);
+  bool is_set = current.has_value();
+  bool is_empty = !is_set || current->empty();
+  bool treat_as_unset = is_colon_form ? is_empty : !is_set;
+
+  switch (op) {
+  case '-':
+    return treat_as_unset ? expand_modifier_word(word) : *current;
+  case '=':
+    if (treat_as_unset) {
+      std::string assigned = expand_modifier_word(word);
+      set_shell_variable(name, assigned);
+      return assigned;
+    }
+    return *current;
+  case '+':
+    return treat_as_unset ? std::string{} : expand_modifier_word(word);
+  case '?':
+    if (treat_as_unset) {
+      throw Error{word.empty() ? name + ": parameter not set or empty"
+                               : expand_modifier_word(word)};
+    }
+    return *current;
+  case '#':
+    return trim_matching_prefix(current.value_or(""),
+                                expand_modifier_word(word), is_doubled);
+  case '%':
+    return trim_matching_suffix(current.value_or(""),
+                                expand_modifier_word(word), is_doubled);
+  default:
+    return expand_variable(name);
+  }
+}
+
 std::string
 EvalContext::make_stats_string() const
 {
@@ -519,6 +694,298 @@ EvalContext::expand_path(GlobField field)
   return values;
 }
 
+namespace {
+
+/* A recursive-descent evaluator for $((...)), following C operator precedence,
+   that resolves and assigns shell variables through the context. */
+struct ArithmeticParser
+{
+  EvalContext &context;
+  const std::string &source;
+  usize pos;
+
+  [[noreturn]] void fail(const std::string &message)
+  {
+    throw Error{"Arithmetic: " + message};
+  }
+
+  void skip_spaces()
+  {
+    while (pos < source.length() &&
+           (source[pos] == ' ' || source[pos] == '\t' || source[pos] == '\n' ||
+            source[pos] == '\r'))
+      pos++;
+  }
+
+  bool starts_with(std::string_view op)
+  {
+    skip_spaces();
+    return pos + op.size() <= source.length() &&
+           std::string_view{source}.substr(pos, op.size()) == op;
+  }
+
+  bool consume(std::string_view op)
+  {
+    if (!starts_with(op)) return false;
+    pos += op.size();
+    return true;
+  }
+
+  i64 read_variable_value(const std::string &name)
+  {
+    std::string value = context.get_variable_value(name).value_or("");
+    if (value.empty()) return 0;
+    try {
+      return std::stoll(value, nullptr, 0);
+    } catch (...) {
+      return 0;
+    }
+  }
+
+  i64 parse()
+  {
+    i64 result = parse_assignment();
+    skip_spaces();
+    if (pos != source.length()) fail("unexpected trailing characters");
+    return result;
+  }
+
+  i64 apply_compound(i64 lhs, i64 rhs, char kind)
+  {
+    switch (kind) {
+    case '+': return lhs + rhs;
+    case '-': return lhs - rhs;
+    case '*': return lhs * rhs;
+    case '/':
+      if (rhs == 0) fail("division by zero");
+      return lhs / rhs;
+    case '%':
+      if (rhs == 0) fail("division by zero");
+      return lhs % rhs;
+    case '&': return lhs & rhs;
+    case '|': return lhs | rhs;
+    case '^': return lhs ^ rhs;
+    case 'L': return lhs << rhs;
+    case 'R': return lhs >> rhs;
+    default: return rhs;
+    }
+  }
+
+  i64 parse_assignment()
+  {
+    /* An assignment has a bare variable name on the left, so try it and rewind
+       when the name is not followed by an assignment operator. */
+    usize save = pos;
+    skip_spaces();
+    if (pos < source.length() && lexer::is_variable_name_start(source[pos])) {
+      std::string name{};
+      while (pos < source.length() && lexer::is_variable_name(source[pos]))
+        name += source[pos++];
+
+      static const std::pair<std::string_view, char> compound_operators[] = {
+          {"<<=", 'L'}, {">>=", 'R'}, {"+=", '+'}, {"-=", '-'},
+          {"*=", '*'},  {"/=", '/'},  {"%=", '%'}, {"&=", '&'},
+          {"|=", '|'},  {"^=", '^'},
+      };
+      for (const auto &[op, kind] : compound_operators) {
+        if (consume(op)) {
+          i64 rhs = parse_assignment();
+          i64 result = apply_compound(read_variable_value(name), rhs, kind);
+          context.set_shell_variable(name, std::to_string(result));
+          return result;
+        }
+      }
+      if (starts_with("=") && !starts_with("==")) {
+        consume("=");
+        i64 rhs = parse_assignment();
+        context.set_shell_variable(name, std::to_string(rhs));
+        return rhs;
+      }
+      pos = save;
+    }
+    return parse_ternary();
+  }
+
+  i64 parse_ternary()
+  {
+    i64 condition = parse_logical_or();
+    if (consume("?")) {
+      i64 if_true = parse_assignment();
+      if (!consume(":")) fail("expected ':' in a conditional");
+      i64 if_false = parse_ternary();
+      return condition != 0 ? if_true : if_false;
+    }
+    return condition;
+  }
+
+  i64 parse_logical_or()
+  {
+    i64 lhs = parse_logical_and();
+    while (consume("||"))
+      lhs = (lhs != 0 || parse_logical_and() != 0) ? 1 : 0;
+    return lhs;
+  }
+
+  i64 parse_logical_and()
+  {
+    i64 lhs = parse_bitwise_or();
+    while (consume("&&"))
+      lhs = (lhs != 0 && parse_bitwise_or() != 0) ? 1 : 0;
+    return lhs;
+  }
+
+  i64 parse_bitwise_or()
+  {
+    i64 lhs = parse_bitwise_xor();
+    while (starts_with("|") && !starts_with("||")) {
+      consume("|");
+      lhs |= parse_bitwise_xor();
+    }
+    return lhs;
+  }
+
+  i64 parse_bitwise_xor()
+  {
+    i64 lhs = parse_bitwise_and();
+    while (consume("^"))
+      lhs ^= parse_bitwise_and();
+    return lhs;
+  }
+
+  i64 parse_bitwise_and()
+  {
+    i64 lhs = parse_equality();
+    while (starts_with("&") && !starts_with("&&")) {
+      consume("&");
+      lhs &= parse_equality();
+    }
+    return lhs;
+  }
+
+  i64 parse_equality()
+  {
+    i64 lhs = parse_relational();
+    for (;;) {
+      if (consume("=="))
+        lhs = (lhs == parse_relational()) ? 1 : 0;
+      else if (consume("!="))
+        lhs = (lhs != parse_relational()) ? 1 : 0;
+      else
+        break;
+    }
+    return lhs;
+  }
+
+  i64 parse_relational()
+  {
+    i64 lhs = parse_shift();
+    for (;;) {
+      if (consume("<="))
+        lhs = (lhs <= parse_shift()) ? 1 : 0;
+      else if (consume(">="))
+        lhs = (lhs >= parse_shift()) ? 1 : 0;
+      else if (starts_with("<") && !starts_with("<<")) {
+        consume("<");
+        lhs = (lhs < parse_shift()) ? 1 : 0;
+      } else if (starts_with(">") && !starts_with(">>")) {
+        consume(">");
+        lhs = (lhs > parse_shift()) ? 1 : 0;
+      } else
+        break;
+    }
+    return lhs;
+  }
+
+  i64 parse_shift()
+  {
+    i64 lhs = parse_additive();
+    for (;;) {
+      if (consume("<<"))
+        lhs <<= parse_additive();
+      else if (consume(">>"))
+        lhs >>= parse_additive();
+      else
+        break;
+    }
+    return lhs;
+  }
+
+  i64 parse_additive()
+  {
+    i64 lhs = parse_multiplicative();
+    for (;;) {
+      if (consume("+"))
+        lhs += parse_multiplicative();
+      else if (consume("-"))
+        lhs -= parse_multiplicative();
+      else
+        break;
+    }
+    return lhs;
+  }
+
+  i64 parse_multiplicative()
+  {
+    i64 lhs = parse_unary();
+    for (;;) {
+      if (consume("*"))
+        lhs *= parse_unary();
+      else if (consume("/")) {
+        i64 divisor = parse_unary();
+        if (divisor == 0) fail("division by zero");
+        lhs /= divisor;
+      } else if (consume("%")) {
+        i64 divisor = parse_unary();
+        if (divisor == 0) fail("division by zero");
+        lhs %= divisor;
+      } else
+        break;
+    }
+    return lhs;
+  }
+
+  i64 parse_unary()
+  {
+    if (consume("!")) return parse_unary() == 0 ? 1 : 0;
+    if (consume("~")) return ~parse_unary();
+    if (consume("-")) return -parse_unary();
+    if (consume("+")) return parse_unary();
+    return parse_primary();
+  }
+
+  i64 parse_primary()
+  {
+    skip_spaces();
+    if (consume("(")) {
+      i64 value = parse_assignment();
+      if (!consume(")")) fail("expected ')'");
+      return value;
+    }
+    if (pos < source.length() && lexer::is_number(source[pos])) {
+      usize consumed = 0;
+      i64 value = std::stoll(source.substr(pos), &consumed, 0);
+      pos += consumed;
+      return value;
+    }
+    if (pos < source.length() && lexer::is_variable_name_start(source[pos])) {
+      std::string name{};
+      while (pos < source.length() && lexer::is_variable_name(source[pos]))
+        name += source[pos++];
+      return read_variable_value(name);
+    }
+    fail("unexpected character");
+  }
+};
+
+} /* namespace */
+
+i64
+EvalContext::evaluate_arithmetic(const std::string &expression)
+{
+  ArithmeticParser parser{*this, expression, 0};
+  return parser.parse();
+}
+
 std::vector<GlobField>
 EvalContext::expand_word(const Word &word)
 {
@@ -595,7 +1062,7 @@ EvalContext::expand_word(const Word &word)
         }
         break;
       }
-      std::string value = expand_variable(segment.text);
+      std::string value = apply_parameter_expansion(segment.text);
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -607,6 +1074,13 @@ EvalContext::expand_word(const Word &word)
         append_run(output, false);
       else
         append_split_run(output, false);
+    } break;
+    case WordSegment::Kind::ArithmeticExpansion: {
+      std::string value = std::to_string(evaluate_arithmetic(segment.text));
+      if (segment.is_in_double_quotes)
+        append_run(value, false);
+      else
+        append_split_run(value, false);
     } break;
     }
   }
@@ -625,9 +1099,11 @@ EvalContext::expand_word_for_assignment(const Word &word)
   std::string result{};
   for (const WordSegment &segment : segments) {
     if (segment.kind == WordSegment::Kind::VariableReference)
-      result += expand_variable(segment.text);
+      result += apply_parameter_expansion(segment.text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
       result += capture_command_substitution(segment.text);
+    else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
+      result += std::to_string(evaluate_arithmetic(segment.text));
     else
       result += segment.text;
   }
