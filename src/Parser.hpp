@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Containers.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 
@@ -15,7 +16,7 @@ struct Parser
   ~Parser();
 
   std::unique_ptr<Expression> construct_ast();
-  const std::vector<Word> &debug_words() const;
+  const ArrayList<Word> &debug_words() const;
 
 private:
   static constexpr usize MAX_RECURSION_DEPTH = 64;

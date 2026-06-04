@@ -35,7 +35,7 @@ Parser::Parser(Lexer &&lexer) : m_lexer(lexer) {}
 
 Parser::~Parser() = default;
 
-const std::vector<Word> &
+const ArrayList<Word> &
 Parser::debug_words() const
 {
   return m_lexer.debug_words();

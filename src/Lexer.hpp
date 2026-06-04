@@ -52,7 +52,7 @@ struct Lexer
   [[nodiscard]] Token *next_shell_token();
 
   std::string_view source() const;
-  const std::vector<Word> &debug_words() const;
+  const ArrayList<Word> &debug_words() const;
   BumpArena &arena() const;
   /* Redirect node allocation to another arena, so a function body can be parsed
      into the persistent function arena and restored afterward. */
@@ -74,7 +74,7 @@ protected:
      recorded by its start position, so peeking the same token twice, which the
      parser does to look ahead, records it only once. */
   bool m_should_collect_debug_words{false};
-  std::vector<Word> m_debug_words{};
+  ArrayList<Word> m_debug_words{heap_allocator()};
   usize m_last_collected_word_position{static_cast<usize>(-1)};
 
   /* Heredoc bodies are filled once the line ends, so the last shell token kind

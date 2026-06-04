@@ -178,7 +178,7 @@ Lexer::source() const
   return m_source;
 }
 
-const std::vector<Word> &
+const ArrayList<Word> &
 Lexer::debug_words() const
 {
   return m_debug_words;
@@ -617,7 +617,7 @@ Lexer::lex_identifier()
   if (m_should_collect_debug_words &&
       m_cursor_position != m_last_collected_word_position)
   {
-    m_debug_words.push_back(word);
+    m_debug_words.push(word);
     m_last_collected_word_position = m_cursor_position;
   }
 
