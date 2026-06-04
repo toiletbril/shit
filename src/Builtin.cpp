@@ -105,6 +105,10 @@ builtin_help(Builtin::Kind kind)
     return {"trap [action condition ...]",
             "Run an action when a condition such as EXIT occurs, or list "
             "traps."};
+  case Builtin::Kind::Exec:
+    return {"exec [command [argument ...]]",
+            "Replace the shell with the command, or apply redirections to the "
+            "shell."};
   }
   return {"", ""};
 }

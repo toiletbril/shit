@@ -216,6 +216,34 @@ execute_program(ExecContext &&ec)
   return child_pid;
 }
 
+void
+replace_process(ExecContext &&ec)
+{
+  std::vector<const char *> os_args = make_os_args(ec.args());
+
+  if (ec.in_fd) check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
+  if (ec.out_fd) check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
+  if (ec.err_fd) check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
+  if (ec.dup_err_to_out) check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
+  if (ec.dup_out_to_err) check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
+
+  reset_signal_handlers();
+
+  execv(ec.program_path().c_str(), const_cast<char *const *>(os_args.data()));
+
+  /* execv returns only when it fails to replace the process. */
+  throw shit::Error{ec.program_path().string() + ": " +
+                    last_system_error_message()};
+}
+
+void
+redirect_self(const ExecContext &ec)
+{
+  if (ec.in_fd) check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
+  if (ec.out_fd) check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
+  if (ec.err_fd) check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
+}
+
 Maybe<Pipe>
 make_pipe()
 {
@@ -598,6 +626,26 @@ execute_program(ExecContext &&ec)
   }
 
   return process_info.hProcess;
+}
+
+void
+replace_process(ExecContext &&ec)
+{
+  /* Windows cannot replace a process in place, so the program runs to
+     completion and the shell exits with its status, which behaves like exec for
+     a launched script. */
+  process child = execute_program(std::move(ec));
+  i32 status = wait_and_monitor_process(child);
+  ExitProcess(static_cast<UINT>(status));
+  SHIT_UNREACHABLE();
+}
+
+void
+redirect_self(const ExecContext &ec)
+{
+  if (ec.in_fd) SetStdHandle(STD_INPUT_HANDLE, *ec.in_fd);
+  if (ec.out_fd) SetStdHandle(STD_OUTPUT_HANDLE, *ec.out_fd);
+  if (ec.err_fd) SetStdHandle(STD_ERROR_HANDLE, *ec.err_fd);
 }
 
 Maybe<Pipe>

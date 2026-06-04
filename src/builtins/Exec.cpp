@@ -1,0 +1,80 @@
+#include "../Builtin.hpp"
+#include "../Cli.hpp"
+#include "../Errors.hpp"
+#include "../Eval.hpp"
+#include "../Platform.hpp"
+#include "../Utils.hpp"
+
+#include <filesystem>
+#include <list>
+
+/* exec replaces the shell with the named program, so it does not fork. With no
+   command it applies its redirections to the shell itself and returns. exec
+   names an executable file, not a builtin, since it replaces the process. */
+
+namespace shit {
+
+Exec::Exec() = default;
+
+Builtin::Kind
+Exec::kind() const
+{
+  return Kind::Exec;
+}
+
+i32
+Exec::execute(ExecContext &ec, EvalContext &cxt) const
+{
+  SHIT_UNUSED(cxt);
+  const std::vector<std::string> &args = ec.args();
+
+  /* exec with only redirections changes the shell's own descriptors and
+     returns, so the rest of the session inherits them. */
+  if (args.size() == 1) {
+    os::redirect_self(ec);
+    return 0;
+  }
+
+  const std::string &command_name = args[1];
+
+  /* Resolve to an executable file. A failure here ends the shell with 127, the
+     status a command-not-found leaves. */
+  std::filesystem::path program_path{};
+  if (command_name.find('/') != std::string::npos) {
+    Maybe<std::filesystem::path> resolved =
+        utils::canonicalize_path(command_name);
+    if (!resolved) {
+      show_message("exec: '" + command_name + "': not found");
+      utils::quit(127, true);
+    }
+    program_path = resolved.take();
+  } else {
+    std::list<std::filesystem::path> found =
+        utils::search_program_path(command_name);
+    if (found.empty()) {
+      show_message("exec: '" + command_name + "': not found");
+      utils::quit(127, true);
+    }
+    program_path = found.front();
+  }
+
+  std::vector<std::string> command_args{args.begin() + 1, args.end()};
+  ExecContext command = ExecContext::from_resolved(ec.source_location(),
+                                                   program_path, command_args);
+  if (ec.in_fd) command.in_fd = ec.in_fd.take();
+  if (ec.out_fd) command.out_fd = ec.out_fd.take();
+  if (ec.err_fd) command.err_fd = ec.err_fd.take();
+  command.dup_err_to_out = ec.dup_err_to_out;
+  command.dup_out_to_err = ec.dup_out_to_err;
+
+  /* An external command replaces the shell. replace_process returns only by
+     throwing, when the program cannot be run, which also ends the shell. */
+  try {
+    os::replace_process(std::move(command));
+  } catch (const Error &error) {
+    show_message(error.to_string());
+    utils::quit(127, true);
+  }
+}
+
+} /* namespace shit */

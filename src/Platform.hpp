@@ -92,6 +92,15 @@ void reset_signal_handlers();
 
 process execute_program(ExecContext &&ec);
 
+/* Replace the current shell process with the program, applying its
+   redirections, the way exec does. It does not fork, so on success it never
+   returns. It throws on failure. */
+[[noreturn]] void replace_process(ExecContext &&ec);
+
+/* Apply an exec context's redirections to the shell's own descriptors, for an
+   exec with redirections and no command. */
+void redirect_self(const ExecContext &ec);
+
 } /* namespace os */
 
 } /* namespace shit */
