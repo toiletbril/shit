@@ -37,7 +37,7 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     operands = cxt.positional_params();
 
   i64 optind = 1;
-  if (std::optional<std::string> value = cxt.get_variable_value("OPTIND");
+  if (Maybe<std::string> value = cxt.get_variable_value("OPTIND");
       value.has_value())
   {
     try {

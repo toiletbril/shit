@@ -2,6 +2,7 @@
 
 #include "Builtin.hpp"
 #include "Common.hpp"
+#include "Maybe.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -98,7 +99,7 @@ struct EvalContext
 
   void set_shell_variable(const std::string &name, std::string value);
   void unset_shell_variable(const std::string &name);
-  std::optional<std::string> get_variable_value(const std::string &name) const;
+  Maybe<std::string> get_variable_value(const std::string &name) const;
 
   /* The positional parameters, $1 upward, with $0 separate as the shell name.
    */

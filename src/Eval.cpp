@@ -70,7 +70,7 @@ EvalContext::unset_shell_variable(const std::string &name)
   if (name == "IFS") m_field_separators = " \t\n";
 }
 
-std::optional<std::string>
+Maybe<std::string>
 EvalContext::get_variable_value(const std::string &name) const
 {
   if (name == "?") return std::to_string(m_last_exit_status);
@@ -114,7 +114,9 @@ EvalContext::get_variable_value(const std::string &name) const
   if (auto it = m_shell_variables.find(name); it != m_shell_variables.end())
     return it->second;
 
-  return os::get_environment_variable(name);
+  if (std::optional<std::string> env = os::get_environment_variable(name))
+    return *env;
+  return shit::nothing;
 }
 
 const std::vector<std::string> &
@@ -517,7 +519,7 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
     std::string name = spec.substr(1);
     if (name == "@" || name == "*")
       return std::to_string(m_positional_params.size());
-    std::optional<std::string> value = get_variable_value(name);
+    Maybe<std::string> value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
     return std::to_string(value.value_or("").length());
@@ -558,7 +560,7 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
                      rest[op_index + 1] == op && (op == '#' || op == '%'));
   std::string word = rest.substr(op_index + (is_doubled ? 2 : 1));
 
-  std::optional<std::string> current = get_variable_value(name);
+  Maybe<std::string> current = get_variable_value(name);
   bool is_set = current.has_value();
   bool is_empty = !is_set || current->empty();
   bool treat_as_unset = is_colon_form ? is_empty : !is_set;
