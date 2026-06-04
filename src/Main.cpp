@@ -143,7 +143,7 @@ run_script_contents(const std::string &script_contents,
     /* Validate the whole tree before running anything. An unconditional
        problem stops execution, a conditional one only warns. */
     if (!shit::analyze_ast(ast.get(), script_contents,
-                           context.function_names()))
+                           context.function_names(), context.alias_names()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {

@@ -59,6 +59,11 @@ EvalContext::end_command()
 void
 EvalContext::set_shell_variable(const std::string &name, std::string value)
 {
+  /* A read-only variable rejects the assignment. The common case has no
+     read-only names, so the scan is skipped entirely. */
+  if (is_readonly(name))
+    throw Error{"'" + name + "' is read only and cannot be assigned"};
+
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
   if (name == "IFS") m_field_separators = value;
@@ -207,6 +212,118 @@ EvalContext::run_exit_trap()
   if (const String *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->size() > 0)
       run_source(std::string{action->c_str(), action->size()}, "the EXIT trap");
+}
+
+void
+EvalContext::mark_readonly(const std::string &name)
+{
+  if (is_readonly(name)) return;
+  m_readonly_names.push(
+      String{heap_allocator(), StringView{name.data(), name.size()}});
+}
+
+bool
+EvalContext::is_readonly(const std::string &name) const
+{
+  if (m_readonly_names.size() == 0) return false;
+  StringView wanted{name.data(), name.size()};
+  for (const String &readonly_name : m_readonly_names)
+    if (StringView{readonly_name.c_str(), readonly_name.size()} == wanted)
+      return true;
+  return false;
+}
+
+std::vector<std::string>
+EvalContext::readonly_names() const
+{
+  std::vector<std::string> out{};
+  for (const String &name : m_readonly_names)
+    out.push_back(std::string{name.c_str(), name.size()});
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+void
+EvalContext::enter_function_scope()
+{
+  m_local_scopes.emplace_back();
+}
+
+void
+EvalContext::leave_function_scope()
+{
+  if (m_local_scopes.empty()) return;
+
+  /* Restore each shadowed binding in reverse, so a name declared local twice
+     ends with the value it held before the function ran. */
+  std::vector<LocalBinding> &scope = m_local_scopes.back();
+  for (auto it = scope.rbegin(); it != scope.rend(); ++it) {
+    if (it->previous_value.has_value())
+      set_shell_variable(it->name, *it->previous_value);
+    else
+      unset_shell_variable(it->name);
+  }
+  m_local_scopes.pop_back();
+}
+
+bool
+EvalContext::in_function_scope() const
+{
+  return !m_local_scopes.empty();
+}
+
+void
+EvalContext::declare_local(const std::string &name)
+{
+  if (m_local_scopes.empty()) return;
+  m_local_scopes.back().push_back(LocalBinding{name, get_variable_value(name)});
+}
+
+void
+EvalContext::set_alias(const std::string &name, const std::string &value)
+{
+  m_aliases.set(StringView{name.data(), name.size()},
+                StringView{value.data(), value.size()});
+}
+
+bool
+EvalContext::remove_alias(const std::string &name)
+{
+  StringView key{name.data(), name.size()};
+  if (m_aliases.find(key) == nullptr) return false;
+  m_aliases.erase(key);
+  return true;
+}
+
+Maybe<std::string>
+EvalContext::get_alias(const std::string &name) const
+{
+  if (const String *value = m_aliases.find(StringView{name.data(), name.size()}))
+    return std::string{value->c_str(), value->size()};
+  return nothing;
+}
+
+std::vector<std::string>
+EvalContext::alias_definitions() const
+{
+  std::vector<std::string> out{};
+  m_aliases.for_each([&out](StringView key, const String &value) {
+    out.push_back(std::string{key.data, key.size()} + "='" +
+                  std::string{value.c_str(), value.size()} + "'");
+  });
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+std::unordered_set<std::string>
+EvalContext::alias_names() const
+{
+  std::unordered_set<std::string> out{};
+  m_aliases.for_each([&out](StringView key, const String &value) {
+    SHIT_UNUSED(value);
+    out.insert(std::string{key.data, key.size()});
+  });
+  return out;
 }
 
 void

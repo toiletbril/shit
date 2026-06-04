@@ -106,6 +106,31 @@ builtin_help(Builtin::Kind kind)
     return {"exec [command [argument ...]]",
             "Replace the shell with the command, or apply redirections to the "
             "shell."};
+  case Builtin::Kind::Type:
+    return {"type name [name ...]",
+            "Report how each name would be resolved as a command."};
+  case Builtin::Kind::CommandBuiltin:
+    return {"command [-v] name [argument ...]",
+            "Run a command ignoring a function, or report its resolution."};
+  case Builtin::Kind::Readonly:
+    return {"readonly [name[=value] ...]",
+            "Mark a variable unwritable, or list the read-only variables."};
+  case Builtin::Kind::Local:
+    return {"local name[=value] ...",
+            "Declare a variable local to the current function."};
+  case Builtin::Kind::Times:
+    return {"times", "Print the user and system times of the shell."};
+  case Builtin::Kind::Ulimit:
+    return {"ulimit [-f|-n|-t|-u] [limit]",
+            "Print or set a resource limit of the shell."};
+  case Builtin::Kind::Hash:
+    return {"hash [-r] [name ...]",
+            "Accepted for compatibility, the shell resolves PATH lazily."};
+  case Builtin::Kind::Alias:
+    return {"alias [name[=value] ...]",
+            "Define a command alias, or list the defined aliases."};
+  case Builtin::Kind::Unalias:
+    return {"unalias name [name ...]", "Remove a command alias."};
   }
   return {"", ""};
 }

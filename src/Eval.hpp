@@ -82,6 +82,15 @@ struct ControlFlow
   std::string origin{};
 };
 
+/* A variable binding saved when a local shadows it. The previous value is
+   nothing when the name was unset, so leaving the scope restores the unset
+   state rather than an empty string. */
+struct LocalBinding
+{
+  std::string name;
+  Maybe<std::string> previous_value;
+};
+
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. */
 struct EvalStateSnapshot
@@ -164,6 +173,30 @@ struct EvalContext
   void remove_trap(const std::string &condition);
   const HashMap<String> &traps() const;
   void run_exit_trap();
+
+  /* readonly marks a variable so a later assignment to it fails. The set is
+     usually empty, so set_shell_variable only scans it when it is not. */
+  void mark_readonly(const std::string &name);
+  bool is_readonly(const std::string &name) const;
+  std::vector<std::string> readonly_names() const;
+
+  /* A function call pushes a local scope so a local builtin inside it can
+     shadow a variable and have the old value restored when the call returns.
+     declare_local records the current binding of a name in the innermost scope
+     before the caller overwrites it. */
+  void enter_function_scope();
+  void leave_function_scope();
+  bool in_function_scope() const;
+  void declare_local(const std::string &name);
+
+  /* alias maps a command word to its replacement text, consulted by the parser
+     before a simple command. */
+  void set_alias(const std::string &name, const std::string &value);
+  bool remove_alias(const std::string &name);
+  Maybe<std::string> get_alias(const std::string &name) const;
+  std::vector<std::string> alias_definitions() const;
+  /* The defined alias names, so the prepass treats a use of one as resolvable. */
+  std::unordered_set<std::string> alias_names() const;
 
   /* Save and restore the mutable state around a subshell or a command
      substitution, so changes inside do not leak to the parent. */
@@ -327,6 +360,15 @@ protected:
   i64 m_getopts_last_optind{0};
   HashMap<String> m_traps{heap_allocator()};
   bool m_exit_trap_ran{false};
+
+  /* The names marked read-only, scanned by set_shell_variable only when the
+     list is not empty. */
+  ArrayList<String> m_readonly_names{heap_allocator()};
+  /* The alias name to replacement table. */
+  HashMap<String> m_aliases{heap_allocator()};
+  /* One entry per active function call, holding the bindings a local shadowed
+     so leaving the call restores them. */
+  std::vector<std::vector<LocalBinding>> m_local_scopes{};
   bool m_enable_path_expansion;
   bool m_enable_echo;
   bool m_enable_echo_expanded;

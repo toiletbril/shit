@@ -135,12 +135,14 @@ word_has_backtick(const Word &word)
 
 bool
 analyze_ast(const Expression *root, std::string_view source,
-            const std::unordered_set<std::string> &known_functions)
+            const std::unordered_set<std::string> &known_functions,
+            const std::unordered_set<std::string> &known_aliases)
 {
   AnalysisContext actx{source};
-  /* A function defined by an earlier command resolves, so seed the prepass with
-     the names already registered. */
+  /* A function or alias defined by an earlier command resolves, so seed the
+     prepass with the names already registered. */
   actx.defined_functions = known_functions;
+  actx.known_aliases = known_aliases;
   root->analyze(actx, true);
   return !actx.has_fatal;
 }
@@ -446,6 +448,51 @@ SimpleCommand::args() const
   return m_args;
 }
 
+namespace {
+
+/* Replace a command word that names an alias with the alias body. The body is
+   split on whitespace, which covers the common case of an alias to a command
+   and its options, and a name already expanded is not expanded again so a
+   self-referential alias terminates. A quoted space inside the body is not
+   preserved, since this expansion does not re-run the full tokenizer. */
+void
+expand_command_aliases(EvalContext &cxt, std::vector<std::string> &args)
+{
+  std::vector<std::string> already_expanded{};
+
+  while (!args.empty()) {
+    const std::string &word = args[0];
+
+    bool seen = false;
+    for (const std::string &name : already_expanded)
+      if (name == word) seen = true;
+    if (seen) break;
+
+    Maybe<std::string> body = cxt.get_alias(word);
+    if (!body.has_value()) break;
+    already_expanded.push_back(word);
+
+    std::vector<std::string> words{};
+    std::string current{};
+    for (char c : *body) {
+      if (c == ' ' || c == '\t') {
+        if (!current.empty()) {
+          words.push_back(current);
+          current.clear();
+        }
+      } else {
+        current += c;
+      }
+    }
+    if (!current.empty()) words.push_back(current);
+
+    args.erase(args.begin());
+    args.insert(args.begin(), words.begin(), words.end());
+  }
+}
+
+} /* namespace */
+
 i64
 SimpleCommand::evaluate_impl(EvalContext &cxt) const
 {
@@ -457,6 +504,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     std::cout << utils::merge_tokens_to_string(m_args) << std::endl;
 
   std::vector<std::string> program_args = cxt.process_args(m_args);
+  expand_command_aliases(cxt, program_args);
 
   /* Open the redirection targets. A redirection takes effect even when the
      command expands to nothing, so > file with no command still creates the
@@ -579,6 +627,11 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     cxt.set_positional_params(
         std::vector<std::string>{program_args.begin() + 1, program_args.end()});
     SHIT_DEFER { cxt.set_positional_params(std::move(saved_params)); };
+
+    /* Open a local scope so a local builtin in the body shadows a variable and
+       the old value returns when the call ends. */
+    cxt.enter_function_scope();
+    SHIT_DEFER { cxt.leave_function_scope(); };
 
     i64 function_ret = function_body->evaluate(cxt);
 
@@ -1620,12 +1673,27 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
                 .to_literal_string()
           : m_args[0]->raw_string();
 
-  /* A dot, source, or eval runs code the prepass cannot see, so any later
-     unresolved command must not be a hard failure. */
+  /* A dot, source, eval, or alias runs or defines code the prepass cannot see,
+     so any later unresolved command must not be a hard failure. */
   if (command_literal == "." || command_literal == "source" ||
-      command_literal == "eval")
+      command_literal == "eval" || command_literal == "alias")
   {
     actx.saw_runtime_definer = true;
+  }
+
+  /* An alias defined earlier in the same input resolves at runtime, so record
+     each name this alias command defines for the later resolution check. */
+  if (command_literal == "alias") {
+    for (usize i = 1; i < m_args.size(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      std::string literal =
+          static_cast<const tokens::WordToken *>(m_args[i])
+              ->word()
+              .to_literal_string();
+      usize equals_position = literal.find('=');
+      if (equals_position != std::string::npos && equals_position > 0)
+        actx.known_aliases.insert(literal.substr(0, equals_position));
+    }
   }
 
   /* A backtick anywhere in the command is an unsupported substitution. */
@@ -1684,7 +1752,8 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 
   if (name && !command_resolves(*name) &&
-      actx.defined_functions.find(*name) == actx.defined_functions.end())
+      actx.defined_functions.find(*name) == actx.defined_functions.end() &&
+      actx.known_aliases.find(*name) == actx.known_aliases.end())
   {
     std::string message = "Command '" + *name + "' was not found";
     /* Point at the command word, not at the whole command. With an assignment

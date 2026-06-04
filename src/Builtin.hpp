@@ -45,6 +45,15 @@ struct Builtin
     Getopts,
     Trap,
     Exec,
+    Type,
+    CommandBuiltin,
+    Readonly,
+    Local,
+    Times,
+    Ulimit,
+    Hash,
+    Alias,
+    Unalias,
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
@@ -87,6 +96,15 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
     {"getopts",  Builtin::Kind::Getopts },
     {"trap",     Builtin::Kind::Trap    },
     {"exec",     Builtin::Kind::Exec    },
+    {"type",     Builtin::Kind::Type    },
+    {"command",  Builtin::Kind::CommandBuiltin},
+    {"readonly", Builtin::Kind::Readonly},
+    {"local",    Builtin::Kind::Local   },
+    {"times",    Builtin::Kind::Times   },
+    {"ulimit",   Builtin::Kind::Ulimit  },
+    {"hash",     Builtin::Kind::Hash    },
+    {"alias",    Builtin::Kind::Alias   },
+    {"unalias",  Builtin::Kind::Unalias },
 };
 
 #define B_CASE(btin)                                                           \
@@ -117,7 +135,16 @@ const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
   B_CASE(Umask);                                                               \
   B_CASE(Getopts);                                                             \
   B_CASE(Trap);                                                                \
-  B_CASE(Exec)
+  B_CASE(Exec);                                                                \
+  B_CASE(Type);                                                                \
+  B_CASE(CommandBuiltin);                                                             \
+  B_CASE(Readonly);                                                            \
+  B_CASE(Local);                                                               \
+  B_CASE(Times);                                                               \
+  B_CASE(Ulimit);                                                              \
+  B_CASE(Hash);                                                                \
+  B_CASE(Alias);                                                               \
+  B_CASE(Unalias)
 
 #define BUILTIN_STRUCT(b)                                                      \
   struct b : public Builtin                                                    \
@@ -152,6 +179,15 @@ BUILTIN_STRUCT(Umask);
 BUILTIN_STRUCT(Getopts);
 BUILTIN_STRUCT(Trap);
 BUILTIN_STRUCT(Exec);
+BUILTIN_STRUCT(Type);
+BUILTIN_STRUCT(CommandBuiltin);
+BUILTIN_STRUCT(Readonly);
+BUILTIN_STRUCT(Local);
+BUILTIN_STRUCT(Times);
+BUILTIN_STRUCT(Ulimit);
+BUILTIN_STRUCT(Hash);
+BUILTIN_STRUCT(Alias);
+BUILTIN_STRUCT(Unalias);
 
 struct Exit : public Builtin
 {
