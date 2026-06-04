@@ -99,21 +99,21 @@ Word::to_pretty_string() const
   return result;
 }
 
-std::optional<std::pair<std::string, Word>>
+Maybe<std::pair<std::string, Word>>
 Word::get_assignment_split() const
 {
-  if (segments.empty()) return std::nullopt;
+  if (segments.empty()) return shit::nothing;
 
   const WordSegment &first = segments[0];
-  if (first.kind != WordSegment::Kind::UnquotedText) return std::nullopt;
+  if (first.kind != WordSegment::Kind::UnquotedText) return shit::nothing;
 
   usize equals_position = first.text.find('=');
   if (equals_position == std::string::npos || equals_position == 0)
-    return std::nullopt;
+    return shit::nothing;
 
-  if (!lexer::is_variable_name_start(first.text[0])) return std::nullopt;
+  if (!lexer::is_variable_name_start(first.text[0])) return shit::nothing;
   for (usize i = 1; i < equals_position; i++) {
-    if (!lexer::is_variable_name(first.text[i])) return std::nullopt;
+    if (!lexer::is_variable_name(first.text[i])) return shit::nothing;
   }
 
   std::string name = first.text.substr(0, equals_position);

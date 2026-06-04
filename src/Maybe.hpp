@@ -87,6 +87,17 @@ struct [[nodiscard]] Maybe
     return m_has_value ? reference() : std::move(fallback);
   }
 
+  /* Equal to a bare value only when present and that value matches, so a
+     comparison reads like the one against a std::optional. */
+  [[nodiscard]] bool operator==(const T &other) const
+  {
+    return m_has_value && reference() == other;
+  }
+  [[nodiscard]] bool operator!=(const T &other) const
+  {
+    return !(*this == other);
+  }
+
   /* Drop the value, leaving the Maybe empty. */
   void reset() noexcept
   {

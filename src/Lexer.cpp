@@ -363,7 +363,7 @@ Lexer::lex_identifier()
 
   bool should_escape = false;
 
-  std::optional<char> quote_char = std::nullopt;
+  Maybe<char> quote_char;
 
   /* Append a character to the open segment, starting a new one when the kind
      changes. A variable reference never merges, since each one carries its own
@@ -403,7 +403,7 @@ Lexer::lex_identifier()
     if (quote_char == '\'') {
       /* Single quotes take everything literally up to the closing quote. */
       if (ch == '\'')
-        quote_char = std::nullopt;
+        quote_char.reset();
       else
         append_char(WordSegment::Kind::LiteralText, ch);
       byte_count++;
@@ -435,7 +435,7 @@ Lexer::lex_identifier()
     bool is_in_double_quotes = quote_char == '"';
 
     if (is_in_double_quotes && ch == '"') {
-      quote_char = std::nullopt;
+      quote_char.reset();
       byte_count++;
       continue;
     }

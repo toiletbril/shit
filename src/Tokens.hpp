@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Maybe.hpp"
 #include "Common.hpp"
 #include "Eval.hpp"
 
@@ -58,7 +59,7 @@ struct Word
 
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. */
-  std::optional<std::pair<std::string, Word>> get_assignment_split() const;
+  Maybe<std::pair<std::string, Word>> get_assignment_split() const;
 };
 
 /**
