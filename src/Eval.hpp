@@ -227,7 +227,7 @@ protected:
 
   std::string m_shell_name{};
   std::vector<std::string> m_positional_params{};
-  std::optional<i64> m_last_background_pid{};
+  Maybe<i64> m_last_background_pid{};
   std::unordered_map<std::string, const Expression *> m_functions{};
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
@@ -288,9 +288,9 @@ struct ExecContext
                 std::variant<shit::Builtin::Kind, std::filesystem::path> kind,
                 const std::vector<std::string> &args);
 
-  std::optional<os::descriptor> in_fd{std::nullopt};
-  std::optional<os::descriptor> out_fd{std::nullopt};
-  std::optional<os::descriptor> err_fd{std::nullopt};
+  Maybe<os::descriptor> in_fd{};
+  Maybe<os::descriptor> out_fd{};
+  Maybe<os::descriptor> err_fd{};
 
   /* 2>&1 routes the standard error to wherever the standard output goes, and
      1>&2 the reverse. Applied after the file descriptors are placed. */

@@ -87,18 +87,20 @@ struct [[nodiscard]] Maybe
     return m_has_value ? reference() : std::move(fallback);
   }
 
-private:
-  T &reference() noexcept { return *reinterpret_cast<T *>(&m_storage); }
-  const T &reference() const noexcept
-  {
-    return *reinterpret_cast<const T *>(&m_storage);
-  }
+  /* Drop the value, leaving the Maybe empty. */
   void reset() noexcept
   {
     if (m_has_value) {
       reference().~T();
       m_has_value = false;
     }
+  }
+
+private:
+  T &reference() noexcept { return *reinterpret_cast<T *>(&m_storage); }
+  const T &reference() const noexcept
+  {
+    return *reinterpret_cast<const T *>(&m_storage);
   }
 
   bool m_has_value;

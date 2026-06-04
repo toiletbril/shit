@@ -444,9 +444,9 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
      command expands to nothing, so > file with no command still creates the
      file. The final descriptors pass to the exec context, which closes them,
      and the guard closes them on any path that does not hand them off. */
-  std::optional<os::descriptor> redirect_in_fd;
-  std::optional<os::descriptor> redirect_out_fd;
-  std::optional<os::descriptor> redirect_err_fd;
+  Maybe<os::descriptor> redirect_in_fd;
+  Maybe<os::descriptor> redirect_out_fd;
+  Maybe<os::descriptor> redirect_err_fd;
   bool dup_err_to_out = false;
   bool dup_out_to_err = false;
   bool redirect_fds_handed_off = false;
