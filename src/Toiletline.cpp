@@ -1,18 +1,63 @@
 /* Toiletline.hpp is not included to define toiletline configuration macros here
  * rather than in the header. */
 
+#include "Arena.hpp"
 #include "Cli.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Platform.hpp"
 #include "Utils.hpp"
 
+#include <cstdlib>
+#include <cstring>
 #include <tuple>
 #include <vector>
 
 #if !defined(SHIT_NO_TOILETLINE)
 
 namespace {
+
+/* The line editor allocates its history and line buffers through these hooks,
+   which draw from one arena that lives for the whole interactive session and is
+   never reset, since the history persists across lines. A non-interactive run
+   never starts the editor, so it pays nothing. The arena does not resize a
+   block in place, so a realloc allocates a fresh block and copies, which leaves
+   the old block as free space the arena reclaims only at exit. A size header
+   before each block lets the realloc copy the right number of bytes. */
+shit::BumpArena g_interactive_arena{};
+
+constexpr usize TL_ALLOC_HEADER = 16;
+
+void *
+tl_arena_malloc(usize length)
+{
+  char *base = static_cast<char *>(
+      g_interactive_arena.allocate(length + TL_ALLOC_HEADER, TL_ALLOC_HEADER));
+  *reinterpret_cast<usize *>(base) = length;
+  return base + TL_ALLOC_HEADER;
+}
+
+void *
+tl_arena_realloc(void *pointer, usize length)
+{
+  if (pointer == NULL) return tl_arena_malloc(length);
+  usize old_length =
+      *reinterpret_cast<usize *>(static_cast<char *>(pointer) - TL_ALLOC_HEADER);
+  void *fresh = tl_arena_malloc(length);
+  std::memcpy(fresh, pointer, old_length < length ? old_length : length);
+  return fresh;
+}
+
+void
+tl_arena_free(void *pointer)
+{
+  SHIT_UNUSED(pointer);
+}
+
+#define TL_MALLOC  tl_arena_malloc
+#define TL_REALLOC tl_arena_realloc
+#define TL_FREE    tl_arena_free
+#define TL_ABORT() std::abort()
 
 #define TL_NO_SUSPEND
 #define TL_ASSERT           SHIT_ASSERT
