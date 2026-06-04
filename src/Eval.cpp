@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -956,6 +957,16 @@ struct ArithmeticParser
 
   i64 read_variable_value(const std::string &name)
   {
+    /* A plain shell variable, the common operand, reads its digits straight from
+       the stored value with no copy. strtoll stops at the first non-digit and
+       returns zero on a non-numeric value, which matches the old stoll path. */
+    if (const String *stored = context.lookup_shell_variable(
+            StringView{name.data(), name.size()}))
+    {
+      if (stored->size() == 0) return 0;
+      return std::strtoll(stored->c_str(), nullptr, 0);
+    }
+
     std::string value = context.get_variable_value(name).value_or("");
     if (value.empty()) return 0;
     try {

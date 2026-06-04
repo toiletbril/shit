@@ -113,6 +113,14 @@ struct EvalContext
   void unset_shell_variable(const std::string &name);
   Maybe<std::string> get_variable_value(const std::string &name) const;
 
+  /* The stored value of a plain shell variable, or nullptr when the name is
+     unset or names a special parameter. The pointer reads the value without a
+     copy and stays valid until the next assignment to that name. */
+  const String *lookup_shell_variable(StringView name) const
+  {
+    return m_shell_variables.find(name);
+  }
+
   /* The positional parameters, $1 upward, with $0 separate as the shell name.
    */
   const std::vector<std::string> &positional_params() const;
