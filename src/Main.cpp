@@ -539,7 +539,7 @@ int main(int argc, char **argv)
             shit::print_to_standard_output("^Z");
             shit::flush_standard_output();
             break;
-          default: SHIT_UNREACHABLE();
+          default:;
           }
 
           toiletline::emit_newlines(input);

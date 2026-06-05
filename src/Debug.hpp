@@ -37,7 +37,13 @@ SHIT_USED void t__strprintf(StringT &s, const char *fmt, ...)
   va_start(a, fmt);
   va_list ac;
   va_copy(ac, a);
-  usize n = vsnprintf(nullptr, 0, fmt, ac);
+  int written = vsnprintf(nullptr, 0, fmt, ac);
+  if (written < 0) {
+    va_end(ac);
+    va_end(a);
+    return;
+  }
+  usize n = static_cast<usize>(written);
   char *b = new char[n + 1];
   SHIT_UNUSED(vsnprintf(b, n + 1, fmt, a));
   s.append(b);

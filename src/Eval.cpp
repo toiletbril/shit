@@ -1784,6 +1784,17 @@ i32 EvalContext::run_source(StringView source, StringView origin)
     SHIT_DEFER { set_current_source(previous_source, previous_origin); };
 
     ast->evaluate(*this);
+    /* A return at the top of a sourced file or an eval returns from that source
+       with its status, the way a return ends a function. Break, continue, and
+       exit keep propagating, so an enclosing loop or the shell consumes them. */
+    if (has_pending_control_flow() &&
+        pending_control_flow().kind == ControlFlow::Kind::Return)
+    {
+      i32 source_status = static_cast<i32>(pending_control_flow().value);
+      clear_control_flow();
+      set_last_exit_status(source_status);
+      return source_status;
+    }
     return last_exit_status();
   } catch (const ErrorWithLocationAndDetails &e) {
     show_message(e.to_string(source));

@@ -75,6 +75,10 @@ StringView Path::filename() const
 StringView Path::extension() const
 {
   StringView name = filename();
+  /* The . and .. directory entries have no extension, matching std::filesystem,
+     so the trailing dot in .. is not read as one. */
+  if (name == StringView{"."} || name == StringView{".."})
+    return StringView{name.data + name.length, 0};
   /* A dot at the start names a hidden file rather than an extension, so the
      scan stops before the first byte. */
   for (usize i = name.length; i > 1; i--)
