@@ -11,14 +11,9 @@ namespace shit {
 
 WhoAmI::WhoAmI() = default;
 
-Builtin::Kind
-WhoAmI::kind() const
-{
-  return Kind::WhoAmI;
-}
+Builtin::Kind WhoAmI::kind() const { return Kind::WhoAmI; }
 
-i32
-WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
+i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
@@ -28,8 +23,8 @@ WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
 
   String p{};
 
-  if (Maybe<std::string> u = os::get_current_user(); u.has_value()) {
-    p.append(StringView{u->data(), u->size()});
+  if (Maybe<String> u = os::get_current_user(); u.has_value()) {
+    p.append(u->view());
     p += '\n';
     ec.print_to_stdout(p);
     return 0;

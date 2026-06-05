@@ -19,14 +19,9 @@ namespace shit {
 
 Read::Read() = default;
 
-Builtin::Kind
-Read::kind() const
-{
-  return Kind::Read;
-}
+Builtin::Kind Read::kind() const { return Kind::Read; }
 
-i32
-Read::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Read::execute(ExecContext &ec, EvalContext &cxt) const
 {
   /* -r is accepted, and since backslash processing is not done here the read is
      raw either way. The first returned element is the command name, so the
@@ -49,7 +44,7 @@ Read::execute(ExecContext &ec, EvalContext &cxt) const
      read, falling back to the shell's standard input when none is present. The
      line comes back over the os boundary as a std::string and is copied into a
      String for the splitting below. */
-  Maybe<std::string> read_line =
+  Maybe<String> read_line =
       utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN));
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)

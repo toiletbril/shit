@@ -22,14 +22,9 @@ namespace shit {
 
 CommandBuiltin::CommandBuiltin() = default;
 
-Builtin::Kind
-CommandBuiltin::kind() const
-{
-  return Kind::CommandBuiltin;
-}
+Builtin::Kind CommandBuiltin::kind() const { return Kind::CommandBuiltin; }
 
-i32
-CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
+i32 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };

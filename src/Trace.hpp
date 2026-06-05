@@ -27,10 +27,9 @@ enum class Verbosity : u8
 /* The active log level. A message prints when its level is at or below this.
    Main sets it from a flag, so a release build that leaves the default pays one
    comparison per call. */
-inline Verbosity g_log_verbosity = Verbosity::Warn;
+inline Verbosity LOGGER_VERBOSITY = Verbosity::Warn;
 
-constexpr const char *
-verbosity_to_string(Verbosity verbosity)
+constexpr const char *verbosity_to_string(Verbosity verbosity)
 {
   switch (verbosity) {
   case Verbosity::Nothing: return "Nothing";
@@ -45,26 +44,19 @@ verbosity_to_string(Verbosity verbosity)
 
 namespace log_detail {
 
-inline String
-value_to_log_string(StringView value)
-{
-  return String{value};
-}
+inline String value_to_log_string(StringView value) { return String{value}; }
 
-inline String
-value_to_log_string(const char *value)
+inline String value_to_log_string(const char *value)
 {
   return value != NULL ? String{value} : String{"(null)"};
 }
 
-inline String
-value_to_log_string(bool value)
+inline String value_to_log_string(bool value)
 {
   return value ? String{"true"} : String{"false"};
 }
 
-inline String
-value_to_log_string(char value)
+inline String value_to_log_string(char value)
 {
   String out{};
   out.push(value);
@@ -73,8 +65,7 @@ value_to_log_string(char value)
 
 template <class T>
   requires std::is_integral_v<T>
-String
-value_to_log_string(T value)
+String value_to_log_string(T value)
 {
   std::string text = std::to_string(value);
   return String{
@@ -84,8 +75,7 @@ value_to_log_string(T value)
 
 template <class T>
   requires std::is_floating_point_v<T>
-String
-value_to_log_string(T value)
+String value_to_log_string(T value)
 {
   std::string text = std::to_string(value);
   return String{
@@ -95,8 +85,7 @@ value_to_log_string(T value)
 
 template <class T>
   requires std::is_pointer_v<T>
-String
-value_to_log_string(T value)
+String value_to_log_string(T value)
 {
   char buffer[32];
   std::snprintf(buffer, sizeof(buffer), "%p", static_cast<const void *>(value));
@@ -107,8 +96,7 @@ value_to_log_string(T value)
    "a = 1, b = 2". The names come from the stringized argument list, so the
    output reads like the source that called it. */
 template <class... Args>
-String
-format_named_values(StringView names, Args &&...args)
+String format_named_values(StringView names, Args &&...args)
 {
   String out{};
   std::size_t index = 0;
@@ -150,7 +138,7 @@ format_named_values(StringView names, Args &&...args)
 /* Print a printf-style message at the given level when the level is active. */
 #define SHIT_LOG(level, ...)                                                   \
   do {                                                                         \
-    if ((level) <= ::shit::g_log_verbosity) [[unlikely]] {                     \
+    if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                     \
       SHIT_UNUSED(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): ",          \
                                ::shit::verbosity_to_string(level), __LINE__,   \
                                __func__));                                     \
@@ -163,7 +151,7 @@ format_named_values(StringView names, Args &&...args)
    SHIT_LOG_VARS(Verbosity::Debug, argument_count, name). */
 #define SHIT_LOG_VARS(level, ...)                                              \
   do {                                                                         \
-    if ((level) <= ::shit::g_log_verbosity) [[unlikely]] {                     \
+    if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                     \
       ::shit::String t__vars =                                                 \
           ::shit::log_detail::format_named_values(#__VA_ARGS__, __VA_ARGS__);  \
       SHIT_UNUSED(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): %s\n",      \

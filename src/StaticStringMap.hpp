@@ -23,11 +23,11 @@ struct StaticStringMap
   const Entry *entries;
   usize entry_count;
 
-  [[nodiscard]] Maybe<Value>
-  find(StringView text) const
+  [[nodiscard]] Maybe<Value> find(StringView text) const
   {
     if (text.size() > 16) return None;
     PackedStringKey wanted = PackedStringKey::from_view(text);
+    /* TODO: slow? */
     for (usize i = 0; i < entry_count; i++)
       if (entries[i].key == wanted) return entries[i].value;
     return None;

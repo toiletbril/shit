@@ -5,6 +5,8 @@
 #include "Containers.hpp"
 #include "Errors.hpp"
 #include "Maybe.hpp"
+#include "Path.hpp"
+#include "ResolvedCommand.hpp"
 
 #include <string>
 
@@ -118,17 +120,9 @@ struct EvalContext
 
   /* The allocator for transient expansion data, which a bump arena hands out
      and reclaims whole when the command ends. */
-  Allocator
-  scratch_allocator()
-  {
-    return bump_allocator(m_scratch_arena);
-  }
+  Allocator scratch_allocator() { return bump_allocator(m_scratch_arena); }
   /* Reclaim the scratch arena, called between top-level commands. */
-  void
-  reset_scratch_arena()
-  {
-    m_scratch_arena.reset();
-  }
+  void reset_scratch_arena() { m_scratch_arena.reset(); }
 
   void set_shell_variable(StringView name, StringView value);
   void unset_shell_variable(StringView name);
@@ -137,8 +131,7 @@ struct EvalContext
   /* The stored value of a plain shell variable, or nullptr when the name is
      unset or names a special parameter. The pointer reads the value without a
      copy and stays valid until the next assignment to that name. */
-  const String *
-  lookup_shell_variable(StringView name) const
+  const String *lookup_shell_variable(StringView name) const
   {
     return m_shell_variables.find(name);
   }

@@ -12,18 +12,13 @@ namespace shit {
 
 Trap::Trap() = default;
 
-Builtin::Kind
-Trap::kind() const
-{
-  return Kind::Trap;
-}
+Builtin::Kind Trap::kind() const { return Kind::Trap; }
 
 namespace {
 
 /* Normalize a condition name to its bare upper-case form, so SIGINT, sigint,
    int, and the number 2 all name the same condition, and 0 names EXIT. */
-String
-normalize_condition(StringView raw)
+String normalize_condition(StringView raw)
 {
   String name{};
   for (usize i = 0; i < raw.size(); i++)
@@ -36,8 +31,7 @@ normalize_condition(StringView raw)
 
 } /* namespace */
 
-i32
-Trap::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
 

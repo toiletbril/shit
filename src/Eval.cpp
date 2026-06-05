@@ -39,20 +39,11 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_field_separators(m_field_separators.view());
 }
 
-void
-EvalContext::add_evaluated_expression()
-{
-  m_expressions_executed_last++;
-}
+void EvalContext::add_evaluated_expression() { m_expressions_executed_last++; }
 
-void
-EvalContext::add_expansion()
-{
-  m_expansions_last++;
-}
+void EvalContext::add_expansion() { m_expansions_last++; }
 
-void
-EvalContext::end_command()
+void EvalContext::end_command()
 {
   m_expansions_total += m_expansions_last;
   m_expressions_executed_total += m_expressions_executed_last;
@@ -60,8 +51,7 @@ EvalContext::end_command()
   m_expansions_last = m_expressions_executed_last = 0;
 }
 
-void
-EvalContext::assign_variable(StringView name, StringView value)
+void EvalContext::assign_variable(StringView name, StringView value)
 {
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
@@ -69,8 +59,7 @@ EvalContext::assign_variable(StringView name, StringView value)
   m_shell_variables.set(name, value);
 }
 
-void
-EvalContext::set_field_separators(StringView value)
+void EvalContext::set_field_separators(StringView value)
 {
   /* The table is built before m_field_separators is touched, since the
      constructor seeds it from m_field_separators' own view, so value may alias
@@ -85,14 +74,12 @@ EvalContext::set_field_separators(StringView value)
   }
 }
 
-bool
-EvalContext::is_field_separator(char c) const
+bool EvalContext::is_field_separator(char c) const
 {
   return m_field_separator_table[static_cast<u8>(c)];
 }
 
-void
-EvalContext::set_shell_variable(StringView name, StringView value)
+void EvalContext::set_shell_variable(StringView name, StringView value)
 {
   /* A read-only variable rejects the assignment. The common case has no
      read-only names, so the scan is skipped entirely. */
@@ -102,8 +89,7 @@ EvalContext::set_shell_variable(StringView name, StringView value)
   assign_variable(name, value);
 }
 
-void
-EvalContext::unset_shell_variable(StringView name)
+void EvalContext::unset_shell_variable(StringView name)
 {
   m_shell_variables.erase(name);
   /* An exported variable also lives in the process environment, so it is
@@ -114,8 +100,7 @@ EvalContext::unset_shell_variable(StringView name)
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
-Maybe<String>
-EvalContext::get_variable_value(StringView name) const
+Maybe<String> EvalContext::get_variable_value(StringView name) const
 {
   if (name == "?")
     return String{heap_allocator(),
@@ -177,26 +162,22 @@ EvalContext::get_variable_value(StringView name) const
   return shit::None;
 }
 
-const ArrayList<String> &
-EvalContext::positional_params() const
+const ArrayList<String> &EvalContext::positional_params() const
 {
   return m_positional_params;
 }
 
-void
-EvalContext::set_positional_params(ArrayList<String> params)
+void EvalContext::set_positional_params(ArrayList<String> params)
 {
   m_positional_params = std::move(params);
 }
 
-void
-EvalContext::set_last_background_pid(i64 pid)
+void EvalContext::set_last_background_pid(i64 pid)
 {
   m_last_background_pid = pid;
 }
 
-int
-EvalContext::register_job(os::process pid, StringView command)
+int EvalContext::register_job(os::process pid, StringView command)
 {
   Job job{};
   job.id = m_next_job_id++;
@@ -208,8 +189,7 @@ EvalContext::register_job(os::process pid, StringView command)
   return m_jobs.back().id;
 }
 
-void
-EvalContext::update_jobs()
+void EvalContext::update_jobs()
 {
   for (Job &job : m_jobs) {
     if (job.state == Job::State::Done) continue;
@@ -227,22 +207,16 @@ EvalContext::update_jobs()
   }
 }
 
-ArrayList<Job> &
-EvalContext::jobs()
-{
-  return m_jobs;
-}
+ArrayList<Job> &EvalContext::jobs() { return m_jobs; }
 
-Job *
-EvalContext::find_job(int id)
+Job *EvalContext::find_job(int id)
 {
   for (Job &job : m_jobs)
     if (job.id == id) return &job;
   return nullptr;
 }
 
-Job *
-EvalContext::most_recent_job()
+Job *EvalContext::most_recent_job()
 {
   /* Skip a finished job, so a bare fg or bg acts on a job that is still
      running or stopped rather than a dead pid. */
@@ -251,8 +225,7 @@ EvalContext::most_recent_job()
   return nullptr;
 }
 
-void
-EvalContext::forget_done_jobs()
+void EvalContext::forget_done_jobs()
 {
   ArrayList<Job> kept{};
   for (Job &job : m_jobs) {
@@ -262,45 +235,26 @@ EvalContext::forget_done_jobs()
   m_jobs = std::move(kept);
 }
 
-void
-EvalContext::set_monitor(bool enabled)
-{
-  m_monitor = enabled;
-}
+void EvalContext::set_monitor(bool enabled) { m_monitor = enabled; }
 
-bool
-EvalContext::monitor() const
-{
-  return m_monitor;
-}
+bool EvalContext::monitor() const { return m_monitor; }
 
-void
-EvalContext::register_function(StringView name, const Expression *body)
+void EvalContext::register_function(StringView name, const Expression *body)
 {
   m_functions.set(name, body);
 }
 
-const Expression *
-EvalContext::find_function(StringView name) const
+const Expression *EvalContext::find_function(StringView name) const
 {
   if (const Expression *const *slot = m_functions.find(name)) return *slot;
   return nullptr;
 }
 
-bool
-EvalContext::has_functions() const
-{
-  return m_functions.size() != 0;
-}
+bool EvalContext::has_functions() const { return m_functions.size() != 0; }
 
-void
-EvalContext::unset_function(StringView name)
-{
-  m_functions.erase(name);
-}
+void EvalContext::unset_function(StringView name) { m_functions.erase(name); }
 
-HashSet
-EvalContext::function_names() const
+HashSet EvalContext::function_names() const
 {
   HashSet names{heap_allocator()};
   m_functions.for_each([&](StringView name, const Expression *body) {
@@ -310,26 +264,19 @@ EvalContext::function_names() const
   return names;
 }
 
-void
-EvalContext::set_trap(StringView condition, StringView action)
+void EvalContext::set_trap(StringView condition, StringView action)
 {
   m_traps.set(condition, action);
 }
 
-void
-EvalContext::remove_trap(StringView condition)
+void EvalContext::remove_trap(StringView condition)
 {
   m_traps.erase(condition);
 }
 
-const HashMap<String> &
-EvalContext::traps() const
-{
-  return m_traps;
-}
+const HashMap<String> &EvalContext::traps() const { return m_traps; }
 
-void
-EvalContext::run_exit_trap()
+void EvalContext::run_exit_trap()
 {
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
@@ -339,15 +286,13 @@ EvalContext::run_exit_trap()
       run_source(std::string{action->c_str(), action->size()}, "the EXIT trap");
 }
 
-void
-EvalContext::mark_readonly(StringView name)
+void EvalContext::mark_readonly(StringView name)
 {
   if (is_readonly(name)) return;
   m_readonly_names.push(String{heap_allocator(), name});
 }
 
-bool
-EvalContext::is_readonly(StringView name) const
+bool EvalContext::is_readonly(StringView name) const
 {
   if (m_readonly_names.size() == 0) return false;
   for (const String &readonly_name : m_readonly_names)
@@ -356,8 +301,7 @@ EvalContext::is_readonly(StringView name) const
   return false;
 }
 
-ArrayList<String>
-EvalContext::readonly_names() const
+ArrayList<String> EvalContext::readonly_names() const
 {
   ArrayList<String> out{};
   for (const String &name : m_readonly_names)
@@ -368,14 +312,12 @@ EvalContext::readonly_names() const
   return out;
 }
 
-void
-EvalContext::enter_function_scope()
+void EvalContext::enter_function_scope()
 {
   m_local_scopes.push(ArrayList<LocalBinding>{});
 }
 
-void
-EvalContext::leave_function_scope()
+void EvalContext::leave_function_scope()
 {
   if (m_local_scopes.empty()) return;
 
@@ -399,44 +341,35 @@ EvalContext::leave_function_scope()
   m_local_scopes = std::move(kept);
 }
 
-bool
-EvalContext::in_function_scope() const
-{
-  return !m_local_scopes.empty();
-}
+bool EvalContext::in_function_scope() const { return !m_local_scopes.empty(); }
 
-void
-EvalContext::declare_local(StringView name)
+void EvalContext::declare_local(StringView name)
 {
   if (m_local_scopes.empty()) return;
   m_local_scopes.back().push(
       LocalBinding{String{name}, get_variable_value(name)});
 }
 
-void
-EvalContext::set_alias(StringView name, StringView value)
+void EvalContext::set_alias(StringView name, StringView value)
 {
   m_aliases.set(name, value);
 }
 
-bool
-EvalContext::remove_alias(StringView name)
+bool EvalContext::remove_alias(StringView name)
 {
   if (m_aliases.find(name) == nullptr) return false;
   m_aliases.erase(name);
   return true;
 }
 
-Maybe<String>
-EvalContext::get_alias(StringView name) const
+Maybe<String> EvalContext::get_alias(StringView name) const
 {
   if (const String *value = m_aliases.find(name))
     return String{heap_allocator(), value->view()};
   return None;
 }
 
-ArrayList<String>
-EvalContext::alias_definitions() const
+ArrayList<String> EvalContext::alias_definitions() const
 {
   ArrayList<String> out{};
   m_aliases.for_each([&out](StringView key, const String &value) {
@@ -450,8 +383,7 @@ EvalContext::alias_definitions() const
   return out;
 }
 
-HashSet
-EvalContext::alias_names() const
+HashSet EvalContext::alias_names() const
 {
   HashSet out{heap_allocator()};
   m_aliases.for_each([&out](StringView key, const String &value) {
@@ -461,34 +393,20 @@ EvalContext::alias_names() const
   return out;
 }
 
-void
-EvalContext::enter_subshell()
-{
-  m_subshell_depth++;
-}
+void EvalContext::enter_subshell() { m_subshell_depth++; }
 
-void
-EvalContext::leave_subshell()
-{
-  m_subshell_depth--;
-}
+void EvalContext::leave_subshell() { m_subshell_depth--; }
 
-bool
-EvalContext::in_subshell() const
-{
-  return m_subshell_depth > 0;
-}
+bool EvalContext::in_subshell() const { return m_subshell_depth > 0; }
 
-void
-EvalContext::request_break(i64 level, SourceLocation location)
+void EvalContext::request_break(i64 level, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
                                m_current_source, String{m_current_origin}};
 }
 
-void
-EvalContext::request_continue(i64 level, SourceLocation location)
+void EvalContext::request_continue(i64 level, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "continue requested, level %lld",
            (long long) level);
@@ -496,8 +414,7 @@ EvalContext::request_continue(i64 level, SourceLocation location)
                                m_current_source, String{m_current_origin}};
 }
 
-void
-EvalContext::request_return(i64 status, SourceLocation location)
+void EvalContext::request_return(i64 status, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "return requested, status %lld",
            (long long) status);
@@ -505,179 +422,96 @@ EvalContext::request_return(i64 status, SourceLocation location)
                                m_current_source, String{m_current_origin}};
 }
 
-void
-EvalContext::request_exit(i64 status, SourceLocation location)
+void EvalContext::request_exit(i64 status, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
                                m_current_source, String{m_current_origin}};
 }
 
-bool
-EvalContext::has_pending_control_flow() const
+bool EvalContext::has_pending_control_flow() const
 {
   return m_control_flow.kind != ControlFlow::Kind::Normal;
 }
 
-ControlFlow &
-EvalContext::pending_control_flow()
+ControlFlow &EvalContext::pending_control_flow() { return m_control_flow; }
+
+const ControlFlow &EvalContext::pending_control_flow() const
 {
   return m_control_flow;
 }
 
-const ControlFlow &
-EvalContext::pending_control_flow() const
-{
-  return m_control_flow;
-}
-
-void
-EvalContext::clear_control_flow()
+void EvalContext::clear_control_flow()
 {
   m_control_flow.kind = ControlFlow::Kind::Normal;
 }
 
-void
-EvalContext::set_current_source(const std::string *source, String origin)
+void EvalContext::set_current_source(const std::string *source, String origin)
 {
   m_current_source = source;
   m_current_origin = std::move(origin);
 }
 
-const std::string *
-EvalContext::current_source() const
+const std::string *EvalContext::current_source() const
 {
   return m_current_source;
 }
 
-const String &
-EvalContext::current_origin() const
-{
-  return m_current_origin;
-}
+const String &EvalContext::current_origin() const { return m_current_origin; }
 
-void
-EvalContext::set_error_exit(bool enabled)
-{
-  m_error_exit = enabled;
-}
+void EvalContext::set_error_exit(bool enabled) { m_error_exit = enabled; }
 
-bool
-EvalContext::error_exit() const
-{
-  return m_error_exit;
-}
+bool EvalContext::error_exit() const { return m_error_exit; }
 
-void
-EvalContext::set_echo_expanded(bool enabled)
+void EvalContext::set_echo_expanded(bool enabled)
 {
   m_enable_echo_expanded = enabled;
 }
 
-void
-EvalContext::set_error_unset(bool enabled)
-{
-  m_error_unset = enabled;
-}
+void EvalContext::set_error_unset(bool enabled) { m_error_unset = enabled; }
 
-bool
-EvalContext::error_unset() const
-{
-  return m_error_unset;
-}
+bool EvalContext::error_unset() const { return m_error_unset; }
 
-void
-EvalContext::set_no_clobber(bool enabled)
-{
-  m_no_clobber = enabled;
-}
+void EvalContext::set_no_clobber(bool enabled) { m_no_clobber = enabled; }
 
-bool
-EvalContext::no_clobber() const
-{
-  return m_no_clobber;
-}
+bool EvalContext::no_clobber() const { return m_no_clobber; }
 
-void
-EvalContext::set_export_all(bool enabled)
-{
-  m_export_all = enabled;
-}
+void EvalContext::set_export_all(bool enabled) { m_export_all = enabled; }
 
-bool
-EvalContext::export_all() const
-{
-  return m_export_all;
-}
+bool EvalContext::export_all() const { return m_export_all; }
 
-void
-EvalContext::set_no_glob(bool enabled)
+void EvalContext::set_no_glob(bool enabled)
 {
   m_enable_path_expansion = !enabled;
 }
 
-bool
-EvalContext::no_glob() const
-{
-  return !m_enable_path_expansion;
-}
+bool EvalContext::no_glob() const { return !m_enable_path_expansion; }
 
-void
-EvalContext::set_no_exec(bool enabled)
-{
-  m_no_exec = enabled;
-}
+void EvalContext::set_no_exec(bool enabled) { m_no_exec = enabled; }
 
-bool
-EvalContext::no_exec() const
-{
-  return m_no_exec;
-}
+bool EvalContext::no_exec() const { return m_no_exec; }
 
-void
-EvalContext::enter_condition()
-{
-  m_condition_depth++;
-}
+void EvalContext::enter_condition() { m_condition_depth++; }
 
-void
-EvalContext::leave_condition()
-{
-  m_condition_depth--;
-}
+void EvalContext::leave_condition() { m_condition_depth--; }
 
-bool
-EvalContext::in_condition() const
-{
-  return m_condition_depth > 0;
-}
+bool EvalContext::in_condition() const { return m_condition_depth > 0; }
 
-usize
-EvalContext::getopts_char_index() const
-{
-  return m_getopts_char_index;
-}
+usize EvalContext::getopts_char_index() const { return m_getopts_char_index; }
 
-void
-EvalContext::set_getopts_char_index(usize index)
+void EvalContext::set_getopts_char_index(usize index)
 {
   m_getopts_char_index = index;
 }
 
-i64
-EvalContext::getopts_last_optind() const
-{
-  return m_getopts_last_optind;
-}
+i64 EvalContext::getopts_last_optind() const { return m_getopts_last_optind; }
 
-void
-EvalContext::set_getopts_last_optind(i64 optind)
+void EvalContext::set_getopts_last_optind(i64 optind)
 {
   m_getopts_last_optind = optind;
 }
 
-ArrayList<String>
-EvalContext::sorted_variable_assignments() const
+ArrayList<String> EvalContext::sorted_variable_assignments() const
 {
   ArrayList<String> assignments{};
   assignments.reserve(m_shell_variables.size());
@@ -691,21 +525,15 @@ EvalContext::sorted_variable_assignments() const
   return assignments;
 }
 
-void
-EvalContext::clear_functions()
-{
-  m_functions.clear();
-}
+void EvalContext::clear_functions() { m_functions.clear(); }
 
-EvalStateSnapshot
-EvalContext::snapshot_state() const
+EvalStateSnapshot EvalContext::snapshot_state() const
 {
   return EvalStateSnapshot{m_shell_variables, m_functions, m_positional_params,
                            Path::current_directory()};
 }
 
-void
-EvalContext::restore_state(EvalStateSnapshot snapshot)
+void EvalContext::restore_state(EvalStateSnapshot snapshot)
 {
   m_shell_variables = std::move(snapshot.shell_variables);
   m_functions = std::move(snapshot.functions);
@@ -726,8 +554,7 @@ EvalContext::restore_state(EvalStateSnapshot snapshot)
      substitution propagate the status of their last command to the parent. */
 }
 
-String
-EvalContext::option_flags_string() const
+String EvalContext::option_flags_string() const
 {
   String flags{};
   if (m_error_exit) flags += 'e';
@@ -738,20 +565,14 @@ EvalContext::option_flags_string() const
   return flags;
 }
 
-void
-EvalContext::set_last_exit_status(i32 status)
+void EvalContext::set_last_exit_status(i32 status)
 {
   m_last_exit_status = status;
 }
 
-i32
-EvalContext::last_exit_status() const
-{
-  return m_last_exit_status;
-}
+i32 EvalContext::last_exit_status() const { return m_last_exit_status; }
 
-String
-EvalContext::expand_variable(StringView name) const
+String EvalContext::expand_variable(StringView name) const
 {
   return get_variable_value(name).value_or(String{});
 }
@@ -760,8 +581,7 @@ namespace {
 
 /* Remove the shortest or longest prefix of value that matches pattern as a
    glob, returning the remainder. */
-String
-trim_matching_prefix(StringView value, StringView pattern, bool longest)
+String trim_matching_prefix(StringView value, StringView pattern, bool longest)
 {
   ArrayList<bool> active{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
@@ -785,8 +605,7 @@ trim_matching_prefix(StringView value, StringView pattern, bool longest)
 
 /* Remove the shortest or longest suffix of value that matches pattern as a
    glob, returning the head. */
-String
-trim_matching_suffix(StringView value, StringView pattern, bool longest)
+String trim_matching_suffix(StringView value, StringView pattern, bool longest)
 {
   ArrayList<bool> active{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
@@ -808,8 +627,7 @@ trim_matching_suffix(StringView value, StringView pattern, bool longest)
 
 } /* namespace */
 
-String
-EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
+String EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
 {
   String out{heap_allocator()};
   bool in_single_quote = false;
@@ -912,8 +730,7 @@ EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
   return out;
 }
 
-String
-EvalContext::apply_parameter_expansion(StringView spec)
+String EvalContext::apply_parameter_expansion(StringView spec)
 {
   if (spec.empty()) return String{heap_allocator()};
 
@@ -1005,8 +822,7 @@ EvalContext::apply_parameter_expansion(StringView spec)
   }
 }
 
-String
-EvalContext::make_stats_string() const
+String EvalContext::make_stats_string() const
 {
   String s{};
 
@@ -1034,52 +850,39 @@ EvalContext::make_stats_string() const
   return s;
 }
 
-bool
-EvalContext::should_echo() const
-{
-  return m_enable_echo;
-}
+bool EvalContext::should_echo() const { return m_enable_echo; }
 
-bool
-EvalContext::should_echo_expanded() const
+bool EvalContext::should_echo_expanded() const
 {
   return m_enable_echo_expanded;
 }
 
-bool
-EvalContext::shell_is_interactive() const
+bool EvalContext::shell_is_interactive() const
 {
   return m_shell_is_interactive;
 }
 
-usize
-EvalContext::last_expressions_executed() const
+usize EvalContext::last_expressions_executed() const
 {
   return m_expressions_executed_last;
 }
 
-usize
-EvalContext::total_expressions_executed() const
+usize EvalContext::total_expressions_executed() const
 {
   return m_expressions_executed_total + m_expressions_executed_last;
 }
 
-usize
-EvalContext::last_expansion_count() const
-{
-  return m_expansions_last;
-}
+usize EvalContext::last_expansion_count() const { return m_expansions_last; }
 
-usize
-EvalContext::total_expansion_count() const
+usize EvalContext::total_expansion_count() const
 {
   return m_expansions_total + m_expansions_last;
 }
 
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
-ArrayList<GlobField>
-EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
+ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
+                                                   bool should_expand_files)
 {
   Allocator scratch = scratch_allocator();
   ArrayList<GlobField> expanded{scratch};
@@ -1166,8 +969,7 @@ namespace {
    without a later ']' is a literal bracket, not a glob, so a field such as the
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
-Maybe<usize>
-first_active_glob(StringView text, const ArrayList<bool> &mask)
+Maybe<usize> first_active_glob(StringView text, const ArrayList<bool> &mask)
 {
   Maybe<usize> open_bracket{};
   for (usize i = 0; i < mask.size(); i++) {
@@ -1265,8 +1067,7 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
   return result;
 }
 
-void
-EvalContext::expand_tilde(WordSegment &leading_segment) const
+void EvalContext::expand_tilde(WordSegment &leading_segment) const
 {
   /* A tilde only expands when it is unquoted. An escaped or quoted tilde is a
      literal segment and stays as is. */
@@ -1290,8 +1091,7 @@ EvalContext::expand_tilde(WordSegment &leading_segment) const
   text = std::move(expanded);
 }
 
-ArrayList<String>
-EvalContext::expand_path(GlobField field)
+ArrayList<String> EvalContext::expand_path(GlobField field)
 {
   Allocator scratch = scratch_allocator();
 
@@ -1339,8 +1139,7 @@ namespace {
 /* The count of leading bytes that are digits in the given radix, so a value
    with trailing non-digit bytes reads only its numeric prefix the way base-0
    strtoll did. A hexadecimal scan accepts both letter cases. */
-usize
-count_leading_digits(StringView text, u32 radix)
+usize count_leading_digits(StringView text, u32 radix)
 {
   usize length = 0;
   while (length < text.length) {
@@ -1368,8 +1167,7 @@ count_leading_digits(StringView text, u32 radix)
    the old strtoll path produced after its throw was caught. The utils parsers
    take no base argument, so the radix is chosen here from the prefix and the
    matching parser runs on the scanned digit run. */
-i64
-parse_arithmetic_operand(StringView text)
+i64 parse_arithmetic_operand(StringView text)
 {
   StringView body = text;
   bool is_negative = false;
@@ -1405,38 +1203,33 @@ struct ArithmeticParser
   StringView source;
   usize pos;
 
-  [[noreturn]] void
-  fail(StringView message)
+  [[noreturn]] void fail(StringView message)
   {
     throw Error{"Arithmetic: " + message};
   }
 
-  void
-  skip_spaces()
+  void skip_spaces()
   {
     while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
                                    source[pos] == '\n' || source[pos] == '\r'))
       pos++;
   }
 
-  bool
-  starts_with(StringView op)
+  bool starts_with(StringView op)
   {
     skip_spaces();
     return pos + op.length <= source.length &&
            source.substring_of_length(pos, op.length) == op;
   }
 
-  bool
-  consume(StringView op)
+  bool consume(StringView op)
   {
     if (!starts_with(op)) return false;
     pos += op.length;
     return true;
   }
 
-  i64
-  read_variable_value(StringView name)
+  i64 read_variable_value(StringView name)
   {
     /* A plain shell variable, the common operand, reads its digits straight
        from the stored value with no copy. The operand parser stops at the first
@@ -1452,8 +1245,7 @@ struct ArithmeticParser
     return parse_arithmetic_operand(value.view());
   }
 
-  i64
-  parse()
+  i64 parse()
   {
     i64 result = parse_assignment();
     skip_spaces();
@@ -1461,8 +1253,7 @@ struct ArithmeticParser
     return result;
   }
 
-  i64
-  apply_compound(i64 lhs, i64 rhs, char kind)
+  i64 apply_compound(i64 lhs, i64 rhs, char kind)
   {
     switch (kind) {
     case '+': return lhs + rhs;
@@ -1483,8 +1274,7 @@ struct ArithmeticParser
     }
   }
 
-  i64
-  parse_assignment()
+  i64 parse_assignment()
   {
     /* An assignment has a bare variable name on the left, so try it and rewind
        when the name is not followed by an assignment operator. */
@@ -1531,8 +1321,7 @@ struct ArithmeticParser
     return parse_ternary();
   }
 
-  i64
-  parse_ternary()
+  i64 parse_ternary()
   {
     i64 condition = parse_logical_or();
     if (consume("?")) {
@@ -1544,8 +1333,7 @@ struct ArithmeticParser
     return condition;
   }
 
-  i64
-  parse_logical_or()
+  i64 parse_logical_or()
   {
     i64 lhs = parse_logical_and();
     while (consume("||"))
@@ -1553,8 +1341,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_logical_and()
+  i64 parse_logical_and()
   {
     i64 lhs = parse_bitwise_or();
     while (consume("&&"))
@@ -1562,8 +1349,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_bitwise_or()
+  i64 parse_bitwise_or()
   {
     i64 lhs = parse_bitwise_xor();
     while (starts_with("|") && !starts_with("||")) {
@@ -1573,8 +1359,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_bitwise_xor()
+  i64 parse_bitwise_xor()
   {
     i64 lhs = parse_bitwise_and();
     while (consume("^"))
@@ -1582,8 +1367,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_bitwise_and()
+  i64 parse_bitwise_and()
   {
     i64 lhs = parse_equality();
     while (starts_with("&") && !starts_with("&&")) {
@@ -1593,8 +1377,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_equality()
+  i64 parse_equality()
   {
     i64 lhs = parse_relational();
     for (;;) {
@@ -1608,8 +1391,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_relational()
+  i64 parse_relational()
   {
     i64 lhs = parse_shift();
     for (;;) {
@@ -1629,8 +1411,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_shift()
+  i64 parse_shift()
   {
     i64 lhs = parse_additive();
     for (;;) {
@@ -1644,8 +1425,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_additive()
+  i64 parse_additive()
   {
     i64 lhs = parse_multiplicative();
     for (;;) {
@@ -1659,8 +1439,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_multiplicative()
+  i64 parse_multiplicative()
   {
     i64 lhs = parse_unary();
     for (;;) {
@@ -1680,8 +1459,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64
-  parse_unary()
+  i64 parse_unary()
   {
     if (consume("!")) return parse_unary() == 0 ? 1 : 0;
     if (consume("~")) return ~parse_unary();
@@ -1690,8 +1468,7 @@ struct ArithmeticParser
     return parse_primary();
   }
 
-  i64
-  parse_primary()
+  i64 parse_primary()
   {
     skip_spaces();
     if (consume("(")) {
@@ -1732,8 +1509,7 @@ struct ArithmeticParser
 
 } /* namespace */
 
-i64
-EvalContext::evaluate_arithmetic(StringView expression)
+i64 EvalContext::evaluate_arithmetic(StringView expression)
 {
   /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
      arithmetic becomes its value before the expression is parsed. A bare name
@@ -1754,8 +1530,7 @@ EvalContext::evaluate_arithmetic(StringView expression)
   return parser.parse();
 }
 
-ArrayList<GlobField>
-EvalContext::expand_word(const Word &word)
+ArrayList<GlobField> EvalContext::expand_word(const Word &word)
 {
   Allocator scratch = scratch_allocator();
 
@@ -1868,8 +1643,7 @@ EvalContext::expand_word(const Word &word)
   return fields;
 }
 
-String
-EvalContext::expand_word_for_assignment(const Word &word)
+String EvalContext::expand_word_for_assignment(const Word &word)
 {
   /* Only copy the segments when a leading tilde must be rewritten, so the
      common assignment reads its segments in place with no per-command copy. */
@@ -1899,16 +1673,15 @@ EvalContext::expand_word_for_assignment(const Word &word)
   return result;
 }
 
-String
-EvalContext::capture_command_substitution(const String &source)
+String EvalContext::capture_command_substitution(const String &source)
 {
   /* Parse the inner command into the active parse arena. It coexists with the
      outer tree and is reclaimed when the arena resets. */
-  if (g_ast_arena == nullptr)
+  if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
   Parser parser{
-      Lexer{String{source.view()}, *g_ast_arena}
+      Lexer{String{source.view()}, *AST_ARENA}
   };
   std::unique_ptr<Expression> ast = parser.construct_ast();
 
@@ -1977,13 +1750,13 @@ EvalContext::capture_command_substitution(const String &source)
   return captured;
 }
 
-i32
-EvalContext::run_source(const std::string &source, const std::string &origin)
+i32 EvalContext::run_source(const std::string &source,
+                            const std::string &origin)
 {
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
      so a return or a break inside the evaluated source reaches the caller. */
-  if (g_ast_arena == nullptr)
+  if (AST_ARENA == nullptr)
     throw Error{"Cannot run source outside of a parse"};
 
   /* A located error from the sourced text carries an offset into that text, not
@@ -1994,7 +1767,7 @@ EvalContext::run_source(const std::string &source, const std::string &origin)
     /* The Lexer takes a String, while this entry still takes a std::string for
        the builtin callers, so the source crosses that boundary here. */
     Parser parser{
-        Lexer{String{StringView{source.data(), source.size()}}, *g_ast_arena}
+        Lexer{String{StringView{source.data(), source.size()}}, *AST_ARENA}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this
@@ -2033,8 +1806,7 @@ EvalContext::run_source(const std::string &source, const std::string &origin)
   }
 }
 
-void
-EvalContext::clear_retained_sources()
+void EvalContext::clear_retained_sources()
 {
   for (Expression *ast : m_retained_source_asts)
     delete ast;
@@ -2050,14 +1822,12 @@ EvalContext::clear_retained_sources()
   m_current_origin.clear();
 }
 
-void
-EvalContext::retain_ast(Expression *ast)
+void EvalContext::retain_ast(Expression *ast)
 {
   m_retained_source_asts.push(ast);
 }
 
-String
-EvalContext::expand_heredoc_body(StringView body)
+String EvalContext::expand_heredoc_body(StringView body)
 {
   /* A heredoc body keeps its quote characters literally. */
   return expand_modifier_word(body, false);
@@ -2140,39 +1910,24 @@ ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
     : m_kind(std::move(kind)), m_location(location), m_args(args)
 {}
 
-const SourceLocation &
-ExecContext::source_location() const
+const SourceLocation &ExecContext::source_location() const
 {
   return m_location;
 }
 
-const String &
-ExecContext::program() const
-{
-  return m_args[0];
-}
+const String &ExecContext::program() const { return m_args[0]; }
 
-const ArrayList<String> &
-ExecContext::args() const
-{
-  return m_args;
-}
+const ArrayList<String> &ExecContext::args() const { return m_args; }
 
-bool
-ExecContext::is_builtin() const
-{
-  return m_kind.is_builtin();
-}
+bool ExecContext::is_builtin() const { return m_kind.is_builtin(); }
 
-const Path &
-ExecContext::program_path() const
+const Path &ExecContext::program_path() const
 {
   SHIT_ASSERT(!is_builtin());
   return m_kind.program_path;
 }
 
-void
-ExecContext::close_fds()
+void ExecContext::close_fds()
 {
   if (in_fd) {
     os::close_fd(*in_fd);
@@ -2188,15 +1943,13 @@ ExecContext::close_fds()
   }
 }
 
-const Builtin::Kind &
-ExecContext::builtin_kind() const
+const Builtin::Kind &ExecContext::builtin_kind() const
 {
   SHIT_ASSERT(is_builtin());
   return m_kind.builtin_kind;
 }
 
-void
-ExecContext::print_to_stdout(StringView s) const
+void ExecContext::print_to_stdout(StringView s) const
 {
   if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data, s.length).has_value())
   {
@@ -2205,8 +1958,8 @@ ExecContext::print_to_stdout(StringView s) const
   }
 }
 
-ExecContext
-ExecContext::make_from(SourceLocation location, const ArrayList<String> &args)
+ExecContext ExecContext::make_from(SourceLocation location,
+                                   const ArrayList<String> &args)
 {
   /* Make sure we always include at least one argument, the program path. */
   SHIT_ASSERT(args.size() > 0);
@@ -2247,9 +2000,9 @@ ExecContext::make_from(SourceLocation location, const ArrayList<String> &args)
   return {location, std::move(kind), args};
 }
 
-ExecContext
-ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
-                           const ArrayList<String> &args)
+ExecContext ExecContext::from_resolved(SourceLocation location,
+                                       ResolvedCommand kind,
+                                       const ArrayList<String> &args)
 {
   SHIT_ASSERT(args.size() > 0);
   return {location, std::move(kind), args};
@@ -2259,22 +2012,10 @@ SourceLocation::SourceLocation(usize position, usize length)
     : m_position(position), m_length(length)
 {}
 
-usize
-SourceLocation::position() const
-{
-  return m_position;
-}
+usize SourceLocation::position() const { return m_position; }
 
-usize
-SourceLocation::length() const
-{
-  return m_length;
-}
+usize SourceLocation::length() const { return m_length; }
 
-void
-SourceLocation::add_length(usize n)
-{
-  m_length += n;
-}
+void SourceLocation::add_length(usize n) { m_length += n; }
 
 } /* namespace shit */

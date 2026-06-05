@@ -6,14 +6,9 @@ namespace shit {
 
 False::False() = default;
 
-Builtin::Kind
-False::kind() const
-{
-  return Kind::False;
-}
+Builtin::Kind False::kind() const { return Kind::False; }
 
-i32
-False::execute(ExecContext &ec, EvalContext &cxt) const
+i32 False::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(ec);
   SHIT_UNUSED(cxt);

@@ -22,8 +22,7 @@ namespace shit {
 
 namespace utils {
 
-String
-merge_tokens_to_string(const ArrayList<const Token *> &v)
+String merge_tokens_to_string(const ArrayList<const Token *> &v)
 {
   String r{};
   for (const shit::Token *t : v) {
@@ -35,8 +34,7 @@ merge_tokens_to_string(const ArrayList<const Token *> &v)
   return r;
 }
 
-i32
-execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
+i32 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
 {
   if (!ec.is_builtin()) {
     /* The command word is kept for the job table before the context is moved
@@ -62,9 +60,8 @@ execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
   SHIT_UNREACHABLE();
 }
 
-i32
-execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
-                            bool is_async)
+i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
+                                bool is_async)
 {
   SHIT_ASSERT(ecs.size() > 1);
 
@@ -148,8 +145,7 @@ execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
    NOT_FOUND_INDEX when no occurrence remains. The bytes carry no null
    terminator, so the match is a plain byte scan rather than a C string search.
  */
-static usize
-find_subview(StringView haystack, StringView needle, usize start)
+static usize find_subview(StringView haystack, StringView needle, usize start)
 {
   if (needle.length == 0)
     return start <= haystack.length ? start : NOT_FOUND_INDEX;
@@ -161,9 +157,8 @@ find_subview(StringView haystack, StringView needle, usize start)
   return NOT_FOUND_INDEX;
 }
 
-void
-string_replace(String &s, const StringView to_replace,
-               const StringView replace_with)
+void string_replace(String &s, const StringView to_replace,
+                    const StringView replace_with)
 {
   String result{};
   result.reserve(s.size());
@@ -185,8 +180,7 @@ string_replace(String &s, const StringView to_replace,
   s = std::move(result);
 }
 
-String
-lowercase_string(StringView s)
+String lowercase_string(StringView s)
 {
   String l{};
   l.reserve(s.size());
@@ -195,8 +189,7 @@ lowercase_string(StringView s)
   return l;
 }
 
-static bool
-is_ascii_whitespace(char c)
+static bool is_ascii_whitespace(char c)
 {
   return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' ||
          c == '\r';
@@ -204,8 +197,8 @@ is_ascii_whitespace(char c)
 
 /* Turn an accumulated magnitude and sign into a saturating signed result. The
    per-base parsers share this so only the digit loop stays base-specific. */
-static i64
-saturate_signed_magnitude(u64 magnitude, bool is_negative, bool has_overflowed)
+static i64 saturate_signed_magnitude(u64 magnitude, bool is_negative,
+                                     bool has_overflowed)
 {
   if (is_negative) {
     if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX) + 1)
@@ -217,8 +210,7 @@ saturate_signed_magnitude(u64 magnitude, bool is_negative, bool has_overflowed)
   return static_cast<i64>(magnitude);
 }
 
-static Error
-not_an_integer_error(StringView text)
+static Error not_an_integer_error(StringView text)
 {
   return Error{
       "'" + std::string{text.data, text.length}
@@ -226,8 +218,7 @@ not_an_integer_error(StringView text)
   };
 }
 
-String
-unsigned_integer_to_string(u64 value)
+String unsigned_integer_to_string(u64 value)
 {
   /* The digits are written into a fixed buffer from the least significant end,
      since a u64 never needs more than twenty decimal digits, then copied out in
@@ -243,8 +234,7 @@ unsigned_integer_to_string(u64 value)
   };
 }
 
-String
-integer_to_string(i64 value)
+String integer_to_string(i64 value)
 {
   if (value >= 0) return unsigned_integer_to_string(static_cast<u64>(value));
   /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
@@ -254,8 +244,7 @@ integer_to_string(i64 value)
   return result;
 }
 
-ErrorOr<i64>
-parse_decimal_integer(StringView text)
+ErrorOr<i64> parse_decimal_integer(StringView text)
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -290,8 +279,7 @@ parse_decimal_integer(StringView text)
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-ErrorOr<i64>
-parse_octal_integer(StringView text)
+ErrorOr<i64> parse_octal_integer(StringView text)
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -326,8 +314,7 @@ parse_octal_integer(StringView text)
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-ErrorOr<i64>
-parse_hexadecimal_integer(StringView text)
+ErrorOr<i64> parse_hexadecimal_integer(StringView text)
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -377,8 +364,7 @@ parse_hexadecimal_integer(StringView text)
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-usize
-find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
+usize find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
 {
   for (usize i = 0; i < suffixes.size(); i++) {
     if (suffixes[i] == wanted) return i;
@@ -386,8 +372,7 @@ find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
   return NOT_FOUND_INDEX;
 }
 
-Maybe<Path>
-canonicalize_path(StringView path)
+Maybe<Path> canonicalize_path(StringView path)
 {
   Path candidate{path};
 
@@ -416,15 +401,13 @@ canonicalize_path(StringView path)
 
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
-static bool
-is_glob_char_active(const ArrayList<bool> &glob_active, usize index)
+static bool is_glob_char_active(const ArrayList<bool> &glob_active, usize index)
 {
   return index < glob_active.size() && glob_active[index];
 }
 
-bool
-glob_matches(StringView glob, StringView str,
-             const ArrayList<bool> &glob_active, usize mask_offset)
+bool glob_matches(StringView glob, StringView str,
+                  const ArrayList<bool> &glob_active, usize mask_offset)
 {
   usize s = 0;
   usize g = 0;
@@ -546,8 +529,7 @@ glob_matches(StringView glob, StringView str,
   return false;
 }
 
-[[noreturn]] void
-quit(i32 code, bool should_goodbye)
+[[noreturn]] void quit(i32 code, bool should_goodbye)
 {
   u8 actual_code = static_cast<u8>(code);
 
@@ -587,14 +569,12 @@ static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
-static void
-cache_resolved_path(StringView name, const Path &full_path)
+static void cache_resolved_path(StringView name, const Path &full_path)
 {
   PATH_CACHE.get_or_create(name, ArrayList<Path>{}).push(full_path);
 }
 
-void
-clear_path_map()
+void clear_path_map()
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
@@ -603,8 +583,7 @@ clear_path_map()
 /* Split PATH into its directory components. The last component carries no
    trailing delimiter, so a plain delimiter scan drops it and the directory is
    never searched. POSIX treats an empty component as the current directory. */
-static ArrayList<String>
-split_path_dirs(StringView path_var)
+static ArrayList<String> split_path_dirs(StringView path_var)
 {
   ArrayList<String> dirs{};
   String current{};
@@ -623,8 +602,7 @@ split_path_dirs(StringView path_var)
   return dirs;
 }
 
-void
-initialize_path_map()
+void initialize_path_map()
 {
   if (!MAYBE_PATH) return;
 
@@ -650,8 +628,7 @@ initialize_path_map()
   }
 }
 
-ArrayList<Path>
-search_and_cache(StringView program_name)
+ArrayList<Path> search_and_cache(StringView program_name)
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   if (!MAYBE_PATH) return ArrayList<Path>{};
@@ -696,8 +673,7 @@ search_and_cache(StringView program_name)
   return result;
 }
 
-ArrayList<Path>
-search_program_path(StringView program_name)
+ArrayList<Path> search_program_path(StringView program_name)
 {
   std::string sp{program_name.data, program_name.length};
   ArrayList<Path> result{};
@@ -730,8 +706,7 @@ search_program_path(StringView program_name)
   return search_and_cache(program_name);
 }
 
-Maybe<String>
-read_entire_file(StringView path)
+Maybe<String> read_entire_file(StringView path)
 {
   Maybe<os::descriptor> file =
       os::open_file_descriptor(path, os::FileOpenMode::Read);
@@ -748,8 +723,7 @@ read_entire_file(StringView path)
   return contents;
 }
 
-String
-read_entire_standard_input()
+String read_entire_standard_input()
 {
   String contents{};
   char buffer[4096];
@@ -761,8 +735,7 @@ read_entire_standard_input()
   return contents;
 }
 
-Maybe<String>
-read_line_from_fd(os::descriptor fd)
+Maybe<String> read_line_from_fd(os::descriptor fd)
 {
   String line{};
   bool read_any_byte = false;

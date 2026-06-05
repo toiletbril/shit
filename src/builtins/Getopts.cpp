@@ -15,14 +15,9 @@ namespace shit {
 
 Getopts::Getopts() = default;
 
-Builtin::Kind
-Getopts::kind() const
-{
-  return Kind::Getopts;
-}
+Builtin::Kind Getopts::kind() const { return Kind::Getopts; }
 
-i32
-Getopts::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
   if (args.size() < 3)

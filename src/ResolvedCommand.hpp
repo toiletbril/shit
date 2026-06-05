@@ -35,8 +35,7 @@ struct ResolvedCommand
     return resolved;
   }
 
-  [[nodiscard]] static ResolvedCommand
-  from_program(Path path)
+  [[nodiscard]] static ResolvedCommand from_program(Path path)
   {
     ResolvedCommand resolved{};
     resolved.kind = Kind::Program;
@@ -44,11 +43,7 @@ struct ResolvedCommand
     return resolved;
   }
 
-  [[nodiscard]] bool
-  is_builtin() const
-  {
-    return kind == Kind::Builtin;
-  }
+  [[nodiscard]] bool is_builtin() const { return kind == Kind::Builtin; }
 };
 
 } /* namespace shit */

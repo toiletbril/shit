@@ -17,14 +17,9 @@ namespace shit {
 
 Local::Local() = default;
 
-Builtin::Kind
-Local::kind() const
-{
-  return Kind::Local;
-}
+Builtin::Kind Local::kind() const { return Kind::Local; }
 
-i32
-Local::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Local::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 

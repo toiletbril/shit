@@ -17,14 +17,9 @@ namespace shit {
 
 Kill::Kill() = default;
 
-Builtin::Kind
-Kill::kind() const
-{
-  return Kind::Kill;
-}
+Builtin::Kind Kill::kind() const { return Kind::Kill; }
 
-i32
-Kill::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Kill::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
 

@@ -17,8 +17,8 @@ struct PreciseLocation
   usize last_newline_location;
 };
 
-static PreciseLocation
-calc_precise_position(StringView source, usize byte_position)
+static PreciseLocation calc_precise_position(StringView source,
+                                             usize byte_position)
 {
   SHIT_ASSERT(byte_position <= source.size(),
               "byte position: %zu, source length: %zu", byte_position,
@@ -36,8 +36,7 @@ calc_precise_position(StringView source, usize byte_position)
 }
 
 template <class T>
-static usize
-number_string_length(T n)
+static usize number_string_length(T n)
 {
   usize len = 0;
   while (n > 0) {
@@ -47,11 +46,11 @@ number_string_length(T n)
   return len;
 }
 
-static String
-get_context_pointing_to(StringView source, usize byte_position,
-                        usize byte_count, usize line_number,
-                        usize last_newline_location, usize unicode_position,
-                        Maybe<StringView> message)
+static String get_context_pointing_to(StringView source, usize byte_position,
+                                      usize byte_count, usize line_number,
+                                      usize last_newline_location,
+                                      usize unicode_position,
+                                      Maybe<StringView> message)
 {
   /* Offset from the start of the line. */
   usize start_offset = byte_position - last_newline_location;
@@ -141,61 +140,35 @@ ErrorBase::ErrorBase(StringView message) : m_is_active(true), m_message(message)
 
 ErrorBase::~ErrorBase() = default;
 
-ErrorBase::
-operator bool &()
-{
-  return m_is_active;
-}
+ErrorBase::operator bool &() { return m_is_active; }
 
-String
-ErrorBase::message() const
-{
-  return m_message;
-}
+String ErrorBase::message() const { return m_message; }
 
-String
-ErrorBase::severity_word() const
-{
-  return "Error";
-}
+String ErrorBase::severity_word() const { return "Error"; }
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
-String
-Error::to_string() const
+String Error::to_string() const
 {
   return severity_word() + ": " + message() + ".";
 }
 
-Error::
-operator String() const
-{
-  return to_string();
-}
+Error::operator String() const { return to_string(); }
 
 Warning::Warning(StringView message) : Error(message) {}
 
-String
-Warning::severity_word() const
-{
-  return "Warning";
-}
+String Warning::severity_word() const { return "Warning"; }
 
 Note::Note(StringView message) : Error(message) {}
 
-String
-Note::severity_word() const
-{
-  return "Note";
-}
+String Note::severity_word() const { return "Note"; }
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
     : ErrorBase(message), m_location(location)
 {}
 
-String
-ErrorWithLocation::to_string(StringView source) const
+String ErrorWithLocation::to_string(StringView source) const
 {
   usize byte_position = m_location.position();
   usize byte_count = m_location.length();
@@ -245,11 +218,7 @@ WarningWithLocation::WarningWithLocation(SourceLocation location,
     : ErrorWithLocation(location, message)
 {}
 
-String
-WarningWithLocation::severity_word() const
-{
-  return "Warning";
-}
+String WarningWithLocation::severity_word() const { return "Warning"; }
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message,
@@ -258,8 +227,7 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
       m_details_location(details_location), m_details_message(details_message)
 {}
 
-String
-ErrorWithLocationAndDetails::details_to_string(StringView source) const
+String ErrorWithLocationAndDetails::details_to_string(StringView source) const
 {
   usize byte_position = m_details_location.position();
   usize byte_count = m_details_location.length();

@@ -34,8 +34,7 @@ struct ArrayList
     other.m_capacity = 0;
   }
 
-  ArrayList &
-  operator=(ArrayList &&other) noexcept
+  ArrayList &operator=(ArrayList &&other) noexcept
   {
     if (this != &other) {
       destroy_all();
@@ -49,8 +48,7 @@ struct ArrayList
     }
     return *this;
   }
-  ArrayList &
-  operator=(const ArrayList &other)
+  ArrayList &operator=(const ArrayList &other)
   {
     if (this != &other) {
       ArrayList copy{other};
@@ -61,49 +59,16 @@ struct ArrayList
 
   ~ArrayList() { destroy_all(); }
 
-  [[nodiscard]] usize
-  size() const
-  {
-    return m_length;
-  }
-  [[nodiscard]] bool
-  empty() const
-  {
-    return m_length == 0;
-  }
-  [[nodiscard]] T &
-  operator[](usize i)
-  {
-    return m_data[i];
-  }
-  [[nodiscard]] const T &
-  operator[](usize i) const
-  {
-    return m_data[i];
-  }
-  [[nodiscard]] T *
-  begin()
-  {
-    return m_data;
-  }
-  [[nodiscard]] T *
-  end()
-  {
-    return m_data + m_length;
-  }
-  [[nodiscard]] const T *
-  begin() const
-  {
-    return m_data;
-  }
-  [[nodiscard]] const T *
-  end() const
-  {
-    return m_data + m_length;
-  }
+  [[nodiscard]] usize size() const { return m_length; }
+  [[nodiscard]] bool empty() const { return m_length == 0; }
+  [[nodiscard]] T &operator[](usize i) { return m_data[i]; }
+  [[nodiscard]] const T &operator[](usize i) const { return m_data[i]; }
+  [[nodiscard]] T *begin() { return m_data; }
+  [[nodiscard]] T *end() { return m_data + m_length; }
+  [[nodiscard]] const T *begin() const { return m_data; }
+  [[nodiscard]] const T *end() const { return m_data + m_length; }
 
-  void
-  push(T value)
+  void push(T value)
   {
     reserve(m_length + 1);
     new (&m_data[m_length]) T(std::move(value));
@@ -112,8 +77,7 @@ struct ArrayList
 
   /* Destroy and drop the last element. The caller guarantees the list is not
      empty. */
-  void
-  pop_back()
+  void pop_back()
   {
     SHIT_ASSERT(m_length > 0, "pop_back on an empty list");
     m_length--;
@@ -122,37 +86,19 @@ struct ArrayList
 
   /* Destroy the elements but keep the storage, so a reused list does not
      reallocate. */
-  void
-  clear()
+  void clear()
   {
     for (usize i = 0; i < m_length; i++)
       m_data[i].~T();
     m_length = 0;
   }
 
-  [[nodiscard]] T &
-  back()
-  {
-    return m_data[m_length - 1];
-  }
-  [[nodiscard]] const T &
-  back() const
-  {
-    return m_data[m_length - 1];
-  }
-  [[nodiscard]] T &
-  front()
-  {
-    return m_data[0];
-  }
-  [[nodiscard]] const T &
-  front() const
-  {
-    return m_data[0];
-  }
+  [[nodiscard]] T &back() { return m_data[m_length - 1]; }
+  [[nodiscard]] const T &back() const { return m_data[m_length - 1]; }
+  [[nodiscard]] T &front() { return m_data[0]; }
+  [[nodiscard]] const T &front() const { return m_data[0]; }
 
-  void
-  reserve(usize needed)
+  void reserve(usize needed)
   {
     if (needed <= m_capacity) return;
     usize new_capacity = m_capacity == 0 ? 8 : m_capacity * 2;
@@ -169,8 +115,7 @@ struct ArrayList
   }
 
 private:
-  void
-  destroy_all()
+  void destroy_all()
   {
     for (usize i = 0; i < m_length; i++)
       m_data[i].~T();

@@ -5,14 +5,9 @@ namespace shit {
 
 Echo::Echo() = default;
 
-Builtin::Kind
-Echo::kind() const
-{
-  return Kind::Echo;
-}
+Builtin::Kind Echo::kind() const { return Kind::Echo; }
 
-i32
-Echo::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Echo::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 

@@ -10,14 +10,9 @@ namespace shit {
 
 Shift::Shift() = default;
 
-Builtin::Kind
-Shift::kind() const
-{
-  return Kind::Shift;
-}
+Builtin::Kind Shift::kind() const { return Kind::Shift; }
 
-i32
-Shift::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const
 {
   i64 count = 1;
   if (ec.args().size() > 1) {

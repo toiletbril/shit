@@ -19,8 +19,7 @@ namespace lexer {
 
 static constexpr char CEOF = static_cast<char>(EOF);
 
-bool
-is_whitespace(char ch)
+bool is_whitespace(char ch)
 {
   switch (ch) {
   case ' ':
@@ -31,14 +30,9 @@ is_whitespace(char ch)
   }
 }
 
-bool
-is_number(char ch)
-{
-  return ch >= '0' && ch <= '9';
-}
+bool is_number(char ch) { return ch >= '0' && ch <= '9'; }
 
-bool
-is_expression_sentinel(char ch)
+bool is_expression_sentinel(char ch)
 {
   switch (ch) {
   case '\n':
@@ -64,8 +58,7 @@ is_expression_sentinel(char ch)
 }
 
 /* TODO: Separate redirections from here. */
-bool
-is_shell_sentinel(char ch)
+bool is_shell_sentinel(char ch)
 {
   switch (ch) {
   case '\n':
@@ -82,14 +75,12 @@ is_shell_sentinel(char ch)
   };
 }
 
-bool
-is_part_of_identifier(char ch)
+bool is_part_of_identifier(char ch)
 {
   return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
 }
 
-bool
-is_string_quote(char ch)
+bool is_string_quote(char ch)
 {
   /* A backtick is intentionally not a quote here. It stays a literal character
      so the prepass can warn and point at $(...), rather than failing the lex.
@@ -101,14 +92,12 @@ is_string_quote(char ch)
   }
 }
 
-bool
-is_ascii_char(char ch)
+bool is_ascii_char(char ch)
 {
   return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
 
-bool
-is_expandable_char(char ch)
+bool is_expandable_char(char ch)
 {
   switch (ch) {
   case '[':
@@ -118,14 +107,9 @@ is_expandable_char(char ch)
   }
 }
 
-bool
-is_variable_name_start(char ch)
-{
-  return is_ascii_char(ch) || ch == '_';
-}
+bool is_variable_name_start(char ch) { return is_ascii_char(ch) || ch == '_'; }
 
-bool
-is_variable_name(char ch)
+bool is_variable_name(char ch)
 {
   return is_variable_name_start(ch) || is_number(ch);
 }
@@ -143,22 +127,19 @@ Lexer::~Lexer()
     delete body;
 }
 
-Token *
-Lexer::peek_expression_token()
+Token *Lexer::peek_expression_token()
 {
   skip_whitespace();
   return lex_expression_token();
 }
 
-Token *
-Lexer::peek_shell_token()
+Token *Lexer::peek_shell_token()
 {
   skip_whitespace();
   return lex_shell_token();
 }
 
-Token *
-Lexer::next_expression_token()
+Token *Lexer::next_expression_token()
 {
   skip_whitespace();
   Token *t = lex_expression_token();
@@ -166,8 +147,7 @@ Lexer::next_expression_token()
   return t;
 }
 
-Token *
-Lexer::next_shell_token()
+Token *Lexer::next_shell_token()
 {
   skip_whitespace();
   Token *t = lex_shell_token();
@@ -175,32 +155,15 @@ Lexer::next_shell_token()
   return t;
 }
 
-StringView
-Lexer::source() const
-{
-  return m_source.view();
-}
+StringView Lexer::source() const { return m_source.view(); }
 
-const ArrayList<Word> &
-Lexer::debug_words() const
-{
-  return m_debug_words;
-}
+const ArrayList<Word> &Lexer::debug_words() const { return m_debug_words; }
 
-BumpArena &
-Lexer::arena() const
-{
-  return *m_arena;
-}
+BumpArena &Lexer::arena() const { return *m_arena; }
 
-void
-Lexer::set_arena(BumpArena &arena)
-{
-  m_arena = &arena;
-}
+void Lexer::set_arena(BumpArena &arena) { m_arena = &arena; }
 
-usize
-Lexer::advance_past_last_peek()
+usize Lexer::advance_past_last_peek()
 {
   usize r = advance_forward(m_cached_offset);
   m_cached_offset = 0;
@@ -215,8 +178,8 @@ Lexer::advance_past_last_peek()
   return r;
 }
 
-const std::string *
-Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
+const std::string *Lexer::register_heredoc(StringView delimiter,
+                                           bool strip_tabs)
 {
   std::string *body = new std::string{};
   m_heredoc_bodies.push(body);
@@ -224,8 +187,7 @@ Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
   return body;
 }
 
-void
-Lexer::collect_pending_heredocs()
+void Lexer::collect_pending_heredocs()
 {
   for (HeredocPending &pending : m_pending_heredocs) {
     /* The body is written into the lexer-owned std::string the parsed
@@ -260,8 +222,7 @@ Lexer::collect_pending_heredocs()
   m_pending_heredocs.clear();
 }
 
-Token *
-Lexer::lex_expression_token()
+Token *Lexer::lex_expression_token()
 {
   if (char ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_number(ch))
@@ -281,8 +242,7 @@ Lexer::lex_expression_token()
       SourceLocation{m_cursor_position, 1});
 }
 
-Token *
-Lexer::lex_shell_token()
+Token *Lexer::lex_shell_token()
 {
   Token *t{};
   if (char ch = chop_character(); ch != lexer::CEOF) {
@@ -304,8 +264,7 @@ Lexer::lex_shell_token()
   return t;
 }
 
-void
-Lexer::skip_whitespace()
+void Lexer::skip_whitespace()
 {
   usize i = 0;
   for (;;) {
@@ -324,16 +283,14 @@ Lexer::skip_whitespace()
   advance_forward(i);
 }
 
-usize
-Lexer::advance_forward(usize offset)
+usize Lexer::advance_forward(usize offset)
 {
   SHIT_ASSERT(m_cursor_position + offset <= m_source.length());
   m_cursor_position += offset;
   return offset;
 }
 
-char
-Lexer::chop_character(usize offset)
+char Lexer::chop_character(usize offset)
 {
   if (m_cursor_position + offset < m_source.length())
     return m_source[m_cursor_position + offset];
@@ -341,8 +298,7 @@ Lexer::chop_character(usize offset)
   return lexer::CEOF;
 }
 
-Token *
-Lexer::lex_number()
+Token *Lexer::lex_number()
 {
   char ch;
   String digits{};
@@ -360,8 +316,7 @@ Lexer::lex_number()
   return num;
 }
 
-Token *
-Lexer::lex_identifier()
+Token *Lexer::lex_identifier()
 {
   Word word{};
 
@@ -672,8 +627,7 @@ Lexer::lex_identifier()
 /* The token kind a single operator character begins, or None when the
    character is not an operator. The switch keeps this allocation free and the
    compiler lowers it to a jump table. */
-static Maybe<Token::Kind>
-lookup_operator(char ch)
+static Maybe<Token::Kind> lookup_operator(char ch)
 {
   switch (ch) {
   case ')': return Token::Kind::RightParen;
@@ -702,8 +656,7 @@ lookup_operator(char ch)
   }
 }
 
-Token *
-Lexer::lex_sentinel()
+Token *Lexer::lex_sentinel()
 {
   char ch = chop_character();
   usize extra_length = 0;

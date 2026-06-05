@@ -48,8 +48,7 @@ struct [[nodiscard]] ErrorOr
       new (&m_storage) T(std::move(other.value_reference()));
   }
 
-  ErrorOr &
-  operator=(const ErrorOr &other)
+  ErrorOr &operator=(const ErrorOr &other)
   {
     if (this != &other) {
       destroy();
@@ -61,8 +60,7 @@ struct [[nodiscard]] ErrorOr
     }
     return *this;
   }
-  ErrorOr &
-  operator=(ErrorOr &&other) noexcept
+  ErrorOr &operator=(ErrorOr &&other) noexcept
   {
     if (this != &other) {
       destroy();
@@ -77,49 +75,39 @@ struct [[nodiscard]] ErrorOr
 
   ~ErrorOr() { destroy(); }
 
-  [[nodiscard]] bool
-  is_error() const
-  {
-    return m_is_error;
-  }
+  [[nodiscard]] bool is_error() const { return m_is_error; }
 
-  [[nodiscard]] T &
-  value()
+  [[nodiscard]] T &value()
   {
     SHIT_ASSERT(!m_is_error);
     return value_reference();
   }
-  [[nodiscard]] const T &
-  value() const
+  [[nodiscard]] const T &value() const
   {
     SHIT_ASSERT(!m_is_error);
     return value_reference();
   }
 
-  [[nodiscard]] Error &
-  error()
+  [[nodiscard]] Error &error()
   {
     SHIT_ASSERT(m_is_error);
     return error_reference();
   }
-  [[nodiscard]] const Error &
-  error() const
+  [[nodiscard]] const Error &error() const
   {
     SHIT_ASSERT(m_is_error);
     return error_reference();
   }
 
   /* Move the value out, called once the caller has checked is_error. */
-  [[nodiscard]] T
-  take()
+  [[nodiscard]] T take()
   {
     SHIT_ASSERT(!m_is_error);
     return std::move(value_reference());
   }
 
 private:
-  void
-  destroy() noexcept
+  void destroy() noexcept
   {
     if (m_is_error)
       error_reference().~Error();
@@ -127,23 +115,16 @@ private:
       value_reference().~T();
   }
 
-  T &
-  value_reference() noexcept
-  {
-    return *reinterpret_cast<T *>(&m_storage);
-  }
-  const T &
-  value_reference() const noexcept
+  T &value_reference() noexcept { return *reinterpret_cast<T *>(&m_storage); }
+  const T &value_reference() const noexcept
   {
     return *reinterpret_cast<const T *>(&m_storage);
   }
-  Error &
-  error_reference() noexcept
+  Error &error_reference() noexcept
   {
     return *reinterpret_cast<Error *>(&m_storage);
   }
-  const Error &
-  error_reference() const noexcept
+  const Error &error_reference() const noexcept
   {
     return *reinterpret_cast<const Error *>(&m_storage);
   }

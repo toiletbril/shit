@@ -14,14 +14,9 @@ namespace shit {
 
 Exec::Exec() = default;
 
-Builtin::Kind
-Exec::kind() const
-{
-  return Kind::Exec;
-}
+Builtin::Kind Exec::kind() const { return Kind::Exec; }
 
-i32
-Exec::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Exec::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
   const ArrayList<String> &args = ec.args();

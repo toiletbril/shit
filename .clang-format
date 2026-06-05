@@ -18,7 +18,6 @@ AlignConsecutiveMacros: true
 AllowShortBlocksOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortCaseLabelsOnASingleLine: true
-AlwaysBreakAfterReturnType: AllDefinitions
 AlwaysBreakTemplateDeclarations: true
 IncludeBlocks: Regroup
 IndentExternBlock: NoIndent

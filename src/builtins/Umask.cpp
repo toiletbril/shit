@@ -13,14 +13,9 @@ namespace shit {
 
 Umask::Umask() = default;
 
-Builtin::Kind
-Umask::kind() const
-{
-  return Kind::Umask;
-}
+Builtin::Kind Umask::kind() const { return Kind::Umask; }
 
-i32
-Umask::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
   const ArrayList<String> &args = ec.args();

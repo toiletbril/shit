@@ -37,8 +37,7 @@ struct BumpArena
   void release(Mark saved);
 
   template <class T, class... Args>
-  T *
-  create(Args &&...args)
+  T *create(Args &&...args)
   {
     void *storage = allocate(sizeof(T), alignof(T));
     return new (storage) T(std::forward<Args>(args)...);
@@ -63,12 +62,12 @@ private:
    being built. The operator delete on a node consults it to tell arena storage
    apart from an ordinary heap node, since a few arithmetic nodes are still
    built with make_unique. It is null outside a parse. */
-extern BumpArena *g_ast_arena;
+extern BumpArena *AST_ARENA;
 
 /* The arena that holds function bodies. A function body outlives the command
    that defined it, so it is parsed here instead of the per-command arena, which
    resets after every command. It is never reset during a run. */
-extern BumpArena *g_function_arena;
+extern BumpArena *FUNCTION_ARENA;
 
 /* True when the pointer belongs to either arena, so a node delete knows to
    leave the storage to the arena. */

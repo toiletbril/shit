@@ -15,8 +15,7 @@ namespace shit {
 using namespace tokens;
 using namespace expressions;
 
-static CompoundListCondition::Kind
-get_sequence_kind(Token::Kind tk)
+static CompoundListCondition::Kind get_sequence_kind(Token::Kind tk)
 {
   switch (tk) {
   case Token::Kind::Newline:
@@ -35,14 +34,12 @@ Parser::Parser(Lexer &&lexer) : m_lexer(std::move(lexer)) {}
 
 Parser::~Parser() = default;
 
-const ArrayList<Word> &
-Parser::debug_words() const
+const ArrayList<Word> &Parser::debug_words() const
 {
   return m_lexer.debug_words();
 }
 
-static bool
-kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
+static bool kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
 {
   for (Token::Kind k : set) {
     if (k == kind) return true;
@@ -53,8 +50,8 @@ kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
 /* The byte location of the keyword as a whole word somewhere in the source. A
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
-static Maybe<SourceLocation>
-find_standalone_keyword(StringView source, StringView keyword)
+static Maybe<SourceLocation> find_standalone_keyword(StringView source,
+                                                     StringView keyword)
 {
   auto is_boundary = [](char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0 || c == ';' ||
@@ -76,9 +73,10 @@ find_standalone_keyword(StringView source, StringView keyword)
 /* Report a missing terminator. When the keyword is found earlier in the source,
    point the note at it and explain it was read as an argument, otherwise point
    at the token where the terminator was expected. */
-[[noreturn]] static void
-throw_unterminated(SourceLocation opener, StringView what, StringView source,
-                   StringView keyword, SourceLocation fallback)
+[[noreturn]] static void throw_unterminated(SourceLocation opener,
+                                            StringView what, StringView source,
+                                            StringView keyword,
+                                            SourceLocation fallback)
 {
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
@@ -92,16 +90,14 @@ throw_unterminated(SourceLocation opener, StringView what, StringView source,
                                     "expected '" + keyword + "'"};
 }
 
-static bool
-is_empty_list(const Expression *expression)
+static bool is_empty_list(const Expression *expression)
 {
   return expression->is_dummy();
 }
 
 /* The reserved word ! is a single unquoted exclamation mark standing alone in
    command position. It is distinct from a != comparison or a quoted literal. */
-static bool
-is_negation_token(const Token *token)
+static bool is_negation_token(const Token *token)
 {
   if (token->kind() != Token::Kind::Word) return false;
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
@@ -112,8 +108,7 @@ is_negation_token(const Token *token)
 
 /* A friendly message for a token that cannot start a command. A stray control
    keyword almost always means its opener is missing. */
-static String
-unexpected_command_token_message(const Token *token)
+static String unexpected_command_token_message(const Token *token)
 {
   switch (token->kind()) {
   case Token::Kind::Then:
@@ -141,9 +136,7 @@ unexpected_command_token_message(const Token *token)
   }
 }
 
-/* A pipeline stage must be a simple command for now. Reject a compound command
-   with a clear error instead of an invalid downcast that would corrupt memory.
- */
+/* TODO */
 static SimpleCommand *
 require_simple_in_pipeline(std::unique_ptr<Command> command)
 {
@@ -155,10 +148,7 @@ require_simple_in_pipeline(std::unique_ptr<Command> command)
   return static_cast<SimpleCommand *>(command.release());
 }
 
-/* A token that closes a compound command or a case arm, so a command before it
-   is complete. */
-static bool
-is_compound_terminator(Token::Kind kind)
+static bool is_compound_terminator(Token::Kind kind)
 {
   switch (kind) {
   case Token::Kind::RightParen:
@@ -175,8 +165,7 @@ is_compound_terminator(Token::Kind kind)
   }
 }
 
-std::unique_ptr<Expression>
-Parser::construct_ast()
+std::unique_ptr<Expression> Parser::construct_ast()
 {
   /* The top-level list ends only at the end of input. */
   return parse_command_list({});
@@ -193,7 +182,7 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
   CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
 
   bool should_parse_command = true;
-  bool negate_pending = false;
+  bool should_negate_pending = false;
 
   for (;;) {
     if (should_parse_command) {
@@ -201,7 +190,7 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
       std::unique_ptr<Token> maybe_negation{m_lexer.peek_shell_token()};
       if (is_negation_token(maybe_negation.get())) {
         m_lexer.advance_past_last_peek();
-        negate_pending = true;
+        should_negate_pending = true;
       }
       lhs = parse_simple_command();
     } else {
@@ -215,9 +204,9 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
        the terminator for the caller to consume. */
     if (kind_in(token->kind(), terminators)) {
       if (lhs) {
-        if (negate_pending) {
+        if (should_negate_pending) {
           lhs->set_negated();
-          negate_pending = false;
+          should_negate_pending = false;
         }
         compound_list->append_node(
             m_lexer.arena().create<CompoundListCondition>(
@@ -241,13 +230,13 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
-        String ast = token->to_ast_string();
-        String message = "Expected a command ";
-        message += compound_list->is_empty() ? "before" : "after";
-        message += " operator, found '";
-        message += ast.view();
-        message += "'";
-        throw shit::ErrorWithLocation{token->source_location(), message};
+        const String ast = token->to_ast_string();
+        String msg = "Expected a command ";
+        msg += compound_list->is_empty() ? "before" : "after";
+        msg += " operator, found '";
+        msg += ast.view();
+        msg += "'";
+        throw shit::ErrorWithLocation{token->source_location(), msg};
       }
       [[fallthrough]];
     case Token::Kind::Newline:
@@ -257,9 +246,9 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
       m_lexer.advance_past_last_peek();
 
       if (lhs) {
-        if (negate_pending) {
+        if (should_negate_pending) {
           lhs->set_negated();
-          negate_pending = false;
+          should_negate_pending = false;
         }
         compound_list->append_node(
             m_lexer.arena().create<CompoundListCondition>(
@@ -274,15 +263,15 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
                                         "Expected a command after an operator"};
         }
 
-        /* Empty input? */
+        /* Empty input yields a dummy, since lhs is null when no command was
+           parsed before the terminator. */
         if (compound_list->is_empty()) {
-          SHIT_ASSERT(!lhs);
           return std::unique_ptr<DummyExpression>{
               m_lexer.arena().create<DummyExpression>(
                   token->source_location())};
-        } else {
-          return compound_list;
         }
+
+        return compound_list;
       }
     } break;
 
@@ -336,8 +325,7 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
 /* return: a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position introduces a
    compound command. */
-std::unique_ptr<Command>
-Parser::parse_simple_command()
+std::unique_ptr<Command> Parser::parse_simple_command()
 {
   Maybe<SourceLocation> source_location;
   ArrayList<std::unique_ptr<Token>> args_accumulator{};
@@ -607,8 +595,7 @@ Parser::parse_simple_command()
   SHIT_UNREACHABLE();
 }
 
-std::unique_ptr<Command>
-Parser::parse_if()
+std::unique_ptr<Command> Parser::parse_if()
 {
   std::unique_ptr<Token> if_token{m_lexer.next_shell_token()};
   SourceLocation location = if_token->source_location();
@@ -669,8 +656,7 @@ Parser::parse_if()
   return node;
 }
 
-std::unique_ptr<Command>
-Parser::parse_while_or_until(bool is_until)
+std::unique_ptr<Command> Parser::parse_while_or_until(bool is_until)
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   SourceLocation location = keyword->source_location();
@@ -696,8 +682,7 @@ Parser::parse_while_or_until(bool is_until)
       location, condition.release(), body.release(), is_until)};
 }
 
-std::unique_ptr<Command>
-Parser::parse_for()
+std::unique_ptr<Command> Parser::parse_for()
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   SourceLocation location = keyword->source_location();
@@ -766,8 +751,7 @@ Parser::parse_for()
       body.release())};
 }
 
-std::unique_ptr<Command>
-Parser::parse_case()
+std::unique_ptr<Command> Parser::parse_case()
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   SourceLocation location = keyword->source_location();
@@ -824,16 +808,20 @@ Parser::parse_case()
 
     for (;;) {
       std::unique_ptr<Token> pattern{m_lexer.next_shell_token()};
+
       if (pattern->kind() != Token::Kind::Word) {
         throw ErrorWithLocationAndDetails{
             location, "Unterminated case", pattern->source_location(),
             "expected a pattern to start an arm, or 'esac' to end the case"};
       }
+
       patterns.push(pattern.release());
 
       std::unique_ptr<Token> separator{m_lexer.next_shell_token()};
+
       if (separator->kind() == Token::Kind::Pipe) continue;
       if (separator->kind() == Token::Kind::RightParen) break;
+
       throw ErrorWithLocation{separator->source_location(),
                               "Expected '|' or ')' in a case pattern"};
     }
@@ -855,8 +843,7 @@ Parser::parse_case()
       location, word.release(), std::move(items))};
 }
 
-std::unique_ptr<Command>
-Parser::parse_brace_group()
+std::unique_ptr<Command> Parser::parse_brace_group()
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
 
@@ -874,8 +861,7 @@ Parser::parse_brace_group()
       open->source_location(), body.release())};
 }
 
-std::unique_ptr<Command>
-Parser::parse_subshell()
+std::unique_ptr<Command> Parser::parse_subshell()
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
 
@@ -918,7 +904,7 @@ Parser::parse_function_definition(std::unique_ptr<Token> name_token)
   /* The body is parsed into the persistent function arena, so it outlives the
      command that defined it once the per-command arena resets. */
   BumpArena &per_command_arena = m_lexer.arena();
-  if (g_function_arena != nullptr) m_lexer.set_arena(*g_function_arena);
+  if (FUNCTION_ARENA != nullptr) m_lexer.set_arena(*FUNCTION_ARENA);
   std::unique_ptr<Command> body{parse_simple_command()};
   m_lexer.set_arena(per_command_arena);
 
@@ -933,8 +919,7 @@ Parser::parse_function_definition(std::unique_ptr<Token> name_token)
 }
 
 /* A standard pratt-parser for expressions. */
-std::unique_ptr<Expression>
-Parser::parse_expression(u8 min_precedence)
+std::unique_ptr<Expression> Parser::parse_expression(u8 min_precedence)
 {
   m_recursion_depth++;
   SHIT_DEFER { m_recursion_depth--; };

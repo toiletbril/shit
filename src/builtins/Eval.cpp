@@ -9,14 +9,9 @@ namespace shit {
 
 Eval::Eval() = default;
 
-Builtin::Kind
-Eval::kind() const
-{
-  return Kind::Eval;
-}
+Builtin::Kind Eval::kind() const { return Kind::Eval; }
 
-i32
-Eval::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Eval::execute(ExecContext &ec, EvalContext &cxt) const
 {
   std::string joined{};
   for (usize i = 1; i < ec.args().size(); i++) {

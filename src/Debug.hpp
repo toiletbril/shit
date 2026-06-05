@@ -24,8 +24,7 @@
 #if defined __clang__
 #include <cstdarg>
 #include <string>
-SHIT_USED static void
-t__strprintf(std::string &s, const char *fmt, ...)
+SHIT_USED static void t__strprintf(std::string &s, const char *fmt, ...)
 {
   va_list a;
   va_start(a, fmt);
@@ -38,8 +37,7 @@ t__strprintf(std::string &s, const char *fmt, ...)
   delete[] b;
 }
 template <class T>
-std::string
-t__string_from_struct(const T &x)
+std::string t__string_from_struct(const T &x)
 {
   std::string s{};
   __builtin_dump_struct(&x, t__strprintf, s);

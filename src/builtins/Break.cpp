@@ -8,14 +8,9 @@ namespace shit {
 
 Break::Break() = default;
 
-Builtin::Kind
-Break::kind() const
-{
-  return Kind::Break;
-}
+Builtin::Kind Break::kind() const { return Kind::Break; }
 
-i32
-Break::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Break::execute(ExecContext &ec, EvalContext &cxt) const
 {
   /* The optional argument is how many enclosing loops to break, default one. */
   i64 level = 1;

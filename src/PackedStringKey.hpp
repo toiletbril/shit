@@ -20,8 +20,7 @@ struct PackedStringKey
 
   /* Pack a NUL-terminated literal at compile time, so a static table entry
      becomes a constant with no runtime initialization. */
-  static constexpr PackedStringKey
-  from_literal(const char *text)
+  static constexpr PackedStringKey from_literal(const char *text)
   {
     PackedStringKey key{};
     usize i = 0;
@@ -34,8 +33,7 @@ struct PackedStringKey
   }
 
   /* Pack the first sixteen bytes of a view at lookup time. */
-  static PackedStringKey
-  from_view(StringView text)
+  static PackedStringKey from_view(StringView text)
   {
     PackedStringKey key{};
     usize count = text.size() < 16 ? text.size() : 16;
@@ -47,8 +45,7 @@ struct PackedStringKey
     return key;
   }
 
-  [[nodiscard]] bool
-  operator==(const PackedStringKey &other) const
+  [[nodiscard]] bool operator==(const PackedStringKey &other) const
   {
     return low_word == other.low_word && high_word == other.high_word;
   }

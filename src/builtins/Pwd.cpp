@@ -12,14 +12,9 @@ namespace shit {
 
 Pwd::Pwd() = default;
 
-Builtin::Kind
-Pwd::kind() const
-{
-  return Kind::Pwd;
-}
+Builtin::Kind Pwd::kind() const { return Kind::Pwd; }
 
-i32
-Pwd::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 

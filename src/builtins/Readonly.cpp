@@ -15,14 +15,9 @@ namespace shit {
 
 Readonly::Readonly() = default;
 
-Builtin::Kind
-Readonly::kind() const
-{
-  return Kind::Readonly;
-}
+Builtin::Kind Readonly::kind() const { return Kind::Readonly; }
 
-i32
-Readonly::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 

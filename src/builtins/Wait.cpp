@@ -16,8 +16,7 @@ namespace shit {
 namespace {
 
 /* Wait for one job to finish, reusing a status already collected. */
-i32
-wait_for_job(Job &job)
+i32 wait_for_job(Job &job)
 {
   if (job.state == Job::State::Done) return job.last_status;
   i32 status = os::wait_and_monitor_process(job.pid);
@@ -30,14 +29,9 @@ wait_for_job(Job &job)
 
 Wait::Wait() = default;
 
-Builtin::Kind
-Wait::kind() const
-{
-  return Kind::Wait;
-}
+Builtin::Kind Wait::kind() const { return Kind::Wait; }
 
-i32
-Wait::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
 

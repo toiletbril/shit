@@ -15,14 +15,9 @@ namespace shit {
 
 Which::Which() = default;
 
-Builtin::Kind
-Which::kind() const
-{
-  return Kind::Which;
-}
+Builtin::Kind Which::kind() const { return Kind::Which; }
 
-i32
-Which::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 

@@ -13,27 +13,17 @@ struct HashSet
 {
   explicit HashSet(Allocator allocator) : m_map(allocator) {}
 
-  void
-  add(StringView key)
-  {
-    m_map.set(key, Nothing{});
-  }
+  void add(StringView key) { m_map.set(key, Nothing{}); }
 
-  [[nodiscard]] bool
-  contains(StringView key) const
+  [[nodiscard]] bool contains(StringView key) const
   {
     return m_map.find(key) != nullptr;
   }
 
-  [[nodiscard]] usize
-  size() const
-  {
-    return m_map.size();
-  }
+  [[nodiscard]] usize size() const { return m_map.size(); }
 
   template <class Fn>
-  void
-  for_each(Fn fn) const
+  void for_each(Fn fn) const
   {
     m_map.for_each([&fn](StringView key, const Nothing &) { fn(key); });
   }

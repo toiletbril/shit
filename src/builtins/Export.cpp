@@ -13,14 +13,9 @@ namespace shit {
 
 Export::Export() = default;
 
-Builtin::Kind
-Export::kind() const
-{
-  return Kind::Export;
-}
+Builtin::Kind Export::kind() const { return Kind::Export; }
 
-i32
-Export::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Export::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };

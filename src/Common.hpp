@@ -109,8 +109,7 @@ private:
 struct t__exit_scope_help
 {
   template <typename T>
-  t__exit_scope<T>
-  operator+(T t)
+  t__exit_scope<T> operator+(T t)
   {
     return t;
   }

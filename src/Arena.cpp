@@ -7,14 +7,13 @@
 
 namespace shit {
 
-BumpArena *g_ast_arena = nullptr;
-BumpArena *g_function_arena = nullptr;
+BumpArena *AST_ARENA = nullptr;
+BumpArena *FUNCTION_ARENA = nullptr;
 
-bool
-is_arena_pointer(const void *pointer)
+bool is_arena_pointer(const void *pointer)
 {
-  return (g_ast_arena != nullptr && g_ast_arena->owns(pointer)) ||
-         (g_function_arena != nullptr && g_function_arena->owns(pointer));
+  return (AST_ARENA != nullptr && AST_ARENA->owns(pointer)) ||
+         (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
 }
 
 BumpArena::BumpArena() = default;
@@ -25,8 +24,7 @@ BumpArena::~BumpArena()
     std::free(block.base);
 }
 
-void
-BumpArena::add_block(usize minimum_size)
+void BumpArena::add_block(usize minimum_size)
 {
   usize size = DEFAULT_BLOCK_SIZE;
   if (minimum_size > size) size = minimum_size;
@@ -37,8 +35,7 @@ BumpArena::add_block(usize minimum_size)
   m_blocks.push_back(Block{base, size, 0});
 }
 
-void *
-BumpArena::allocate(usize size, usize alignment)
+void *BumpArena::allocate(usize size, usize alignment)
 {
   for (;;) {
     if (!m_blocks.empty()) {
@@ -54,8 +51,7 @@ BumpArena::allocate(usize size, usize alignment)
   }
 }
 
-bool
-BumpArena::owns(const void *pointer) const
+bool BumpArena::owns(const void *pointer) const
 {
   const u8 *p = static_cast<const u8 *>(pointer);
   for (const Block &block : m_blocks) {
@@ -64,15 +60,13 @@ BumpArena::owns(const void *pointer) const
   return false;
 }
 
-BumpArena::Mark
-BumpArena::mark() const
+BumpArena::Mark BumpArena::mark() const
 {
   if (m_blocks.empty()) return Mark{0, 0};
   return Mark{m_blocks.size(), m_blocks.back().used};
 }
 
-void
-BumpArena::release(Mark saved)
+void BumpArena::release(Mark saved)
 {
   /* Reset the bump pointer to the marked position, keeping the blocks so a loop
      body reuses the same storage each turn instead of asking the system again.
@@ -83,8 +77,7 @@ BumpArena::release(Mark saved)
     m_blocks[saved.block_count - 1].used = saved.used_in_last;
 }
 
-void
-BumpArena::reset()
+void BumpArena::reset()
 {
   /* Keep the first block and drop the rest, so a typical command reuses one
      block without asking the system for memory again. */

@@ -10,22 +10,18 @@ namespace shit {
 
 Source::Source() = default;
 
-Builtin::Kind
-Source::kind() const
-{
-  return Kind::Source;
-}
+Builtin::Kind Source::kind() const { return Kind::Source; }
 
-i32
-Source::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Source::execute(ExecContext &ec, EvalContext &cxt) const
 {
   if (ec.args().size() < 2) throw Error{"filename argument is required"};
 
   std::string path{ec.args()[1].c_str(), ec.args()[1].size()};
-  Maybe<std::string> contents = utils::read_entire_file(path);
+  Maybe<String> contents = utils::read_entire_file(path);
   if (!contents) throw Error{"could not open '" + path + "'"};
 
-  return cxt.run_source(*contents, "the file '" + path + "'");
+  return cxt.run_source(std::string{contents->c_str(), contents->size()},
+                        "the file '" + path + "'");
 }
 
 } /* namespace shit */

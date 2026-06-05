@@ -42,31 +42,27 @@ const SetOption SET_OPTIONS[] = {
     {'v', "verbose",   nullptr,                         nullptr                  },
 };
 
-const SetOption *
-find_option_by_letter(char letter)
+const SetOption *find_option_by_letter(char letter)
 {
   for (const SetOption &option : SET_OPTIONS)
     if (option.letter == letter) return &option;
   return nullptr;
 }
 
-const SetOption *
-find_option_by_name(StringView name)
+const SetOption *find_option_by_name(StringView name)
 {
   for (const SetOption &option : SET_OPTIONS)
     if (option.name == name) return &option;
   return nullptr;
 }
 
-bool
-option_is_on(const EvalContext &cxt, const SetOption &option)
+bool option_is_on(const EvalContext &cxt, const SetOption &option)
 {
   return option.get != nullptr ? (cxt.*(option.get))() : false;
 }
 
 /* The reusable command form that set -o and set +o print, one line each. */
-String
-list_options(const EvalContext &cxt)
+String list_options(const EvalContext &cxt)
 {
   String out{};
   for (const SetOption &option : SET_OPTIONS) {
@@ -81,14 +77,9 @@ list_options(const EvalContext &cxt)
 
 Set::Set() = default;
 
-Builtin::Kind
-Set::kind() const
-{
-  return Kind::Set;
-}
+Builtin::Kind Set::kind() const { return Kind::Set; }
 
-i32
-Set::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
 

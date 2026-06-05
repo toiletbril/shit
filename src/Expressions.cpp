@@ -19,14 +19,9 @@ namespace shit {
 
 Expression::Expression(SourceLocation location) : m_location(location) {}
 
-SourceLocation
-Expression::source_location() const
-{
-  return m_location;
-}
+SourceLocation Expression::source_location() const { return m_location; }
 
-String
-Expression::to_ast_string(usize layer) const
+String Expression::to_ast_string(usize layer) const
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -34,61 +29,47 @@ Expression::to_ast_string(usize layer) const
   return pad + "[" + to_string() + "]";
 }
 
-i64
-Expression::evaluate(EvalContext &cxt) const
+i64 Expression::evaluate(EvalContext &cxt) const
 {
   cxt.add_evaluated_expression();
   return evaluate_impl(cxt);
 }
 
-void
-Expression::operator delete(void *pointer)
+void Expression::operator delete(void *pointer)
 {
   if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);
 }
 
-void
-AnalysisContext::warn(SourceLocation location, StringView message)
+void AnalysisContext::warn(SourceLocation location, StringView message)
 {
   WarningWithLocation located{location, message};
   show_message(located.to_string(source));
 }
 
-void
-AnalysisContext::fail(SourceLocation location, StringView message)
+void AnalysisContext::fail(SourceLocation location, StringView message)
 {
   ErrorWithLocation located{location, message};
   show_message(located.to_string(source));
   has_fatal = true;
 }
 
-void
-Expression::analyze(AnalysisContext &actx, bool is_unconditional) const
+void Expression::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   SHIT_UNUSED(actx);
   SHIT_UNUSED(is_unconditional);
 }
 
-bool
-Expression::is_simple_command() const
-{
-  return false;
-}
+bool Expression::is_simple_command() const { return false; }
 
-bool
-Expression::is_dummy() const
-{
-  return false;
-}
+bool Expression::is_dummy() const { return false; }
 
 namespace {
 
 /* The literal name of a command when it is statically known. A word that holds
    a variable reference or a live glob metacharacter is dynamic, so its target
    cannot be checked before run time. */
-Maybe<String>
-static_command_name(const Token *token)
+Maybe<String> static_command_name(const Token *token)
 {
   if (token->kind() != Token::Kind::Word) return shit::None;
 
@@ -110,8 +91,7 @@ static_command_name(const Token *token)
 /* A command resolves when it is a builtin, a program on PATH, or an existing
    path. This shares the PATH cache with execution, so an unconditional command
    is resolved only once. */
-bool
-command_resolves(const String &name)
+bool command_resolves(const String &name)
 {
   if (name.empty()) return false;
   if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
@@ -121,8 +101,7 @@ command_resolves(const String &name)
   return utils::search_program_path(name.view()).size() != 0;
 }
 
-bool
-word_has_backtick(const Word &word)
+bool word_has_backtick(const Word &word)
 {
   for (const WordSegment &segment : word.segments) {
     if (segment.text.find_character('`').has_value()) return true;
@@ -132,9 +111,8 @@ word_has_backtick(const Word &word)
 
 } /* namespace */
 
-bool
-analyze_ast(const Expression *root, StringView source,
-            const HashSet &known_functions, const HashSet &known_aliases)
+bool analyze_ast(const Expression *root, StringView source,
+                 const HashSet &known_functions, const HashSet &known_aliases)
 {
   AnalysisContext actx{source};
   /* A function or alias defined by an earlier command resolves, so seed the
@@ -167,8 +145,7 @@ IfStatement::~IfStatement()
   if (m_otherwise != nullptr) delete m_otherwise;
 }
 
-i64
-IfStatement::evaluate_impl(EvalContext &cxt) const
+i64 IfStatement::evaluate_impl(EvalContext &cxt) const
 {
   i64 condition = m_condition->evaluate(cxt);
   /* A jump set while evaluating the condition stops the if and stays pending.
@@ -183,14 +160,9 @@ IfStatement::evaluate_impl(EvalContext &cxt) const
   return 0;
 }
 
-String
-IfStatement::to_string() const
-{
-  return "If";
-}
+String IfStatement::to_string() const { return "If"; }
 
-String
-IfStatement::to_ast_string(usize layer) const
+String IfStatement::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -214,66 +186,35 @@ IfStatement::to_ast_string(usize layer) const
 
 Command::Command(SourceLocation location) : Expression(location) {}
 
-void
-Command::make_async()
-{
-  m_is_async = true;
-}
+void Command::make_async() { m_is_async = true; }
 
-bool
-Command::is_async() const
-{
-  return m_is_async;
-}
+bool Command::is_async() const { return m_is_async; }
 
-void
-Command::set_negated()
-{
-  m_is_negated = true;
-}
+void Command::set_negated() { m_is_negated = true; }
 
-bool
-Command::is_negated() const
-{
-  return m_is_negated;
-}
+bool Command::is_negated() const { return m_is_negated; }
 
-void
-Command::set_local_vars(HashMap<Word> &&vars)
+void Command::set_local_vars(HashMap<Word> &&vars)
 {
   m_local_vars = std::move(vars);
 }
 
-bool
-Command::is_assignment() const
-{
-  return false;
-}
+bool Command::is_assignment() const { return false; }
 
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
 {}
 
-bool
-DummyExpression::is_dummy() const
-{
-  return true;
-}
+bool DummyExpression::is_dummy() const { return true; }
 
-i64
-DummyExpression::evaluate_impl(EvalContext &cxt) const
+i64 DummyExpression::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
   return 0;
 }
 
-String
-DummyExpression::to_string() const
-{
-  return "Dummy";
-}
+String DummyExpression::to_string() const { return "Dummy"; }
 
-String
-DummyExpression::to_ast_string(usize layer) const
+String DummyExpression::to_ast_string(usize layer) const
 {
   String pad{};
   for (usize i = 0; i < layer; i++) {
@@ -288,20 +229,11 @@ AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
 
 AssignCommand::~AssignCommand() { delete m_assignment; }
 
-const Assignment *
-AssignCommand::assignment() const
-{
-  return m_assignment;
-}
+const Assignment *AssignCommand::assignment() const { return m_assignment; }
 
-bool
-AssignCommand::is_assignment() const
-{
-  return true;
-}
+bool AssignCommand::is_assignment() const { return true; }
 
-i64
-AssignCommand::evaluate_impl(EvalContext &cxt) const
+i64 AssignCommand::evaluate_impl(EvalContext &cxt) const
 {
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
@@ -322,16 +254,14 @@ AssignCommand::evaluate_impl(EvalContext &cxt) const
   return cxt.last_exit_status();
 }
 
-String
-AssignCommand::to_string() const
+String AssignCommand::to_string() const
 {
   String s = "Assign " + m_assignment->to_ast_string();
 
   return s;
 }
 
-String
-AssignCommand::to_ast_string(usize layer) const
+String AssignCommand::to_ast_string(usize layer) const
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -339,8 +269,7 @@ AssignCommand::to_ast_string(usize layer) const
   return pad + "[" + to_string() + "]";
 }
 
-void
-AssignCommand::redirect_to(usize d, String &f, bool duplicate)
+void AssignCommand::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -348,8 +277,7 @@ AssignCommand::redirect_to(usize d, String &f, bool duplicate)
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-void
-AssignCommand::append_to(usize d, String &f, bool duplicate)
+void AssignCommand::append_to(usize d, String &f, bool duplicate)
 {
   redirect_to(d, f, duplicate);
 }
@@ -372,15 +300,14 @@ SimpleCommand::~SimpleCommand()
   }
 }
 
-void
-SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections)
+void SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections)
 {
   for (const Redirection &redirection : redirections)
     m_redirections.push(redirection);
 }
 
-void
-SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
+void SimpleCommand::redirect_exec_context(ExecContext &ec,
+                                          EvalContext &cxt) const
 {
   for (const Redirection &redirection : m_redirections) {
     if (redirection.kind == Redirection::Kind::Heredoc) {
@@ -443,17 +370,9 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
   }
 }
 
-bool
-SimpleCommand::is_simple_command() const
-{
-  return true;
-}
+bool SimpleCommand::is_simple_command() const { return true; }
 
-const ArrayList<const Token *> &
-SimpleCommand::args() const
-{
-  return m_args;
-}
+const ArrayList<const Token *> &SimpleCommand::args() const { return m_args; }
 
 namespace {
 
@@ -462,8 +381,7 @@ namespace {
    and its options, and a name already expanded is not expanded again so a
    self-referential alias terminates. A quoted space inside the body is not
    preserved, since this expansion does not re-run the full tokenizer. */
-void
-expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
+void expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
 {
   ArrayList<String> already_expanded{};
 
@@ -514,8 +432,7 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
 
 } /* namespace */
 
-i64
-SimpleCommand::evaluate_impl(EvalContext &cxt) const
+i64 SimpleCommand::evaluate_impl(EvalContext &cxt) const
 {
   /* A command may have no words when it is only a redirection, such as > file,
      so the redirections still run below. */
@@ -730,8 +647,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   return ret;
 }
 
-String
-SimpleCommand::to_string() const
+String SimpleCommand::to_string() const
 {
   String s = "SimpleCommand";
 
@@ -750,8 +666,7 @@ SimpleCommand::to_string() const
   return s;
 }
 
-String
-SimpleCommand::to_ast_string(usize layer) const
+String SimpleCommand::to_ast_string(usize layer) const
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -759,8 +674,7 @@ SimpleCommand::to_ast_string(usize layer) const
   return pad + "[" + to_string() + "]";
 }
 
-void
-SimpleCommand::append_to(usize d, String &f, bool duplicate)
+void SimpleCommand::append_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -768,8 +682,7 @@ SimpleCommand::append_to(usize d, String &f, bool duplicate)
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-void
-SimpleCommand::redirect_to(usize d, String &f, bool duplicate)
+void SimpleCommand::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -786,27 +699,17 @@ CompoundList::~CompoundList()
   }
 }
 
-bool
-CompoundList::is_empty() const
-{
-  return m_nodes.empty();
-}
+bool CompoundList::is_empty() const { return m_nodes.empty(); }
 
-void
-CompoundList::append_node(const CompoundListCondition *node)
+void CompoundList::append_node(const CompoundListCondition *node)
 {
   m_location.add_length(node->source_location().length());
   m_nodes.push(node);
 }
 
-String
-CompoundList::to_string() const
-{
-  return "CompoundList";
-}
+String CompoundList::to_string() const { return "CompoundList"; }
 
-String
-CompoundList::to_ast_string(usize layer) const
+String CompoundList::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -822,8 +725,7 @@ CompoundList::to_ast_string(usize layer) const
   return s;
 }
 
-i64
-CompoundList::evaluate_impl(EvalContext &cxt) const
+i64 CompoundList::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_nodes.size() > 0);
 
@@ -879,14 +781,12 @@ CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
 
 CompoundListCondition::~CompoundListCondition() { delete m_cmd; }
 
-CompoundListCondition::Kind
-CompoundListCondition::kind() const
+CompoundListCondition::Kind CompoundListCondition::kind() const
 {
   return m_kind;
 }
 
-String
-CompoundListCondition::to_string() const
+String CompoundListCondition::to_string() const
 {
   String k;
   switch (kind()) {
@@ -898,8 +798,7 @@ CompoundListCondition::to_string() const
   return "CompoundListCondition, " + k;
 }
 
-String
-CompoundListCondition::to_ast_string(usize layer) const
+String CompoundListCondition::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -912,8 +811,7 @@ CompoundListCondition::to_ast_string(usize layer) const
   return s;
 }
 
-i64
-CompoundListCondition::evaluate_impl(EvalContext &cxt) const
+i64 CompoundListCondition::evaluate_impl(EvalContext &cxt) const
 {
   i64 status = m_cmd->evaluate(cxt);
 
@@ -936,29 +834,22 @@ Pipeline::~Pipeline()
   }
 }
 
-bool
-Pipeline::is_empty() const
-{
-  return m_commands.empty();
-}
+bool Pipeline::is_empty() const { return m_commands.empty(); }
 
-void
-Pipeline::append_command(const SimpleCommand *node)
+void Pipeline::append_command(const SimpleCommand *node)
 {
   m_location.add_length(node->source_location().length());
   m_commands.push(node);
 }
 
-String
-Pipeline::to_string() const
+String Pipeline::to_string() const
 {
   String s = "Pipeline";
   if (is_async()) s += ", Async";
   return s;
 }
 
-String
-Pipeline::to_ast_string(usize layer) const
+String Pipeline::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -975,8 +866,7 @@ Pipeline::to_ast_string(usize layer) const
   return s;
 }
 
-i64
-Pipeline::evaluate_impl(EvalContext &cxt) const
+i64 Pipeline::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_commands.size() > 1);
 
@@ -1009,8 +899,7 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
   return utils::execute_contexts_with_pipes(std::move(ecs), cxt, is_async());
 }
 
-void
-Pipeline::append_to(usize d, String &f, bool duplicate)
+void Pipeline::append_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1018,8 +907,7 @@ Pipeline::append_to(usize d, String &f, bool duplicate)
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-void
-Pipeline::redirect_to(usize d, String &f, bool duplicate)
+void Pipeline::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1029,8 +917,7 @@ Pipeline::redirect_to(usize d, String &f, bool duplicate)
 
 CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
 
-void
-CompoundCommand::append_to(usize d, String &f, bool duplicate)
+void CompoundCommand::append_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1039,8 +926,7 @@ CompoundCommand::append_to(usize d, String &f, bool duplicate)
                           "Redirection on a compound command is not supported"};
 }
 
-void
-CompoundCommand::redirect_to(usize d, String &f, bool duplicate)
+void CompoundCommand::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1049,8 +935,7 @@ CompoundCommand::redirect_to(usize d, String &f, bool duplicate)
                           "Redirection on a compound command is not supported"};
 }
 
-static String
-indent_for_layer(usize layer)
+static String indent_for_layer(usize layer)
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -1080,14 +965,9 @@ IfClause::~IfClause()
   delete m_otherwise;
 }
 
-String
-IfClause::to_string() const
-{
-  return "IfClause";
-}
+String IfClause::to_string() const { return "IfClause"; }
 
-String
-IfClause::to_ast_string(usize layer) const
+String IfClause::to_ast_string(usize layer) const
 {
   String pad = indent_for_layer(layer);
   String child_pad = pad + EXPRESSION_AST_INDENT;
@@ -1101,8 +981,7 @@ IfClause::to_ast_string(usize layer) const
   return s;
 }
 
-i64
-IfClause::evaluate_impl(EvalContext &cxt) const
+i64 IfClause::evaluate_impl(EvalContext &cxt) const
 {
   for (const auto &[condition, body] : m_branches) {
     i64 condition_status;
@@ -1119,8 +998,7 @@ IfClause::evaluate_impl(EvalContext &cxt) const
   return 0;
 }
 
-void
-IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const
+void IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional, since a branch may not be reached. */
@@ -1145,14 +1023,12 @@ WhileLoop::~WhileLoop()
   delete m_body;
 }
 
-String
-WhileLoop::to_string() const
+String WhileLoop::to_string() const
 {
   return m_is_until ? "UntilLoop" : "WhileLoop";
 }
 
-String
-WhileLoop::to_ast_string(usize layer) const
+String WhileLoop::to_ast_string(usize layer) const
 {
   String pad = indent_for_layer(layer);
   String child_pad = pad + EXPRESSION_AST_INDENT;
@@ -1174,8 +1050,7 @@ enum class LoopDisposition
   StopLoop,
 };
 
-LoopDisposition
-resolve_loop_control(EvalContext &cxt)
+LoopDisposition resolve_loop_control(EvalContext &cxt)
 {
   if (!cxt.has_pending_control_flow()) return LoopDisposition::RunNext;
 
@@ -1204,8 +1079,7 @@ resolve_loop_control(EvalContext &cxt)
 
 } /* namespace */
 
-i64
-WhileLoop::evaluate_impl(EvalContext &cxt) const
+i64 WhileLoop::evaluate_impl(EvalContext &cxt) const
 {
   i64 ret = 0;
   for (;;) {
@@ -1230,8 +1104,7 @@ WhileLoop::evaluate_impl(EvalContext &cxt) const
   return ret;
 }
 
-void
-WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
+void WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   /* The condition runs at least once, the body may run zero times. */
   m_condition->analyze(actx, is_unconditional);
@@ -1258,8 +1131,7 @@ ForLoop::~ForLoop()
   delete m_body;
 }
 
-String
-ForLoop::to_string() const
+String ForLoop::to_string() const
 {
   String result{"ForLoop \""};
   result += StringView{m_variable_name};
@@ -1267,8 +1139,7 @@ ForLoop::to_string() const
   return result;
 }
 
-String
-ForLoop::to_ast_string(usize layer) const
+String ForLoop::to_ast_string(usize layer) const
 {
   String pad = indent_for_layer(layer);
   String s = pad + "[" + to_string() + "]";
@@ -1276,8 +1147,7 @@ ForLoop::to_ast_string(usize layer) const
   return s;
 }
 
-i64
-ForLoop::evaluate_impl(EvalContext &cxt) const
+i64 ForLoop::evaluate_impl(EvalContext &cxt) const
 {
   /* Without an in clause the loop walks the positional parameters. */
   ArrayList<String> values =
@@ -1293,8 +1163,7 @@ ForLoop::evaluate_impl(EvalContext &cxt) const
   return ret;
 }
 
-void
-ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
+void ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   SHIT_UNUSED(is_unconditional);
   m_body->analyze(actx, false);
@@ -1321,14 +1190,9 @@ CaseClause::~CaseClause()
   }
 }
 
-String
-CaseClause::to_string() const
-{
-  return "CaseClause";
-}
+String CaseClause::to_string() const { return "CaseClause"; }
 
-String
-CaseClause::to_ast_string(usize layer) const
+String CaseClause::to_ast_string(usize layer) const
 {
   String pad = indent_for_layer(layer);
   String child_pad = pad + EXPRESSION_AST_INDENT;
@@ -1338,8 +1202,7 @@ CaseClause::to_ast_string(usize layer) const
   return s;
 }
 
-i64
-CaseClause::evaluate_impl(EvalContext &cxt) const
+i64 CaseClause::evaluate_impl(EvalContext &cxt) const
 {
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no pathname globbing, so a pattern keeps its metacharacters
@@ -1372,8 +1235,7 @@ CaseClause::evaluate_impl(EvalContext &cxt) const
   return 0;
 }
 
-void
-CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const
+void CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   SHIT_UNUSED(is_unconditional);
   for (const CaseItem &item : m_items)
@@ -1386,28 +1248,21 @@ BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
 
 BraceGroup::~BraceGroup() { delete m_body; }
 
-String
-BraceGroup::to_string() const
-{
-  return "BraceGroup";
-}
+String BraceGroup::to_string() const { return "BraceGroup"; }
 
-String
-BraceGroup::to_ast_string(usize layer) const
+String BraceGroup::to_ast_string(usize layer) const
 {
   String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
 
-i64
-BraceGroup::evaluate_impl(EvalContext &cxt) const
+i64 BraceGroup::evaluate_impl(EvalContext &cxt) const
 {
   return m_body->evaluate(cxt);
 }
 
-void
-BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const
+void BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   m_body->analyze(actx, is_unconditional);
 }
@@ -1418,22 +1273,16 @@ Subshell::Subshell(SourceLocation location, const Expression *body)
 
 Subshell::~Subshell() { delete m_body; }
 
-String
-Subshell::to_string() const
-{
-  return "Subshell";
-}
+String Subshell::to_string() const { return "Subshell"; }
 
-String
-Subshell::to_ast_string(usize layer) const
+String Subshell::to_ast_string(usize layer) const
 {
   String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
 
-i64
-Subshell::evaluate_impl(EvalContext &cxt) const
+i64 Subshell::evaluate_impl(EvalContext &cxt) const
 {
   /* This shell has no process-level subshell, so isolate by snapshot. A cd or
      an assignment inside does not leak, but the exit status propagates. An exit
@@ -1468,8 +1317,7 @@ Subshell::evaluate_impl(EvalContext &cxt) const
   return ret;
 }
 
-void
-Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const
+void Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   m_body->analyze(actx, is_unconditional);
 }
@@ -1483,20 +1331,11 @@ FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
    rather than this node, so it is not deleted here. */
 FunctionDefinition::~FunctionDefinition() = default;
 
-const String &
-FunctionDefinition::name() const
-{
-  return m_name;
-}
+const String &FunctionDefinition::name() const { return m_name; }
 
-const Expression *
-FunctionDefinition::body() const
-{
-  return m_body;
-}
+const Expression *FunctionDefinition::body() const { return m_body; }
 
-String
-FunctionDefinition::to_string() const
+String FunctionDefinition::to_string() const
 {
   String result{"FunctionDefinition \""};
   result += StringView{m_name};
@@ -1504,24 +1343,22 @@ FunctionDefinition::to_string() const
   return result;
 }
 
-String
-FunctionDefinition::to_ast_string(usize layer) const
+String FunctionDefinition::to_ast_string(usize layer) const
 {
   String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
 
-i64
-FunctionDefinition::evaluate_impl(EvalContext &cxt) const
+i64 FunctionDefinition::evaluate_impl(EvalContext &cxt) const
 {
   cxt.register_function(m_name, m_body);
   cxt.set_last_exit_status(0);
   return 0;
 }
 
-void
-FunctionDefinition::analyze(AnalysisContext &actx, bool is_unconditional) const
+void FunctionDefinition::analyze(AnalysisContext &actx,
+                                 bool is_unconditional) const
 {
   SHIT_UNUSED(is_unconditional);
   actx.defined_functions.add(m_name);
@@ -1534,8 +1371,7 @@ UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
 
 UnaryExpression::~UnaryExpression() { delete m_rhs; }
 
-String
-UnaryExpression::to_ast_string(usize layer) const
+String UnaryExpression::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -1558,8 +1394,7 @@ BinaryExpression::~BinaryExpression()
   delete m_rhs;
 }
 
-String
-BinaryExpression::to_ast_string(usize layer) const
+String BinaryExpression::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -1579,15 +1414,13 @@ ConstantNumber::ConstantNumber(SourceLocation location, i64 value)
 
 ConstantNumber::~ConstantNumber() = default;
 
-i64
-ConstantNumber::evaluate_impl(EvalContext &cxt) const
+i64 ConstantNumber::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
   return m_value;
 }
 
-String
-ConstantNumber::to_ast_string(usize layer) const
+String ConstantNumber::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -1597,8 +1430,7 @@ ConstantNumber::to_ast_string(usize layer) const
   return s;
 }
 
-String
-ConstantNumber::to_string() const
+String ConstantNumber::to_string() const
 {
   return utils::integer_to_string(m_value);
 }
@@ -1609,15 +1441,13 @@ ConstantString::ConstantString(SourceLocation location, StringView value)
 
 ConstantString::~ConstantString() = default;
 
-i64
-ConstantString::evaluate_impl(EvalContext &cxt) const
+i64 ConstantString::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
   SHIT_UNREACHABLE();
 }
 
-String
-ConstantString::to_ast_string(usize layer) const
+String ConstantString::to_ast_string(usize layer) const
 {
   String s{};
   String pad{};
@@ -1627,11 +1457,7 @@ ConstantString::to_ast_string(usize layer) const
   return s;
 }
 
-String
-ConstantString::to_string() const
-{
-  return m_value;
-}
+String ConstantString::to_string() const { return m_value; }
 
 #define UNARY_EXPRESSION_DECLS(e, expr)                                        \
   e::e(SourceLocation location, const Expression *rhs)                         \
@@ -1654,14 +1480,12 @@ BinaryDummyExpression::BinaryDummyExpression(SourceLocation location,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-String
-BinaryDummyExpression::to_string() const
+String BinaryDummyExpression::to_string() const
 {
   return "BinaryDummyExpression";
 }
 
-i64
-BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const
+i64 BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
   return 0;
@@ -1672,15 +1496,10 @@ Divide::Divide(SourceLocation location, const Expression *lhs,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-String
-Divide::to_string() const
-{
-  return "/";
-}
+String Divide::to_string() const { return "/"; }
 
 /* Custom evaluation, since we can't divide by zero. */
-i64
-Divide::evaluate_impl(EvalContext &cxt) const
+i64 Divide::evaluate_impl(EvalContext &cxt) const
 {
   i64 denom = m_rhs->evaluate(cxt);
   if (denom == 0)
@@ -1716,8 +1535,7 @@ BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
-void
-SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
+void SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   if (m_args.empty()) return;
 
@@ -1830,22 +1648,19 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 }
 
-void
-Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const
+void Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   for (const SimpleCommand *command : m_commands)
     command->analyze(actx, is_unconditional);
 }
 
-void
-CompoundListCondition::analyze(AnalysisContext &actx,
-                               bool is_unconditional) const
+void CompoundListCondition::analyze(AnalysisContext &actx,
+                                    bool is_unconditional) const
 {
   m_cmd->analyze(actx, is_unconditional);
 }
 
-void
-CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
+void CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   for (const CompoundListCondition *node : m_nodes) {
     /* A semicolon or newline node runs whenever the list runs. An && or || node
@@ -1856,8 +1671,7 @@ CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 }
 
-void
-IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
+void IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   /* The condition always runs to decide the branch. The branches do not. */
   m_condition->analyze(actx, is_unconditional);

@@ -16,14 +16,9 @@ namespace shit {
 
 Unset::Unset() = default;
 
-Builtin::Kind
-Unset::kind() const
-{
-  return Kind::Unset;
-}
+Builtin::Kind Unset::kind() const { return Kind::Unset; }
 
-i32
-Unset::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> names = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };

@@ -24,7 +24,7 @@ namespace {
    growing it on every keystroke. A header before each block records the block's
    capacity, used both to copy the right bytes on realloc and to size a reused
    block. Each free block links to the next through its own payload. */
-shit::BumpArena g_interactive_arena{};
+shit::BumpArena TOILETLINE_ARENA{};
 
 constexpr usize TL_ALLOC_HEADER = 16;
 
@@ -32,21 +32,19 @@ struct TlFreeBlock
 {
   TlFreeBlock *next;
 };
-TlFreeBlock *g_tl_free_list = nullptr;
+TlFreeBlock *TOILETLINE_FREE_LIST = nullptr;
 
-usize &
-tl_block_capacity(void *payload)
+usize &tl_block_capacity(void *payload)
 {
   return *reinterpret_cast<usize *>(static_cast<char *>(payload) -
                                     TL_ALLOC_HEADER);
 }
 
-void *
-tl_arena_malloc(usize length)
+void *tl_arena_malloc(usize length)
 {
   /* Reuse the first free block large enough, so repeated same-size line-buffer
      allocations do not keep growing the arena. */
-  for (TlFreeBlock **link = &g_tl_free_list; *link != nullptr;
+  for (TlFreeBlock **link = &TOILETLINE_FREE_LIST; *link != nullptr;
        link = &(*link)->next)
   {
     void *payload = *link;
@@ -57,22 +55,20 @@ tl_arena_malloc(usize length)
   }
 
   char *base = static_cast<char *>(
-      g_interactive_arena.allocate(length + TL_ALLOC_HEADER, TL_ALLOC_HEADER));
+      TOILETLINE_ARENA.allocate(length + TL_ALLOC_HEADER, TL_ALLOC_HEADER));
   *reinterpret_cast<usize *>(base) = length;
   return base + TL_ALLOC_HEADER;
 }
 
-void
-tl_arena_free(void *pointer)
+void tl_arena_free(void *pointer)
 {
   if (pointer == NULL) return;
   TlFreeBlock *block = static_cast<TlFreeBlock *>(pointer);
-  block->next = g_tl_free_list;
-  g_tl_free_list = block;
+  block->next = TOILETLINE_FREE_LIST;
+  TOILETLINE_FREE_LIST = block;
 }
 
-void *
-tl_arena_realloc(void *pointer, usize length)
+void *tl_arena_realloc(void *pointer, usize length)
 {
   if (pointer == NULL) return tl_arena_malloc(length);
   usize old_capacity = tl_block_capacity(pointer);
@@ -122,28 +118,21 @@ static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
 static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
 
-void
-set_title(const String &title)
+void set_title(const String &title)
 {
   if (::tl_set_title(title.c_str()) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Could not set the title for the terminal"};
 }
 
-usize
-utf8_strlen(const String &s, usize count)
+usize utf8_strlen(const String &s, usize count)
 {
   return (count != static_cast<usize>(-1)) ? ::tl_utf8_strnlen(s.c_str(), count)
                                            : ::tl_utf8_strlen(s.c_str());
 }
 
-bool
-is_active()
-{
-  return ::itl_g_is_active;
-}
+bool is_active() { return ::itl_g_is_active; }
 
-void
-initialize()
+void initialize()
 {
   /* Load history. */
   if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
@@ -171,8 +160,7 @@ initialize()
   }
 }
 
-void
-exit()
+void exit()
 {
   /* Dump history. */
   if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
@@ -193,8 +181,7 @@ exit()
   }
 }
 
-InputResult
-get_input(const String &prompt)
+InputResult get_input(const String &prompt)
 {
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   if (code == TL_ERROR) {
@@ -204,21 +191,18 @@ get_input(const String &prompt)
   return InputResult{code, String{TL_BUFFER}};
 }
 
-void
-set_input(const String &input)
+void set_input(const String &input)
 {
   ::tl_set_predefined_input(input.c_str());
 }
 
-void
-enter_raw_mode()
+void enter_raw_mode()
 {
   if (::tl_enter_raw_mode() != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't force the terminal into raw mode"};
 }
 
-void
-exit_raw_mode()
+void exit_raw_mode()
 {
   if (::tl_exit_raw_mode() != TL_SUCCESS) {
     throw shit::Error{
@@ -226,8 +210,7 @@ exit_raw_mode()
   }
 }
 
-void
-emit_newlines(StringView buffer)
+void emit_newlines(StringView buffer)
 {
   if (::tl_emit_newlines(buffer.data) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
@@ -251,62 +234,37 @@ struct InputResult
   String text;
 };
 
-void
-set_title(const String &title)
-{
-  SHIT_UNUSED(title);
-}
+void set_title(const String &title) { SHIT_UNUSED(title); }
 
-usize
-utf8_strlen(const String &s, usize count)
+usize utf8_strlen(const String &s, usize count)
 {
   return (count != static_cast<usize>(-1) && count < s.length()) ? count
                                                                  : s.length();
 }
 
-bool
-is_active()
-{
-  return false;
-}
+bool is_active() { return false; }
 
-void
-initialize()
+void initialize()
 {
   throw shit::Error{
       "This build has no line editor, use '-c', '-s', or a file argument"};
 }
 
-void
-exit()
-{}
+void exit() {}
 
-InputResult
-get_input(const String &prompt)
+InputResult get_input(const String &prompt)
 {
   SHIT_UNUSED(prompt);
   throw shit::Error{"This build has no line editor"};
 }
 
-void
-set_input(const String &input)
-{
-  SHIT_UNUSED(input);
-}
+void set_input(const String &input) { SHIT_UNUSED(input); }
 
-void
-enter_raw_mode()
-{}
+void enter_raw_mode() {}
 
-void
-exit_raw_mode()
-{}
+void exit_raw_mode() {}
 
-void
-emit_newlines(StringView buffer)
-{
-  SHIT_UNUSED(buffer);
-}
+void emit_newlines(StringView buffer) { SHIT_UNUSED(buffer); }
 
 } /* namespace toiletline */
 

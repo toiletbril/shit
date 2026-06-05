@@ -15,14 +15,9 @@ namespace shit {
 
 Unalias::Unalias() = default;
 
-Builtin::Kind
-Unalias::kind() const
-{
-  return Kind::Unalias;
-}
+Builtin::Kind Unalias::kind() const { return Kind::Unalias; }
 
-i32
-Unalias::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 

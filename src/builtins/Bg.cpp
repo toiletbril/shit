@@ -16,14 +16,9 @@ namespace shit {
 
 Bg::Bg() = default;
 
-Builtin::Kind
-Bg::kind() const
-{
-  return Kind::Bg;
-}
+Builtin::Kind Bg::kind() const { return Kind::Bg; }
 
-i32
-Bg::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Bg::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
 

@@ -20,8 +20,7 @@ namespace shit {
 
 namespace os {
 
-Maybe<usize>
-write_fd(os::descriptor fd, const void *buf, usize size)
+Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size)
 {
   for (;;) {
     ssize_t w = write(fd, buf, size);
@@ -33,8 +32,7 @@ write_fd(os::descriptor fd, const void *buf, usize size)
   }
 }
 
-Maybe<usize>
-read_fd(os::descriptor fd, void *buf, usize size)
+Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size)
 {
   for (;;) {
     ssize_t r = read(fd, buf, size);
@@ -47,14 +45,9 @@ read_fd(os::descriptor fd, void *buf, usize size)
   }
 }
 
-bool
-close_fd(os::descriptor fd)
-{
-  return close(fd) != -1;
-}
+bool close_fd(os::descriptor fd) { return close(fd) != -1; }
 
-os::descriptor
-redirect_stdout(os::descriptor target)
+os::descriptor redirect_stdout(os::descriptor target)
 {
   /* The saved copy of the real stdout is close-on-exec, so a forked command
      does not inherit it and hold the shell's own output open. An immortal
@@ -69,23 +62,20 @@ redirect_stdout(os::descriptor target)
   return saved;
 }
 
-void
-restore_stdout(os::descriptor saved)
+void restore_stdout(os::descriptor saved)
 {
   dup2(saved, STDOUT_FILENO);
   close(saved);
 }
 
-Maybe<String>
-get_current_user()
+Maybe<String> get_current_user()
 {
   struct passwd *pw = getpwuid(getuid());
   if (pw != NULL) return String{StringView{pw->pw_name}};
   return shit::None;
 }
 
-Maybe<Path>
-get_home_directory()
+Maybe<Path> get_home_directory()
 {
   if (Maybe<String> home = get_environment_variable("HOME"))
     return Path{StringView{*home}};
@@ -94,35 +84,15 @@ get_home_directory()
 
 static const pid_t PARENT_SHELL_PID = getpid();
 
-bool
-is_child_process()
-{
-  return getpid() != PARENT_SHELL_PID;
-}
+bool is_child_process() { return getpid() != PARENT_SHELL_PID; }
 
-i64
-get_shell_process_id()
-{
-  return static_cast<i64>(PARENT_SHELL_PID);
-}
+i64 get_shell_process_id() { return static_cast<i64>(PARENT_SHELL_PID); }
 
-i64
-process_id_of(process p)
-{
-  return static_cast<i64>(p);
-}
+i64 process_id_of(process p) { return static_cast<i64>(p); }
 
-bool
-is_stdin_a_tty()
-{
-  return isatty(SHIT_STDIN);
-}
+bool is_stdin_a_tty() { return isatty(SHIT_STDIN); }
 
-bool
-is_stdout_a_tty()
-{
-  return isatty(SHIT_STDOUT);
-}
+bool is_stdout_a_tty() { return isatty(SHIT_STDOUT); }
 
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
@@ -133,8 +103,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
   return suffixes;
 }();
 
-ExtIndex
-erase_extension_and_get_its_index(std::string &program_name)
+ExtIndex erase_extension_and_get_its_index(std::string &program_name)
 {
   /* POSIX does not really make use of extensions for executable files. */
   SHIT_UNUSED(program_name);
@@ -142,8 +111,7 @@ erase_extension_and_get_its_index(std::string &program_name)
 }
 #endif /* !COSMO */
 
-Maybe<String>
-get_environment_variable(StringView key)
+Maybe<String> get_environment_variable(StringView key)
 {
   String key_string{key};
   const char *e = std::getenv(key_string.c_str());
@@ -151,23 +119,20 @@ get_environment_variable(StringView key)
   return shit::None;
 }
 
-void
-set_environment_variable(StringView key, StringView value)
+void set_environment_variable(StringView key, StringView value)
 {
   String key_string{key};
   String value_string{value};
   setenv(key_string.c_str(), value_string.c_str(), 1);
 }
 
-void
-unset_environment_variable(StringView key)
+void unset_environment_variable(StringView key)
 {
   String key_string{key};
   unsetenv(key_string.c_str());
 }
 
-i32
-check_syscall_impl(i32 status, StringView invocation)
+i32 check_syscall_impl(i32 status, StringView invocation)
 {
   if (status == -1) {
     throw shit::Error{"'" + invocation +
@@ -179,8 +144,7 @@ check_syscall_impl(i32 status, StringView invocation)
 
 #define check_syscall(fn) check_syscall_impl(fn, #fn)
 
-process
-execute_program(ExecContext &&ec)
+process execute_program(ExecContext &&ec)
 {
   SHIT_DEFER { ec.close_fds(); };
 
@@ -231,8 +195,7 @@ execute_program(ExecContext &&ec)
   return child_pid;
 }
 
-void
-replace_process(ExecContext &&ec)
+void replace_process(ExecContext &&ec)
 {
   os_args child_args = make_os_args(ec.args());
 
@@ -264,16 +227,14 @@ replace_process(ExecContext &&ec)
                     last_system_error_message()};
 }
 
-void
-redirect_self(const ExecContext &ec)
+void redirect_self(const ExecContext &ec)
 {
   if (ec.in_fd) check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
   if (ec.out_fd) check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
   if (ec.err_fd) check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
 }
 
-Maybe<Pipe>
-make_pipe()
+Maybe<Pipe> make_pipe()
 {
   descriptor p[2] = {SHIT_INVALID_FD, SHIT_INVALID_FD};
 
@@ -293,8 +254,7 @@ make_pipe()
   return Pipe{p[0], p[1]};
 }
 
-Maybe<descriptor>
-open_file_descriptor(StringView path, FileOpenMode mode)
+Maybe<descriptor> open_file_descriptor(StringView path, FileOpenMode mode)
 {
   int flags = 0;
   switch (mode) {
@@ -318,8 +278,7 @@ open_file_descriptor(StringView path, FileOpenMode mode)
   return fd;
 }
 
-Maybe<descriptor>
-write_to_temp_file(StringView content)
+Maybe<descriptor> write_to_temp_file(StringView content)
 {
   /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
      so a cosmo binary running on Windows writes to the Windows temp directory
@@ -359,8 +318,7 @@ write_to_temp_file(StringView content)
   return fd;
 }
 
-u32
-get_file_creation_mask()
+u32 get_file_creation_mask()
 {
   /* umask only reads through a set, so the old value is read and put back. */
   mode_t old = umask(0);
@@ -368,14 +326,9 @@ get_file_creation_mask()
   return static_cast<u32>(old);
 }
 
-void
-set_file_creation_mask(u32 mask)
-{
-  umask(static_cast<mode_t>(mask));
-}
+void set_file_creation_mask(u32 mask) { umask(static_cast<mode_t>(mask)); }
 
-i32
-wait_and_monitor_process(process pid)
+i32 wait_and_monitor_process(process pid)
 {
   SHIT_ASSERT(pid >= 0);
 
@@ -430,8 +383,7 @@ wait_and_monitor_process(process pid)
   SHIT_UNREACHABLE();
 }
 
-ProcessState
-poll_process(process p, i32 &status_out)
+ProcessState poll_process(process p, i32 &status_out)
 {
   i32 status = 0;
   pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
@@ -454,20 +406,14 @@ poll_process(process p, i32 &status_out)
   return ProcessState::Exited;
 }
 
-bool
-signal_process(process p, i32 signal_number)
+bool signal_process(process p, i32 signal_number)
 {
   return kill(p, signal_number) == 0;
 }
 
-process
-process_from_pid(i64 pid)
-{
-  return static_cast<process>(pid);
-}
+process process_from_pid(i64 pid) { return static_cast<process>(pid); }
 
-Maybe<i32>
-signal_number_from_name(StringView name)
+Maybe<i32> signal_number_from_name(StringView name)
 {
   /* A bare number names the signal directly. */
   if (!name.empty() &&
@@ -502,8 +448,7 @@ signal_number_from_name(StringView name)
   return NAMES.find(bare);
 }
 
-os_args
-make_os_args(const ArrayList<String> &args)
+os_args make_os_args(const ArrayList<String> &args)
 {
   os_args result{};
   result.reserve(args.size() + 1);
@@ -516,14 +461,12 @@ make_os_args(const ArrayList<String> &args)
   return result;
 }
 
-String
-last_system_error_message()
+String last_system_error_message()
 {
   return String{StringView{strerror(errno)}};
 }
 
-static sigset_t
-make_sigset_impl(int first, ...)
+static sigset_t make_sigset_impl(int first, ...)
 {
   va_list va;
 
@@ -540,16 +483,14 @@ make_sigset_impl(int first, ...)
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
-static void
-sigchild_handler(int n, siginfo_t *siginfo, void *ctx)
+static void sigchild_handler(int n, siginfo_t *siginfo, void *ctx)
 {
   SHIT_UNUSED(n);
   SHIT_UNUSED(ctx);
   SHIT_UNUSED(siginfo);
 }
 
-void
-reset_signal_handlers()
+void reset_signal_handlers()
 {
   sigset_t sm;
   sigfillset(&sm);
@@ -560,8 +501,7 @@ reset_signal_handlers()
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
 }
 
-void
-set_default_signal_handlers()
+void set_default_signal_handlers()
 {
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
@@ -584,8 +524,7 @@ namespace shit {
 
 namespace os {
 
-Maybe<usize>
-write_fd(os::descriptor fd, const void *buf, usize size)
+Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size)
 {
   DWORD w = -1;
   if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
@@ -593,8 +532,7 @@ write_fd(os::descriptor fd, const void *buf, usize size)
   return static_cast<usize>(w);
 }
 
-Maybe<usize>
-read_fd(os::descriptor fd, void *buf, usize size)
+Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD r = -1;
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
@@ -602,28 +540,21 @@ read_fd(os::descriptor fd, void *buf, usize size)
   return static_cast<usize>(r);
 }
 
-bool
-close_fd(os::descriptor fd)
-{
-  return CloseHandle(fd);
-}
+bool close_fd(os::descriptor fd) { return CloseHandle(fd); }
 
-os::descriptor
-redirect_stdout(os::descriptor target)
+os::descriptor redirect_stdout(os::descriptor target)
 {
   os::descriptor saved = GetStdHandle(STD_OUTPUT_HANDLE);
   SetStdHandle(STD_OUTPUT_HANDLE, target);
   return saved;
 }
 
-void
-restore_stdout(os::descriptor saved)
+void restore_stdout(os::descriptor saved)
 {
   SetStdHandle(STD_OUTPUT_HANDLE, saved);
 }
 
-Maybe<String>
-get_current_user()
+Maybe<String> get_current_user()
 {
   DWORD size = 0;
   GetUserNameA(nullptr, &size);
@@ -640,8 +571,7 @@ get_current_user()
   return shit::None;
 }
 
-Maybe<Path>
-get_home_directory()
+Maybe<Path> get_home_directory()
 {
   if (Maybe<String> home = get_environment_variable("USERPROFILE"))
     return Path{StringView{*home}};
@@ -650,40 +580,19 @@ get_home_directory()
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
-bool
-is_child_process()
-{
-  return GetCurrentProcessId() != PARENT_SHELL_PID;
-}
+bool is_child_process() { return GetCurrentProcessId() != PARENT_SHELL_PID; }
 
-i64
-get_shell_process_id()
-{
-  return static_cast<i64>(PARENT_SHELL_PID);
-}
+i64 get_shell_process_id() { return static_cast<i64>(PARENT_SHELL_PID); }
 
-i64
-process_id_of(process p)
-{
-  return static_cast<i64>(GetProcessId(p));
-}
+i64 process_id_of(process p) { return static_cast<i64>(GetProcessId(p)); }
 
-bool
-is_stdin_a_tty()
-{
-  return _isatty(_fileno(stdin));
-}
+bool is_stdin_a_tty() { return _isatty(_fileno(stdin)); }
 
-bool
-is_stdout_a_tty()
-{
-  return _isatty(_fileno(stdout));
-}
+bool is_stdout_a_tty() { return _isatty(_fileno(stdout)); }
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
 
-Maybe<String>
-get_environment_variable(StringView key)
+Maybe<String> get_environment_variable(StringView key)
 {
   String key_string{key};
   char buffer[WIN32_MAX_ENV_SIZE] = {0};
@@ -692,23 +601,20 @@ get_environment_variable(StringView key)
   return String{StringView{buffer}};
 }
 
-void
-set_environment_variable(StringView key, StringView value)
+void set_environment_variable(StringView key, StringView value)
 {
   String key_string{key};
   String value_string{value};
   SetEnvironmentVariableA(key_string.c_str(), value_string.c_str());
 }
 
-void
-unset_environment_variable(StringView key)
+void unset_environment_variable(StringView key)
 {
   String key_string{key};
   SetEnvironmentVariableA(key_string.c_str(), nullptr);
 }
 
-process
-execute_program(ExecContext &&ec)
+process execute_program(ExecContext &&ec)
 {
   std::string command_line = make_os_args(ec.args());
 
@@ -761,8 +667,7 @@ execute_program(ExecContext &&ec)
   return process_info.hProcess;
 }
 
-void
-replace_process(ExecContext &&ec)
+void replace_process(ExecContext &&ec)
 {
   /* Windows cannot replace a process in place, so the program runs to
      completion and the shell exits with its status, which behaves like exec for
@@ -773,8 +678,7 @@ replace_process(ExecContext &&ec)
   SHIT_UNREACHABLE();
 }
 
-void
-redirect_self(const ExecContext &ec)
+void redirect_self(const ExecContext &ec)
 {
   /* Duplicate each redirect handle into the standard slot, so the caller's
      close of the original handles leaves the shell's new standard handles
@@ -792,8 +696,7 @@ redirect_self(const ExecContext &ec)
     SetStdHandle(STD_ERROR_HANDLE, duplicate);
 }
 
-Maybe<Pipe>
-make_pipe()
+Maybe<Pipe> make_pipe()
 {
   SECURITY_ATTRIBUTES att{};
 
@@ -816,8 +719,7 @@ make_pipe()
   return Pipe{in, out};
 }
 
-Maybe<descriptor>
-open_file_descriptor(StringView path, FileOpenMode mode)
+Maybe<descriptor> open_file_descriptor(StringView path, FileOpenMode mode)
 {
   DWORD access = (mode == FileOpenMode::Read) ? GENERIC_READ : GENERIC_WRITE;
   DWORD disposition = OPEN_EXISTING;
@@ -850,8 +752,7 @@ open_file_descriptor(StringView path, FileOpenMode mode)
   return handle;
 }
 
-Maybe<descriptor>
-write_to_temp_file(StringView content)
+Maybe<descriptor> write_to_temp_file(StringView content)
 {
   char temp_dir[MAX_PATH];
   if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
@@ -876,22 +777,16 @@ write_to_temp_file(StringView content)
   return handle;
 }
 
-u32
-get_file_creation_mask()
+u32 get_file_creation_mask()
 {
   int old = _umask(0);
   _umask(old);
   return static_cast<u32>(old);
 }
 
-void
-set_file_creation_mask(u32 mask)
-{
-  _umask(static_cast<int>(mask));
-}
+void set_file_creation_mask(u32 mask) { _umask(static_cast<int>(mask)); }
 
-i32
-wait_and_monitor_process(process p)
+i32 wait_and_monitor_process(process p)
 {
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
@@ -903,8 +798,7 @@ wait_and_monitor_process(process p)
   return code;
 }
 
-ProcessState
-poll_process(process p, i32 &status_out)
+ProcessState poll_process(process p, i32 &status_out)
 {
   /* Windows has no stopped state, so a process is either alive or finished. */
   DWORD code = 0;
@@ -917,8 +811,7 @@ poll_process(process p, i32 &status_out)
   return ProcessState::Exited;
 }
 
-bool
-signal_process(process p, i32 signal_number)
+bool signal_process(process p, i32 signal_number)
 {
   /* Windows cannot deliver a POSIX signal, so only a terminate is honored and a
      resume or a stop is a no-op the caller treats as unsupported. */
@@ -927,16 +820,14 @@ signal_process(process p, i32 signal_number)
   return false;
 }
 
-process
-process_from_pid(i64 pid)
+process process_from_pid(i64 pid)
 {
   return OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE |
                          PROCESS_QUERY_INFORMATION,
                      FALSE, static_cast<DWORD>(pid));
 }
 
-Maybe<i32>
-signal_number_from_name(StringView name)
+Maybe<i32> signal_number_from_name(StringView name)
 {
   if (!name.empty() &&
       std::all_of(name.data, name.data + name.length,
@@ -954,8 +845,7 @@ signal_number_from_name(StringView name)
   return None;
 }
 
-os_args
-make_os_args(const ArrayList<String> &args)
+os_args make_os_args(const ArrayList<String> &args)
 {
   SHIT_ASSERT(args.size() > 0);
 
@@ -978,8 +868,7 @@ make_os_args(const ArrayList<String> &args)
   return s;
 }
 
-String
-last_system_error_message()
+String last_system_error_message()
 {
   LPSTR errno_str{};
   DWORD win_errno = GetLastError();
@@ -1031,8 +920,7 @@ last_system_error_message()
   return err;
 }
 
-static void
-handle_interrupt(int s)
+static void handle_interrupt(int s)
 {
   SHIT_UNUSED(s);
   shit::print_to_standard_output("\n");
@@ -1041,8 +929,7 @@ handle_interrupt(int s)
 }
 
 /* TODO: Use Windows events. */
-void
-set_default_signal_handlers()
+void set_default_signal_handlers()
 {
   if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||
       signal(SIGINT, handle_interrupt) == SIG_ERR)
@@ -1051,8 +938,7 @@ set_default_signal_handlers()
   }
 }
 
-void
-reset_signal_handlers()
+void reset_signal_handlers()
 {
   if (signal(SIGTERM, SIG_DFL) == SIG_ERR || signal(SIGINT, SIG_DFL) == SIG_ERR)
   {
@@ -1082,8 +968,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
 
 constexpr static usize MIN_SUFFIX_LEN = 3;
 
-ExtIndex
-erase_extension_and_get_its_index(std::string &program_name)
+ExtIndex erase_extension_and_get_its_index(std::string &program_name)
 {
 #if SHIT_PLATFORM_IS COSMO
   if (IsWindows())

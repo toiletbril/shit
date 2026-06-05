@@ -21,8 +21,7 @@ namespace shit {
 namespace {
 
 /* Format a count of seconds as the minutes and seconds form times prints. */
-String
-format_time(double seconds)
+String format_time(double seconds)
 {
   long minutes = static_cast<long>(seconds) / 60;
   double remainder = seconds - static_cast<double>(minutes * 60);
@@ -35,14 +34,9 @@ format_time(double seconds)
 
 Times::Times() = default;
 
-Builtin::Kind
-Times::kind() const
-{
-  return Kind::Times;
-}
+Builtin::Kind Times::kind() const { return Kind::Times; }
 
-i32
-Times::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Times::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 

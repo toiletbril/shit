@@ -71,9 +71,8 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
    function, or sourced script to consume it. The jump carries the source and
    the origin it was made in, so the caret points at the exact builtin and the
    note names where it ran. */
-static void
-report_escaped_control_flow(shit::EvalContext &context,
-                            const std::string &fallback_source)
+static void report_escaped_control_flow(shit::EvalContext &context,
+                                        const std::string &fallback_source)
 {
   if (!context.has_pending_control_flow()) return;
 
@@ -109,9 +108,9 @@ report_escaped_control_flow(shit::EvalContext &context,
 /* Lex, parse, validate, and evaluate one chunk of shell source in the given
    context. The main loop and source_file share this so a sourced file runs the
    same pipeline as an interactive line. Returns the resulting exit code. */
-static int
-run_script_contents(const std::string &script_contents,
-                    shit::EvalContext &context, shit::BumpArena &ast_arena)
+static int run_script_contents(const std::string &script_contents,
+                               shit::EvalContext &context,
+                               shit::BumpArena &ast_arena)
 {
   int exit_code = EXIT_FAILURE;
 
@@ -197,9 +196,8 @@ run_script_contents(const std::string &script_contents,
 
 /* Read a whole file and run it in the given context. A missing file is not an
    error, since a login shell sources profiles that may not exist. */
-static void
-source_file(const shit::Path &path, shit::EvalContext &context,
-            shit::BumpArena &ast_arena)
+static void source_file(const shit::Path &path, shit::EvalContext &context,
+                        shit::BumpArena &ast_arena)
 {
   shit::Maybe<shit::String> contents =
       shit::utils::read_entire_file(path.text());
@@ -212,9 +210,9 @@ source_file(const shit::Path &path, shit::EvalContext &context,
 }
 
 /* Expand the common prompt escapes in PS1 and PS2. */
-static shit::String
-expand_prompt_escapes(shit::StringView prompt, shit::StringView user,
-                      shit::StringView working_directory)
+static shit::String expand_prompt_escapes(shit::StringView prompt,
+                                          shit::StringView user,
+                                          shit::StringView working_directory)
 {
   shit::String out{};
   for (usize i = 0; i < prompt.length; i++) {
@@ -254,8 +252,7 @@ expand_prompt_escapes(shit::StringView prompt, shit::StringView user,
   return out;
 }
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 #if SHIT_PLATFORM_IS COSMO
   ShowCrashReports();
@@ -416,12 +413,12 @@ main(int argc, char **argv)
   /* The parse arena holds the AST and its tokens for one command, and is reset
      between commands. It outlives each tree it builds. */
   shit::BumpArena ast_arena{};
-  shit::g_ast_arena = &ast_arena;
+  shit::AST_ARENA = &ast_arena;
 
   /* The function arena holds function bodies, which outlive the command that
      defined them, so it is never reset during the run. */
   shit::BumpArena function_arena{};
-  shit::g_function_arena = &function_arena;
+  shit::FUNCTION_ARENA = &function_arena;
 
   /* A login shell reads /etc/profile and ~/.profile if they exist, then the
      file named by ENV when that is set. A missing file is silently skipped. */
@@ -550,6 +547,7 @@ main(int argc, char **argv)
             shit::print_to_standard_output("^Z");
             shit::flush_standard_output();
             break;
+          default: SHIT_UNREACHABLE();
           }
 
           toiletline::emit_newlines(input);

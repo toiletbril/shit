@@ -10,14 +10,9 @@ namespace shit {
 
 Cd::Cd() = default;
 
-Builtin::Kind
-Cd::kind() const
-{
-  return Kind::Cd;
-}
+Builtin::Kind Cd::kind() const { return Kind::Cd; }
 
-i32
-Cd::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Cd::execute(ExecContext &ec, EvalContext &cxt) const
 {
   String arg_path{};
 
@@ -29,10 +24,9 @@ Cd::execute(ExecContext &ec, EvalContext &cxt) const
     }
   } else {
     /* Empty cd should go to the home directory. */
-    Maybe<std::filesystem::path> p = os::get_home_directory();
+    Maybe<Path> p = os::get_home_directory();
     if (!p) throw Error{"Could not figure out home directory"};
-    std::string home = p->string();
-    arg_path.append(StringView{home.data(), home.size()});
+    arg_path.append(p->text());
   }
 
   Path target{arg_path};

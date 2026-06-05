@@ -13,8 +13,7 @@ namespace shit {
 
 namespace {
 
-const char *
-state_word(Job::State state)
+const char *state_word(Job::State state)
 {
   switch (state) {
   case Job::State::Running: return "Running";
@@ -28,14 +27,9 @@ state_word(Job::State state)
 
 Jobs::Jobs() = default;
 
-Builtin::Kind
-Jobs::kind() const
-{
-  return Kind::Jobs;
-}
+Builtin::Kind Jobs::kind() const { return Kind::Jobs; }
 
-i32
-Jobs::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Jobs::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(ec);
 

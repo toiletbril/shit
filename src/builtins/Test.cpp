@@ -8,8 +8,7 @@ namespace shit {
 
 namespace {
 
-bool
-parse_integer(StringView text, i64 &out)
+bool parse_integer(StringView text, i64 &out)
 {
   ErrorOr<i64> parsed = utils::parse_decimal_integer(text);
   if (parsed.is_error()) return false;
@@ -25,27 +24,17 @@ struct TestEvaluator
   usize pos;
   bool had_error;
 
-  const String &
-  current() const
-  {
-    return args[pos];
-  }
-  bool
-  at_end() const
-  {
-    return pos >= args.size();
-  }
+  const String &current() const { return args[pos]; }
+  bool at_end() const { return pos >= args.size(); }
 
-  void
-  fail(StringView message)
+  void fail(StringView message)
   {
     if (!had_error)
       shit::print_to_standard_error(StringView{"test: "} + message + "\n");
     had_error = true;
   }
 
-  bool
-  evaluate_unary(const String &op, const String &operand)
+  bool evaluate_unary(const String &op, const String &operand)
   {
     if (op == "-z") return operand.empty();
     if (op == "-n") return !operand.empty();
@@ -64,8 +53,8 @@ struct TestEvaluator
     return false;
   }
 
-  bool
-  evaluate_binary(const String &left, const String &op, const String &right)
+  bool evaluate_binary(const String &left, const String &op,
+                       const String &right)
   {
     if (op == "=") return left == right;
     if (op == "!=") return left != right;
@@ -88,22 +77,19 @@ struct TestEvaluator
     return false;
   }
 
-  bool
-  is_unary_operator(const String &s)
+  bool is_unary_operator(const String &s)
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
            s == "-s" || s == "-r" || s == "-w" || s == "-x";
   }
 
-  bool
-  is_binary_operator(const String &s)
+  bool is_binary_operator(const String &s)
   {
     return s == "=" || s == "!=" || s == "-eq" || s == "-ne" || s == "-lt" ||
            s == "-le" || s == "-gt" || s == "-ge";
   }
 
-  bool
-  parse_factor()
+  bool parse_factor()
   {
     if (at_end()) {
       fail("argument expected");
@@ -147,8 +133,7 @@ struct TestEvaluator
     return result;
   }
 
-  bool
-  parse_term()
+  bool parse_term()
   {
     bool result = parse_factor();
     while (!at_end() && current() == "-a") {
@@ -159,8 +144,7 @@ struct TestEvaluator
     return result;
   }
 
-  bool
-  parse_expression()
+  bool parse_expression()
   {
     bool result = parse_term();
     while (!at_end() && current() == "-o") {
@@ -176,14 +160,9 @@ struct TestEvaluator
 
 Test::Test() = default;
 
-Builtin::Kind
-Test::kind() const
-{
-  return Kind::Test;
-}
+Builtin::Kind Test::kind() const { return Kind::Test; }
 
-i32
-Test::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 

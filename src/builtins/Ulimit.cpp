@@ -38,8 +38,7 @@ struct Resource
   rlim_t units_per_value;
 };
 
-Resource
-selected_resource()
+Resource selected_resource()
 {
   if (FLAG_OPEN_FILES.is_enabled()) return {RLIMIT_NOFILE, 1};
   if (FLAG_CPU_TIME.is_enabled()) return {RLIMIT_CPU, 1};
@@ -50,8 +49,7 @@ selected_resource()
 
 } /* namespace */
 
-i32
-Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
@@ -99,8 +97,7 @@ Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 
 #else /* not POSIX */
 
-i32
-Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
@@ -116,10 +113,6 @@ Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 
 Ulimit::Ulimit() = default;
 
-Builtin::Kind
-Ulimit::kind() const
-{
-  return Kind::Ulimit;
-}
+Builtin::Kind Ulimit::kind() const { return Kind::Ulimit; }
 
 } /* namespace shit */

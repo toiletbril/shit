@@ -15,14 +15,9 @@ namespace shit {
 
 Alias::Alias() = default;
 
-Builtin::Kind
-Alias::kind() const
-{
-  return Kind::Alias;
-}
+Builtin::Kind Alias::kind() const { return Kind::Alias; }
 
-i32
-Alias::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Alias::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };

@@ -19,61 +19,28 @@ Flag::Flag(Flag::Kind kind, char short_name, StringView long_name,
       m_description(description)
 {}
 
-Flag::Kind
-Flag::kind() const
-{
-  return m_kind;
-}
+Flag::Kind Flag::kind() const { return m_kind; }
 
-void
-Flag::set_position(u32 n)
-{
-  m_position = n;
-}
+void Flag::set_position(u32 n) { m_position = n; }
 
-usize
-Flag::position() const
-{
-  return m_position;
-}
+usize Flag::position() const { return m_position; }
 
-char
-Flag::short_name() const
-{
-  return m_short_name;
-}
+char Flag::short_name() const { return m_short_name; }
 
-StringView
-Flag::long_name() const
-{
-  return m_long_name;
-}
+StringView Flag::long_name() const { return m_long_name; }
 
-StringView
-Flag::description() const
-{
-  return m_description;
-}
+StringView Flag::description() const { return m_description; }
 
 FlagBool::FlagBool(char short_name, StringView long_name,
                    StringView description)
     : Flag(Flag::Kind::Bool, short_name, long_name, description)
 {}
 
-void
-FlagBool::toggle()
-{
-  m_value = !m_value;
-}
+void FlagBool::toggle() { m_value = !m_value; }
 
-bool
-FlagBool::is_enabled() const
-{
-  return m_value;
-}
+bool FlagBool::is_enabled() const { return m_value; }
 
-void
-FlagBool::reset()
+void FlagBool::reset()
 {
   m_position = 0;
   m_value = false;
@@ -84,27 +51,17 @@ FlagString::FlagString(char short_name, StringView long_name,
     : Flag(Flag::Kind::String, short_name, long_name, description)
 {}
 
-void
-FlagString::set(StringView v)
+void FlagString::set(StringView v)
 {
   m_value = v;
   m_is_set = true;
 }
 
-bool
-FlagString::is_set() const
-{
-  return m_is_set;
-}
+bool FlagString::is_set() const { return m_is_set; }
 
-StringView
-FlagString::value() const
-{
-  return m_value.view();
-}
+StringView FlagString::value() const { return m_value.view(); }
 
-void
-FlagString::reset()
+void FlagString::reset()
 {
   m_position = 0;
   m_value.clear();
@@ -116,54 +73,35 @@ FlagManyStrings::FlagManyStrings(char short_name, StringView long_name,
     : Flag(Flag::Kind::ManyStrings, short_name, long_name, description)
 {}
 
-void
-FlagManyStrings::append(StringView v)
+void FlagManyStrings::append(StringView v)
 {
   m_values.push(String{heap_allocator(), v});
 }
 
-bool
-FlagManyStrings::is_empty() const
-{
-  return m_values.empty();
-}
+bool FlagManyStrings::is_empty() const { return m_values.empty(); }
 
-usize
-FlagManyStrings::size() const
-{
-  return m_values.size();
-}
+usize FlagManyStrings::size() const { return m_values.size(); }
 
-StringView
-FlagManyStrings::get(usize i) const
-{
-  return m_values[i].view();
-}
+StringView FlagManyStrings::get(usize i) const { return m_values[i].view(); }
 
-StringView
-FlagManyStrings::next()
+StringView FlagManyStrings::next()
 {
   const String &value = m_values[m_value_position++];
   return value.view();
 }
 
-bool
-FlagManyStrings::at_end() const
-{
-  return m_value_position == size();
-}
+bool FlagManyStrings::at_end() const { return m_value_position == size(); }
 
-void
-FlagManyStrings::reset()
+void FlagManyStrings::reset()
 {
   m_position = 0;
   m_values.clear();
   m_value_position = 0;
 }
 
-static bool
-find_flag(const ArrayList<Flag *> &flags, const char *flag_start, bool is_long,
-          Flag **result_flag, const char **value_start)
+static bool find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
+                      bool is_long, Flag **result_flag,
+                      const char **value_start)
 {
   size_t longest_length = 0;
 
@@ -201,8 +139,8 @@ find_flag(const ArrayList<Flag *> &flags, const char *flag_start, bool is_long,
   return longest_length > 0;
 }
 
-ArrayList<String>
-parse_flags_vec(const ArrayList<Flag *> &flags, const ArrayList<String> &args)
+ArrayList<String> parse_flags_vec(const ArrayList<Flag *> &flags,
+                                  const ArrayList<String> &args)
 {
   std::vector<const char *> os_argv;
   os_argv.reserve(args.size());
@@ -214,8 +152,7 @@ parse_flags_vec(const ArrayList<Flag *> &flags, const ArrayList<String> &args)
                      const_cast<char const *const *>(os_argv.data()));
 }
 
-static String
-flag_name(const Flag *f, bool is_long)
+static String flag_name(const Flag *f, bool is_long)
 {
   String name{};
   name += "-";
@@ -228,8 +165,8 @@ flag_name(const Flag *f, bool is_long)
   return name;
 }
 
-ArrayList<String>
-parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
+ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,
+                              const char *const *argv)
 {
   SHIT_ASSERT(argc >= 0);
 
@@ -399,16 +336,14 @@ parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
   return args;
 }
 
-void
-reset_flags(const ArrayList<Flag *> &flags)
+void reset_flags(const ArrayList<Flag *> &flags)
 {
   for (Flag *f : flags) {
     f->reset();
   }
 }
 
-void
-show_version()
+void show_version()
 {
   String s{};
   s += "Shit Shell ";
@@ -448,8 +383,7 @@ show_version()
   flush_standard_output();
 }
 
-void
-show_short_version()
+void show_short_version()
 {
   String s{};
   s += std::to_string(SHIT_VER_MAJOR);
@@ -464,9 +398,8 @@ show_short_version()
   flush_standard_output();
 }
 
-std::string
-make_synopsis(std::string_view program_name,
-              const std::vector<std::string> &lines)
+std::string make_synopsis(std::string_view program_name,
+                          const std::vector<std::string> &lines)
 {
   String s{};
 
@@ -483,8 +416,7 @@ make_synopsis(std::string_view program_name,
   return std::string{s.c_str(), s.size()};
 }
 
-std::string
-make_flag_help(const ArrayList<Flag *> &flags)
+std::string make_flag_help(const ArrayList<Flag *> &flags)
 {
   String s{};
 
@@ -548,8 +480,7 @@ make_flag_help(const ArrayList<Flag *> &flags)
   return std::string{s.c_str(), s.size()};
 }
 
-void
-print_to_standard_output(StringView text)
+void print_to_standard_output(StringView text)
 {
   /* The output is flushed at once so it interleaves with the unbuffered
      write_fd path the builtins use, keeping the order a reader sees correct. */
@@ -557,21 +488,15 @@ print_to_standard_output(StringView text)
   std::fflush(stdout);
 }
 
-void
-print_to_standard_error(StringView text)
+void print_to_standard_error(StringView text)
 {
   std::fwrite(text.data, 1, text.size(), stderr);
   std::fflush(stderr);
 }
 
-void
-flush_standard_output()
-{
-  std::fflush(stdout);
-}
+void flush_standard_output() { std::fflush(stdout); }
 
-void
-show_message(StringView err)
+void show_message(StringView err)
 {
   print_to_standard_error("shit: ");
   print_to_standard_error(err);

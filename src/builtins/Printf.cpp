@@ -17,8 +17,7 @@ namespace {
 /* Parse one signed integer argument the way printf does, in base zero. A
    leading 0x marks hexadecimal, otherwise the digits are decimal. A malformed
    argument yields zero. */
-i64
-parse_printf_integer(const String &arg)
+i64 parse_printf_integer(const String &arg)
 {
   usize first_digit = 0;
   if (first_digit < arg.size() &&
@@ -37,8 +36,7 @@ parse_printf_integer(const String &arg)
   return parsed.is_error() ? 0 : parsed.value();
 }
 
-void
-append_escape(String &out, const String &fmt, usize &i)
+void append_escape(String &out, const String &fmt, usize &i)
 {
   char e = fmt[i];
   switch (e) {
@@ -59,9 +57,8 @@ append_escape(String &out, const String &fmt, usize &i)
 
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
-void
-append_conversion(String &out, const std::string &spec, char conv,
-                  const String &arg)
+void append_conversion(String &out, const std::string &spec, char conv,
+                       const String &arg)
 {
   char buffer[256];
   std::string full = spec + conv;
@@ -93,14 +90,9 @@ append_conversion(String &out, const std::string &spec, char conv,
 
 Printf::Printf() = default;
 
-Builtin::Kind
-Printf::kind() const
-{
-  return Kind::Printf;
-}
+Builtin::Kind Printf::kind() const { return Kind::Printf; }
 
-i32
-Printf::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 

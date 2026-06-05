@@ -24,8 +24,7 @@ static constexpr char DIRECTORY_SEPARATOR = '/';
 
 /* A forward slash is always a separator so a POSIX-style path keeps working
    everywhere, and a backslash is one on Windows too. */
-static bool
-is_directory_separator(char c)
+static bool is_directory_separator(char c)
 {
 #if SHIT_PLATFORM_IS WIN32
   return c == '/' || c == '\\';
@@ -36,32 +35,15 @@ is_directory_separator(char c)
 
 Path::Path(StringView text) : m_text(text) {}
 
-const String &
-Path::text() const
-{
-  return m_text;
-}
+const String &Path::text() const { return m_text; }
 
-const char *
-Path::c_str() const
-{
-  return m_text.c_str();
-}
+const char *Path::c_str() const { return m_text.c_str(); }
 
-usize
-Path::size() const
-{
-  return m_text.size();
-}
+usize Path::size() const { return m_text.size(); }
 
-bool
-Path::empty() const
-{
-  return m_text.empty();
-}
+bool Path::empty() const { return m_text.empty(); }
 
-bool
-Path::is_absolute() const
+bool Path::is_absolute() const
 {
   if (m_text.empty()) return false;
 #if SHIT_PLATFORM_IS WIN32
@@ -73,31 +55,24 @@ Path::is_absolute() const
 #endif
 }
 
-bool
-Path::is_relative() const
-{
-  return !is_absolute();
-}
+bool Path::is_relative() const { return !is_absolute(); }
 
 /* The offset just past the last separator, so the filename starts there. Zero
    when there is no separator. */
-static usize
-filename_offset(const String &text)
+static usize filename_offset(const String &text)
 {
   for (usize i = text.size(); i > 0; i--)
     if (is_directory_separator(text[i - 1])) return i;
   return 0;
 }
 
-StringView
-Path::filename() const
+StringView Path::filename() const
 {
   usize start = filename_offset(m_text);
   return m_text.substring(start);
 }
 
-StringView
-Path::extension() const
+StringView Path::extension() const
 {
   StringView name = filename();
   /* A dot at the start names a hidden file rather than an extension, so the
@@ -107,8 +82,7 @@ Path::extension() const
   return StringView{name.data + name.length, 0};
 }
 
-Path
-Path::parent() const
+Path Path::parent() const
 {
   usize end = filename_offset(m_text);
   if (end == 0) return Path{};
@@ -117,8 +91,7 @@ Path::parent() const
   return Path{m_text.substring_of_length(0, end - 1)};
 }
 
-Path &
-Path::push_component(StringView component)
+Path &Path::push_component(StringView component)
 {
   if (component.length == 0) return *this;
   if (!m_text.empty() && !is_directory_separator(m_text.back()) &&
@@ -130,8 +103,7 @@ Path::push_component(StringView component)
   return *this;
 }
 
-Path
-Path::with_extension(StringView new_extension) const
+Path Path::with_extension(StringView new_extension) const
 {
   StringView existing = extension();
   usize keep = m_text.size() - existing.length;
@@ -142,8 +114,7 @@ Path::with_extension(StringView new_extension) const
   return result;
 }
 
-Path
-Path::normalized() const
+Path Path::normalized() const
 {
   bool absolute = is_absolute();
 
@@ -185,8 +156,7 @@ Path::normalized() const
   return Path{built};
 }
 
-Path
-Path::to_absolute() const
+Path Path::to_absolute() const
 {
   if (is_absolute()) return normalized();
   Path result = current_directory();
@@ -194,81 +164,61 @@ Path::to_absolute() const
   return result.normalized();
 }
 
-bool
-Path::operator==(const Path &other) const
+bool Path::operator==(const Path &other) const
 {
   return m_text == other.m_text;
 }
 
 #if SHIT_PLATFORM_IS POSIX
 
-bool
-Path::exists() const
+bool Path::exists() const
 {
   struct stat info{};
   return ::stat(m_text.c_str(), &info) == 0;
 }
 
-bool
-Path::is_directory() const
+bool Path::is_directory() const
 {
   struct stat info{};
   if (::stat(m_text.c_str(), &info) != 0) return false;
   return S_ISDIR(info.st_mode);
 }
 
-bool
-Path::is_regular_file() const
+bool Path::is_regular_file() const
 {
   struct stat info{};
   if (::stat(m_text.c_str(), &info) != 0) return false;
   return S_ISREG(info.st_mode);
 }
 
-Maybe<u64>
-Path::file_size() const
+Maybe<u64> Path::file_size() const
 {
   struct stat info{};
   if (::stat(m_text.c_str(), &info) != 0 || !S_ISREG(info.st_mode)) return None;
   return static_cast<u64>(info.st_size);
 }
 
-bool
-Path::is_readable() const
-{
-  return ::access(m_text.c_str(), R_OK) == 0;
-}
+bool Path::is_readable() const { return ::access(m_text.c_str(), R_OK) == 0; }
 
-bool
-Path::is_writable() const
-{
-  return ::access(m_text.c_str(), W_OK) == 0;
-}
+bool Path::is_writable() const { return ::access(m_text.c_str(), W_OK) == 0; }
 
-bool
-Path::is_executable() const
-{
-  return ::access(m_text.c_str(), X_OK) == 0;
-}
+bool Path::is_executable() const { return ::access(m_text.c_str(), X_OK) == 0; }
 
-Path
-Path::current_directory()
+Path Path::current_directory()
 {
   char buffer[4096];
   if (::getcwd(buffer, sizeof(buffer)) != NULL) return Path{StringView{buffer}};
   return Path{};
 }
 
-ErrorOr<Ok>
-Path::set_current_directory(const Path &path)
+ErrorOr<Ok> Path::set_current_directory(const Path &path)
 {
   if (::chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
   return Ok{};
 }
 
-Maybe<ArrayList<String>>
-Path::read_directory(const Path &dir)
+Maybe<ArrayList<String>> Path::read_directory(const Path &dir)
 {
   DIR *handle = ::opendir(dir.c_str());
   if (handle == NULL) return None;
@@ -287,30 +237,26 @@ Path::read_directory(const Path &dir)
 
 #elif SHIT_PLATFORM_IS WIN32
 
-bool
-Path::exists() const
+bool Path::exists() const
 {
   return GetFileAttributesA(m_text.c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
-bool
-Path::is_directory() const
+bool Path::is_directory() const
 {
   DWORD attributes = GetFileAttributesA(m_text.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
-bool
-Path::is_regular_file() const
+bool Path::is_regular_file() const
 {
   DWORD attributes = GetFileAttributesA(m_text.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
-Maybe<u64>
-Path::file_size() const
+Maybe<u64> Path::file_size() const
 {
   WIN32_FILE_ATTRIBUTE_DATA data{};
   if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &data) == 0)
@@ -319,44 +265,32 @@ Path::file_size() const
   return (static_cast<u64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
 }
 
-bool
-Path::is_readable() const
-{
-  return _access(m_text.c_str(), 4) == 0;
-}
+bool Path::is_readable() const { return _access(m_text.c_str(), 4) == 0; }
 
-bool
-Path::is_writable() const
-{
-  return _access(m_text.c_str(), 2) == 0;
-}
+bool Path::is_writable() const { return _access(m_text.c_str(), 2) == 0; }
 
-bool
-Path::is_executable() const
+bool Path::is_executable() const
 {
   /* Windows has no execute permission bit, so an existing file is treated as
      runnable, matching how the shell resolves a program there. */
   return exists();
 }
 
-Path
-Path::current_directory()
+Path Path::current_directory()
 {
   char buffer[4096];
   if (_getcwd(buffer, sizeof(buffer)) != NULL) return Path{StringView{buffer}};
   return Path{};
 }
 
-ErrorOr<Ok>
-Path::set_current_directory(const Path &path)
+ErrorOr<Ok> Path::set_current_directory(const Path &path)
 {
   if (_chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
   return Ok{};
 }
 
-Maybe<ArrayList<String>>
-Path::read_directory(const Path &dir)
+Maybe<ArrayList<String>> Path::read_directory(const Path &dir)
 {
   String pattern{dir.text()};
   pattern.push(DIRECTORY_SEPARATOR);
@@ -378,8 +312,7 @@ Path::read_directory(const Path &dir)
 
 #endif
 
-Path
-Path::temp_directory()
+Path Path::temp_directory()
 {
 #if SHIT_PLATFORM_IS WIN32
   if (const char *from_env = std::getenv("TEMP"))
@@ -394,8 +327,7 @@ Path::temp_directory()
 
 PathBuilder::PathBuilder(StringView root) : m_text(root) {}
 
-PathBuilder &
-PathBuilder::append(StringView component)
+PathBuilder &PathBuilder::append(StringView component)
 {
   if (component.length == 0) return *this;
   if (!m_text.empty() && !is_directory_separator(m_text.back()) &&
@@ -407,17 +339,12 @@ PathBuilder::append(StringView component)
   return *this;
 }
 
-PathBuilder &
-PathBuilder::append_raw(StringView bytes)
+PathBuilder &PathBuilder::append_raw(StringView bytes)
 {
   m_text.append(bytes);
   return *this;
 }
 
-Path
-PathBuilder::build() const
-{
-  return Path{m_text};
-}
+Path PathBuilder::build() const { return Path{m_text}; }
 
 } /* namespace shit */

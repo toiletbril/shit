@@ -17,14 +17,9 @@ namespace shit {
 
 Hash::Hash() = default;
 
-Builtin::Kind
-Hash::kind() const
-{
-  return Kind::Hash;
-}
+Builtin::Kind Hash::kind() const { return Kind::Hash; }
 
-i32
-Hash::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Hash::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 

@@ -8,14 +8,9 @@ namespace shit {
 
 Continue::Continue() = default;
 
-Builtin::Kind
-Continue::kind() const
-{
-  return Kind::Continue;
-}
+Builtin::Kind Continue::kind() const { return Kind::Continue; }
 
-i32
-Continue::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Continue::execute(ExecContext &ec, EvalContext &cxt) const
 {
   /* The optional argument is how many enclosing loops to skip, default one. */
   i64 level = 1;

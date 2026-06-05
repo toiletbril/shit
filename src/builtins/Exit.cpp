@@ -8,14 +8,9 @@ namespace shit {
 
 Exit::Exit() = default;
 
-Builtin::Kind
-Exit::kind() const
-{
-  return Kind::Exit;
-}
+Builtin::Kind Exit::kind() const { return Kind::Exit; }
 
-i32
-Exit::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Exit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   /* exit with no argument uses the status of the last command. */
   i64 status = cxt.last_exit_status();

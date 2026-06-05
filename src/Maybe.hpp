@@ -34,8 +34,7 @@ struct [[nodiscard]] Maybe
     if (m_has_value) new (&m_storage) T(std::move(other.reference()));
   }
 
-  Maybe &
-  operator=(const Maybe &other)
+  Maybe &operator=(const Maybe &other)
   {
     if (this != &other) {
       reset();
@@ -44,8 +43,7 @@ struct [[nodiscard]] Maybe
     }
     return *this;
   }
-  Maybe &
-  operator=(Maybe &&other) noexcept
+  Maybe &operator=(Maybe &&other) noexcept
   {
     if (this != &other) {
       reset();
@@ -57,53 +55,26 @@ struct [[nodiscard]] Maybe
 
   ~Maybe() { reset(); }
 
-  [[nodiscard]] bool
-  has_value() const noexcept
-  {
-    return m_has_value;
-  }
-  [[nodiscard]] explicit
-  operator bool() const noexcept
-  {
-    return m_has_value;
-  }
+  [[nodiscard]] bool has_value() const noexcept { return m_has_value; }
+  [[nodiscard]] explicit operator bool() const noexcept { return m_has_value; }
 
-  [[nodiscard]] T &
-  value()
+  [[nodiscard]] T &value()
   {
     SHIT_ASSERT(m_has_value);
     return reference();
   }
-  [[nodiscard]] const T &
-  value() const
+  [[nodiscard]] const T &value() const
   {
     SHIT_ASSERT(m_has_value);
     return reference();
   }
-  [[nodiscard]] T &
-  operator*()
-  {
-    return value();
-  }
-  [[nodiscard]] const T &
-  operator*() const
-  {
-    return value();
-  }
-  [[nodiscard]] T *
-  operator->()
-  {
-    return &reference();
-  }
-  [[nodiscard]] const T *
-  operator->() const
-  {
-    return &reference();
-  }
+  [[nodiscard]] T &operator*() { return value(); }
+  [[nodiscard]] const T &operator*() const { return value(); }
+  [[nodiscard]] T *operator->() { return &reference(); }
+  [[nodiscard]] const T *operator->() const { return &reference(); }
 
   /* Move the value out, leaving the Maybe empty. */
-  [[nodiscard]] T
-  take()
+  [[nodiscard]] T take()
   {
     SHIT_ASSERT(m_has_value);
     T moved = std::move(reference());
@@ -112,28 +83,24 @@ struct [[nodiscard]] Maybe
   }
 
   /* The value when present, otherwise the fallback. */
-  [[nodiscard]] T
-  value_or(T fallback) const
+  [[nodiscard]] T value_or(T fallback) const
   {
     return m_has_value ? reference() : std::move(fallback);
   }
 
   /* Equal to a bare value only when present and that value matches, so a
      comparison reads like the one against a std::optional. */
-  [[nodiscard]] bool
-  operator==(const T &other) const
+  [[nodiscard]] bool operator==(const T &other) const
   {
     return m_has_value && reference() == other;
   }
-  [[nodiscard]] bool
-  operator!=(const T &other) const
+  [[nodiscard]] bool operator!=(const T &other) const
   {
     return !(*this == other);
   }
 
   /* Drop the value, leaving the Maybe empty. */
-  void
-  reset() noexcept
+  void reset() noexcept
   {
     if (m_has_value) {
       reference().~T();
@@ -142,13 +109,8 @@ struct [[nodiscard]] Maybe
   }
 
 private:
-  T &
-  reference() noexcept
-  {
-    return *reinterpret_cast<T *>(&m_storage);
-  }
-  const T &
-  reference() const noexcept
+  T &reference() noexcept { return *reinterpret_cast<T *>(&m_storage); }
+  const T &reference() const noexcept
   {
     return *reinterpret_cast<const T *>(&m_storage);
   }

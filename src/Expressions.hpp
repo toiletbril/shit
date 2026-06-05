@@ -62,8 +62,6 @@ struct Expression
   virtual String to_string() const = 0;
   virtual String to_ast_string(usize layer = 0) const;
 
-  /* Lightweight kind tags so a caller can recognize a node without RTTI or a
-     string compare. The base returns false, the concrete node overrides. */
   virtual bool is_simple_command() const;
   virtual bool is_dummy() const;
 

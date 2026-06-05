@@ -43,8 +43,7 @@ struct HashMap
     other.m_count = 0;
     other.m_tombstones = 0;
   }
-  HashMap &
-  operator=(HashMap &&other) noexcept
+  HashMap &operator=(HashMap &&other) noexcept
   {
     if (this != &other) {
       destroy_all();
@@ -60,8 +59,7 @@ struct HashMap
     }
     return *this;
   }
-  HashMap &
-  operator=(const HashMap &other)
+  HashMap &operator=(const HashMap &other)
   {
     if (this != &other) {
       HashMap copy{other};
@@ -72,16 +70,11 @@ struct HashMap
 
   ~HashMap() { destroy_all(); }
 
-  [[nodiscard]] usize
-  size() const
-  {
-    return m_count;
-  }
+  [[nodiscard]] usize size() const { return m_count; }
 
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */
-  [[nodiscard]] const Value *
-  find(StringView key) const
+  [[nodiscard]] const Value *find(StringView key) const
   {
     if (m_capacity == 0) return nullptr;
     PackedStringKey wanted = PackedStringKey::from_view(key);
@@ -102,18 +95,13 @@ struct HashMap
   }
 
   /* Store a value the table owns by move. */
-  void
-  set(StringView key, Value value)
-  {
-    set_value(key, std::move(value));
-  }
+  void set(StringView key, Value value) { set_value(key, std::move(value)); }
 
   /* The value for a key, inserting the supplied default when the key is absent,
      then returning a mutable reference. The caller passes the default already
      built with the right allocator. The reference is valid until the next set
      that grows the table. */
-  Value &
-  get_or_create(StringView key, Value default_value)
+  Value &get_or_create(StringView key, Value default_value)
   {
     if (const Value *existing = find(key))
       return *const_cast<Value *>(existing);
@@ -123,14 +111,12 @@ struct HashMap
 
   /* Store a String value built from a view, the form the variable store and the
      traps use. Only instantiated when Value is String. */
-  void
-  set(StringView key, StringView value)
+  void set(StringView key, StringView value)
   {
     set_value(key, String{m_allocator, value});
   }
 
-  void
-  erase(StringView key)
+  void erase(StringView key)
   {
     if (m_capacity == 0) return;
     usize mask = m_capacity - 1;
@@ -155,8 +141,7 @@ struct HashMap
 
   /* Visit each key and value in unspecified order. */
   template <class Fn>
-  void
-  for_each(Fn fn) const
+  void for_each(Fn fn) const
   {
     for (usize i = 0; i < m_capacity; i++) {
       if (m_slots[i].state == Slot::Occupied)
@@ -164,11 +149,7 @@ struct HashMap
     }
   }
 
-  void
-  clear()
-  {
-    destroy_all();
-  }
+  void clear() { destroy_all(); }
 
 private:
   struct Slot
@@ -185,8 +166,7 @@ private:
     Value value{};
   };
 
-  void
-  set_value(StringView key, Value value)
+  void set_value(StringView key, Value value)
   {
     /* Tombstones count toward the load, so the table rehashes before a probe
        chain fills with deleted slots. That keeps an Empty slot reachable on
@@ -225,8 +205,7 @@ private:
     }
   }
 
-  void
-  place(usize index, StringView key, Value value)
+  void place(usize index, StringView key, Value value)
   {
     Slot &slot = m_slots[index];
     slot.key = String{m_allocator, key};
@@ -236,8 +215,7 @@ private:
     m_count++;
   }
 
-  void
-  rehash(usize new_capacity)
+  void rehash(usize new_capacity)
   {
     Slot *old_slots = m_slots;
     usize old_capacity = m_capacity;
@@ -257,8 +235,7 @@ private:
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);
   }
 
-  void
-  destroy_all()
+  void destroy_all()
   {
     for (usize i = 0; i < m_capacity; i++)
       m_slots[i].~Slot();

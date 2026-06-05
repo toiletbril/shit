@@ -17,14 +17,9 @@ namespace shit {
 
 Type::Type() = default;
 
-Builtin::Kind
-Type::kind() const
-{
-  return Kind::Type;
-}
+Builtin::Kind Type::kind() const { return Kind::Type; }
 
-i32
-Type::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
 {
   ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 

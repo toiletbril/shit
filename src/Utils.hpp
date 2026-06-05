@@ -17,8 +17,7 @@ String merge_tokens_to_string(const ArrayList<const Token *> &v);
 /* Join the argument list into a single space-separated string. The container is
    the ArrayList<String> the exec-argv path now carries, so each element is
    appended through its byte view. */
-inline String
-merge_args_to_string(const ArrayList<String> &v)
+inline String merge_args_to_string(const ArrayList<String> &v)
 {
   String r{};
   for (usize i = 0; i < v.size(); i++) {
