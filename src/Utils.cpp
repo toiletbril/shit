@@ -210,6 +210,32 @@ not_an_integer_error(StringView text)
                "' is not a valid integer"};
 }
 
+String
+unsigned_integer_to_string(u64 value)
+{
+  /* The digits are written into a fixed buffer from the least significant end,
+     since a u64 never needs more than twenty decimal digits, then copied out in
+     order. No allocation happens until the result String is built. */
+  char buffer[20];
+  usize offset = sizeof(buffer);
+  do {
+    buffer[--offset] = static_cast<char>('0' + value % 10);
+    value /= 10;
+  } while (value > 0);
+  return String{StringView{buffer + offset, sizeof(buffer) - offset}};
+}
+
+String
+integer_to_string(i64 value)
+{
+  if (value >= 0) return unsigned_integer_to_string(static_cast<u64>(value));
+  /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
+  u64 magnitude = ~static_cast<u64>(value) + 1;
+  String result{"-"};
+  result.append(unsigned_integer_to_string(magnitude));
+  return result;
+}
+
 ErrorOr<i64>
 parse_decimal_integer(StringView text)
 {

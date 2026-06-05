@@ -65,6 +65,12 @@ String lowercase_string(StringView s);
    i64 range on overflow, and any other content yields an Error. The hexadecimal
    form also accepts a leading 0x. */
 ErrorOr<i64> parse_decimal_integer(StringView text);
+
+/* Format a signed integer as decimal into a fresh String, the StringView-native
+   replacement for std::to_string. The unsigned form is for ids and sizes that
+   exceed the i64 range. */
+String integer_to_string(i64 value);
+String unsigned_integer_to_string(u64 value);
 ErrorOr<i64> parse_octal_integer(StringView text);
 ErrorOr<i64> parse_hexadecimal_integer(StringView text);
 
