@@ -3,8 +3,6 @@
 #include "Common.hpp"
 #include "Eval.hpp"
 
-#include <string>
-
 namespace shit {
 
 static constexpr usize ERROR_CONTEXT_SIZE = 24;
@@ -17,16 +15,16 @@ struct ErrorBase
 
   operator bool &();
 
-  std::string message() const;
+  String message() const;
 
   /* The word printed before the message, Error by default. A warning subclass
      overrides it to Warning, so the reporting code reads the severity from the
      object rather than taking it as an argument. */
-  virtual std::string severity_word() const;
+  virtual String severity_word() const;
 
 protected:
   bool m_is_active{false};
-  std::string m_message;
+  String m_message;
 };
 
 struct Error : public ErrorBase
@@ -34,11 +32,11 @@ struct Error : public ErrorBase
   Error();
   Error(StringView message);
 
-  std::string to_string() const;
+  String to_string() const;
 
   /* Convert to the formatted message, so a call site passes an Error where a
      string is expected without spelling out to_string. */
-  operator std::string() const;
+  operator String() const;
 };
 
 /* An Error that prints as a warning and is shown rather than thrown. */
@@ -46,7 +44,7 @@ struct Warning : public Error
 {
   Warning(StringView message);
 
-  std::string severity_word() const override;
+  String severity_word() const override;
 };
 
 /* An Error that prints as a note and is shown rather than thrown. It carries no
@@ -55,7 +53,7 @@ struct Note : public Error
 {
   Note(StringView message);
 
-  std::string severity_word() const override;
+  String severity_word() const override;
 };
 
 /**
@@ -70,7 +68,7 @@ struct ErrorWithLocation : public ErrorBase
 
   /* The severity word comes from severity_word, so a warning subclass prints
      Warning over the same caret without passing the word in. */
-  virtual std::string to_string(std::string_view source) const;
+  virtual String to_string(StringView source) const;
 
 protected:
   SourceLocation m_location;
@@ -82,7 +80,7 @@ struct WarningWithLocation : public ErrorWithLocation
 {
   WarningWithLocation(SourceLocation location, StringView message);
 
-  std::string severity_word() const override;
+  String severity_word() const override;
 };
 
 struct ErrorWithLocationAndDetails : public ErrorWithLocation
@@ -93,11 +91,11 @@ struct ErrorWithLocationAndDetails : public ErrorWithLocation
                               SourceLocation details_location,
                               StringView details_message);
 
-  std::string details_to_string(std::string_view source) const;
+  String details_to_string(StringView source) const;
 
 protected:
   SourceLocation m_details_location;
-  std::string m_details_message;
+  String m_details_message;
 };
 
 } /* namespace shit */

@@ -13,8 +13,8 @@ namespace shit {
 
 /* TODO: Make CLI tests. */
 
-Flag::Flag(Flag::Kind kind, char short_name, const std::string &long_name,
-           const std::string &description)
+Flag::Flag(Flag::Kind kind, char short_name, StringView long_name,
+           StringView description)
     : m_kind(kind), m_short_name(short_name), m_long_name(long_name),
       m_description(description)
 {}
@@ -43,20 +43,20 @@ Flag::short_name() const
   return m_short_name;
 }
 
-std::string_view
+StringView
 Flag::long_name() const
 {
   return m_long_name;
 }
 
-std::string_view
+StringView
 Flag::description() const
 {
   return m_description;
 }
 
-FlagBool::FlagBool(char short_name, const std::string &long_name,
-                   const std::string &description)
+FlagBool::FlagBool(char short_name, StringView long_name,
+                   StringView description)
     : Flag(Flag::Kind::Bool, short_name, long_name, description)
 {}
 
@@ -79,15 +79,15 @@ FlagBool::reset()
   m_value = false;
 }
 
-FlagString::FlagString(char short_name, const std::string &long_name,
-                       const std::string &description)
+FlagString::FlagString(char short_name, StringView long_name,
+                       StringView description)
     : Flag(Flag::Kind::String, short_name, long_name, description)
 {}
 
 void
-FlagString::set(std::string_view v)
+FlagString::set(StringView v)
 {
-  m_value = StringView{v.data(), v.size()};
+  m_value = v;
   m_is_set = true;
 }
 
@@ -111,15 +111,15 @@ FlagString::reset()
   m_is_set = false;
 }
 
-FlagManyStrings::FlagManyStrings(char short_name, const std::string &long_name,
-                                 const std::string &description)
+FlagManyStrings::FlagManyStrings(char short_name, StringView long_name,
+                                 StringView description)
     : Flag(Flag::Kind::ManyStrings, short_name, long_name, description)
 {}
 
 void
-FlagManyStrings::append(std::string_view v)
+FlagManyStrings::append(StringView v)
 {
-  m_values.push(String{heap_allocator(), StringView{v.data(), v.size()}});
+  m_values.push(String{heap_allocator(), v});
 }
 
 bool
@@ -134,17 +134,17 @@ FlagManyStrings::size() const
   return m_values.size();
 }
 
-std::string_view
+StringView
 FlagManyStrings::get(usize i) const
 {
-  return std::string_view{m_values[i].c_str(), m_values[i].size()};
+  return m_values[i].view();
 }
 
-std::string_view
+StringView
 FlagManyStrings::next()
 {
   const String &value = m_values[m_value_position++];
-  return std::string_view{value.c_str(), value.size()};
+  return value.view();
 }
 
 bool
@@ -183,11 +183,11 @@ find_flag(const ArrayList<Flag *> &flags, const char *flag_start, bool is_long,
       if (!flags[i]->long_name().empty()) {
         /* There might be flags that are prefixes of other flags. Go
            through all flags first and pick the longest match. */
-        size_t flag_length = flags[i]->long_name().length();
+        size_t flag_length = flags[i]->long_name().length;
 
         if (flag_length > longest_length &&
             /* Yay let's add starts_with in C++20. */
-            std::memcmp(flags[i]->long_name().data(), flag_start,
+            std::memcmp(flags[i]->long_name().data, flag_start,
                         flag_length) == 0)
         {
           *result_flag = flags[i];
@@ -199,20 +199,6 @@ find_flag(const ArrayList<Flag *> &flags, const char *flag_start, bool is_long,
   }
 
   return longest_length > 0;
-}
-
-ArrayList<String>
-parse_flags_vec(const ArrayList<Flag *> &flags,
-                const std::vector<std::string> &args)
-{
-  std::vector<const char *> os_argv;
-  os_argv.reserve(args.size());
-
-  for (const std::string &arg : args)
-    os_argv.emplace_back(arg.c_str());
-
-  return parse_flags(flags, os_argv.size(),
-                     const_cast<char const *const *>(os_argv.data()));
 }
 
 ArrayList<String>
@@ -235,7 +221,7 @@ flag_name(const Flag *f, bool is_long)
   name += "-";
   if (is_long) {
     name += "-";
-    name += StringView{f->long_name().data(), f->long_name().size()};
+    name += f->long_name();
   } else {
     name.push(f->short_name());
   }
@@ -486,11 +472,11 @@ make_synopsis(std::string_view program_name,
 
   s += "SYNOPSIS\n";
 
-  for (std::string_view l : lines) {
+  for (StringView l : lines) {
     s += "  ";
     s += StringView{program_name.data(), program_name.size()};
     s += ' ';
-    s += StringView{l.data(), l.size()};
+    s += l;
     s += '\n';
   }
 
@@ -530,7 +516,7 @@ make_flag_help(const ArrayList<Flag *> &flags)
 
       /* '-E, --exit-code' */
       s += "--";
-      s += StringView{f->long_name().data(), f->long_name().size()};
+      s += f->long_name();
 
       switch (f->kind()) {
       /* '-E, --exit-code=<...>' */
@@ -548,7 +534,7 @@ make_flag_help(const ArrayList<Flag *> &flags)
       s += "    ";
     }
 
-    usize padding = MAX_WIDTH - f->long_name().length() -
+    usize padding = MAX_WIDTH - f->long_name().length -
                     (long_is_string ? LONG_PADDING : 0);
 
     for (usize i = 0; i < padding; i++) {
@@ -556,7 +542,7 @@ make_flag_help(const ArrayList<Flag *> &flags)
     }
 
     /* NOTE: This does not wrap long descriptions. */
-    s += StringView{f->description().data(), f->description().size()};
+    s += f->description();
   }
 
   return std::string{s.c_str(), s.size()};

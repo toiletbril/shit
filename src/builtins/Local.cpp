@@ -45,10 +45,7 @@ Local::execute(ExecContext &ec, EvalContext &cxt) const
     cxt.declare_local(name);
 
     if (equals_position.has_value())
-      cxt.set_shell_variable(name, std::string{arg.c_str() + *equals_position +
-                                                   1,
-                                               arg.size() - *equals_position -
-                                                   1});
+      cxt.set_shell_variable(name, arg.substring(*equals_position + 1));
     else
       cxt.set_shell_variable(name, "");
   }

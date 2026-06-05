@@ -365,7 +365,7 @@ main(int argc, char **argv)
                             FLAG_EXPAND_VERBOSE.is_enabled(),
                             should_be_interactive,
                             FLAG_ERROR_EXIT.is_enabled(),
-                            program_path,
+                            shit::String{program_path},
                             std::move(positional_params)};
 
   /* Apply the remaining option flags that the constructor does not take. */
@@ -461,7 +461,8 @@ main(int argc, char **argv)
           should_quit = true;
         }
       } else if (should_execute_commands) {
-        script_contents = FLAG_COMMAND.next();
+        shit::StringView command_view = FLAG_COMMAND.next();
+        script_contents = std::string{command_view.data, command_view.length};
         if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {

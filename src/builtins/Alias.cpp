@@ -49,7 +49,7 @@ Alias::execute(ExecContext &ec, EvalContext &cxt) const
     if (equals_position.has_value()) {
       cxt.set_alias(arg.substring_of_length(0, *equals_position),
                     arg.substring(*equals_position + 1));
-    } else if (Maybe<std::string> value = cxt.get_alias(arg)) {
+    } else if (Maybe<String> value = cxt.get_alias(arg)) {
       String message = "alias ";
       message += arg;
       message += "='";

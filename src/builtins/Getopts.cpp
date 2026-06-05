@@ -77,6 +77,8 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   char option = current[char_index];
+  String option_as_string{};
+  option_as_string.push(option);
   Maybe<usize> spec = optstring.find_character(option);
 
   auto advance_letter = [&]() {
@@ -91,11 +93,11 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     advance_letter();
     cxt.set_shell_variable(name, "?");
     if (is_silent) {
-      cxt.set_shell_variable("OPTARG", std::string{option});
+      cxt.set_shell_variable("OPTARG", option_as_string);
     } else {
       cxt.unset_shell_variable("OPTARG");
-      shit::print_to_standard_error("getopts: illegal option -- " +
-                                    std::string{option} + "\n");
+      shit::print_to_standard_error(StringView{"getopts: illegal option -- "} +
+                                    option_as_string + "\n");
     }
     return finish(0);
   }
@@ -105,14 +107,12 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   if (wants_argument) {
     if (char_index + 1 < current.length()) {
       StringView optarg = current.substring(char_index + 1);
-      cxt.set_shell_variable("OPTARG",
-                             std::string{optarg.data, optarg.size()});
+      cxt.set_shell_variable("OPTARG", optarg);
       optind++;
       char_index = 1;
     } else if (static_cast<usize>(optind) < operands.size()) {
       const String &optarg = operands[static_cast<usize>(optind)];
-      cxt.set_shell_variable("OPTARG",
-                             std::string{optarg.c_str(), optarg.size()});
+      cxt.set_shell_variable("OPTARG", optarg);
       optind += 2;
       char_index = 1;
     } else {
@@ -120,24 +120,24 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
       char_index = 1;
       if (is_silent) {
         cxt.set_shell_variable(name, ":");
-        cxt.set_shell_variable("OPTARG", std::string{option});
+        cxt.set_shell_variable("OPTARG", option_as_string);
       } else {
         cxt.set_shell_variable(name, "?");
         cxt.unset_shell_variable("OPTARG");
         shit::print_to_standard_error(
-            "getopts: option requires an argument -- " + std::string{option} +
-            "\n");
+            StringView{"getopts: option requires an argument -- "} +
+            option_as_string + "\n");
       }
       return finish(0);
     }
-    cxt.set_shell_variable(name, std::string{option});
+    cxt.set_shell_variable(name, option_as_string);
     return finish(0);
   }
 
   /* An option that takes no argument leaves OPTARG unset. */
   advance_letter();
   cxt.unset_shell_variable("OPTARG");
-  cxt.set_shell_variable(name, std::string{option});
+  cxt.set_shell_variable(name, option_as_string);
   return finish(0);
 }
 

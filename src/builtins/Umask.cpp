@@ -35,8 +35,7 @@ Umask::execute(ExecContext &ec, EvalContext &cxt) const
   const String &requested = args[1];
   ErrorOr<i64> parsed = utils::parse_octal_integer(requested);
   if (parsed.is_error()) {
-    throw Error{"umask: '" + std::string{requested.c_str(), requested.size()} +
-                "' is not a valid octal mask"};
+    throw Error{"umask: '" + requested + "' is not a valid octal mask"};
   }
   os::set_file_creation_mask(static_cast<u32>(parsed.value()));
 

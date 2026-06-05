@@ -122,7 +122,7 @@ struct EvalContext
 {
   EvalContext(bool should_disable_path_expansion, bool should_echo,
               bool should_echo_expanded, bool shell_is_interactive,
-              bool should_error_exit = false, std::string shell_name = {},
+              bool should_error_exit = false, String shell_name = {},
               ArrayList<String> positional_params = {});
 
   void add_expansion();
@@ -227,7 +227,7 @@ struct EvalContext
      before a simple command. */
   void set_alias(StringView name, StringView value);
   bool remove_alias(StringView name);
-  Maybe<std::string> get_alias(StringView name) const;
+  Maybe<String> get_alias(StringView name) const;
   ArrayList<String> alias_definitions() const;
   /* The defined alias names, so the prepass treats a use of one as resolvable. */
   HashSet alias_names() const;
@@ -261,9 +261,9 @@ struct EvalContext
      request or a deferred report formats a caret against the right text. Set
      around a top-level run and around a sourced run, restoring the previous
      frame afterwards. */
-  void set_current_source(const std::string *source, std::string origin);
+  void set_current_source(const std::string *source, String origin);
   const std::string *current_source() const;
-  const std::string &current_origin() const;
+  const String &current_origin() const;
 
   /* The set builtin toggles these options at run time. error_exit is set -e,
      echo_expanded is set -x, and error_unset is set -u. */
@@ -342,7 +342,7 @@ struct EvalContext
   bool should_echo_expanded() const;
   bool shell_is_interactive() const;
 
-  std::string make_stats_string() const;
+  String make_stats_string() const;
 
   usize last_expressions_executed() const;
   usize total_expressions_executed() const;
@@ -360,7 +360,7 @@ protected:
   HashMap<String> m_shell_variables{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
-  std::string m_field_separators{" \t\n"};
+  String m_field_separators{" \t\n"};
 
   /* A byte-indexed table that answers whether a character is a field separator
      in one load, instead of scanning IFS per byte. The layout is a contiguous
@@ -373,7 +373,7 @@ protected:
   bool is_field_separator(char c) const;
   i32 m_last_exit_status{0};
 
-  std::string m_shell_name{};
+  String m_shell_name{};
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   HashMap<const Expression *> m_functions{heap_allocator()};
@@ -384,7 +384,7 @@ protected:
   ControlFlow m_control_flow{};
   /* The source and name of the text being evaluated, for caret formatting. */
   const std::string *m_current_source{nullptr};
-  std::string m_current_origin{};
+  String m_current_origin{};
 
   /* ASTs from eval and dot, kept alive until the next top-level command so a
      function they define survives the rest of the current one. */
@@ -424,7 +424,7 @@ protected:
   bool m_error_exit;
 
   /* The single-letter option flags for $-, built from the flags above. */
-  std::string option_flags_string() const;
+  String option_flags_string() const;
 
   String expand_variable(StringView name) const;
 

@@ -4,14 +4,13 @@
 #include "../Utils.hpp"
 
 #include <filesystem>
-#include <string>
 
 namespace shit {
 
 namespace {
 
 bool
-parse_integer(const std::string &text, i64 &out)
+parse_integer(StringView text, i64 &out)
 {
   ErrorOr<i64> parsed = utils::parse_decimal_integer(text);
   if (parsed.is_error()) return false;
@@ -20,10 +19,11 @@ parse_integer(const std::string &text, i64 &out)
 }
 
 bool
-path_has_mode(const std::string &path, std::filesystem::perms mask)
+path_has_mode(const String &path, std::filesystem::perms mask)
 {
   std::error_code ec{};
-  std::filesystem::file_status status = std::filesystem::status(path, ec);
+  std::filesystem::file_status status =
+      std::filesystem::status(path.c_str(), ec);
   if (ec) return false;
   return (status.permissions() & mask) != std::filesystem::perms::none;
 }
@@ -32,11 +32,11 @@ path_has_mode(const std::string &path, std::filesystem::perms mask)
    test grammar so -a binds tighter than -o and ! and parentheses nest. */
 struct TestEvaluator
 {
-  const std::vector<std::string> &args;
+  const ArrayList<String> &args;
   usize pos;
   bool had_error;
 
-  const std::string &
+  const String &
   current() const
   {
     return args[pos];
@@ -48,38 +48,37 @@ struct TestEvaluator
   }
 
   void
-  fail(const std::string &message)
+  fail(StringView message)
   {
     if (!had_error)
-      shit::print_to_standard_error("test: " + message + "\n");
+      shit::print_to_standard_error(StringView{"test: "} + message + "\n");
     had_error = true;
   }
 
   bool
-  evaluate_unary(const std::string &op, const std::string &operand)
+  evaluate_unary(const String &op, const String &operand)
   {
     if (op == "-z") return operand.empty();
     if (op == "-n") return !operand.empty();
     std::error_code ec{};
-    if (op == "-e") return std::filesystem::exists(operand, ec);
-    if (op == "-f") return std::filesystem::is_regular_file(operand, ec);
-    if (op == "-d") return std::filesystem::is_directory(operand, ec);
+    if (op == "-e") return std::filesystem::exists(operand.c_str(), ec);
+    if (op == "-f") return std::filesystem::is_regular_file(operand.c_str(), ec);
+    if (op == "-d") return std::filesystem::is_directory(operand.c_str(), ec);
     if (op == "-s")
-      return std::filesystem::exists(operand, ec) &&
-             std::filesystem::file_size(operand, ec) > 0;
+      return std::filesystem::exists(operand.c_str(), ec) &&
+             std::filesystem::file_size(operand.c_str(), ec) > 0;
     if (op == "-r")
       return path_has_mode(operand, std::filesystem::perms::owner_read);
     if (op == "-w")
       return path_has_mode(operand, std::filesystem::perms::owner_write);
     if (op == "-x")
       return path_has_mode(operand, std::filesystem::perms::owner_exec);
-    fail("unknown unary operator '" + op + "'");
+    fail(StringView{"unknown unary operator '"} + op + "'");
     return false;
   }
 
   bool
-  evaluate_binary(const std::string &left, const std::string &op,
-                  const std::string &right)
+  evaluate_binary(const String &left, const String &op, const String &right)
   {
     if (op == "=") return left == right;
     if (op == "!=") return left != right;
@@ -98,19 +97,19 @@ struct TestEvaluator
       if (op == "-gt") return a > b;
       return a >= b;
     }
-    fail("unknown binary operator '" + op + "'");
+    fail(StringView{"unknown binary operator '"} + op + "'");
     return false;
   }
 
   bool
-  is_unary_operator(const std::string &s)
+  is_unary_operator(const String &s)
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
            s == "-s" || s == "-r" || s == "-w" || s == "-x";
   }
 
   bool
-  is_binary_operator(const std::string &s)
+  is_binary_operator(const String &s)
   {
     return s == "=" || s == "!=" || s == "-eq" || s == "-ne" || s == "-lt" ||
            s == "-le" || s == "-gt" || s == "-ge";
@@ -140,19 +139,19 @@ struct TestEvaluator
        argument is true when it is non-empty. */
     if (pos + 1 < args.size() && is_binary_operator(args[pos + 1])) {
       if (pos + 2 >= args.size()) {
-        fail("argument expected after '" + args[pos + 1] + "'");
+        fail(StringView{"argument expected after '"} + args[pos + 1] + "'");
         pos = args.size();
         return false;
       }
-      const std::string &left = args[pos];
-      const std::string &op = args[pos + 1];
-      const std::string &right = args[pos + 2];
+      const String &left = args[pos];
+      const String &op = args[pos + 1];
+      const String &right = args[pos + 2];
       pos += 3;
       return evaluate_binary(left, op, right);
     }
     if (is_unary_operator(current()) && pos + 1 < args.size()) {
-      const std::string &op = args[pos];
-      const std::string &operand = args[pos + 1];
+      const String &op = args[pos];
+      const String &operand = args[pos + 1];
       pos += 2;
       return evaluate_unary(op, operand);
     }
@@ -202,20 +201,21 @@ Test::execute(ExecContext &ec, EvalContext &cxt) const
   SHIT_UNUSED(cxt);
 
   /* Strip the program name, and for the [ form the required trailing ]. The
-     evaluator works over std::string, so the String arguments are copied into
-     std::string operands once here. */
-  std::vector<std::string> operands{};
-  for (usize i = 1; i < ec.args().size(); i++) {
-    const String &argument = ec.args()[i];
-    operands.emplace_back(argument.c_str(), argument.size());
-  }
+     last operand index ends the expression, one before the trailing ] in the
+     bracket form. */
+  const ArrayList<String> &arguments = ec.args();
+  usize expression_end = arguments.size();
   if (ec.program() == "[") {
-    if (operands.empty() || operands.back() != "]") {
+    if (arguments.size() < 2 || arguments[arguments.size() - 1] != "]") {
       shit::print_to_standard_error("[: missing closing ']'\n");
       return 2;
     }
-    operands.pop_back();
+    expression_end = arguments.size() - 1;
   }
+
+  ArrayList<String> operands{};
+  for (usize i = 1; i < expression_end; i++)
+    operands.push(arguments[i]);
 
   /* An empty expression is false, as POSIX specifies for test with no
      arguments. */
@@ -225,7 +225,7 @@ Test::execute(ExecContext &ec, EvalContext &cxt) const
   bool result = evaluator.parse_expression();
   if (evaluator.had_error) return 2;
   if (evaluator.pos != operands.size()) {
-    shit::print_to_standard_error("test: unexpected argument '" +
+    shit::print_to_standard_error(StringView{"test: unexpected argument '"} +
                                   operands[evaluator.pos] + "'\n");
     return 2;
   }

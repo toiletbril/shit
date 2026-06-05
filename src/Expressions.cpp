@@ -133,7 +133,7 @@ word_has_backtick(const Word &word)
 } /* namespace */
 
 bool
-analyze_ast(const Expression *root, std::string_view source,
+analyze_ast(const Expression *root, StringView source,
             const HashSet &known_functions, const HashSet &known_aliases)
 {
   AnalysisContext actx{source};
@@ -314,8 +314,10 @@ AssignCommand::evaluate_impl(EvalContext &cxt) const
      marked for the environment so a child inherits it, while a later lookup
      still finds the shell copy. */
   cxt.set_shell_variable(m_assignment->key(), value);
-  if (cxt.export_all())
-    os::set_environment_variable(m_assignment->key(), value);
+  if (cxt.export_all()) {
+    const String &key = m_assignment->key();
+    os::set_environment_variable(std::string{key.c_str(), key.size()}, value);
+  }
   return cxt.last_exit_status();
 }
 
@@ -337,7 +339,7 @@ AssignCommand::to_ast_string(usize layer) const
 }
 
 void
-AssignCommand::redirect_to(usize d, std::string &f, bool duplicate)
+AssignCommand::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -346,7 +348,7 @@ AssignCommand::redirect_to(usize d, std::string &f, bool duplicate)
 }
 
 void
-AssignCommand::append_to(usize d, std::string &f, bool duplicate)
+AssignCommand::append_to(usize d, String &f, bool duplicate)
 {
   redirect_to(d, f, duplicate);
 }
@@ -472,7 +474,7 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
       if (name == word) seen = true;
     if (seen) break;
 
-    Maybe<std::string> body = cxt.get_alias(word);
+    Maybe<String> body = cxt.get_alias(word);
     if (!body.has_value()) break;
     already_expanded.push(
         String{heap_allocator(), StringView{word.c_str(), word.size()}});
@@ -482,7 +484,9 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
        is built and swapped in. */
     ArrayList<String> rebuilt{};
     String current{};
-    for (char c : *body) {
+    const String &body_value = *body;
+    for (usize i = 0; i < body_value.size(); i++) {
+      char c = body_value[i];
       if (c == ' ' || c == '\t') {
         if (!current.empty()) {
           rebuilt.push(
@@ -753,7 +757,7 @@ SimpleCommand::to_ast_string(usize layer) const
 }
 
 void
-SimpleCommand::append_to(usize d, std::string &f, bool duplicate)
+SimpleCommand::append_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -762,7 +766,7 @@ SimpleCommand::append_to(usize d, std::string &f, bool duplicate)
 }
 
 void
-SimpleCommand::redirect_to(usize d, std::string &f, bool duplicate)
+SimpleCommand::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1003,7 +1007,7 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
 }
 
 void
-Pipeline::append_to(usize d, std::string &f, bool duplicate)
+Pipeline::append_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1012,7 +1016,7 @@ Pipeline::append_to(usize d, std::string &f, bool duplicate)
 }
 
 void
-Pipeline::redirect_to(usize d, std::string &f, bool duplicate)
+Pipeline::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1023,7 +1027,7 @@ Pipeline::redirect_to(usize d, std::string &f, bool duplicate)
 CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
 
 void
-CompoundCommand::append_to(usize d, std::string &f, bool duplicate)
+CompoundCommand::append_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1033,7 +1037,7 @@ CompoundCommand::append_to(usize d, std::string &f, bool duplicate)
 }
 
 void
-CompoundCommand::redirect_to(usize d, std::string &f, bool duplicate)
+CompoundCommand::redirect_to(usize d, String &f, bool duplicate)
 {
   SHIT_UNUSED(d);
   SHIT_UNUSED(f);
@@ -1231,10 +1235,10 @@ WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
   m_body->analyze(actx, false);
 }
 
-ForLoop::ForLoop(SourceLocation location, std::string variable_name,
+ForLoop::ForLoop(SourceLocation location, StringView variable_name,
                  ArrayList<const Token *> &&words, bool has_in_clause,
                  const Expression *body)
-    : CompoundCommand(location), m_variable_name(std::move(variable_name)),
+    : CompoundCommand(location), m_variable_name(variable_name),
       m_has_in_clause(has_in_clause), m_body(body)
 {
   for (const Token *word : words)
@@ -1278,8 +1282,7 @@ ForLoop::evaluate_impl(EvalContext &cxt) const
 
   i64 ret = 0;
   for (const String &value : values) {
-    cxt.set_shell_variable(m_variable_name,
-                           std::string{value.c_str(), value.size()});
+    cxt.set_shell_variable(m_variable_name, value);
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
   }
@@ -1468,16 +1471,16 @@ Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const
   m_body->analyze(actx, is_unconditional);
 }
 
-FunctionDefinition::FunctionDefinition(SourceLocation location,
-                                       std::string name, const Expression *body)
-    : CompoundCommand(location), m_name(std::move(name)), m_body(body)
+FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
+                                       const Expression *body)
+    : CompoundCommand(location), m_name(name), m_body(body)
 {}
 
 /* The body lives in the persistent function arena, owned by the function table
    rather than this node, so it is not deleted here. */
 FunctionDefinition::~FunctionDefinition() = default;
 
-const std::string &
+const String &
 FunctionDefinition::name() const
 {
   return m_name;
@@ -1518,7 +1521,7 @@ void
 FunctionDefinition::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   SHIT_UNUSED(is_unconditional);
-  actx.defined_functions.add(StringView{m_name.data(), m_name.size()});
+  actx.defined_functions.add(m_name);
   m_body->analyze(actx, false);
 }
 
@@ -1597,8 +1600,7 @@ ConstantNumber::to_string() const
   return String{StringView{std::to_string(m_value)}};
 }
 
-ConstantString::ConstantString(SourceLocation location,
-                               const std::string &value)
+ConstantString::ConstantString(SourceLocation location, StringView value)
     : Expression(location), m_value(value)
 {}
 
@@ -1625,7 +1627,7 @@ ConstantString::to_ast_string(usize layer) const
 String
 ConstantString::to_string() const
 {
-  return String{StringView{m_value}};
+  return m_value;
 }
 
 #define UNARY_EXPRESSION_DECLS(e, expr)                                        \

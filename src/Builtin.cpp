@@ -17,13 +17,13 @@ show_builtin_help_impl(const ExecContext &ec,
                        const std::vector<std::string> &hs,
                        const ArrayList<Flag *> &fl)
 {
-  std::string h{};
-  h += make_synopsis(std::string{ec.args()[0].c_str(), ec.args()[0].size()},
-                     hs);
-  h += '\n';
-  h += make_flag_help(fl);
-  h += '\n';
-  ec.print_to_stdout(h);
+  String help_text{};
+  help_text += StringView{make_synopsis(
+      std::string_view{ec.args()[0].c_str(), ec.args()[0].size()}, hs)};
+  help_text += '\n';
+  help_text += StringView{make_flag_help(fl)};
+  help_text += '\n';
+  ec.print_to_stdout(help_text);
 }
 
 Maybe<Builtin::Kind>
@@ -37,8 +37,8 @@ search_builtin(std::string_view builtin_name)
 /* The one-line synopsis and the sentence of explanation a builtin shows. */
 struct BuiltinHelp
 {
-  std::string synopsis;
-  std::string description;
+  String synopsis;
+  String description;
 };
 
 static BuiltinHelp
@@ -154,8 +154,9 @@ execute_builtin(ExecContext &&ec, EvalContext &cxt)
 {
   /* Every builtin answers --help with its synopsis and a short explanation. */
   if (ec.args().size() > 1 && ec.args()[1] == "--help") {
-    auto [synopsis, description] = builtin_help(ec.builtin_kind());
-    ec.print_to_stdout("SYNOPSIS\n  " + synopsis + "\n\n" + description + "\n");
+    BuiltinHelp help = builtin_help(ec.builtin_kind());
+    ec.print_to_stdout(StringView{"SYNOPSIS\n  "} + help.synopsis + "\n\n" +
+                       help.description + "\n");
     ec.close_fds();
     return 0;
   }
@@ -178,10 +179,9 @@ execute_builtin(ExecContext &&ec, EvalContext &cxt)
   try {
     return b->execute(ec, cxt);
   } catch (const Error &e) {
-    throw ErrorWithLocation{
-        ec.source_location(),
-        "Builtin '" + std::string{ec.program().c_str(), ec.program().size()} +
-            "': " + e.message()};
+    throw ErrorWithLocation{ec.source_location(),
+                            StringView{"Builtin '"} + ec.program() + "': " +
+                                e.message()};
   }
 }
 

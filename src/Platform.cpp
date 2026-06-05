@@ -463,11 +463,13 @@ signal_number_from_name(const std::string &name)
       std::all_of(name.begin(), name.end(),
                   [](unsigned char c) { return std::isdigit(c) != 0; }))
   {
-    return static_cast<i32>(std::strtol(name.c_str(), nullptr, 10));
+    ErrorOr<i64> parsed = utils::parse_decimal_integer(StringView{name});
+    if (parsed.is_error()) return shit::None;
+    return static_cast<i32>(parsed.value());
   }
 
-  std::string bare = name;
-  if (bare.rfind("SIG", 0) == 0) bare = bare.substr(3);
+  String bare{StringView{name}};
+  if (bare.starts_with("SIG")) bare = String{bare.substring(3)};
 
   static constexpr StaticStringMap<i32>::Entry NAME_ENTRIES[] = {
       {PackedStringKey::from_literal("HUP"),  SIGHUP },
@@ -486,7 +488,7 @@ signal_number_from_name(const std::string &name)
   };
   static constexpr StaticStringMap<i32> NAMES{
       NAME_ENTRIES, sizeof(NAME_ENTRIES) / sizeof(NAME_ENTRIES[0])};
-  return NAMES.find(StringView{bare.data(), bare.size()});
+  return NAMES.find(bare);
 }
 
 os_args

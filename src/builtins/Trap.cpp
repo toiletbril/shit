@@ -1,7 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 
-#include <algorithm>
 #include <cctype>
 
 /* trap lists the set traps with no argument, sets an action for one or more
@@ -23,13 +22,15 @@ namespace {
 
 /* Normalize a condition name to its bare upper-case form, so SIGINT, sigint,
    int, and the number 2 all name the same condition, and 0 names EXIT. */
-std::string
-normalize_condition(const std::string &raw)
+String
+normalize_condition(StringView raw)
 {
-  std::string name = raw;
-  std::transform(name.begin(), name.end(), name.begin(),
-                 [](unsigned char c) { return static_cast<char>(toupper(c)); });
-  if (name.rfind("SIG", 0) == 0 && name.length() > 3) name = name.substr(3);
+  String name{};
+  for (usize i = 0; i < raw.size(); i++)
+    name.push(static_cast<char>(
+        toupper(static_cast<unsigned char>(raw[i]))));
+  if (name.starts_with("SIG") && name.size() > 3)
+    name = String{name.substring(3)};
   if (name == "0") name = "EXIT";
   return name;
 }
@@ -60,8 +61,7 @@ Trap::execute(ExecContext &ec, EvalContext &cxt) const
   bool is_reset = action == "-";
 
   for (usize i = 2; i < args.size(); i++) {
-    std::string condition =
-        normalize_condition(std::string{args[i].c_str(), args[i].size()});
+    String condition = normalize_condition(args[i]);
     if (is_reset)
       cxt.remove_trap(condition);
     else

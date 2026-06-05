@@ -469,13 +469,16 @@ Parser::parse_simple_command()
       /* A run of digits touching a redirection operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
-        String literal_string = static_cast<tokens::WordToken *>(token.get())
-                                    ->word()
-                                    .to_literal_string();
-        std::string literal{literal_string.c_str(), literal_string.size()};
-        bool is_all_digits =
-            !literal.empty() &&
-            literal.find_first_not_of("0123456789") == std::string::npos;
+        String literal = static_cast<tokens::WordToken *>(token.get())
+                             ->word()
+                             .to_literal_string();
+        bool is_all_digits = !literal.empty();
+        for (usize i = 0; i < literal.size(); i++) {
+          if (literal[i] < '0' || literal[i] > '9') {
+            is_all_digits = false;
+            break;
+          }
+        }
         if (is_all_digits) {
           SourceLocation word_location = token->source_location();
           m_lexer.advance_past_last_peek();
@@ -537,9 +540,8 @@ Parser::parse_simple_command()
                                                   a.release())};
       } else {
         /* Single-command variable. */
-        const std::string &assignment_key = a->key();
-        local_vars.set(StringView{assignment_key.data(), assignment_key.size()},
-                       Word{a->value_word()});
+        const String &assignment_key = a->key();
+        local_vars.set(assignment_key, Word{a->value_word()});
       }
     } break;
 

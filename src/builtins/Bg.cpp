@@ -32,9 +32,7 @@ Bg::execute(ExecContext &ec, EvalContext &cxt) const
     ErrorOr<i64> parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
     if (parsed.is_error())
-      throw Error{"bg: '" +
-                  std::string{args[1].c_str(), args[1].size()} +
-                  "' is not a valid job"};
+      throw Error{"bg: '" + args[1] + "' is not a valid job"};
     job = cxt.find_job(static_cast<int>(parsed.value()));
   } else
     job = cxt.most_recent_job();

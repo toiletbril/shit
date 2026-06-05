@@ -6,8 +6,6 @@
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 
-#include <optional>
-
 /* TODO: Print proper offset and context for UTF-8. */
 
 namespace shit {
@@ -20,11 +18,11 @@ struct PreciseLocation
 };
 
 static PreciseLocation
-calc_precise_position(std::string_view source, usize byte_position)
+calc_precise_position(StringView source, usize byte_position)
 {
-  SHIT_ASSERT(byte_position <= source.length(),
+  SHIT_ASSERT(byte_position <= source.size(),
               "byte position: %zu, source length: %zu", byte_position,
-              source.length());
+              source.size());
 
   usize line_number = 0, last_newline_location = 0;
 
@@ -49,11 +47,11 @@ number_string_length(T n)
   return len;
 }
 
-static std::string
-get_context_pointing_to(std::string_view source, usize byte_position,
+static String
+get_context_pointing_to(StringView source, usize byte_position,
                         usize byte_count, usize line_number,
                         usize last_newline_location, usize unicode_position,
-                        std::optional<std::string_view> message)
+                        Maybe<StringView> message)
 {
   /* Offset from the start of the line. */
   usize start_offset = byte_position - last_newline_location;
@@ -65,14 +63,13 @@ get_context_pointing_to(std::string_view source, usize byte_position,
   /* Find out where the next newline is. */
   usize line_byte_count = 0;
 
-  while (byte_position - start_offset + line_byte_count < source.length() &&
+  while (byte_position - start_offset + line_byte_count < source.size() &&
          source[byte_position - start_offset + line_byte_count] != '\n')
   {
     line_byte_count++;
   }
 
-  SHIT_ASSERT(byte_position - start_offset + line_byte_count ==
-                  source.length() ||
+  SHIT_ASSERT(byte_position - start_offset + line_byte_count == source.size() ||
               source[byte_position - start_offset + line_byte_count] == '\n');
 
   /* Add spacer before line number. */
@@ -86,24 +83,24 @@ get_context_pointing_to(std::string_view source, usize byte_position,
   msg += std::to_string(line_number + 1) + " |  ";
 
   /* Line that caused the error. */
-  std::string_view context =
-      source.substr(byte_position - start_offset, line_byte_count);
+  StringView context =
+      source.substring_of_length(byte_position - start_offset, line_byte_count);
 
   /* We don't need accidental newlines in the middle of the context.
    * *pulls hair out* */
-  SHIT_ASSERT(context.find('\n') == std::string::npos,
-              "'%s', start: %zu, end: %zu", context.data(), start_offset,
+  SHIT_ASSERT(!context.find_character('\n').has_value(),
+              "'%s', start: %zu, end: %zu", context.data, start_offset,
               line_byte_count);
 
-  msg += StringView{context.data(), context.size()};
+  msg += context;
 
   /* Calculate proper unicode offsets and lengths for underline. */
   usize unicode_start_offset_position =
-      toiletline::utf8_strlen(source.data(), byte_position - start_offset);
+      toiletline::utf8_strlen(source.data, byte_position - start_offset);
 
   /* Does token length go beyond that line? */
   usize unicode_length =
-      toiletline::utf8_strlen(source.data() + byte_position,
+      toiletline::utf8_strlen(source.data + byte_position,
                               (byte_count > line_byte_count - start_offset)
                                   ? line_byte_count - start_offset
                                   : byte_count);
@@ -131,17 +128,16 @@ get_context_pointing_to(std::string_view source, usize byte_position,
 
   if (message.has_value()) {
     msg += ' ';
-    msg += StringView{message->data(), message->size()};
+    msg += *message;
     msg += '.';
   }
 
-  return std::string{msg.c_str(), msg.size()};
+  return msg;
 }
 
 ErrorBase::ErrorBase() = default;
 
-ErrorBase::ErrorBase(StringView message)
-    : m_is_active(true), m_message(message.data, message.length)
+ErrorBase::ErrorBase(StringView message) : m_is_active(true), m_message(message)
 {}
 
 ErrorBase::~ErrorBase() = default;
@@ -152,13 +148,13 @@ operator bool &()
   return m_is_active;
 }
 
-std::string
+String
 ErrorBase::message() const
 {
   return m_message;
 }
 
-std::string
+String
 ErrorBase::severity_word() const
 {
   return "Error";
@@ -166,20 +162,20 @@ ErrorBase::severity_word() const
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
-std::string
+String
 Error::to_string() const
 {
   return severity_word() + ": " + message() + ".";
 }
 
-Error::operator std::string() const
+Error::operator String() const
 {
   return to_string();
 }
 
 Warning::Warning(StringView message) : Error(message) {}
 
-std::string
+String
 Warning::severity_word() const
 {
   return "Warning";
@@ -187,7 +183,7 @@ Warning::severity_word() const
 
 Note::Note(StringView message) : Error(message) {}
 
-std::string
+String
 Note::severity_word() const
 {
   return "Note";
@@ -198,8 +194,8 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
     : ErrorBase(message), m_location(location)
 {}
 
-std::string
-ErrorWithLocation::to_string(std::string_view source) const
+String
+ErrorWithLocation::to_string(StringView source) const
 {
   usize byte_position = m_location.position();
   usize byte_count = m_location.length();
@@ -208,11 +204,11 @@ ErrorWithLocation::to_string(std::string_view source) const
   SHIT_LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
 
   /* FIXME: Below are two dirty hacks. */
-  if (byte_position + 2 < source.length() && source[byte_position] == '\\' &&
+  if (byte_position + 2 < source.size() && source[byte_position] == '\\' &&
       source[byte_position + 1] == '\n')
   {
     byte_position += 2;
-  } else if (byte_position + 1 < source.length() &&
+  } else if (byte_position + 1 < source.size() &&
              source[byte_position] == '\n')
   {
     byte_position++;
@@ -221,8 +217,7 @@ ErrorWithLocation::to_string(std::string_view source) const
   auto [line_number, last_newline_location] =
       calc_precise_position(source, byte_position);
 
-  usize unicode_position =
-      toiletline::utf8_strlen(source.data(), byte_position);
+  usize unicode_position = toiletline::utf8_strlen(source.data, byte_position);
 
   /* Our count starts from 0. If there's only a single line, we need to use the
    * raw location for the correct offset. Otherwise, newline counts as an extra
@@ -242,8 +237,8 @@ ErrorWithLocation::to_string(std::string_view source) const
   result += ".\n";
   result += get_context_pointing_to(source, byte_position, byte_count,
                                     line_number, last_newline_location,
-                                    unicode_position, "here");
-  return std::string{result.c_str(), result.size()};
+                                    unicode_position, StringView{"here"});
+  return result;
 }
 
 WarningWithLocation::WarningWithLocation(SourceLocation location,
@@ -251,7 +246,7 @@ WarningWithLocation::WarningWithLocation(SourceLocation location,
     : ErrorWithLocation(location, message)
 {}
 
-std::string
+String
 WarningWithLocation::severity_word() const
 {
   return "Warning";
@@ -261,17 +256,16 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message,
     SourceLocation details_location, StringView details_message)
     : ErrorWithLocation(location, message),
-      m_details_location(details_location),
-      m_details_message(details_message.data, details_message.length)
+      m_details_location(details_location), m_details_message(details_message)
 {}
 
-std::string
-ErrorWithLocationAndDetails::details_to_string(std::string_view source) const
+String
+ErrorWithLocationAndDetails::details_to_string(StringView source) const
 {
   usize byte_position = m_details_location.position();
   usize byte_count = m_details_location.length();
 
-  if (byte_position > 0 && byte_position == source.length() &&
+  if (byte_position > 0 && byte_position == source.size() &&
       source[byte_position - 1] == '\n')
     byte_position--;
 
@@ -279,7 +273,7 @@ ErrorWithLocationAndDetails::details_to_string(std::string_view source) const
       calc_precise_position(source, byte_position);
 
   usize unicode_details_position =
-      toiletline::utf8_strlen(source.data(), byte_position);
+      toiletline::utf8_strlen(source.data, byte_position);
 
   usize details_line_byte_position =
       (details_last_newline_location > 0)
@@ -294,8 +288,8 @@ ErrorWithLocationAndDetails::details_to_string(std::string_view source) const
   result += get_context_pointing_to(
       source, byte_position, byte_count, details_line_number,
       details_last_newline_location, unicode_details_position,
-      m_details_message);
-  return std::string{result.c_str(), result.size()};
+      m_details_message.view());
+  return result;
 }
 
 } /* namespace shit */

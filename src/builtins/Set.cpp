@@ -132,8 +132,7 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
       const String &name = args[++i];
       const SetOption *option = find_option_by_name(name);
       if (option == nullptr)
-        throw Error{"set: '" + std::string{name.c_str(), name.size()} +
-                    "' is not a valid option name"};
+        throw Error{"set: '" + name + "' is not a valid option name"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
       continue;
     }
@@ -145,8 +144,10 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
         char letter = arg[c];
         const SetOption *option = find_option_by_letter(letter);
         if (option == nullptr) {
-          throw Error{"set: '" + std::string{arg[0]} + std::string{letter} +
-                      "' is not a valid option"};
+          String invalid_option{};
+          invalid_option += arg[0];
+          invalid_option += letter;
+          throw Error{"set: '" + invalid_option + "' is not a valid option"};
         }
         if (option->set != nullptr) (cxt.*(option->set))(enable);
       }

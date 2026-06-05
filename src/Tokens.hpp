@@ -6,11 +6,7 @@
 #include "Maybe.hpp"
 
 #include <memory>
-#include <optional>
-#include <string>
-#include <string_view>
 #include <utility>
-#include <vector>
 
 namespace shit {
 
@@ -61,7 +57,7 @@ struct Word
      unescaped NAME= prefix. The returned word is the right hand side. The pair
      stays std::pair here, since a named struct holding a Word by value cannot
      complete inside Word's own definition. */
-  Maybe<std::pair<std::string, Word>> get_assignment_split() const;
+  Maybe<std::pair<String, Word>> get_assignment_split() const;
 };
 
 /**
@@ -277,52 +273,51 @@ TOKEN_STRUCT(DoubleRightSquareBracket);
 
 struct Redirection : Token
 {
-  Redirection(SourceLocation location, std::string_view what_fd,
-              std::string_view to_file);
+  Redirection(SourceLocation location, StringView what_fd, StringView to_file);
 
   Kind kind() const override;
   Flags flags() const override;
 
-  const std::string &from_fd() const;
-  const std::string &to_file() const;
+  const String &from_fd() const;
+  const String &to_file() const;
 
 protected:
-  std::string m_from_fd{};
-  std::string m_to_file{};
+  String m_from_fd{};
+  String m_to_file{};
 };
 
 struct Assignment : public Token
 {
-  Assignment(SourceLocation location, std::string_view key, Word value);
+  Assignment(SourceLocation location, StringView key, Word value);
 
   Kind kind() const override;
   Flags flags() const override;
 
   String raw_string() const override;
 
-  const std::string &key() const;
+  const String &key() const;
   const Word &value_word() const;
 
 protected:
-  std::string m_key;
+  String m_key;
   Word m_value;
 };
 
 /* Tokens with values. */
 struct Value : public Token
 {
-  Value(SourceLocation location, std::string_view sv);
+  Value(SourceLocation location, StringView sv);
 
   String raw_string() const override;
 
 protected:
-  std::string m_value;
+  String m_value;
 };
 
 #define VALUE_TOKEN_STRUCT(t)                                                  \
   struct t : public Value                                                      \
   {                                                                            \
-    t(SourceLocation location, std::string_view sv);                           \
+    t(SourceLocation location, StringView sv);                                 \
                                                                                \
     Kind kind() const override;                                                \
     Flags flags() const override;                                              \

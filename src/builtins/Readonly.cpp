@@ -54,7 +54,7 @@ Readonly::execute(ExecContext &ec, EvalContext &cxt) const
     if (equals_position.has_value()) {
       StringView name = arg.substring_of_length(0, *equals_position);
       StringView value = arg.substring(*equals_position + 1);
-      cxt.set_shell_variable(name, std::string{value.data, value.length});
+      cxt.set_shell_variable(name, value);
       cxt.mark_readonly(name);
     } else {
       cxt.mark_readonly(arg);

@@ -1,9 +1,11 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 /* Interprets a format string with the common conversions and backslash escapes,
    recycling the format over any remaining arguments, like the POSIX utility. */
@@ -12,8 +14,27 @@ namespace shit {
 
 namespace {
 
+/* Parse one signed integer argument the way printf does, in base zero. A leading
+   0x marks hexadecimal, otherwise the digits are decimal. A malformed argument
+   yields zero. */
+i64
+parse_printf_integer(const String &arg)
+{
+  usize first_digit = 0;
+  if (first_digit < arg.size() &&
+      (arg[first_digit] == '+' || arg[first_digit] == '-'))
+    first_digit++;
+  bool is_hexadecimal = first_digit + 1 < arg.size() &&
+                        arg[first_digit] == '0' &&
+                        (arg[first_digit + 1] == 'x' ||
+                         arg[first_digit + 1] == 'X');
+  ErrorOr<i64> parsed = is_hexadecimal ? utils::parse_hexadecimal_integer(arg)
+                                       : utils::parse_decimal_integer(arg);
+  return parsed.is_error() ? 0 : parsed.value();
+}
+
 void
-append_escape(std::string &out, const std::string &fmt, usize &i)
+append_escape(String &out, const String &fmt, usize &i)
 {
   char e = fmt[i];
   switch (e) {
@@ -35,8 +56,8 @@ append_escape(std::string &out, const std::string &fmt, usize &i)
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
 void
-append_conversion(std::string &out, const std::string &spec, char conv,
-                  const std::string &arg)
+append_conversion(String &out, const std::string &spec, char conv,
+                  const String &arg)
 {
   char buffer[256];
   std::string full = spec + conv;
@@ -49,9 +70,8 @@ append_conversion(std::string &out, const std::string &spec, char conv,
     out += arg.empty() ? '\0' : arg[0];
   } else if (conv == 'd' || conv == 'i') {
     std::string with_ll = spec + "lld";
-    std::snprintf(
-        buffer, sizeof(buffer), with_ll.c_str(),
-        static_cast<long long>(std::strtoll(arg.c_str(), nullptr, 0)));
+    std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
+                  static_cast<long long>(parse_printf_integer(arg)));
     out += buffer;
   } else if (conv == 'x' || conv == 'X' || conv == 'o' || conv == 'u') {
     std::string with_ll = spec + "ll" + conv;
@@ -82,12 +102,12 @@ Printf::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (ec.args().size() < 2) return 0;
 
-  std::string fmt = std::string{ec.args()[1].c_str(), ec.args()[1].size()};
-  std::vector<std::string> operands{};
+  const String &fmt = ec.args()[1];
+  ArrayList<String> operands{};
   for (usize i = 2; i < ec.args().size(); i++)
-    operands.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
+    operands.push(ec.args()[i]);
 
-  std::string out{};
+  String out{};
   usize operand_index = 0;
   bool consumed_a_conversion = false;
 
@@ -128,8 +148,8 @@ Printf::execute(ExecContext &ec, EvalContext &cxt) const
         continue;
       }
 
-      std::string arg =
-          operand_index < operands.size() ? operands[operand_index] : "";
+      String arg =
+          operand_index < operands.size() ? operands[operand_index] : String{};
       append_conversion(out, spec, conv, arg);
       operand_index++;
       consumed_a_conversion = true;

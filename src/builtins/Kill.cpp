@@ -48,7 +48,7 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
   i32 status = 0;
   for (usize i = first_target; i < args.size(); i++) {
     const String &target = args[i];
-    std::string target_text = std::string{target.c_str(), target.size()};
+    String target_text = target;
 
     os::process pid{};
     if (!target.empty() && target[0] == '%') {

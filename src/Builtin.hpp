@@ -61,7 +61,7 @@ struct Builtin
   };
 
   void set_fds(os::descriptor in, os::descriptor out);
-  void print_to_stdout(const std::string &s) const;
+  void print_to_stdout(StringView s) const;
 
   virtual Kind kind() const = 0;
   virtual i32 execute(ExecContext &ec, EvalContext &cxt) const = 0;

@@ -21,14 +21,14 @@ namespace shit {
 namespace {
 
 /* Format a count of seconds as the minutes and seconds form times prints. */
-std::string
+String
 format_time(double seconds)
 {
   long minutes = static_cast<long>(seconds) / 60;
   double remainder = seconds - static_cast<double>(minutes * 60);
   char buffer[64];
   std::snprintf(buffer, sizeof(buffer), "%ldm%.3fs", minutes, remainder);
-  return std::string{buffer};
+  return String{buffer};
 }
 
 } /* namespace */
@@ -61,7 +61,7 @@ Times::execute(ExecContext &ec, EvalContext &cxt) const
   }
 #endif
 
-  std::string out{};
+  String out{};
   out += format_time(self_user) + " " + format_time(self_system) + "\n";
   out += format_time(child_user) + " " + format_time(child_system) + "\n";
   ec.print_to_stdout(out);

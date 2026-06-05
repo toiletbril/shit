@@ -147,8 +147,8 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
 }
 
 void
-string_replace(std::string &s, const std::string_view to_replace,
-               const std::string_view replace_with)
+string_replace(std::string &s, const StringView to_replace,
+               const StringView replace_with)
 {
   std::string b{};
   b.reserve(s.size());
@@ -158,25 +158,27 @@ string_replace(std::string &s, const std::string_view to_replace,
 
   for (;;) {
     p = i;
-    i = s.find(to_replace, i);
+    /* The view carries no null terminator, so the bytes are matched through the
+       pointer and length overload of find. */
+    i = s.find(to_replace.data, i, to_replace.length);
     if (i == std::string::npos) break;
     b.append(s, p, i - p);
-    b += replace_with;
-    i += to_replace.size();
+    b.append(replace_with.data, replace_with.length);
+    i += to_replace.length;
   }
 
   b.append(s, p, s.size() - p);
   s.swap(b);
 }
 
-std::string
-lowercase_string(std::string_view s)
+String
+lowercase_string(StringView s)
 {
   String l{};
-  l.reserve(s.length());
-  for (usize i = 0; i < s.length(); i++)
+  l.reserve(s.size());
+  for (usize i = 0; i < s.size(); i++)
     l.push(static_cast<char>(std::tolower(s[i])));
-  return std::string{l.c_str(), l.size()};
+  return l;
 }
 
 static bool
@@ -570,21 +572,21 @@ clear_path_map()
 /* Split PATH into its directory components. The last component carries no
    trailing delimiter, so a plain delimiter scan drops it and the directory is
    never searched. POSIX treats an empty component as the current directory. */
-static std::vector<std::string>
+static ArrayList<String>
 split_path_dirs(const std::string &path_var)
 {
-  std::vector<std::string> dirs{};
-  std::string current{};
+  ArrayList<String> dirs{};
+  String current{};
 
   for (const char &ch : path_var) {
     if (ch == os::PATH_DELIMITER) {
-      dirs.push_back(current.empty() ? "." : current);
+      dirs.push(current.empty() ? String{"."} : current);
       current.clear();
     } else {
       current += ch;
     }
   }
-  dirs.push_back(current.empty() ? "." : current);
+  dirs.push(current.empty() ? String{"."} : current);
 
   return dirs;
 }
@@ -594,15 +596,15 @@ initialize_path_map()
 {
   if (!MAYBE_PATH) return;
 
-  for (const std::string &dir_string : split_path_dirs(*MAYBE_PATH)) {
+  for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
     try {
       /* What the heck? A path in PATH that does not exist? Are you a
        * Windows user? */
-      if (std::filesystem::exists(dir_string)) {
+      if (std::filesystem::exists(dir_string.c_str())) {
         /* Cache every file in the directory under its name without an omitted
            extension, pointing at its full path. */
         for (const std::filesystem::directory_entry &f :
-             std::filesystem::directory_iterator{dir_string})
+             std::filesystem::directory_iterator{dir_string.c_str()})
         {
           std::string name = f.path().filename().string();
           os::erase_extension_and_get_its_index(name);
@@ -630,11 +632,11 @@ search_and_cache(const std::string &program_name)
 
   ArrayList<std::filesystem::path> result{};
 
-  for (std::string &dir_string : split_path_dirs(*MAYBE_PATH)) {
+  for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
     bool is_valid_dir = false;
 
     try {
-      is_valid_dir = std::filesystem::exists(dir_string);
+      is_valid_dir = std::filesystem::exists(dir_string.c_str());
     } catch (const std::filesystem::filesystem_error &e) {
 #if 0
       shit::show_message(
@@ -653,7 +655,7 @@ search_and_cache(const std::string &program_name)
     os::erase_extension_and_get_its_index(key);
 
     std::filesystem::path full_path =
-        std::filesystem::path{dir_string} / program_name;
+        std::filesystem::path{dir_string.c_str()} / program_name;
     std::string full_path_str = full_path.string();
 
     /* This file already has an extesion specified? */

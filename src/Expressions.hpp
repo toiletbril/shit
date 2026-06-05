@@ -20,7 +20,7 @@ struct Token;
    located message that does not stop execution, a failure does. */
 struct AnalysisContext
 {
-  std::string_view source;
+  StringView source;
   bool has_fatal{false};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
      see, so a later unresolved command is a warning rather than a failure. */
@@ -32,8 +32,7 @@ struct AnalysisContext
      the alias expansion, so it is not a missing command. */
   HashSet known_aliases{heap_allocator()};
 
-  explicit AnalysisContext(std::string_view source_view) : source(source_view)
-  {}
+  explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
   void warn(SourceLocation location, StringView message);
   void fail(SourceLocation location, StringView message);
@@ -41,7 +40,7 @@ struct AnalysisContext
 
 /* Walk the tree and report. Returns true when execution may proceed, false when
    an unconditional command failed to resolve. */
-bool analyze_ast(const Expression *root, std::string_view source,
+bool analyze_ast(const Expression *root, StringView source,
                  const HashSet &known_functions,
                  const HashSet &known_aliases);
 
@@ -136,8 +135,8 @@ struct Command : public Expression
 
   virtual bool is_assignment() const;
 
-  virtual void append_to(usize d, std::string &f, bool duplicate) = 0;
-  virtual void redirect_to(usize d, std::string &f, bool duplicate) = 0;
+  virtual void append_to(usize d, String &f, bool duplicate) = 0;
+  virtual void redirect_to(usize d, String &f, bool duplicate) = 0;
 
 protected:
   bool m_is_async{false};
@@ -157,8 +156,8 @@ struct AssignCommand : public Command
   String to_string() const override;
   String to_ast_string(usize layer = 0) const override;
 
-  void append_to(usize d, std::string &f, bool duplicate) override;
-  void redirect_to(usize d, std::string &f, bool duplicate) override;
+  void append_to(usize d, String &f, bool duplicate) override;
+  void redirect_to(usize d, String &f, bool duplicate) override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -210,8 +209,8 @@ struct SimpleCommand : public Command
 
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
-  void append_to(usize d, std::string &f, bool duplicate) override;
-  void redirect_to(usize d, std::string &f, bool duplicate) override;
+  void append_to(usize d, String &f, bool duplicate) override;
+  void redirect_to(usize d, String &f, bool duplicate) override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -289,8 +288,8 @@ struct Pipeline : public Command
 
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
-  void append_to(usize d, std::string &f, bool duplicate) override;
-  void redirect_to(usize d, std::string &f, bool duplicate) override;
+  void append_to(usize d, String &f, bool duplicate) override;
+  void redirect_to(usize d, String &f, bool duplicate) override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -305,8 +304,8 @@ struct CompoundCommand : public Command
 {
   CompoundCommand(SourceLocation location);
 
-  void append_to(usize d, std::string &f, bool duplicate) override;
-  void redirect_to(usize d, std::string &f, bool duplicate) override;
+  void append_to(usize d, String &f, bool duplicate) override;
+  void redirect_to(usize d, String &f, bool duplicate) override;
 };
 
 struct IfClause : public CompoundCommand
@@ -353,7 +352,7 @@ protected:
 
 struct ForLoop : public CompoundCommand
 {
-  ForLoop(SourceLocation location, std::string variable_name,
+  ForLoop(SourceLocation location, StringView variable_name,
           ArrayList<const Token *> &&words, bool has_in_clause,
           const Expression *body);
   ~ForLoop() override;
@@ -365,7 +364,7 @@ struct ForLoop : public CompoundCommand
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::string m_variable_name;
+  String m_variable_name;
   ArrayList<const Token *> m_words{heap_allocator()};
   /* Without an in clause, a for loop iterates the positional parameters. */
   bool m_has_in_clause;
@@ -428,11 +427,11 @@ protected:
 
 struct FunctionDefinition : public CompoundCommand
 {
-  FunctionDefinition(SourceLocation location, std::string name,
+  FunctionDefinition(SourceLocation location, StringView name,
                      const Expression *body);
   ~FunctionDefinition() override;
 
-  const std::string &name() const;
+  const String &name() const;
   const Expression *body() const;
 
   String to_string() const override;
@@ -442,7 +441,7 @@ struct FunctionDefinition : public CompoundCommand
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  std::string m_name;
+  String m_name;
   const Expression *m_body;
 };
 
@@ -462,7 +461,7 @@ protected:
 
 struct ConstantString : public Expression
 {
-  ConstantString(SourceLocation location, const std::string &value);
+  ConstantString(SourceLocation location, StringView value);
   ~ConstantString() override;
 
   String to_ast_string(usize layer = 0) const override;
@@ -471,7 +470,7 @@ struct ConstantString : public Expression
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
 
-  const std::string m_value;
+  const String m_value;
 };
 
 struct UnaryExpression : public Expression

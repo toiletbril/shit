@@ -38,27 +38,27 @@ struct Flag
   usize position() const;
   void set_position(u32 n);
   char short_name() const;
-  std::string_view long_name() const;
-  std::string_view description() const;
+  StringView long_name() const;
+  StringView description() const;
 
   /* Reset the flag state, mainly for builtins. */
   virtual void reset() = 0;
 
 protected:
-  Flag(Kind type, char short_name, const std::string &long_name,
-       const std::string &description);
+  Flag(Kind type, char short_name, StringView long_name,
+       StringView description);
 
   Kind m_kind;
   usize m_position{0}; /* 0 if it wasn't specified. */
   char m_short_name;
-  std::string m_long_name;
-  std::string m_description;
+  String m_long_name;
+  String m_description;
 };
 
 struct FlagBool : public Flag
 {
-  FlagBool(char short_name, const std::string &long_name,
-           const std::string &description);
+  FlagBool(char short_name, StringView long_name,
+           StringView description);
 
   void toggle();
   bool is_enabled() const;
@@ -71,10 +71,10 @@ private:
 
 struct FlagString : public Flag
 {
-  FlagString(char short_name, const std::string &long_name,
-             const std::string &description);
+  FlagString(char short_name, StringView long_name,
+             StringView description);
 
-  void set(std::string_view v);
+  void set(StringView v);
   bool is_set() const;
   StringView value() const;
 
@@ -87,16 +87,16 @@ private:
 
 struct FlagManyStrings : public Flag
 {
-  FlagManyStrings(char short_name, const std::string &long_name,
-                  const std::string &description);
+  FlagManyStrings(char short_name, StringView long_name,
+                  StringView description);
 
-  void append(std::string_view v);
+  void append(StringView v);
   usize size() const;
   bool is_empty() const;
 
-  std::string_view get(usize i) const;
+  StringView get(usize i) const;
 
-  std::string_view next();
+  StringView next();
   bool at_end() const;
 
   void reset() override;
@@ -108,8 +108,6 @@ private:
 
 /* These return arguments which are not flags. */
 
-ArrayList<String> parse_flags_vec(const ArrayList<Flag *> &flags,
-                                         const std::vector<std::string> &args);
 ArrayList<String> parse_flags_vec(const ArrayList<Flag *> &flags,
                                          const ArrayList<String> &args);
 ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,

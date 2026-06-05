@@ -68,11 +68,11 @@ Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
   /* A bare flag reads the soft limit, an operand sets both the soft and the
      hard limit. */
   if (args.size() < 2) {
-    std::string out{};
+    String out{};
     if (limit.rlim_cur == RLIM_INFINITY)
-      out = "unlimited";
+      out = String{"unlimited"};
     else
-      out = std::to_string(limit.rlim_cur / resource.units_per_value);
+      out = String{std::to_string(limit.rlim_cur / resource.units_per_value)};
     ec.print_to_stdout(out + "\n");
     return 0;
   }

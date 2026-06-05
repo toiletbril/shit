@@ -39,15 +39,16 @@ Read::execute(ExecContext &ec, EvalContext &cxt) const
   bool has_operands = names.size() > 1;
   usize first_operand = 1;
   usize operand_count = has_operands ? names.size() - first_operand : 1;
-  std::string reply_name = "REPLY";
-  auto operand_name = [&](usize index) -> std::string {
+  String reply_name = "REPLY";
+  auto operand_name = [&](usize index) -> String {
     if (!has_operands) return reply_name;
-    const String &name = names[first_operand + index];
-    return std::string{name.c_str(), name.size()};
+    return names[first_operand + index];
   };
 
   /* The command's input descriptor honors a redirection or a heredoc on the
-     read, falling back to the shell's standard input when none is present. */
+     read, falling back to the shell's standard input when none is present. The
+     line comes back over the os boundary as a std::string and is copied into a
+     String for the splitting below. */
   Maybe<std::string> read_line =
       utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN));
   if (!read_line) {
@@ -55,7 +56,7 @@ Read::execute(ExecContext &ec, EvalContext &cxt) const
       cxt.set_shell_variable(operand_name(i), "");
     return 1;
   }
-  const std::string &line = *read_line;
+  String line = String{StringView{*read_line}};
 
   String field_separators =
       cxt.get_variable_value("IFS").value_or(String{heap_allocator(), " \t\n"});
@@ -71,7 +72,7 @@ Read::execute(ExecContext &ec, EvalContext &cxt) const
     if (i + 1 == operand_count) {
       /* The last variable receives the rest of the line with trailing
          separators trimmed. */
-      std::string rest = line.substr(cursor);
+      String rest = String{line.substring(cursor)};
       while (!rest.empty() && is_separator(rest.back()))
         rest.pop_back();
       cxt.set_shell_variable(operand_name(i), rest);
@@ -79,7 +80,8 @@ Read::execute(ExecContext &ec, EvalContext &cxt) const
       usize start = cursor;
       while (cursor < line.length() && !is_separator(line[cursor]))
         cursor++;
-      cxt.set_shell_variable(operand_name(i), line.substr(start, cursor - start));
+      cxt.set_shell_variable(operand_name(i),
+                             line.substring_of_length(start, cursor - start));
     }
   }
 

@@ -103,7 +103,7 @@ Word::to_pretty_string() const
   return result;
 }
 
-Maybe<std::pair<std::string, Word>>
+Maybe<std::pair<String, Word>>
 Word::get_assignment_split() const
 {
   if (segments.empty()) return shit::None;
@@ -120,7 +120,7 @@ Word::get_assignment_split() const
   }
 
   StringView name_view = first.text.substring_of_length(0, *equals_position);
-  std::string name{name_view.data, name_view.length};
+  String name{name_view};
 
   Word value{};
   /* The value always begins with an unquoted segment, even when empty, so that
@@ -191,19 +191,17 @@ SENTINEL_TOKEN_DECLS(DoubleRightSquareBracket, "]]");
 SENTINEL_TOKEN_DECLS(LeftBracket, "{");
 SENTINEL_TOKEN_DECLS(RightBracket, "}");
 
-Value::Value(SourceLocation location, std::string_view sv)
+Value::Value(SourceLocation location, StringView sv)
     : Token(location), m_value(sv)
 {}
 
 String
 Value::raw_string() const
 {
-  return String{StringView{m_value}};
+  return m_value;
 }
 
-Number::Number(SourceLocation location, std::string_view sv)
-    : Value(location, sv)
-{}
+Number::Number(SourceLocation location, StringView sv) : Value(location, sv) {}
 
 Token::Kind
 Number::kind() const
@@ -217,8 +215,7 @@ Number::flags() const
   return Token::Flag::Value;
 }
 
-Assignment::Assignment(SourceLocation location, std::string_view key,
-                       Word value)
+Assignment::Assignment(SourceLocation location, StringView key, Word value)
     : Token(location), m_key(key), m_value(std::move(value))
 {}
 
@@ -237,13 +234,13 @@ Assignment::flags() const
 String
 Assignment::raw_string() const
 {
-  String result{StringView{m_key}};
+  String result{m_key};
   result += "=";
   result += m_value.to_literal_string();
   return result;
 }
 
-const std::string &
+const String &
 Assignment::key() const
 {
   return m_key;
@@ -258,8 +255,7 @@ Assignment::value_word() const
 WordToken::WordToken(SourceLocation location, Word word)
     : Value(location, ""), m_word(std::move(word))
 {
-  String literal = m_word.to_literal_string();
-  m_value = std::string{literal.c_str(), literal.size()};
+  m_value = m_word.to_literal_string();
 }
 
 Token::Kind
@@ -280,7 +276,7 @@ WordToken::word() const
   return m_word;
 }
 
-Identifier::Identifier(SourceLocation location, std::string_view sv)
+Identifier::Identifier(SourceLocation location, StringView sv)
     : Value(location, sv)
 {}
 
@@ -296,8 +292,8 @@ Identifier::flags() const
   return Token::Flag::Value;
 }
 
-Redirection::Redirection(SourceLocation location, std::string_view what_fd,
-                         std::string_view to_file)
+Redirection::Redirection(SourceLocation location, StringView what_fd,
+                         StringView to_file)
     : Token(location), m_from_fd(what_fd), m_to_file(to_file)
 {}
 
@@ -313,13 +309,13 @@ Redirection::flags() const
   return Token::Flag::Special;
 }
 
-const std::string &
+const String &
 Redirection::from_fd() const
 {
   return m_from_fd;
 }
 
-const std::string &
+const String &
 Redirection::to_file() const
 {
   return m_to_file;

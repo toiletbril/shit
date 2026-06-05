@@ -25,7 +25,7 @@ namespace shit {
 
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
-                         bool should_error_exit, std::string shell_name,
+                         bool should_error_exit, String shell_name,
                          ArrayList<String> positional_params)
     : m_shell_name(std::move(shell_name)),
       m_positional_params(std::move(positional_params)),
@@ -36,8 +36,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
 {
   /* Seed the separator table from the default IFS, since the table starts
      empty while m_field_separators is initialized to whitespace. */
-  set_field_separators(StringView{m_field_separators.data(),
-                                  m_field_separators.size()});
+  set_field_separators(m_field_separators.view());
 }
 
 void
@@ -73,11 +72,17 @@ EvalContext::assign_variable(StringView name, StringView value)
 void
 EvalContext::set_field_separators(StringView value)
 {
-  m_field_separators.assign(value.data, value.length);
+  /* The table is built before m_field_separators is touched, since the
+     constructor seeds it from m_field_separators' own view, so value may alias
+     the buffer that the assignment below rewrites. */
   for (usize i = 0; i < 256; i++)
     m_field_separator_table[i] = false;
   for (usize i = 0; i < value.length; i++)
     m_field_separator_table[static_cast<u8>(value.data[i])] = true;
+  if (value.data != m_field_separators.data()) {
+    m_field_separators.clear();
+    m_field_separators.append(value);
+  }
 }
 
 bool
@@ -92,8 +97,7 @@ EvalContext::set_shell_variable(StringView name, StringView value)
   /* A read-only variable rejects the assignment. The common case has no
      read-only names, so the scan is skipped entirely. */
   if (is_readonly(name))
-    throw Error{"'" + std::string{name.data, name.length} +
-                "' is read only and cannot be assigned"};
+    throw Error{"'" + name + "' is read only and cannot be assigned"};
 
   assign_variable(name, value);
 }
@@ -135,7 +139,9 @@ EvalContext::get_variable_value(StringView name) const
     }
   if (is_all_digits) {
     if (name.size() > 9) return String{};
-    usize index = std::stoul(std::string{name.data, name.length});
+    ErrorOr<i64> parsed_index = utils::parse_decimal_integer(name);
+    if (parsed_index.is_error()) return String{};
+    usize index = static_cast<usize>(parsed_index.value());
     if (index >= 1 && index <= m_positional_params.size())
       return m_positional_params[index - 1];
     return String{};
@@ -147,9 +153,9 @@ EvalContext::get_variable_value(StringView name) const
     char separator = ' ';
     bool has_separator = true;
     if (name == "*") {
-      const std::string &ifs = m_field_separators;
+      const String &ifs = m_field_separators;
       has_separator = !ifs.empty();
-      if (has_separator) separator = ifs.front();
+      if (has_separator) separator = ifs.first_character();
     }
     String joined{};
     for (usize i = 0; i < m_positional_params.size(); i++) {
@@ -415,11 +421,11 @@ EvalContext::remove_alias(StringView name)
   return true;
 }
 
-Maybe<std::string>
+Maybe<String>
 EvalContext::get_alias(StringView name) const
 {
   if (const String *value = m_aliases.find(name))
-    return std::string{value->c_str(), value->size()};
+    return String{heap_allocator(), value->view()};
   return None;
 }
 
@@ -526,7 +532,7 @@ EvalContext::clear_control_flow()
 }
 
 void
-EvalContext::set_current_source(const std::string *source, std::string origin)
+EvalContext::set_current_source(const std::string *source, String origin)
 {
   m_current_source = source;
   m_current_origin = std::move(origin);
@@ -538,7 +544,7 @@ EvalContext::current_source() const
   return m_current_source;
 }
 
-const std::string &
+const String &
 EvalContext::current_origin() const
 {
   return m_current_origin;
@@ -712,10 +718,10 @@ EvalContext::restore_state(EvalStateSnapshot snapshot)
      substitution propagate the status of their last command to the parent. */
 }
 
-std::string
+String
 EvalContext::option_flags_string() const
 {
-  std::string flags{};
+  String flags{};
   if (m_error_exit) flags += 'e';
   if (!m_enable_path_expansion) flags += 'f';
   if (m_enable_echo) flags += 'v';
@@ -914,7 +920,7 @@ EvalContext::apply_parameter_expansion(StringView spec)
                     StringView{std::to_string(m_positional_params.size())}};
     Maybe<String> value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
-      throw Error{std::string{name.data, name.length} + ": parameter not set"};
+      throw Error{name + ": parameter not set"};
     return String{
         heap_allocator(),
         StringView{std::to_string(value.value_or(String{}).length())}};
@@ -940,7 +946,7 @@ EvalContext::apply_parameter_expansion(StringView spec)
        while a form with a modifier such as ${x:-w} handles the unset case
        itself. */
     if (m_error_unset && !get_variable_value(name).has_value())
-      throw Error{std::string{name.data, name.length} + ": parameter not set"};
+      throw Error{name + ": parameter not set"};
     return expand_variable(name);
   }
 
@@ -967,7 +973,7 @@ EvalContext::apply_parameter_expansion(StringView spec)
   case '=':
     if (treat_as_unset) {
       String assigned = expand_modifier_word(word);
-      set_shell_variable(name, std::string{assigned.c_str(), assigned.size()});
+      set_shell_variable(name, assigned);
       return assigned;
     }
     return String{heap_allocator(), current->view()};
@@ -977,8 +983,7 @@ EvalContext::apply_parameter_expansion(StringView spec)
   case '?':
     if (treat_as_unset) {
       if (word.empty())
-        throw Error{std::string{name.data, name.length} +
-                    ": parameter not set or empty"};
+        throw Error{name + ": parameter not set or empty"};
       throw Error{expand_modifier_word(word)};
     }
     return String{heap_allocator(), current->view()};
@@ -996,10 +1001,10 @@ EvalContext::apply_parameter_expansion(StringView spec)
   }
 }
 
-std::string
+String
 EvalContext::make_stats_string() const
 {
-  std::string s{};
+  String s{};
 
   s += "[Stats\n";
 
@@ -1332,16 +1337,77 @@ EvalContext::expand_path(GlobField field)
 
 namespace {
 
+/* The count of leading bytes that are digits in the given radix, so a value with
+   trailing non-digit bytes reads only its numeric prefix the way base-0 strtoll
+   did. A hexadecimal scan accepts both letter cases. */
+usize
+count_leading_digits(StringView text, u32 radix)
+{
+  usize length = 0;
+  while (length < text.length) {
+    char c = text[length];
+    u32 digit;
+    if (c >= '0' && c <= '9')
+      digit = static_cast<u32>(c - '0');
+    else if (c >= 'a' && c <= 'f')
+      digit = static_cast<u32>(c - 'a') + 10;
+    else if (c >= 'A' && c <= 'F')
+      digit = static_cast<u32>(c - 'A') + 10;
+    else
+      break;
+    if (digit >= radix) break;
+    length++;
+  }
+  return length;
+}
+
+/* Read a numeric operand the way base-0 strtoll did, detecting the radix from
+   the prefix so a leading 0x reads as hexadecimal, a leading 0 reads as octal,
+   and anything else reads as decimal. Only the leading run of valid digits is
+   read, so a trailing non-digit suffix is ignored rather than rejected. A value
+   with no leading digit or one that overflows reads as zero, the same result
+   the old strtoll path produced after its throw was caught. The utils parsers
+   take no base argument, so the radix is chosen here from the prefix and the
+   matching parser runs on the scanned digit run. */
+i64
+parse_arithmetic_operand(StringView text)
+{
+  StringView body = text;
+  bool is_negative = false;
+  if (body.length > 0 && (body[0] == '+' || body[0] == '-')) {
+    is_negative = body[0] == '-';
+    body = body.substring(1);
+  }
+
+  ErrorOr<i64> parsed = [&]() -> ErrorOr<i64> {
+    if (body.length >= 2 && body[0] == '0' &&
+        (body[1] == 'x' || body[1] == 'X'))
+    {
+      StringView digits = body.substring(2);
+      return utils::parse_hexadecimal_integer(
+          digits.substring_of_length(0, count_leading_digits(digits, 16)));
+    }
+    if (body.length >= 1 && body[0] == '0')
+      return utils::parse_octal_integer(
+          body.substring_of_length(0, count_leading_digits(body, 8)));
+    return utils::parse_decimal_integer(
+        body.substring_of_length(0, count_leading_digits(body, 10)));
+  }();
+
+  if (parsed.is_error()) return 0;
+  return is_negative ? -parsed.value() : parsed.value();
+}
+
 /* A recursive-descent evaluator for $((...)), following C operator precedence,
    that resolves and assigns shell variables through the context. */
 struct ArithmeticParser
 {
   EvalContext &context;
-  const std::string &source;
+  StringView source;
   usize pos;
 
   [[noreturn]] void
-  fail(const std::string &message)
+  fail(StringView message)
   {
     throw Error{"Arithmetic: " + message};
   }
@@ -1349,53 +1415,43 @@ struct ArithmeticParser
   void
   skip_spaces()
   {
-    while (pos < source.length() &&
+    while (pos < source.length &&
            (source[pos] == ' ' || source[pos] == '\t' || source[pos] == '\n' ||
             source[pos] == '\r'))
       pos++;
   }
 
   bool
-  starts_with(std::string_view op)
+  starts_with(StringView op)
   {
     skip_spaces();
-    return pos + op.size() <= source.length() &&
-           std::string_view{source}.substr(pos, op.size()) == op;
+    return pos + op.length <= source.length &&
+           source.substring_of_length(pos, op.length) == op;
   }
 
   bool
-  consume(std::string_view op)
+  consume(StringView op)
   {
     if (!starts_with(op)) return false;
-    pos += op.size();
+    pos += op.length;
     return true;
   }
 
   i64
-  read_variable_value(const std::string &name)
+  read_variable_value(StringView name)
   {
     /* A plain shell variable, the common operand, reads its digits straight
-       from the stored value with no copy. strtoll stops at the first non-digit
-       and returns zero on a non-numeric value, which matches the old stoll
-       path. */
-    if (const String *stored =
-            context.lookup_shell_variable(StringView{name.data(), name.size()}))
-    {
+       from the stored value with no copy. The operand parser stops at the first
+       non-digit and reads a non-numeric value as zero, which matches the old
+       strtoll path. */
+    if (const String *stored = context.lookup_shell_variable(name)) {
       if (stored->size() == 0) return 0;
-      errno = 0;
-      i64 parsed = std::strtoll(stored->c_str(), nullptr, 0);
-      /* An out-of-range value reads as zero, the same as the old stoll path
-         which threw and was caught. */
-      if (errno == ERANGE) return 0;
-      return parsed;
+      return parse_arithmetic_operand(stored->view());
     }
 
     String value = context.get_variable_value(name).value_or(String{});
     if (value.empty()) return 0;
-    errno = 0;
-    i64 parsed = std::strtoll(value.c_str(), nullptr, 0);
-    if (errno == ERANGE) return 0;
-    return parsed;
+    return parse_arithmetic_operand(value.view());
   }
 
   i64
@@ -1403,7 +1459,7 @@ struct ArithmeticParser
   {
     i64 result = parse_assignment();
     skip_spaces();
-    if (pos != source.length()) fail("unexpected trailing characters");
+    if (pos != source.length) fail("unexpected trailing characters");
     return result;
   }
 
@@ -1436,14 +1492,14 @@ struct ArithmeticParser
        when the name is not followed by an assignment operator. */
     usize save = pos;
     skip_spaces();
-    if (pos < source.length() && lexer::is_variable_name_start(source[pos])) {
-      std::string name{};
-      while (pos < source.length() && lexer::is_variable_name(source[pos]))
+    if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
+      String name{};
+      while (pos < source.length && lexer::is_variable_name(source[pos]))
         name += source[pos++];
 
       struct CompoundOperator
       {
-        std::string_view token;
+        StringView token;
         char kind;
       };
       static const CompoundOperator compound_operators[] = {
@@ -1645,15 +1701,29 @@ struct ArithmeticParser
       if (!consume(")")) fail("expected ')'");
       return value;
     }
-    if (pos < source.length() && lexer::is_number(source[pos])) {
+    if (pos < source.length && lexer::is_number(source[pos])) {
+      /* The literal starts at pos and runs while its digits are valid in the
+         radix the prefix selects, matching the prefix and the consumed length
+         that base-0 strtoll reported. The utils parsers take no base and report
+         no consumed length, so the run is measured here and the matching parser
+         runs on the scanned slice. */
+      StringView rest = source.substring(pos);
       usize consumed = 0;
-      i64 value = std::stoll(source.substr(pos), &consumed, 0);
+      if (rest.length >= 2 && rest[0] == '0' &&
+          (rest[1] == 'x' || rest[1] == 'X'))
+        consumed = 2 + count_leading_digits(rest.substring(2), 16);
+      else if (rest.length >= 1 && rest[0] == '0')
+        consumed = count_leading_digits(rest, 8);
+      else
+        consumed = count_leading_digits(rest, 10);
+
+      i64 value = parse_arithmetic_operand(rest.substring_of_length(0, consumed));
       pos += consumed;
       return value;
     }
-    if (pos < source.length() && lexer::is_variable_name_start(source[pos])) {
-      std::string name{};
-      while (pos < source.length() && lexer::is_variable_name(source[pos]))
+    if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
+      String name{};
+      while (pos < source.length && lexer::is_variable_name(source[pos]))
         name += source[pos++];
       return read_variable_value(name);
     }
@@ -1674,14 +1744,14 @@ EvalContext::evaluate_arithmetic(StringView expression)
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
-    std::string source{expression.data, expression.length};
-    ArithmeticParser parser{*this, source, 0};
+    ArithmeticParser parser{*this, expression, 0};
     return parser.parse();
   }
 
+  /* The expanded word owns the bytes the parser views, so it outlives the
+     parser below. */
   String expanded_word = expand_modifier_word(expression);
-  std::string expanded{expanded_word.c_str(), expanded_word.size()};
-  ArithmeticParser parser{*this, expanded, 0};
+  ArithmeticParser parser{*this, expanded_word.view(), 0};
   return parser.parse();
 }
 
@@ -1943,8 +2013,8 @@ EvalContext::run_source(const std::string &source, const std::string &origin)
     m_retained_sources.push(retained_source);
 
     const std::string *previous_source = m_current_source;
-    std::string previous_origin = m_current_origin;
-    set_current_source(retained_source, origin);
+    String previous_origin = m_current_origin;
+    set_current_source(retained_source, String{StringView{origin}});
     SHIT_DEFER { set_current_source(previous_source, previous_origin); };
 
     ast->evaluate(*this);
@@ -2054,9 +2124,13 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
      enclosing subshell, so the top shell shows '+', a substitution '++', and a
      nested one '+++'. */
   if (should_echo_expanded()) {
-    std::string prefix(m_subshell_depth + 1, '+');
-    shit::print_to_standard_error(
-        prefix + ' ' + utils::merge_args_to_string(expanded_args) + '\n');
+    String trace{};
+    for (usize i = 0; i < m_subshell_depth + 1; i++)
+      trace.push('+');
+    trace.push(' ');
+    trace.append(utils::merge_args_to_string(expanded_args));
+    trace.push('\n');
+    shit::print_to_standard_error(trace);
   }
 
   return expanded_args;

@@ -53,10 +53,10 @@ i32 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async);
 i32 execute_contexts_with_pipes(std::vector<ExecContext> &&ecs,
                                 EvalContext &cxt, bool is_async);
 
-void string_replace(std::string &s, std::string_view to_replace,
-                    std::string_view replace_with);
+void string_replace(std::string &s, StringView to_replace,
+                    StringView replace_with);
 
-std::string lowercase_string(std::string_view s);
+String lowercase_string(StringView s);
 
 /* Parse a whole view as a signed integer, the StringView-native replacement for
    std::stoll. Each base has its own function so the digit loop carries no base
