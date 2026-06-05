@@ -85,9 +85,19 @@ static void report_escaped_control_flow(shit::EvalContext &context,
   case shit::ControlFlow::Kind::Continue:
     what = "'continue' used outside of a loop";
     break;
-  case shit::ControlFlow::Kind::Return:
+  case shit::ControlFlow::Kind::Return: {
+    /* A return that reaches the top of a non-interactive script ends the shell
+       with its status, the way dash treats a top-level return. It stays an
+       error at an interactive prompt, where there is nothing to return from. */
+    if (!context.shell_is_interactive()) {
+      i32 return_status = static_cast<i32>(control.value);
+      context.clear_control_flow();
+      context.run_exit_trap();
+      shit::utils::quit(return_status, true);
+    }
     what = "'return' used outside of a function or a sourced script";
     break;
+  }
   case shit::ControlFlow::Kind::Exit:
   case shit::ControlFlow::Kind::Normal: context.clear_control_flow(); return;
   }

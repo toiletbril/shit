@@ -288,7 +288,12 @@ struct EvalContext
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
      so a break, a return, or an assignment inside acts on the caller. */
-  i32 run_source(StringView source, StringView origin = "a sourced command");
+  /* Lex, parse, and evaluate a chunk of source in this context. A dot-source
+     consumes a return at the top of the chunk and ends there, while an eval
+     leaves the return pending so it propagates to the enclosing function or the
+     shell, which is why consume_return is false for eval. */
+  i32 run_source(StringView source, StringView origin = "a sourced command",
+                 bool consume_return = true);
 
   /* getopts keeps the position inside the current argument here, so a grouped
      option such as -abc is parsed one letter per call. last_optind detects when

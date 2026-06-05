@@ -1746,7 +1746,8 @@ String EvalContext::capture_command_substitution(const String &source)
   return captured;
 }
 
-i32 EvalContext::run_source(StringView source, StringView origin)
+i32 EvalContext::run_source(StringView source, StringView origin,
+                            bool consume_return)
 {
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
@@ -1787,7 +1788,7 @@ i32 EvalContext::run_source(StringView source, StringView origin)
     /* A return at the top of a sourced file or an eval returns from that source
        with its status, the way a return ends a function. Break, continue, and
        exit keep propagating, so an enclosing loop or the shell consumes them. */
-    if (has_pending_control_flow() &&
+    if (consume_return && has_pending_control_flow() &&
         pending_control_flow().kind == ControlFlow::Kind::Return)
     {
       i32 source_status = static_cast<i32>(pending_control_flow().value);
