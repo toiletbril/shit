@@ -7,11 +7,11 @@
    reaches a throwing path. */
 
 #include "Common.hpp"
+#include "Debug.hpp"
 #include "Errors.hpp"
 
-#include <string>
+#include <new>
 #include <utility>
-#include <variant>
 
 namespace shit {
 
@@ -20,25 +20,136 @@ namespace shit {
 struct Ok
 {};
 
+/* A value or an Error, held in one of two members of an explicit tagged union
+   rather than a std::variant. The active member is tracked by m_is_error, and
+   the storage is sized for the larger of the two, so only one is alive at a
+   time and no heap allocation happens for the discriminant. */
 template <class T>
 struct [[nodiscard]] ErrorOr
 {
-  ErrorOr(T value) : m_data(std::move(value)) {}
-  ErrorOr(Error error) : m_data(std::move(error)) {}
+  ErrorOr(T value) : m_is_error(false)
+  {
+    new (&m_storage) T(std::move(value));
+  }
+  ErrorOr(Error error) : m_is_error(true)
+  {
+    new (&m_storage) Error(std::move(error));
+  }
 
-  bool is_error() const { return m_data.index() == 1; }
+  ErrorOr(const ErrorOr &other) : m_is_error(other.m_is_error)
+  {
+    if (m_is_error)
+      new (&m_storage) Error(other.error_reference());
+    else
+      new (&m_storage) T(other.value_reference());
+  }
+  ErrorOr(ErrorOr &&other) noexcept : m_is_error(other.m_is_error)
+  {
+    if (m_is_error)
+      new (&m_storage) Error(std::move(other.error_reference()));
+    else
+      new (&m_storage) T(std::move(other.value_reference()));
+  }
 
-  T &value() { return *std::get_if<T>(&m_data); }
-  const T &value() const { return *std::get_if<T>(&m_data); }
+  ErrorOr &
+  operator=(const ErrorOr &other)
+  {
+    if (this != &other) {
+      destroy();
+      m_is_error = other.m_is_error;
+      if (m_is_error)
+        new (&m_storage) Error(other.error_reference());
+      else
+        new (&m_storage) T(other.value_reference());
+    }
+    return *this;
+  }
+  ErrorOr &
+  operator=(ErrorOr &&other) noexcept
+  {
+    if (this != &other) {
+      destroy();
+      m_is_error = other.m_is_error;
+      if (m_is_error)
+        new (&m_storage) Error(std::move(other.error_reference()));
+      else
+        new (&m_storage) T(std::move(other.value_reference()));
+    }
+    return *this;
+  }
 
-  Error &error() { return *std::get_if<Error>(&m_data); }
-  const Error &error() const { return *std::get_if<Error>(&m_data); }
+  ~ErrorOr() { destroy(); }
+
+  [[nodiscard]] bool is_error() const { return m_is_error; }
+
+  [[nodiscard]] T &
+  value()
+  {
+    SHIT_ASSERT(!m_is_error);
+    return value_reference();
+  }
+  [[nodiscard]] const T &
+  value() const
+  {
+    SHIT_ASSERT(!m_is_error);
+    return value_reference();
+  }
+
+  [[nodiscard]] Error &
+  error()
+  {
+    SHIT_ASSERT(m_is_error);
+    return error_reference();
+  }
+  [[nodiscard]] const Error &
+  error() const
+  {
+    SHIT_ASSERT(m_is_error);
+    return error_reference();
+  }
 
   /* Move the value out, called once the caller has checked is_error. */
-  T take() { return std::move(*std::get_if<T>(&m_data)); }
+  [[nodiscard]] T
+  take()
+  {
+    SHIT_ASSERT(!m_is_error);
+    return std::move(value_reference());
+  }
 
 private:
-  std::variant<T, Error> m_data;
+  void
+  destroy() noexcept
+  {
+    if (m_is_error)
+      error_reference().~Error();
+    else
+      value_reference().~T();
+  }
+
+  T &
+  value_reference() noexcept
+  {
+    return *reinterpret_cast<T *>(&m_storage);
+  }
+  const T &
+  value_reference() const noexcept
+  {
+    return *reinterpret_cast<const T *>(&m_storage);
+  }
+  Error &
+  error_reference() noexcept
+  {
+    return *reinterpret_cast<Error *>(&m_storage);
+  }
+  const Error &
+  error_reference() const noexcept
+  {
+    return *reinterpret_cast<const Error *>(&m_storage);
+  }
+
+  bool m_is_error;
+  alignas(T) alignas(Error) unsigned char
+      m_storage[sizeof(T) > sizeof(Error) ? sizeof(T) : sizeof(Error)];
 };
 
 } /* namespace shit */
