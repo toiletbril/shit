@@ -65,6 +65,9 @@ CXXFLAGS := \
 	-Wno-unknown-warning-option \
 	-Wno-error=maybe-uninitialized \
 	-pthread \
+	-pipe \
+	-fvisibility=hidden \
+	-fno-rtti \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
