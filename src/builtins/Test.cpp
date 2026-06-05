@@ -10,7 +10,7 @@ namespace {
 
 bool parse_integer(StringView text, i64 &out)
 {
-  ErrorOr<i64> parsed = utils::parse_decimal_integer(text);
+  const ErrorOr<i64> parsed = utils::parse_decimal_integer(text);
   if (parsed.is_error()) return false;
   out = parsed.value();
   return true;
@@ -38,12 +38,12 @@ struct TestEvaluator
   {
     if (op == "-z") return operand.empty();
     if (op == "-n") return !operand.empty();
-    Path operand_path{operand};
+    const Path operand_path{operand};
     if (op == "-e") return operand_path.exists();
     if (op == "-f") return operand_path.is_regular_file();
     if (op == "-d") return operand_path.is_directory();
     if (op == "-s") {
-      Maybe<u64> size = operand_path.file_size();
+      const Maybe<u64> size = operand_path.file_size();
       return size.has_value() && size.value() > 0;
     }
     if (op == "-r") return operand_path.is_readable();
@@ -101,7 +101,7 @@ struct TestEvaluator
     }
     if (current() == "(") {
       pos++;
-      bool result = parse_expression();
+      const bool result = parse_expression();
       if (at_end() || current() != ")")
         fail("expected ')'");
       else
@@ -128,7 +128,7 @@ struct TestEvaluator
       pos += 2;
       return evaluate_unary(op, operand);
     }
-    bool result = !current().empty();
+    const bool result = !current().empty();
     pos++;
     return result;
   }
@@ -188,7 +188,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
   if (operands.empty()) return 1;
 
   TestEvaluator evaluator{operands, 0, false};
-  bool result = evaluator.parse_expression();
+  const bool result = evaluator.parse_expression();
   if (evaluator.had_error) return 2;
   if (evaluator.pos != operands.size()) {
     shit::print_error(StringView{"test: unexpected argument '"} +

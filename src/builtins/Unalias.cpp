@@ -19,17 +19,17 @@ Builtin::Kind Unalias::kind() const { return Kind::Unalias; }
 
 i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (FLAG_ALL.is_enabled()) {
     /* alias_definitions yields name='value', so the name ends at the equals. */
     for (const String &definition : cxt.alias_definitions()) {
-      Maybe<usize> equals_position = definition.find_character('=');
-      usize name_length =
+      const Maybe<usize> equals_position = definition.find_character('=');
+      const usize name_length =
           equals_position.has_value() ? *equals_position : definition.size();
-      StringView name = definition.substring_of_length(0, name_length);
+      const StringView name = definition.substring_of_length(0, name_length);
       cxt.remove_alias(name);
     }
     return 0;

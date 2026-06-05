@@ -49,12 +49,11 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   const String &action = args[1];
-  /* A lone dash, or a first operand that is itself a condition, resets the
-     conditions to their defaults. */
-  bool is_reset = action == "-";
+  /* A lone dash resets the named conditions to their defaults. */
+  const bool is_reset = action == "-";
 
   for (usize i = 2; i < args.size(); i++) {
-    String condition = normalize_condition(args[i]);
+    const String condition = normalize_condition(args[i]);
     if (is_reset)
       cxt.remove_trap(condition);
     else

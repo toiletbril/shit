@@ -26,7 +26,7 @@ Builtin::Kind CommandBuiltin::kind() const { return Kind::CommandBuiltin; }
 
 i32 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
+  const ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
@@ -38,7 +38,7 @@ i32 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
   /* -v and -V resolve the name without running it, against a builtin and the
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
-    bool verbose = FLAG_SHOW_VERBOSE.is_enabled();
+    const bool verbose = FLAG_SHOW_VERBOSE.is_enabled();
     if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
     {
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n"

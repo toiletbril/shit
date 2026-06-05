@@ -37,7 +37,7 @@ i32 Echo::execute(ExecContext &ec, EvalContext &cxt) const
         continue;
       }
 
-      char escaped = arg[j + 1];
+      const char escaped = arg[j + 1];
       j++;
       switch (escaped) {
       case 'a': buf += '\a'; break;

@@ -26,6 +26,7 @@ String merge_tokens_to_string(const ArrayList<const Token *> &v)
 {
   String r{};
   for (const shit::Token *t : v) {
+    SHIT_ASSERT(t != NULL);
     r += t->raw_string();
     if (t != v.back()) {
       r += ' ';
@@ -41,10 +42,10 @@ i32 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
        into the spawn. */
     String command = is_async ? String{ec.program().view()} : String{};
 
-    os::process p = os::execute_program(std::move(ec));
+    const os::process p = os::execute_program(std::move(ec));
     if (is_async) {
       cxt.set_last_background_pid(os::process_id_of(p));
-      int id = cxt.register_job(p, command);
+      const int id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
         shit::print_error(
             "[" + integer_to_string(id) + "] " +
@@ -79,7 +80,7 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   for (ExecContext &ec : ecs) {
     Maybe<os::Pipe> pipe;
 
-    bool is_last = (&ec == &ecs.back());
+    const bool is_last = (&ec == &ecs.back());
 
     if (!is_last) {
       pipe = os::make_pipe();
@@ -105,7 +106,7 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     }
 
     if (!ec.is_builtin()) {
-      os::process child = os::execute_program(std::move(ec));
+      const os::process child = os::execute_program(std::move(ec));
       children.push(child);
       last_child = child;
     } else {
@@ -120,7 +121,7 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   if (is_async) {
     if (last_child != SHIT_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
-      int id = cxt.register_job(last_child, "pipeline");
+      const int id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
         shit::print_error(
             "[" + integer_to_string(id) + "] " +
@@ -133,8 +134,8 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 
   /* Wait for every stage. The pipeline status is the last stage's, so a stage
      that is the last external child sets the result. */
-  for (os::process child : children) {
-    i32 status = os::wait_and_monitor_process(child);
+  for (const os::process child : children) {
+    const i32 status = os::wait_and_monitor_process(child);
     if (child == last_child) ret = status;
   }
 
@@ -163,13 +164,13 @@ void string_replace(String &s, const StringView to_replace,
   String result{};
   result.reserve(s.size());
 
-  StringView source = s.view();
+  const StringView source = s.view();
   usize i = 0;
   usize previous = 0;
 
   for (;;) {
     previous = i;
-    usize match = find_subview(source, to_replace, i);
+    const usize match = find_subview(source, to_replace, i);
     if (match == NOT_FOUND_INDEX) break;
     result.append(source.substring_of_length(previous, match - previous));
     result.append(replace_with);
@@ -238,7 +239,7 @@ String integer_to_string(i64 value)
 {
   if (value >= 0) return unsigned_integer_to_string(static_cast<u64>(value));
   /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
-  u64 magnitude = ~static_cast<u64>(value) + 1;
+  const u64 magnitude = ~static_cast<u64>(value) + 1;
   String result{"-"};
   result.append(unsigned_integer_to_string(magnitude));
   return result;
@@ -264,7 +265,7 @@ ErrorOr<i64> parse_decimal_integer(StringView text)
   while (offset < text.length && text.data[offset] >= '0' &&
          text.data[offset] <= '9')
   {
-    u64 digit = static_cast<u64>(text.data[offset] - '0');
+    const u64 digit = static_cast<u64>(text.data[offset] - '0');
     has_digits = true;
     if (magnitude > (UINT64_MAX - digit) / 10)
       has_overflowed = true;
@@ -299,7 +300,7 @@ ErrorOr<i64> parse_octal_integer(StringView text)
   while (offset < text.length && text.data[offset] >= '0' &&
          text.data[offset] <= '7')
   {
-    u64 digit = static_cast<u64>(text.data[offset] - '0');
+    const u64 digit = static_cast<u64>(text.data[offset] - '0');
     has_digits = true;
     if (magnitude > (UINT64_MAX - digit) / 8)
       has_overflowed = true;
@@ -340,7 +341,7 @@ ErrorOr<i64> parse_hexadecimal_integer(StringView text)
   bool has_digits = false;
   bool has_overflowed = false;
   for (; offset < text.length; offset++) {
-    char current = text.data[offset];
+    const char current = text.data[offset];
     u64 digit = 0;
     if (current >= '0' && current <= '9')
       digit = static_cast<u64>(current - '0');
@@ -385,7 +386,8 @@ Maybe<Path> canonicalize_path(StringView path)
   /* If there's no extension, we may have to add it ourselves. The ending dot is
      stripped by the path normalization, so a name written with a trailing dot
      is left as typed. */
-  bool ends_with_dot = path.length > 0 && path.data[path.length - 1] == '.';
+  const bool ends_with_dot =
+      path.length > 0 && path.data[path.length - 1] == '.';
   if (candidate.extension().empty() && !ends_with_dot) {
     usize suffix_index = 0;
     while (!candidate.exists() && suffix_index < os::OMITTED_SUFFIXES.size()) {
@@ -531,9 +533,8 @@ bool glob_matches(StringView glob, StringView str,
 
 [[noreturn]] void quit(i32 code, bool should_goodbye)
 {
-  u8 actual_code = static_cast<u8>(code);
+  const u8 actual_code = static_cast<u8>(code);
 
-  /* Cleanup for main proccess. */
   if (!os::is_child_process()) {
     if (toiletline::is_active()) {
       try {
@@ -589,7 +590,7 @@ static ArrayList<String> split_path_dirs(StringView path_var)
   String current{};
 
   for (usize i = 0; i < path_var.length; i++) {
-    char ch = path_var.data[i];
+    const char ch = path_var.data[i];
     if (ch == os::PATH_DELIMITER) {
       dirs.push(current.empty() ? String{"."} : current);
       current.clear();
@@ -607,12 +608,11 @@ void initialize_path_map()
   if (!MAYBE_PATH) return;
 
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
-    Path directory{dir_string.view()};
+    const Path directory{dir_string.view()};
 
-    /* What the heck? A path in PATH that does not exist? Are you a
-     * Windows user? read_directory returns None for a missing or unreadable
-     * directory, so the path is skipped without a separate exists check. */
-    Maybe<ArrayList<String>> entries = Path::read_directory(directory);
+    /* read_directory returns None for a missing or unreadable directory, so the
+       path is skipped without a separate exists check. */
+    const Maybe<ArrayList<String>> entries = Path::read_directory(directory);
     if (!entries) continue;
 
     /* Cache every file in the directory under its name without an omitted
@@ -636,7 +636,7 @@ ArrayList<Path> search_and_cache(StringView program_name)
   ArrayList<Path> result{};
 
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
-    Path directory{dir_string.view()};
+    const Path directory{dir_string.view()};
     if (!directory.is_directory()) continue;
 
     /* The cache key is the program name without an omitted extension, the same
@@ -657,7 +657,7 @@ ArrayList<Path> search_and_cache(StringView program_name)
            ext_index++)
       {
         const String &suffix = os::OMITTED_SUFFIXES[ext_index];
-        Path try_path{(full_path.text() + suffix.view()).view()};
+        const Path try_path{(full_path.text() + suffix.view()).view()};
 
         if (try_path.exists()) {
           cache_resolved_path(StringView{key.data(), key.size()}, try_path);
@@ -678,7 +678,8 @@ ArrayList<Path> search_program_path(StringView program_name)
   std::string sp{program_name.data, program_name.length};
   ArrayList<Path> result{};
 
-  os::ExtIndex typed_extension = os::erase_extension_and_get_its_index(sp);
+  const os::ExtIndex typed_extension =
+      os::erase_extension_and_get_its_index(sp);
 
   /* A name typed with an explicit extension is matched exactly by the search,
      so the extension-stripped cache key would resolve the wrong file. The cache
@@ -708,7 +709,7 @@ ArrayList<Path> search_program_path(StringView program_name)
 
 Maybe<String> read_entire_file(StringView path)
 {
-  Maybe<os::descriptor> file =
+  const Maybe<os::descriptor> file =
       os::open_file_descriptor(path, os::FileOpenMode::Read);
   if (!file) return None;
 

@@ -24,7 +24,8 @@ static PreciseLocation calc_precise_position(StringView source,
               "byte position: %zu, source length: %zu", byte_position,
               source.size());
 
-  usize line_number = 0, last_newline_location = 0;
+  usize line_number = 0;
+  usize last_newline_location = 0;
 
   for (usize i = 0; i < byte_position; i++) {
     if (source[i] != '\n') continue;
@@ -52,14 +53,12 @@ static String get_context_pointing_to(StringView source, usize byte_position,
                                       usize unicode_position,
                                       Maybe<StringView> message)
 {
-  /* Offset from the start of the line. */
   usize start_offset = byte_position - last_newline_location;
 
   /* If we have a newline before, start_offset points to this newline. Get rid
    * of it. */
   if (last_newline_location != 0 && start_offset > 0) start_offset--;
 
-  /* Find out where the next newline is. */
   usize line_byte_count = 0;
 
   while (byte_position - start_offset + line_byte_count < source.size() &&
@@ -82,7 +81,7 @@ static String get_context_pointing_to(StringView source, usize byte_position,
   msg += std::to_string(line_number + 1) + " |  ";
 
   /* Line that caused the error. */
-  StringView context =
+  const StringView context =
       source.substring_of_length(byte_position - start_offset, line_byte_count);
 
   /* We don't need accidental newlines in the middle of the context.
@@ -94,11 +93,11 @@ static String get_context_pointing_to(StringView source, usize byte_position,
   msg += context;
 
   /* Calculate proper unicode offsets and lengths for underline. */
-  usize unicode_start_offset_position =
+  const usize unicode_start_offset_position =
       toiletline::utf8_strlen(source.data, byte_position - start_offset);
 
   /* Does token length go beyond that line? */
-  usize unicode_length = toiletline::utf8_strlen(
+  const usize unicode_length = toiletline::utf8_strlen(
       source.data + byte_position, (byte_count > line_byte_count - start_offset)
                                        ? line_byte_count - start_offset
                                        : byte_count);
@@ -108,9 +107,9 @@ static String get_context_pointing_to(StringView source, usize byte_position,
   msg += "       |  "; /* 10 chars */
 
   /* Starting amount of spaces before the error arrow beneath the context. */
-  usize added_symbols = 10;
+  const usize added_symbols = 10;
 
-  usize underline_padding_length =
+  const usize underline_padding_length =
       (unicode_position - unicode_start_offset_position) + added_symbols - 10;
 
   /* Remaining spaces to pad the underline. */
@@ -171,7 +170,7 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
 String ErrorWithLocation::to_string(StringView source) const
 {
   usize byte_position = m_location.position();
-  usize byte_count = m_location.length();
+  const usize byte_count = m_location.length();
 
   SHIT_LOG_VARS(Verbosity::Debug, byte_position, byte_count);
   SHIT_LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
@@ -189,12 +188,13 @@ String ErrorWithLocation::to_string(StringView source) const
   auto [line_number, last_newline_location] =
       calc_precise_position(source, byte_position);
 
-  usize unicode_position = toiletline::utf8_strlen(source.data, byte_position);
+  const usize unicode_position =
+      toiletline::utf8_strlen(source.data, byte_position);
 
   /* Our count starts from 0. If there's only a single line, we need to use the
    * raw location for the correct offset. Otherwise, newline counts as an extra
    * character. */
-  usize line_byte_position = (last_newline_location > 0)
+  const usize line_byte_position = (last_newline_location > 0)
                                  ? unicode_position - last_newline_location
                                  : unicode_position + 1;
 
@@ -230,7 +230,7 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
 String ErrorWithLocationAndDetails::details_to_string(StringView source) const
 {
   usize byte_position = m_details_location.position();
-  usize byte_count = m_details_location.length();
+  const usize byte_count = m_details_location.length();
 
   if (byte_position > 0 && byte_position == source.size() &&
       source[byte_position - 1] == '\n')
@@ -239,10 +239,10 @@ String ErrorWithLocationAndDetails::details_to_string(StringView source) const
   auto [details_line_number, details_last_newline_location] =
       calc_precise_position(source, byte_position);
 
-  usize unicode_details_position =
+  const usize unicode_details_position =
       toiletline::utf8_strlen(source.data, byte_position);
 
-  usize details_line_byte_position =
+  const usize details_line_byte_position =
       (details_last_newline_location > 0)
           ? unicode_details_position - details_last_newline_location
           : unicode_details_position + 1;

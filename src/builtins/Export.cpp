@@ -17,14 +17,14 @@ Builtin::Kind Export::kind() const { return Kind::Export; }
 
 i32 Export::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
+  const ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   for (usize i = 1; i < args.size(); i++) {
     const String &arg = args[i];
-    Maybe<usize> equals_position = arg.find_character('=');
+    const Maybe<usize> equals_position = arg.find_character('=');
 
     String name{};
     String value{};

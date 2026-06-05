@@ -21,7 +21,7 @@ Builtin::Kind Type::kind() const { return Kind::Type; }
 
 i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 

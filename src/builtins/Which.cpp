@@ -22,7 +22,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 

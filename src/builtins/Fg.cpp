@@ -24,7 +24,7 @@ i32 Fg::execute(ExecContext &ec, EvalContext &cxt) const
 
   Job *job = nullptr;
   if (args.size() > 1 && !args[1].empty() && args[1][0] == '%') {
-    ErrorOr<i64> parsed =
+    const ErrorOr<i64> parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
     if (parsed.is_error())
       throw Error{"fg: '" + args[1] + "' is not a valid job"};
@@ -33,11 +33,12 @@ i32 Fg::execute(ExecContext &ec, EvalContext &cxt) const
     job = cxt.most_recent_job();
 
   if (job == nullptr) throw Error{"fg: there is no such job"};
+  SHIT_ASSERT(job != NULL);
 
   /* A job already reaped by a prior poll has its status recorded, so report it
      instead of waiting on a pid that no longer exists. */
   if (job->state == Job::State::Done) {
-    i32 done_status = job->last_status;
+    const i32 done_status = job->last_status;
     cxt.forget_done_jobs();
     return done_status;
   }
@@ -50,7 +51,7 @@ i32 Fg::execute(ExecContext &ec, EvalContext &cxt) const
 
   ec.print_to_stdout(job->command + "\n");
 
-  i32 status = os::wait_and_monitor_process(job->pid);
+  const i32 status = os::wait_and_monitor_process(job->pid);
   job->state = Job::State::Done;
   job->last_status = status;
   cxt.forget_done_jobs();

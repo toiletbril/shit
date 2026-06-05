@@ -92,7 +92,7 @@ Maybe<std::pair<String, Word>> Word::get_assignment_split() const
   const WordSegment &first = segments[0];
   if (first.kind != WordSegment::Kind::UnquotedText) return shit::None;
 
-  Maybe<usize> equals_position = first.text.find_character('=');
+  const Maybe<usize> equals_position = first.text.find_character('=');
   if (!equals_position.has_value() || *equals_position == 0) return shit::None;
 
   if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
@@ -100,7 +100,8 @@ Maybe<std::pair<String, Word>> Word::get_assignment_split() const
     if (!lexer::is_variable_name(first.text[i])) return shit::None;
   }
 
-  StringView name_view = first.text.substring_of_length(0, *equals_position);
+  const StringView name_view =
+      first.text.substring_of_length(0, *equals_position);
   String name{name_view};
 
   Word value{};

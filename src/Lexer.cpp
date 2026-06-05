@@ -142,7 +142,7 @@ Token *Lexer::peek_shell_token()
 Token *Lexer::next_expression_token()
 {
   skip_whitespace();
-  Token *t = lex_expression_token();
+  Token *const t = lex_expression_token();
   advance_past_last_peek();
   return t;
 }
@@ -150,7 +150,7 @@ Token *Lexer::next_expression_token()
 Token *Lexer::next_shell_token()
 {
   skip_whitespace();
-  Token *t = lex_shell_token();
+  Token *const t = lex_shell_token();
   advance_past_last_peek();
   return t;
 }
@@ -165,7 +165,7 @@ void Lexer::set_arena(BumpArena &arena) { m_arena = &arena; }
 
 usize Lexer::advance_past_last_peek()
 {
-  usize r = advance_forward(m_cached_offset);
+  const usize r = advance_forward(m_cached_offset);
   m_cached_offset = 0;
 
   /* Consuming the newline that ends a line with a pending heredoc is where the
@@ -196,11 +196,11 @@ void Lexer::collect_pending_heredocs()
     for (;;) {
       if (m_cursor_position >= m_source.length()) break;
 
-      usize line_start = m_cursor_position;
+      const usize line_start = m_cursor_position;
       usize i = line_start;
       while (i < m_source.length() && m_source[i] != '\n')
         i++;
-      bool has_newline = (i < m_source.length());
+      const bool has_newline = (i < m_source.length());
       m_cursor_position = has_newline ? i + 1 : i;
 
       usize line_offset = line_start;
@@ -212,11 +212,13 @@ void Lexer::collect_pending_heredocs()
         }
       }
 
-      StringView line = m_source.substring_of_length(line_offset, line_length);
+      const StringView line =
+          m_source.substring_of_length(line_offset, line_length);
       if (pending.delimiter == line) break;
       collected.append(line.data, line.length);
       collected += '\n';
     }
+    SHIT_ASSERT(pending.body != NULL);
     *pending.body = std::move(collected);
   }
   m_pending_heredocs.clear();
@@ -309,7 +311,7 @@ Token *Lexer::lex_number()
     length++;
   }
 
-  Token *num = m_arena->create<tokens::Number>(
+  Token *const num = m_arena->create<tokens::Number>(
       SourceLocation{m_cursor_position, length}, digits);
   m_cached_offset = length;
 
@@ -343,9 +345,10 @@ Token *Lexer::lex_identifier()
   };
 
   for (;;) {
-    char ch = chop_character(byte_count);
+    const char ch = chop_character(byte_count);
 
-    bool is_inside_quote_or_escape = quote_char.has_value() || should_escape;
+    const bool is_inside_quote_or_escape =
+        quote_char.has_value() || should_escape;
     if (!lexer::is_part_of_identifier(ch) &&
         !(is_inside_quote_or_escape && ch != lexer::CEOF))
     {
@@ -380,7 +383,7 @@ Token *Lexer::lex_identifier()
          "\n" is a backslash and an n, not an escape. Outside double quotes a
          backslash escapes the next character. */
       if (quote_char == '"') {
-        char escaped_next = chop_character(byte_count + 1);
+        const char escaped_next = chop_character(byte_count + 1);
         if (escaped_next == '$' || escaped_next == '`' || escaped_next == '"' ||
             escaped_next == '\\' || escaped_next == '\n')
         {
@@ -396,7 +399,7 @@ Token *Lexer::lex_identifier()
       continue;
     }
 
-    bool is_in_double_quotes = quote_char == '"';
+    const bool is_in_double_quotes = quote_char == '"';
 
     if (is_in_double_quotes && ch == '"') {
       quote_char.reset();
@@ -428,7 +431,7 @@ Token *Lexer::lex_identifier()
           String arithmetic{};
           usize group_depth = 0;
           for (;;) {
-            char c = chop_character(byte_count);
+            const char c = chop_character(byte_count);
             if (c == lexer::CEOF) {
               throw ErrorWithLocationAndDetails{
                   {m_cursor_position,              byte_count},
@@ -463,7 +466,7 @@ Token *Lexer::lex_identifier()
         usize depth = 1;
         char quote = 0;
         for (;;) {
-          char c = chop_character(byte_count);
+          const char c = chop_character(byte_count);
           if (c == lexer::CEOF) {
             throw ErrorWithLocationAndDetails{
                 {m_cursor_position,              byte_count},
@@ -481,7 +484,7 @@ Token *Lexer::lex_identifier()
           }
           if (c == '\\') {
             inner += c;
-            char escaped = chop_character(byte_count);
+            const char escaped = chop_character(byte_count);
             if (escaped != lexer::CEOF) {
               byte_count++;
               inner += escaped;
@@ -507,7 +510,7 @@ Token *Lexer::lex_identifier()
         byte_count++;
         String name{};
         for (;;) {
-          char c = chop_character(byte_count);
+          const char c = chop_character(byte_count);
           if (c == lexer::CEOF) {
             throw ErrorWithLocationAndDetails{
                 {m_cursor_position + byte_count, 1},
@@ -578,7 +581,8 @@ Token *Lexer::lex_identifier()
     };
   }
 
-  usize actual_cursor_position = m_cursor_position + escaped_newline_count;
+  const usize actual_cursor_position =
+      m_cursor_position + escaped_newline_count;
 
   if (m_should_collect_debug_words &&
       m_cursor_position != m_last_collected_word_position)
@@ -601,7 +605,7 @@ Token *Lexer::lex_identifier()
     /* A bare word may name a keyword. A quoted or escaped word never does, so
        only a single unquoted segment qualifies. */
     const String &word_text = word.segments[0].text;
-    if (Maybe<Token::Kind> kw =
+    if (const Maybe<Token::Kind> kw =
             KEYWORDS.find(StringView{word_text.data(), word_text.size()}))
     {
       switch (*kw) {
@@ -658,7 +662,7 @@ static Maybe<Token::Kind> lookup_operator(char ch)
 
 Token *Lexer::lex_sentinel()
 {
-  char ch = chop_character();
+  const char ch = chop_character();
   usize extra_length = 0;
 
   Token *tok{};
@@ -705,7 +709,7 @@ Token *Lexer::lex_sentinel()
   } break;
   /* clang-format on */
 
-  if (Maybe<Token::Kind> op = lookup_operator(ch)) {
+  if (const Maybe<Token::Kind> op = lookup_operator(ch)) {
     switch (*op) {
       TOKEN_CASE_ONE(RightParen);
       TOKEN_CASE_ONE(LeftParen);

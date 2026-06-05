@@ -22,22 +22,23 @@ i64 parse_printf_integer(const String &arg)
   if (first_digit < arg.size() &&
       (arg[first_digit] == '+' || arg[first_digit] == '-'))
     first_digit++;
-  bool is_hexadecimal =
+  const bool is_hexadecimal =
       first_digit + 1 < arg.size() && arg[first_digit] == '0' &&
       (arg[first_digit + 1] == 'x' || arg[first_digit + 1] == 'X');
   /* A leading zero that is not 0x marks octal, as the C base-zero strtoll the
      old code used did, so printf '%d' 010 yields 8. */
-  bool is_octal = !is_hexadecimal && first_digit < arg.size() &&
-                  arg[first_digit] == '0' && first_digit + 1 < arg.size();
-  ErrorOr<i64> parsed = is_hexadecimal ? utils::parse_hexadecimal_integer(arg)
-                        : is_octal     ? utils::parse_octal_integer(arg)
-                                       : utils::parse_decimal_integer(arg);
+  const bool is_octal = !is_hexadecimal && first_digit < arg.size() &&
+                        arg[first_digit] == '0' && first_digit + 1 < arg.size();
+  const ErrorOr<i64> parsed = is_hexadecimal
+                                  ? utils::parse_hexadecimal_integer(arg)
+                              : is_octal ? utils::parse_octal_integer(arg)
+                                         : utils::parse_decimal_integer(arg);
   return parsed.is_error() ? 0 : parsed.value();
 }
 
 void append_escape(String &out, const String &fmt, usize &i)
 {
-  char e = fmt[i];
+  const char e = fmt[i];
   switch (e) {
   case 'n': out += '\n'; break;
   case 't': out += '\t'; break;
@@ -121,8 +122,6 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
         continue;
       }
 
-      /* Collect a conversion specification, the flags, the width, and the
-         precision, up to the conversion character. */
       String spec = "%";
       i++;
       while (i < fmt.length() && std::strchr("-+ 0#", fmt[i]) != nullptr)
@@ -139,13 +138,13 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
         break;
       }
 
-      char conv = fmt[i];
+      const char conv = fmt[i];
       if (conv == '%') {
         out += '%';
         continue;
       }
 
-      String arg =
+      const String arg =
           operand_index < operands.size() ? operands[operand_index] : String{};
       append_conversion(out, spec, conv, arg);
       operand_index++;

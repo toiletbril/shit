@@ -43,13 +43,13 @@ void Expression::operator delete(void *pointer)
 
 void AnalysisContext::warn(SourceLocation location, StringView message)
 {
-  WarningWithLocation located{location, message};
+  const WarningWithLocation located{location, message};
   show_message(located.to_string(source));
 }
 
 void AnalysisContext::fail(SourceLocation location, StringView message)
 {
-  ErrorWithLocation located{location, message};
+  const ErrorWithLocation located{location, message};
   show_message(located.to_string(source));
   has_fatal = true;
 }
@@ -147,7 +147,7 @@ IfStatement::~IfStatement()
 
 i64 IfStatement::evaluate_impl(EvalContext &cxt) const
 {
-  i64 condition = m_condition->evaluate(cxt);
+  const i64 condition = m_condition->evaluate(cxt);
   /* A jump set while evaluating the condition stops the if and stays pending.
    */
   if (cxt.has_pending_control_flow()) return condition;
@@ -238,9 +238,9 @@ i64 AssignCommand::evaluate_impl(EvalContext &cxt) const
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  String expanded_value =
+  const String expanded_value =
       cxt.expand_word_for_assignment(m_assignment->value_word());
-  std::string value{expanded_value.c_str(), expanded_value.size()};
+  const std::string value{expanded_value.c_str(), expanded_value.size()};
 
   /* The assignment goes through set_shell_variable first, so it still rejects a
      readonly name and refreshes the cached IFS. Under allexport it is then
@@ -256,9 +256,7 @@ i64 AssignCommand::evaluate_impl(EvalContext &cxt) const
 
 String AssignCommand::to_string() const
 {
-  String s = "Assign " + m_assignment->to_ast_string();
-
-  return s;
+  return "Assign " + m_assignment->to_ast_string();
 }
 
 String AssignCommand::to_ast_string(usize layer) const
@@ -313,7 +311,7 @@ void SimpleCommand::redirect_exec_context(ExecContext &ec,
     if (redirection.kind == Redirection::Kind::Heredoc) {
       std::string body = *redirection.heredoc_body;
       if (redirection.heredoc_expand) {
-        String expanded = cxt.expand_heredoc_body(body);
+        const String expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
       Maybe<os::descriptor> opened = os::write_to_temp_file(body);
@@ -335,7 +333,7 @@ void SimpleCommand::redirect_exec_context(ExecContext &ec,
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redirection.target);
-    ArrayList<String> target = cxt.process_args(target_tokens);
+    const ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Redirection target is not a single file"};
@@ -348,14 +346,14 @@ void SimpleCommand::redirect_exec_context(ExecContext &ec,
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    std::string target_path{target[0].c_str(), target[0].size()};
+    const std::string target_path{target[0].c_str(), target[0].size()};
     Maybe<os::descriptor> opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Could not open '" + target_path +
                                   "': " + os::last_system_error_message()};
     }
-    os::descriptor file_fd = opened.take();
+    const os::descriptor file_fd = opened.take();
 
     if (redirection.fd == 0) {
       if (ec.in_fd) os::close_fd(*ec.in_fd);
@@ -406,7 +404,7 @@ void expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
     String current{};
     const String &body_value = *body;
     for (usize i = 0; i < body_value.size(); i++) {
-      char c = body_value[i];
+      const char c = body_value[i];
       if (c == ' ' || c == '\t') {
         if (!current.empty()) {
           rebuilt.push(String{
@@ -472,7 +470,7 @@ i64 SimpleCommand::evaluate_impl(EvalContext &cxt) const
     if (redirection.kind == Redirection::Kind::Heredoc) {
       std::string body = *redirection.heredoc_body;
       if (redirection.heredoc_expand) {
-        String expanded = cxt.expand_heredoc_body(body);
+        const String expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
       Maybe<os::descriptor> opened = os::write_to_temp_file(body);
@@ -496,7 +494,7 @@ i64 SimpleCommand::evaluate_impl(EvalContext &cxt) const
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redirection.target);
-    ArrayList<String> target = cxt.process_args(target_tokens);
+    const ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Redirection target is not a single file"};
@@ -509,14 +507,14 @@ i64 SimpleCommand::evaluate_impl(EvalContext &cxt) const
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    std::string target_path{target[0].c_str(), target[0].size()};
+    const std::string target_path{target[0].c_str(), target[0].size()};
     Maybe<os::descriptor> opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Could not open '" + target_path +
                                   "': " + os::last_system_error_message()};
     }
-    os::descriptor file_fd = opened.take();
+    const os::descriptor file_fd = opened.take();
 
     /* The last redirection of a descriptor wins, so a superseded open closes
        at once. */
@@ -616,7 +614,7 @@ i64 SimpleCommand::evaluate_impl(EvalContext &cxt) const
 
   /* Reuse a memoized resolution when the command word is unchanged, otherwise
      search PATH once and remember the result for the next run. */
-  bool is_cache_valid =
+  const bool is_cache_valid =
       m_resolved_kind.has_value() && program_args[0] == m_resolved_name;
 
   ExecContext ec =
@@ -641,7 +639,7 @@ i64 SimpleCommand::evaluate_impl(EvalContext &cxt) const
   ec.dup_out_to_err = dup_out_to_err;
   redirect_fds_handed_off = true;
 
-  i64 ret = utils::execute_context(std::move(ec), cxt, is_async());
+  const i64 ret = utils::execute_context(std::move(ec), cxt, is_async());
 
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -754,7 +752,7 @@ i64 CompoundList::evaluate_impl(EvalContext &cxt) const
     /* Under set -e the shell exits once a command at the end of its and-or
        chain fails, unless this list is the condition of an if, a while, or an
        and-or operand. */
-    bool ends_and_or_chain =
+    const bool ends_and_or_chain =
         index + 1 >= m_nodes.size() ||
         m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
     if (cxt.error_exit() && !cxt.in_condition() && ends_and_or_chain &&
@@ -813,6 +811,7 @@ String CompoundListCondition::to_ast_string(usize layer) const
 
 i64 CompoundListCondition::evaluate_impl(EvalContext &cxt) const
 {
+  SHIT_ASSERT(m_cmd != nullptr);
   i64 status = m_cmd->evaluate(cxt);
 
   /* A pipeline prefixed with ! reports the inverse of its status, and that
@@ -969,8 +968,8 @@ String IfClause::to_string() const { return "IfClause"; }
 
 String IfClause::to_ast_string(usize layer) const
 {
-  String pad = indent_for_layer(layer);
-  String child_pad = pad + EXPRESSION_AST_INDENT;
+  const String pad = indent_for_layer(layer);
+  const String child_pad = pad + EXPRESSION_AST_INDENT;
   String s = pad + "[" + to_string() + "]";
   for (const auto &[condition, body] : m_branches) {
     s += "\n" + child_pad + condition->to_ast_string(layer + 1);
@@ -1030,8 +1029,8 @@ String WhileLoop::to_string() const
 
 String WhileLoop::to_ast_string(usize layer) const
 {
-  String pad = indent_for_layer(layer);
-  String child_pad = pad + EXPRESSION_AST_INDENT;
+  const String pad = indent_for_layer(layer);
+  const String child_pad = pad + EXPRESSION_AST_INDENT;
   String s = pad + "[" + to_string() + "]";
   s += "\n" + child_pad + m_condition->to_ast_string(layer + 1);
   s += "\n" + child_pad + m_body->to_ast_string(layer + 1);
@@ -1072,7 +1071,7 @@ LoopDisposition resolve_loop_control(EvalContext &cxt)
 
   /* The jump targets this loop. A break stops it, a continue runs the next
      iteration. Either way the request is consumed here. */
-  bool is_break = control.kind == ControlFlow::Kind::Break;
+  const bool is_break = control.kind == ControlFlow::Kind::Break;
   cxt.clear_control_flow();
   return is_break ? LoopDisposition::StopLoop : LoopDisposition::RunNext;
 }
@@ -1081,6 +1080,8 @@ LoopDisposition resolve_loop_control(EvalContext &cxt)
 
 i64 WhileLoop::evaluate_impl(EvalContext &cxt) const
 {
+  SHIT_ASSERT(m_condition != nullptr);
+  SHIT_ASSERT(m_body != nullptr);
   i64 ret = 0;
   for (;;) {
     i64 condition_status;
@@ -1093,7 +1094,7 @@ i64 WhileLoop::evaluate_impl(EvalContext &cxt) const
        the loop and stays pending for the caller. */
     if (cxt.has_pending_control_flow()) break;
 
-    bool should_run_body =
+    const bool should_run_body =
         m_is_until ? (condition_status != 0) : (condition_status == 0);
     if (!should_run_body) break;
 
@@ -1141,7 +1142,7 @@ String ForLoop::to_string() const
 
 String ForLoop::to_ast_string(usize layer) const
 {
-  String pad = indent_for_layer(layer);
+  const String pad = indent_for_layer(layer);
   String s = pad + "[" + to_string() + "]";
   s += "\n" + pad + EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
   return s;
@@ -1149,8 +1150,9 @@ String ForLoop::to_ast_string(usize layer) const
 
 i64 ForLoop::evaluate_impl(EvalContext &cxt) const
 {
+  SHIT_ASSERT(m_body != nullptr);
   /* Without an in clause the loop walks the positional parameters. */
-  ArrayList<String> values =
+  const ArrayList<String> values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
 
   i64 ret = 0;
@@ -1194,8 +1196,8 @@ String CaseClause::to_string() const { return "CaseClause"; }
 
 String CaseClause::to_ast_string(usize layer) const
 {
-  String pad = indent_for_layer(layer);
-  String child_pad = pad + EXPRESSION_AST_INDENT;
+  const String pad = indent_for_layer(layer);
+  const String child_pad = pad + EXPRESSION_AST_INDENT;
   String s = pad + "[" + to_string() + "]";
   for (const CaseItem &item : m_items)
     s += "\n" + child_pad + item.body->to_ast_string(layer + 1);
@@ -1215,16 +1217,16 @@ i64 CaseClause::evaluate_impl(EvalContext &cxt) const
     return t->raw_string();
   };
 
-  String subject = expand_no_glob(m_word);
+  const String subject = expand_no_glob(m_word);
 
   for (const CaseItem &item : m_items) {
     for (const Token *pattern_token : item.patterns) {
-      String pattern = expand_no_glob(pattern_token);
+      const String pattern = expand_no_glob(pattern_token);
       ArrayList<bool> all_active{heap_allocator()};
       for (usize k = 0; k < pattern.size(); k++)
         all_active.push(true);
       if (utils::glob_matches(pattern, subject, all_active, 0)) {
-        i64 ret = item.body->evaluate(cxt);
+        const i64 ret = item.body->evaluate(cxt);
         cxt.set_last_exit_status(static_cast<i32>(ret));
         return ret;
       }
@@ -1252,13 +1254,14 @@ String BraceGroup::to_string() const { return "BraceGroup"; }
 
 String BraceGroup::to_ast_string(usize layer) const
 {
-  String pad = indent_for_layer(layer);
+  const String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
 
 i64 BraceGroup::evaluate_impl(EvalContext &cxt) const
 {
+  SHIT_ASSERT(m_body != nullptr);
   return m_body->evaluate(cxt);
 }
 
@@ -1277,7 +1280,7 @@ String Subshell::to_string() const { return "Subshell"; }
 
 String Subshell::to_ast_string(usize layer) const
 {
-  String pad = indent_for_layer(layer);
+  const String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
@@ -1345,7 +1348,7 @@ String FunctionDefinition::to_string() const
 
 String FunctionDefinition::to_ast_string(usize layer) const
 {
-  String pad = indent_for_layer(layer);
+  const String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
@@ -1501,7 +1504,7 @@ String Divide::to_string() const { return "/"; }
 /* Custom evaluation, since we can't divide by zero. */
 i64 Divide::evaluate_impl(EvalContext &cxt) const
 {
-  i64 denom = m_rhs->evaluate(cxt);
+  const i64 denom = m_rhs->evaluate(cxt);
   if (denom == 0)
     throw ErrorWithLocation{m_rhs->source_location(), "Division by 0"};
   return m_lhs->evaluate(cxt) / denom;
@@ -1539,12 +1542,12 @@ void SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   if (m_args.empty()) return;
 
-  Maybe<String> name = static_command_name(m_args[0]);
+  const Maybe<String> name = static_command_name(m_args[0]);
 
   /* The literal command text, used for the test recognition. A name like [
      holds a glob metacharacter, so static_command_name rejects it, but the test
      check still needs to see it. */
-  String command_literal =
+  const String command_literal =
       m_args[0]->kind() == Token::Kind::Word
           ? static_cast<const tokens::WordToken *>(m_args[0])
                 ->word()
@@ -1564,10 +1567,10 @@ void SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   if (command_literal == "alias") {
     for (usize i = 1; i < m_args.size(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
-      String literal = static_cast<const tokens::WordToken *>(m_args[i])
-                           ->word()
-                           .to_literal_string();
-      Maybe<usize> equals_position = literal.find_character('=');
+      const String literal = static_cast<const tokens::WordToken *>(m_args[i])
+                                 ->word()
+                                 .to_literal_string();
+      const Maybe<usize> equals_position = literal.find_character('=');
       if (equals_position.has_value() && *equals_position > 0)
         actx.known_aliases.add(StringView{literal.data(), *equals_position});
     }
@@ -1619,7 +1622,7 @@ void SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
             m_local_vars.find(StringView{segment.text.data(),
                                          segment.text.size()}) != nullptr)
         {
-          String message =
+          const String message =
               StringView{"The assignment prefix does not affect this "
                          "command, '"} +
               segment.text + StringView{"' is read before it is set"};
@@ -1635,8 +1638,8 @@ void SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
           StringView{name->data(), name->size()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->size()}))
   {
-    String message = StringView{"Command '"} + StringView{*name} +
-                     StringView{"' was not found"};
+    const String message = StringView{"Command '"} + StringView{*name} +
+                           StringView{"' was not found"};
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. A
        command after a dot, source, or eval may be defined at runtime, so it is
@@ -1665,7 +1668,7 @@ void CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
   for (const CompoundListCondition *node : m_nodes) {
     /* A semicolon or newline node runs whenever the list runs. An && or || node
        runs only depending on the previous command, so it is conditional. */
-    bool node_unconditional =
+    const bool node_unconditional =
         is_unconditional && node->kind() == CompoundListCondition::Kind::None;
     node->analyze(actx, node_unconditional);
   }

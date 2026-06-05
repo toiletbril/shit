@@ -6,8 +6,8 @@
 
 #include <cstdio>
 
-/* No flags. umask prints the current file-creation mask as octal with no
-   argument, and sets it from an octal argument. */
+/* umask prints the current file-creation mask as octal with no argument, and
+   sets it from an octal argument. */
 
 namespace shit {
 
@@ -28,7 +28,7 @@ i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   const String &requested = args[1];
-  ErrorOr<i64> parsed = utils::parse_octal_integer(requested);
+  const ErrorOr<i64> parsed = utils::parse_octal_integer(requested);
   if (parsed.is_error()) {
     throw Error{"umask: '" + requested + "' is not a valid octal mask"};
   }

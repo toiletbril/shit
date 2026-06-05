@@ -129,9 +129,9 @@ Maybe<String> EvalContext::get_variable_value(StringView name) const
     }
   if (is_all_digits) {
     if (name.size() > 9) return String{};
-    ErrorOr<i64> parsed_index = utils::parse_decimal_integer(name);
+    const ErrorOr<i64> parsed_index = utils::parse_decimal_integer(name);
     if (parsed_index.is_error()) return String{};
-    usize index = static_cast<usize>(parsed_index.value());
+    const usize index = static_cast<usize>(parsed_index.value());
     if (index >= 1 && index <= m_positional_params.size())
       return m_positional_params[index - 1];
     return String{};
@@ -195,7 +195,7 @@ void EvalContext::update_jobs()
     if (job.state == Job::State::Done) continue;
 
     i32 status = 0;
-    os::ProcessState state = os::poll_process(job.pid, status);
+    const os::ProcessState state = os::poll_process(job.pid, status);
     if (state == os::ProcessState::Exited) {
       job.state = Job::State::Done;
       job.last_status = status;
@@ -654,7 +654,7 @@ String EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
       break;
     }
 
-    char next = word[i + 1];
+    const char next = word[i + 1];
     if (next == '{') {
       String inner{heap_allocator()};
       usize j = i + 2;
@@ -733,11 +733,11 @@ String EvalContext::apply_parameter_expansion(StringView spec)
   /* ${#name} is the length of the value, distinct from $# which is the count of
      positional parameters. */
   if (spec.length > 1 && spec[0] == '#') {
-    StringView name = spec.substring(1);
+    const StringView name = spec.substring(1);
     if (name == "@" || name == "*")
       return String{heap_allocator(), utils::unsigned_integer_to_string(
                                           m_positional_params.size())};
-    Maybe<String> value = get_variable_value(name);
+    const Maybe<String> value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
     return String{heap_allocator(), utils::unsigned_integer_to_string(
@@ -757,8 +757,8 @@ String EvalContext::apply_parameter_expansion(StringView spec)
     name_end = 1;
   }
 
-  StringView name = spec.substring_of_length(0, name_end);
-  StringView rest = spec.substring(name_end);
+  const StringView name = spec.substring_of_length(0, name_end);
+  const StringView rest = spec.substring(name_end);
   if (rest.empty()) {
     /* Under set -u a plain reference to a variable that is not set is an error,
        while a form with a modifier such as ${x:-w} handles the unset case
@@ -770,19 +770,19 @@ String EvalContext::apply_parameter_expansion(StringView spec)
 
   /* A leading colon makes the default, assign, alternate, and error forms treat
      an empty value as unset. */
-  bool is_colon_form = rest[0] == ':';
-  usize op_index = is_colon_form ? 1 : 0;
+  const bool is_colon_form = rest[0] == ':';
+  const usize op_index = is_colon_form ? 1 : 0;
   if (op_index >= rest.length) return expand_variable(name);
 
-  char op = rest[op_index];
-  bool is_doubled = (op_index + 1 < rest.length && rest[op_index + 1] == op &&
-                     (op == '#' || op == '%'));
-  StringView word = rest.substring(op_index + (is_doubled ? 2 : 1));
+  const char op = rest[op_index];
+  const bool is_doubled = (op_index + 1 < rest.length &&
+                           rest[op_index + 1] == op && (op == '#' || op == '%'));
+  const StringView word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
-  Maybe<String> current = get_variable_value(name);
-  bool is_set = current.has_value();
-  bool is_empty = !is_set || current->empty();
-  bool treat_as_unset = is_colon_form ? is_empty : !is_set;
+  const Maybe<String> current = get_variable_value(name);
+  const bool is_set = current.has_value();
+  const bool is_empty = !is_set || current->empty();
+  const bool treat_as_unset = is_colon_form ? is_empty : !is_set;
 
   switch (op) {
   case '-':
@@ -790,7 +790,7 @@ String EvalContext::apply_parameter_expansion(StringView spec)
     return String{heap_allocator(), current->view()};
   case '=':
     if (treat_as_unset) {
-      String assigned = expand_modifier_word(word);
+      const String assigned = expand_modifier_word(word);
       set_shell_variable(name, assigned);
       return assigned;
     }
@@ -805,12 +805,12 @@ String EvalContext::apply_parameter_expansion(StringView spec)
     }
     return String{heap_allocator(), current->view()};
   case '#': {
-    String value = current.value_or(String{});
+    const String value = current.value_or(String{});
     return trim_matching_prefix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
   case '%': {
-    String value = current.value_or(String{});
+    const String value = current.value_or(String{});
     return trim_matching_suffix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
@@ -880,13 +880,13 @@ usize EvalContext::total_expansion_count() const
 ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
                                                    bool should_expand_files)
 {
-  Allocator scratch = scratch_allocator();
+  const Allocator scratch = scratch_allocator();
   ArrayList<GlobField> expanded{scratch};
 
   /* This runs only for a field that holds a real glob, which is rare. The path
      text is split on its last separator into a parent directory and the glob
      stem. */
-  StringView path = field.text.view();
+  const StringView path = field.text.view();
 
   Maybe<usize> last_slash{};
   for (usize i = path.length; i > 0; i--)
@@ -894,9 +894,8 @@ ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
       last_slash = i - 1;
       break;
     }
-  bool has_slashes = last_slash.has_value();
+  const bool has_slashes = last_slash.has_value();
 
-  /* Prefix is the parent directory. */
   Path parent_dir{};
   if (has_slashes)
     parent_dir =
@@ -907,12 +906,12 @@ ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
 
   /* Stem of the glob after the last slash. Its mask starts at stem_start in the
      field, so glob_matches reads field.glob_active from there. */
-  usize stem_start = has_slashes ? *last_slash + 1 : 0;
-  bool has_glob = stem_start < path.length;
+  const usize stem_start = has_slashes ? *last_slash + 1 : 0;
+  const bool has_glob = stem_start < path.length;
   StringView glob{};
   if (has_glob) glob = path.substring(stem_start);
 
-  Maybe<ArrayList<String>> entries = Path::read_directory(parent_dir);
+  const Maybe<ArrayList<String>> entries = Path::read_directory(parent_dir);
   if (!entries.has_value())
     throw Error{"Could not descend into '" + parent_dir.text() +
                 "': " + os::last_system_error_message()};
@@ -925,10 +924,10 @@ ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
     return expanded;
   }
 
-  bool parent_is_dot = parent_dir.text() == StringView{"."};
+  const bool parent_is_dot = parent_dir.text() == StringView{"."};
 
   for (const String &entry_name : *entries) {
-    StringView filename = entry_name.view();
+    const StringView filename = entry_name.view();
 
     /* The full path joins the parent and the filename, the way the directory
        walk needs it for the is_directory test and the result text. */
@@ -970,7 +969,7 @@ Maybe<usize> first_active_glob(StringView text, const ArrayList<bool> &mask)
   Maybe<usize> open_bracket{};
   for (usize i = 0; i < mask.size(); i++) {
     if (!mask[i]) continue;
-    char ch = text.data[i];
+    const char ch = text.data[i];
     if (ch == '*' || ch == '?') return i;
     if (ch == '[') {
       if (!open_bracket) open_bracket = i;
@@ -986,15 +985,15 @@ Maybe<usize> first_active_glob(StringView text, const ArrayList<bool> &mask)
 ArrayList<GlobField>
 EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
 {
-  Allocator scratch = scratch_allocator();
+  const Allocator scratch = scratch_allocator();
   ArrayList<GlobField> result{scratch};
 
   for (GlobField &field : fields) {
-    StringView text = field.text.view();
+    const StringView text = field.text.view();
 
     /* An empty mask is the all-literal convention, so a field without one holds
        no live glob metacharacter. */
-    Maybe<usize> expand_ch = first_active_glob(text, field.glob_active);
+    const Maybe<usize> expand_ch = first_active_glob(text, field.glob_active);
 
     if (!expand_ch) {
       /* No glob remains. This field is a literal suffix appended after an
@@ -1025,7 +1024,8 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
     /* Split off the first globbed directory component and the literal-or-glob
        suffix after it, building each from a substring rather than copying the
        whole field. */
-    std::ptrdiff_t slash_offset = static_cast<std::ptrdiff_t>(*slash_after);
+    const std::ptrdiff_t slash_offset =
+        static_cast<std::ptrdiff_t>(*slash_after);
     GlobField operating{scratch};
     operating.text.append(StringView{text.data, *slash_after});
     for (std::ptrdiff_t k = 0; k < slash_offset; k++)
@@ -1043,7 +1043,7 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
        match came back all-literal with an empty mask, so restore its false
        entries before the suffix mask to keep the mask aligned with the text. */
     for (GlobField &f : once) {
-      usize matched_length = f.text.size();
+      const usize matched_length = f.text.size();
       f.text.append(removed_suffix.text.view());
       f.glob_active.clear();
       for (usize k = 0; k < matched_length; k++)
@@ -1089,13 +1089,13 @@ void EvalContext::expand_tilde(WordSegment &leading_segment) const
 
 ArrayList<String> EvalContext::expand_path(GlobField field)
 {
-  Allocator scratch = scratch_allocator();
+  const Allocator scratch = scratch_allocator();
 
   /* Fast path. A field with no glob that actually matches paths is its own
      single result, so it skips the recursion, the directory scan, and every
      copy. A bare command word such as '[' lands here instead of scanning the
      current directory. */
-  bool has_glob =
+  const bool has_glob =
       m_enable_path_expansion &&
       first_active_glob(field.text.view(), field.glob_active).has_value();
 
@@ -1139,7 +1139,7 @@ usize count_leading_digits(StringView text, u32 radix)
 {
   usize length = 0;
   while (length < text.length) {
-    char c = text[length];
+    const char c = text[length];
     u32 digit;
     if (c >= '0' && c <= '9')
       digit = static_cast<u32>(c - '0');
@@ -1172,11 +1172,11 @@ i64 parse_arithmetic_operand(StringView text)
     body = body.substring(1);
   }
 
-  ErrorOr<i64> parsed = [&]() -> ErrorOr<i64> {
+  const ErrorOr<i64> parsed = [&]() -> ErrorOr<i64> {
     if (body.length >= 2 && body[0] == '0' &&
         (body[1] == 'x' || body[1] == 'X'))
     {
-      StringView digits = body.substring(2);
+      const StringView digits = body.substring(2);
       return utils::parse_hexadecimal_integer(
           digits.substring_of_length(0, count_leading_digits(digits, 16)));
     }
@@ -1243,7 +1243,7 @@ struct ArithmeticParser
 
   i64 parse()
   {
-    i64 result = parse_assignment();
+    const i64 result = parse_assignment();
     skip_spaces();
     if (pos != source.length) fail("unexpected trailing characters");
     return result;
@@ -1274,7 +1274,7 @@ struct ArithmeticParser
   {
     /* An assignment has a bare variable name on the left, so try it and rewind
        when the name is not followed by an assignment operator. */
-    usize save = pos;
+    const usize save = pos;
     skip_spaces();
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
       String name{};
@@ -1300,15 +1300,15 @@ struct ArithmeticParser
       };
       for (const auto &[op, kind] : compound_operators) {
         if (consume(op)) {
-          i64 rhs = parse_assignment();
-          i64 result = apply_compound(read_variable_value(name), rhs, kind);
+          const i64 rhs = parse_assignment();
+          const i64 result = apply_compound(read_variable_value(name), rhs, kind);
           context.set_shell_variable(name, utils::integer_to_string(result));
           return result;
         }
       }
       if (starts_with("=") && !starts_with("==")) {
         consume("=");
-        i64 rhs = parse_assignment();
+        const i64 rhs = parse_assignment();
         context.set_shell_variable(name, utils::integer_to_string(rhs));
         return rhs;
       }
@@ -1319,11 +1319,11 @@ struct ArithmeticParser
 
   i64 parse_ternary()
   {
-    i64 condition = parse_logical_or();
+    const i64 condition = parse_logical_or();
     if (consume("?")) {
-      i64 if_true = parse_assignment();
+      const i64 if_true = parse_assignment();
       if (!consume(":")) fail("expected ':' in a conditional");
-      i64 if_false = parse_ternary();
+      const i64 if_false = parse_ternary();
       return condition != 0 ? if_true : if_false;
     }
     return condition;
@@ -1442,11 +1442,11 @@ struct ArithmeticParser
       if (consume("*"))
         lhs *= parse_unary();
       else if (consume("/")) {
-        i64 divisor = parse_unary();
+        const i64 divisor = parse_unary();
         if (divisor == 0) fail("division by zero");
         lhs /= divisor;
       } else if (consume("%")) {
-        i64 divisor = parse_unary();
+        const i64 divisor = parse_unary();
         if (divisor == 0) fail("division by zero");
         lhs %= divisor;
       } else
@@ -1468,7 +1468,7 @@ struct ArithmeticParser
   {
     skip_spaces();
     if (consume("(")) {
-      i64 value = parse_assignment();
+      const i64 value = parse_assignment();
       if (!consume(")")) fail("expected ')'");
       return value;
     }
@@ -1478,7 +1478,7 @@ struct ArithmeticParser
          that base-0 strtoll reported. The utils parsers take no base and report
          no consumed length, so the run is measured here and the matching parser
          runs on the scanned slice. */
-      StringView rest = source.substring(pos);
+      const StringView rest = source.substring(pos);
       usize consumed = 0;
       if (rest.length >= 2 && rest[0] == '0' &&
           (rest[1] == 'x' || rest[1] == 'X'))
@@ -1488,7 +1488,7 @@ struct ArithmeticParser
       else
         consumed = count_leading_digits(rest, 10);
 
-      i64 value =
+      const i64 value =
           parse_arithmetic_operand(rest.substring_of_length(0, consumed));
       pos += consumed;
       return value;
@@ -1521,14 +1521,14 @@ i64 EvalContext::evaluate_arithmetic(StringView expression)
 
   /* The expanded word owns the bytes the parser views, so it outlives the
      parser below. */
-  String expanded_word = expand_modifier_word(expression);
+  const String expanded_word = expand_modifier_word(expression);
   ArithmeticParser parser{*this, expanded_word.view(), 0};
   return parser.parse();
 }
 
 ArrayList<GlobField> EvalContext::expand_word(const Word &word)
 {
-  Allocator scratch = scratch_allocator();
+  const Allocator scratch = scratch_allocator();
 
   /* Only copy the segments when a leading tilde must be rewritten. The common
      word has no tilde and reads its segments in place. */
@@ -1542,9 +1542,6 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
     expand_tilde(tilde_expanded_segments.front());
     segments = &tilde_expanded_segments;
   }
-
-  /* The cached separator table answers each byte in one load. The table
-     defaults to whitespace when IFS is unset. */
 
   ArrayList<GlobField> fields{scratch};
   GlobField current{scratch};
@@ -1584,7 +1581,7 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
   };
 
   for (const WordSegment &segment : *segments) {
-    StringView segment_text{segment.text.data(), segment.text.size()};
+    const StringView segment_text{segment.text.data(), segment.text.size()};
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
@@ -1605,8 +1602,8 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
         }
         break;
       }
-      String value{heap_allocator(),
-                   apply_parameter_expansion(segment.text.view())};
+      const String value{heap_allocator(),
+                         apply_parameter_expansion(segment.text.view())};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1615,15 +1612,15 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
         append_split_run(value, true);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
-      String output{heap_allocator(),
-                    capture_command_substitution(segment.text)};
+      const String output{heap_allocator(),
+                          capture_command_substitution(segment.text)};
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
         append_split_run(output, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      String value{
+      const String value{
           heap_allocator(),
           utils::integer_to_string(evaluate_arithmetic(segment.text.view()))};
       if (segment.is_in_double_quotes)
@@ -1656,7 +1653,7 @@ String EvalContext::expand_word_for_assignment(const Word &word)
 
   String result{heap_allocator()};
   for (const WordSegment &segment : *segments) {
-    StringView segment_text = segment.text.view();
+    const StringView segment_text = segment.text.view();
     if (segment.kind == WordSegment::Kind::VariableReference)
       result += apply_parameter_expansion(segment_text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
@@ -1680,11 +1677,12 @@ String EvalContext::capture_command_substitution(const String &source)
       Lexer{String{source.view()}, *AST_ARENA}
   };
   std::unique_ptr<Expression> ast = parser.construct_ast();
+  SHIT_ASSERT(ast != nullptr);
 
   /* A cd or an assignment inside the substitution must not leak. */
   EvalStateSnapshot snapshot = snapshot_state();
 
-  Maybe<os::Pipe> pipe = os::make_pipe();
+  const Maybe<os::Pipe> pipe = os::make_pipe();
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
 
   /* Drain the read end on a thread so output larger than the pipe buffer cannot
@@ -1704,11 +1702,11 @@ String EvalContext::capture_command_substitution(const String &source)
   });
 
   shit::flush();
-  os::descriptor saved = os::redirect_stdout(pipe->out);
+  const os::descriptor saved = os::redirect_stdout(pipe->out);
 
   /* The inner commands write to the pipe, not the terminal, so suppress the
      interactive title updates while the substitution runs. */
-  bool was_interactive = m_shell_is_interactive;
+  const bool was_interactive = m_shell_is_interactive;
   m_shell_is_interactive = false;
 
   /* Run the inner command, then always tear down, even on an error. A break,
@@ -1768,7 +1766,8 @@ i32 EvalContext::run_source(StringView source, StringView origin,
        call and a control-flow exception thrown inside still leaves it owned.
        The destructor runs at the next top-level command, freeing the node
        members while the arena storage is reclaimed by the reset. */
-    Expression *ast = parser.construct_ast().release();
+    Expression *const ast = parser.construct_ast().release();
+    SHIT_ASSERT(ast != nullptr);
     m_retained_source_asts.push(ast);
 
     /* Keep a copy of the source alive for as long as the AST, so a control-flow
@@ -1776,11 +1775,11 @@ i32 EvalContext::run_source(StringView source, StringView origin,
        call returns and the jump propagates to the caller. The pointer below
        indexes this retained buffer, which survives until clear_retained_sources
        runs at the next top-level command. */
-    String *retained_source = new String{source};
+    String *const retained_source = new String{source};
     m_retained_sources.push(retained_source);
 
-    const String *previous_source = m_current_source;
-    String previous_origin = m_current_origin;
+    const String *const previous_source = m_current_source;
+    const String previous_origin = m_current_origin;
     set_current_source(retained_source, String{origin});
     SHIT_DEFER { set_current_source(previous_source, previous_origin); };
 
@@ -1791,7 +1790,7 @@ i32 EvalContext::run_source(StringView source, StringView origin,
     if (consume_return && has_pending_control_flow() &&
         pending_control_flow().kind == ControlFlow::Kind::Return)
     {
-      i32 source_status = static_cast<i32>(pending_control_flow().value);
+      const i32 source_status = static_cast<i32>(pending_control_flow().value);
       clear_control_flow();
       set_last_exit_status(source_status);
       return source_status;
@@ -1854,7 +1853,7 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
   expanded_args.reserve(args.size());
 
   for (const Token *t : args) {
-    SourceLocation l = t->source_location();
+    const SourceLocation l = t->source_location();
     try {
       /* A word token is expanded in place. Any other token is wrapped as one
          unquoted literal word, which is the only case that needs a temporary.
@@ -1868,8 +1867,9 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
            ordinary word. Rebuild it as the literal key, an equals sign, and the
            value segments, so the value still expands instead of staying
            literal. */
-        const tokens::Assignment *a =
+        const tokens::Assignment *const a =
             static_cast<const tokens::Assignment *>(t);
+        SHIT_ASSERT(a != nullptr);
         String key_literal{StringView{a->key()}};
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
@@ -1976,17 +1976,14 @@ ExecContext ExecContext::make_from(SourceLocation location,
   Maybe<Builtin::Kind> bk;
   Maybe<Path> p;
 
-  /* This isn't a path? */
   if (!program.find_character('/').has_value()) {
     bk = search_builtin(std::string_view{program.c_str(), program.size()});
 
     if (!bk) {
-      /* Not a builtin, try to search PATH. */
       ArrayList<Path> ps = utils::search_program_path(program.view());
       if (ps.size() > 0) p = std::move(ps[0]);
     }
   } else {
-    /* This is a path. */
     /* TODO: Sanitize extensions here too. */
     p = utils::canonicalize_path(program.view());
   }

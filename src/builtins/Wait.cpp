@@ -19,7 +19,7 @@ namespace {
 i32 wait_for_job(Job &job)
 {
   if (job.state == Job::State::Done) return job.last_status;
-  i32 status = os::wait_and_monitor_process(job.pid);
+  const i32 status = os::wait_and_monitor_process(job.pid);
   job.state = Job::State::Done;
   job.last_status = status;
   return status;
@@ -48,16 +48,16 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const
     const String &target = args[i];
 
     if (!target.empty() && target[0] == '%') {
-      ErrorOr<i64> parsed =
+      const ErrorOr<i64> parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (!parsed.is_error()) {
         if (Job *job = cxt.find_job(static_cast<int>(parsed.value())))
           status = wait_for_job(*job);
       }
     } else {
-      ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
+      const ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
       if (!parsed.is_error()) {
-        os::process pid = os::process_from_pid(parsed.value());
+        const os::process pid = os::process_from_pid(parsed.value());
         status = os::wait_and_monitor_process(pid);
       }
     }

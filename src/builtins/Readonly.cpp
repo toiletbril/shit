@@ -19,7 +19,7 @@ Builtin::Kind Readonly::kind() const { return Kind::Readonly; }
 
 i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -42,13 +42,13 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
 
   for (usize i = 1; i < args.size(); i++) {
     const String &arg = args[i];
-    Maybe<usize> equals_position = arg.find_character('=');
+    const Maybe<usize> equals_position = arg.find_character('=');
 
     /* An operand with an equals sign assigns the value first, then marks the
        name. A bare name marks whatever it currently holds. */
     if (equals_position.has_value()) {
-      StringView name = arg.substring_of_length(0, *equals_position);
-      StringView value = arg.substring(*equals_position + 1);
+      const StringView name = arg.substring_of_length(0, *equals_position);
+      const StringView value = arg.substring(*equals_position + 1);
       cxt.set_shell_variable(name, value);
       cxt.mark_readonly(name);
     } else {

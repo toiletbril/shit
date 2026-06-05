@@ -122,7 +122,7 @@ static bool find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
       if (!flags[i]->long_name().empty()) {
         /* There might be flags that are prefixes of other flags. Go
            through all flags first and pick the longest match. */
-        size_t flag_length = flags[i]->long_name().length;
+        const size_t flag_length = flags[i]->long_name().length;
 
         if (flag_length > longest_length &&
             /* Yay let's add starts_with in C++20. */
@@ -189,6 +189,7 @@ ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,
     if (next_arg_is_value) {
       next_arg_is_value = false;
 
+      SHIT_ASSERT(prev_flag != NULL);
       if (prev_flag->kind() == Flag::Kind::String)
         static_cast<FlagString *>(prev_flag)->set(argv[i]);
       else
@@ -230,12 +231,13 @@ ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,
     while (repeat) {
       repeat = false;
 
-      bool found = find_flag(flags, flag_offset, is_long, &flag, &value_offset);
+      const bool found =
+          find_flag(flags, flag_offset, is_long, &flag, &value_offset);
 
       if (found) {
         switch (flag->kind()) {
         case Flag::Kind::Bool: {
-          FlagBool *fb = static_cast<FlagBool *>(flag);
+          FlagBool *const fb = static_cast<FlagBool *>(flag);
 
           fb->toggle();
           fb->set_position(++position);
@@ -309,8 +311,8 @@ ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,
           } else {
             s += "-";
 
-            StringView flag_sv = flag_offset;
-            Maybe<usize> equals_pos = flag_sv.find_character('=');
+            const StringView flag_sv = flag_offset;
+            const Maybe<usize> equals_pos = flag_sv.find_character('=');
 
             if (equals_pos)
               s += flag_sv.substring_of_length(0, equals_pos.value());
@@ -467,7 +469,7 @@ std::string make_flag_help(const ArrayList<Flag *> &flags)
       s += "    ";
     }
 
-    usize padding =
+    const usize padding =
         MAX_WIDTH - f->long_name().length - (long_is_string ? LONG_PADDING : 0);
 
     for (usize i = 0; i < padding; i++) {

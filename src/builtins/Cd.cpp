@@ -5,8 +5,6 @@
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
-/* No flags. */
-
 namespace shit {
 
 Cd::Cd() = default;
@@ -25,7 +23,7 @@ i32 Cd::execute(ExecContext &ec, EvalContext &cxt) const
     }
   } else {
     /* Empty cd should go to the home directory. */
-    Maybe<Path> p = os::get_home_directory();
+    const Maybe<Path> p = os::get_home_directory();
     if (!p) throw Error{"Could not figure out home directory"};
     arg_path.append(p->text());
   }
@@ -37,8 +35,8 @@ i32 Cd::execute(ExecContext &ec, EvalContext &cxt) const
     /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. An
        unreadable current directory yields an empty path, so OLDPWD stays as it
        was. */
-    Path old_directory = Path::current_directory();
-    ErrorOr<Ok> changed = Path::set_current_directory(target);
+    const Path old_directory = Path::current_directory();
+    const ErrorOr<Ok> changed = Path::set_current_directory(target);
     SHIT_UNUSED(changed);
     if (!old_directory.empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());

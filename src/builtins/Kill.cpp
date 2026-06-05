@@ -28,8 +28,8 @@ i32 Kill::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* A leading -name or -number names the signal to send. */
   if (args.size() > 1 && args[1].length() > 1 && args[1][0] == '-') {
-    String name = String{args[1].substring(1)};
-    Maybe<i32> resolved = os::signal_number_from_name(name);
+    const String name = String{args[1].substring(1)};
+    const Maybe<i32> resolved = os::signal_number_from_name(name);
     if (!resolved) throw Error{"kill: '" + name + "' is not a valid signal"};
     signal_number = *resolved;
     first_target = 2;
@@ -41,11 +41,11 @@ i32 Kill::execute(ExecContext &ec, EvalContext &cxt) const
   i32 status = 0;
   for (usize i = first_target; i < args.size(); i++) {
     const String &target = args[i];
-    String target_text = target;
+    const String target_text = target;
 
     os::process pid{};
     if (!target.empty() && target[0] == '%') {
-      ErrorOr<i64> parsed =
+      const ErrorOr<i64> parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (parsed.is_error()) {
         show_message(Error{"kill: '" + target_text +
@@ -63,7 +63,7 @@ i32 Kill::execute(ExecContext &ec, EvalContext &cxt) const
       }
       pid = job->pid;
     } else {
-      ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
+      const ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
       if (parsed.is_error()) {
         /* A non-numeric target must not fall through to kill(0), which would
            signal the whole process group including this shell. */

@@ -53,11 +53,11 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  Resource resource = selected_resource();
+  const Resource resource = selected_resource();
 
   struct rlimit limit{};
   if (getrlimit(resource.which, &limit) != 0)
@@ -81,7 +81,7 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
     limit.rlim_cur = RLIM_INFINITY;
     limit.rlim_max = RLIM_INFINITY;
   } else {
-    rlim_t value =
+    const rlim_t value =
         static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10)) *
         resource.units_per_value;
     limit.rlim_cur = value;
@@ -101,7 +101,7 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* This platform does not expose resource limits, so report unlimited. */

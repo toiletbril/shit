@@ -25,7 +25,7 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
 
   const String &optstring = args[1];
   const String &name = args[2];
-  bool is_silent = !optstring.empty() && optstring[0] == ':';
+  const bool is_silent = !optstring.empty() && optstring[0] == ':';
 
   ArrayList<String> operands{};
   if (args.size() > 3) {
@@ -59,6 +59,7 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     return finish(1);
   }
 
+  SHIT_ASSERT(static_cast<usize>(optind) - 1 < operands.size());
   const String &current = operands[static_cast<usize>(optind) - 1];
   if (current.length() < 2 || current[0] != '-') {
     cxt.set_shell_variable(name, "?");
@@ -70,10 +71,10 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     return finish(1);
   }
 
-  char option = current[char_index];
+  const char option = current[char_index];
   String option_as_string{};
   option_as_string.push(option);
-  Maybe<usize> spec = optstring.find_character(option);
+  const Maybe<usize> spec = optstring.find_character(option);
 
   auto advance_letter = [&]() {
     char_index++;
@@ -96,11 +97,11 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     return finish(0);
   }
 
-  bool wants_argument =
+  const bool wants_argument =
       *spec + 1 < optstring.length() && optstring[*spec + 1] == ':';
   if (wants_argument) {
     if (char_index + 1 < current.length()) {
-      StringView optarg = current.substring(char_index + 1);
+      const StringView optarg = current.substring(char_index + 1);
       cxt.set_shell_variable("OPTARG", optarg);
       optind++;
       char_index = 1;

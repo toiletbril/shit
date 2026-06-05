@@ -115,7 +115,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
     /* The long form -o name and +o name names one option, or lists them all
        when no name follows. */
     if (arg == "-o" || arg == "+o") {
-      bool enable = arg[0] == '-';
+      const bool enable = arg[0] == '-';
       if (i + 1 >= args.size()) {
         ec.print_to_stdout(list_options(cxt));
         continue;
@@ -130,9 +130,9 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
 
     /* A minus enables each following letter, a plus disables each one. */
     if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {
-      bool enable = arg[0] == '-';
+      const bool enable = arg[0] == '-';
       for (usize c = 1; c < arg.length(); c++) {
-        char letter = arg[c];
+        const char letter = arg[c];
         const SetOption *option = find_option_by_letter(letter);
         if (option == nullptr) {
           String invalid_option{};

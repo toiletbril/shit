@@ -3,8 +3,7 @@
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
-/* No flags. shift drops the first n positional parameters, n defaulting to 1.
- */
+/* shift drops the first n positional parameters, n defaulting to 1. */
 
 namespace shit {
 
@@ -16,7 +15,7 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const
 {
   i64 count = 1;
   if (ec.args().size() > 1) {
-    ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    const ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
     if (parsed.is_error()) throw parsed.error();
     count = parsed.value();
   }

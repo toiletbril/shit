@@ -24,7 +24,7 @@ i32 Bg::execute(ExecContext &ec, EvalContext &cxt) const
 
   Job *job = nullptr;
   if (args.size() > 1 && !args[1].empty() && args[1][0] == '%') {
-    ErrorOr<i64> parsed =
+    const ErrorOr<i64> parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
     if (parsed.is_error())
       throw Error{"bg: '" + args[1] + "' is not a valid job"};
@@ -33,6 +33,7 @@ i32 Bg::execute(ExecContext &ec, EvalContext &cxt) const
     job = cxt.most_recent_job();
 
   if (job == nullptr) throw Error{"bg: there is no such job"};
+  SHIT_ASSERT(job != NULL);
 
   if (Maybe<i32> cont = os::signal_number_from_name("CONT"))
     os::signal_process(job->pid, *cont);

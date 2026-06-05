@@ -2,8 +2,8 @@
 
 #include "../Builtin.hpp"
 
-/* No flags. The eval builtin joins its arguments with spaces and runs the
-   result in the current shell. */
+/* The eval builtin joins its arguments with spaces and runs the result in the
+   current shell. */
 
 namespace shit {
 

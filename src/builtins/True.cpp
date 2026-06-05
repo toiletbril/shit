@@ -1,7 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 
-/* No flags. Always returns success. */
+/* Always returns success. */
 
 namespace shit {
 

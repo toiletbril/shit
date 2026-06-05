@@ -15,7 +15,7 @@ i32 Exit::execute(ExecContext &ec, EvalContext &cxt) const
   /* exit with no argument uses the status of the last command. */
   i64 status = cxt.last_exit_status();
   if (ec.args().size() > 1) {
-    ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    const ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
     if (parsed.is_error()) throw parsed.error();
     status = parsed.value();
   }

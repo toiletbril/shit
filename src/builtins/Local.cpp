@@ -21,7 +21,7 @@ Builtin::Kind Local::kind() const { return Kind::Local; }
 
 i32 Local::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -30,11 +30,11 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const
 
   for (usize i = 1; i < args.size(); i++) {
     const String &arg = args[i];
-    Maybe<usize> equals_position = arg.find_character('=');
+    const Maybe<usize> equals_position = arg.find_character('=');
 
     /* Record the shadowed binding before overwriting it, so leaving the
        function restores it. A bare name shadows with an empty value. */
-    StringView name = equals_position.has_value()
+    const StringView name = equals_position.has_value()
                           ? arg.substring_of_length(0, *equals_position)
                           : arg.view();
     cxt.declare_local(name);
