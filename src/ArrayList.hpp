@@ -2,6 +2,7 @@
 
 #include "Allocator.hpp"
 #include "Common.hpp"
+#include "Debug.hpp"
 
 #include <new>
 #include <utility>
@@ -107,6 +108,16 @@ struct ArrayList
     reserve(m_length + 1);
     new (&m_data[m_length]) T(std::move(value));
     m_length++;
+  }
+
+  /* Destroy and drop the last element. The caller guarantees the list is not
+     empty. */
+  void
+  pop_back()
+  {
+    SHIT_ASSERT(m_length > 0, "pop_back on an empty list");
+    m_length--;
+    m_data[m_length].~T();
   }
 
   /* Destroy the elements but keep the storage, so a reused list does not
