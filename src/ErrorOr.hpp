@@ -15,6 +15,13 @@
 
 namespace shit {
 
+namespace utils {
+/* Declared here rather than included from Utils.hpp, since Utils.hpp includes
+   ErrorOr.hpp and the include would close a cycle. The definition lives in
+   Utils.cpp. */
+String integer_to_string(i64 value);
+} /* namespace utils */
+
 /* The success payload of a fallible function that returns no value. A caller
    writes ErrorOr<Ok> and returns Ok{} on success. */
 struct Ok
@@ -153,5 +160,6 @@ private:
 #define SHIT_MAKE_ERROR(msg)                                                   \
   ::shit::Error                                                                \
   {                                                                            \
-    std::string{__FILE__ ":"} + std::to_string(__LINE__) + ": " + (msg)        \
+    ::shit::String{__FILE__ ":"} +                                            \
+        ::shit::utils::integer_to_string(__LINE__) + ": " + (msg)              \
   }

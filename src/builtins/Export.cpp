@@ -26,18 +26,15 @@ i32 Export::execute(ExecContext &ec, EvalContext &cxt) const
     const String &arg = args[i];
     Maybe<usize> equals_position = arg.find_character('=');
 
-    std::string name{};
-    std::string value{};
+    String name{};
+    String value{};
     if (!equals_position.has_value()) {
       /* Export an existing variable by its current value. */
-      name = std::string{arg.c_str(), arg.size()};
-      String current = cxt.get_variable_value(arg).value_or(String{});
-      value = std::string{current.c_str(), current.size()};
+      name = arg;
+      value = cxt.get_variable_value(arg).value_or(String{});
     } else {
-      StringView name_view = arg.substring_of_length(0, *equals_position);
-      StringView value_view = arg.substring(*equals_position + 1);
-      name = std::string{name_view.data, name_view.length};
-      value = std::string{value_view.data, value_view.length};
+      name = String{arg.substring_of_length(0, *equals_position)};
+      value = String{arg.substring(*equals_position + 1)};
     }
 
     /* The variable moves into the environment, so the bare shell copy is

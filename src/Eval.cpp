@@ -282,8 +282,7 @@ void EvalContext::run_exit_trap()
   m_exit_trap_ran = true;
 
   if (const String *action = m_traps.find(StringView{"EXIT", 4}))
-    if (action->size() > 0)
-      run_source(std::string{action->c_str(), action->size()}, "the EXIT trap");
+    if (action->size() > 0) run_source(action->view(), "the EXIT trap");
 }
 
 void EvalContext::mark_readonly(StringView name)
@@ -446,16 +445,13 @@ void EvalContext::clear_control_flow()
   m_control_flow.kind = ControlFlow::Kind::Normal;
 }
 
-void EvalContext::set_current_source(const std::string *source, String origin)
+void EvalContext::set_current_source(const String *source, String origin)
 {
   m_current_source = source;
   m_current_origin = std::move(origin);
 }
 
-const std::string *EvalContext::current_source() const
-{
-  return m_current_source;
-}
+const String *EvalContext::current_source() const { return m_current_source; }
 
 const String &EvalContext::current_origin() const { return m_current_origin; }
 
@@ -1750,8 +1746,7 @@ String EvalContext::capture_command_substitution(const String &source)
   return captured;
 }
 
-i32 EvalContext::run_source(const std::string &source,
-                            const std::string &origin)
+i32 EvalContext::run_source(StringView source, StringView origin)
 {
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
@@ -1764,10 +1759,8 @@ i32 EvalContext::run_source(const std::string &source,
      marked with its origin. Otherwise the caller would print the caret against
      the wrong line. */
   try {
-    /* The Lexer takes a String, while this entry still takes a std::string for
-       the builtin callers, so the source crosses that boundary here. */
     Parser parser{
-        Lexer{String{StringView{source.data(), source.size()}}, *AST_ARENA}
+        Lexer{String{source}, *AST_ARENA}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this
@@ -1779,13 +1772,15 @@ i32 EvalContext::run_source(const std::string &source,
 
     /* Keep a copy of the source alive for as long as the AST, so a control-flow
        jump made inside it can point a caret at the right text even after this
-       call returns and the jump propagates to the caller. */
-    std::string *retained_source = new std::string{source};
+       call returns and the jump propagates to the caller. The pointer below
+       indexes this retained buffer, which survives until clear_retained_sources
+       runs at the next top-level command. */
+    String *retained_source = new String{source};
     m_retained_sources.push(retained_source);
 
-    const std::string *previous_source = m_current_source;
+    const String *previous_source = m_current_source;
     String previous_origin = m_current_origin;
-    set_current_source(retained_source, String{StringView{origin}});
+    set_current_source(retained_source, String{origin});
     SHIT_DEFER { set_current_source(previous_source, previous_origin); };
 
     ast->evaluate(*this);
@@ -1812,7 +1807,7 @@ void EvalContext::clear_retained_sources()
     delete ast;
   m_retained_source_asts.clear();
 
-  for (std::string *source : m_retained_sources)
+  for (String *source : m_retained_sources)
     delete source;
   m_retained_sources.clear();
 

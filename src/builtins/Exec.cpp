@@ -29,22 +29,21 @@ i32 Exec::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   const String &command_name = args[1];
-  std::string command_name_string{command_name.c_str(), command_name.size()};
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the
      status a command-not-found leaves. */
   Path program_path{};
   if (command_name.find_character('/').has_value()) {
-    Maybe<Path> resolved = utils::canonicalize_path(command_name_string);
+    Maybe<Path> resolved = utils::canonicalize_path(command_name);
     if (!resolved) {
-      show_message("exec: '" + command_name_string + "': not found");
+      show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);
     }
     program_path = resolved.take();
   } else {
     ArrayList<Path> found = utils::search_program_path(command_name);
     if (found.size() == 0) {
-      show_message("exec: '" + command_name_string + "': not found");
+      show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);
     }
     program_path = found[0];

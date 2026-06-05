@@ -69,6 +69,7 @@ CXXFLAGS := \
 	-fvisibility=hidden \
 	-fno-rtti \
 	-fno-semantic-interposition \
+	-fno-strict-aliasing \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
@@ -80,6 +81,10 @@ USE_LD := -fuse-ld=lld
 else
 USE_LD :=
 endif
+
+# Bind every internal symbol to its own definition at link time, so a call
+# inside the binary never routes through the PLT to an interposed copy.
+USE_LD += -Wl,-Bsymbolic
 
 ifeq ($(SHIT_MODE), rel)
 CXXFLAGS += \

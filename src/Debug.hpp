@@ -2,6 +2,10 @@
 
 #include "Common.hpp"
 
+namespace shit {
+struct String;
+} /* namespace shit */
+
 #if !defined NDEBUG
 #include <cstdio>
 /* fprintf(stderr, ...) */
@@ -23,8 +27,11 @@
   } while (0)
 #if defined __clang__
 #include <cstdarg>
-#include <string>
-SHIT_USED static void t__strprintf(std::string &s, const char *fmt, ...)
+/* The string parameter is a template so the body sees a complete ::shit::String
+   only at the call site. Debug.hpp can not include String.hpp, since String.hpp
+   includes Debug.hpp, so naming String here would close an include cycle. */
+template <class StringT>
+SHIT_USED void t__strprintf(StringT &s, const char *fmt, ...)
 {
   va_list a;
   va_start(a, fmt);
@@ -35,24 +42,29 @@ SHIT_USED static void t__strprintf(std::string &s, const char *fmt, ...)
   SHIT_UNUSED(vsnprintf(b, n + 1, fmt, a));
   s.append(b);
   delete[] b;
+  va_end(ac);
+  va_end(a);
 }
-template <class T>
-std::string t__string_from_struct(const T &x)
+/* The string type is a template parameter so the return type is dependent and
+   its completeness is checked at the call site, where ::shit::String is whole,
+   rather than here where it is only forward-declared. */
+template <class StringT, class T>
+StringT t__string_from_struct(const T &x)
 {
-  std::string s{};
-  __builtin_dump_struct(&x, t__strprintf, s);
+  StringT s{};
+  __builtin_dump_struct(&x, t__strprintf<StringT>, s);
   return s;
 }
-#define SHIT_STRUCT_STRING(x) t__string_from_struct(x)
+#define SHIT_STRUCT_STRING(x) ::shit::t__string_from_struct<::shit::String>(x)
 #endif
 #else /* !NDEBUG */
-#define SHIT_STRUCT_STRING(...) std::string{"<optimized out>"}
+#define SHIT_STRUCT_STRING(...) ::shit::String{"<optimized out>"}
 #define SHIT_TRACE(...)         /* None */
 #define SHIT_TRACELN(...)       /* None */
 #endif
 
 #if !defined SHIT_STRUCT_STRING
-#define SHIT_STRUCT_STRING(...) std::string{"<not supported>"}
+#define SHIT_STRUCT_STRING(...) ::shit::String{"<not supported>"}
 #endif
 
 #define t__va_are_empty(...) (sizeof((char[]) {#__VA_ARGS__}) == 1)

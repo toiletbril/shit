@@ -28,8 +28,7 @@ i32 Kill::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* A leading -name or -number names the signal to send. */
   if (args.size() > 1 && args[1].length() > 1 && args[1][0] == '-') {
-    StringView name_view = args[1].substring(1);
-    std::string name = std::string{name_view.data, name_view.size()};
+    String name = String{args[1].substring(1)};
     Maybe<i32> resolved = os::signal_number_from_name(name);
     if (!resolved) throw Error{"kill: '" + name + "' is not a valid signal"};
     signal_number = *resolved;

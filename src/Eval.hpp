@@ -61,7 +61,7 @@ struct ControlFlow
      The source the offset indexes lives in source, set when the jump is made.
    */
   SourceLocation location{0, 0};
-  const std::string *source{nullptr};
+  const String *source{nullptr};
   String origin{};
 };
 
@@ -238,8 +238,8 @@ struct EvalContext
      request or a deferred report formats a caret against the right text. Set
      around a top-level run and around a sourced run, restoring the previous
      frame afterwards. */
-  void set_current_source(const std::string *source, String origin);
-  const std::string *current_source() const;
+  void set_current_source(const String *source, String origin);
+  const String *current_source() const;
   const String &current_origin() const;
 
   /* The set builtin toggles these options at run time. error_exit is set -e,
@@ -288,8 +288,7 @@ struct EvalContext
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
      so a break, a return, or an assignment inside acts on the caller. */
-  i32 run_source(const std::string &source,
-                 const std::string &origin = "a sourced command");
+  i32 run_source(StringView source, StringView origin = "a sourced command");
 
   /* getopts keeps the position inside the current argument here, so a grouped
      option such as -abc is parsed one letter per call. last_optind detects when
@@ -360,7 +359,7 @@ protected:
   /* The pending non-local jump, Normal when none is pending. */
   ControlFlow m_control_flow{};
   /* The source and name of the text being evaluated, for caret formatting. */
-  const std::string *m_current_source{nullptr};
+  const String *m_current_source{nullptr};
   String m_current_origin{};
 
   /* ASTs from eval and dot, kept alive until the next top-level command so a
@@ -370,7 +369,10 @@ protected:
   /* The source text of each eval and dot run, kept alive for as long as the
      ASTs above. A control-flow jump made inside one points its caret at this
      text, so the pointer must outlive the run that escaped it. */
-  ArrayList<std::string *> m_retained_sources{heap_allocator()};
+  /* The retained source buffers are heap-owned pointers, not inline elements,
+     so a nested run_source that grows the list never moves an earlier buffer
+     and leaves m_current_source or a ControlFlow::source dangling. */
+  ArrayList<String *> m_retained_sources{heap_allocator()};
 
   bool m_error_unset{false};
   bool m_no_clobber{false};

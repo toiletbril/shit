@@ -3,6 +3,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Utils.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -347,11 +348,11 @@ void show_version()
 {
   String s{};
   s += "Shit Shell ";
-  s += std::to_string(SHIT_VER_MAJOR);
+  s += utils::integer_to_string(SHIT_VER_MAJOR);
   s += '.';
-  s += std::to_string(SHIT_VER_MINOR);
+  s += utils::integer_to_string(SHIT_VER_MINOR);
   s += '.';
-  s += std::to_string(SHIT_VER_PATCH);
+  s += utils::integer_to_string(SHIT_VER_PATCH);
   s += '-';
   s += SHIT_VER_EXTRA;
   s += '\n';
@@ -386,11 +387,11 @@ void show_version()
 void show_short_version()
 {
   String s{};
-  s += std::to_string(SHIT_VER_MAJOR);
+  s += utils::integer_to_string(SHIT_VER_MAJOR);
   s += '.';
-  s += std::to_string(SHIT_VER_MINOR);
+  s += utils::integer_to_string(SHIT_VER_MINOR);
   s += '.';
-  s += std::to_string(SHIT_VER_PATCH);
+  s += utils::integer_to_string(SHIT_VER_PATCH);
   s += '-';
   s += SHIT_VER_EXTRA;
   s += '\n';

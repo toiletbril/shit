@@ -72,7 +72,7 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
    the origin it was made in, so the caret points at the exact builtin and the
    note names where it ran. */
 static void report_escaped_control_flow(shit::EvalContext &context,
-                                        const std::string &fallback_source)
+                                        const shit::String &fallback_source)
 {
   if (!context.has_pending_control_flow()) return;
 
@@ -92,8 +92,8 @@ static void report_escaped_control_flow(shit::EvalContext &context,
   case shit::ControlFlow::Kind::Normal: context.clear_control_flow(); return;
   }
 
-  const std::string *source =
-      control.source != nullptr ? control.source : &fallback_source;
+  const shit::String *source =
+      control.source != NULL ? control.source : &fallback_source;
   shit::ErrorWithLocation located{control.location, what};
   shit::show_message(located.to_string(*source));
   if (!control.origin.empty()) {
@@ -108,7 +108,7 @@ static void report_escaped_control_flow(shit::EvalContext &context,
 /* Lex, parse, validate, and evaluate one chunk of shell source in the given
    context. The main loop and source_file share this so a sourced file runs the
    same pipeline as an interactive line. Returns the resulting exit code. */
-static int run_script_contents(const std::string &script_contents,
+static int run_script_contents(const shit::String &script_contents,
                                shit::EvalContext &context,
                                shit::BumpArena &ast_arena)
 {
@@ -126,7 +126,7 @@ static int run_script_contents(const std::string &script_contents,
     context.reset_scratch_arena();
 
     shit::Parser p{
-        shit::Lexer{shit::String{shit::StringView{script_contents}}, ast_arena,
+        shit::Lexer{shit::String{script_contents.view()}, ast_arena,
                     FLAG_ESCAPE_MAP.is_enabled()}
     };
     std::unique_ptr<shit::Expression> ast = p.construct_ast();
@@ -203,10 +203,7 @@ static void source_file(const shit::Path &path, shit::EvalContext &context,
       shit::utils::read_entire_file(path.text());
   if (!contents) return;
 
-  /* run_script_contents holds the source as a std::string so the eval context
-     can point its caret at it, so convert the read String at this boundary. */
-  std::string script_contents{contents->c_str(), contents->size()};
-  run_script_contents(script_contents, context, ast_arena);
+  run_script_contents(*contents, context, ast_arena);
 }
 
 /* Expand the common prompt escapes in PS1 and PS2. */
@@ -443,7 +440,7 @@ int main(int argc, char **argv)
   for (;;) {
     SHIT_ASSERT(!shit::os::is_child_process());
 
-    std::string script_contents{};
+    shit::String script_contents{};
 
     /* Figure out what to do and retrieve the code. */
     try {
@@ -453,12 +450,7 @@ int main(int argc, char **argv)
            no iostream file stream is pulled in. */
         if (should_read_stdin || file_names[arg_index] == "-") {
           should_quit = should_quit || should_read_stdin;
-          /* script_contents stays a std::string for the eval context, so copy
-             the read String at this boundary. */
-          shit::String stdin_contents =
-              shit::utils::read_entire_standard_input();
-          script_contents =
-              std::string{stdin_contents.c_str(), stdin_contents.size()};
+          script_contents = shit::utils::read_entire_standard_input();
         } else {
           const shit::String &file_name = file_names[arg_index];
           shit::Maybe<shit::String> contents =
@@ -467,7 +459,7 @@ int main(int argc, char **argv)
             throw shit::Error{"Could not open '" + file_name.view() +
                               "': " + shit::os::last_system_error_message()};
           }
-          script_contents = std::string{contents->c_str(), contents->size()};
+          script_contents = std::move(*contents);
         }
 
         if ((arg_index += 1) == file_names.size()) {
@@ -475,7 +467,7 @@ int main(int argc, char **argv)
         }
       } else if (should_execute_commands) {
         shit::StringView command_view = FLAG_COMMAND.next();
-        script_contents = std::string{command_view.data, command_view.length};
+        script_contents = shit::String{command_view};
         if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
@@ -552,11 +544,9 @@ int main(int argc, char **argv)
 
           toiletline::emit_newlines(input);
 
-          /* Execute the command without raw mode. The interactive read returns
-             a String, and script_contents stays a std::string for the eval
-             context, so copy the bytes at this boundary. */
+          /* Execute the command without raw mode. */
           if (code == TL_PRESSED_ENTER && !input.empty()) {
-            script_contents = std::string{input.c_str(), input.size()};
+            script_contents = std::move(input);
             break;
           }
         }

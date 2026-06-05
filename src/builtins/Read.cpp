@@ -3,8 +3,6 @@
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
-#include <string>
-
 /* Reads one line from standard input and splits it on IFS into the named
    variables, the last variable taking the remainder. The flag parser rejects
    an unknown option. */
@@ -42,8 +40,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* The command's input descriptor honors a redirection or a heredoc on the
      read, falling back to the shell's standard input when none is present. The
-     line comes back over the os boundary as a std::string and is copied into a
-     String for the splitting below. */
+     line is copied into a heap String for the splitting below. */
   Maybe<String> read_line =
       utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN));
   if (!read_line) {

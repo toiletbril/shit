@@ -20,8 +20,7 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const
   Maybe<String> contents = utils::read_entire_file(path);
   if (!contents) throw Error{"could not open '" + path + "'"};
 
-  return cxt.run_source(std::string{contents->c_str(), contents->size()},
-                        "the file '" + path + "'");
+  return cxt.run_source(*contents, "the file '" + path + "'");
 }
 
 } /* namespace shit */

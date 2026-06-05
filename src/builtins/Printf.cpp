@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <string>
 
 /* Interprets a format string with the common conversions and backslash escapes,
    recycling the format over any remaining arguments, like the POSIX utility. */
@@ -57,32 +56,34 @@ void append_escape(String &out, const String &fmt, usize &i)
 
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
-void append_conversion(String &out, const std::string &spec, char conv,
+void append_conversion(String &out, const String &spec, char conv,
                        const String &arg)
 {
   char buffer[256];
-  std::string full = spec + conv;
 
   if (conv == 's') {
-    std::string with_s = spec + 's';
+    String with_s = spec;
+    with_s.push('s');
     std::snprintf(buffer, sizeof(buffer), with_s.c_str(), arg.c_str());
     out += buffer;
   } else if (conv == 'c') {
     out += arg.empty() ? '\0' : arg[0];
   } else if (conv == 'd' || conv == 'i') {
-    std::string with_ll = spec + "lld";
+    String with_ll = spec + "lld";
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<long long>(parse_printf_integer(arg)));
     out += buffer;
   } else if (conv == 'x' || conv == 'X' || conv == 'o' || conv == 'u') {
-    std::string with_ll = spec + "ll" + conv;
+    String with_ll = spec + "ll";
+    with_ll.push(conv);
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<unsigned long long>(
                       std::strtoull(arg.c_str(), nullptr, 0)));
     out += buffer;
   } else {
     /* An unknown conversion is emitted verbatim. */
-    out += full;
+    out += spec;
+    out += conv;
   }
 }
 
@@ -122,16 +123,16 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
 
       /* Collect a conversion specification, the flags, the width, and the
          precision, up to the conversion character. */
-      std::string spec = "%";
+      String spec = "%";
       i++;
       while (i < fmt.length() && std::strchr("-+ 0#", fmt[i]) != nullptr)
-        spec += fmt[i++];
+        spec.push(fmt[i++]);
       while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
-        spec += fmt[i++];
+        spec.push(fmt[i++]);
       if (i < fmt.length() && fmt[i] == '.') {
-        spec += fmt[i++];
+        spec.push(fmt[i++]);
         while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
-          spec += fmt[i++];
+          spec.push(fmt[i++]);
       }
       if (i >= fmt.length()) {
         out += spec;
