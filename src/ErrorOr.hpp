@@ -16,8 +16,8 @@
 namespace shit {
 
 /* The success payload of a fallible function that returns no value. A caller
-   writes ErrorOr<Unit> and returns Unit{} on success. */
-struct Unit
+   writes ErrorOr<Ok> and returns Ok{} on success. */
+struct Ok
 {};
 
 template <class T>

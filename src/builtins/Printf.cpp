@@ -28,7 +28,12 @@ parse_printf_integer(const String &arg)
                         arg[first_digit] == '0' &&
                         (arg[first_digit + 1] == 'x' ||
                          arg[first_digit + 1] == 'X');
+  /* A leading zero that is not 0x marks octal, as the C base-zero strtoll the
+     old code used did, so printf '%d' 010 yields 8. */
+  bool is_octal = !is_hexadecimal && first_digit < arg.size() &&
+                  arg[first_digit] == '0' && first_digit + 1 < arg.size();
   ErrorOr<i64> parsed = is_hexadecimal ? utils::parse_hexadecimal_integer(arg)
+                        : is_octal     ? utils::parse_octal_integer(arg)
                                        : utils::parse_decimal_integer(arg);
   return parsed.is_error() ? 0 : parsed.value();
 }
