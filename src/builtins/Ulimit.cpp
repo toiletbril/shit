@@ -17,8 +17,9 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("ulimit [-f|-n|-t|-u] [limit]");
 
-FLAG(FILE_SIZE, Bool, 'f', "", "The largest file the shell may create, in "
-                               "512-byte blocks.");
+FLAG(FILE_SIZE, Bool, 'f', "",
+     "The largest file the shell may create, in "
+     "512-byte blocks.");
 FLAG(OPEN_FILES, Bool, 'n', "", "The largest number of open file descriptors.");
 FLAG(CPU_TIME, Bool, 't', "", "The most CPU time in seconds.");
 FLAG(PROCESSES, Bool, 'u', "", "The most processes for the user.");
@@ -82,9 +83,9 @@ Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
     limit.rlim_cur = RLIM_INFINITY;
     limit.rlim_max = RLIM_INFINITY;
   } else {
-    rlim_t value = static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr,
-                                                     10)) *
-                   resource.units_per_value;
+    rlim_t value =
+        static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10)) *
+        resource.units_per_value;
     limit.rlim_cur = value;
     limit.rlim_max = value;
   }

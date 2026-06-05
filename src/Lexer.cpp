@@ -132,8 +132,7 @@ is_variable_name(char ch)
 
 } /* namespace lexer */
 
-Lexer::Lexer(std::string source, BumpArena &arena,
-             bool should_collect_debug_words)
+Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words)
     : m_source(std::move(source)), m_arena(&arena),
       m_should_collect_debug_words(should_collect_debug_words)
 {}
@@ -176,10 +175,10 @@ Lexer::next_shell_token()
   return t;
 }
 
-std::string_view
+StringView
 Lexer::source() const
 {
-  return m_source;
+  return m_source.view();
 }
 
 const ArrayList<Word> &
@@ -217,11 +216,11 @@ Lexer::advance_past_last_peek()
 }
 
 const std::string *
-Lexer::register_heredoc(std::string delimiter, bool strip_tabs)
+Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
 {
   std::string *body = new std::string{};
   m_heredoc_bodies.push(body);
-  m_pending_heredocs.push({std::move(delimiter), strip_tabs, body});
+  m_pending_heredocs.push({String{delimiter}, strip_tabs, body});
   return body;
 }
 
@@ -229,6 +228,8 @@ void
 Lexer::collect_pending_heredocs()
 {
   for (HeredocPending &pending : m_pending_heredocs) {
+    /* The body is written into the lexer-owned std::string the parsed
+       redirection points at, so it accumulates as one. */
     std::string collected{};
     for (;;) {
       if (m_cursor_position >= m_source.length()) break;
@@ -240,16 +241,18 @@ Lexer::collect_pending_heredocs()
       bool has_newline = (i < m_source.length());
       m_cursor_position = has_newline ? i + 1 : i;
 
-      std::string line = m_source.substr(line_start, i - line_start);
+      usize line_offset = line_start;
+      usize line_length = i - line_start;
       if (pending.strip_tabs) {
-        usize tabs = 0;
-        while (tabs < line.length() && line[tabs] == '\t')
-          tabs++;
-        line.erase(0, tabs);
+        while (line_length > 0 && m_source[line_offset] == '\t') {
+          line_offset++;
+          line_length--;
+        }
       }
 
-      if (line == pending.delimiter) break;
-      collected += line;
+      StringView line = m_source.substring_of_length(line_offset, line_length);
+      if (pending.delimiter == line) break;
+      collected.append(line.data, line.length);
       collected += '\n';
     }
     *pending.body = std::move(collected);
@@ -342,16 +345,16 @@ Token *
 Lexer::lex_number()
 {
   char ch;
-  std::string n{};
+  String digits{};
   usize length = 0;
 
   while (lexer::is_number((ch = chop_character(length)))) {
-    n += ch;
+    digits += ch;
     length++;
   }
 
   Token *num = m_arena->create<tokens::Number>(
-      SourceLocation{m_cursor_position, length}, n);
+      SourceLocation{m_cursor_position, length}, digits);
   m_cached_offset = length;
 
   return num;
@@ -580,7 +583,8 @@ Lexer::lex_identifier()
         String special{};
         special.push(next);
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       std::move(special), is_in_double_quotes});
+                                       std::move(special),
+                                       is_in_double_quotes});
       } else {
         /* A dollar sign that names None stays a literal dollar sign. */
         append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
@@ -597,13 +601,16 @@ Lexer::lex_identifier()
   }
 
   if (quote_char) {
+    String expected_quote{};
+    expected_quote += "expected ";
+    expected_quote += *quote_char;
+    expected_quote += " here";
     throw ErrorWithLocationAndDetails{
         {m_cursor_position + relative_last_quote_char_pos,
          SHIT_SUB_SAT(byte_count, relative_last_quote_char_pos)},
         "Unterminated string literal",
         {m_cursor_position + byte_count, 1},
-        "expected " + std::string{*quote_char}
-        + " here"
+        expected_quote
     };
   }
 
@@ -644,8 +651,7 @@ Lexer::lex_identifier()
     {
       switch (*kw) {
         KW_SWITCH_CASES();
-      default:
-        SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(*kw));
+      default: SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(*kw));
       }
     }
   }
@@ -670,29 +676,29 @@ static Maybe<Token::Kind>
 lookup_operator(char ch)
 {
   switch (ch) {
-  case ')':  return Token::Kind::RightParen;
-  case '(':  return Token::Kind::LeftParen;
-  case ']':  return Token::Kind::RightSquareBracket;
-  case '[':  return Token::Kind::LeftSquareBracket;
-  case '}':  return Token::Kind::RightBracket;
-  case '{':  return Token::Kind::LeftBracket;
-  case ';':  return Token::Kind::Semicolon;
-  case '.':  return Token::Kind::Dot;
+  case ')': return Token::Kind::RightParen;
+  case '(': return Token::Kind::LeftParen;
+  case ']': return Token::Kind::RightSquareBracket;
+  case '[': return Token::Kind::LeftSquareBracket;
+  case '}': return Token::Kind::RightBracket;
+  case '{': return Token::Kind::LeftBracket;
+  case ';': return Token::Kind::Semicolon;
+  case '.': return Token::Kind::Dot;
   case '\n': return Token::Kind::Newline;
-  case '+':  return Token::Kind::Plus;
-  case '-':  return Token::Kind::Minus;
-  case '*':  return Token::Kind::Asterisk;
-  case '/':  return Token::Kind::Slash;
-  case '%':  return Token::Kind::Percent;
-  case '~':  return Token::Kind::Tilde;
-  case '^':  return Token::Kind::Cap;
-  case '!':  return Token::Kind::ExclamationMark;
-  case '&':  return Token::Kind::Ampersand;
-  case '>':  return Token::Kind::Greater;
-  case '<':  return Token::Kind::Less;
-  case '|':  return Token::Kind::Pipe;
-  case '=':  return Token::Kind::Equals;
-  default:   return None;
+  case '+': return Token::Kind::Plus;
+  case '-': return Token::Kind::Minus;
+  case '*': return Token::Kind::Asterisk;
+  case '/': return Token::Kind::Slash;
+  case '%': return Token::Kind::Percent;
+  case '~': return Token::Kind::Tilde;
+  case '^': return Token::Kind::Cap;
+  case '!': return Token::Kind::ExclamationMark;
+  case '&': return Token::Kind::Ampersand;
+  case '>': return Token::Kind::Greater;
+  case '<': return Token::Kind::Less;
+  case '|': return Token::Kind::Pipe;
+  case '=': return Token::Kind::Equals;
+  default: return None;
   }
 }
 
@@ -773,8 +779,7 @@ Lexer::lex_sentinel()
       TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
       TOKEN_CASE_THREE(Less, '<', DoubleLess, '=', LessEquals);
 
-    default:
-      SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(*op));
+    default: SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(*op));
     }
   } else {
     String s{};

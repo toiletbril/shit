@@ -77,7 +77,9 @@ String
 value_to_log_string(T value)
 {
   std::string text = std::to_string(value);
-  return String{StringView{text.data(), text.size()}};
+  return String{
+      StringView{text.data(), text.size()}
+  };
 }
 
 template <class T>
@@ -86,7 +88,9 @@ String
 value_to_log_string(T value)
 {
   std::string text = std::to_string(value);
-  return String{StringView{text.data(), text.size()}};
+  return String{
+      StringView{text.data(), text.size()}
+  };
 }
 
 template <class T>
@@ -95,8 +99,7 @@ String
 value_to_log_string(T value)
 {
   char buffer[32];
-  std::snprintf(buffer, sizeof(buffer), "%p",
-                static_cast<const void *>(value));
+  std::snprintf(buffer, sizeof(buffer), "%p", static_cast<const void *>(value));
   return String{buffer};
 }
 

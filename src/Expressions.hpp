@@ -5,9 +5,7 @@
 #include "Tokens.hpp"
 
 #include <string>
-#include <string_view>
 #include <utility>
-#include <vector>
 
 namespace shit {
 
@@ -41,8 +39,7 @@ struct AnalysisContext
 /* Walk the tree and report. Returns true when execution may proceed, false when
    an unconditional command failed to resolve. */
 bool analyze_ast(const Expression *root, StringView source,
-                 const HashSet &known_functions,
-                 const HashSet &known_aliases);
+                 const HashSet &known_functions, const HashSet &known_aliases);
 
 struct Expression
 {
@@ -221,8 +218,7 @@ protected:
      a loop body does not search PATH on every iteration. The name guards the
      cache, since an expanded name from a variable may differ between runs. */
   mutable String m_resolved_name{};
-  mutable Maybe<std::variant<Builtin::Kind, std::filesystem::path>>
-      m_resolved_kind{};
+  mutable Maybe<ResolvedCommand> m_resolved_kind{};
 
   ArrayList<Redirection> m_redirections{heap_allocator()};
 };

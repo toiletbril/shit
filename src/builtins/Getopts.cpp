@@ -41,8 +41,7 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   i64 optind = 1;
-  if (Maybe<String> value = cxt.get_variable_value("OPTIND");
-      value.has_value())
+  if (Maybe<String> value = cxt.get_variable_value("OPTIND"); value.has_value())
   {
     ErrorOr<i64> parsed = utils::parse_decimal_integer(*value);
     optind = parsed.is_error() ? 1 : parsed.value();

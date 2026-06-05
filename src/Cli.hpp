@@ -57,8 +57,7 @@ protected:
 
 struct FlagBool : public Flag
 {
-  FlagBool(char short_name, StringView long_name,
-           StringView description);
+  FlagBool(char short_name, StringView long_name, StringView description);
 
   void toggle();
   bool is_enabled() const;
@@ -71,8 +70,7 @@ private:
 
 struct FlagString : public Flag
 {
-  FlagString(char short_name, StringView long_name,
-             StringView description);
+  FlagString(char short_name, StringView long_name, StringView description);
 
   void set(StringView v);
   bool is_set() const;
@@ -109,9 +107,9 @@ private:
 /* These return arguments which are not flags. */
 
 ArrayList<String> parse_flags_vec(const ArrayList<Flag *> &flags,
-                                         const ArrayList<String> &args);
+                                  const ArrayList<String> &args);
 ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,
-                                     const char *const *argv);
+                              const char *const *argv);
 
 void reset_flags(const ArrayList<Flag *> &flags);
 

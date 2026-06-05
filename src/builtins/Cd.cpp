@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Errors.hpp"
+#include "../Path.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
@@ -34,21 +35,23 @@ Cd::execute(ExecContext &ec, EvalContext &cxt) const
     arg_path.append(StringView{home.data(), home.size()});
   }
 
-  std::filesystem::path np{std::string{arg_path.c_str(), arg_path.size()}};
-  np = std::filesystem::absolute(np).lexically_normal();
+  Path target{arg_path};
+  target = target.to_absolute().normalized();
 
-  if (std::filesystem::exists(np)) {
-    /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. */
-    std::error_code cwd_error{};
-    std::filesystem::path old = std::filesystem::current_path(cwd_error);
-    utils::set_current_directory(np);
-    if (!cwd_error) cxt.set_shell_variable("OLDPWD", old.string());
-    cxt.set_shell_variable("PWD", np.string());
+  if (target.exists()) {
+    /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. An
+       unreadable current directory yields an empty path, so OLDPWD stays as it
+       was. */
+    Path old_directory = Path::current_directory();
+    ErrorOr<Ok> changed = Path::set_current_directory(target);
+    SHIT_UNUSED(changed);
+    if (!old_directory.empty())
+      cxt.set_shell_variable("OLDPWD", old_directory.text());
+    cxt.set_shell_variable("PWD", target.text());
     return 0;
   }
 
-  throw Error{"Path '" + std::string{arg_path.c_str(), arg_path.size()} +
-              "' does not exist"};
+  throw Error{StringView{"Path '"} + arg_path + "' does not exist"};
 }
 
 } /* namespace shit */

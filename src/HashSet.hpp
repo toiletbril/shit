@@ -6,9 +6,9 @@
 
 namespace shit {
 
-/* A set of byte-string keys over the HashMap open-addressing table. The value is
-   None, so a set stores only keys. It owns a copy of every key it holds, so a
-   view passed to add need not outlive it. */
+/* A set of byte-string keys over the HashMap open-addressing table. The value
+   is None, so a set stores only keys. It owns a copy of every key it holds, so
+   a view passed to add need not outlive it. */
 struct HashSet
 {
   explicit HashSet(Allocator allocator) : m_map(allocator) {}

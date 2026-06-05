@@ -1,4 +1,5 @@
 #include "../Builtin.hpp"
+#include "../Path.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -27,8 +28,7 @@ Pwd::execute(ExecContext &ec, EvalContext &cxt) const
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   String p{};
-  std::string cwd = utils::get_current_directory().string();
-  p.append(StringView{cwd.data(), cwd.size()});
+  p.append(Path::current_directory().text());
   p += '\n';
   ec.print_to_stdout(p);
   return 0;

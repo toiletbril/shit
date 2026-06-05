@@ -87,23 +87,22 @@ namespace {
 /* The literal name of a command when it is statically known. A word that holds
    a variable reference or a live glob metacharacter is dynamic, so its target
    cannot be checked before run time. */
-Maybe<std::string>
+Maybe<String>
 static_command_name(const Token *token)
 {
   if (token->kind() != Token::Kind::Word) return shit::None;
 
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
 
-  std::string name{};
+  String name{};
   for (const WordSegment &segment : word.segments) {
-    if (segment.kind == WordSegment::Kind::VariableReference)
-      return shit::None;
+    if (segment.kind == WordSegment::Kind::VariableReference) return shit::None;
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       for (usize i = 0; i < segment.text.size(); i++) {
         if (lexer::is_expandable_char(segment.text[i])) return shit::None;
       }
     }
-    name.append(segment.text.c_str(), segment.text.size());
+    name.append(segment.text.view());
   }
   return name;
 }
@@ -112,13 +111,14 @@ static_command_name(const Token *token)
    path. This shares the PATH cache with execution, so an unconditional command
    is resolved only once. */
 bool
-command_resolves(const std::string &name)
+command_resolves(const String &name)
 {
   if (name.empty()) return false;
-  if (search_builtin(name).has_value()) return true;
-  if (name.find('/') != std::string::npos)
-    return utils::canonicalize_path(name).has_value();
-  return !utils::search_program_path(name).empty();
+  if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
+    return true;
+  if (name.find_character('/').has_value())
+    return utils::canonicalize_path(name.view()).has_value();
+  return utils::search_program_path(name.view()).size() != 0;
 }
 
 bool
@@ -171,7 +171,8 @@ i64
 IfStatement::evaluate_impl(EvalContext &cxt) const
 {
   i64 condition = m_condition->evaluate(cxt);
-  /* A jump set while evaluating the condition stops the if and stays pending. */
+  /* A jump set while evaluating the condition stops the if and stays pending.
+   */
   if (cxt.has_pending_control_flow()) return condition;
 
   if (condition)
@@ -476,8 +477,9 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
 
     Maybe<String> body = cxt.get_alias(word);
     if (!body.has_value()) break;
-    already_expanded.push(
-        String{heap_allocator(), StringView{word.c_str(), word.size()}});
+    already_expanded.push(String{
+        heap_allocator(), StringView{word.c_str(), word.size()}
+    });
 
     /* The alias body replaces the first word, so the split words go in front of
        the remaining arguments. ArrayList has no in-place erase, so the new list
@@ -489,8 +491,9 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
       char c = body_value[i];
       if (c == ' ' || c == '\t') {
         if (!current.empty()) {
-          rebuilt.push(
-              String{heap_allocator(), StringView{current.data(), current.size()}});
+          rebuilt.push(String{
+              heap_allocator(), StringView{current.data(), current.size()}
+          });
           current.clear();
         }
       } else {
@@ -498,8 +501,9 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
       }
     }
     if (!current.empty())
-      rebuilt.push(
-          String{heap_allocator(), StringView{current.data(), current.size()}});
+      rebuilt.push(String{
+          heap_allocator(), StringView{current.data(), current.size()}
+      });
 
     for (usize i = 1; i < args.size(); i++)
       rebuilt.push(std::move(args[i]));
@@ -518,7 +522,8 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   SHIT_ASSERT(m_args.size() > 0 || !m_redirections.empty());
 
   if (cxt.should_echo()) {
-    shit::print_to_standard_output(utils::merge_tokens_to_string(m_args) + "\n");
+    shit::print_to_standard_output(utils::merge_tokens_to_string(m_args) +
+                                   "\n");
     shit::flush_standard_output();
   }
 
@@ -624,25 +629,23 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   /* The environment value a prefix assignment shadowed, restored on exit. */
   struct SavedEnvVar
   {
-    std::string name;
-    std::optional<std::string> previous_value;
+    String name;
+    Maybe<String> previous_value;
   };
   ArrayList<SavedEnvVar> saved_env{heap_allocator()};
   m_local_vars.for_each([&](StringView name, const Word &value_word) {
-    std::string name_str{name.data, name.length};
     saved_env.push(
-        SavedEnvVar{name_str, os::get_environment_variable(name_str)});
+        SavedEnvVar{String{name}, os::get_environment_variable(name)});
     String expanded_value = cxt.expand_word_for_assignment(value_word);
-    os::set_environment_variable(
-        name_str, std::string{expanded_value.c_str(), expanded_value.size()});
+    os::set_environment_variable(name, expanded_value.view());
   });
   SHIT_DEFER
   {
     for (const auto &[name, old_value] : saved_env) {
       if (old_value)
-        os::set_environment_variable(name, *old_value);
+        os::set_environment_variable(name.view(), old_value->view());
       else
-        os::unset_environment_variable(name);
+        os::unset_environment_variable(name.view());
     }
   };
 
@@ -657,9 +660,10 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     ArrayList<String> saved_params = cxt.positional_params();
     ArrayList<String> call_params{};
     for (usize i = 1; i < program_args.size(); i++)
-      call_params.push(String{heap_allocator(),
-                              StringView{program_args[i].c_str(),
-                                         program_args[i].size()}});
+      call_params.push(String{
+          heap_allocator(),
+          StringView{program_args[i].c_str(), program_args[i].size()}
+      });
     cxt.set_positional_params(std::move(call_params));
     SHIT_DEFER { cxt.set_positional_params(std::move(saved_params)); };
 
@@ -704,11 +708,10 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
                      : ExecContext::make_from(source_location(), program_args);
 
   if (!is_cache_valid) {
-    using ResolvedKind = std::variant<Builtin::Kind, std::filesystem::path>;
     if (ec.is_builtin())
-      m_resolved_kind = ResolvedKind{ec.builtin_kind()};
+      m_resolved_kind = ResolvedCommand::from_builtin(ec.builtin_kind());
     else
-      m_resolved_kind = ResolvedKind{ec.program_path()};
+      m_resolved_kind = ResolvedCommand::from_program(ec.program_path());
     m_resolved_name = program_name;
   }
 
@@ -977,7 +980,7 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
 {
   SHIT_ASSERT(m_commands.size() > 1);
 
-  std::vector<ExecContext> ecs;
+  ArrayList<ExecContext> ecs{heap_allocator()};
   ecs.reserve(m_commands.size());
 
   for (const SimpleCommand *e : m_commands) {
@@ -1000,7 +1003,7 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
        its descriptors. The pipe only sets stdin and stdout, so a stderr
        redirection composes with it. */
     e->redirect_exec_context(ec, cxt);
-    ecs.emplace_back(std::move(ec));
+    ecs.push(std::move(ec));
   }
 
   return utils::execute_contexts_with_pipes(std::move(ecs), cxt, is_async());
@@ -1277,8 +1280,8 @@ i64
 ForLoop::evaluate_impl(EvalContext &cxt) const
 {
   /* Without an in clause the loop walks the positional parameters. */
-  ArrayList<String> values = m_has_in_clause ? cxt.process_args(m_words)
-                                             : cxt.positional_params();
+  ArrayList<String> values =
+      m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
 
   i64 ret = 0;
   for (const String &value : values) {
@@ -1597,7 +1600,7 @@ ConstantNumber::to_ast_string(usize layer) const
 String
 ConstantNumber::to_string() const
 {
-  return String{StringView{std::to_string(m_value)}};
+  return utils::integer_to_string(m_value);
 }
 
 ConstantString::ConstantString(SourceLocation location, StringView value)
@@ -1718,7 +1721,7 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   if (m_args.empty()) return;
 
-  Maybe<std::string> name = static_command_name(m_args[0]);
+  Maybe<String> name = static_command_name(m_args[0]);
 
   /* The literal command text, used for the test recognition. A name like [
      holds a glob metacharacter, so static_command_name rejects it, but the test
@@ -1743,10 +1746,9 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   if (command_literal == "alias") {
     for (usize i = 1; i < m_args.size(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
-      String literal =
-          static_cast<const tokens::WordToken *>(m_args[i])
-              ->word()
-              .to_literal_string();
+      String literal = static_cast<const tokens::WordToken *>(m_args[i])
+                           ->word()
+                           .to_literal_string();
       Maybe<usize> equals_position = literal.find_character('=');
       if (equals_position.has_value() && *equals_position > 0)
         actx.known_aliases.add(StringView{literal.data(), *equals_position});
@@ -1802,8 +1804,7 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
           String message =
               StringView{"The assignment prefix does not affect this "
                          "command, '"} +
-              segment.text +
-              StringView{"' is read before it is set"};
+              segment.text + StringView{"' is read before it is set"};
           actx.warn(m_args[i]->source_location(), message);
           break;
         }
@@ -1812,11 +1813,12 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 
   if (name && !command_resolves(*name) &&
-      !actx.defined_functions.contains(StringView{name->data(), name->size()}) &&
+      !actx.defined_functions.contains(
+          StringView{name->data(), name->size()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->size()}))
   {
-    String message =
-        StringView{"Command '"} + StringView{*name} + StringView{"' was not found"};
+    String message = StringView{"Command '"} + StringView{*name} +
+                     StringView{"' was not found"};
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. A
        command after a dot, source, or eval may be defined at runtime, so it is

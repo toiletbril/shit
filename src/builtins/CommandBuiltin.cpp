@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Path.hpp"
 #include "../Utils.hpp"
 
 /* command runs its operand as a command while ignoring a shell function of the
@@ -13,7 +14,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("command [-v] [-V] name [argument ...]");
 
 FLAG(SHOW, Bool, 'v', "", "Print the resolution of the name in a terse form.");
-FLAG(SHOW_VERBOSE, Bool, 'V', "", "Print the resolution of the name verbosely.");
+FLAG(SHOW_VERBOSE, Bool, 'V', "",
+     "Print the resolution of the name verbosely.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -42,24 +44,23 @@ CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     bool verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    if (search_builtin(std::string_view{name.c_str(), name.size()})
-            .has_value())
+    if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
     {
-      ec.print_to_stdout(verbose ? name + " is a shell builtin\n" : name + "\n");
+      ec.print_to_stdout(verbose ? name + " is a shell builtin\n"
+                                 : name + "\n");
       return 0;
     }
-    if (ArrayList<std::filesystem::path> paths =
-            utils::search_program_path(std::string{name.c_str(), name.size()});
+    if (ArrayList<Path> paths = utils::search_program_path(name);
         paths.size() != 0)
     {
       String resolved{};
       if (verbose) {
         resolved += name;
         resolved += " is ";
-        resolved += paths[0].string();
+        resolved += paths[0].text();
         resolved += "\n";
       } else {
-        resolved += paths[0].string();
+        resolved += paths[0].text();
         resolved += "\n";
       }
       ec.print_to_stdout(resolved);

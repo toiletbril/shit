@@ -2,10 +2,9 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Path.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
-
-#include <filesystem>
 
 /* exec replaces the shell with the named program, so it does not fork. With no
    command it applies its redirections to the shell itself and returns. exec
@@ -39,18 +38,16 @@ Exec::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the
      status a command-not-found leaves. */
-  std::filesystem::path program_path{};
+  Path program_path{};
   if (command_name.find_character('/').has_value()) {
-    Maybe<std::filesystem::path> resolved =
-        utils::canonicalize_path(command_name_string);
+    Maybe<Path> resolved = utils::canonicalize_path(command_name_string);
     if (!resolved) {
       show_message("exec: '" + command_name_string + "': not found");
       utils::quit(127, true);
     }
     program_path = resolved.take();
   } else {
-    ArrayList<std::filesystem::path> found =
-        utils::search_program_path(command_name_string);
+    ArrayList<Path> found = utils::search_program_path(command_name);
     if (found.size() == 0) {
       show_message("exec: '" + command_name_string + "': not found");
       utils::quit(127, true);
@@ -61,8 +58,9 @@ Exec::execute(ExecContext &ec, EvalContext &cxt) const
   ArrayList<String> command_args{};
   for (usize i = 1; i < args.size(); i++)
     command_args.push(String{heap_allocator(), args[i]});
-  ExecContext command = ExecContext::from_resolved(ec.source_location(),
-                                                   program_path, command_args);
+  ExecContext command = ExecContext::from_resolved(
+      ec.source_location(), ResolvedCommand::from_program(program_path),
+      command_args);
   if (ec.in_fd) command.in_fd = ec.in_fd.take();
   if (ec.out_fd) command.out_fd = ec.out_fd.take();
   if (ec.err_fd) command.err_fd = ec.err_fd.take();

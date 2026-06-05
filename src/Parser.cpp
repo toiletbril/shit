@@ -9,7 +9,6 @@
 
 #include <cctype>
 #include <memory>
-#include <optional>
 
 namespace shit {
 
@@ -55,20 +54,21 @@ kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
 static Maybe<SourceLocation>
-find_standalone_keyword(std::string_view source, std::string_view keyword)
+find_standalone_keyword(StringView source, StringView keyword)
 {
   auto is_boundary = [](char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0 || c == ';' ||
            c == '&' || c == '|';
   };
 
-  usize pos = 0;
-  while ((pos = source.find(keyword, pos)) != std::string_view::npos) {
-    usize end = pos + keyword.size();
+  if (keyword.length == 0 || keyword.length > source.length) return shit::None;
+
+  for (usize pos = 0; pos + keyword.length <= source.length; pos++) {
+    if (source.substring_of_length(pos, keyword.length) != keyword) continue;
+    usize end = pos + keyword.length;
     bool left_ok = pos == 0 || is_boundary(source[pos - 1]);
-    bool right_ok = end == source.size() || is_boundary(source[end]);
-    if (left_ok && right_ok) return SourceLocation{pos, keyword.size()};
-    pos = end;
+    bool right_ok = end == source.length || is_boundary(source[end]);
+    if (left_ok && right_ok) return SourceLocation{pos, keyword.length};
   }
   return shit::None;
 }
@@ -77,9 +77,8 @@ find_standalone_keyword(std::string_view source, std::string_view keyword)
    point the note at it and explain it was read as an argument, otherwise point
    at the token where the terminator was expected. */
 [[noreturn]] static void
-throw_unterminated(SourceLocation opener, const std::string &what,
-                   std::string_view source, const std::string &keyword,
-                   SourceLocation fallback)
+throw_unterminated(SourceLocation opener, StringView what, StringView source,
+                   StringView keyword, SourceLocation fallback)
 {
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
@@ -569,7 +568,7 @@ Parser::parse_simple_command()
           static_cast<tokens::WordToken *>(delimiter_token.get())->word();
 
       String delimiter_literal = delimiter_word.to_literal_string();
-      std::string delimiter{delimiter_literal.c_str(), delimiter_literal.size()};
+      StringView delimiter = delimiter_literal.view();
       bool strip_tabs = false;
       /* <<- strips leading tabs, the dash touching the operator. */
       if (!delimiter.empty() && delimiter[0] == '-' &&
@@ -577,7 +576,7 @@ Parser::parse_simple_command()
               op_location.position() + op_location.length())
       {
         strip_tabs = true;
-        delimiter.erase(0, 1);
+        delimiter = delimiter.substring(1);
       }
 
       /* A quoted delimiter, such as <<'EOF', keeps the body literal. */
@@ -708,9 +707,7 @@ Parser::parse_for()
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
   }
-  String variable_name_string = name_token->raw_string();
-  std::string variable_name{variable_name_string.c_str(),
-                            variable_name_string.size()};
+  String variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{};
   /* Free the released word tokens if the loop fails to parse. */
@@ -765,7 +762,7 @@ Parser::parse_for()
   }
 
   return std::unique_ptr<ForLoop>{m_lexer.arena().create<ForLoop>(
-      location, std::move(variable_name), std::move(words), has_in_clause,
+      location, variable_name.view(), std::move(words), has_in_clause,
       body.release())};
 }
 
@@ -900,8 +897,7 @@ std::unique_ptr<Command>
 Parser::parse_function_definition(std::unique_ptr<Token> name_token)
 {
   SourceLocation location = name_token->source_location();
-  String name_string = name_token->raw_string();
-  std::string name{name_string.c_str(), name_string.size()};
+  String name = name_token->raw_string();
 
   /* The opening parenthesis was peeked by the caller. Consume the empty pair.
    */
@@ -932,7 +928,7 @@ Parser::parse_function_definition(std::unique_ptr<Token> name_token)
   }
 
   return std::unique_ptr<FunctionDefinition>{
-      m_lexer.arena().create<FunctionDefinition>(location, std::move(name),
+      m_lexer.arena().create<FunctionDefinition>(location, name.view(),
                                                  body.release())};
 }
 
@@ -946,9 +942,10 @@ Parser::parse_expression(u8 min_precedence)
   std::unique_ptr<Token> t{m_lexer.next_expression_token()};
 
   if (m_recursion_depth > MAX_RECURSION_DEPTH) {
-    throw ErrorWithLocation{t->source_location(),
-                            "Expression nesting level exceeded maximum of " +
-                                std::to_string(MAX_RECURSION_DEPTH)};
+    throw ErrorWithLocation{
+        t->source_location(),
+        "Expression nesting level exceeded maximum of " +
+            utils::integer_to_string(static_cast<i64>(MAX_RECURSION_DEPTH))};
   }
 
   std::unique_ptr<Expression> lhs{};
@@ -1018,9 +1015,10 @@ Parser::parse_expression(u8 min_precedence)
   /* Blocks */
   case Token::Kind::LeftParen: {
     if (m_recursion_depth + m_parentheses_depth > MAX_RECURSION_DEPTH) {
-      throw ErrorWithLocation{t->source_location(),
-                              "Bracket nesting level exceeded maximum of " +
-                                  std::to_string(MAX_RECURSION_DEPTH)};
+      throw ErrorWithLocation{
+          t->source_location(),
+          "Bracket nesting level exceeded maximum of " +
+              utils::integer_to_string(static_cast<i64>(MAX_RECURSION_DEPTH))};
     }
 
     m_parentheses_depth++;

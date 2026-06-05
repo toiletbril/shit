@@ -11,9 +11,9 @@ namespace shit {
 
 /* The owning filesystem path this shell uses in place of std::filesystem::path.
    The text is a String, so a path carries no std::string and no heavyweight
-   library. Pure-text questions, such as the parent or the filename, are answered
-   by scanning the bytes. Questions that touch the disk, such as exists or
-   is_directory, go through one syscall each rather than the std::filesystem
+   library. Pure-text questions, such as the parent or the filename, are
+   answered by scanning the bytes. Questions that touch the disk, such as exists
+   or is_directory, go through one syscall each rather than the std::filesystem
    machinery, which the shell measured as slow. The separator is the platform
    one, and a forward slash is always accepted on input so a script written for
    POSIX keeps working on Windows. */
@@ -36,8 +36,8 @@ struct Path
      filename has none. A leading dot does not start an extension. */
   [[nodiscard]] StringView extension() const;
 
-  /* True when the path starts at a root, a leading separator on POSIX or a drive
-     on Windows. */
+  /* True when the path starts at a root, a leading separator on POSIX or a
+     drive on Windows. */
   [[nodiscard]] bool is_absolute() const;
   [[nodiscard]] bool is_relative() const;
 
@@ -45,8 +45,8 @@ struct Path
      std::filesystem lexically_normal without touching the disk. */
   [[nodiscard]] Path normalized() const;
 
-  /* This path joined onto a base when it is relative, the base being the current
-     working directory unless one is given. */
+  /* This path joined onto a base when it is relative, the base being the
+     current working directory unless one is given. */
   [[nodiscard]] Path to_absolute() const;
 
   /* Append a component with a separator between, so a builder grows a path one

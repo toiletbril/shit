@@ -10,8 +10,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <tuple>
-#include <vector>
 
 #if !defined(SHIT_NO_TOILETLINE)
 
@@ -111,10 +109,13 @@ tl_arena_realloc(void *pointer, usize length)
 
 namespace toiletline {
 
+using shit::String;
+using shit::StringView;
+
 struct InputResult
 {
   i32 code;
-  std::string text;
+  String text;
 };
 
 static char TL_BUFFER[ITL_STRING_MAX_LEN];
@@ -122,17 +123,17 @@ static char TL_BUFFER[ITL_STRING_MAX_LEN];
 static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
 
 void
-set_title(const std::string &title)
+set_title(const String &title)
 {
   if (::tl_set_title(title.c_str()) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Could not set the title for the terminal"};
 }
 
 usize
-utf8_strlen(const std::string &s, usize count)
+utf8_strlen(const String &s, usize count)
 {
-  return (count != std::string::npos) ? ::tl_utf8_strnlen(s.c_str(), count)
-                                      : ::tl_utf8_strlen(s.c_str());
+  return (count != static_cast<usize>(-1)) ? ::tl_utf8_strnlen(s.c_str(), count)
+                                           : ::tl_utf8_strlen(s.c_str());
 }
 
 bool
@@ -145,20 +146,19 @@ void
 initialize()
 {
   /* Load history. */
-  if (shit::Maybe<std::filesystem::path> h = shit::os::get_home_directory();
-      h.has_value())
+  if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
   {
-    std::filesystem::path shit_history = *h / SHIT_HISTORY_FILE;
-    if (int ret = ::tl_history_load(shit_history.string().c_str());
-        ret != TL_SUCCESS)
-    {
+    shit::Path shit_history = *h;
+    shit_history.push_component(SHIT_HISTORY_FILE);
+    if (int ret = ::tl_history_load(shit_history.c_str()); ret != TL_SUCCESS) {
       /* Don't count non-existent history file as an error. */
       if (ret != -ENOENT) {
         shit::String err_message = "Toiletline: Could not load history: ";
-        err_message += (errno == EINVAL)
-                           ? std::string{"Non-text byte detected in history "
-                                         "file. Truncate it manually"}
-                           : shit::os::last_system_error_message();
+        if (errno == EINVAL)
+          err_message += "Non-text byte detected in history file. Truncate it "
+                         "manually";
+        else
+          err_message += shit::os::last_system_error_message();
         shit::Error e{err_message};
         shit::show_message(e.to_string());
       }
@@ -175,11 +175,11 @@ void
 exit()
 {
   /* Dump history. */
-  if (shit::Maybe<std::filesystem::path> h = shit::os::get_home_directory();
-      h.has_value())
+  if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
   {
-    std::filesystem::path shit_history = *h / SHIT_HISTORY_FILE;
-    if (int ret = ::tl_history_dump(shit_history.string().c_str());
+    shit::Path shit_history = *h;
+    shit_history.push_component(SHIT_HISTORY_FILE);
+    if (int ret = ::tl_history_dump(shit_history.c_str());
         ret != TL_SUCCESS && ret != -EINVAL)
     {
       shit::Error e{"Toiletline: Could not dump history: " +
@@ -194,18 +194,18 @@ exit()
 }
 
 InputResult
-get_input(const std::string &prompt)
+get_input(const String &prompt)
 {
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   if (code == TL_ERROR) {
     throw shit::Error{
         "Toiletline: Unexpected internal error while getting the input"};
   }
-  return InputResult{code, TL_BUFFER};
+  return InputResult{code, String{TL_BUFFER}};
 }
 
 void
-set_input(const std::string &input)
+set_input(const String &input)
 {
   ::tl_set_predefined_input(input.c_str());
 }
@@ -227,9 +227,9 @@ exit_raw_mode()
 }
 
 void
-emit_newlines(std::string_view buffer)
+emit_newlines(StringView buffer)
 {
-  if (::tl_emit_newlines(buffer.data()) != TL_SUCCESS)
+  if (::tl_emit_newlines(buffer.data) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
 }
 
@@ -242,23 +242,26 @@ emit_newlines(std::string_view buffer)
    the raw terminal handling would otherwise perturb the run. */
 namespace toiletline {
 
+using shit::String;
+using shit::StringView;
+
 struct InputResult
 {
   i32 code;
-  std::string text;
+  String text;
 };
 
 void
-set_title(const std::string &title)
+set_title(const String &title)
 {
   SHIT_UNUSED(title);
 }
 
 usize
-utf8_strlen(const std::string &s, usize count)
+utf8_strlen(const String &s, usize count)
 {
-  return (count != std::string::npos && count < s.length()) ? count
-                                                            : s.length();
+  return (count != static_cast<usize>(-1) && count < s.length()) ? count
+                                                                 : s.length();
 }
 
 bool
@@ -278,15 +281,15 @@ void
 exit()
 {}
 
-std::tuple<i32, std::string>
-get_input(const std::string &prompt)
+InputResult
+get_input(const String &prompt)
 {
   SHIT_UNUSED(prompt);
   throw shit::Error{"This build has no line editor"};
 }
 
 void
-set_input(const std::string &input)
+set_input(const String &input)
 {
   SHIT_UNUSED(input);
 }
@@ -300,7 +303,7 @@ exit_raw_mode()
 {}
 
 void
-emit_newlines(std::string_view buffer)
+emit_newlines(StringView buffer)
 {
   SHIT_UNUSED(buffer);
 }

@@ -36,8 +36,7 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
     StringView name_view = args[1].substring(1);
     std::string name = std::string{name_view.data, name_view.size()};
     Maybe<i32> resolved = os::signal_number_from_name(name);
-    if (!resolved)
-      throw Error{"kill: '" + name + "' is not a valid signal"};
+    if (!resolved) throw Error{"kill: '" + name + "' is not a valid signal"};
     signal_number = *resolved;
     first_target = 2;
   }
@@ -55,16 +54,16 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
       ErrorOr<i64> parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (parsed.is_error()) {
-        show_message(
-            Error{"kill: '" + target_text + "' is not a valid job or process id"}
-                .to_string());
+        show_message(Error{"kill: '" + target_text +
+                           "' is not a valid job or process id"}
+                         .to_string());
         status = 1;
         continue;
       }
       Job *job = cxt.find_job(static_cast<int>(parsed.value()));
       if (job == nullptr) {
-        show_message(
-            Error{"kill: '" + target_text + "' is not a known job"}.to_string());
+        show_message(Error{"kill: '" + target_text + "' is not a known job"}
+                         .to_string());
         status = 1;
         continue;
       }
@@ -74,9 +73,9 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
       if (parsed.is_error()) {
         /* A non-numeric target must not fall through to kill(0), which would
            signal the whole process group including this shell. */
-        show_message(
-            Error{"kill: '" + target_text + "' is not a valid job or process id"}
-                .to_string());
+        show_message(Error{"kill: '" + target_text +
+                           "' is not a valid job or process id"}
+                         .to_string());
         status = 1;
         continue;
       }

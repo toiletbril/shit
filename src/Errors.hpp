@@ -1,11 +1,28 @@
 #pragma once
 
+#include "Builtin.hpp"
 #include "Common.hpp"
 #include "Eval.hpp"
 
 namespace shit {
 
 static constexpr usize ERROR_CONTEXT_SIZE = 24;
+
+struct SourceLocation
+{
+  SourceLocation() = delete;
+  SourceLocation(usize position, usize length);
+
+  /* Both variables are byte-offsets and do not account for unicode. */
+  usize position() const;
+  usize length() const;
+
+  void add_length(usize n);
+
+private:
+  usize m_position;
+  usize m_length;
+};
 
 struct ErrorBase
 {
@@ -18,7 +35,8 @@ struct ErrorBase
   String message() const;
 
   /* The word printed before the message, Error by default. A warning subclass
-     overrides it to Warning, so the reporting code reads the severity from the
+     overrides i
+     t to Warning, so the reporting code reads the severity from the
      object rather than taking it as an argument. */
   virtual String severity_word() const;
 

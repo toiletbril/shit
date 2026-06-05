@@ -27,8 +27,7 @@ normalize_condition(StringView raw)
 {
   String name{};
   for (usize i = 0; i < raw.size(); i++)
-    name.push(static_cast<char>(
-        toupper(static_cast<unsigned char>(raw[i]))));
+    name.push(static_cast<char>(toupper(static_cast<unsigned char>(raw[i]))));
   if (name.starts_with("SIG") && name.size() > 3)
     name = String{name.substring(3)};
   if (name == "0") name = "EXIT";

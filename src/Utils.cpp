@@ -13,10 +13,7 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
-#include <optional>
-
-/* FIXME: std::filesystem::exists() is VERY slow. */
+#include <string>
 
 /* TODO: Support background processes. */
 /* TODO: Support setting environment variables. */
@@ -44,18 +41,17 @@ execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
   if (!ec.is_builtin()) {
     /* The command word is kept for the job table before the context is moved
        into the spawn. */
-    std::string command =
-        is_async ? std::string{ec.program().c_str(), ec.program().size()}
-                 : std::string{};
+    String command = is_async ? String{ec.program().view()} : String{};
 
     os::process p = os::execute_program(std::move(ec));
     if (is_async) {
       cxt.set_last_background_pid(os::process_id_of(p));
       int id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
-        shit::print_to_standard_error("[" + std::to_string(id) + "] " +
-                                      std::to_string(os::process_id_of(p)) +
-                                      "\n");
+        shit::print_to_standard_error(
+            "[" + integer_to_string(id) + "] " +
+            unsigned_integer_to_string(static_cast<u64>(os::process_id_of(p))) +
+            "\n");
       return 0;
     }
     return os::wait_and_monitor_process(p);
@@ -67,7 +63,7 @@ execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
 }
 
 i32
-execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
+execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                             bool is_async)
 {
   SHIT_ASSERT(ecs.size() > 1);
@@ -130,8 +126,10 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
       int id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
         shit::print_to_standard_error(
-            "[" + std::to_string(id) + "] " +
-            std::to_string(os::process_id_of(last_child)) + "\n");
+            "[" + integer_to_string(id) + "] " +
+            unsigned_integer_to_string(
+                static_cast<u64>(os::process_id_of(last_child))) +
+            "\n");
     }
     return ret;
   }
@@ -146,29 +144,45 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
   return ret;
 }
 
+/* The offset of the first occurrence of needle at or after start, or
+   NOT_FOUND_INDEX when no occurrence remains. The bytes carry no null
+   terminator, so the match is a plain byte scan rather than a C string search.
+ */
+static usize
+find_subview(StringView haystack, StringView needle, usize start)
+{
+  if (needle.length == 0)
+    return start <= haystack.length ? start : NOT_FOUND_INDEX;
+  if (needle.length > haystack.length) return NOT_FOUND_INDEX;
+  for (usize i = start; i + needle.length <= haystack.length; i++) {
+    if (std::memcmp(haystack.data + i, needle.data, needle.length) == 0)
+      return i;
+  }
+  return NOT_FOUND_INDEX;
+}
+
 void
-string_replace(std::string &s, const StringView to_replace,
+string_replace(String &s, const StringView to_replace,
                const StringView replace_with)
 {
-  std::string b{};
-  b.reserve(s.size());
+  String result{};
+  result.reserve(s.size());
 
-  std::size_t i{0};
-  std::size_t p{0};
+  StringView source = s.view();
+  usize i = 0;
+  usize previous = 0;
 
   for (;;) {
-    p = i;
-    /* The view carries no null terminator, so the bytes are matched through the
-       pointer and length overload of find. */
-    i = s.find(to_replace.data, i, to_replace.length);
-    if (i == std::string::npos) break;
-    b.append(s, p, i - p);
-    b.append(replace_with.data, replace_with.length);
-    i += to_replace.length;
+    previous = i;
+    usize match = find_subview(source, to_replace, i);
+    if (match == NOT_FOUND_INDEX) break;
+    result.append(source.substring_of_length(previous, match - previous));
+    result.append(replace_with);
+    i = match + to_replace.length;
   }
 
-  b.append(s, p, s.size() - p);
-  s.swap(b);
+  result.append(source.substring(previous));
+  s = std::move(result);
 }
 
 String
@@ -206,8 +220,10 @@ saturate_signed_magnitude(u64 magnitude, bool is_negative, bool has_overflowed)
 static Error
 not_an_integer_error(StringView text)
 {
-  return Error{"'" + std::string{text.data, text.length} +
-               "' is not a valid integer"};
+  return Error{
+      "'" + std::string{text.data, text.length}
+        + "' is not a valid integer"
+  };
 }
 
 String
@@ -222,7 +238,9 @@ unsigned_integer_to_string(u64 value)
     buffer[--offset] = static_cast<char>('0' + value % 10);
     value /= 10;
   } while (value > 0);
-  return String{StringView{buffer + offset, sizeof(buffer) - offset}};
+  return String{
+      StringView{buffer + offset, sizeof(buffer) - offset}
+  };
 }
 
 String
@@ -359,51 +377,41 @@ parse_hexadecimal_integer(StringView text)
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-Maybe<std::filesystem::path>
-canonicalize_path(const std::string &path)
+usize
+find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
 {
-  std::filesystem::path p{path};
-
-  if (p.is_relative() && p.string().find('/') != std::string::npos) {
-    p = std::filesystem::absolute(p);
+  for (usize i = 0; i < suffixes.size(); i++) {
+    if (suffixes[i] == wanted) return i;
   }
-
-  p = p.lexically_normal();
-
-  /* If there's no extension, we may have to add it ourselves. */
-  if (p.extension().empty() &&
-      path.back() != '.' /* fs::path strips the ending dot. TODO: test */)
-  {
-    size_t i = 0;
-    while (!std::filesystem::exists(p) && i < os::OMITTED_SUFFIXES.size())
-      p.replace_extension(os::OMITTED_SUFFIXES[i++]);
-  }
-
-  if (!std::filesystem::exists(p)) return shit::None;
-
-  return p;
+  return NOT_FOUND_INDEX;
 }
 
-void
-set_current_directory(const std::filesystem::path &path)
+Maybe<Path>
+canonicalize_path(StringView path)
 {
-  try {
-    std::filesystem::current_path(path);
-  } catch (const std::filesystem::filesystem_error &err) {
-    SHIT_UNUSED(err);
-    throw shit::Error{os::last_system_error_message()};
-  }
-}
+  Path candidate{path};
 
-std::filesystem::path
-get_current_directory()
-{
-  try {
-    return std::filesystem::current_path();
-  } catch (const std::filesystem::filesystem_error &err) {
-    SHIT_UNUSED(err);
-    throw shit::Error{os::last_system_error_message()};
+  if (candidate.is_relative() && path.find_character('/').has_value()) {
+    candidate = candidate.to_absolute();
   }
+
+  candidate = candidate.normalized();
+
+  /* If there's no extension, we may have to add it ourselves. The ending dot is
+     stripped by the path normalization, so a name written with a trailing dot
+     is left as typed. */
+  bool ends_with_dot = path.length > 0 && path.data[path.length - 1] == '.';
+  if (candidate.extension().empty() && !ends_with_dot) {
+    usize suffix_index = 0;
+    while (!candidate.exists() && suffix_index < os::OMITTED_SUFFIXES.size()) {
+      const String &suffix = os::OMITTED_SUFFIXES[suffix_index++];
+      candidate = candidate.with_extension(suffix.view());
+    }
+  }
+
+  if (!candidate.exists()) return shit::None;
+
+  return candidate;
 }
 
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
@@ -558,7 +566,7 @@ quit(i32 code, bool should_goodbye)
       String code_str{};
       if (code != 0) {
         code_str += " (Code ";
-        code_str += std::to_string(actual_code);
+        code_str += unsigned_integer_to_string(actual_code);
         code_str += ')';
       }
       show_message("Goodbye :c" + code_str);
@@ -573,19 +581,16 @@ quit(i32 code, bool should_goodbye)
    without rebuilding from a directory index. The resizable map carries a packed
    key per slot, so a lookup rejects a mismatch in two words before the byte
    compare. */
-static HashMap<ArrayList<String>> PATH_CACHE{heap_allocator()};
+static HashMap<ArrayList<Path>> PATH_CACHE{heap_allocator()};
 
-static std::optional<std::string> MAYBE_PATH =
-    os::get_environment_variable("PATH");
+static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
 static void
-cache_resolved_path(StringView name, const std::string &full_path)
+cache_resolved_path(StringView name, const Path &full_path)
 {
-  PATH_CACHE.get_or_create(name, ArrayList<String>{})
-      .push(String{heap_allocator(),
-                   StringView{full_path.data(), full_path.size()}});
+  PATH_CACHE.get_or_create(name, ArrayList<Path>{}).push(full_path);
 }
 
 void
@@ -599,17 +604,18 @@ clear_path_map()
    trailing delimiter, so a plain delimiter scan drops it and the directory is
    never searched. POSIX treats an empty component as the current directory. */
 static ArrayList<String>
-split_path_dirs(const std::string &path_var)
+split_path_dirs(StringView path_var)
 {
   ArrayList<String> dirs{};
   String current{};
 
-  for (const char &ch : path_var) {
+  for (usize i = 0; i < path_var.length; i++) {
+    char ch = path_var.data[i];
     if (ch == os::PATH_DELIMITER) {
       dirs.push(current.empty() ? String{"."} : current);
       current.clear();
     } else {
-      current += ch;
+      current.push(ch);
     }
   }
   dirs.push(current.empty() ? String{"."} : current);
@@ -623,66 +629,47 @@ initialize_path_map()
   if (!MAYBE_PATH) return;
 
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
-    try {
-      /* What the heck? A path in PATH that does not exist? Are you a
-       * Windows user? */
-      if (std::filesystem::exists(dir_string.c_str())) {
-        /* Cache every file in the directory under its name without an omitted
-           extension, pointing at its full path. */
-        for (const std::filesystem::directory_entry &f :
-             std::filesystem::directory_iterator{dir_string.c_str()})
-        {
-          std::string name = f.path().filename().string();
-          os::erase_extension_and_get_its_index(name);
-          cache_resolved_path(StringView{name.data(), name.size()},
-                              f.path().string());
-        }
-      }
-    } catch (const std::filesystem::filesystem_error &e) {
-#if 0
-      shit::show_message(
-          "Unable to read '" + e.path1().string() +
-          "' while reading PATH: " + os::last_system_error_message());
-#else
-      SHIT_UNUSED(e);
-#endif
+    Path directory{dir_string.view()};
+
+    /* What the heck? A path in PATH that does not exist? Are you a
+     * Windows user? read_directory returns None for a missing or unreadable
+     * directory, so the path is skipped without a separate exists check. */
+    Maybe<ArrayList<String>> entries = Path::read_directory(directory);
+    if (!entries) continue;
+
+    /* Cache every file in the directory under its name without an omitted
+       extension, pointing at its full path. */
+    for (const String &entry_name : *entries) {
+      std::string name{entry_name.c_str(), entry_name.size()};
+      os::erase_extension_and_get_its_index(name);
+
+      Path full_path = directory;
+      full_path.push_component(entry_name.view());
+      cache_resolved_path(StringView{name.data(), name.size()}, full_path);
     }
   }
 }
 
-ArrayList<std::filesystem::path>
-search_and_cache(const std::string &program_name)
+ArrayList<Path>
+search_and_cache(StringView program_name)
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
-  if (!MAYBE_PATH) return ArrayList<std::filesystem::path>{};
+  if (!MAYBE_PATH) return ArrayList<Path>{};
 
-  ArrayList<std::filesystem::path> result{};
+  ArrayList<Path> result{};
 
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
-    bool is_valid_dir = false;
-
-    try {
-      is_valid_dir = std::filesystem::exists(dir_string.c_str());
-    } catch (const std::filesystem::filesystem_error &e) {
-#if 0
-      shit::show_message(
-          "Unable to read '" + dir_string +
-          "' while reading PATH: " + os::last_system_error_message());
-#else
-      SHIT_UNUSED(e);
-#endif
-    }
-
-    if (!is_valid_dir) continue;
+    Path directory{dir_string.view()};
+    if (!directory.is_directory()) continue;
 
     /* The cache key is the program name without an omitted extension, the same
        key the lookup uses. */
-    std::string key{program_name};
+    std::string key{program_name.data, program_name.length};
     os::erase_extension_and_get_its_index(key);
 
-    std::filesystem::path full_path =
-        std::filesystem::path{dir_string.c_str()} / program_name;
-    std::string full_path_str = full_path.string();
+    Path full_path = directory;
+    full_path.push_component(program_name);
+    std::string full_path_str{full_path.c_str(), full_path.size()};
 
     /* This file already has an extesion specified? */
     if (os::ExtIndex explicit_ext =
@@ -692,29 +679,28 @@ search_and_cache(const std::string &program_name)
       for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
            ext_index++)
       {
-        std::string try_path =
-            full_path.string() + os::OMITTED_SUFFIXES[ext_index];
+        const String &suffix = os::OMITTED_SUFFIXES[ext_index];
+        Path try_path{(full_path.text() + suffix.view()).view()};
 
-        if (std::filesystem::exists(try_path)) {
+        if (try_path.exists()) {
           cache_resolved_path(StringView{key.data(), key.size()}, try_path);
-          result.push(std::filesystem::path{try_path});
+          result.push(try_path);
         }
       }
-    } else if (std::filesystem::exists(full_path)) {
-      cache_resolved_path(StringView{key.data(), key.size()},
-                          full_path.string());
-      result.push(std::move(full_path));
+    } else if (full_path.exists()) {
+      cache_resolved_path(StringView{key.data(), key.size()}, full_path);
+      result.push(full_path);
     }
   }
 
   return result;
 }
 
-ArrayList<std::filesystem::path>
-search_program_path(const std::string &program_name)
+ArrayList<Path>
+search_program_path(StringView program_name)
 {
-  std::string sp{program_name};
-  ArrayList<std::filesystem::path> result{};
+  std::string sp{program_name.data, program_name.length};
+  ArrayList<Path> result{};
 
   os::ExtIndex typed_extension = os::erase_extension_and_get_its_index(sp);
 
@@ -722,18 +708,15 @@ search_program_path(const std::string &program_name)
      so the extension-stripped cache key would resolve the wrong file. The cache
      is consulted only when no extension was typed, which on POSIX is always. */
   if (typed_extension == 0) {
-    if (ArrayList<String> *cached = const_cast<ArrayList<String> *>(
+    if (ArrayList<Path> *cached = const_cast<ArrayList<Path> *>(
             PATH_CACHE.find(StringView{sp.data(), sp.size()})))
     {
-      ArrayList<String> kept{};
+      ArrayList<Path> kept{};
       for (usize i = 0; i < cached->size(); i++) {
-        const String &path_string = (*cached)[i];
-        std::filesystem::path tp{
-            std::string{path_string.c_str(), path_string.size()}};
-        if (std::filesystem::exists(tp)) {
-          result.push(std::filesystem::path{tp});
-          kept.push(String{heap_allocator(),
-                           StringView{path_string.c_str(), path_string.size()}});
+        const Path &cached_path = (*cached)[i];
+        if (cached_path.exists()) {
+          result.push(cached_path);
+          kept.push(cached_path);
         }
       }
       /* Drop entries that no longer exist, so a later lookup does not stat them
@@ -747,41 +730,41 @@ search_program_path(const std::string &program_name)
   return search_and_cache(program_name);
 }
 
-Maybe<std::string>
-read_entire_file(const std::string &path)
+Maybe<String>
+read_entire_file(StringView path)
 {
   Maybe<os::descriptor> file =
       os::open_file_descriptor(path, os::FileOpenMode::Read);
   if (!file) return None;
 
-  std::string contents{};
+  String contents{};
   char buffer[4096];
   for (;;) {
     Maybe<usize> read_count = os::read_fd(*file, buffer, sizeof(buffer));
     if (!read_count || *read_count == 0) break;
-    contents.append(buffer, *read_count);
+    contents.append(StringView{buffer, *read_count});
   }
   os::close_fd(*file);
   return contents;
 }
 
-std::string
+String
 read_entire_standard_input()
 {
-  std::string contents{};
+  String contents{};
   char buffer[4096];
   for (;;) {
     Maybe<usize> read_count = os::read_fd(SHIT_STDIN, buffer, sizeof(buffer));
     if (!read_count || *read_count == 0) break;
-    contents.append(buffer, *read_count);
+    contents.append(StringView{buffer, *read_count});
   }
   return contents;
 }
 
-Maybe<std::string>
+Maybe<String>
 read_line_from_fd(os::descriptor fd)
 {
-  std::string line{};
+  String line{};
   bool read_any_byte = false;
   for (;;) {
     char one_byte = 0;
@@ -789,7 +772,7 @@ read_line_from_fd(os::descriptor fd)
     if (!read_count || *read_count == 0) break;
     read_any_byte = true;
     if (one_byte == '\n') return line;
-    line += one_byte;
+    line.push(one_byte);
   }
   if (!read_any_byte) return None;
   return line;

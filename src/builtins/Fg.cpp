@@ -37,8 +37,7 @@ Fg::execute(ExecContext &ec, EvalContext &cxt) const
   } else
     job = cxt.most_recent_job();
 
-  if (job == nullptr)
-    throw Error{"fg: there is no such job"};
+  if (job == nullptr) throw Error{"fg: there is no such job"};
 
   /* A job already reaped by a prior poll has its status recorded, so report it
      instead of waiting on a pid that no longer exists. */

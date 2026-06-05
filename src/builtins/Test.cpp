@@ -1,9 +1,8 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Path.hpp"
 #include "../Utils.hpp"
-
-#include <filesystem>
 
 namespace shit {
 
@@ -16,16 +15,6 @@ parse_integer(StringView text, i64 &out)
   if (parsed.is_error()) return false;
   out = parsed.value();
   return true;
-}
-
-bool
-path_has_mode(const String &path, std::filesystem::perms mask)
-{
-  std::error_code ec{};
-  std::filesystem::file_status status =
-      std::filesystem::status(path.c_str(), ec);
-  if (ec) return false;
-  return (status.permissions() & mask) != std::filesystem::perms::none;
 }
 
 /* A recursive-descent evaluator over the test arguments, following the POSIX
@@ -60,19 +49,17 @@ struct TestEvaluator
   {
     if (op == "-z") return operand.empty();
     if (op == "-n") return !operand.empty();
-    std::error_code ec{};
-    if (op == "-e") return std::filesystem::exists(operand.c_str(), ec);
-    if (op == "-f") return std::filesystem::is_regular_file(operand.c_str(), ec);
-    if (op == "-d") return std::filesystem::is_directory(operand.c_str(), ec);
-    if (op == "-s")
-      return std::filesystem::exists(operand.c_str(), ec) &&
-             std::filesystem::file_size(operand.c_str(), ec) > 0;
-    if (op == "-r")
-      return path_has_mode(operand, std::filesystem::perms::owner_read);
-    if (op == "-w")
-      return path_has_mode(operand, std::filesystem::perms::owner_write);
-    if (op == "-x")
-      return path_has_mode(operand, std::filesystem::perms::owner_exec);
+    Path operand_path{operand};
+    if (op == "-e") return operand_path.exists();
+    if (op == "-f") return operand_path.is_regular_file();
+    if (op == "-d") return operand_path.is_directory();
+    if (op == "-s") {
+      Maybe<u64> size = operand_path.file_size();
+      return size.has_value() && size.value() > 0;
+    }
+    if (op == "-r") return operand_path.is_readable();
+    if (op == "-w") return operand_path.is_writable();
+    if (op == "-x") return operand_path.is_executable();
     fail(StringView{"unknown unary operator '"} + op + "'");
     return false;
   }

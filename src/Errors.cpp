@@ -99,11 +99,10 @@ get_context_pointing_to(StringView source, usize byte_position,
       toiletline::utf8_strlen(source.data, byte_position - start_offset);
 
   /* Does token length go beyond that line? */
-  usize unicode_length =
-      toiletline::utf8_strlen(source.data + byte_position,
-                              (byte_count > line_byte_count - start_offset)
-                                  ? line_byte_count - start_offset
-                                  : byte_count);
+  usize unicode_length = toiletline::utf8_strlen(
+      source.data + byte_position, (byte_count > line_byte_count - start_offset)
+                                       ? line_byte_count - start_offset
+                                       : byte_count);
 
   /* Add spaces before the underline. */
   msg += '\n';
@@ -168,7 +167,8 @@ Error::to_string() const
   return severity_word() + ": " + message() + ".";
 }
 
-Error::operator String() const
+Error::
+operator String() const
 {
   return to_string();
 }
@@ -208,8 +208,7 @@ ErrorWithLocation::to_string(StringView source) const
       source[byte_position + 1] == '\n')
   {
     byte_position += 2;
-  } else if (byte_position + 1 < source.size() &&
-             source[byte_position] == '\n')
+  } else if (byte_position + 1 < source.size() && source[byte_position] == '\n')
   {
     byte_position++;
   }

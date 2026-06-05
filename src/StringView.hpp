@@ -64,7 +64,8 @@ struct StringView
     return None;
   }
 
-  /* The view from start to the end. A start past the end yields an empty view. */
+  /* The view from start to the end. A start past the end yields an empty view.
+   */
   [[nodiscard]] StringView
   substring(usize start) const
   {

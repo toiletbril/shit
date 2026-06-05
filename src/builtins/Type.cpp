@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Path.hpp"
 #include "../Utils.hpp"
 
 /* type reports how each name resolves, checking the same order the shell uses
@@ -43,14 +44,12 @@ Type::execute(ExecContext &ec, EvalContext &cxt) const
     {
       out += name;
       out += " is a shell builtin\n";
-    } else if (ArrayList<std::filesystem::path> paths =
-                   utils::search_program_path(
-                       std::string{name.c_str(), name.size()});
+    } else if (ArrayList<Path> paths = utils::search_program_path(name);
                paths.size() != 0)
     {
       out += name;
       out += " is ";
-      out += paths[0].string();
+      out += paths[0].text();
       out += "\n";
     } else {
       out += name;

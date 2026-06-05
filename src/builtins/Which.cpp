@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
+#include "../Path.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
@@ -33,8 +34,8 @@ Which::execute(ExecContext &ec, EvalContext &cxt) const
 
   for (usize i = 1; i < args.size(); i++) {
     const String &program_name = args[i];
-    if (search_builtin(std::string_view{program_name.c_str(),
-                                        program_name.size()})
+    if (search_builtin(
+            std::string_view{program_name.c_str(), program_name.size()})
             .has_value())
     {
       buf += program_name;
@@ -42,18 +43,16 @@ Which::execute(ExecContext &ec, EvalContext &cxt) const
          the name, which stays machine readable. */
       if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
-    } else if (ArrayList<std::filesystem::path> ps =
-                   utils::search_program_path(
-                       std::string{program_name.c_str(), program_name.size()});
+    } else if (ArrayList<Path> ps = utils::search_program_path(program_name);
                ps.size() != 0)
     {
       if (FLAG_ALL.is_enabled()) {
-        for (const auto &p : ps) {
-          buf += p.string();
+        for (const Path &p : ps) {
+          buf += p.text();
           buf += '\n';
         }
       } else {
-        buf += ps[0].string();
+        buf += ps[0].text();
         buf += '\n';
       }
     }

@@ -27,10 +27,7 @@ struct Ok
 template <class T>
 struct [[nodiscard]] ErrorOr
 {
-  ErrorOr(T value) : m_is_error(false)
-  {
-    new (&m_storage) T(std::move(value));
-  }
+  ErrorOr(T value) : m_is_error(false) { new (&m_storage) T(std::move(value)); }
   ErrorOr(Error error) : m_is_error(true)
   {
     new (&m_storage) Error(std::move(error));
@@ -80,7 +77,11 @@ struct [[nodiscard]] ErrorOr
 
   ~ErrorOr() { destroy(); }
 
-  [[nodiscard]] bool is_error() const { return m_is_error; }
+  [[nodiscard]] bool
+  is_error() const
+  {
+    return m_is_error;
+  }
 
   [[nodiscard]] T &
   value()
@@ -148,8 +149,9 @@ private:
   }
 
   bool m_is_error;
-  alignas(T) alignas(Error) unsigned char
-      m_storage[sizeof(T) > sizeof(Error) ? sizeof(T) : sizeof(Error)];
+  alignas(T) alignas(
+      Error) unsigned char m_storage[sizeof(T) > sizeof(Error) ? sizeof(T)
+                                                               : sizeof(Error)];
 };
 
 } /* namespace shit */
@@ -161,7 +163,7 @@ private:
 #define SHIT_UNWRAP(expr)                                                      \
   ({                                                                           \
     auto t__result = (expr);                                                   \
-    if (t__result.is_error()) return t__result.error();                       \
+    if (t__result.is_error()) return t__result.error();                        \
     t__result.take();                                                          \
   })
 
@@ -170,5 +172,5 @@ private:
 #define SHIT_MAKE_ERROR(msg)                                                   \
   ::shit::Error                                                                \
   {                                                                            \
-    std::string{__FILE__ ":"} + std::to_string(__LINE__) + ": " + (msg)       \
+    std::string{__FILE__ ":"} + std::to_string(__LINE__) + ": " + (msg)        \
   }

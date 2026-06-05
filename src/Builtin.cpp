@@ -179,9 +179,9 @@ execute_builtin(ExecContext &&ec, EvalContext &cxt)
   try {
     return b->execute(ec, cxt);
   } catch (const Error &e) {
-    throw ErrorWithLocation{ec.source_location(),
-                            StringView{"Builtin '"} + ec.program() + "': " +
-                                e.message()};
+    throw ErrorWithLocation{ec.source_location(), StringView{"Builtin '"} +
+                                                      ec.program() +
+                                                      "': " + e.message()};
   }
 }
 

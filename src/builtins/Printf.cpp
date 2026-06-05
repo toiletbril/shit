@@ -14,9 +14,9 @@ namespace shit {
 
 namespace {
 
-/* Parse one signed integer argument the way printf does, in base zero. A leading
-   0x marks hexadecimal, otherwise the digits are decimal. A malformed argument
-   yields zero. */
+/* Parse one signed integer argument the way printf does, in base zero. A
+   leading 0x marks hexadecimal, otherwise the digits are decimal. A malformed
+   argument yields zero. */
 i64
 parse_printf_integer(const String &arg)
 {
@@ -24,10 +24,9 @@ parse_printf_integer(const String &arg)
   if (first_digit < arg.size() &&
       (arg[first_digit] == '+' || arg[first_digit] == '-'))
     first_digit++;
-  bool is_hexadecimal = first_digit + 1 < arg.size() &&
-                        arg[first_digit] == '0' &&
-                        (arg[first_digit + 1] == 'x' ||
-                         arg[first_digit + 1] == 'X');
+  bool is_hexadecimal =
+      first_digit + 1 < arg.size() && arg[first_digit] == '0' &&
+      (arg[first_digit + 1] == 'x' || arg[first_digit + 1] == 'X');
   /* A leading zero that is not 0x marks octal, as the C base-zero strtoll the
      old code used did, so printf '%d' 010 yields 8. */
   bool is_octal = !is_hexadecimal && first_digit < arg.size() &&

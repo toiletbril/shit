@@ -7,12 +7,12 @@
 
 namespace shit {
 
-/* A short byte string packed into a fixed sixteen-byte block held in two machine
-   words. A lookup compares two integers rather than walking bytes, which the
-   compiler lowers to a couple of wide register compares, and the layout is
-   contiguous so a later pass can scan many keys with one SIMD instruction. A key
-   longer than sixteen bytes keeps only its first sixteen bytes here and relies on
-   a full compare to disambiguate. */
+/* A short byte string packed into a fixed sixteen-byte block held in two
+   machine words. A lookup compares two integers rather than walking bytes,
+   which the compiler lowers to a couple of wide register compares, and the
+   layout is contiguous so a later pass can scan many keys with one SIMD
+   instruction. A key longer than sixteen bytes keeps only its first sixteen
+   bytes here and relies on a full compare to disambiguate. */
 struct PackedStringKey
 {
   u64 low_word{0};

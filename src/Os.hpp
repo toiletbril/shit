@@ -30,8 +30,10 @@
 #define SHIT_PLATFORM_IS   (SHIT_SUPPORT_VECTOR) &
 #define SHIT_PLATFORM_ISNT (~SHIT_SUPPORT_VECTOR) &
 
+#include "ArrayList.hpp"
+#include "String.hpp"
+
 #include <string>
-#include <vector>
 
 namespace shit {
 
@@ -55,7 +57,7 @@ constexpr char PATH_DELIMITER = ':';
 
 using process = pid_t;
 using descriptor = int;
-using os_args = std::vector<const char *>;
+using os_args = ArrayList<const char *>;
 
 #define SHIT_INVALID_FD      -1
 #define SHIT_INVALID_PROCESS -1

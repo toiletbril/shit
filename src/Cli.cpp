@@ -187,8 +187,8 @@ find_flag(const ArrayList<Flag *> &flags, const char *flag_start, bool is_long,
 
         if (flag_length > longest_length &&
             /* Yay let's add starts_with in C++20. */
-            std::memcmp(flags[i]->long_name().data, flag_start,
-                        flag_length) == 0)
+            std::memcmp(flags[i]->long_name().data, flag_start, flag_length) ==
+                0)
         {
           *result_flag = flags[i];
           *value_start = flag_start + flag_length;
@@ -534,8 +534,8 @@ make_flag_help(const ArrayList<Flag *> &flags)
       s += "    ";
     }
 
-    usize padding = MAX_WIDTH - f->long_name().length -
-                    (long_is_string ? LONG_PADDING : 0);
+    usize padding =
+        MAX_WIDTH - f->long_name().length - (long_is_string ? LONG_PADDING : 0);
 
     for (usize i = 0; i < padding; i++) {
       s += ' ';

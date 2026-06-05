@@ -15,8 +15,8 @@ namespace shit {
 /* An open-addressing hash table from a string key to a Value over an explicit
    allocator, the std::unordered_map replacement. The value defaults to String
    for the variable store and the traps, and takes a pointer for the function
-   table. Each slot caches a PackedStringKey of the key's first sixteen bytes, so
-   a probe rejects a mismatch with a two-word compare before the full byte
+   table. Each slot caches a PackedStringKey of the key's first sixteen bytes,
+   so a probe rejects a mismatch with a two-word compare before the full byte
    compare. Linear probing, power-of-two capacity, grows past a load of three
    quarters, and counts tombstones toward the load so an insert is never
    dropped. */
@@ -91,7 +91,8 @@ struct HashMap
       const Slot &slot = m_slots[i];
       if (slot.state == Slot::Empty) return nullptr;
       /* The packed compare rejects a mismatch in two words before the byte
-         compare runs, and the byte compare confirms a key past sixteen bytes. */
+         compare runs, and the byte compare confirms a key past sixteen bytes.
+       */
       if (slot.state == Slot::Occupied && slot.packed == wanted &&
           slot.key == key)
         return &slot.value;

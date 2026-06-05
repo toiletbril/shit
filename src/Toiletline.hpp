@@ -1,6 +1,6 @@
 #include "Common.hpp"
-
-#include <string>
+#include "String.hpp"
+#include "StringView.hpp"
 
 namespace {
 
@@ -10,9 +10,12 @@ namespace {
 
 namespace toiletline {
 
-void set_title(const std::string &title);
+using shit::String;
+using shit::StringView;
 
-usize utf8_strlen(const std::string &s, usize byte_count = std::string::npos);
+void set_title(const String &title);
+
+usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));
 
 bool is_active();
 
@@ -25,17 +28,17 @@ void exit();
 struct InputResult
 {
   i32 code;
-  std::string text;
+  String text;
 };
 
-InputResult get_input(const std::string &prompt);
+InputResult get_input(const String &prompt);
 
-void set_input(const std::string &input);
+void set_input(const String &input);
 
 void enter_raw_mode();
 
 void exit_raw_mode();
 
-void emit_newlines(std::string_view buffer);
+void emit_newlines(StringView buffer);
 
 } /* namespace toiletline */

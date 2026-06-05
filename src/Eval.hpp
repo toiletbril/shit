@@ -3,31 +3,12 @@
 #include "Builtin.hpp"
 #include "Common.hpp"
 #include "Containers.hpp"
+#include "Errors.hpp"
 #include "Maybe.hpp"
 
-#include <filesystem>
-#include <optional>
 #include <string>
-#include <variant>
-#include <vector>
 
 namespace shit {
-
-struct SourceLocation
-{
-  SourceLocation() = delete;
-  SourceLocation(usize position, usize length);
-
-  /* Both variables are byte-offsets and do not account for unicode. */
-  usize position() const;
-  usize length() const;
-
-  void add_length(usize n);
-
-private:
-  usize m_position;
-  usize m_length;
-};
 
 /* A field is a candidate argument after variable expansion and field splitting.
    It carries a parallel mask that marks which characters may act as glob
@@ -71,10 +52,12 @@ struct ControlFlow
   };
 
   Kind kind{Kind::Normal};
-  /* The loop level for break and continue, or the status for return and exit. */
+  /* The loop level for break and continue, or the status for return and exit.
+   */
   i64 value{0};
   /* Where the requesting builtin sits, so an escaped jump points a caret at it.
-     The source the offset indexes lives in source, set when the jump is made. */
+     The source the offset indexes lives in source, set when the jump is made.
+   */
   SourceLocation location{0, 0};
   const std::string *source{nullptr};
   String origin{};
@@ -115,7 +98,7 @@ struct EvalStateSnapshot
   HashMap<String> shell_variables;
   HashMap<const Expression *> functions;
   ArrayList<String> positional_params;
-  std::filesystem::path working_directory;
+  Path working_directory;
 };
 
 struct EvalContext
@@ -229,7 +212,8 @@ struct EvalContext
   bool remove_alias(StringView name);
   Maybe<String> get_alias(StringView name) const;
   ArrayList<String> alias_definitions() const;
-  /* The defined alias names, so the prepass treats a use of one as resolvable. */
+  /* The defined alias names, so the prepass treats a use of one as resolvable.
+   */
   HashSet alias_names() const;
 
   /* Save and restore the mutable state around a subshell or a command
@@ -273,8 +257,8 @@ struct EvalContext
   void set_error_unset(bool enabled);
   bool error_unset() const;
 
-  /* noclobber rejects an overwrite of an existing file through a plain >, set by
-     -C and set -o noclobber. */
+  /* noclobber rejects an overwrite of an existing file through a plain >, set
+     by -C and set -o noclobber. */
   void set_no_clobber(bool enabled);
   bool no_clobber() const;
   /* allexport marks every later assignment for the environment, set by -a and
@@ -306,7 +290,7 @@ struct EvalContext
      newlines stripped. The inner command runs in-process with the working
      directory and variables snapshotted, so a cd or an assignment inside does
      not leak to the parent. */
-  String capture_command_substitution(const std::string &source);
+  String capture_command_substitution(const String &source);
 
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
@@ -463,10 +447,9 @@ struct ExecContext
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and
      reuses it across the iterations of a loop. */
-  static ExecContext
-  from_resolved(SourceLocation location,
-                std::variant<shit::Builtin::Kind, std::filesystem::path> kind,
-                const ArrayList<String> &args);
+  static ExecContext from_resolved(SourceLocation location,
+                                   ResolvedCommand kind,
+                                   const ArrayList<String> &args);
 
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
@@ -488,17 +471,14 @@ struct ExecContext
 
   i32 execute(bool is_async);
 
-  const std::filesystem::path &program_path() const;
+  const Path &program_path() const;
   const Builtin::Kind &builtin_kind() const;
 
 private:
-  /* clang-format off */
-  ExecContext(SourceLocation location,
-              std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
+  ExecContext(SourceLocation location, ResolvedCommand &&kind,
               const ArrayList<String> &args);
-  /* clang-format on */
 
-  std::variant<shit::Builtin::Kind, std::filesystem::path> m_kind;
+  ResolvedCommand m_kind;
 
   SourceLocation m_location;
   ArrayList<String> m_args{heap_allocator()};

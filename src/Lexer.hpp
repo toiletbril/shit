@@ -2,11 +2,11 @@
 
 #include "Common.hpp"
 #include "Containers.hpp"
+#include "String.hpp"
+#include "StringView.hpp"
 #include "Tokens.hpp"
 
 #include <string>
-#include <string_view>
-#include <vector>
 
 namespace shit {
 
@@ -14,10 +14,12 @@ struct BumpArena;
 
 /* A heredoc whose body is collected when the line that introduced it ends. The
    body buffer has a stable address, so a parsed redirection points at it and
-   reads it once the lexer fills it. */
+   reads it once the lexer fills it. The body stays a std::string because the
+   parsed Redirection field that points at it is a std::string pointer the Eval
+   layer reads. */
 struct HeredocPending
 {
-  std::string delimiter;
+  String delimiter;
   bool strip_tabs;
   std::string *body;
 };
@@ -41,7 +43,7 @@ bool is_variable_name(char ch);
  * internal cursor. */
 struct Lexer
 {
-  Lexer(std::string source, BumpArena &arena,
+  Lexer(String source, BumpArena &arena,
         bool should_collect_debug_words = false);
   ~Lexer();
 
@@ -58,7 +60,7 @@ struct Lexer
   [[nodiscard]] Token *next_expression_token();
   [[nodiscard]] Token *next_shell_token();
 
-  std::string_view source() const;
+  StringView source() const;
   const ArrayList<Word> &debug_words() const;
   BumpArena &arena() const;
   /* Redirect node allocation to another arena, so a function body can be parsed
@@ -67,11 +69,13 @@ struct Lexer
   usize advance_past_last_peek();
 
   /* Reserve a heredoc body for the given delimiter, returning the stable buffer
-     the lexer fills when the current line ends. */
-  const std::string *register_heredoc(std::string delimiter, bool strip_tabs);
+     the lexer fills when the current line ends. The buffer is a std::string
+     because the parsed Redirection field that points at it is read as one by
+     the Eval layer. */
+  const std::string *register_heredoc(StringView delimiter, bool strip_tabs);
 
 protected:
-  std::string m_source{};
+  String m_source{};
   BumpArena *m_arena;
   usize m_cursor_position{0};
   usize m_cached_offset{0};

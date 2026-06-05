@@ -8,7 +8,9 @@
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Path.hpp"
 #include "Platform.hpp"
+#include "ResolvedCommand.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -17,8 +19,6 @@
 #include <cerrno>
 #include <cstdlib>
 #include <exception>
-#include <filesystem>
-#include <optional>
 #include <thread>
 
 namespace shit {
@@ -106,10 +106,11 @@ void
 EvalContext::unset_shell_variable(StringView name)
 {
   m_shell_variables.erase(name);
-  /* An exported variable also lives in the process environment, so it is removed
-     there too. Otherwise a later lookup falls back to the stale environment
-     value and the variable appears still set, which dash does not do. */
-  os::unset_environment_variable(std::string{name.data, name.length});
+  /* An exported variable also lives in the process environment, so it is
+     removed there too. Otherwise a later lookup falls back to the stale
+     environment value and the variable appears still set, which dash does not
+     do. */
+  os::unset_environment_variable(name);
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
@@ -117,16 +118,20 @@ Maybe<String>
 EvalContext::get_variable_value(StringView name) const
 {
   if (name == "?")
-    return String{heap_allocator(), std::to_string(m_last_exit_status)};
+    return String{heap_allocator(),
+                  utils::integer_to_string(m_last_exit_status)};
   if (name == "$")
-    return String{heap_allocator(), std::to_string(os::get_shell_process_id())};
+    return String{heap_allocator(),
+                  utils::integer_to_string(os::get_shell_process_id())};
   if (name == "!")
     return m_last_background_pid
-               ? String{heap_allocator(), std::to_string(*m_last_background_pid)}
+               ? String{heap_allocator(),
+                        utils::integer_to_string(*m_last_background_pid)}
                : String{};
   if (name == "-") return String{heap_allocator(), option_flags_string()};
   if (name == "#")
-    return String{heap_allocator(), std::to_string(m_positional_params.size())};
+    return String{heap_allocator(), utils::unsigned_integer_to_string(
+                                        m_positional_params.size())};
   if (name == "0") return String{heap_allocator(), m_shell_name};
 
   /* A purely numeric name selects a positional parameter, $1 upward. An index
@@ -167,9 +172,8 @@ EvalContext::get_variable_value(StringView name) const
 
   if (const String *stored = m_shell_variables.find(name)) return *stored;
 
-  if (std::optional<std::string> env =
-          os::get_environment_variable(std::string{name.data, name.length}))
-    return String{heap_allocator(), *env};
+  if (Maybe<String> env = os::get_environment_variable(name))
+    return String{heap_allocator(), env->view()};
   return shit::None;
 }
 
@@ -357,7 +361,9 @@ EvalContext::readonly_names() const
 {
   ArrayList<String> out{};
   for (const String &name : m_readonly_names)
-    out.push(String{heap_allocator(), StringView{name.c_str(), name.size()}});
+    out.push(String{
+        heap_allocator(), StringView{name.c_str(), name.size()}
+    });
   std::sort(out.begin(), out.end());
   return out;
 }
@@ -476,7 +482,7 @@ EvalContext::in_subshell() const
 void
 EvalContext::request_break(i64 level, SourceLocation location)
 {
-  SHIT_LOG(Verbosity::Debug, "break requested, level %lld", (long long)level);
+  SHIT_LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
                                m_current_source, String{m_current_origin}};
 }
@@ -485,7 +491,7 @@ void
 EvalContext::request_continue(i64 level, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "continue requested, level %lld",
-           (long long)level);
+           (long long) level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Continue, level, location,
                                m_current_source, String{m_current_origin}};
 }
@@ -494,7 +500,7 @@ void
 EvalContext::request_return(i64 status, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "return requested, status %lld",
-           (long long)status);
+           (long long) status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Return, status, location,
                                m_current_source, String{m_current_origin}};
 }
@@ -502,7 +508,7 @@ EvalContext::request_return(i64 status, SourceLocation location)
 void
 EvalContext::request_exit(i64 status, SourceLocation location)
 {
-  SHIT_LOG(Verbosity::Debug, "exit requested, status %lld", (long long)status);
+  SHIT_LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
                                m_current_source, String{m_current_origin}};
 }
@@ -695,7 +701,7 @@ EvalStateSnapshot
 EvalContext::snapshot_state() const
 {
   return EvalStateSnapshot{m_shell_variables, m_functions, m_positional_params,
-                           utils::get_current_directory()};
+                           Path::current_directory()};
 }
 
 void
@@ -704,7 +710,9 @@ EvalContext::restore_state(EvalStateSnapshot snapshot)
   m_shell_variables = std::move(snapshot.shell_variables);
   m_functions = std::move(snapshot.functions);
   m_positional_params = std::move(snapshot.positional_params);
-  utils::set_current_directory(snapshot.working_directory);
+  /* set_current_directory reports an error through ErrorOr, ignored here to
+     match the prior void call that swallowed a failed chdir. */
+  (void) Path::set_current_directory(snapshot.working_directory);
 
   /* The cached field separators track the restored map, so an IFS change inside
      the subshell or the command substitution does not leak its split behavior
@@ -866,15 +874,14 @@ EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
           depth++;
         } else if (word[j] == ')' && depth > 0) {
           depth--;
-        } else if (word[j] == ')' && j + 1 < word.length &&
-                   word[j + 1] == ')')
+        } else if (word[j] == ')' && j + 1 < word.length && word[j + 1] == ')')
         {
           j += 2;
           break;
         }
         inner += word[j];
       }
-      out += std::to_string(evaluate_arithmetic(inner));
+      out += utils::integer_to_string(evaluate_arithmetic(inner));
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). */
@@ -890,8 +897,7 @@ EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
         }
         inner += word[j];
       }
-      out += capture_command_substitution(
-          std::string{inner.c_str(), inner.size()});
+      out += capture_command_substitution(inner);
       i = j;
     } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                next == '$' || next == '!' || next == '-' ||
@@ -916,14 +922,13 @@ EvalContext::apply_parameter_expansion(StringView spec)
   if (spec.length > 1 && spec[0] == '#') {
     StringView name = spec.substring(1);
     if (name == "@" || name == "*")
-      return String{heap_allocator(),
-                    StringView{std::to_string(m_positional_params.size())}};
+      return String{heap_allocator(), utils::unsigned_integer_to_string(
+                                          m_positional_params.size())};
     Maybe<String> value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
-    return String{
-        heap_allocator(),
-        StringView{std::to_string(value.value_or(String{}).length())}};
+    return String{heap_allocator(), utils::unsigned_integer_to_string(
+                                        value.value_or(String{}).length())};
   }
 
   /* Split the parameter name from an optional operator and its word. */
@@ -982,8 +987,7 @@ EvalContext::apply_parameter_expansion(StringView spec)
     return expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {
-      if (word.empty())
-        throw Error{name + ": parameter not set or empty"};
+      if (word.empty()) throw Error{name + ": parameter not set or empty"};
       throw Error{expand_modifier_word(word)};
     }
     return String{heap_allocator(), current->view()};
@@ -1009,16 +1013,20 @@ EvalContext::make_stats_string() const
   s += "[Stats\n";
 
   s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Expansions: " + std::to_string(last_expansion_count());
+  s += "Expansions: " +
+       utils::unsigned_integer_to_string(last_expansion_count());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Nodes evaluated: " + std::to_string(last_expressions_executed());
+  s += "Nodes evaluated: " +
+       utils::unsigned_integer_to_string(last_expressions_executed());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Total expansions: " + std::to_string(total_expansion_count());
+  s += "Total expansions: " +
+       utils::unsigned_integer_to_string(total_expansion_count());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Total nodes evaluated: " + std::to_string(total_expressions_executed());
+  s += "Total nodes evaluated: " +
+       utils::unsigned_integer_to_string(total_expressions_executed());
   s += '\n';
 
   s += "]";
@@ -1076,36 +1084,39 @@ EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
   Allocator scratch = scratch_allocator();
   ArrayList<GlobField> expanded{scratch};
 
-  /* This runs only for a field that holds a real glob, which is rare, so a
-     local std::string keeps the directory and pattern arithmetic plain. */
-  std::string path{field.text.c_str(), field.text.size()};
+  /* This runs only for a field that holds a real glob, which is rare. The path
+     text is split on its last separator into a parent directory and the glob
+     stem. */
+  StringView path = field.text.view();
 
-  usize last_slash = path.rfind('/');
-  bool has_slashes = (last_slash != std::string::npos);
+  Maybe<usize> last_slash{};
+  for (usize i = path.length; i > 0; i--)
+    if (path[i - 1] == '/') {
+      last_slash = i - 1;
+      break;
+    }
+  bool has_slashes = last_slash.has_value();
 
   /* Prefix is the parent directory. */
-  std::string parent_dir{};
+  Path parent_dir{};
   if (has_slashes)
     parent_dir =
-        (last_slash != 0) ? path.substr(0, last_slash) : path.substr(0, 1);
+        Path{*last_slash != 0 ? path.substring_of_length(0, *last_slash)
+                              : path.substring_of_length(0, 1)};
   else
-    parent_dir = ".";
+    parent_dir = Path{StringView{"."}};
 
   /* Stem of the glob after the last slash. Its mask starts at stem_start in the
      field, so glob_matches reads field.glob_active from there. */
-  usize stem_start = has_slashes ? last_slash + 1 : 0;
-  bool has_glob = stem_start < path.length();
-  std::string_view glob{};
-  if (has_glob) glob = std::string_view{path}.substr(stem_start);
+  usize stem_start = has_slashes ? *last_slash + 1 : 0;
+  bool has_glob = stem_start < path.length;
+  StringView glob{};
+  if (has_glob) glob = path.substring(stem_start);
 
-  std::filesystem::directory_iterator d{};
-  try {
-    d = std::filesystem::directory_iterator{parent_dir};
-  } catch (const std::filesystem::filesystem_error &e) {
-    SHIT_UNUSED(e);
-    throw Error{"Could not descend into '" + parent_dir +
+  Maybe<ArrayList<String>> entries = Path::read_directory(parent_dir);
+  if (!entries.has_value())
+    throw Error{"Could not descend into '" + parent_dir.text() +
                 "': " + os::last_system_error_message()};
-  }
 
   if (!has_glob) {
     GlobField copy{scratch};
@@ -1115,42 +1126,33 @@ EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
     return expanded;
   }
 
-  for (const std::filesystem::directory_entry &e : d) {
-    if (!should_expand_files && !e.is_directory()) continue;
+  bool parent_is_dot = parent_dir.text() == StringView{"."};
 
-    /* The entry already holds the full path it built. On POSIX native() is a
-       std::string reference, so the filename is a view into it with no
-       allocation. On Windows native() is a std::wstring, so the path is
-       converted to a std::string for the byte-oriented matching below. */
-#if SHIT_PLATFORM_IS WIN32
-    std::string full = e.path().string();
-#else
-    const std::string &full = e.path().native();
-#endif
-    usize slash = full.find_last_of("/\\");
-    std::string_view filename = (slash == std::string::npos)
-                                    ? std::string_view{full}
-                                    : std::string_view{full}.substr(slash + 1);
+  for (const String &entry_name : *entries) {
+    StringView filename = entry_name.view();
+
+    /* The full path joins the parent and the filename, the way the directory
+       walk needs it for the is_directory test and the result text. */
+    Path full_path = parent_dir;
+    full_path.push_component(filename);
+
+    if (!should_expand_files && !full_path.is_directory()) continue;
 
     /* TODO: Figure the rules of hidden file expansion. */
     if (glob[0] != '.' && !filename.empty() && filename[0] == '.') continue;
 
-    if (utils::glob_matches(StringView{glob.data(), glob.size()},
-                            StringView{filename.data(), filename.size()},
-                            field.glob_active, stem_start))
-    {
+    if (utils::glob_matches(glob, filename, field.glob_active, stem_start)) {
       add_expansion();
 
       /* A real filename is literal, so the resulting field never globs again.
          The empty mask is the all-literal convention, so it carries no
-         per-result allocation. The iterator built the full path already, so
-         reuse it instead of joining the parent and filename again. A parent of
-         "." is dropped to keep the result relative. */
+         per-result allocation. A parent of "." is dropped to keep the result
+         relative. */
       GlobField result_field{scratch};
-      if (parent_dir == ".")
-        result_field.text.append(StringView{filename.data(), filename.size()});
+      if (parent_is_dot)
+        result_field.text.append(filename);
       else
-        result_field.text.append(StringView{full.data(), full.size()});
+        result_field.text.append(full_path.text().view());
       expanded.push(std::move(result_field));
     }
   }
@@ -1201,9 +1203,7 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
          earlier glob, so keep it only when it actually exists. A path produced
          purely by globbing came from a directory read and always exists, so it
          never reaches here and pays no stat. */
-      std::error_code exists_error{};
-      if (std::filesystem::exists(field.text.c_str(), exists_error))
-        result.push(std::move(field));
+      if (Path{field.text.view()}.exists()) result.push(std::move(field));
       continue;
     }
 
@@ -1279,14 +1279,13 @@ EvalContext::expand_tilde(WordSegment &leading_segment) const
   /* Only a bare ~ or a ~/ prefix expands. ~user is left alone for now. */
   if (text.length() > 1 && text[1] != '/') return;
 
-  Maybe<std::filesystem::path> home = os::get_home_directory();
+  Maybe<Path> home = os::get_home_directory();
   if (!home) throw Error{"Could not figure out home directory"};
 
   /* String has no in-place erase or insert, so the home path and the remainder
      after the tilde are joined into a fresh buffer and moved back. */
-  std::string home_string = home->string();
   String expanded{heap_allocator()};
-  expanded.append(StringView{home_string.data(), home_string.size()});
+  expanded.append(home->text().view());
   expanded.append(text.substring(1));
   text = std::move(expanded);
 }
@@ -1337,9 +1336,9 @@ EvalContext::expand_path(GlobField field)
 
 namespace {
 
-/* The count of leading bytes that are digits in the given radix, so a value with
-   trailing non-digit bytes reads only its numeric prefix the way base-0 strtoll
-   did. A hexadecimal scan accepts both letter cases. */
+/* The count of leading bytes that are digits in the given radix, so a value
+   with trailing non-digit bytes reads only its numeric prefix the way base-0
+   strtoll did. A hexadecimal scan accepts both letter cases. */
 usize
 count_leading_digits(StringView text, u32 radix)
 {
@@ -1415,9 +1414,8 @@ struct ArithmeticParser
   void
   skip_spaces()
   {
-    while (pos < source.length &&
-           (source[pos] == ' ' || source[pos] == '\t' || source[pos] == '\n' ||
-            source[pos] == '\r'))
+    while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
+                                   source[pos] == '\n' || source[pos] == '\r'))
       pos++;
   }
 
@@ -1518,14 +1516,14 @@ struct ArithmeticParser
         if (consume(op)) {
           i64 rhs = parse_assignment();
           i64 result = apply_compound(read_variable_value(name), rhs, kind);
-          context.set_shell_variable(name, std::to_string(result));
+          context.set_shell_variable(name, utils::integer_to_string(result));
           return result;
         }
       }
       if (starts_with("=") && !starts_with("==")) {
         consume("=");
         i64 rhs = parse_assignment();
-        context.set_shell_variable(name, std::to_string(rhs));
+        context.set_shell_variable(name, utils::integer_to_string(rhs));
         return rhs;
       }
       pos = save;
@@ -1717,7 +1715,8 @@ struct ArithmeticParser
       else
         consumed = count_leading_digits(rest, 10);
 
-      i64 value = parse_arithmetic_operand(rest.substring_of_length(0, consumed));
+      i64 value =
+          parse_arithmetic_operand(rest.substring_of_length(0, consumed));
       pos += consumed;
       return value;
     }
@@ -1845,19 +1844,17 @@ EvalContext::expand_word(const Word &word)
         append_split_run(value, true);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
-      String output{
-          heap_allocator(),
-          capture_command_substitution(
-              std::string{segment.text.c_str(), segment.text.size()})};
+      String output{heap_allocator(),
+                    capture_command_substitution(segment.text)};
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
         append_split_run(output, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      String value{heap_allocator(),
-                   StringView{std::to_string(
-                       evaluate_arithmetic(segment.text.view()))}};
+      String value{
+          heap_allocator(),
+          utils::integer_to_string(evaluate_arithmetic(segment.text.view()))};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1893,10 +1890,9 @@ EvalContext::expand_word_for_assignment(const Word &word)
     if (segment.kind == WordSegment::Kind::VariableReference)
       result += apply_parameter_expansion(segment_text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
-      result += capture_command_substitution(
-          std::string{segment_text.data, segment_text.length});
+      result += capture_command_substitution(segment.text);
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
-      result += StringView{std::to_string(evaluate_arithmetic(segment_text))};
+      result += utils::integer_to_string(evaluate_arithmetic(segment_text));
     else
       result += segment_text;
   }
@@ -1904,7 +1900,7 @@ EvalContext::expand_word_for_assignment(const Word &word)
 }
 
 String
-EvalContext::capture_command_substitution(const std::string &source)
+EvalContext::capture_command_substitution(const String &source)
 {
   /* Parse the inner command into the active parse arena. It coexists with the
      outer tree and is reclaimed when the arena resets. */
@@ -1912,7 +1908,7 @@ EvalContext::capture_command_substitution(const std::string &source)
     throw Error{"Command substitution outside of a parse"};
 
   Parser parser{
-      Lexer{source, *g_ast_arena}
+      Lexer{String{source.view()}, *g_ast_arena}
   };
   std::unique_ptr<Expression> ast = parser.construct_ast();
 
@@ -1995,8 +1991,10 @@ EvalContext::run_source(const std::string &source, const std::string &origin)
      marked with its origin. Otherwise the caller would print the caret against
      the wrong line. */
   try {
+    /* The Lexer takes a String, while this entry still takes a std::string for
+       the builtin callers, so the source crosses that boundary here. */
     Parser parser{
-        Lexer{source, *g_ast_arena}
+        Lexer{String{StringView{source.data(), source.size()}}, *g_ast_arena}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this
@@ -2097,8 +2095,8 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
             static_cast<const tokens::Assignment *>(t);
         String key_literal{StringView{a->key()}};
         key_literal += "=";
-        fallback_word.segments.push(WordSegment{
-            WordSegment::Kind::LiteralText, std::move(key_literal), false});
+        fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
+                                                std::move(key_literal), false});
         const Word &value = a->value_word();
         for (const WordSegment &value_segment : value.segments)
           fallback_word.segments.push(value_segment);
@@ -2111,8 +2109,9 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
 
       for (GlobField &field : expand_word(*word)) {
         for (String &g : expand_path(std::move(field)))
-          expanded_args.push(
-              String{heap_allocator(), StringView{g.c_str(), g.size()}});
+          expanded_args.push(String{
+              heap_allocator(), StringView{g.c_str(), g.size()}
+          });
       }
     } catch (const Error &e) {
       throw ErrorWithLocation{l, e.message()};
@@ -2136,14 +2135,10 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
   return expanded_args;
 }
 
-/* clang-format off */
-ExecContext::ExecContext(
-    SourceLocation location,
-    std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
-    const ArrayList<String> &args)
-    : m_kind(kind), m_location(location), m_args(args)
+ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
+                         const ArrayList<String> &args)
+    : m_kind(std::move(kind)), m_location(location), m_args(args)
 {}
-/* clang-format on */
 
 const SourceLocation &
 ExecContext::source_location() const
@@ -2166,14 +2161,14 @@ ExecContext::args() const
 bool
 ExecContext::is_builtin() const
 {
-  return std::holds_alternative<shit::Builtin::Kind>(m_kind);
+  return m_kind.is_builtin();
 }
 
-const std::filesystem::path &
+const Path &
 ExecContext::program_path() const
 {
   SHIT_ASSERT(!is_builtin());
-  return std::get<std::filesystem::path>(m_kind);
+  return m_kind.program_path;
 }
 
 void
@@ -2197,14 +2192,13 @@ const Builtin::Kind &
 ExecContext::builtin_kind() const
 {
   SHIT_ASSERT(is_builtin());
-  return std::get<shit::Builtin::Kind>(m_kind);
+  return m_kind.builtin_kind;
 }
 
 void
 ExecContext::print_to_stdout(StringView s) const
 {
-  if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data, s.length)
-           .has_value())
+  if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data, s.length).has_value())
   {
     throw Error{"Unable to write to stdout: " +
                 os::last_system_error_message()};
@@ -2212,19 +2206,15 @@ ExecContext::print_to_stdout(StringView s) const
 }
 
 ExecContext
-ExecContext::make_from(SourceLocation location,
-                       const ArrayList<String> &args)
+ExecContext::make_from(SourceLocation location, const ArrayList<String> &args)
 {
   /* Make sure we always include at least one argument, the program path. */
   SHIT_ASSERT(args.size() > 0);
 
-  std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
-
   const String &program = args[0];
-  std::string program_string{program.c_str(), program.size()};
 
   Maybe<Builtin::Kind> bk;
-  Maybe<std::filesystem::path> p;
+  Maybe<Path> p;
 
   /* This isn't a path? */
   if (!program.find_character('/').has_value()) {
@@ -2232,36 +2222,34 @@ ExecContext::make_from(SourceLocation location,
 
     if (!bk) {
       /* Not a builtin, try to search PATH. */
-      ArrayList<std::filesystem::path> ps =
-          utils::search_program_path(program_string);
-      if (ps.size() > 0) p = ps[0];
+      ArrayList<Path> ps = utils::search_program_path(program.view());
+      if (ps.size() > 0) p = std::move(ps[0]);
     }
   } else {
     /* This is a path. */
     /* TODO: Sanitize extensions here too. */
-    p = utils::canonicalize_path(program_string);
+    p = utils::canonicalize_path(program.view());
   }
 
   /* Builtins take precedence over programs. */
+  ResolvedCommand kind;
   if (!bk) {
     if (p.has_value()) {
-      kind = *p;
+      kind = ResolvedCommand::from_program(std::move(*p));
     } else {
       throw ErrorWithLocation{location,
-                              "Program '" + program_string + "' wasn't found"};
+                              "Program '" + program + "' wasn't found"};
     }
   } else {
-    kind = *bk;
+    kind = ResolvedCommand::from_builtin(*bk);
   }
 
   return {location, std::move(kind), args};
 }
 
 ExecContext
-ExecContext::from_resolved(
-    SourceLocation location,
-    std::variant<shit::Builtin::Kind, std::filesystem::path> kind,
-    const ArrayList<String> &args)
+ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
+                           const ArrayList<String> &args)
 {
   SHIT_ASSERT(args.size() > 0);
   return {location, std::move(kind), args};
