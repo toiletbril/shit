@@ -46,7 +46,7 @@ i32 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
       cxt.set_last_background_pid(os::process_id_of(p));
       int id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
-        shit::print_to_standard_error(
+        shit::print_error(
             "[" + integer_to_string(id) + "] " +
             unsigned_integer_to_string(static_cast<u64>(os::process_id_of(p))) +
             "\n");
@@ -122,7 +122,7 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       cxt.set_last_background_pid(os::process_id_of(last_child));
       int id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_to_standard_error(
+        shit::print_error(
             "[" + integer_to_string(id) + "] " +
             unsigned_integer_to_string(
                 static_cast<u64>(os::process_id_of(last_child))) +

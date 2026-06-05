@@ -380,8 +380,8 @@ void show_version()
   s += '\n';
   s += "(c) toiletbril <https://github.com/toiletbril>";
   s += '\n';
-  print_to_standard_output(s);
-  flush_standard_output();
+  print(s);
+  flush();
 }
 
 void show_short_version()
@@ -395,8 +395,8 @@ void show_short_version()
   s += '-';
   s += SHIT_VER_EXTRA;
   s += '\n';
-  print_to_standard_output(s);
-  flush_standard_output();
+  print(s);
+  flush();
 }
 
 std::string make_synopsis(std::string_view program_name,
@@ -481,7 +481,7 @@ std::string make_flag_help(const ArrayList<Flag *> &flags)
   return std::string{s.c_str(), s.size()};
 }
 
-void print_to_standard_output(StringView text)
+void print(StringView text)
 {
   /* The output is flushed at once so it interleaves with the unbuffered
      write_fd path the builtins use, keeping the order a reader sees correct. */
@@ -489,19 +489,19 @@ void print_to_standard_output(StringView text)
   std::fflush(stdout);
 }
 
-void print_to_standard_error(StringView text)
+void print_error(StringView text)
 {
   std::fwrite(text.data, 1, text.size(), stderr);
   std::fflush(stderr);
 }
 
-void flush_standard_output() { std::fflush(stdout); }
+void flush() { std::fflush(stdout); }
 
 void show_message(StringView err)
 {
-  print_to_standard_error("shit: ");
-  print_to_standard_error(err);
-  print_to_standard_error("\n");
+  print_error("shit: ");
+  print_error(err);
+  print_error("\n");
 }
 
 } /* namespace shit */

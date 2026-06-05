@@ -125,8 +125,8 @@ void show_message(StringView err);
 /* Write bytes to the standard streams without going through the iostream
    layer. The shell uses these instead of std::cout and std::cerr so the binary
    does not pull in the stream machinery. */
-void print_to_standard_output(StringView text);
-void print_to_standard_error(StringView text);
-void flush_standard_output();
+void print(StringView text);
+void print_error(StringView text);
+void flush();
 
 } /* namespace shit */

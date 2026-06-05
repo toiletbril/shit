@@ -350,11 +350,11 @@ i32 wait_and_monitor_process(process pid)
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      shit::print_to_standard_output(
+      shit::print(
           "[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
           ", signal " + utils::integer_to_string(sig) + "]\n");
     } else {
-      shit::print_to_standard_output("\n");
+      shit::print("\n");
     }
 
     return 128 + sig;
@@ -364,7 +364,7 @@ i32 wait_and_monitor_process(process pid)
     String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
                                         : String{StringView{"Unknown"}};
 
-    shit::print_to_standard_output(
+    shit::print(
         "[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
         ", signal " + utils::integer_to_string(sig) + " and killed]\n");
 
@@ -923,7 +923,7 @@ String last_system_error_message()
 static void handle_interrupt(int s)
 {
   SHIT_UNUSED(s);
-  shit::print_to_standard_output("\n");
+  shit::print("\n");
   /* TODO: Ignore error? */
   signal(SIGINT, handle_interrupt);
 }

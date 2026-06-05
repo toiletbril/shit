@@ -30,7 +30,7 @@ struct TestEvaluator
   void fail(StringView message)
   {
     if (!had_error)
-      shit::print_to_standard_error(StringView{"test: "} + message + "\n");
+      shit::print_error(StringView{"test: "} + message + "\n");
     had_error = true;
   }
 
@@ -173,7 +173,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
   usize expression_end = arguments.size();
   if (ec.program() == "[") {
     if (arguments.size() < 2 || arguments[arguments.size() - 1] != "]") {
-      shit::print_to_standard_error("[: missing closing ']'\n");
+      shit::print_error("[: missing closing ']'\n");
       return 2;
     }
     expression_end = arguments.size() - 1;
@@ -191,7 +191,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
   bool result = evaluator.parse_expression();
   if (evaluator.had_error) return 2;
   if (evaluator.pos != operands.size()) {
-    shit::print_to_standard_error(StringView{"test: unexpected argument '"} +
+    shit::print_error(StringView{"test: unexpected argument '"} +
                                   operands[evaluator.pos] + "'\n");
     return 2;
   }

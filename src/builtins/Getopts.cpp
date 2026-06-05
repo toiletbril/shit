@@ -90,7 +90,7 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
       cxt.set_shell_variable("OPTARG", option_as_string);
     } else {
       cxt.unset_shell_variable("OPTARG");
-      shit::print_to_standard_error(StringView{"getopts: illegal option -- "} +
+      shit::print_error(StringView{"getopts: illegal option -- "} +
                                     option_as_string + "\n");
     }
     return finish(0);
@@ -118,7 +118,7 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
       } else {
         cxt.set_shell_variable(name, "?");
         cxt.unset_shell_variable("OPTARG");
-        shit::print_to_standard_error(
+        shit::print_error(
             StringView{"getopts: option requires an argument -- "} +
             option_as_string + "\n");
       }

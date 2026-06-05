@@ -142,14 +142,14 @@ static int run_script_contents(const shit::String &script_contents,
     std::unique_ptr<shit::Expression> ast = p.construct_ast();
 
     if (FLAG_AST.is_enabled()) {
-      shit::print_to_standard_output(ast->to_ast_string());
-      shit::print_to_standard_output("\n");
+      shit::print(ast->to_ast_string());
+      shit::print("\n");
     }
 
     if (FLAG_ESCAPE_MAP.is_enabled()) {
       for (const auto &word : p.debug_words()) {
-        shit::print_to_standard_output(word.to_pretty_string());
-        shit::print_to_standard_output("\n");
+        shit::print(word.to_pretty_string());
+        shit::print("\n");
       }
     }
 
@@ -173,12 +173,12 @@ static int run_script_contents(const shit::String &script_contents,
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
     if (FLAG_EXIT_CODE.is_enabled())
-      shit::print_to_standard_output(
+      shit::print(
           "[Code " + shit::utils::integer_to_string(exit_code) + "]\n");
 
     if (FLAG_STATS.is_enabled()) {
-      shit::print_to_standard_output(context.make_stats_string());
-      shit::print_to_standard_output("\n");
+      shit::print(context.make_stats_string());
+      shit::print("\n");
     }
   } catch (const shit::ErrorWithLocationAndDetails &e) {
     shit::show_message(e.to_string(script_contents));
@@ -302,7 +302,7 @@ int main(int argc, char **argv)
     h += '\n';
     h += shit::make_flag_help(FLAG_LIST);
     h += '\n';
-    shit::print_to_standard_error(h);
+    shit::print_error(h);
     return EXIT_SUCCESS;
   } else if (FLAG_VERSION.is_enabled()) {
     shit::show_version();
@@ -528,26 +528,26 @@ int main(int argc, char **argv)
           switch (code) {
           case TL_PRESSED_TAB:
             /* TODO. */
-            shit::print_to_standard_output("^I");
-            shit::flush_standard_output();
+            shit::print("^I");
+            shit::flush();
             toiletline::set_input(input);
             break;
           case TL_PRESSED_EOF:
             /* Exit on CTRL-D. */
-            shit::print_to_standard_output("^D");
-            shit::flush_standard_output();
+            shit::print("^D");
+            shit::flush();
             toiletline::emit_newlines(input);
             shit::utils::quit(exit_code, true);
             break;
           case TL_PRESSED_INTERRUPT:
             /* Ignore Ctrl-C. */
-            shit::print_to_standard_output("^C");
-            shit::flush_standard_output();
+            shit::print("^C");
+            shit::flush();
             break;
           case TL_PRESSED_SUSPEND:
             /* Ignore Ctrl-Z. */
-            shit::print_to_standard_output("^Z");
-            shit::flush_standard_output();
+            shit::print("^Z");
+            shit::flush();
             break;
           default:;
           }

@@ -1703,7 +1703,7 @@ String EvalContext::capture_command_substitution(const String &source)
     } catch (...) {}
   });
 
-  shit::flush_standard_output();
+  shit::flush();
   os::descriptor saved = os::redirect_stdout(pipe->out);
 
   /* The inner commands write to the pipe, not the terminal, so suppress the
@@ -1732,7 +1732,7 @@ String EvalContext::capture_command_substitution(const String &source)
 
   m_shell_is_interactive = was_interactive;
 
-  shit::flush_standard_output();
+  shit::flush();
   os::restore_stdout(saved);
   os::close_fd(pipe->out);
   reader.join();
@@ -1906,7 +1906,7 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
     trace.push(' ');
     trace.append(utils::merge_args_to_string(expanded_args));
     trace.push('\n');
-    shit::print_to_standard_error(trace);
+    shit::print_error(trace);
   }
 
   return expanded_args;

@@ -439,9 +439,9 @@ i64 SimpleCommand::evaluate_impl(EvalContext &cxt) const
   SHIT_ASSERT(m_args.size() > 0 || !m_redirections.empty());
 
   if (cxt.should_echo()) {
-    shit::print_to_standard_output(utils::merge_tokens_to_string(m_args) +
+    shit::print(utils::merge_tokens_to_string(m_args) +
                                    "\n");
-    shit::flush_standard_output();
+    shit::flush();
   }
 
   ArrayList<String> program_args = cxt.process_args(m_args);
