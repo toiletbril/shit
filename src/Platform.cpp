@@ -70,8 +70,13 @@ void restore_stdout(os::descriptor saved)
 
 Maybe<String> get_current_user()
 {
-  struct passwd *pw = getpwuid(getuid());
-  if (pw != NULL) return String{StringView{pw->pw_name}};
+  /* The name comes from the environment rather than getpwuid, which a static
+     build cannot call without pulling in the runtime glibc and which the linker
+     warns about. A login shell sets LOGNAME and USER. */
+  if (const char *name = std::getenv("LOGNAME"); name != NULL)
+    return String{StringView{name}};
+  if (const char *name = std::getenv("USER"); name != NULL)
+    return String{StringView{name}};
   return shit::None;
 }
 

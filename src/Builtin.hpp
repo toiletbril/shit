@@ -29,7 +29,6 @@ struct Builtin
     Break,
     Continue,
     Return,
-    Colon,
     True,
     False,
     Test,
@@ -83,7 +82,7 @@ inline constexpr StaticStringMap<Builtin::Kind>::Entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("break"),    Builtin::Kind::Break         },
     {PackedStringKey::from_literal("continue"), Builtin::Kind::Continue      },
     {PackedStringKey::from_literal("return"),   Builtin::Kind::Return        },
-    {PackedStringKey::from_literal(":"),        Builtin::Kind::Colon         },
+    {PackedStringKey::from_literal(":"),        Builtin::Kind::True          },
     {PackedStringKey::from_literal("true"),     Builtin::Kind::True          },
     {PackedStringKey::from_literal("false"),    Builtin::Kind::False         },
     {PackedStringKey::from_literal("test"),     Builtin::Kind::Test          },
@@ -133,7 +132,6 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Break);                                                               \
   B_CASE(Continue);                                                            \
   B_CASE(Return);                                                              \
-  B_CASE(Colon);                                                               \
   B_CASE(True);                                                                \
   B_CASE(False);                                                               \
   B_CASE(Test);                                                                \
@@ -181,7 +179,6 @@ BUILTIN_STRUCT(Export);
 BUILTIN_STRUCT(Break);
 BUILTIN_STRUCT(Continue);
 BUILTIN_STRUCT(Return);
-BUILTIN_STRUCT(Colon);
 BUILTIN_STRUCT(True);
 BUILTIN_STRUCT(False);
 BUILTIN_STRUCT(Test);
