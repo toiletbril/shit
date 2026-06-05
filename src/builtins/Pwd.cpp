@@ -1,4 +1,5 @@
 #include "../Builtin.hpp"
+#include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Utils.hpp"
 

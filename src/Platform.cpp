@@ -4,7 +4,10 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
+#include "Utils.hpp"
 
+#include <algorithm>
 #include <csignal>
 #include <cstdarg>
 #include <cstring>

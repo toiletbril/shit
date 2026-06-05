@@ -1,6 +1,6 @@
 #include "Path.hpp"
 
-#include "Os.hpp"
+#include "Platform.hpp"
 
 #include <cstdlib>
 

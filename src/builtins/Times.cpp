@@ -1,7 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
-#include "../Os.hpp"
+#include "../Platform.hpp"
 
 #if SHIT_PLATFORM_IS POSIX
 #include <sys/times.h>

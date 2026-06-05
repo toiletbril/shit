@@ -6,7 +6,6 @@
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "Os.hpp"
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"

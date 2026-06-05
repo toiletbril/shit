@@ -1,4 +1,5 @@
 #include "../Builtin.hpp"
+#include "../Eval.hpp"
 #include "../Utils.hpp"
 
 namespace shit {

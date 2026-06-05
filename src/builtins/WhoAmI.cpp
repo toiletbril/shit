@@ -1,4 +1,5 @@
 #include "../Builtin.hpp"
+#include "../Eval.hpp"
 #include "../Platform.hpp"
 
 FLAG_LIST_DECL();
