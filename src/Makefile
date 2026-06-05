@@ -68,6 +68,7 @@ CXXFLAGS := \
 	-pipe \
 	-fvisibility=hidden \
 	-fno-rtti \
+	-fno-semantic-interposition \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
