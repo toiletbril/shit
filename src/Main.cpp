@@ -68,6 +68,34 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 
 namespace shit {
 
+/* Print the help or version text and return the exit code when one of those
+   flags is set, otherwise None so the shell proceeds to normal startup. */
+static fn print_help_or_version_status(const String &program_path)
+    -> Maybe<int>
+{
+  if (FLAG_HELP.is_enabled()) {
+    String h{};
+    /* make_synopsis remains on the std::string_view Cli boundary, so spell the
+       view from the program path String here. */
+    h += make_synopsis(
+        std::string_view{program_path.c_str(), program_path.size()},
+        HELP_SYNOPSIS);
+    h += '\n';
+    h += make_flag_help(FLAG_LIST);
+    h += '\n';
+    print_error(h);
+    return EXIT_SUCCESS;
+  } else if (FLAG_VERSION.is_enabled()) {
+    show_version();
+    return EXIT_SUCCESS;
+  } else if (FLAG_SHORT_VERSION.is_enabled()) {
+    show_short_version();
+    return EXIT_SUCCESS;
+  }
+
+  return None;
+}
+
 /* Report a break, continue, or return that reached the top with no loop,
    function, or sourced script to consume it. The jump carries the source and
    the origin it was made in, so the caret points at the exact builtin and the
@@ -300,25 +328,8 @@ fn main(int argc, char **argv) -> int
     program_path = "<unknown>";
   }
 
-  if (FLAG_HELP.is_enabled()) {
-    shit::String h{};
-    /* make_synopsis remains on the std::string_view Cli boundary, so spell the
-       view from the program path String here. */
-    h += shit::make_synopsis(
-        std::string_view{program_path.c_str(), program_path.size()},
-        HELP_SYNOPSIS);
-    h += '\n';
-    h += shit::make_flag_help(FLAG_LIST);
-    h += '\n';
-    shit::print_error(h);
-    return EXIT_SUCCESS;
-  } else if (FLAG_VERSION.is_enabled()) {
-    shit::show_version();
-    return EXIT_SUCCESS;
-  } else if (FLAG_SHORT_VERSION.is_enabled()) {
-    shit::show_short_version();
-    return EXIT_SUCCESS;
-  }
+  if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
+    return *code;
 
   if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
 
