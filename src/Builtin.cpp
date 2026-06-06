@@ -7,30 +7,27 @@
 #include "Utils.hpp"
 
 #include <optional>
-#include <string>
-#include <string_view>
 
 namespace shit {
 
 cold fn show_builtin_help_impl(const ExecContext &ec,
-                               const std::vector<std::string> &hs,
+                               const ArrayList<StringView> &hs,
                                const ArrayList<Flag *> &fl) throws -> void
 {
   ASSERT(!ec.args().is_empty());
 
   String help_text{};
-  help_text += StringView{make_synopsis(
-      std::string_view{ec.args()[0].c_str(), ec.args()[0].count()}, hs)};
+  help_text += make_synopsis(ec.args()[0].view(), hs);
   help_text += '\n';
-  help_text += StringView{make_flag_help(fl)};
+  help_text += make_flag_help(fl);
   help_text += '\n';
   ec.print_to_stdout(help_text);
 }
 
-flatten fn search_builtin(std::string_view builtin_name) throws
+flatten fn search_builtin(StringView builtin_name) throws
     -> Maybe<Builtin::Kind>
 {
-  return BUILTINS.find(StringView{builtin_name.data(), builtin_name.size()});
+  return BUILTINS.find(builtin_name);
 }
 
 /* A one-line synopsis and a sentence of explanation for each builtin, shown by

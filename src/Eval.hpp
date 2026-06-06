@@ -9,8 +9,6 @@
 #include "Path.hpp"
 #include "ResolvedCommand.hpp"
 
-#include <string>
-
 namespace shit {
 
 /* A field is a candidate argument after variable expansion and field splitting.

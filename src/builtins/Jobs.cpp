@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 /* jobs lists the background jobs and the state each one is in, then forgets the
    ones that have finished, the same as a shell prompt would. */
@@ -37,8 +38,8 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let out = String{};
   for (let const &job : cxt.jobs()) {
-    out += "[" + std::to_string(job.id) + "] " + state_word(job.state) + "\t" +
-           job.command.c_str() + "\n";
+    out += "[" + utils::integer_to_string(job.id) + "] " +
+           state_word(job.state) + "\t" + job.command.c_str() + "\n";
   }
   ec.print_to_stdout(out);
 

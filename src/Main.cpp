@@ -14,7 +14,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <string>
 
 FLAG_LIST_DECL();
 
@@ -76,11 +75,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     String h{};
     h += "shit, a pedantic, super-fast and awesome posix-compatible command "
          "line interpreter\nor a friendly interactive shell for gigachads.\n\n";
-    /* make_synopsis remains on the std::string_view Cli boundary, so spell the
-       view from the program path String here. */
-    h += make_synopsis(
-        std::string_view{program_path.c_str(), program_path.count()},
-        HELP_SYNOPSIS);
+    h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
     h += make_flag_help(FLAG_LIST);
     h += '\n';

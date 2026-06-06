@@ -4,6 +4,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 
+#include <initializer_list>
 #include <new>
 #include <utility>
 
@@ -18,6 +19,16 @@ public:
      HashMap slot holds before a real list is placed into it. */
   ArrayList() : m_allocator(heap_allocator()) {}
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
+
+  /* A heap-backed list of the braced elements, so a static help table can be
+     spelled as a brace list. The initializer_list is header-only and adds no
+     standard-library link dependency. */
+  ArrayList(std::initializer_list<T> elements) : m_allocator(heap_allocator())
+  {
+    reserve(elements.size());
+    for (const T &element : elements)
+      push(element);
+  }
 
   ArrayList(const ArrayList &other) : m_allocator(other.m_allocator)
   {

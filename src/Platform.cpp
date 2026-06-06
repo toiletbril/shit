@@ -118,8 +118,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
   return suffixes;
 }();
 
-fn erase_extension_and_get_its_index(std::string &program_name) throws
-    -> ext_index
+fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index
 {
   /* POSIX does not really make use of extensions for executable files. */
   unused(program_name);
@@ -670,7 +669,7 @@ fn unset_environment_variable(StringView key) -> void
 
 fn execute_program(ExecContext &&ec) -> process
 {
-  std::string command_line = make_os_args(ec.args());
+  String command_line = make_os_args(ec.args());
 
   PROCESS_INFORMATION process_info{};
   STARTUPINFOA startup_info{};
@@ -904,10 +903,10 @@ fn make_os_args(const ArrayList<String> &args) -> os_args
 {
   ASSERT(args.count() > 0);
 
-  std::string s{};
+  String s{};
 
   s += '"';
-  s.append(args[0].c_str(), args[0].count());
+  s.append(args[0].view());
   s += '"';
 
   /* TODO: Remove CVE and escape quotes. */
@@ -915,7 +914,7 @@ fn make_os_args(const ArrayList<String> &args) -> os_args
     for (usize i = 1; i < args.count(); i++) {
       s += ' ';
       s += '"';
-      s.append(args[i].c_str(), args[i].count());
+      s.append(args[i].view());
       s += '"';
     }
   }
@@ -1027,24 +1026,24 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
 
 constexpr static usize MIN_SUFFIX_LEN = 3;
 
-fn erase_extension_and_get_its_index(std::string &program_name) -> ext_index
+fn erase_extension_and_get_its_index(String &program_name) -> ext_index
 {
 #if SHIT_PLATFORM_IS COSMO
   if (IsWindows())
 #endif
   {
-    usize extension_pos = program_name.rfind('.');
+    let const extension_pos = program_name.find_last_character('.');
 
-    if (extension_pos != std::string::npos &&
-        extension_pos + MIN_SUFFIX_LEN < program_name.length())
+    if (extension_pos.has_value() &&
+        *extension_pos + MIN_SUFFIX_LEN < program_name.length())
     {
-      std::string extension = program_name.substr(extension_pos);
+      const StringView extension = program_name.substring(*extension_pos);
 
       if (usize i = utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
-          i != std::string::npos)
+          i != utils::NOT_FOUND_INDEX)
       {
-        program_name.erase(program_name.begin() + extension_pos,
-                           program_name.end());
+        program_name =
+            String{program_name.substring_of_length(0, *extension_pos)};
         return i;
       }
     }

@@ -13,7 +13,6 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <cstring>
-#include <string>
 
 /* TODO: Support background processes. */
 /* TODO: Support setting environment variables. */
@@ -222,10 +221,7 @@ static pure fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
 
 static fn not_an_integer_error(StringView text) throws -> Error
 {
-  return Error{
-      "'" + std::string{text.data, text.length}
-        + "' is not a valid integer"
-  };
+  return Error{"'" + text + "' is not a valid integer"};
 }
 
 fn unsigned_integer_to_string(u64 value) throws -> String
@@ -634,12 +630,12 @@ fn initialize_path_map() throws -> void
     /* Cache every file in the directory under its name without an omitted
        extension, pointing at its full path. */
     for (const String &entry_name : *entries) {
-      std::string name{entry_name.c_str(), entry_name.count()};
+      String name{entry_name};
       os::erase_extension_and_get_its_index(name);
 
       let full_path = directory;
       full_path.push_component(entry_name.view());
-      cache_resolved_path(StringView{name.data(), name.size()}, full_path);
+      cache_resolved_path(name.view(), full_path);
     }
   }
 }
@@ -657,12 +653,12 @@ fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
 
     /* The cache key is the program name without an omitted extension, the same
        key the lookup uses. */
-    std::string key{program_name.data, program_name.length};
+    String key{program_name};
     os::erase_extension_and_get_its_index(key);
 
     let full_path = directory;
     full_path.push_component(program_name);
-    std::string full_path_str{full_path.c_str(), full_path.count()};
+    String full_path_str{full_path.text()};
 
     /* This file already has an extesion specified? */
     if (os::ext_index explicit_ext =
@@ -676,12 +672,12 @@ fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
         const Path try_path{(full_path.text() + suffix.view()).view()};
 
         if (try_path.exists()) {
-          cache_resolved_path(StringView{key.data(), key.size()}, try_path);
+          cache_resolved_path(key.view(), try_path);
           result.push(try_path);
         }
       }
     } else if (full_path.exists()) {
-      cache_resolved_path(StringView{key.data(), key.size()}, full_path);
+      cache_resolved_path(key.view(), full_path);
       result.push(full_path);
     }
   }
@@ -691,7 +687,7 @@ fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
 
 hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
 {
-  std::string sp{program_name.data, program_name.length};
+  String sp{program_name};
   ArrayList<Path> result{};
 
   const os::ext_index typed_extension =
@@ -701,8 +697,8 @@ hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
      so the extension-stripped cache key would resolve the wrong file. The cache
      is consulted only when no extension was typed, which on POSIX is always. */
   if (typed_extension == 0) {
-    if (ArrayList<Path> *const cached = const_cast<ArrayList<Path> *>(
-            PATH_CACHE.find(StringView{sp.data(), sp.size()})))
+    if (ArrayList<Path> *const cached =
+            const_cast<ArrayList<Path> *>(PATH_CACHE.find(sp.view())))
     {
       ArrayList<Path> kept{};
       for (usize i = 0; i < cached->count(); i++) {

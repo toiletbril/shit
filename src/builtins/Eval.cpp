@@ -15,13 +15,13 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
-  let joined = std::string{};
+  let joined = String{};
   for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) joined += ' ';
-    joined.append(ec.args()[i].c_str(), ec.args()[i].count());
+    joined.append(ec.args()[i].view());
   }
 
-  if (joined.empty()) return 0;
+  if (joined.is_empty()) return 0;
 
   /* eval leaves a return pending so it ends the enclosing function or the
      shell, the way dash propagates it, rather than ending the eval itself. */

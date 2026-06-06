@@ -55,8 +55,7 @@ public:
   fn push_component(StringView component) throws -> Path &;
 
   /* Replace the extension of the filename, adding one when absent. */
-  mustuse pure fn with_extension(StringView new_extension) const throws
-      -> Path;
+  mustuse pure fn with_extension(StringView new_extension) const throws -> Path;
 
   /* Disk queries, one syscall each. file_size is None when the path is missing
      or is not a regular file. */

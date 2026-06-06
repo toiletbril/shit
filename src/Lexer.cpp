@@ -8,8 +8,6 @@
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
-#include <string>
-
 /* TODO: Rewrite the lexer and parser to suit the shell language better. */
 /* TODO: Cache the token for repeated peeks. */
 
@@ -130,7 +128,7 @@ Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
 
 Lexer::~Lexer()
 {
-  for (std::string *body : m_heredoc_bodies)
+  for (String *body : m_heredoc_bodies)
     delete body;
 }
 
@@ -202,9 +200,9 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
 }
 
 cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
-    -> const std::string *
+    -> const String *
 {
-  let body = new std::string{};
+  let body = new String{};
   ASSERT(body != nullptr);
 
   m_heredoc_bodies.push(body);
@@ -216,9 +214,9 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
 cold fn Lexer::collect_pending_heredocs() throws -> void
 {
   for (heredoc_pending &pending : m_pending_heredocs) {
-    /* The body is written into the lexer-owned std::string the parsed
-       redirection points at, so it accumulates as one. */
-    std::string collected{};
+    /* The body is written into the lexer-owned String the parsed redirection
+       points at, so it accumulates as one. */
+    String collected{};
     for (;;) {
       if (m_cursor_position >= m_source.length()) break;
 
@@ -242,7 +240,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
 
       const let line = m_source.substring_of_length(line_offset, line_length);
       if (pending.delimiter == line) break;
-      collected.append(line.data, line.length);
+      collected.append(line);
       collected += '\n';
     }
     ASSERT(pending.body != nullptr);
@@ -611,8 +609,8 @@ hot fn Lexer::lex_identifier() throws -> Token *
       assignment_split.has_value())
   {
     t = m_arena->create<tokens::Assignment>(
-        here(actual_cursor_position, byte_count), assignment_split->first,
-        steal(assignment_split->second));
+        here(actual_cursor_position, byte_count), assignment_split->name,
+        steal(assignment_split->value));
   } else if (word.segments.count() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {

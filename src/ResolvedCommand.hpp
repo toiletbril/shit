@@ -27,8 +27,7 @@ public:
   Builtin::Kind builtin_kind{};
   Path program_path{};
 
-  mustuse static ResolvedCommand
-  from_builtin(Builtin::Kind chosen_builtin)
+  mustuse static ResolvedCommand from_builtin(Builtin::Kind chosen_builtin)
   {
     ResolvedCommand resolved{};
     resolved.kind = Kind::Builtin;

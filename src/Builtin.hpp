@@ -6,7 +6,6 @@
 #include "Platform.hpp"
 
 #include <optional>
-#include <string>
 
 /* TODO: test */
 
@@ -219,10 +218,10 @@ public:
   i32 execute(ExecContext &ec, EvalContext &cxt) const throws override;
 };
 
-Maybe<Builtin::Kind> search_builtin(std::string_view builtin_name) throws;
+Maybe<Builtin::Kind> search_builtin(StringView builtin_name) throws;
 
 void show_builtin_help_impl(const ExecContext &ec,
-                            const std::vector<std::string> &hs,
+                            const ArrayList<StringView> &hs,
                             const ArrayList<Flag *> &fl) throws;
 
 #define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \

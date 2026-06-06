@@ -610,7 +610,7 @@ hot fn Parser::parse_if() throws -> Command *
   ASSERT(if_token->kind() == Token::Kind::If);
   const let location = if_token->source_location();
 
-  ArrayList<std::pair<const Expression *, const Expression *>> branches{};
+  ArrayList<IfBranch> branches{};
   const Expression *otherwise = nullptr;
   /* Free the released branch nodes if a later branch fails to parse. */
   defer
@@ -636,8 +636,7 @@ hot fn Parser::parse_if() throws -> Command *
 
     Expression *body = parse_command_list(
         {Token::Kind::Elif, Token::Kind::Else, Token::Kind::Fi});
-    branches.push(
-        std::pair<const Expression *, const Expression *>{condition, body});
+    branches.push(IfBranch{condition, body});
 
     Token *after = m_lexer.next_shell_token();
     ASSERT(after != nullptr);

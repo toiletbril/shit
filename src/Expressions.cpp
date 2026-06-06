@@ -109,8 +109,7 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 fn command_resolves(const String &name) throws -> bool
 {
   if (name.is_empty()) return false;
-  if (search_builtin(std::string_view{name.c_str(), name.count()}).has_value())
-    return true;
+  if (search_builtin(name.view()).has_value()) return true;
   if (name.find_character('/').has_value())
     return utils::canonicalize_path(name.view()).has_value();
   return utils::search_program_path(name.view()).count() != 0;
@@ -338,9 +337,8 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  let const expanded_value =
+  const String value =
       cxt.expand_word_for_assignment(m_assignment->value_word());
-  const std::string value{expanded_value.c_str(), expanded_value.count()};
 
   /* The assignment goes through set_shell_variable first, so it still rejects a
      readonly name and refreshes the cached IFS. Under allexport it is then
@@ -349,7 +347,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_shell_variable(m_assignment->key(), value);
   if (cxt.export_all()) {
     let const &key = m_assignment->key();
-    os::set_environment_variable(std::string{key.c_str(), key.count()}, value);
+    os::set_environment_variable(key, value);
   }
   return cxt.last_exit_status();
 }
@@ -422,10 +420,9 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     if (redir.kind == Redirection::Kind::Heredoc) {
       ASSERT(redir.heredoc_body != nullptr);
 
-      let body = std::string{*redir.heredoc_body};
+      String body{*redir.heredoc_body};
       if (redir.heredoc_expand) {
-        let const expanded = cxt.expand_heredoc_body(body);
-        body.assign(expanded.c_str(), expanded.count());
+        body = cxt.expand_heredoc_body(body);
       }
 
       let opened = os::write_to_temp_file(body);
@@ -463,7 +460,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     else if (redir.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    const std::string target_path{target[0].c_str(), target[0].count()};
+    const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redir.target->source_location(),
@@ -591,10 +588,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (redir.kind == Redirection::Kind::Heredoc) {
       ASSERT(redir.heredoc_body != nullptr);
 
-      let body = std::string{*redir.heredoc_body};
+      String body{*redir.heredoc_body};
       if (redir.heredoc_expand) {
-        let const expanded = cxt.expand_heredoc_body(body);
-        body.assign(expanded.c_str(), expanded.count());
+        body = cxt.expand_heredoc_body(body);
       }
 
       let opened = os::write_to_temp_file(body);
@@ -634,7 +630,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     else if (redir.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    const std::string target_path{target[0].c_str(), target[0].count()};
+    const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redir.target->source_location(),
@@ -1087,10 +1083,8 @@ static fn indent_for_layer(usize layer) throws -> String
   return pad;
 }
 
-IfClause::IfClause(
-    SourceLocation location,
-    ArrayList<std::pair<const Expression *, const Expression *>> &&branches,
-    const Expression *otherwise)
+IfClause::IfClause(SourceLocation location, ArrayList<IfBranch> &&branches,
+                   const Expression *otherwise)
     : CompoundCommand(location), m_otherwise(otherwise)
 {
   for (const auto &branch : branches)

@@ -3,6 +3,8 @@
 #include "../Eval.hpp"
 #include "../Platform.hpp"
 
+#include <cstdio>
+
 #if SHIT_PLATFORM_IS POSIX
 #include <sys/times.h>
 #include <unistd.h>

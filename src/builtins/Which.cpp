@@ -32,10 +32,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 1; i < args.count(); i++) {
     let const &program_name = args[i];
-    if (search_builtin(
-            std::string_view{program_name.c_str(), program_name.count()})
-            .has_value())
-    {
+    if (search_builtin(program_name.view()).has_value()) {
       buf += program_name;
       /* The descriptive suffix is for a human at a terminal. A pipe gets just
          the name, which stays machine readable. */

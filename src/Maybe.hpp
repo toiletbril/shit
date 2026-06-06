@@ -95,10 +95,7 @@ public:
   {
     return m_has_value && reference() == other;
   }
-  mustuse bool operator!=(const T &other) const
-  {
-    return !(*this == other);
-  }
+  mustuse bool operator!=(const T &other) const { return !(*this == other); }
 
   /* Drop the value, leaving the Maybe empty. */
   void reset() noexcept

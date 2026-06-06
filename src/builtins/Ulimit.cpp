@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Utils.hpp"
 
 #if SHIT_PLATFORM_IS POSIX
 #include <sys/resource.h>
@@ -72,7 +73,8 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (limit.rlim_cur == RLIM_INFINITY)
       out = String{"unlimited"};
     else
-      out = String{std::to_string(limit.rlim_cur / resource.units_per_value)};
+      out = utils::unsigned_integer_to_string(limit.rlim_cur /
+                                              resource.units_per_value);
     ec.print_to_stdout(out + "\n");
     return 0;
   }

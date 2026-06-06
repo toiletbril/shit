@@ -11,10 +11,10 @@ namespace shit {
 
 /* A bump arena hands out node storage from large blocks and frees every block
    at once on reset. The AST and its tokens live here for one command, so their
-   many small allocations collapse into a handful of block allocations. An object
-   with a non-trivial destructor, such as a node that owns a heap String, has its
-   destructor registered at create and run on reset or release, since the block
-   reclaim alone would leak those owned members. */
+   many small allocations collapse into a handful of block allocations. An
+   object with a non-trivial destructor, such as a node that owns a heap String,
+   has its destructor registered at create and run on reset or release, since
+   the block reclaim alone would leak those owned members. */
 class BumpArena
 {
 public:
@@ -48,8 +48,8 @@ public:
     /* A trivially destructible object needs no teardown, so the registration is
        skipped and only the genuinely-owning ones cost a slot. */
     if constexpr (!std::is_trivially_destructible_v<T>)
-      m_destructors.push(
-          pending_destructor{object, [](void *p) { static_cast<T *>(p)->~T(); }});
+      m_destructors.push(pending_destructor{
+          object, [](void *p) { static_cast<T *>(p)->~T(); }});
     return object;
   }
 
@@ -76,7 +76,8 @@ private:
 
   fn add_block(usize minimum_size) throws -> void;
   /* Run and drop every registered destructor from the index down to first, in
-     reverse of registration so an object tears down before the one it followed. */
+     reverse of registration so an object tears down before the one it followed.
+   */
   fn run_destructors_down_to(usize first) wontthrow -> void;
 };
 

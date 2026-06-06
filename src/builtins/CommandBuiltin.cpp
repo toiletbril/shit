@@ -45,9 +45,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    if (search_builtin(std::string_view{name.c_str(), name.count()})
-            .has_value())
-    {
+    if (search_builtin(name.view()).has_value()) {
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n"
                                  : name + "\n");
       return 0;

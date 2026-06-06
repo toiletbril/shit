@@ -5,6 +5,7 @@
 #include "Eval.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
+#include "Utils.hpp"
 
 /* TODO: Print proper offset and context for UTF-8. */
 
@@ -79,7 +80,7 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
     msg += ' ';
   }
 
-  msg += std::to_string(line_number + 1) + " |  ";
+  msg += utils::unsigned_integer_to_string(line_number + 1) + " |  ";
 
   /* Line that caused the error. */
   let const context =
@@ -162,10 +163,7 @@ ErrorBase::operator bool &() throws { return m_is_active; }
 
 cold fn ErrorBase::message() const throws -> String { return m_message; }
 
-cold fn ErrorBase::severity_word() const wontthrow -> String
-{
-  return "Error";
-}
+cold fn ErrorBase::severity_word() const wontthrow -> String { return "Error"; }
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
@@ -178,10 +176,7 @@ Error::operator String() const throws { return to_string(); }
 
 Warning::Warning(StringView message) : Error(message) {}
 
-cold fn Warning::severity_word() const wontthrow -> String
-{
-  return "Warning";
-}
+cold fn Warning::severity_word() const wontthrow -> String { return "Warning"; }
 
 Note::Note(StringView message) : Error(message) {}
 
@@ -235,13 +230,13 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += *name;
     result += ':';
   }
-  result += std::to_string(line_number + 1);
+  result += utils::unsigned_integer_to_string(line_number + 1);
   result += ':';
-  result += std::to_string(line_byte_position);
+  result += utils::unsigned_integer_to_string(line_byte_position);
   result += ": ";
   result += severity_word();
-  /* A located note with no message, such as a backtrace trace frame, ends at the
-     severity word, so nothing follows the colon. */
+  /* A located note with no message, such as a backtrace trace frame, ends at
+     the severity word, so nothing follows the colon. */
   if (!m_message.is_empty()) {
     result += ": ";
     result += m_message;
@@ -307,9 +302,9 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
           : unicode_details_position + 1;
 
   String result{};
-  result += std::to_string(details_line_number + 1);
+  result += utils::unsigned_integer_to_string(details_line_number + 1);
   result += ':';
-  result += std::to_string(details_line_byte_position);
+  result += utils::unsigned_integer_to_string(details_line_byte_position);
   result += ": Note:\n";
 
   result += get_context_pointing_to(

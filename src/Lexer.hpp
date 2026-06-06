@@ -6,22 +6,19 @@
 #include "StringView.hpp"
 #include "Tokens.hpp"
 
-#include <string>
-
 namespace shit {
 
 class BumpArena;
 
 /* A heredoc whose body is collected when the line that introduced it ends. The
    body buffer has a stable address, so a parsed redirection points at it and
-   reads it once the lexer fills it. The body stays a std::string because the
-   parsed Redirection field that points at it is a std::string pointer the Eval
-   layer reads. */
+   reads it once the lexer fills it. The body is a heap String the lexer owns,
+   and a parsed Redirection field holds a pointer into one. */
 struct heredoc_pending
 {
   String delimiter;
   bool strip_tabs;
-  std::string *body;
+  String *body;
 };
 
 namespace lexer {
@@ -71,11 +68,10 @@ public:
   fn advance_past_last_peek() throws -> usize;
 
   /* Reserve a heredoc body for the given delimiter, returning the stable buffer
-     the lexer fills when the current line ends. The buffer is a std::string
-     because the parsed Redirection field that points at it is read as one by
-     the Eval layer. */
+     the lexer fills when the current line ends. The buffer is a heap String the
+     Eval layer reads through the parsed Redirection field that points at it. */
   fn register_heredoc(StringView delimiter, bool strip_tabs) throws
-      -> const std::string *;
+      -> const String *;
 
 protected:
   /* Stamp a location in the source being lexed with this lexer's filename, so
@@ -108,7 +104,7 @@ protected:
   /* Each body is heap-allocated so its address is stable. A parsed redirection
      holds a pointer into one, and the pointer must stay valid while the array
      of pointers grows. The lexer frees them in its destructor. */
-  ArrayList<std::string *> m_heredoc_bodies{heap_allocator()};
+  ArrayList<String *> m_heredoc_bodies{heap_allocator()};
   ArrayList<heredoc_pending> m_pending_heredocs{heap_allocator()};
   fn collect_pending_heredocs() throws -> void;
 

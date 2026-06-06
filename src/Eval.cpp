@@ -339,7 +339,7 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
     out.push(String{
         heap_allocator(), StringView{name.c_str(), name.count()}
     });
-  std::sort(out.begin(), out.end());
+  utils::sort_ascending(out);
   return out;
 }
 
@@ -416,7 +416,7 @@ fn EvalContext::alias_definitions() const throws -> ArrayList<String>
     definition.push('\'');
     out.push(steal(definition));
   });
-  std::sort(out.begin(), out.end());
+  utils::sort_ascending(out);
   return out;
 }
 
@@ -616,7 +616,7 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
     entry.append(StringView{value.c_str(), value.count()});
     assignments.push(steal(entry));
   });
-  std::sort(assignments.begin(), assignments.end());
+  utils::sort_ascending(assignments);
   return assignments;
 }
 
@@ -1253,7 +1253,7 @@ hot fn EvalContext::expand_path(glob_field field,
   /* Sort the matches in byte order, which is the POSIX collating order in the C
      locale and what dash produces. A plain compare also keeps a large expansion
      from spending most of its time in the sort comparator. */
-  std::sort(values.begin(), values.end());
+  utils::sort_ascending(values);
 
   /* A glob that matches no file is a hard error here, unlike the POSIX fallback
      of expanding to the literal pattern. The caret points at the offending
@@ -1924,8 +1924,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
       if (frame.parent_source != nullptr) {
         /* A frame is context under the primary error, not an error of its own,
            so it prints with the Trace severity rather than Error. */
-        let const sourced_here =
-            TraceWithLocation{frame.call_site};
+        let const sourced_here = TraceWithLocation{frame.call_site};
         show_message(sourced_here.to_string(*frame.parent_source));
       } else {
         show_message("This error was raised while running " + frame.origin +
@@ -2181,7 +2180,7 @@ fn ExecContext::make_from(SourceLocation location,
   Maybe<Path> p;
 
   if (!program.find_character('/').has_value()) {
-    bk = search_builtin(std::string_view{program.c_str(), program.count()});
+    bk = search_builtin(program.view());
 
     if (!bk) {
       let ps = utils::search_program_path(program.view());

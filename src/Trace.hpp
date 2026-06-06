@@ -9,7 +9,6 @@
 #include "Containers.hpp"
 
 #include <cstdio>
-#include <string>
 #include <type_traits>
 
 namespace shit {
@@ -67,20 +66,24 @@ template <class T>
   requires std::is_integral_v<T>
 String value_to_log_string(T value)
 {
-  std::string text = std::to_string(value);
-  return String{
-      StringView{text.data(), text.size()}
-  };
+  char buffer[32];
+  if constexpr (std::is_signed_v<T>) {
+    std::snprintf(buffer, sizeof(buffer), "%lld",
+                  static_cast<long long>(value));
+  } else {
+    std::snprintf(buffer, sizeof(buffer), "%llu",
+                  static_cast<unsigned long long>(value));
+  }
+  return String{buffer};
 }
 
 template <class T>
   requires std::is_floating_point_v<T>
 String value_to_log_string(T value)
 {
-  std::string text = std::to_string(value);
-  return String{
-      StringView{text.data(), text.size()}
-  };
+  char buffer[64];
+  std::snprintf(buffer, sizeof(buffer), "%g", static_cast<double>(value));
+  return String{buffer};
 }
 
 template <class T>
@@ -99,8 +102,8 @@ template <class... Args>
 String format_named_values(StringView names, Args &&...args)
 {
   String out{};
-  std::size_t index = 0;
-  const std::size_t count = sizeof...(Args);
+  usize index = 0;
+  const usize count = sizeof...(Args);
 
   auto append_one = [&](auto &&value) {
     StringView name = names;

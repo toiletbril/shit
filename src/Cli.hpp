@@ -3,16 +3,12 @@
 #include "Common.hpp"
 #include "Containers.hpp"
 
-#include <string>
-#include <string_view>
-#include <vector>
-
 #define FLAG_LIST T__FLAG_LIST
 
 #define HELP_SYNOPSIS T__FLAG_HELP_SYNOPSIS
 
 #define HELP_SYNOPSIS_DECL(...)                                                \
-  static std::vector<std::string> HELP_SYNOPSIS { __VA_ARGS__ }
+  static shit::ArrayList<shit::StringView> HELP_SYNOPSIS { __VA_ARGS__ }
 
 #define FLAG_LIST_DECL()                                                       \
   static shit::ArrayList<shit::Flag *> FLAG_LIST { shit::heap_allocator() }
@@ -120,9 +116,9 @@ fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
 fn show_version() throws -> void;
 fn show_short_version() throws -> void;
 
-fn make_synopsis(std::string_view program_name,
-                 const std::vector<std::string> &lines) throws -> std::string;
-fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string;
+fn make_synopsis(StringView program_name,
+                 const ArrayList<StringView> &lines) throws -> String;
+fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String;
 
 fn show_message(StringView err) throws -> void;
 

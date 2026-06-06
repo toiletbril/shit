@@ -25,9 +25,8 @@ public:
   {
     append(initial);
   }
-  /* Heap-backed conversions from a literal or a view, so a String stands in for
-     the std::string a conversion replaces. The literal form wins over the view
-     form for a const char*, since it is a single conversion. */
+  /* Heap-backed conversions from a literal or a view. The literal form wins
+     over the view form for a const char*, since it is a single conversion. */
   String(const char *cstr) : m_allocator(heap_allocator())
   {
     append(StringView{cstr});
@@ -83,10 +82,7 @@ public:
      passes to a comparison or a function taking a view without spelling out
      view(). */
   operator StringView() const { return StringView{m_data, m_length}; }
-  mustuse const char *c_str() const
-  {
-    return m_data != nullptr ? m_data : "";
-  }
+  mustuse const char *c_str() const { return m_data != nullptr ? m_data : ""; }
 
   void clear()
   {
@@ -152,7 +148,7 @@ public:
   }
 
   /* Search and slice forward to the view, so the owned string answers the same
-     questions a std::string does without exposing its buffer. */
+     questions through the view without exposing its buffer. */
   mustuse Maybe<usize> find_character(char wanted) const
   {
     return view().find_character(wanted);
@@ -170,14 +166,8 @@ public:
     return view().starts_with(prefix);
   }
 
-  mustuse bool operator==(StringView other) const
-  {
-    return view() == other;
-  }
-  mustuse bool operator!=(StringView other) const
-  {
-    return !(view() == other);
-  }
+  mustuse bool operator==(StringView other) const { return view() == other; }
+  mustuse bool operator!=(StringView other) const { return !(view() == other); }
 
   /* Byte order, so a sort matches the C locale collating order. */
   mustuse bool operator<(const String &other) const
@@ -197,8 +187,7 @@ public:
 
   /* The index of the first occurrence of a substring at or after a start, or
      None when it is absent. */
-  mustuse Maybe<usize> find_substring(StringView needle,
-                                            usize from = 0) const
+  mustuse Maybe<usize> find_substring(StringView needle, usize from = 0) const
   {
     if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
     if (needle.length > m_length) return None;

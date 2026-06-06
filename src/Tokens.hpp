@@ -12,6 +12,12 @@ namespace shit {
 
 class Expression;
 
+/* The name and right hand side of an assignment word, the named result of
+   Word::get_assignment_split. The struct is forward-declared here and defined
+   below Word, since its value field holds a Word by value and a Word is not yet
+   complete at this point. */
+struct WordAssignmentSplit;
+
 class WordSegment
 {
 public:
@@ -56,10 +62,14 @@ public:
   fn to_pretty_string() const throws -> String;
 
   /* A word is an assignment when its first segment is unquoted text holding an
-     unescaped NAME= prefix. The returned word is the right hand side. The pair
-     stays std::pair here, since a named struct holding a Word by value cannot
-     complete inside Word's own definition. */
-  fn get_assignment_split() const throws -> Maybe<std::pair<String, Word>>;
+     unescaped NAME= prefix. The returned word is the right hand side. */
+  fn get_assignment_split() const throws -> Maybe<WordAssignmentSplit>;
+};
+
+struct WordAssignmentSplit
+{
+  String name;
+  Word value;
 };
 
 /**

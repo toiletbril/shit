@@ -7,8 +7,6 @@
 
 #include <cstdio>
 #include <cstring>
-#include <string>
-#include <vector>
 
 namespace shit {
 
@@ -163,14 +161,13 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args) throws -> ArrayList<String>
 {
-  std::vector<const char *> os_argv;
+  ArrayList<const char *> os_argv{};
   os_argv.reserve(args.count());
 
   for (const String &arg : args)
-    os_argv.emplace_back(arg.c_str());
+    os_argv.push(arg.c_str());
 
-  return parse_flags(flags, os_argv.size(),
-                     const_cast<char const *const *>(os_argv.data()));
+  return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin());
 }
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
@@ -424,9 +421,8 @@ cold fn show_short_version() throws -> void
   flush();
 }
 
-cold fn make_synopsis(std::string_view program_name,
-                      const std::vector<std::string> &lines) throws
-    -> std::string
+cold fn make_synopsis(StringView program_name,
+                      const ArrayList<StringView> &lines) throws -> String
 {
   String s{};
 
@@ -434,16 +430,16 @@ cold fn make_synopsis(std::string_view program_name,
 
   for (StringView l : lines) {
     s += "  ";
-    s += StringView{program_name.data(), program_name.size()};
+    s += program_name;
     s += ' ';
     s += l;
     s += '\n';
   }
 
-  return std::string{s.c_str(), s.count()};
+  return s;
 }
 
-cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string
+cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 {
   String s{};
 
@@ -504,7 +500,7 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string
     s += f->description();
   }
 
-  return std::string{s.c_str(), s.count()};
+  return s;
 }
 
 fn print(StringView text) throws -> void

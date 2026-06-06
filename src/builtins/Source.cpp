@@ -18,7 +18,7 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (ec.args().count() < 2) throw Error{"filename argument is required"};
 
-  const std::string path{ec.args()[1].c_str(), ec.args()[1].count()};
+  const String path{ec.args()[1]};
   let const contents = utils::read_entire_file(path);
   if (!contents) throw Error{"could not open '" + path + "'"};
 

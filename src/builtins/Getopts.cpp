@@ -4,8 +4,6 @@
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
-#include <string>
-
 /* getopts optstring name [arg ...]. It parses one option per call from the
    positional parameters, or from explicit args, tracking progress through
    OPTIND and the per-argument index the EvalContext keeps. A leading colon in
@@ -51,7 +49,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let char_index = cxt.getopts_char_index();
 
   auto finish = [&](i32 code) -> i32 {
-    cxt.set_shell_variable("OPTIND", std::to_string(optind));
+    cxt.set_shell_variable("OPTIND", utils::integer_to_string(optind));
     cxt.set_getopts_char_index(char_index);
     cxt.set_getopts_last_optind(optind);
     return code;

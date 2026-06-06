@@ -88,8 +88,7 @@ cold fn Word::to_pretty_string() const throws -> String
   return result;
 }
 
-hot fn Word::get_assignment_split() const throws
-    -> Maybe<std::pair<String, Word>>
+hot fn Word::get_assignment_split() const throws -> Maybe<WordAssignmentSplit>
 {
   if (segments.is_empty()) return shit::None;
 
@@ -118,7 +117,7 @@ hot fn Word::get_assignment_split() const throws
   for (usize i = 1; i < segments.count(); i++)
     value.segments.push(segments[i]);
 
-  return std::make_pair(steal(name), steal(value));
+  return WordAssignmentSplit{steal(name), steal(value)};
 }
 
 namespace tokens {

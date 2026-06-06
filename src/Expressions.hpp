@@ -4,7 +4,6 @@
 #include "Eval.hpp"
 #include "Tokens.hpp"
 
-#include <string>
 #include <utility>
 
 namespace shit {
@@ -190,7 +189,7 @@ public:
   /* For a duplication, the descriptor to copy from, as in 2>&1. */
   i32 dup_fd;
   /* For a heredoc, the lexer-owned body and whether it is expanded. */
-  const std::string *heredoc_body;
+  const String *heredoc_body;
   bool heredoc_expand;
 };
 
@@ -322,16 +321,22 @@ public:
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 };
 
+/* One branch of an if clause, the condition list and the body to run when it
+   succeeds. The plain if and every elif each form one of these. */
+struct IfBranch
+{
+  const Expression *condition;
+  const Expression *body;
+};
+
 class IfClause : public CompoundCommand
 {
 public:
   /* Each branch pairs a condition list with the body to run when it succeeds.
      The plain if and every elif share this list. The else body has no
      condition and is held separately. */
-  IfClause(
-      SourceLocation location,
-      ArrayList<std::pair<const Expression *, const Expression *>> &&branches,
-      const Expression *otherwise);
+  IfClause(SourceLocation location, ArrayList<IfBranch> &&branches,
+           const Expression *otherwise);
   ~IfClause() override;
 
   fn to_string() const throws -> String override;
@@ -342,8 +347,7 @@ public:
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
-  ArrayList<std::pair<const Expression *, const Expression *>> m_branches{
-      heap_allocator()};
+  ArrayList<IfBranch> m_branches{heap_allocator()};
   const Expression *m_otherwise;
 };
 

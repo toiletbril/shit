@@ -36,9 +36,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
       out += name;
       out += " is a shell function\n";
-    } else if (search_builtin(std::string_view{name.c_str(), name.count()})
-                   .has_value())
-    {
+    } else if (search_builtin(name.view()).has_value()) {
       out += name;
       out += " is a shell builtin\n";
     } else if (let const paths = utils::search_program_path(name);

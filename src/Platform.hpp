@@ -37,7 +37,6 @@
 #include "String.hpp"
 
 #include <csignal>
-#include <string>
 
 namespace shit {
 
@@ -52,7 +51,7 @@ constexpr char PATH_DELIMITER = ';';
 
 using process = HANDLE;
 using descriptor = HANDLE;
-using os_args = std::string;
+using os_args = String;
 
 #define SHIT_INVALID_FD      INVALID_HANDLE_VALUE
 #define SHIT_INVALID_PROCESS INVALID_HANDLE_VALUE
@@ -169,8 +168,7 @@ fn process_id_of(process p) wontthrow -> i64;
 fn is_stdin_a_tty() wontthrow -> bool;
 fn is_stdout_a_tty() wontthrow -> bool;
 
-fn erase_extension_and_get_its_index(std::string &program_name) throws
-    -> ext_index;
+fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
 
 fn get_current_user() throws -> Maybe<String>;
 

@@ -4,7 +4,6 @@
 #include "Maybe.hpp"
 
 #include <cstring>
-#include <string>
 
 namespace shit {
 
@@ -21,10 +20,6 @@ public:
   StringView(const char *cstr)
       : data(cstr), length(cstr != nullptr ? std::strlen(cstr) : 0)
   {}
-  /* A view of a std::string, so a boundary that still holds one passes it to a
-     function taking a view. This is transitional, removed once std::string is
-     gone from the tree. TODO: drop with the last std::string. */
-  StringView(const std::string &s) : data(s.data()), length(s.size()) {}
 
   mustuse usize count() const { return length; }
   mustuse bool is_empty() const { return length == 0; }
@@ -35,10 +30,7 @@ public:
     return length == other.length &&
            (length == 0 || std::memcmp(data, other.data, length) == 0);
   }
-  mustuse bool operator!=(StringView other) const
-  {
-    return !(*this == other);
-  }
+  mustuse bool operator!=(StringView other) const { return !(*this == other); }
 
   /* The index of the first occurrence of a byte, or None when it is absent.
      A Maybe keeps the absent case out of band rather than using a sentinel
