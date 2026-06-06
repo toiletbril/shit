@@ -1,4 +1,4 @@
-# make SHIT_MODE=dbg/rel/prof/nostdlibpp/cosmo/cosmo_dbg
+# make SHIT_MODE=dbg/rel/prof/cosmo/cosmo_dbg
 SHIT_MODE ?= dbg
 
 SOURCES := $(wildcard *.cpp)
@@ -64,18 +64,20 @@ CXXFLAGS := \
 	-std=c++23 \
 	-Wno-unknown-warning-option \
 	-Wno-error=maybe-uninitialized \
-	-pthread \
 	-pipe \
 	-fvisibility=hidden \
 	-fno-rtti \
 	-fno-semantic-interposition \
 	-Bsymbolic \
 	-fno-strict-aliasing \
-	-nostdlib++ \
-	-lsupc++ \
-	-lpthread \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
+
+# Libraries that must trail the objects on the link line, so a symbol an object
+# needs is still unresolved when the linker reaches the archive. libsupc++ backs
+# the exception runtime and operator new under -nostdlib++, and libpthread backs
+# the command-substitution drain thread.
+LINK_LIBS :=
 
 # Speed up the linking a bit.
 ifneq ($(shell which mold > $(DEVNULL) 2>&1),)
@@ -96,10 +98,14 @@ CXXFLAGS += \
 	-flto
 # Link the runtime statically so a -c invocation or a script launch does not
 # pay the dynamic linker on every startup. This nearly halves the startup time
-# and brings it close to dash.
+# and brings it close to dash. Drop libstdc++ with -nostdlib++ and keep only
+# libsupc++ for the exception runtime, since the shell carries its own
+# containers. Windows clang has no libsupc++, so the drop stays POSIX-only.
 ifneq ($(OS), Windows_NT)
 CXXFLAGS += \
-	-static
+	-static \
+	-nostdlib++
+LINK_LIBS += -lsupc++
 endif
 else ifeq ($(SHIT_MODE), dbg)
 CXXFLAGS += \
@@ -144,8 +150,23 @@ CXXFLAGS += \
 	-fno-omit-frame-pointer \
 	-O3 \
 	-flto
+# The same libstdc++ drop as rel, so a profile measures the shipped binary.
+ifneq ($(OS), Windows_NT)
+CXXFLAGS += \
+	-nostdlib++
+LINK_LIBS += -lsupc++
+endif
 else
 $(error Invalid SHIT_MODE=$(SHIT_MODE). Available modes are "dbg", "rel", "prof", "cosmo")
+endif
+
+# The command-substitution drain runs on a pthread, so every POSIX build links
+# libpthread. Native Windows clang has no libpthread and uses the Win32 thread
+# API instead, so the flag stays off there.
+ifneq ($(OS), Windows_NT)
+CXXFLAGS += \
+	-pthread
+LINK_LIBS += -lpthread
 endif
 
 # Missing Windows libraries.
@@ -164,7 +185,7 @@ o/$(SHIT_MODE)/%.o: %.cpp
 # Linking.
 $(OUT): $(OBJECTS)
 	printf "\t$(OBJECTS) <-> $(OUT)\n"
-	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) -o $@
+	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) $(LINK_LIBS) -o $@
 
 dirs: $(DIRS)
 	mkdir -p o/$(SHIT_MODE)/
