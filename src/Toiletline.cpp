@@ -28,11 +28,11 @@ shit::BumpArena TOILETLINE_ARENA{};
 
 constexpr usize TL_ALLOC_HEADER = 16;
 
-struct TlFreeBlock
+struct tl_free_block
 {
-  TlFreeBlock *next;
+  tl_free_block *next;
 };
-TlFreeBlock *TOILETLINE_FREE_LIST = nullptr;
+tl_free_block *TOILETLINE_FREE_LIST = nullptr;
 
 fn tl_block_capacity(void *payload) -> usize &
 {
@@ -44,7 +44,7 @@ fn tl_arena_malloc(usize length) -> void *
 {
   /* Reuse the first free block large enough, so repeated same-size line-buffer
      allocations do not keep growing the arena. */
-  for (TlFreeBlock **link = &TOILETLINE_FREE_LIST; *link != nullptr;
+  for (tl_free_block **link = &TOILETLINE_FREE_LIST; *link != nullptr;
        link = &(*link)->next)
   {
     void *payload = *link;
@@ -63,7 +63,7 @@ fn tl_arena_malloc(usize length) -> void *
 fn tl_arena_free(void *pointer) -> void
 {
   if (pointer == NULL) return;
-  TlFreeBlock *block = static_cast<TlFreeBlock *>(pointer);
+  tl_free_block *block = static_cast<tl_free_block *>(pointer);
   block->next = TOILETLINE_FREE_LIST;
   TOILETLINE_FREE_LIST = block;
 }
@@ -108,7 +108,7 @@ namespace toiletline {
 using shit::String;
 using shit::StringView;
 
-struct InputResult
+struct input_result
 {
   i32 code;
   String text;
@@ -181,14 +181,14 @@ fn exit() -> void
   }
 }
 
-fn get_input(const String &prompt) -> InputResult
+fn get_input(const String &prompt) -> input_result
 {
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   if (code == TL_ERROR) {
     throw shit::Error{
         "Toiletline: Unexpected internal error while getting the input"};
   }
-  return InputResult{code, String{TL_BUFFER}};
+  return input_result{code, String{TL_BUFFER}};
 }
 
 fn set_input(const String &input) -> void
@@ -228,7 +228,7 @@ namespace toiletline {
 using shit::String;
 using shit::StringView;
 
-struct InputResult
+struct input_result
 {
   i32 code;
   String text;
@@ -252,7 +252,7 @@ fn initialize() -> void
 
 fn exit() -> void {}
 
-fn get_input(const String &prompt) -> InputResult
+fn get_input(const String &prompt) -> input_result
 {
   unused(prompt);
   throw shit::Error{"This build has no line editor"};

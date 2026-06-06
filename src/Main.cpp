@@ -106,16 +106,16 @@ static fn report_escaped_control_flow(EvalContext &context,
 {
   if (!context.has_pending_control_flow()) return;
 
-  const ControlFlow &control = context.pending_control_flow();
+  const control_flow &control = context.pending_control_flow();
   String what{};
   switch (control.kind) {
-  case ControlFlow::Kind::Break:
+  case control_flow::Kind::Break:
     what = "'break' used outside of a loop";
     break;
-  case ControlFlow::Kind::Continue:
+  case control_flow::Kind::Continue:
     what = "'continue' used outside of a loop";
     break;
-  case ControlFlow::Kind::Return: {
+  case control_flow::Kind::Return: {
     /* A return that reaches the top of a non-interactive script ends the shell
        with its status, the way dash treats a top-level return. It stays an
        error at an interactive prompt, where there is nothing to return from. */
@@ -128,8 +128,8 @@ static fn report_escaped_control_flow(EvalContext &context,
     what = "'return' used outside of a function or a sourced script";
     break;
   }
-  case ControlFlow::Kind::Exit:
-  case ControlFlow::Kind::Normal: context.clear_control_flow(); return;
+  case control_flow::Kind::Exit:
+  case control_flow::Kind::Normal: context.clear_control_flow(); return;
   }
 
   const String *source =

@@ -25,8 +25,9 @@
 
 namespace shit {
 
-struct Flag
+class Flag
 {
+public:
   enum class Kind : u8
   {
     Bool,
@@ -55,8 +56,9 @@ protected:
   String m_description;
 };
 
-struct FlagBool : public Flag
+class FlagBool : public Flag
 {
+public:
   FlagBool(char short_name, StringView long_name, StringView description);
 
   fn toggle() throws -> void;
@@ -68,8 +70,9 @@ private:
   bool m_value{false};
 };
 
-struct FlagString : public Flag
+class FlagString : public Flag
 {
+public:
   FlagString(char short_name, StringView long_name, StringView description);
 
   fn set(StringView v) throws -> void;
@@ -83,8 +86,9 @@ private:
   String m_value{};
 };
 
-struct FlagManyStrings : public Flag
+class FlagManyStrings : public Flag
 {
+public:
   FlagManyStrings(char short_name, StringView long_name,
                   StringView description);
 

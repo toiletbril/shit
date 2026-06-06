@@ -9,20 +9,21 @@ namespace shit {
 
 /* The empty state of a Maybe. A function returns None to say it produced no
    value, and the caller decides what that means. */
-struct Nothing
+struct nothing
 {};
 
-inline constexpr Nothing None{};
+inline constexpr nothing None{};
 
 /* A value or None, the replacement for std::optional. There is no failure
    reason inside, so the caller handles the empty case itself. Reading the value
    out of an empty Maybe traps in the debug build. The value is stored inline,
    so no allocation happens. */
 template <class T>
-struct [[nodiscard]] Maybe
+class [[nodiscard]] Maybe
 {
+public:
   Maybe() noexcept : m_has_value(false) {}
-  Maybe(Nothing) noexcept : m_has_value(false) {}
+  Maybe(nothing) noexcept : m_has_value(false) {}
   Maybe(T value) : m_has_value(true) { new (&m_storage) T(std::move(value)); }
 
   Maybe(const Maybe &other) : m_has_value(other.m_has_value)

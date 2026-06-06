@@ -18,8 +18,9 @@ bool parse_integer(StringView text, i64 &out) throws
 
 /* A recursive-descent evaluator over the test arguments, following the POSIX
    test grammar so -a binds tighter than -o and ! and parentheses nest. */
-struct TestEvaluator
+class TestEvaluator
 {
+public:
   const ArrayList<String> &args;
   usize pos;
   bool had_error;

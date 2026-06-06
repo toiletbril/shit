@@ -21,15 +21,16 @@ namespace shit {
    quarters, and counts tombstones toward the load so an insert is never
    dropped. */
 template <class Value = String>
-struct HashMap
+class HashMap
 {
+public:
   explicit HashMap(Allocator allocator) : m_allocator(allocator) {}
 
   HashMap(const HashMap &other) : m_allocator(other.m_allocator)
   {
     rehash(other.m_capacity == 0 ? 16 : other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
-      if (other.m_slots[i].state == Slot::Occupied)
+      if (other.m_slots[i].state == slot::Occupied)
         set_value(other.m_slots[i].key.view(), Value{other.m_slots[i].value});
     }
   }
@@ -81,12 +82,12 @@ struct HashMap
     usize mask = m_capacity - 1;
     usize i = hash_bytes(key) & mask;
     for (usize probe = 0; probe < m_capacity; probe++) {
-      const Slot &slot = m_slots[i];
-      if (slot.state == Slot::Empty) return nullptr;
+      const slot &slot = m_slots[i];
+      if (slot.state == slot::Empty) return nullptr;
       /* The packed compare rejects a mismatch in two words before the byte
          compare runs, and the byte compare confirms a key past sixteen bytes.
        */
-      if (slot.state == Slot::Occupied && slot.packed == wanted &&
+      if (slot.state == slot::Occupied && slot.packed == wanted &&
           slot.key == key)
         return &slot.value;
       i = (i + 1) & mask;
@@ -122,15 +123,15 @@ struct HashMap
     usize mask = m_capacity - 1;
     usize i = hash_bytes(key) & mask;
     for (usize probe = 0; probe < m_capacity; probe++) {
-      Slot &slot = m_slots[i];
-      if (slot.state == Slot::Empty) return;
-      if (slot.state == Slot::Occupied && slot.key == key) {
+      slot &slot = m_slots[i];
+      if (slot.state == slot::Empty) return;
+      if (slot.state == slot::Occupied && slot.key == key) {
         /* Free the stored key and value but keep the slot objects alive, so a
            later place into this tombstone assigns into a live object rather
            than one whose lifetime already ended. */
         slot.key = String{m_allocator};
         slot.value = Value{};
-        slot.state = Slot::Tombstone;
+        slot.state = slot::Tombstone;
         m_count--;
         m_tombstones++;
         return;
@@ -144,7 +145,7 @@ struct HashMap
   void for_each(Fn callback) const
   {
     for (usize i = 0; i < m_capacity; i++) {
-      if (m_slots[i].state == Slot::Occupied)
+      if (m_slots[i].state == slot::Occupied)
         callback(m_slots[i].key.view(), m_slots[i].value);
     }
   }
@@ -152,7 +153,7 @@ struct HashMap
   void clear() { destroy_all(); }
 
 private:
-  struct Slot
+  struct slot
   {
     enum State : u8
     {
@@ -179,20 +180,20 @@ private:
     usize i = hash_bytes(key) & mask;
     usize first_tombstone = m_capacity;
     for (usize probe = 0; probe < m_capacity; probe++) {
-      Slot &slot = m_slots[i];
-      if (slot.state == Slot::Occupied && slot.packed == wanted &&
+      slot &slot = m_slots[i];
+      if (slot.state == slot::Occupied && slot.packed == wanted &&
           slot.key == key)
       {
         slot.value = std::move(value);
         return;
       }
-      if (slot.state == Slot::Empty) {
+      if (slot.state == slot::Empty) {
         usize target = first_tombstone != m_capacity ? first_tombstone : i;
         if (first_tombstone != m_capacity) m_tombstones--;
         place(target, key, std::move(value));
         return;
       }
-      if (slot.state == Slot::Tombstone && first_tombstone == m_capacity)
+      if (slot.state == slot::Tombstone && first_tombstone == m_capacity)
         first_tombstone = i;
       i = (i + 1) & mask;
     }
@@ -207,30 +208,30 @@ private:
 
   void place(usize index, StringView key, Value value)
   {
-    Slot &slot = m_slots[index];
+    slot &slot = m_slots[index];
     slot.key = String{m_allocator, key};
     slot.packed = PackedStringKey::from_view(key);
     slot.value = std::move(value);
-    slot.state = Slot::Occupied;
+    slot.state = slot::Occupied;
     m_count++;
   }
 
   void rehash(usize new_capacity)
   {
-    Slot *old_slots = m_slots;
+    slot *old_slots = m_slots;
     usize old_capacity = m_capacity;
 
-    m_slots = m_allocator.alloc_array<Slot>(new_capacity);
+    m_slots = m_allocator.alloc_array<slot>(new_capacity);
     for (usize i = 0; i < new_capacity; i++)
-      new (&m_slots[i]) Slot{};
+      new (&m_slots[i]) slot{};
     m_capacity = new_capacity;
     m_count = 0;
     m_tombstones = 0;
 
     for (usize i = 0; i < old_capacity; i++) {
-      if (old_slots[i].state == Slot::Occupied)
+      if (old_slots[i].state == slot::Occupied)
         set_value(old_slots[i].key.view(), std::move(old_slots[i].value));
-      old_slots[i].~Slot();
+      old_slots[i].~slot();
     }
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);
   }
@@ -238,7 +239,7 @@ private:
   void destroy_all()
   {
     for (usize i = 0; i < m_capacity; i++)
-      m_slots[i].~Slot();
+      m_slots[i].~slot();
     if (m_slots != nullptr) m_allocator.free_array(m_slots, m_capacity);
     m_slots = nullptr;
     m_capacity = 0;
@@ -247,7 +248,7 @@ private:
   }
 
   Allocator m_allocator;
-  Slot *m_slots{nullptr};
+  slot *m_slots{nullptr};
   usize m_capacity{0};
   usize m_count{0};
   usize m_tombstones{0};

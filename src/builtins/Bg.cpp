@@ -23,7 +23,7 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.empty());
 
-  Job *job = nullptr;
+  job *job = nullptr;
   if (args.size() > 1 && !args[1].empty() && args[1][0] == '%') {
     let const parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
@@ -38,7 +38,7 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))
     os::signal_process(job->pid, *cont);
-  job->state = Job::State::Running;
+  job->state = job::State::Running;
 
   ec.print_to_stdout("[" + std::to_string(job->id) + "] " + job->command +
                      " &\n");

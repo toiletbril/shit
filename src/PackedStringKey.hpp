@@ -13,8 +13,9 @@ namespace shit {
    layout is contiguous so a later pass can scan many keys with one SIMD
    instruction. A key longer than sixteen bytes keeps only its first sixteen
    bytes here and relies on a full compare to disambiguate. */
-struct PackedStringKey
+class PackedStringKey
 {
+public:
   u64 low_word{0};
   u64 high_word{0};
 

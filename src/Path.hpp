@@ -17,8 +17,9 @@ namespace shit {
    machinery, which the shell measured as slow. The separator is the platform
    one, and a forward slash is always accepted on input so a script written for
    POSIX keeps working on Windows. */
-struct Path
+class Path
 {
+public:
   Path() = default;
   explicit Path(StringView text);
 
@@ -73,7 +74,7 @@ struct Path
 
   /* The working directory of the process. */
   [[nodiscard]] static fn current_directory() throws -> Path;
-  static fn set_current_directory(const Path &path) throws -> ErrorOr<Ok>;
+  static fn set_current_directory(const Path &path) throws -> ErrorOr<ok>;
   /* The directory for temporary files, from TMPDIR or a platform default. */
   [[nodiscard]] static fn temp_directory() throws -> Path;
 
@@ -88,8 +89,9 @@ private:
 
 /* A small builder for assembling a path from a root and a run of components,
    so a caller spells the intent rather than juggling separators by hand. */
-struct PathBuilder
+class PathBuilder
 {
+public:
   PathBuilder() = default;
   explicit PathBuilder(StringView root);
 

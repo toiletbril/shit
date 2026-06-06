@@ -10,14 +10,14 @@
 
 namespace shit {
 
-struct BumpArena;
+class BumpArena;
 
 /* A heredoc whose body is collected when the line that introduced it ends. The
    body buffer has a stable address, so a parsed redirection points at it and
    reads it once the lexer fills it. The body stays a std::string because the
    parsed Redirection field that points at it is a std::string pointer the Eval
    layer reads. */
-struct HeredocPending
+struct heredoc_pending
 {
   String delimiter;
   bool strip_tabs;
@@ -41,8 +41,9 @@ pure fn is_variable_name(char ch) wontthrow -> bool;
 /* Dumb note: Main idea is that none of the routines except
  * advance_past_last_peek(), skip_whitespace() and advance_forward() move
  * internal cursor. */
-struct Lexer
+class Lexer
 {
+public:
   Lexer(String source, BumpArena &arena,
         bool should_collect_debug_words = false,
         Maybe<StringView> filename = None);
@@ -108,7 +109,7 @@ protected:
      holds a pointer into one, and the pointer must stay valid while the array
      of pointers grows. The lexer frees them in its destructor. */
   ArrayList<std::string *> m_heredoc_bodies{heap_allocator()};
-  ArrayList<HeredocPending> m_pending_heredocs{heap_allocator()};
+  ArrayList<heredoc_pending> m_pending_heredocs{heap_allocator()};
   fn collect_pending_heredocs() throws -> void;
 
   fn lex_expression_token() throws -> Token *;

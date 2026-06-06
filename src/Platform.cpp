@@ -121,7 +121,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
 }();
 
 fn erase_extension_and_get_its_index(std::string &program_name) throws
-    -> ExtIndex
+    -> ext_index
 {
   /* POSIX does not really make use of extensions for executable files. */
   unused(program_name);
@@ -456,7 +456,7 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
   String bare{name};
   if (bare.starts_with("SIG")) bare = String{bare.substring(3)};
 
-  static constexpr StaticStringMap<i32>::Entry NAME_ENTRIES[] = {
+  static constexpr StaticStringMap<i32>::entry NAME_ENTRIES[] = {
       {PackedStringKey::from_literal("HUP"),  SIGHUP },
       {PackedStringKey::from_literal("INT"),  SIGINT },
       {PackedStringKey::from_literal("QUIT"), SIGQUIT},
@@ -1021,7 +1021,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
 
 constexpr static usize MIN_SUFFIX_LEN = 3;
 
-fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex
+fn erase_extension_and_get_its_index(std::string &program_name) -> ext_index
 {
 #if SHIT_PLATFORM_IS COSMO
   if (IsWindows())

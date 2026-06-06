@@ -10,8 +10,9 @@ namespace shit {
 
 using namespace expressions;
 
-struct Parser
+class Parser
 {
+public:
   Parser(Lexer &&lexer);
   ~Parser();
 

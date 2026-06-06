@@ -14,8 +14,9 @@ namespace shit {
    plainly and carry no library machinery. The unused payload of the inactive
    case stays default-constructed, which is cheap for both a Kind and an empty
    Path. */
-struct ResolvedCommand
+class ResolvedCommand
 {
+public:
   enum class Kind : u8
   {
     Builtin,

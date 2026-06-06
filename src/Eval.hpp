@@ -18,9 +18,9 @@ namespace shit {
    lives on the scratch arena, since it lasts only as long as one command's
    expansion, while the mask stays a heap bit vector so glob_matches reads it
    unchanged. */
-struct GlobField
+struct glob_field
 {
-  explicit GlobField(Allocator allocator)
+  explicit glob_field(Allocator allocator)
       : text(allocator), glob_active(heap_allocator())
   {}
 
@@ -31,17 +31,17 @@ struct GlobField
   ArrayList<bool> glob_active;
 };
 
-struct Token;
-struct Word;
-struct WordSegment;
-struct Expression;
+class Token;
+class Word;
+class WordSegment;
+class Expression;
 
 /* A pending non-local jump the evaluator carries instead of throwing. The break
    and continue builtins request a loop jump, return requests a function jump,
    and exit inside a subshell requests an exit. The tree-walk checks for a
    pending request after each child and either consumes it at the matching
    boundary or leaves it pending so an outer node consumes it. */
-struct ControlFlow
+struct control_flow
 {
   enum class Kind : u8
   {
@@ -70,9 +70,9 @@ struct ControlFlow
    where the dot or eval sits in its parent, and parent_source is the text that
    call site lives in so a caret renders against it. The parent_source is None
    for a top-level source whose call site has no surrounding text. */
-struct SourceFrame
+struct source_frame
 {
-  SourceFrame(String origin, SourceLocation call_site,
+  source_frame(String origin, SourceLocation call_site,
               const String *parent_source)
       : origin(std::move(origin)), call_site(call_site),
         parent_source(parent_source)
@@ -86,7 +86,7 @@ struct SourceFrame
 /* A variable binding saved when a local shadows it. The previous value is
    None when the name was unset, so leaving the scope restores the unset
    state rather than an empty string. */
-struct LocalBinding
+struct local_binding
 {
   String name;
   Maybe<String> previous_value;
@@ -95,7 +95,7 @@ struct LocalBinding
 /* A background job, one entry in the job table. The id is the number jobs and
    fg name with a percent, such as %1. The pid is the process group leader so a
    signal reaches every stage of a pipeline. */
-struct Job
+struct job
 {
   enum class State : u8
   {
@@ -113,7 +113,7 @@ struct Job
 
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. */
-struct EvalStateSnapshot
+struct eval_state_snapshot
 {
   HashMap<String> shell_variables;
   HashMap<const Expression *> functions;
@@ -121,8 +121,9 @@ struct EvalStateSnapshot
   Path working_directory;
 };
 
-struct EvalContext
+class EvalContext
 {
+public:
   EvalContext(bool should_disable_path_expansion, bool should_echo,
               bool should_echo_expanded, bool shell_is_interactive,
               bool should_error_exit = false, String shell_name = {},
@@ -175,9 +176,9 @@ struct EvalContext
      marks the ones that finished or stopped. */
   fn register_job(os::process pid, StringView command) throws -> i32;
   fn update_jobs() throws -> void;
-  fn jobs() wontthrow -> ArrayList<Job> &;
-  fn find_job(i32 id) wontthrow -> Job *;
-  fn most_recent_job() wontthrow -> Job *;
+  fn jobs() wontthrow -> ArrayList<job> &;
+  fn find_job(i32 id) wontthrow -> job *;
+  fn most_recent_job() wontthrow -> job *;
   fn forget_done_jobs() throws -> void;
 
   /* monitor mode is set -m. It is on by default in an interactive shell, and it
@@ -233,8 +234,8 @@ struct EvalContext
 
   /* Save and restore the mutable state around a subshell or a command
      substitution, so changes inside do not leak to the parent. */
-  fn snapshot_state() const throws -> EvalStateSnapshot;
-  fn restore_state(EvalStateSnapshot snapshot) throws -> void;
+  fn snapshot_state() const throws -> eval_state_snapshot;
+  fn restore_state(eval_state_snapshot snapshot) throws -> void;
 
   /* Track whether evaluation is inside a subshell or a command substitution, so
      the exit builtin ends only that scope instead of the whole shell. */
@@ -252,8 +253,8 @@ struct EvalContext
   fn request_return(i64 status, SourceLocation location) throws -> void;
   fn request_exit(i64 status, SourceLocation location) throws -> void;
   pure fn has_pending_control_flow() const wontthrow -> bool;
-  fn pending_control_flow() wontthrow -> ControlFlow &;
-  pure fn pending_control_flow() const wontthrow -> const ControlFlow &;
+  fn pending_control_flow() wontthrow -> control_flow &;
+  pure fn pending_control_flow() const wontthrow -> const control_flow &;
   fn clear_control_flow() wontthrow -> void;
 
   /* The source currently being evaluated and its human name, so a control-flow
@@ -392,7 +393,7 @@ protected:
   usize m_condition_depth{0};
 
   /* The pending non-local jump, Normal when none is pending. */
-  ControlFlow m_control_flow{};
+  control_flow m_control_flow{};
   /* The source and name of the text being evaluated, for caret formatting. */
   const String *m_current_source{nullptr};
   String m_current_origin{};
@@ -402,7 +403,7 @@ protected:
      rather than only the innermost. Each frame carries the call site and its
      parent text, so a backtrace renders a caret at the dot or eval in the
      parent. run_source pushes on entry, pops on exit. */
-  ArrayList<SourceFrame> m_source_frames{heap_allocator()};
+  ArrayList<source_frame> m_source_frames{heap_allocator()};
 
   /* ASTs from eval and dot, kept alive until the next top-level command so a
      function they define survives the rest of the current one. */
@@ -413,7 +414,7 @@ protected:
      text, so the pointer must outlive the run that escaped it. */
   /* The retained source buffers are heap-owned pointers, not inline elements,
      so a nested run_source that grows the list never moves an earlier buffer
-     and leaves m_current_source or a ControlFlow::source dangling. */
+     and leaves m_current_source or a control_flow::source dangling. */
   ArrayList<String *> m_retained_sources{heap_allocator()};
 
   bool m_error_unset{false};
@@ -432,10 +433,10 @@ protected:
   HashMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed
      so leaving the call restores them. */
-  ArrayList<ArrayList<LocalBinding>> m_local_scopes{heap_allocator()};
+  ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
 
   /* The background jobs and the id to give the next one. */
-  ArrayList<Job> m_jobs{heap_allocator()};
+  ArrayList<job> m_jobs{heap_allocator()};
   i32 m_next_job_id{1};
   bool m_monitor{false};
   bool m_enable_path_expansion;
@@ -464,21 +465,22 @@ protected:
 
   /* Turn a word into fields, applying tilde, variable expansion, command
      substitution, and IFS field splitting, but not globbing. */
-  fn expand_word(const Word &word) throws -> ArrayList<GlobField>;
+  fn expand_word(const Word &word) throws -> ArrayList<glob_field>;
 
-  fn expand_path_once(const GlobField &field, bool should_expand_files) throws
-      -> ArrayList<GlobField>;
-  fn expand_path_recurse(ArrayList<GlobField> fields) throws
-      -> ArrayList<GlobField>;
-  fn expand_path(GlobField field) throws -> ArrayList<String>;
+  fn expand_path_once(const glob_field &field, bool should_expand_files) throws
+      -> ArrayList<glob_field>;
+  fn expand_path_recurse(ArrayList<glob_field> fields) throws
+      -> ArrayList<glob_field>;
+  fn expand_path(glob_field field) throws -> ArrayList<String>;
 
   fn expand_tilde(WordSegment &leading_segment) const throws -> void;
 };
 
 /* Lower-level execution context. Path is the program path to execute, expanded
  * from program. Program is non-altered first arg. */
-struct ExecContext
+class ExecContext
 {
+public:
   static fn make_from(SourceLocation location, const ArrayList<String> &args)
       throws -> ExecContext;
 

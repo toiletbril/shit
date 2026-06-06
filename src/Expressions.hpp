@@ -11,13 +11,14 @@ namespace shit {
 
 using namespace tokens;
 
-struct Token;
+class Token;
 
 /* The prepass walks the whole tree once before any command runs. It carries the
    source for the caret, and a fatal flag that stops execution. A warning is a
    located message that does not stop execution, a failure does. */
-struct AnalysisContext
+class AnalysisContext
 {
+public:
   StringView source;
   bool has_fatal{false};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
@@ -42,8 +43,9 @@ fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases)
     throws -> bool;
 
-struct Expression
+class Expression
 {
+public:
   Expression() = delete;
   Expression(SourceLocation location);
 
@@ -85,8 +87,9 @@ protected:
 
 namespace expressions {
 
-struct IfStatement : public Expression
+class IfStatement : public Expression
 {
+public:
   IfStatement(SourceLocation location, const Expression *condition,
               const Expression *then, const Expression *otherwise);
 
@@ -106,8 +109,9 @@ protected:
   const Expression *m_otherwise;
 };
 
-struct DummyExpression : public Expression
+class DummyExpression : public Expression
 {
+public:
   DummyExpression(SourceLocation location);
 
   fn is_dummy() const wontthrow -> bool override;
@@ -119,8 +123,9 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 };
 
-struct Command : public Expression
+class Command : public Expression
 {
+public:
   Command(SourceLocation location);
 
   fn make_async() wontthrow -> void;
@@ -142,8 +147,9 @@ protected:
   HashMap<Word> m_local_vars{heap_allocator()};
 };
 
-struct AssignCommand : public Command
+class AssignCommand : public Command
 {
+public:
   AssignCommand(SourceLocation location, const Assignment *a);
   ~AssignCommand() override;
 
@@ -165,7 +171,7 @@ protected:
 
 /* One redirection attached to a simple command. The target word is expanded to
    a filename at evaluation, or for a duplication it names a file descriptor. */
-struct Redirection
+struct redirection
 {
   enum class Kind : u8
   {
@@ -187,12 +193,13 @@ struct Redirection
   bool heredoc_expand;
 };
 
-struct SimpleCommand : public Command
+class SimpleCommand : public Command
 {
+public:
   SimpleCommand(SourceLocation location, ArrayList<const Token *> &&args);
   ~SimpleCommand() override;
 
-  fn set_redirections(ArrayList<Redirection> &&redirections) throws -> void;
+  fn set_redirections(ArrayList<redirection> &&redirections) throws -> void;
 
   /* Open this command's redirections into an exec context, for a pipeline stage
      that does not go through evaluate_impl. */
@@ -223,11 +230,12 @@ protected:
   mutable String m_resolved_name{};
   mutable Maybe<ResolvedCommand> m_resolved_kind{};
 
-  ArrayList<Redirection> m_redirections{heap_allocator()};
+  ArrayList<redirection> m_redirections{heap_allocator()};
 };
 
-struct CompoundListCondition : public Expression
+class CompoundListCondition : public Expression
 {
+public:
   enum class Kind : u8
   {
     None,
@@ -254,8 +262,9 @@ protected:
   const Command *m_cmd;
 };
 
-struct CompoundList : public Expression
+class CompoundList : public Expression
 {
+public:
   CompoundList();
 
   ~CompoundList() override;
@@ -275,8 +284,9 @@ protected:
   ArrayList<const CompoundListCondition *> m_nodes{heap_allocator()};
 };
 
-struct Pipeline : public Command
+class Pipeline : public Command
 {
+public:
   Pipeline(SourceLocation location);
 
   ~Pipeline() override;
@@ -302,16 +312,18 @@ protected:
 /* A compound command groups one or more command lists, like a loop body or an
    if branch. It slots into a CompoundListCondition as an ordinary command.
    Redirections on a compound command are not supported yet. */
-struct CompoundCommand : public Command
+class CompoundCommand : public Command
 {
+public:
   CompoundCommand(SourceLocation location);
 
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 };
 
-struct IfClause : public CompoundCommand
+class IfClause : public CompoundCommand
 {
+public:
   /* Each branch pairs a condition list with the body to run when it succeeds.
      The plain if and every elif share this list. The else body has no
      condition and is held separately. */
@@ -334,8 +346,9 @@ protected:
   const Expression *m_otherwise;
 };
 
-struct WhileLoop : public CompoundCommand
+class WhileLoop : public CompoundCommand
 {
+public:
   WhileLoop(SourceLocation location, const Expression *condition,
             const Expression *body, bool is_until);
   ~WhileLoop() override;
@@ -354,8 +367,9 @@ protected:
   bool m_is_until;
 };
 
-struct ForLoop : public CompoundCommand
+class ForLoop : public CompoundCommand
 {
+public:
   ForLoop(SourceLocation location, StringView variable_name,
           ArrayList<const Token *> &&words, bool has_in_clause,
           const Expression *body);
@@ -377,16 +391,17 @@ protected:
 };
 
 /* One arm of a case, a set of patterns and the body that runs on a match. */
-struct CaseItem
+struct case_item
 {
   ArrayList<const Token *> patterns;
   const Expression *body;
 };
 
-struct CaseClause : public CompoundCommand
+class CaseClause : public CompoundCommand
 {
+public:
   CaseClause(SourceLocation location, const Token *word,
-             ArrayList<CaseItem> &&items);
+             ArrayList<case_item> &&items);
   ~CaseClause() override;
 
   fn to_string() const throws -> String override;
@@ -398,11 +413,12 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
   const Token *m_word;
-  ArrayList<CaseItem> m_items{heap_allocator()};
+  ArrayList<case_item> m_items{heap_allocator()};
 };
 
-struct BraceGroup : public CompoundCommand
+class BraceGroup : public CompoundCommand
 {
+public:
   BraceGroup(SourceLocation location, const Expression *body);
   ~BraceGroup() override;
 
@@ -417,8 +433,9 @@ protected:
   const Expression *m_body;
 };
 
-struct Subshell : public CompoundCommand
+class Subshell : public CompoundCommand
 {
+public:
   Subshell(SourceLocation location, const Expression *body);
   ~Subshell() override;
 
@@ -433,8 +450,9 @@ protected:
   const Expression *m_body;
 };
 
-struct FunctionDefinition : public CompoundCommand
+class FunctionDefinition : public CompoundCommand
 {
+public:
   FunctionDefinition(SourceLocation location, StringView name,
                      const Expression *body);
   ~FunctionDefinition() override;
@@ -454,8 +472,9 @@ protected:
   const Expression *m_body;
 };
 
-struct ConstantNumber : public Expression
+class ConstantNumber : public Expression
 {
+public:
   ConstantNumber(SourceLocation location, i64 value);
   ~ConstantNumber() override;
 
@@ -468,8 +487,9 @@ protected:
   const i64 m_value;
 };
 
-struct ConstantString : public Expression
+class ConstantString : public Expression
 {
+public:
   ConstantString(SourceLocation location, StringView value);
   ~ConstantString() override;
 
@@ -482,8 +502,9 @@ protected:
   const String m_value;
 };
 
-struct UnaryExpression : public Expression
+class UnaryExpression : public Expression
 {
+public:
   UnaryExpression(SourceLocation location, const Expression *rhs);
   ~UnaryExpression() override;
 
@@ -494,8 +515,9 @@ protected:
 };
 
 #define UNARY_EXPRESSION_STRUCT(e)                                             \
-  struct e : public UnaryExpression                                            \
+  class e : public UnaryExpression                                             \
   {                                                                            \
+  public:                                                                      \
     e(SourceLocation location, const Expression *rhs);                         \
     String to_string() const throws override;                                  \
                                                                                \
@@ -508,8 +530,9 @@ UNARY_EXPRESSION_STRUCT(Unnegate);
 UNARY_EXPRESSION_STRUCT(LogicalNot);
 UNARY_EXPRESSION_STRUCT(BinaryComplement);
 
-struct BinaryExpression : public Expression
+class BinaryExpression : public Expression
 {
+public:
   BinaryExpression(SourceLocation location, const Expression *lhs,
                    const Expression *rhs);
   ~BinaryExpression() override;
@@ -522,8 +545,9 @@ protected:
 };
 
 #define BINARY_EXPRESSION_STRUCT(e)                                            \
-  struct e : public BinaryExpression                                           \
+  class e : public BinaryExpression                                            \
   {                                                                            \
+  public:                                                                      \
     e(SourceLocation location, const Expression *lhs, const Expression *rhs);  \
     String to_string() const throws override;                                  \
                                                                                \

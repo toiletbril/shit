@@ -11,8 +11,9 @@ namespace shit {
 
 /* A growable array over an explicit allocator, the std::vector replacement. */
 template <class T>
-struct ArrayList
+class ArrayList
 {
+public:
   /* A default list is heap-backed and empty, so it can serve as the value a
      HashMap slot holds before a real list is placed into it. */
   ArrayList() : m_allocator(heap_allocator()) {}

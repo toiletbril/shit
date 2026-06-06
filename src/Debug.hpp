@@ -3,7 +3,7 @@
 #include "Common.hpp"
 
 namespace shit {
-struct String;
+class String;
 } /* namespace shit */
 
 #if !defined NDEBUG

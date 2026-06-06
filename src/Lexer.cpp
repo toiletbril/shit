@@ -209,7 +209,7 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
 
 cold fn Lexer::collect_pending_heredocs() throws -> void
 {
-  for (HeredocPending &pending : m_pending_heredocs) {
+  for (heredoc_pending &pending : m_pending_heredocs) {
     /* The body is written into the lexer-owned std::string the parsed
        redirection points at, so it accumulates as one. */
     std::string collected{};

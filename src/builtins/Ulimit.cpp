@@ -31,13 +31,13 @@ namespace shit {
 namespace {
 
 /* The resource selected by the flags, with the divisor ulimit reports it in. */
-struct Resource
+struct resource
 {
   int which;
   rlim_t units_per_value;
 };
 
-cold Resource selected_resource() throws
+cold resource selected_resource() throws
 {
   if (FLAG_OPEN_FILES.is_enabled()) return {RLIMIT_NOFILE, 1};
   if (FLAG_CPU_TIME.is_enabled()) return {RLIMIT_CPU, 1};

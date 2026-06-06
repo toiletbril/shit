@@ -20,7 +20,7 @@ BumpArena::BumpArena() = default;
 
 BumpArena::~BumpArena()
 {
-  for (Block &block : m_blocks)
+  for (block &block : m_blocks)
     std::free(block.base);
 }
 
@@ -35,14 +35,14 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
   ASSERT(size >= minimum_size,
          "fresh block must fit the requested allocation");
 
-  m_blocks.push_back(Block{base, size, 0});
+  m_blocks.push_back(block{base, size, 0});
 }
 
 hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 {
   for (;;) {
     if (!m_blocks.empty()) {
-      Block &block = m_blocks.back();
+      block &block = m_blocks.back();
       const usize aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
 
       if (aligned + size <= block.size) {
@@ -62,7 +62,7 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
 {
   let const p = static_cast<const u8 *>(pointer);
-  for (const Block &block : m_blocks) {
+  for (const block &block : m_blocks) {
     if (p >= block.base && p < block.base + block.size) return true;
   }
   return false;

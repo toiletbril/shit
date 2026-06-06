@@ -11,14 +11,14 @@
 namespace shit {
 
 /* The line a byte falls on and the offset of the newline that starts it. */
-struct PreciseLocation
+struct precise_location
 {
   usize line_number;
   usize last_newline_location;
 };
 
 cold static fn calc_precise_position(StringView source, usize byte_position) throws
-    -> PreciseLocation
+    -> precise_location
 {
   ASSERT(byte_position <= source.size(),
               "byte position: %zu, source length: %zu", byte_position,
@@ -33,7 +33,7 @@ cold static fn calc_precise_position(StringView source, usize byte_position) thr
     line_number++;
   }
 
-  return PreciseLocation{line_number, last_newline_location};
+  return precise_location{line_number, last_newline_location};
 }
 
 template <class T>

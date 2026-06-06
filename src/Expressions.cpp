@@ -127,19 +127,19 @@ pure fn word_has_backtick(const Word &word) wontthrow -> bool
 /* A flattened view of a word's bytes paired with whether each byte is an active
    glob metacharacter. Only an unquoted '[' or ']' is active, so a quoted "[" or
    an escaped \[ stays literal and never opens a bracket expression. */
-struct GlobScanByte
+struct glob_scan_byte
 {
   char ch;
   bool is_glob_active;
 };
 
-fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<GlobScanByte>
+fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<glob_scan_byte>
 {
-  ArrayList<GlobScanByte> bytes{heap_allocator()};
+  ArrayList<glob_scan_byte> bytes{heap_allocator()};
   for (const WordSegment &segment : word.segments) {
     const bool is_active = segment.has_live_glob_chars();
     for (usize i = 0; i < segment.text.size(); i++) {
-      bytes.push(GlobScanByte{segment.text[i], is_active});
+      bytes.push(glob_scan_byte{segment.text[i], is_active});
     }
   }
   return bytes;
@@ -153,7 +153,7 @@ fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<GlobScanByte>
    Returns true when malformed. */
 fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 {
-  const ArrayList<GlobScanByte> bytes = collect_glob_scan_bytes(word);
+  const ArrayList<glob_scan_byte> bytes = collect_glob_scan_bytes(word);
 
   usize position = 0;
   while (position < bytes.size()) {
@@ -393,23 +393,23 @@ SimpleCommand::~SimpleCommand()
   for (const Token *t : m_args) {
     delete t;
   }
-  for (const Redirection &redirection : m_redirections) {
+  for (const redirection &redirection : m_redirections) {
     delete redirection.target;
   }
 }
 
-fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
+fn SimpleCommand::set_redirections(ArrayList<redirection> &&redirections) throws
     -> void
 {
-  for (const Redirection &redirection : redirections)
+  for (const redirection &redirection : redirections)
     m_redirections.push(redirection);
 }
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     throws -> void
 {
-  for (const Redirection &redirection : m_redirections) {
-    if (redirection.kind == Redirection::Kind::Heredoc) {
+  for (const redirection &redirection : m_redirections) {
+    if (redirection.kind == redirection::Kind::Heredoc) {
       ASSERT(redirection.heredoc_body != nullptr);
 
       let body = std::string{*redirection.heredoc_body};
@@ -428,7 +428,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
       continue;
     }
 
-    if (redirection.kind == Redirection::Kind::DuplicateOutput) {
+    if (redirection.kind == redirection::Kind::DuplicateOutput) {
       if (redirection.fd == 2 && redirection.dup_fd == 1)
         ec.dup_err_to_out = true;
       else if (redirection.fd == 1 && redirection.dup_fd == 2)
@@ -447,10 +447,10 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     }
 
     let mode = os::FileOpenMode::Read;
-    if (redirection.kind == Redirection::Kind::TruncateOutput)
+    if (redirection.kind == redirection::Kind::TruncateOutput)
       mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
                               : os::FileOpenMode::Truncate;
-    else if (redirection.kind == Redirection::Kind::AppendOutput)
+    else if (redirection.kind == redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
     const std::string target_path{target[0].c_str(), target[0].size()};
@@ -574,10 +574,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   };
 
-  for (const Redirection &redirection : m_redirections) {
+  for (const redirection &redirection : m_redirections) {
     /* A heredoc body becomes the standard input through an anonymous temp
        file, expanded when the delimiter was unquoted. */
-    if (redirection.kind == Redirection::Kind::Heredoc) {
+    if (redirection.kind == redirection::Kind::Heredoc) {
       ASSERT(redirection.heredoc_body != nullptr);
 
       let body = std::string{*redirection.heredoc_body};
@@ -598,7 +598,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     /* A duplication like 2>&1 routes one descriptor to another without a file.
      */
-    if (redirection.kind == Redirection::Kind::DuplicateOutput) {
+    if (redirection.kind == redirection::Kind::DuplicateOutput) {
       if (redirection.fd == 2 && redirection.dup_fd == 1)
         dup_err_to_out = true;
       else if (redirection.fd == 1 && redirection.dup_fd == 2)
@@ -617,10 +617,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     let mode = os::FileOpenMode::Read;
-    if (redirection.kind == Redirection::Kind::TruncateOutput)
+    if (redirection.kind == redirection::Kind::TruncateOutput)
       mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
                               : os::FileOpenMode::Truncate;
-    else if (redirection.kind == Redirection::Kind::AppendOutput)
+    else if (redirection.kind == redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
     const std::string target_path{target[0].c_str(), target[0].size()};
@@ -658,15 +658,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      function call included, so a child inherits them and a function sees them.
      The previous values are restored on every exit path. */
   /* The environment value a prefix assignment shadowed, restored on exit. */
-  struct SavedEnvVar
+  struct saved_env_var
   {
     String name;
     Maybe<String> previous_value;
   };
-  ArrayList<SavedEnvVar> saved_env{heap_allocator()};
+  ArrayList<saved_env_var> saved_env{heap_allocator()};
   m_local_vars.for_each([&](StringView name, const Word &value_word) {
     saved_env.push(
-        SavedEnvVar{String{name}, os::get_environment_variable(name)});
+        saved_env_var{String{name}, os::get_environment_variable(name)});
     let const expanded_value = cxt.expand_word_for_assignment(value_word);
     os::set_environment_variable(name, expanded_value.view());
   });
@@ -711,12 +711,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        escape into a caller's loop and is consumed here. An exit is not ours and
        stays pending for the shell. */
     if (cxt.has_pending_control_flow()) {
-      const ControlFlow::Kind kind = cxt.pending_control_flow().kind;
-      if (kind == ControlFlow::Kind::Return) {
+      const control_flow::Kind kind = cxt.pending_control_flow().kind;
+      if (kind == control_flow::Kind::Return) {
         function_ret = cxt.pending_control_flow().value;
         cxt.clear_control_flow();
-      } else if (kind == ControlFlow::Kind::Break ||
-                 kind == ControlFlow::Kind::Continue)
+      } else if (kind == control_flow::Kind::Break ||
+                 kind == control_flow::Kind::Continue)
       {
         cxt.clear_control_flow();
       }
@@ -1204,8 +1204,8 @@ fn resolve_loop_control(EvalContext &cxt) throws -> LoopDisposition
   if (!cxt.has_pending_control_flow()) return LoopDisposition::RunNext;
 
   let &control = cxt.pending_control_flow();
-  if (control.kind != ControlFlow::Kind::Break &&
-      control.kind != ControlFlow::Kind::Continue)
+  if (control.kind != control_flow::Kind::Break &&
+      control.kind != control_flow::Kind::Continue)
   {
     /* A return or an exit is not a loop's to consume, so this loop stops and
        leaves it pending for the function or the shell. */
@@ -1221,7 +1221,7 @@ fn resolve_loop_control(EvalContext &cxt) throws -> LoopDisposition
 
   /* The jump targets this loop. A break stops it, a continue runs the next
      iteration. Either way the request is consumed here. */
-  let const is_break = control.kind == ControlFlow::Kind::Break;
+  let const is_break = control.kind == control_flow::Kind::Break;
   cxt.clear_control_flow();
   return is_break ? LoopDisposition::StopLoop : LoopDisposition::RunNext;
 }
@@ -1331,10 +1331,10 @@ cold fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const thr
 }
 
 CaseClause::CaseClause(SourceLocation location, const Token *word,
-                       ArrayList<CaseItem> &&items)
+                       ArrayList<case_item> &&items)
     : CompoundCommand(location), m_word(word)
 {
-  for (CaseItem &item : items)
+  for (case_item &item : items)
     m_items.push(std::move(item));
   /* The node now owns the items. Empty the source so the parser's cleanup guard
      does not also free the bodies. */
@@ -1344,7 +1344,7 @@ CaseClause::CaseClause(SourceLocation location, const Token *word,
 CaseClause::~CaseClause()
 {
   delete m_word;
-  for (const CaseItem &item : m_items) {
+  for (const case_item &item : m_items) {
     for (const Token *pattern : item.patterns)
       delete pattern;
     delete item.body;
@@ -1358,7 +1358,7 @@ cold fn CaseClause::to_ast_string(usize layer) const throws -> String
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
   let s = pad + "[" + to_string() + "]";
-  for (const CaseItem &item : m_items) {
+  for (const case_item &item : m_items) {
     ASSERT(item.body != nullptr);
     s += "\n" + child_pad + item.body->to_ast_string(layer + 1);
   }
@@ -1383,7 +1383,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   let const subject = expand_no_glob(m_word);
 
-  for (const CaseItem &item : m_items) {
+  for (const case_item &item : m_items) {
     ASSERT(item.body != nullptr);
 
     for (const Token *pattern_token : item.patterns) {
@@ -1407,7 +1407,7 @@ cold fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const 
     -> void
 {
   unused(is_unconditional);
-  for (const CaseItem &item : m_items) {
+  for (const case_item &item : m_items) {
     ASSERT(item.body != nullptr);
     item.body->analyze(actx, false);
   }
@@ -1486,7 +1486,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
      A break, a continue, or a return stays pending and propagates after the
      state is restored, the same as the old re-throw did. */
   if (cxt.has_pending_control_flow() &&
-      cxt.pending_control_flow().kind == ControlFlow::Kind::Exit)
+      cxt.pending_control_flow().kind == control_flow::Kind::Exit)
   {
     ret = cxt.pending_control_flow().value;
     cxt.clear_control_flow();

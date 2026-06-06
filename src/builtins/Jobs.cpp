@@ -13,12 +13,12 @@ namespace shit {
 
 namespace {
 
-pure fn state_word(Job::State state) wontthrow -> const char *
+pure fn state_word(job::State state) wontthrow -> const char *
 {
   switch (state) {
-  case Job::State::Running: return "Running";
-  case Job::State::Stopped: return "Stopped";
-  case Job::State::Done: return "Done";
+  case job::State::Running: return "Running";
+  case job::State::Stopped: return "Stopped";
+  case job::State::Done: return "Done";
   }
   return "Unknown";
 }

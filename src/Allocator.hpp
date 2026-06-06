@@ -12,8 +12,9 @@ namespace shit {
    context and a table of operations, so a data structure is handed the
    allocator it must use and frees through the same one. It is sixteen bytes and
    passed by value. */
-struct Allocator
+class Allocator
 {
+public:
   struct VTable
   {
     void *(*alloc)(void *context, usize length, usize alignment);

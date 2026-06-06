@@ -43,7 +43,7 @@ namespace shit {
 
 /* ExecContext is defined in Eval.hpp. The os functions take it by reference, so
    a forward declaration keeps this header below Eval in the include graph. */
-struct ExecContext;
+class ExecContext;
 
 namespace os {
 
@@ -74,7 +74,7 @@ using os_args = ArrayList<const char *>;
 #define SHIT_STDOUT STDOUT_FILENO
 #endif
 
-using ExtIndex = usize;
+using ext_index = usize;
 
 struct Pipe
 {
@@ -170,7 +170,7 @@ fn is_stdin_a_tty() wontthrow -> bool;
 fn is_stdout_a_tty() wontthrow -> bool;
 
 fn erase_extension_and_get_its_index(std::string &program_name) throws
-    -> ExtIndex;
+    -> ext_index;
 
 fn get_current_user() throws -> Maybe<String>;
 

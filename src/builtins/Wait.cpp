@@ -16,11 +16,11 @@ namespace shit {
 namespace {
 
 /* Wait for one job to finish, reusing a status already collected. */
-i32 wait_for_job(Job &job) throws
+i32 wait_for_job(job &job) throws
 {
-  if (job.state == Job::State::Done) return job.last_status;
+  if (job.state == job::State::Done) return job.last_status;
   let const status = os::wait_and_monitor_process(job.pid);
-  job.state = Job::State::Done;
+  job.state = job::State::Done;
   job.last_status = status;
   return status;
 }
@@ -39,7 +39,7 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
   i32 status = 0;
 
   if (args.size() == 1) {
-    for (Job &job : cxt.jobs())
+    for (job &job : cxt.jobs())
       status = wait_for_job(job);
     cxt.forget_done_jobs();
     return status;
@@ -52,7 +52,7 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (!parsed.is_error()) {
-        if (Job *const job = cxt.find_job(static_cast<int>(parsed.value())))
+        if (job *const job = cxt.find_job(static_cast<int>(parsed.value())))
           status = wait_for_job(*job);
       }
     } else {

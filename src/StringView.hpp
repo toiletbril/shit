@@ -10,8 +10,9 @@ namespace shit {
 
 /* A non-owning view of bytes, the form a function takes when it does not own
    the characters. It points into a String, a literal, or a slice. */
-struct StringView
+class StringView
 {
+public:
   const char *data{nullptr};
   usize length{0};
 

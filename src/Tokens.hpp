@@ -10,10 +10,11 @@
 
 namespace shit {
 
-struct Expression;
+class Expression;
 
-struct WordSegment
+class WordSegment
 {
+public:
   /* The kind records how the evaluator may expand this segment. LiteralText is
      final and the evaluator leaves it alone. UnquotedText expands a leading
      tilde, splits on IFS after variable expansion, and globs. DoubleQuotedText
@@ -45,8 +46,9 @@ struct WordSegment
 /* A lexed word carries its quoting structure as ordered segments. The evaluator
    expands the segments instead of consulting a source-position escape map, so
    the byte offsets never drift apart from the produced text. */
-struct Word
+class Word
 {
+public:
   ArrayList<WordSegment> segments{heap_allocator()};
 
   pure fn is_empty() const wontthrow -> bool;
@@ -63,8 +65,9 @@ struct Word
 /**
  * Simple tokens
  */
-struct Token
+class Token
 {
+public:
   enum class Kind : u8
   {
     Invalid,
@@ -180,7 +183,7 @@ private:
   SourceLocation m_location;
 };
 
-inline constexpr StaticStringMap<Token::Kind>::Entry KEYWORD_ENTRIES[] = {
+inline constexpr StaticStringMap<Token::Kind>::entry KEYWORD_ENTRIES[] = {
     {PackedStringKey::from_literal("if"),       Token::Kind::If      },
     {PackedStringKey::from_literal("then"),     Token::Kind::Then    },
     {PackedStringKey::from_literal("else"),     Token::Kind::Else    },
@@ -229,8 +232,9 @@ inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
 namespace tokens {
 
 #define TOKEN_STRUCT(t)                                                        \
-  struct t : public Token                                                      \
+  class t : public Token                                                       \
   {                                                                            \
+  public:                                                                      \
     t(SourceLocation location);                                                \
                                                                                \
     Kind kind() const wontthrow override;                                      \
@@ -270,8 +274,9 @@ TOKEN_STRUCT(RightBracket);
 TOKEN_STRUCT(DoubleLeftSquareBracket);
 TOKEN_STRUCT(DoubleRightSquareBracket);
 
-struct Redirection : Token
+class Redirection : public Token
 {
+public:
   Redirection(SourceLocation location, StringView what_fd, StringView to_file);
 
   fn kind() const wontthrow -> Kind override;
@@ -285,8 +290,9 @@ protected:
   String m_to_file{};
 };
 
-struct Assignment : public Token
+class Assignment : public Token
 {
+public:
   Assignment(SourceLocation location, StringView key, Word value);
 
   fn kind() const wontthrow -> Kind override;
@@ -303,8 +309,9 @@ protected:
 };
 
 /* Tokens with values. */
-struct Value : public Token
+class Value : public Token
 {
+public:
   Value(SourceLocation location, StringView sv);
 
   fn raw_string() const throws -> String override;
@@ -314,8 +321,9 @@ protected:
 };
 
 #define VALUE_TOKEN_STRUCT(t)                                                  \
-  struct t : public Value                                                      \
+  class t : public Value                                                       \
   {                                                                            \
+  public:                                                                      \
     t(SourceLocation location, StringView sv);                                 \
                                                                                \
     Kind kind() const wontthrow override;                                      \
@@ -325,8 +333,9 @@ protected:
 VALUE_TOKEN_STRUCT(Number);
 VALUE_TOKEN_STRUCT(Identifier);
 
-struct WordToken : public Value
+class WordToken : public Value
 {
+public:
   WordToken(SourceLocation location, Word word);
 
   fn kind() const wontthrow -> Kind override;
@@ -338,8 +347,9 @@ protected:
   Word m_word;
 };
 
-struct Operator : public Token
+class Operator : public Token
 {
+public:
   Operator(SourceLocation location);
 
   virtual fn binary_left_associative() const wontthrow -> bool;
@@ -355,8 +365,9 @@ struct Operator : public Token
 };
 
 #define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \
-  struct t : Operator                                                          \
+  class t : public Operator                                                    \
   {                                                                            \
+  public:                                                                      \
     t(SourceLocation location);                                                \
                                                                                \
     Kind kind() const wontthrow override;                                      \
@@ -376,8 +387,9 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Plus);
 UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
 
 #define UNARY_OPERATOR_TOKEN_STRUCT(t)                                         \
-  struct t : Operator                                                          \
+  class t : public Operator                                                    \
   {                                                                            \
+  public:                                                                      \
     t(SourceLocation location);                                                \
                                                                                \
     Kind kind() const wontthrow override;                                      \
@@ -393,8 +405,9 @@ UNARY_OPERATOR_TOKEN_STRUCT(Tilde);
 UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
 
 #define BINARY_OPERATOR_TOKEN_STRUCT(t)                                        \
-  struct t : Operator                                                          \
+  class t : public Operator                                                    \
   {                                                                            \
+  public:                                                                      \
     t(SourceLocation location);                                                \
                                                                                \
     Kind kind() const wontthrow override;                                      \

@@ -13,8 +13,9 @@ namespace shit {
    many small allocations collapse into a handful of block allocations. The node
    destructors still run through the normal delete, see the operator delete on
    Expression and Token that no-ops for arena storage. */
-struct BumpArena
+class BumpArena
 {
+public:
   BumpArena();
   ~BumpArena();
 
@@ -44,7 +45,7 @@ struct BumpArena
   }
 
 private:
-  struct Block
+  struct block
   {
     u8 *base;
     usize size;
@@ -53,7 +54,7 @@ private:
 
   static constexpr usize DEFAULT_BLOCK_SIZE = 64 * 1024;
 
-  std::vector<Block> m_blocks{};
+  std::vector<block> m_blocks{};
 
   fn add_block(usize minimum_size) throws -> void;
 };

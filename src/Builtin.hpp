@@ -12,11 +12,12 @@
 
 namespace shit {
 
-struct ExecContext;
-struct EvalContext;
+class ExecContext;
+class EvalContext;
 
-struct Builtin
+class Builtin
 {
+public:
   enum class Kind : uint8_t
   {
     Echo,
@@ -71,7 +72,7 @@ protected:
   Builtin();
 };
 
-inline constexpr StaticStringMap<Builtin::Kind>::Entry BUILTIN_ENTRIES[] = {
+inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("echo"),     Builtin::Kind::Echo          },
     {PackedStringKey::from_literal("exit"),     Builtin::Kind::Exit          },
     {PackedStringKey::from_literal("cd"),       Builtin::Kind::Cd            },
@@ -162,8 +163,9 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Kill)
 
 #define BUILTIN_STRUCT(b)                                                      \
-  struct b : public Builtin                                                    \
+  class b : public Builtin                                                     \
   {                                                                            \
+  public:                                                                      \
     b();                                                                       \
                                                                                \
     pure Kind kind() const wontthrow override;                                 \
@@ -208,8 +210,9 @@ BUILTIN_STRUCT(Bg);
 BUILTIN_STRUCT(Wait);
 BUILTIN_STRUCT(Kill);
 
-struct Exit : public Builtin
+class Exit : public Builtin
 {
+public:
   Exit();
 
   pure Kind kind() const wontthrow override;

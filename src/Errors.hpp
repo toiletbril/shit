@@ -22,8 +22,9 @@ struct SourceLocation
   Maybe<StringView> filename{};
 };
 
-struct ErrorBase
+class ErrorBase
 {
+public:
   ErrorBase();
   ErrorBase(StringView message);
   virtual ~ErrorBase();
@@ -43,8 +44,9 @@ protected:
   String m_message;
 };
 
-struct Error : public ErrorBase
+class Error : public ErrorBase
 {
+public:
   Error();
   Error(StringView message);
 
@@ -56,8 +58,9 @@ struct Error : public ErrorBase
 };
 
 /* An Error that prints as a warning and is shown rather than thrown. */
-struct Warning : public Error
+class Warning : public Error
 {
+public:
   Warning(StringView message);
 
   pure fn severity_word() const wontthrow -> String override;
@@ -65,8 +68,9 @@ struct Warning : public Error
 
 /* An Error that prints as a note and is shown rather than thrown. It carries no
    location, so it adds plain context under a primary error. */
-struct Note : public Error
+class Note : public Error
 {
+public:
   Note(StringView message);
 
   pure fn severity_word() const wontthrow -> String override;
@@ -76,8 +80,9 @@ struct Note : public Error
  * An error with location in the source code. The source must be supplied to
  * resolve context.
  */
-struct ErrorWithLocation : public ErrorBase
+class ErrorWithLocation : public ErrorBase
 {
+public:
   ErrorWithLocation();
 
   ErrorWithLocation(SourceLocation location, StringView message);
@@ -92,8 +97,9 @@ protected:
 
 /* An ErrorWithLocation that prints as a warning and is shown rather than
    thrown. The prepass builds it to point a caret at a non-fatal issue. */
-struct WarningWithLocation : public ErrorWithLocation
+class WarningWithLocation : public ErrorWithLocation
 {
+public:
   WarningWithLocation(SourceLocation location, StringView message);
 
   pure fn severity_word() const wontthrow -> String override;
@@ -102,15 +108,17 @@ struct WarningWithLocation : public ErrorWithLocation
 /* An ErrorWithLocation that prints as a trace and is shown rather than thrown.
    A source backtrace frame builds it so a call site reads as context under the
    primary error rather than as an error of its own. */
-struct TraceWithLocation : public ErrorWithLocation
+class TraceWithLocation : public ErrorWithLocation
 {
+public:
   TraceWithLocation(SourceLocation location, StringView message);
 
   pure fn severity_word() const wontthrow -> String override;
 };
 
-struct ErrorWithLocationAndDetails : public ErrorWithLocation
+class ErrorWithLocationAndDetails : public ErrorWithLocation
 {
+public:
   ErrorWithLocationAndDetails();
 
   ErrorWithLocationAndDetails(SourceLocation location, StringView message,

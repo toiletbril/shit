@@ -25,13 +25,13 @@ void exit();
 
 /* The outcome of one line read. The code is the toiletline status, such as
    enter, end of file, or an interrupt, and text is the bytes the user typed. */
-struct InputResult
+struct input_result
 {
   i32 code;
   String text;
 };
 
-InputResult get_input(const String &prompt);
+input_result get_input(const String &prompt);
 
 void set_input(const String &input);
 

@@ -95,8 +95,9 @@ using uintptr = uintptr_t;
 #define concat_literal(x, y)    t__concat_literal(x, y)
 
 template <typename T>
-struct t__exit_scope
+class t__exit_scope
 {
+public:
   t__exit_scope(T lambda) : m_lambda(lambda) {}
   ~t__exit_scope() { m_lambda(); }
   t__exit_scope(const t__exit_scope &);
@@ -106,8 +107,9 @@ private:
   t__exit_scope &operator=(const t__exit_scope &);
 };
 
-struct t__exit_scope_help
+class t__exit_scope_help
 {
+public:
   template <typename T>
   t__exit_scope<T> operator+(T t)
   {

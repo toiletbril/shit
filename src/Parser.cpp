@@ -335,7 +335,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
   Maybe<SourceLocation> source_location;
   ArrayList<Token *> args_accumulator{};
   HashMap<Word> local_vars{heap_allocator()};
-  ArrayList<expressions::Redirection> redirections{};
+  ArrayList<expressions::redirection> redirections{};
 
   auto build_command = [&]() -> Command * {
     if (!source_location) return NULL;
@@ -359,7 +359,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
                              SourceLocation op_location) {
     if (!source_location) source_location = op_location;
 
-    expressions::Redirection redirection{};
+    expressions::redirection redirection{};
     redirection.fd = fd;
     redirection.target = nullptr;
     redirection.dup_fd = -1;
@@ -389,7 +389,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
           throw ErrorWithLocation{from->source_location(),
                                   "Expected a descriptor after '&'"};
         }
-        redirection.kind = expressions::Redirection::Kind::DuplicateOutput;
+        redirection.kind = expressions::redirection::Kind::DuplicateOutput;
         redirection.dup_fd = from_fd;
         redirections.push(redirection);
         return;
@@ -403,11 +403,11 @@ hot fn Parser::parse_simple_command() throws -> Command *
                               "Expected a filename after the redirection"};
     }
     if (op_kind == Token::Kind::Greater)
-      redirection.kind = expressions::Redirection::Kind::TruncateOutput;
+      redirection.kind = expressions::redirection::Kind::TruncateOutput;
     else if (op_kind == Token::Kind::DoubleGreater)
-      redirection.kind = expressions::Redirection::Kind::AppendOutput;
+      redirection.kind = expressions::redirection::Kind::AppendOutput;
     else
-      redirection.kind = expressions::Redirection::Kind::ReadInput;
+      redirection.kind = expressions::redirection::Kind::ReadInput;
     redirection.target = target;
     redirections.push(redirection);
   };
@@ -585,9 +585,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
         }
       }
 
-      expressions::Redirection redirection{};
+      expressions::redirection redirection{};
       redirection.fd = 0;
-      redirection.kind = expressions::Redirection::Kind::Heredoc;
+      redirection.kind = expressions::redirection::Kind::Heredoc;
       redirection.target = nullptr;
       redirection.dup_fd = -1;
       redirection.heredoc_body =
@@ -794,12 +794,12 @@ hot fn Parser::parse_case() throws -> Command *
                             "Expected 'in' after the case word"};
   }
 
-  ArrayList<CaseItem> items{};
+  ArrayList<case_item> items{};
   /* A parse error before the clause is built abandons these arena nodes, so
      free their tokens and bodies to keep the leak checker happy. */
   defer
   {
-    for (CaseItem &item : items) {
+    for (case_item &item : items) {
       for (const Token *pattern : item.patterns)
         delete pattern;
       delete item.body;
@@ -855,7 +855,7 @@ hot fn Parser::parse_case() throws -> Command *
 
     Expression *body =
         parse_command_list({Token::Kind::DoubleSemicolon, Token::Kind::Esac});
-    items.push(CaseItem{std::move(patterns), body});
+    items.push(case_item{std::move(patterns), body});
 
     Token *after = m_lexer.peek_shell_token();
     ASSERT(after != NULL);

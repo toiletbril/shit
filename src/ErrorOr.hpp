@@ -23,8 +23,8 @@ String integer_to_string(i64 value);
 } /* namespace utils */
 
 /* The success payload of a fallible function that returns no value. A caller
-   writes ErrorOr<Ok> and returns Ok{} on success. */
-struct Ok
+   writes ErrorOr<ok> and returns ok{} on success. */
+struct ok
 {};
 
 /* A value or an Error, held in one of two members of an explicit tagged union
@@ -32,8 +32,9 @@ struct Ok
    the storage is sized for the larger of the two, so only one is alive at a
    time and no heap allocation happens for the discriminant. */
 template <class T>
-struct [[nodiscard]] ErrorOr
+class [[nodiscard]] ErrorOr
 {
+public:
   ErrorOr(T value) : m_is_error(false) { new (&m_storage) T(std::move(value)); }
   ErrorOr(Error error) : m_is_error(true)
   {

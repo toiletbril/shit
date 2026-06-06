@@ -12,15 +12,16 @@ namespace shit {
    and scans, so a tiny table resolves in a handful of integer compares with no
    hashing and no allocation. */
 template <class Value>
-struct StaticStringMap
+class StaticStringMap
 {
-  struct Entry
+public:
+  struct entry
   {
     PackedStringKey key;
     Value value;
   };
 
-  const Entry *entries;
+  const entry *entries;
   usize entry_count;
 
   [[nodiscard]] Maybe<Value> find(StringView text) const

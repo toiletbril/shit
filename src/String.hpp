@@ -14,8 +14,9 @@ namespace shit {
 /* An owned, growable byte string over an explicit allocator. There is no
    small-string buffer yet, so every non-empty string is one allocation, which a
    bump arena makes cheap. The buffer keeps a trailing null so c_str is free. */
-struct String
+class String
 {
+public:
   /* A default String is heap-backed and empty, so it can serve as a container
      slot before its real allocator and value are assigned. */
   String() : m_allocator(heap_allocator()) {}

@@ -19,8 +19,9 @@ namespace {
 
 /* One shell option, named by its letter and its long name. set and get are the
    accessors on EvalContext, both null for an option accepted without effect. */
-struct SetOption
+class SetOption
 {
+public:
   char letter;
   StringView name;
   void (EvalContext::*set)(bool);

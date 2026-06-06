@@ -186,12 +186,12 @@ fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
 
 fn EvalContext::register_job(os::process pid, StringView command) throws -> int
 {
-  let job = Job{};
-  job.id = m_next_job_id++;
-  job.pid = pid;
-  job.command = command;
-  job.state = Job::State::Running;
-  m_jobs.push(std::move(job));
+  let new_job = job{};
+  new_job.id = m_next_job_id++;
+  new_job.pid = pid;
+  new_job.command = command;
+  new_job.state = job::State::Running;
+  m_jobs.push(std::move(new_job));
   ASSERT(!m_jobs.empty());
   LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
@@ -199,47 +199,47 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> int
 
 fn EvalContext::update_jobs() throws -> void
 {
-  for (Job &job : m_jobs) {
-    if (job.state == Job::State::Done) continue;
+  for (job &job : m_jobs) {
+    if (job.state == job::State::Done) continue;
 
     i32 status = 0;
     let const state = os::poll_process(job.pid, status);
     if (state == os::ProcessState::Exited) {
-      job.state = Job::State::Done;
+      job.state = job::State::Done;
       job.last_status = status;
     } else if (state == os::ProcessState::Stopped) {
-      job.state = Job::State::Stopped;
+      job.state = job::State::Stopped;
     } else {
-      job.state = Job::State::Running;
+      job.state = job::State::Running;
     }
   }
 }
 
-fn EvalContext::jobs() wontthrow -> ArrayList<Job> & { return m_jobs; }
+fn EvalContext::jobs() wontthrow -> ArrayList<job> & { return m_jobs; }
 
-fn EvalContext::find_job(int id) wontthrow -> Job *
+fn EvalContext::find_job(int id) wontthrow -> job *
 {
-  for (Job &job : m_jobs)
+  for (job &job : m_jobs)
     if (job.id == id) return &job;
   return nullptr;
 }
 
-fn EvalContext::most_recent_job() wontthrow -> Job *
+fn EvalContext::most_recent_job() wontthrow -> job *
 {
   /* Skip a finished job, so a bare fg or bg acts on a job that is still
      running or stopped rather than a dead pid. */
   for (usize i = m_jobs.size(); i > 0; i--) {
     ASSERT(i - 1 < m_jobs.size());
-    if (m_jobs[i - 1].state != Job::State::Done) return &m_jobs[i - 1];
+    if (m_jobs[i - 1].state != job::State::Done) return &m_jobs[i - 1];
   }
   return nullptr;
 }
 
 fn EvalContext::forget_done_jobs() throws -> void
 {
-  let kept = ArrayList<Job>{};
-  for (Job &job : m_jobs) {
-    if (job.state == Job::State::Done) continue;
+  let kept = ArrayList<job>{};
+  for (job &job : m_jobs) {
+    if (job.state == job::State::Done) continue;
     kept.push(std::move(job));
   }
   m_jobs = std::move(kept);
@@ -342,7 +342,7 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
 
 fn EvalContext::enter_function_scope() throws -> void
 {
-  m_local_scopes.push(ArrayList<LocalBinding>{});
+  m_local_scopes.push(ArrayList<local_binding>{});
 }
 
 fn EvalContext::leave_function_scope() throws -> void
@@ -365,7 +365,7 @@ fn EvalContext::leave_function_scope() throws -> void
     else
       unset_shell_variable(binding.name);
   }
-  let kept = ArrayList<ArrayList<LocalBinding>>{};
+  let kept = ArrayList<ArrayList<local_binding>>{};
   for (usize i = 0; i + 1 < m_local_scopes.size(); i++)
     kept.push(std::move(m_local_scopes[i]));
   m_local_scopes = std::move(kept);
@@ -381,7 +381,7 @@ fn EvalContext::declare_local(StringView name) throws -> void
   if (m_local_scopes.empty()) return;
   ASSERT(!m_local_scopes.empty());
   m_local_scopes.back().push(
-      LocalBinding{String{name}, get_variable_value(name)});
+      local_binding{String{name}, get_variable_value(name)});
 }
 
 fn EvalContext::set_alias(StringView name, StringView value) throws -> void
@@ -443,7 +443,7 @@ pure fn EvalContext::in_subshell() const wontthrow -> bool
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 {
   LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
-  m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
+  m_control_flow = control_flow{control_flow::Kind::Break, level, location,
                                m_current_source, String{m_current_origin}};
 }
 
@@ -452,7 +452,7 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) throws
 {
   LOG(Verbosity::Debug, "continue requested, level %lld",
            (long long) level);
-  m_control_flow = ControlFlow{ControlFlow::Kind::Continue, level, location,
+  m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
                                m_current_source, String{m_current_origin}};
 }
 
@@ -460,36 +460,36 @@ fn EvalContext::request_return(i64 status, SourceLocation location) throws -> vo
 {
   LOG(Verbosity::Debug, "return requested, status %lld",
            (long long) status);
-  m_control_flow = ControlFlow{ControlFlow::Kind::Return, status, location,
+  m_control_flow = control_flow{control_flow::Kind::Return, status, location,
                                m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
-  m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
+  m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
                                m_current_source, String{m_current_origin}};
 }
 
 pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
 {
-  return m_control_flow.kind != ControlFlow::Kind::Normal;
+  return m_control_flow.kind != control_flow::Kind::Normal;
 }
 
-fn EvalContext::pending_control_flow() wontthrow -> ControlFlow &
+fn EvalContext::pending_control_flow() wontthrow -> control_flow &
 {
   return m_control_flow;
 }
 
 pure fn EvalContext::pending_control_flow() const wontthrow
-    -> const ControlFlow &
+    -> const control_flow &
 {
   return m_control_flow;
 }
 
 fn EvalContext::clear_control_flow() wontthrow -> void
 {
-  m_control_flow.kind = ControlFlow::Kind::Normal;
+  m_control_flow.kind = control_flow::Kind::Normal;
 }
 
 fn EvalContext::set_current_source(const String *source, String origin) wontthrow
@@ -617,13 +617,13 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
 
 fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
 
-fn EvalContext::snapshot_state() const throws -> EvalStateSnapshot
+fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
-  return EvalStateSnapshot{m_shell_variables, m_functions, m_positional_params,
+  return eval_state_snapshot{m_shell_variables, m_functions, m_positional_params,
                            Path::current_directory()};
 }
 
-fn EvalContext::restore_state(EvalStateSnapshot snapshot) throws -> void
+fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
   m_shell_variables = std::move(snapshot.shell_variables);
   m_functions = std::move(snapshot.functions);
@@ -991,12 +991,12 @@ pure fn EvalContext::total_expansion_count() const wontthrow -> usize
 
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
-fn EvalContext::expand_path_once(const GlobField &field,
+fn EvalContext::expand_path_once(const glob_field &field,
                                  bool should_expand_files) throws
-    -> ArrayList<GlobField>
+    -> ArrayList<glob_field>
 {
   let const scratch = scratch_allocator();
-  let expanded = ArrayList<GlobField>{scratch};
+  let expanded = ArrayList<glob_field>{scratch};
 
   /* This runs only for a field that holds a real glob, which is rare. The path
      text is split on its last separator into a parent directory and the glob
@@ -1032,7 +1032,7 @@ fn EvalContext::expand_path_once(const GlobField &field,
                 "': " + os::last_system_error_message()};
 
   if (!has_glob) {
-    let copy = GlobField{scratch};
+    let copy = glob_field{scratch};
     copy.text.append(field.text.view());
     copy.glob_active = field.glob_active;
     expanded.push(std::move(copy));
@@ -1066,7 +1066,7 @@ fn EvalContext::expand_path_once(const GlobField &field,
          The empty mask is the all-literal convention, so it carries no
          per-result allocation. A parent of "." is dropped to keep the result
          relative. */
-      let result_field = GlobField{scratch};
+      let result_field = glob_field{scratch};
       if (parent_is_dot)
         result_field.text.append(filename);
       else
@@ -1103,13 +1103,13 @@ hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask) wont
 
 } /* namespace */
 
-fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields) throws
-    -> ArrayList<GlobField>
+fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
+    -> ArrayList<glob_field>
 {
   let const scratch = scratch_allocator();
-  let result = ArrayList<GlobField>{scratch};
+  let result = ArrayList<glob_field>{scratch};
 
-  for (GlobField &field : fields) {
+  for (glob_field &field : fields) {
     let const text = field.text.view();
 
     /* An empty mask is the all-literal convention, so a field without one holds
@@ -1142,7 +1142,7 @@ fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields) throws
        matches as is. */
     if (!slash_after) {
       let once = expand_path_once(field, true);
-      for (GlobField &f : once)
+      for (glob_field &f : once)
         result.push(std::move(f));
       continue;
     }
@@ -1151,11 +1151,11 @@ fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields) throws
        suffix after it, building each from a substring rather than copying the
        whole field. */
     let const slash_offset = static_cast<std::ptrdiff_t>(*slash_after);
-    let operating = GlobField{scratch};
+    let operating = glob_field{scratch};
     operating.text.append(StringView{text.data, *slash_after});
     for (std::ptrdiff_t k = 0; k < slash_offset; k++)
       operating.glob_active.push(field.glob_active[static_cast<usize>(k)]);
-    let removed_suffix = GlobField{scratch};
+    let removed_suffix = glob_field{scratch};
     removed_suffix.text.append(
         StringView{text.data + *slash_after, text.length - *slash_after});
     for (usize k = static_cast<usize>(slash_offset);
@@ -1167,7 +1167,7 @@ fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields) throws
     /* Bring back the removed suffix and recurse on the expanded entries. Each
        match came back all-literal with an empty mask, so restore its false
        entries before the suffix mask to keep the mask aligned with the text. */
-    for (GlobField &f : once) {
+    for (glob_field &f : once) {
       let const matched_length = f.text.size();
       f.text.append(removed_suffix.text.view());
       f.glob_active.clear();
@@ -1181,7 +1181,7 @@ fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields) throws
        literal suffix, the existence check above, so no extra stat is needed
        here. */
     let twice = expand_path_recurse(std::move(once));
-    for (GlobField &f : twice)
+    for (glob_field &f : twice)
       result.push(std::move(f));
   }
 
@@ -1212,7 +1212,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   text = std::move(expanded);
 }
 
-hot fn EvalContext::expand_path(GlobField field) throws -> ArrayList<String>
+hot fn EvalContext::expand_path(glob_field field) throws -> ArrayList<String>
 {
   let const scratch = scratch_allocator();
 
@@ -1235,12 +1235,12 @@ hot fn EvalContext::expand_path(GlobField field) throws -> ArrayList<String>
   let pattern = String{scratch};
   pattern.append(field.text.view());
 
-  let input = ArrayList<GlobField>{scratch};
+  let input = ArrayList<glob_field>{scratch};
   input.push(std::move(field));
   let fields = expand_path_recurse(std::move(input));
 
   let values = ArrayList<String>{scratch};
-  for (GlobField &f : fields)
+  for (glob_field &f : fields)
     values.push(std::move(f.text));
 
   /* Sort the matches in byte order, which is the POSIX collating order in the C
@@ -1318,8 +1318,9 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
 
 /* A recursive-descent evaluator for $((...)), following C operator precedence,
    that resolves and assigns shell variables through the context. */
-struct ArithmeticParser
+class ArithmeticParser
 {
+public:
   EvalContext &context;
   StringView source;
   usize pos;
@@ -1406,12 +1407,12 @@ struct ArithmeticParser
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         name += source[pos++];
 
-      struct CompoundOperator
+      struct compound_operator
       {
         StringView token;
         u8 kind;
       };
-      static const CompoundOperator compound_operators[] = {
+      static const compound_operator compound_operators[] = {
           {"<<=", 'L'},
           {">>=", 'R'},
           {"+=",  '+'},
@@ -1652,7 +1653,7 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
   return parser.parse();
 }
 
-hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<GlobField>
+hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field>
 {
   let const scratch = scratch_allocator();
 
@@ -1669,14 +1670,14 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<GlobField>
     segments = &tilde_expanded_segments;
   }
 
-  let fields = ArrayList<GlobField>{scratch};
-  let current = GlobField{scratch};
+  let fields = ArrayList<glob_field>{scratch};
+  let current = glob_field{scratch};
   let has_current = false;
 
   auto flush = [&]() {
     if (has_current) {
       fields.push(std::move(current));
-      current = GlobField{scratch};
+      current = glob_field{scratch};
       has_current = false;
     }
   };
@@ -1851,7 +1852,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
   /* A break, continue, return, or exit inside the substitution acts only within
      it, so consume any pending jump here. An exit supplies the status. */
   if (has_pending_control_flow()) {
-    if (pending_control_flow().kind == ControlFlow::Kind::Exit)
+    if (pending_control_flow().kind == control_flow::Kind::Exit)
       set_last_exit_status(static_cast<i32>(pending_control_flow().value));
     clear_control_flow();
   }
@@ -1892,7 +1893,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      error deep in a nested source prints every call site. The pop runs at
      function scope, after the catch below has read the stack. A frame with no
      call site stores a zero location, unused because parent_source is NULL. */
-  m_source_frames.push(SourceFrame{
+  m_source_frames.push(source_frame{
       String{origin}, call_site ? *call_site : SourceLocation{0, 0},
       parent_source});
   defer { m_source_frames.pop_back(); };
@@ -1903,7 +1904,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      its call site, otherwise it falls back to naming the origin. */
   let const print_backtrace = [this]() {
     for (usize i = m_source_frames.size(); i > 0; i--) {
-      const SourceFrame &frame = m_source_frames[i - 1];
+      const source_frame &frame = m_source_frames[i - 1];
       if (frame.parent_source != nullptr) {
         /* A frame is context under the primary error, not an error of its own,
            so it prints with the Trace severity rather than Error. */
@@ -1966,7 +1967,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
        exit keep propagating, so an enclosing loop or the shell consumes them.
      */
     if (consume_return && has_pending_control_flow() &&
-        pending_control_flow().kind == ControlFlow::Kind::Return)
+        pending_control_flow().kind == control_flow::Kind::Return)
     {
       let const source_status = static_cast<i32>(pending_control_flow().value);
       clear_control_flow();
@@ -2061,7 +2062,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
         word = &fallback_word;
       }
 
-      for (GlobField &field : expand_word(*word)) {
+      for (glob_field &field : expand_word(*word)) {
         for (String &g : expand_path(std::move(field)))
           expanded_args.push(String{
               heap_allocator(), StringView{g.c_str(), g.size()}

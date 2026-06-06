@@ -665,7 +665,7 @@ fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
     std::string full_path_str{full_path.c_str(), full_path.size()};
 
     /* This file already has an extesion specified? */
-    if (os::ExtIndex explicit_ext =
+    if (os::ext_index explicit_ext =
             os::erase_extension_and_get_its_index(full_path_str);
         explicit_ext == 0)
     {
@@ -694,7 +694,7 @@ hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
   std::string sp{program_name.data, program_name.length};
   ArrayList<Path> result{};
 
-  const os::ExtIndex typed_extension =
+  const os::ext_index typed_extension =
       os::erase_extension_and_get_its_index(sp);
 
   /* A name typed with an explicit extension is matched exactly by the search,
