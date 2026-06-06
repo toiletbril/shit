@@ -179,6 +179,69 @@ flatten fn Parser::construct_ast() throws -> Expression *
   return parse_command_list({});
 }
 
+/* Skip tokens until the next statement boundary, so parsing can resume after a
+   syntax error. The boundary is a newline or a ';', which begins a fresh
+   command, or the end of input. At least one token is always consumed, so a
+   token that itself triggered the error cannot stall the loop forever. */
+cold fn Parser::recover_to_next_statement() throws -> void
+{
+  bool has_consumed_token = false;
+  for (;;) {
+    Token *token = m_lexer.peek_shell_token();
+    ASSERT(token != nullptr);
+
+    if (token->kind() == Token::Kind::EndOfFile) return;
+
+    const bool is_boundary = token->kind() == Token::Kind::Newline ||
+                             token->kind() == Token::Kind::Semicolon;
+
+    /* Consume the boundary itself once at least one token has been skipped, so
+       the resumed parse starts on the command after the boundary rather than on
+       the boundary token. */
+    if (is_boundary && has_consumed_token) {
+      m_lexer.advance_past_last_peek();
+      return;
+    }
+
+    m_lexer.advance_past_last_peek();
+    has_consumed_token = true;
+  }
+}
+
+/* Parse every top-level command, recovering from a syntax error instead of
+   aborting at the first. Each top-level parse runs under a try, and a thrown
+   located error is pushed into errors and parsing resumes at the next statement
+   boundary. A clean file parses in a single iteration whose tree is returned for
+   the caller to run. Once any error is recorded the tree never runs, so the
+   remaining iterations only keep parsing to collect more errors. */
+cold fn Parser::construct_ast_recovering(ArrayList<ErrorWithLocation> &errors)
+    throws -> Expression *
+{
+  Expression *first_piece = nullptr;
+  SourceLocation last_location{};
+
+  for (;;) {
+    Token *token = m_lexer.peek_shell_token();
+    ASSERT(token != nullptr);
+    last_location = token->source_location();
+    if (token->kind() == Token::Kind::EndOfFile) break;
+
+    try {
+      Expression *piece = parse_command_list({});
+      ASSERT(piece != nullptr);
+      if (first_piece == nullptr) first_piece = piece;
+    } catch (const ErrorWithLocation &e) {
+      errors.push(e);
+      recover_to_next_statement();
+    }
+  }
+
+  if (first_piece == nullptr)
+    return m_lexer.arena().create<DummyExpression>(last_location);
+
+  return first_piece;
+}
+
 hot fn Parser::parse_command_list(
     std::initializer_list<Token::Kind> terminators) throws -> Expression *
 {

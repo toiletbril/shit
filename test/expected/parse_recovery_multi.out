@@ -1,0 +1,6 @@
+shit: 1:8: Error: Nowhere to pipe output to.
+     1 |  echo a |
+       |         ^~ here.
+shit: 3:1: Error: 'fi' has no matching 'if'.
+     3 |  fi
+       |  ^~ here.

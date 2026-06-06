@@ -163,7 +163,19 @@ static fn run_script_contents(const String &script_contents,
         Lexer{String{script_contents.view()}, ast_arena,
               FLAG_ESCAPE_MAP.is_enabled(), filename}
     };
-    Expression *ast = p.construct_ast();
+
+    /* Recover from each parse error so the whole file is reported at once. A
+       file with any parse error must not run, so a non-empty error list prints
+       every error and fails without evaluating the partial tree. */
+    ArrayList<ErrorWithLocation> parse_errors{heap_allocator()};
+    Expression *ast = p.construct_ast_recovering(parse_errors);
+
+    if (!parse_errors.is_empty()) {
+      for (const ErrorWithLocation &e : parse_errors)
+        show_message(e.to_string(script_contents));
+      context.set_last_exit_status(EXIT_FAILURE);
+      return EXIT_FAILURE;
+    }
 
     if (FLAG_AST.is_enabled()) {
       print(ast->to_ast_string());

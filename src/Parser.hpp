@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Containers.hpp"
+#include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 
@@ -17,6 +18,15 @@ public:
   ~Parser();
 
   fn construct_ast() throws -> Expression *;
+
+  /* Parse the whole input, recovering from each syntax error by resynchronizing
+     to the next statement boundary and continuing, so one pass collects every
+     error rather than stopping at the first. The located errors are appended to
+     errors, and the returned tree is meant to run only when errors stays empty.
+   */
+  fn construct_ast_recovering(ArrayList<ErrorWithLocation> &errors) throws
+      -> Expression *;
+
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
 
 private:
@@ -29,6 +39,11 @@ private:
   usize m_parentheses_depth{0};
 
   mustuse fn parse_simple_command() throws -> Command *;
+
+  /* Skip tokens until the next statement boundary or the end of input, so a
+     recovering parse can resume after a syntax error. Always consumes at least
+     one token to guarantee forward progress. */
+  fn recover_to_next_statement() throws -> void;
 
   /* Build one file or descriptor-duplication redirection for descriptor fd. The
      operator is already consumed and op_location is its position. Shared by the
