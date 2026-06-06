@@ -1535,6 +1535,149 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
   m_body->analyze(actx, false);
 }
 
+RedirectedCommand::RedirectedCommand(SourceLocation location,
+                                     const Command *child,
+                                     ArrayList<Redirection> &&redirections)
+    : Command(location), m_child(child)
+{
+  for (const Redirection &redir : redirections)
+    m_redirections.push(redir);
+}
+
+/* The child and the redirection target tokens live in the arena, torn down once
+   on reset. */
+RedirectedCommand::~RedirectedCommand() = default;
+
+cold fn RedirectedCommand::to_string() const throws -> String
+{
+  return "RedirectedCommand";
+}
+
+cold fn RedirectedCommand::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_child != nullptr);
+
+  let const pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_child->to_ast_string(layer + 1);
+}
+
+cold fn RedirectedCommand::analyze(AnalysisContext &actx,
+                                   bool is_unconditional) const throws -> void
+{
+  ASSERT(m_child != nullptr);
+
+  m_child->analyze(actx, is_unconditional);
+}
+
+fn RedirectedCommand::append_to(usize d, String &f, bool duplicate) throws
+    -> void
+{
+  unused(d);
+  unused(f);
+  unused(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+fn RedirectedCommand::redirect_to(usize d, String &f, bool duplicate) throws
+    -> void
+{
+  unused(d);
+  unused(f);
+  unused(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_child != nullptr);
+
+  /* The child runs in the shell process, so each redirection points one of the
+     shell's own descriptors at the target and the saved backups put them back.
+     The backups restore in reverse on every exit path, a normal return, a
+     thrown diagnostic, or a pending break, continue, return, or exit that
+     propagates through the child. */
+  ArrayList<os::SavedDescriptor> saved_descriptors{heap_allocator()};
+  defer
+  {
+    /* Any buffered shell output belongs on the redirected target, so it is
+       flushed before the descriptors go back. */
+    shit::flush();
+    for (usize i = saved_descriptors.count(); i > 0; i--)
+      os::restore_descriptor(saved_descriptors[i - 1]);
+  };
+
+  /* Stale buffered output from before the redirection belongs on the original
+     descriptor, so it is flushed before the descriptors move. */
+  shit::flush();
+
+  for (const Redirection &redir : m_redirections) {
+    /* A heredoc body becomes the standard input through an anonymous temp file,
+       expanded when the delimiter was unquoted. */
+    if (redir.kind == Redirection::Kind::Heredoc) {
+      ASSERT(redir.heredoc_body != nullptr);
+
+      String body{*redir.heredoc_body};
+      if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
+
+      let opened = os::write_to_temp_file(body);
+      if (!opened)
+        throw Error{"could not stage the heredoc body: " +
+                    os::last_system_error_message()};
+
+      const os::descriptor temp_fd = opened.take();
+      saved_descriptors.push(
+          os::save_and_replace_descriptor(redir.fd, temp_fd));
+      os::close_fd(temp_fd);
+      continue;
+    }
+
+    /* A duplication like 2>&1 points one shell descriptor at another, with no
+       file opened. */
+    if (redir.kind == Redirection::Kind::DuplicateOutput) {
+      const os::descriptor source = os::descriptor_for_shell_fd(redir.dup_fd);
+      saved_descriptors.push(
+          os::save_and_replace_descriptor(redir.fd, source));
+      continue;
+    }
+
+    ASSERT(redir.target != nullptr);
+
+    ArrayList<const Token *> target_tokens{heap_allocator()};
+    target_tokens.push(redir.target);
+    const ArrayList<String> target = cxt.process_args(target_tokens);
+    if (target.count() != 1) {
+      throw ErrorWithLocation{redir.target->source_location(),
+                              "Redirection target is not a single file"};
+    }
+
+    let mode = os::FileOpenMode::Read;
+    if (redir.kind == Redirection::Kind::TruncateOutput)
+      mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
+                              : os::FileOpenMode::Truncate;
+    else if (redir.kind == Redirection::Kind::AppendOutput)
+      mode = os::FileOpenMode::Append;
+
+    const String &target_path = target[0];
+    let opened = os::open_file_descriptor(target_path, mode);
+    if (!opened) {
+      throw ErrorWithLocation{redir.target->source_location(),
+                              "Could not open '" + target_path +
+                                  "': " + os::last_system_error_message()};
+    }
+    const os::descriptor file_fd = opened.take();
+
+    /* The dup leaves a live copy on the shell descriptor, so the opened file
+       descriptor itself is closed at once to avoid leaking it. */
+    saved_descriptors.push(
+        os::save_and_replace_descriptor(redir.fd, file_fd));
+    os::close_fd(file_fd);
+  }
+
+  const i64 result = m_child->evaluate(cxt);
+  return result;
+}
+
 UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
     : Expression(location), m_rhs(rhs)
 {}

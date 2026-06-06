@@ -30,6 +30,33 @@ private:
 
   mustuse fn parse_simple_command() throws -> Command *;
 
+  /* Build one file or descriptor-duplication redirection for descriptor fd. The
+     operator is already consumed and op_location is its position. Shared by the
+     simple command parser and the trailing redirect parser. */
+  fn build_file_or_dup_redirection(
+      i32 fd, Token::Kind op_kind, SourceLocation op_location,
+      Maybe<SourceLocation> &first_location,
+      ArrayList<expressions::Redirection> &out) throws -> void;
+
+  /* Build one heredoc redirection. The << operator is already consumed and
+     op_location is its position. */
+  fn build_heredoc_redirection(
+      SourceLocation op_location, Maybe<SourceLocation> &first_location,
+      ArrayList<expressions::Redirection> &out) throws -> void;
+
+  /* Peek the next token and, when it begins a redirection, consume the whole
+     redirection and append it to out. Returns true when one was parsed, false
+     when the next token does not begin a redirection. Used to attach trailing
+     redirects to a compound command. */
+  mustuse fn try_parse_trailing_redirection(
+      ArrayList<expressions::Redirection> &out) throws -> bool;
+
+  /* Parse any trailing redirects that follow a compound command and, when there
+     are any, wrap it in a RedirectedCommand. Returns the command unchanged when
+     no redirect follows. */
+  mustuse fn attach_trailing_redirections(Command *compound) throws
+      -> Command *;
+
   /* Build a command list until a terminator keyword is peeked, leaving it for
      the caller. The control-structure parsers call this for their inner lists.
    */

@@ -455,6 +455,32 @@ protected:
   const Expression *m_body;
 };
 
+/* A compound command with trailing redirections, such as { cmd; } >file or
+   (cmd) 2>&1. A compound command runs in the shell process, so the redirections
+   are applied to the shell's own descriptors around the child and restored
+   afterward, rather than handed to a spawned process. */
+class RedirectedCommand : public Command
+{
+public:
+  RedirectedCommand(SourceLocation location, const Command *child,
+                    ArrayList<Redirection> &&redirections);
+  ~RedirectedCommand() override;
+
+  fn to_string() const throws -> String override;
+  fn to_ast_string(usize layer = 0) const throws -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+
+  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
+  fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
+
+protected:
+  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  const Command *m_child;
+  ArrayList<Redirection> m_redirections{heap_allocator()};
+};
+
 class FunctionDefinition : public CompoundCommand
 {
 public:

@@ -153,6 +153,34 @@ fn close_fd(os::descriptor fd) wontthrow -> bool;
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor;
 fn restore_stdout(os::descriptor saved) wontthrow -> void;
 
+/* The backup of a shell descriptor taken before a redirection points it
+   elsewhere. A compound command runs in the shell process, so a trailing
+   redirect must save the shell's own descriptor, point it at the target, and
+   put it back when the child finishes. */
+struct SavedDescriptor
+{
+  /* The shell-level descriptor number that was redirected, such as 0, 1, 2, or
+     a higher number on POSIX. */
+  i32 shell_fd{-1};
+  /* A copy of the original descriptor, valid only when was_open is true. */
+  descriptor saved{SHIT_INVALID_FD};
+  /* False when shell_fd was not open before the redirection, so restore closes
+     it instead of duplicating the backup back. */
+  bool was_open{false};
+};
+
+/* Save shell_fd, then point it at target. The returned backup feeds
+   restore_descriptor. The target descriptor is left for the caller to close. */
+fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
+    -> SavedDescriptor;
+/* Put shell_fd back the way save_and_replace_descriptor found it, closing the
+   backup. */
+fn restore_descriptor(const SavedDescriptor &saved) wontthrow -> void;
+
+/* The live descriptor currently behind a shell descriptor number, for a
+   duplication like 2>&1 that points one shell descriptor at another. */
+fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
+
 fn get_environment_variable(StringView key) throws -> Maybe<String>;
 fn set_environment_variable(StringView key, StringView value) throws -> void;
 fn unset_environment_variable(StringView key) throws -> void;

@@ -1,0 +1,165 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "hi"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "/tmp/shit_compound_redir.txt"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "back"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "wc" "-l"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [ForLoop "n"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "/tmp/shit_compound_redir.txt"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [IfClause]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "true"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-f" "/tmp/shit_compound_redir.txt"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "/tmp/shit_compound_redir.txt"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/tmp/shit_compound_redir.txt"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "back"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "/tmp/shit_compound_redir.txt"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "/tmp/shit_compound_redir.txt"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "n"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "/tmp/shit_compound_redir.txt"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/tmp/shit_compound_redir.txt"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "/tmp/shit_compound_redir.txt"
+]
+hi
+back
+2
+1
+2
+3
+y
+[Code 0]

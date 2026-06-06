@@ -75,6 +75,39 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
   close(saved);
 }
 
+fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
+    -> SavedDescriptor
+{
+  SavedDescriptor result{};
+  result.shell_fd = shell_fd;
+
+  /* The backup is close-on-exec so a command spawned by the redirected child
+     does not inherit the shell's own original descriptor and hold it open. */
+  const os::descriptor backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, 0);
+  result.was_open = backup != -1;
+  result.saved = backup;
+
+  dup2(target, shell_fd);
+  return result;
+}
+
+fn restore_descriptor(const SavedDescriptor &saved) wontthrow -> void
+{
+  if (saved.was_open) {
+    dup2(saved.saved, saved.shell_fd);
+    close(saved.saved);
+  } else {
+    /* The descriptor was not open before, so close the one the redirection
+       opened on it to leave the shell as it was. */
+    close(saved.shell_fd);
+  }
+}
+
+fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
+{
+  return shell_fd;
+}
+
 fn get_current_user() throws -> Maybe<String>
 {
   /* The name comes from the environment rather than getpwuid, which a static
@@ -602,6 +635,48 @@ fn redirect_stdout(os::descriptor target) -> os::descriptor
 fn restore_stdout(os::descriptor saved) -> void
 {
   SetStdHandle(STD_OUTPUT_HANDLE, saved);
+}
+
+/* Map a shell descriptor number to the Windows standard handle slot. Windows
+   has no general numbered descriptor table, so only the three standard streams
+   are addressable. */
+static fn std_handle_slot_for_shell_fd(i32 shell_fd) -> Maybe<DWORD>
+{
+  switch (shell_fd) {
+  case 0: return STD_INPUT_HANDLE;
+  case 1: return STD_OUTPUT_HANDLE;
+  case 2: return STD_ERROR_HANDLE;
+  default: return shit::None;
+  }
+}
+
+fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target)
+    -> SavedDescriptor
+{
+  SavedDescriptor result{};
+  result.shell_fd = shell_fd;
+
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) return result;
+
+  result.saved = GetStdHandle(*slot);
+  result.was_open = result.saved != INVALID_HANDLE_VALUE;
+  SetStdHandle(*slot, target);
+  return result;
+}
+
+fn restore_descriptor(const SavedDescriptor &saved) -> void
+{
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
+  if (!slot.has_value()) return;
+  if (saved.was_open) SetStdHandle(*slot, saved.saved);
+}
+
+fn descriptor_for_shell_fd(i32 shell_fd) -> os::descriptor
+{
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) return SHIT_INVALID_FD;
+  return GetStdHandle(*slot);
 }
 
 fn get_current_user() -> Maybe<String>

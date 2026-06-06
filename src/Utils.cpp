@@ -53,12 +53,11 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
             "\n");
       return 0;
     }
+
     return os::wait_and_monitor_process(p);
-  } else {
-    return execute_builtin(steal(ec), cxt);
   }
 
-  unreachable();
+  return execute_builtin(steal(ec), cxt);
 }
 
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,

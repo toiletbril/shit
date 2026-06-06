@@ -328,6 +328,203 @@ hot fn Parser::parse_command_list(
   unreachable();
 }
 
+/* Build one redir for descriptor fd. The operator is already consumed, and
+   op_location is its position. A & touching the operator means a descriptor
+   duplication, n>&m, otherwise a filename word follows. */
+fn Parser::build_file_or_dup_redirection(
+    i32 fd, Token::Kind op_kind, SourceLocation op_location,
+    Maybe<SourceLocation> &first_location,
+    ArrayList<expressions::Redirection> &out) throws -> void
+{
+  if (!first_location) first_location = op_location;
+
+  expressions::Redirection redir{};
+  redir.fd = fd;
+  redir.target = nullptr;
+  redir.dup_fd = -1;
+
+  if (op_kind != Token::Kind::Less) {
+    Token *after = m_lexer.peek_shell_token();
+    ASSERT(after != nullptr);
+    if (after->kind() == Token::Kind::Ampersand &&
+        after->source_location().position ==
+            op_location.position + op_location.length)
+    {
+      m_lexer.advance_past_last_peek();
+      Token *from = m_lexer.next_shell_token();
+      String digits{};
+      if (from->kind() == Token::Kind::Word) {
+        digits =
+            static_cast<tokens::WordToken *>(from)->word().to_literal_string();
+      }
+      i32 from_fd = -1;
+      if (!digits.is_empty()) {
+        const let parsed = utils::parse_decimal_integer(digits);
+        if (parsed.is_error()) throw parsed.error();
+        from_fd = static_cast<i32>(parsed.value());
+      }
+      if (from_fd < 0) {
+        throw ErrorWithLocation{from->source_location(),
+                                "Expected a descriptor after '&'"};
+      }
+      redir.kind = expressions::Redirection::Kind::DuplicateOutput;
+      redir.dup_fd = from_fd;
+      out.push(redir);
+      return;
+    }
+  }
+
+  Token *target = m_lexer.next_shell_token();
+  ASSERT(target != nullptr);
+  if (target->kind() != Token::Kind::Word) {
+    throw ErrorWithLocation{target->source_location(),
+                            "Expected a filename after the redir"};
+  }
+  if (op_kind == Token::Kind::Greater)
+    redir.kind = expressions::Redirection::Kind::TruncateOutput;
+  else if (op_kind == Token::Kind::DoubleGreater)
+    redir.kind = expressions::Redirection::Kind::AppendOutput;
+  else
+    redir.kind = expressions::Redirection::Kind::ReadInput;
+  redir.target = target;
+  out.push(redir);
+}
+
+fn Parser::build_heredoc_redirection(
+    SourceLocation op_location, Maybe<SourceLocation> &first_location,
+    ArrayList<expressions::Redirection> &out) throws -> void
+{
+  if (!first_location) first_location = op_location;
+
+  Token *delimiter_token = m_lexer.next_shell_token();
+  ASSERT(delimiter_token != nullptr);
+  if (delimiter_token->kind() != Token::Kind::Word) {
+    throw ErrorWithLocation{delimiter_token->source_location(),
+                            "Expected a heredoc delimiter"};
+  }
+  const Word &delimiter_word =
+      static_cast<tokens::WordToken *>(delimiter_token)->word();
+
+  const let delimiter_literal = delimiter_word.to_literal_string();
+  StringView delimiter = delimiter_literal.view();
+  bool strip_tabs = false;
+  /* <<- strips leading tabs, the dash touching the operator. */
+  if (!delimiter.is_empty() && delimiter[0] == '-' &&
+      delimiter_token->source_location().position ==
+          op_location.position + op_location.length)
+  {
+    strip_tabs = true;
+    delimiter = delimiter.substring(1);
+  }
+
+  /* A quoted delimiter, such as <<'EOF', keeps the body literal. */
+  bool should_expand = true;
+  for (const WordSegment &segment : delimiter_word.segments) {
+    if (segment.kind != WordSegment::Kind::UnquotedText) {
+      should_expand = false;
+      break;
+    }
+  }
+
+  expressions::Redirection redir{};
+  redir.fd = 0;
+  redir.kind = expressions::Redirection::Kind::Heredoc;
+  redir.target = nullptr;
+  redir.dup_fd = -1;
+  redir.heredoc_body = m_lexer.register_heredoc(delimiter, strip_tabs);
+  redir.heredoc_expand = should_expand;
+  out.push(redir);
+}
+
+/* Peek the next token and, when it begins a redirection, parse it. A digit word
+   touching a redirect operator is a descriptor prefix, such as the 2 in 2>file.
+   A bare redirect operator targets descriptor 0 for input or 1 for output. */
+mustuse fn Parser::try_parse_trailing_redirection(
+    ArrayList<expressions::Redirection> &out) throws -> bool
+{
+  Maybe<SourceLocation> ignored_first_location;
+
+  Token *token = m_lexer.peek_shell_token();
+  ASSERT(token != nullptr);
+
+  switch (token->kind()) {
+  case Token::Kind::Greater:
+  case Token::Kind::DoubleGreater:
+  case Token::Kind::Less: {
+    const let op_kind = token->kind();
+    const let op_location = token->source_location();
+    m_lexer.advance_past_last_peek();
+    build_file_or_dup_redirection((op_kind == Token::Kind::Less) ? 0 : 1,
+                                  op_kind, op_location, ignored_first_location,
+                                  out);
+    return true;
+  }
+
+  case Token::Kind::DoubleLess: {
+    const let op_location = token->source_location();
+    m_lexer.advance_past_last_peek();
+    build_heredoc_redirection(op_location, ignored_first_location, out);
+    return true;
+  }
+
+  case Token::Kind::Word: {
+    const let literal =
+        static_cast<tokens::WordToken *>(token)->word().to_literal_string();
+    bool is_all_digits = !literal.is_empty();
+    for (usize i = 0; i < literal.count(); i++) {
+      if (literal[i] < '0' || literal[i] > '9') {
+        is_all_digits = false;
+        break;
+      }
+    }
+    if (!is_all_digits) return false;
+
+    const let word_location = token->source_location();
+    m_lexer.advance_past_last_peek();
+    Token *next = m_lexer.peek_shell_token();
+    ASSERT(next != nullptr);
+    const let nk = next->kind();
+    if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
+         nk == Token::Kind::Less) &&
+        next->source_location().position ==
+            word_location.position + word_location.length)
+    {
+      const let op_location = next->source_location();
+      m_lexer.advance_past_last_peek();
+      const let parsed = utils::parse_decimal_integer(literal);
+      if (parsed.is_error()) throw parsed.error();
+      build_file_or_dup_redirection(static_cast<i32>(parsed.value()), nk,
+                                    op_location, ignored_first_location, out);
+      return true;
+    }
+
+    /* A bare number that does not prefix a redirect operator is not a trailing
+       redirection. The caller already consumed it from the peek, so report it
+       as an unexpected token rather than silently dropping it. */
+    throw ErrorWithLocation{word_location,
+                            "Unexpected word after a compound command"};
+  }
+
+  default: return false;
+  }
+}
+
+mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
+    -> Command *
+{
+  ASSERT(compound != nullptr);
+
+  ArrayList<expressions::Redirection> redirections{};
+  while (try_parse_trailing_redirection(redirections)) {
+    /* Keep consuming, so a chain like done >out 2>&1 attaches every one. */
+  }
+
+  if (redirections.is_empty()) return compound;
+
+  return m_lexer.arena().create<RedirectedCommand>(
+      compound->source_location(), compound, steal(redirections));
+}
+
 /* return: a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position introduces a
    compound command. */
@@ -353,64 +550,10 @@ hot fn Parser::parse_simple_command() throws -> Command *
     return c;
   };
 
-  /* Build one redir for descriptor fd. The operator is already consumed,
-     and op_location is its position. A & touching the operator means a
-     descriptor duplication, n>&m, otherwise a filename word follows. */
   auto add_redirection = [&](i32 fd, Token::Kind op_kind,
                              SourceLocation op_location) {
-    if (!source_location) source_location = op_location;
-
-    expressions::Redirection redir{};
-    redir.fd = fd;
-    redir.target = nullptr;
-    redir.dup_fd = -1;
-
-    if (op_kind != Token::Kind::Less) {
-      Token *after = m_lexer.peek_shell_token();
-      ASSERT(after != nullptr);
-      if (after->kind() == Token::Kind::Ampersand &&
-          after->source_location().position ==
-              op_location.position + op_location.length)
-      {
-        m_lexer.advance_past_last_peek();
-        Token *from = m_lexer.next_shell_token();
-        String digits{};
-        if (from->kind() == Token::Kind::Word) {
-          digits = static_cast<tokens::WordToken *>(from)
-                       ->word()
-                       .to_literal_string();
-        }
-        i32 from_fd = -1;
-        if (!digits.is_empty()) {
-          const let parsed = utils::parse_decimal_integer(digits);
-          if (parsed.is_error()) throw parsed.error();
-          from_fd = static_cast<i32>(parsed.value());
-        }
-        if (from_fd < 0) {
-          throw ErrorWithLocation{from->source_location(),
-                                  "Expected a descriptor after '&'"};
-        }
-        redir.kind = expressions::Redirection::Kind::DuplicateOutput;
-        redir.dup_fd = from_fd;
-        redirections.push(redir);
-        return;
-      }
-    }
-
-    Token *target = m_lexer.next_shell_token();
-    ASSERT(target != nullptr);
-    if (target->kind() != Token::Kind::Word) {
-      throw ErrorWithLocation{target->source_location(),
-                              "Expected a filename after the redir"};
-    }
-    if (op_kind == Token::Kind::Greater)
-      redir.kind = expressions::Redirection::Kind::TruncateOutput;
-    else if (op_kind == Token::Kind::DoubleGreater)
-      redir.kind = expressions::Redirection::Kind::AppendOutput;
-    else
-      redir.kind = expressions::Redirection::Kind::ReadInput;
-    redir.target = target;
-    redirections.push(redir);
+    build_file_or_dup_redirection(fd, op_kind, op_location, source_location,
+                                  redirections);
   };
 
   for (;;) {
@@ -421,13 +564,20 @@ hot fn Parser::parse_simple_command() throws -> Command *
        compound command. A list terminator means there is no command here. */
     if (args_accumulator.is_empty() && local_vars.count() == 0) {
       switch (token->kind()) {
-      case Token::Kind::If: return parse_if();
-      case Token::Kind::While: return parse_while_or_until(false);
-      case Token::Kind::Until: return parse_while_or_until(true);
-      case Token::Kind::For: return parse_for();
-      case Token::Kind::Case: return parse_case();
-      case Token::Kind::LeftBracket: return parse_brace_group();
-      case Token::Kind::LeftParen: return parse_subshell();
+      case Token::Kind::If:
+        return attach_trailing_redirections(parse_if());
+      case Token::Kind::While:
+        return attach_trailing_redirections(parse_while_or_until(false));
+      case Token::Kind::Until:
+        return attach_trailing_redirections(parse_while_or_until(true));
+      case Token::Kind::For:
+        return attach_trailing_redirections(parse_for());
+      case Token::Kind::Case:
+        return attach_trailing_redirections(parse_case());
+      case Token::Kind::LeftBracket:
+        return attach_trailing_redirections(parse_brace_group());
+      case Token::Kind::LeftParen:
+        return attach_trailing_redirections(parse_subshell());
 
       case Token::Kind::Then:
       case Token::Kind::Do:
@@ -553,46 +703,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     case Token::Kind::DoubleLess: {
       const let op_location = token->source_location();
       m_lexer.advance_past_last_peek();
-      if (!source_location) source_location = op_location;
-
-      Token *delimiter_token = m_lexer.next_shell_token();
-      ASSERT(delimiter_token != nullptr);
-      if (delimiter_token->kind() != Token::Kind::Word) {
-        throw ErrorWithLocation{delimiter_token->source_location(),
-                                "Expected a heredoc delimiter"};
-      }
-      const Word &delimiter_word =
-          static_cast<tokens::WordToken *>(delimiter_token)->word();
-
-      const let delimiter_literal = delimiter_word.to_literal_string();
-      StringView delimiter = delimiter_literal.view();
-      bool strip_tabs = false;
-      /* <<- strips leading tabs, the dash touching the operator. */
-      if (!delimiter.is_empty() && delimiter[0] == '-' &&
-          delimiter_token->source_location().position ==
-              op_location.position + op_location.length)
-      {
-        strip_tabs = true;
-        delimiter = delimiter.substring(1);
-      }
-
-      /* A quoted delimiter, such as <<'EOF', keeps the body literal. */
-      bool should_expand = true;
-      for (const WordSegment &segment : delimiter_word.segments) {
-        if (segment.kind != WordSegment::Kind::UnquotedText) {
-          should_expand = false;
-          break;
-        }
-      }
-
-      expressions::Redirection redir{};
-      redir.fd = 0;
-      redir.kind = expressions::Redirection::Kind::Heredoc;
-      redir.target = nullptr;
-      redir.dup_fd = -1;
-      redir.heredoc_body = m_lexer.register_heredoc(delimiter, strip_tabs);
-      redir.heredoc_expand = should_expand;
-      redirections.push(redir);
+      build_heredoc_redirection(op_location, source_location, redirections);
     } break;
 
     /* A separator, an operator, or a list terminator ends the command. */
