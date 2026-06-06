@@ -153,7 +153,7 @@ struct EvalContext
   /* The stored value of a plain shell variable, or nullptr when the name is
      unset or names a special parameter. The pointer reads the value without a
      copy and stays valid until the next assignment to that name. */
-  fn lookup_shell_variable(StringView name) const wontthrow -> const String *
+  hot fn lookup_shell_variable(StringView name) const wontthrow -> const String *
   {
     return m_shell_variables.find(name);
   }

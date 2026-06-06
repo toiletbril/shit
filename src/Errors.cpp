@@ -141,13 +141,13 @@ ErrorBase::~ErrorBase() = default;
 
 ErrorBase::operator bool &() throws { return m_is_active; }
 
-pure fn ErrorBase::message() const throws -> String { return m_message; }
+cold pure fn ErrorBase::message() const throws -> String { return m_message; }
 
-pure fn ErrorBase::severity_word() const wontthrow -> String { return "Error"; }
+cold pure fn ErrorBase::severity_word() const wontthrow -> String { return "Error"; }
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
-fn Error::to_string() const throws -> String
+cold fn Error::to_string() const throws -> String
 {
   return severity_word() + ": " + message() + ".";
 }
@@ -156,11 +156,11 @@ Error::operator String() const throws { return to_string(); }
 
 Warning::Warning(StringView message) : Error(message) {}
 
-pure fn Warning::severity_word() const wontthrow -> String { return "Warning"; }
+cold pure fn Warning::severity_word() const wontthrow -> String { return "Warning"; }
 
 Note::Note(StringView message) : Error(message) {}
 
-pure fn Note::severity_word() const wontthrow -> String { return "Note"; }
+cold pure fn Note::severity_word() const wontthrow -> String { return "Note"; }
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
@@ -229,7 +229,7 @@ WarningWithLocation::WarningWithLocation(SourceLocation location,
     : ErrorWithLocation(location, message)
 {}
 
-pure fn WarningWithLocation::severity_word() const wontthrow -> String
+cold pure fn WarningWithLocation::severity_word() const wontthrow -> String
 {
   return "Warning";
 }
@@ -238,7 +238,7 @@ TraceWithLocation::TraceWithLocation(SourceLocation location, StringView message
     : ErrorWithLocation(location, message)
 {}
 
-pure fn TraceWithLocation::severity_word() const wontthrow -> String
+cold pure fn TraceWithLocation::severity_word() const wontthrow -> String
 {
   return "Trace";
 }

@@ -12,7 +12,7 @@
 
 namespace shit {
 
-fn show_builtin_help_impl(const ExecContext &ec,
+cold fn show_builtin_help_impl(const ExecContext &ec,
                           const std::vector<std::string> &hs,
                           const ArrayList<Flag *> &fl) throws -> void
 {
@@ -27,7 +27,7 @@ fn show_builtin_help_impl(const ExecContext &ec,
   ec.print_to_stdout(help_text);
 }
 
-fn search_builtin(std::string_view builtin_name) throws -> Maybe<Builtin::Kind>
+flatten fn search_builtin(std::string_view builtin_name) throws -> Maybe<Builtin::Kind>
 {
   return BUILTINS.find(StringView{builtin_name.data(), builtin_name.size()});
 }
@@ -41,7 +41,7 @@ struct BuiltinHelp
   String description;
 };
 
-static fn builtin_help(Builtin::Kind kind) throws -> BuiltinHelp
+cold static fn builtin_help(Builtin::Kind kind) throws -> BuiltinHelp
 {
   switch (kind) {
   case Builtin::Kind::Echo:

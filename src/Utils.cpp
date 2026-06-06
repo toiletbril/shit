@@ -689,7 +689,7 @@ fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
   return result;
 }
 
-fn search_program_path(StringView program_name) throws -> ArrayList<Path>
+hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
 {
   std::string sp{program_name.data, program_name.length};
   ArrayList<Path> result{};

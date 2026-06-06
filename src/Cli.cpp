@@ -367,7 +367,7 @@ fn reset_flags(const ArrayList<Flag *> &flags) throws -> void
   }
 }
 
-fn show_version() throws -> void
+cold fn show_version() throws -> void
 {
   String s{};
   s += "Shit Shell ";
@@ -408,7 +408,7 @@ fn show_version() throws -> void
   flush();
 }
 
-fn show_short_version() throws -> void
+cold fn show_short_version() throws -> void
 {
   String s{};
   s += utils::integer_to_string(SHIT_VER_MAJOR);
@@ -424,7 +424,7 @@ fn show_short_version() throws -> void
   flush();
 }
 
-fn make_synopsis(std::string_view program_name,
+cold fn make_synopsis(std::string_view program_name,
                  const std::vector<std::string> &lines) throws -> std::string
 {
   String s{};
@@ -442,7 +442,7 @@ fn make_synopsis(std::string_view program_name,
   return std::string{s.c_str(), s.size()};
 }
 
-fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string
+cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string
 {
   String s{};
 
@@ -522,7 +522,7 @@ fn print_error(StringView text) throws -> void
 
 fn flush() throws -> void { std::fflush(stdout); }
 
-fn show_message(StringView err) throws -> void
+cold fn show_message(StringView err) throws -> void
 {
   print_error("shit: ");
   print_error(err);

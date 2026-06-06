@@ -23,7 +23,7 @@ namespace shit {
 
 namespace os {
 
-fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
+hot fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
     -> Maybe<usize>
 {
   for (;;) {
@@ -36,7 +36,7 @@ fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
   }
 }
 
-fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>
+hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>
 {
   for (;;) {
     ssize_t r = read(fd, buf, size);
@@ -162,7 +162,7 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 
 #define check_syscall(call) check_syscall_impl(call, #call)
 
-fn execute_program(ExecContext &&ec) throws -> process
+hot fn execute_program(ExecContext &&ec) throws -> process
 {
   ASSERT(ec.args().size() > 0, "a program needs at least argv[0]");
 
@@ -476,7 +476,7 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
   return NAMES.find(bare);
 }
 
-fn make_os_args(const ArrayList<String> &args) throws -> os_args
+hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
 {
   ASSERT(args.size() > 0, "argv must carry at least the program name");
 
@@ -491,7 +491,7 @@ fn make_os_args(const ArrayList<String> &args) throws -> os_args
   return result;
 }
 
-fn last_system_error_message() throws -> String
+cold fn last_system_error_message() throws -> String
 {
   return String{StringView{strerror(errno)}};
 }

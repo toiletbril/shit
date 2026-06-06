@@ -15,7 +15,7 @@ Umask::Umask() = default;
 
 pure Builtin::Kind Umask::kind() const wontthrow { return Kind::Umask; }
 
-i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
+cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
   let const &args = ec.args();

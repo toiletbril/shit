@@ -24,7 +24,7 @@ pure fn Expression::source_location() const wontthrow -> SourceLocation
   return m_location;
 }
 
-fn Expression::to_ast_string(usize layer) const throws -> String
+cold fn Expression::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -32,7 +32,7 @@ fn Expression::to_ast_string(usize layer) const throws -> String
   return pad + "[" + to_string() + "]";
 }
 
-hot fn Expression::evaluate(EvalContext &cxt) const throws -> i64
+hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 {
   /* A Ctrl-C sets the interrupt flag, and the check here runs before every node,
      so a running command, including a loop body or condition, stops promptly and
@@ -51,14 +51,14 @@ fn Expression::operator delete(void *pointer) wontthrow -> void
   ::operator delete(pointer);
 }
 
-fn AnalysisContext::warn(SourceLocation location, StringView message) throws
+cold fn AnalysisContext::warn(SourceLocation location, StringView message) throws
     -> void
 {
   const WarningWithLocation located{location, message};
   show_message(located.to_string(source));
 }
 
-fn AnalysisContext::fail(SourceLocation location, StringView message) throws
+cold fn AnalysisContext::fail(SourceLocation location, StringView message) throws
     -> void
 {
   const ErrorWithLocation located{location, message};
@@ -66,7 +66,7 @@ fn AnalysisContext::fail(SourceLocation location, StringView message) throws
   has_fatal = true;
 }
 
-fn Expression::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn Expression::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   unused(actx);
@@ -166,7 +166,7 @@ IfStatement::~IfStatement()
   if (m_otherwise != nullptr) delete m_otherwise;
 }
 
-fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
@@ -184,9 +184,9 @@ fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
-fn IfStatement::to_string() const throws -> String { return "If"; }
+cold fn IfStatement::to_string() const throws -> String { return "If"; }
 
-fn IfStatement::to_ast_string(usize layer) const throws -> String
+cold fn IfStatement::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
@@ -239,9 +239,9 @@ fn DummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
-fn DummyExpression::to_string() const throws -> String { return "Dummy"; }
+cold fn DummyExpression::to_string() const throws -> String { return "Dummy"; }
 
-fn DummyExpression::to_ast_string(usize layer) const throws -> String
+cold fn DummyExpression::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++) {
@@ -263,7 +263,7 @@ pure fn AssignCommand::assignment() const wontthrow -> const Assignment *
 
 fn AssignCommand::is_assignment() const wontthrow -> bool { return true; }
 
-fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_assignment != nullptr);
 
@@ -286,12 +286,12 @@ fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   return cxt.last_exit_status();
 }
 
-fn AssignCommand::to_string() const throws -> String
+cold fn AssignCommand::to_string() const throws -> String
 {
   return "Assign " + m_assignment->to_ast_string();
 }
 
-fn AssignCommand::to_ast_string(usize layer) const throws -> String
+cold fn AssignCommand::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -473,7 +473,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
 
 } /* namespace */
 
-fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* A command may have no words when it is only a redirection, such as > file,
      so the redirections still run below. */
@@ -694,7 +694,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   return ret;
 }
 
-fn SimpleCommand::to_string() const throws -> String
+cold fn SimpleCommand::to_string() const throws -> String
 {
   String s = "SimpleCommand";
 
@@ -713,7 +713,7 @@ fn SimpleCommand::to_string() const throws -> String
   return s;
 }
 
-fn SimpleCommand::to_ast_string(usize layer) const throws -> String
+cold fn SimpleCommand::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -759,9 +759,9 @@ fn CompoundList::append_node(const CompoundListCondition *node) throws -> void
   m_nodes.push(node);
 }
 
-fn CompoundList::to_string() const throws -> String { return "CompoundList"; }
+cold fn CompoundList::to_string() const throws -> String { return "CompoundList"; }
 
-fn CompoundList::to_ast_string(usize layer) const throws -> String
+cold fn CompoundList::to_ast_string(usize layer) const throws -> String
 {
   String s{};
   String pad{};
@@ -777,7 +777,7 @@ fn CompoundList::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_nodes.size() > 0);
 
@@ -837,7 +837,7 @@ CompoundListCondition::~CompoundListCondition() { delete m_cmd; }
 
 pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
 
-fn CompoundListCondition::to_string() const throws -> String
+cold fn CompoundListCondition::to_string() const throws -> String
 {
   String k;
   switch (kind()) {
@@ -849,7 +849,7 @@ fn CompoundListCondition::to_string() const throws -> String
   return "CompoundListCondition, " + k;
 }
 
-fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
+cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_cmd != nullptr);
 
@@ -864,7 +864,7 @@ fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_cmd != nullptr);
   let status = m_cmd->evaluate(cxt);
@@ -901,14 +901,14 @@ fn Pipeline::append_command(const SimpleCommand *node) throws -> void
   m_commands.push(node);
 }
 
-fn Pipeline::to_string() const throws -> String
+cold fn Pipeline::to_string() const throws -> String
 {
   let s = String{"Pipeline"};
   if (is_async()) s += ", Async";
   return s;
 }
 
-fn Pipeline::to_ast_string(usize layer) const throws -> String
+cold fn Pipeline::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
   let pad = String{};
@@ -925,7 +925,7 @@ fn Pipeline::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_commands.size() > 1);
 
@@ -1027,9 +1027,9 @@ IfClause::~IfClause()
   delete m_otherwise;
 }
 
-fn IfClause::to_string() const throws -> String { return "IfClause"; }
+cold fn IfClause::to_string() const throws -> String { return "IfClause"; }
 
-fn IfClause::to_ast_string(usize layer) const throws -> String
+cold fn IfClause::to_ast_string(usize layer) const throws -> String
 {
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
@@ -1048,7 +1048,7 @@ fn IfClause::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   for (const auto &[condition, body] : m_branches) {
     ASSERT(condition != nullptr);
@@ -1071,7 +1071,7 @@ fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
-fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   /* The first condition runs whenever the if runs. The elif conditions and all
@@ -1101,12 +1101,12 @@ WhileLoop::~WhileLoop()
   delete m_body;
 }
 
-fn WhileLoop::to_string() const throws -> String
+cold fn WhileLoop::to_string() const throws -> String
 {
   return m_is_until ? "UntilLoop" : "WhileLoop";
 }
 
-fn WhileLoop::to_ast_string(usize layer) const throws -> String
+cold fn WhileLoop::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1160,7 +1160,7 @@ fn resolve_loop_control(EvalContext &cxt) throws -> LoopDisposition
 
 } /* namespace */
 
-fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1187,7 +1187,7 @@ fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   return ret;
 }
 
-fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   ASSERT(m_condition != nullptr);
@@ -1218,7 +1218,7 @@ ForLoop::~ForLoop()
   delete m_body;
 }
 
-fn ForLoop::to_string() const throws -> String
+cold fn ForLoop::to_string() const throws -> String
 {
   let result = String{"ForLoop \""};
   result += StringView{m_variable_name};
@@ -1226,7 +1226,7 @@ fn ForLoop::to_string() const throws -> String
   return result;
 }
 
-fn ForLoop::to_ast_string(usize layer) const throws -> String
+cold fn ForLoop::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1236,7 +1236,7 @@ fn ForLoop::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
   /* Without an in clause the loop walks the positional parameters. */
@@ -1253,7 +1253,7 @@ fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   return ret;
 }
 
-fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   ASSERT(m_body != nullptr);
@@ -1283,9 +1283,9 @@ CaseClause::~CaseClause()
   }
 }
 
-fn CaseClause::to_string() const throws -> String { return "CaseClause"; }
+cold fn CaseClause::to_string() const throws -> String { return "CaseClause"; }
 
-fn CaseClause::to_ast_string(usize layer) const throws -> String
+cold fn CaseClause::to_ast_string(usize layer) const throws -> String
 {
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
@@ -1335,7 +1335,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
-fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   unused(is_unconditional);
@@ -1351,9 +1351,9 @@ BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
 
 BraceGroup::~BraceGroup() { delete m_body; }
 
-fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
+cold fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
 
-fn BraceGroup::to_ast_string(usize layer) const throws -> String
+cold fn BraceGroup::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1368,7 +1368,7 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
   return m_body->evaluate(cxt);
 }
 
-fn BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   ASSERT(m_body != nullptr);
@@ -1382,9 +1382,9 @@ Subshell::Subshell(SourceLocation location, const Expression *body)
 
 Subshell::~Subshell() { delete m_body; }
 
-fn Subshell::to_string() const throws -> String { return "Subshell"; }
+cold fn Subshell::to_string() const throws -> String { return "Subshell"; }
 
-fn Subshell::to_ast_string(usize layer) const throws -> String
+cold fn Subshell::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1430,7 +1430,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   return ret;
 }
 
-fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   ASSERT(m_body != nullptr);
@@ -1457,7 +1457,7 @@ pure fn FunctionDefinition::body() const wontthrow -> const Expression *
   return m_body;
 }
 
-fn FunctionDefinition::to_string() const throws -> String
+cold fn FunctionDefinition::to_string() const throws -> String
 {
   let result = String{"FunctionDefinition \""};
   result += StringView{m_name};
@@ -1465,7 +1465,7 @@ fn FunctionDefinition::to_string() const throws -> String
   return result;
 }
 
-fn FunctionDefinition::to_ast_string(usize layer) const throws -> String
+cold fn FunctionDefinition::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1483,7 +1483,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
-fn FunctionDefinition::analyze(AnalysisContext &actx,
+cold fn FunctionDefinition::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
@@ -1499,7 +1499,7 @@ UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
 
 UnaryExpression::~UnaryExpression() { delete m_rhs; }
 
-fn UnaryExpression::to_ast_string(usize layer) const throws -> String
+cold fn UnaryExpression::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_rhs != nullptr);
 
@@ -1524,7 +1524,7 @@ BinaryExpression::~BinaryExpression()
   delete m_rhs;
 }
 
-fn BinaryExpression::to_ast_string(usize layer) const throws -> String
+cold fn BinaryExpression::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_lhs != nullptr);
   ASSERT(m_rhs != nullptr);
@@ -1553,7 +1553,7 @@ fn ConstantNumber::evaluate_impl(EvalContext &cxt) const throws -> i64
   return m_value;
 }
 
-fn ConstantNumber::to_ast_string(usize layer) const throws -> String
+cold fn ConstantNumber::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
   let pad = String{};
@@ -1563,7 +1563,7 @@ fn ConstantNumber::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn ConstantNumber::to_string() const throws -> String
+cold fn ConstantNumber::to_string() const throws -> String
 {
   return utils::integer_to_string(m_value);
 }
@@ -1580,7 +1580,7 @@ fn ConstantString::evaluate_impl(EvalContext &cxt) const throws -> i64
   unreachable();
 }
 
-fn ConstantString::to_ast_string(usize layer) const throws -> String
+cold fn ConstantString::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
   let pad = String{};
@@ -1590,7 +1590,7 @@ fn ConstantString::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn ConstantString::to_string() const throws -> String { return m_value; }
+cold fn ConstantString::to_string() const throws -> String { return m_value; }
 
 #define UNARY_EXPRESSION_DECLS(e, expr)                                        \
   e::e(SourceLocation location, const Expression *rhs)                         \
@@ -1613,7 +1613,7 @@ BinaryDummyExpression::BinaryDummyExpression(SourceLocation location,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-fn BinaryDummyExpression::to_string() const throws -> String
+cold fn BinaryDummyExpression::to_string() const throws -> String
 {
   return "BinaryDummyExpression";
 }
@@ -1629,7 +1629,7 @@ Divide::Divide(SourceLocation location, const Expression *lhs,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-fn Divide::to_string() const throws -> String { return "/"; }
+cold fn Divide::to_string() const throws -> String { return "/"; }
 
 /* Custom evaluation, since we can't divide by zero. */
 fn Divide::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -1672,7 +1672,7 @@ BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
-fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
+cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
     throws -> void
 {
   if (m_args.empty()) return;
@@ -1787,7 +1787,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 }
 
-fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+cold fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   for (const SimpleCommand *command : m_commands) {
@@ -1796,7 +1796,7 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
   }
 }
 
-fn CompoundListCondition::analyze(AnalysisContext &actx,
+cold fn CompoundListCondition::analyze(AnalysisContext &actx,
                                   bool is_unconditional) const throws -> void
 {
   ASSERT(m_cmd != nullptr);
@@ -1804,7 +1804,7 @@ fn CompoundListCondition::analyze(AnalysisContext &actx,
   m_cmd->analyze(actx, is_unconditional);
 }
 
-fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
+cold fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
     throws -> void
 {
   for (const CompoundListCondition *node : m_nodes) {
@@ -1818,7 +1818,7 @@ fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 }
 
-fn IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
+cold fn IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
     throws -> void
 {
   ASSERT(m_condition != nullptr);

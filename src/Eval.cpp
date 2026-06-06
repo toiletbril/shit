@@ -54,7 +54,7 @@ fn EvalContext::end_command() wontthrow -> void
   m_expansions_last = m_expressions_executed_last = 0;
 }
 
-fn EvalContext::assign_variable(StringView name, StringView value) throws -> void
+hot fn EvalContext::assign_variable(StringView name, StringView value) throws -> void
 {
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
@@ -77,12 +77,12 @@ fn EvalContext::set_field_separators(StringView value) throws -> void
   }
 }
 
-pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
+hot pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
 {
   return m_field_separator_table[static_cast<u8>(c)];
 }
 
-fn EvalContext::set_shell_variable(StringView name, StringView value) throws
+hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
     -> void
 {
   /* A read-only variable rejects the assignment. The common case has no
@@ -104,7 +104,7 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
-fn EvalContext::get_variable_value(StringView name) const throws -> Maybe<String>
+hot fn EvalContext::get_variable_value(StringView name) const throws -> Maybe<String>
 {
   if (name == "?")
     return String{heap_allocator(),
@@ -300,7 +300,7 @@ pure fn EvalContext::traps() const wontthrow -> const HashMap<String> &
   return m_traps;
 }
 
-fn EvalContext::run_exit_trap() throws -> void
+cold fn EvalContext::run_exit_trap() throws -> void
 {
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
@@ -665,7 +665,7 @@ pure fn EvalContext::last_exit_status() const wontthrow -> i32
   return m_last_exit_status;
 }
 
-fn EvalContext::expand_variable(StringView name) const throws -> String
+hot fn EvalContext::expand_variable(StringView name) const throws -> String
 {
   return get_variable_value(name).value_or(String{});
 }
@@ -826,7 +826,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
   return out;
 }
 
-fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
+hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 {
   if (spec.empty()) return String{heap_allocator()};
 
@@ -926,7 +926,7 @@ fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   }
 }
 
-fn EvalContext::make_stats_string() const throws -> String
+cold fn EvalContext::make_stats_string() const throws -> String
 {
   let s = String{};
 
@@ -1084,7 +1084,7 @@ namespace {
    without a later ']' is a literal bracket, not a glob, so a field such as the
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
-pure fn first_active_glob(StringView text, const ArrayList<bool> &mask) wontthrow
+hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask) wontthrow
     -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};
@@ -1212,7 +1212,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   text = std::move(expanded);
 }
 
-fn EvalContext::expand_path(GlobField field) throws -> ArrayList<String>
+hot fn EvalContext::expand_path(GlobField field) throws -> ArrayList<String>
 {
   let const scratch = scratch_allocator();
 
@@ -1324,7 +1324,7 @@ struct ArithmeticParser
   StringView source;
   usize pos;
 
-  [[noreturn]] fn fail(StringView message) throws -> void
+  [[noreturn]] cold fn fail(StringView message) throws -> void
   {
     throw Error{"Arithmetic: " + message};
   }
@@ -1652,7 +1652,7 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
   return parser.parse();
 }
 
-fn EvalContext::expand_word(const Word &word) throws -> ArrayList<GlobField>
+hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<GlobField>
 {
   let const scratch = scratch_allocator();
 
@@ -1764,7 +1764,7 @@ fn EvalContext::expand_word(const Word &word) throws -> ArrayList<GlobField>
   return fields;
 }
 
-fn EvalContext::expand_word_for_assignment(const Word &word) throws -> String
+hot fn EvalContext::expand_word_for_assignment(const Word &word) throws -> String
 {
   /* Only copy the segments when a leading tilde must be rewritten, so the
      common assignment reads its segments in place with no per-command copy. */
@@ -2017,7 +2017,7 @@ fn EvalContext::expand_heredoc_body(StringView body) throws -> String
   return expand_modifier_word(body, false);
 }
 
-fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
+hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
     -> ArrayList<String>
 {
   /* The expansion fields live on the scratch arena only until the heap argument

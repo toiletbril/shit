@@ -21,7 +21,7 @@ namespace shit {
 namespace {
 
 /* Format a count of seconds as the minutes and seconds form times prints. */
-String format_time(double seconds) throws
+cold String format_time(double seconds) throws
 {
   let const minutes = static_cast<long>(seconds) / 60;
   let const remainder = seconds - static_cast<double>(minutes * 60);
@@ -36,7 +36,7 @@ Times::Times() = default;
 
 pure Builtin::Kind Times::kind() const wontthrow { return Kind::Times; }
 
-i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
+cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 

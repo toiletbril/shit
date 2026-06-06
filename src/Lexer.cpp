@@ -19,7 +19,7 @@ namespace lexer {
 
 static constexpr char CEOF = static_cast<char>(EOF);
 
-pure fn is_whitespace(char ch) wontthrow -> bool
+hot pure fn is_whitespace(char ch) wontthrow -> bool
 {
   switch (ch) {
   case ' ':
@@ -30,9 +30,9 @@ pure fn is_whitespace(char ch) wontthrow -> bool
   }
 }
 
-pure fn is_number(char ch) wontthrow -> bool { return ch >= '0' && ch <= '9'; }
+hot pure fn is_number(char ch) wontthrow -> bool { return ch >= '0' && ch <= '9'; }
 
-pure fn is_expression_sentinel(char ch) wontthrow -> bool
+hot pure fn is_expression_sentinel(char ch) wontthrow -> bool
 {
   switch (ch) {
   case '\n':
@@ -58,7 +58,7 @@ pure fn is_expression_sentinel(char ch) wontthrow -> bool
 }
 
 /* TODO: Separate redirections from here. */
-pure fn is_shell_sentinel(char ch) wontthrow -> bool
+hot pure fn is_shell_sentinel(char ch) wontthrow -> bool
 {
   switch (ch) {
   case '\n':
@@ -75,12 +75,12 @@ pure fn is_shell_sentinel(char ch) wontthrow -> bool
   };
 }
 
-pure fn is_part_of_identifier(char ch) wontthrow -> bool
+hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
 {
   return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
 }
 
-pure fn is_string_quote(char ch) wontthrow -> bool
+hot pure fn is_string_quote(char ch) wontthrow -> bool
 {
   /* A backtick is intentionally not a quote here. It stays a literal character
      so the prepass can warn and point at $(...), rather than failing the lex.
@@ -92,12 +92,12 @@ pure fn is_string_quote(char ch) wontthrow -> bool
   }
 }
 
-pure fn is_ascii_char(char ch) wontthrow -> bool
+hot pure fn is_ascii_char(char ch) wontthrow -> bool
 {
   return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
 
-pure fn is_expandable_char(char ch) wontthrow -> bool
+hot pure fn is_expandable_char(char ch) wontthrow -> bool
 {
   switch (ch) {
   case '[':
@@ -107,12 +107,12 @@ pure fn is_expandable_char(char ch) wontthrow -> bool
   }
 }
 
-pure fn is_variable_name_start(char ch) wontthrow -> bool
+hot pure fn is_variable_name_start(char ch) wontthrow -> bool
 {
   return is_ascii_char(ch) || ch == '_';
 }
 
-pure fn is_variable_name(char ch) wontthrow -> bool
+hot pure fn is_variable_name(char ch) wontthrow -> bool
 {
   return is_variable_name_start(ch) || is_number(ch);
 }
@@ -131,19 +131,19 @@ Lexer::~Lexer()
     delete body;
 }
 
-fn Lexer::peek_expression_token() throws -> Token *
+flatten fn Lexer::peek_expression_token() throws -> Token *
 {
   skip_whitespace();
   return lex_expression_token();
 }
 
-fn Lexer::peek_shell_token() throws -> Token *
+flatten fn Lexer::peek_shell_token() throws -> Token *
 {
   skip_whitespace();
   return lex_shell_token();
 }
 
-fn Lexer::next_expression_token() throws -> Token *
+hot fn Lexer::next_expression_token() throws -> Token *
 {
   skip_whitespace();
 
@@ -155,7 +155,7 @@ fn Lexer::next_expression_token() throws -> Token *
   return t;
 }
 
-fn Lexer::next_shell_token() throws -> Token *
+hot fn Lexer::next_shell_token() throws -> Token *
 {
   skip_whitespace();
 
@@ -178,7 +178,7 @@ pure fn Lexer::arena() const wontthrow -> BumpArena & { return *m_arena; }
 
 fn Lexer::set_arena(BumpArena &arena) wontthrow -> void { m_arena = &arena; }
 
-fn Lexer::advance_past_last_peek() throws -> usize
+hot fn Lexer::advance_past_last_peek() throws -> usize
 {
   ASSERT(m_cursor_position + m_cached_offset <= m_source.length());
 
@@ -195,7 +195,7 @@ fn Lexer::advance_past_last_peek() throws -> usize
   return r;
 }
 
-fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
+cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
     throws -> const std::string *
 {
   let body = new std::string{};
@@ -207,7 +207,7 @@ fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
   return body;
 }
 
-fn Lexer::collect_pending_heredocs() throws -> void
+cold fn Lexer::collect_pending_heredocs() throws -> void
 {
   for (HeredocPending &pending : m_pending_heredocs) {
     /* The body is written into the lexer-owned std::string the parsed
@@ -245,7 +245,7 @@ fn Lexer::collect_pending_heredocs() throws -> void
   m_pending_heredocs.clear();
 }
 
-fn Lexer::lex_expression_token() throws -> Token *
+hot fn Lexer::lex_expression_token() throws -> Token *
 {
   if (const let ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_number(ch))
@@ -264,7 +264,7 @@ fn Lexer::lex_expression_token() throws -> Token *
   return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
 }
 
-fn Lexer::lex_shell_token() throws -> Token *
+hot fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *t{};
   if (const let ch = chop_character(); ch != lexer::CEOF) {
@@ -288,7 +288,7 @@ fn Lexer::lex_shell_token() throws -> Token *
   return t;
 }
 
-fn Lexer::skip_whitespace() wontthrow -> void
+hot fn Lexer::skip_whitespace() wontthrow -> void
 {
   usize i = 0;
   for (;;) {
@@ -307,14 +307,14 @@ fn Lexer::skip_whitespace() wontthrow -> void
   advance_forward(i);
 }
 
-fn Lexer::advance_forward(usize offset) wontthrow -> usize
+hot fn Lexer::advance_forward(usize offset) wontthrow -> usize
 {
   ASSERT(m_cursor_position + offset <= m_source.length());
   m_cursor_position += offset;
   return offset;
 }
 
-fn Lexer::chop_character(usize offset) wontthrow -> char
+hot fn Lexer::chop_character(usize offset) wontthrow -> char
 {
   if (m_cursor_position + offset < m_source.length())
     return m_source[m_cursor_position + offset];
@@ -322,7 +322,7 @@ fn Lexer::chop_character(usize offset) wontthrow -> char
   return lexer::CEOF;
 }
 
-fn Lexer::lex_number() throws -> Token *
+hot fn Lexer::lex_number() throws -> Token *
 {
   char ch;
   String digits{};
@@ -342,7 +342,7 @@ fn Lexer::lex_number() throws -> Token *
   return num;
 }
 
-fn Lexer::lex_identifier() throws -> Token *
+hot fn Lexer::lex_identifier() throws -> Token *
 {
   Word word{};
 
@@ -656,7 +656,7 @@ fn Lexer::lex_identifier() throws -> Token *
 /* The token kind a single operator character begins, or None when the
    character is not an operator. The switch keeps this allocation free and the
    compiler lowers it to a jump table. */
-pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
+hot pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
 {
   switch (ch) {
   case ')': return Token::Kind::RightParen;
@@ -685,7 +685,7 @@ pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
   }
 }
 
-fn Lexer::lex_sentinel() throws -> Token *
+hot fn Lexer::lex_sentinel() throws -> Token *
 {
   const let ch = chop_character();
   ASSERT(ch != lexer::CEOF);

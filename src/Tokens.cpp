@@ -21,7 +21,7 @@ fn Token::operator delete(void *pointer) wontthrow -> void
   ::operator delete(pointer);
 }
 
-fn Token::to_ast_string() const throws -> String { return raw_string(); }
+cold fn Token::to_ast_string() const throws -> String { return raw_string(); }
 
 pure fn WordSegment::is_split_eligible() const wontthrow -> bool
 {
@@ -41,7 +41,7 @@ pure fn WordSegment::is_tilde_candidate() const wontthrow -> bool
 
 pure fn Word::is_empty() const wontthrow -> bool { return segments.empty(); }
 
-fn Word::to_literal_string() const throws -> String
+hot fn Word::to_literal_string() const throws -> String
 {
   String result{};
   for (const WordSegment &segment : segments) {
@@ -63,7 +63,7 @@ fn Word::to_literal_string() const throws -> String
   return result;
 }
 
-fn Word::to_pretty_string() const throws -> String
+cold fn Word::to_pretty_string() const throws -> String
 {
   String result{"[Word"};
   for (const WordSegment &segment : segments) {
@@ -88,7 +88,7 @@ fn Word::to_pretty_string() const throws -> String
   return result;
 }
 
-fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word>>
+hot fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word>>
 {
   if (segments.empty()) return shit::None;
 

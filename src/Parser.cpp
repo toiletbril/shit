@@ -15,7 +15,7 @@ namespace shit {
 using namespace tokens;
 using namespace expressions;
 
-pure static fn get_sequence_kind(Token::Kind tk)
+hot pure static fn get_sequence_kind(Token::Kind tk)
     wontthrow -> CompoundListCondition::Kind
 {
   switch (tk) {
@@ -40,7 +40,7 @@ pure fn Parser::debug_words() const wontthrow -> const ArrayList<Word> &
   return m_lexer.debug_words();
 }
 
-pure static fn kind_in(Token::Kind kind,
+hot pure static fn kind_in(Token::Kind kind,
                        std::initializer_list<Token::Kind> set) wontthrow -> bool
 {
   for (Token::Kind k : set) {
@@ -52,7 +52,7 @@ pure static fn kind_in(Token::Kind kind,
 /* The byte location of the keyword as a whole word somewhere in the source. A
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
-pure static fn find_standalone_keyword(StringView source, StringView keyword)
+cold pure static fn find_standalone_keyword(StringView source, StringView keyword)
     wontthrow -> Maybe<SourceLocation>
 {
   auto is_boundary = [](char c) {
@@ -75,7 +75,7 @@ pure static fn find_standalone_keyword(StringView source, StringView keyword)
 /* Report a missing terminator. When the keyword is found earlier in the source,
    point the note at it and explain it was read as an argument, otherwise point
    at the token where the terminator was expected. */
-[[noreturn]] static fn throw_unterminated(SourceLocation opener,
+cold [[noreturn]] static fn throw_unterminated(SourceLocation opener,
                                           StringView what, StringView source,
                                           StringView keyword,
                                           SourceLocation fallback)
@@ -93,7 +93,7 @@ pure static fn find_standalone_keyword(StringView source, StringView keyword)
                                     "expected '" + keyword + "'"};
 }
 
-pure static fn is_empty_list(const Expression *expression) wontthrow -> bool
+cold pure static fn is_empty_list(const Expression *expression) wontthrow -> bool
 {
   ASSERT(expression != NULL);
   return expression->is_dummy();
@@ -101,7 +101,7 @@ pure static fn is_empty_list(const Expression *expression) wontthrow -> bool
 
 /* The reserved word ! is a single unquoted exclamation mark standing alone in
    command position. It is distinct from a != comparison or a quoted literal. */
-pure static fn is_negation_token(const Token *token) wontthrow -> bool
+hot pure static fn is_negation_token(const Token *token) wontthrow -> bool
 {
   ASSERT(token != NULL);
   if (token->kind() != Token::Kind::Word) return false;
@@ -113,7 +113,7 @@ pure static fn is_negation_token(const Token *token) wontthrow -> bool
 
 /* A friendly message for a token that cannot start a command. A stray control
    keyword almost always means its opener is missing. */
-static fn unexpected_command_token_message(const Token *token) throws -> String
+cold static fn unexpected_command_token_message(const Token *token) throws -> String
 {
   ASSERT(token != NULL);
   switch (token->kind()) {
@@ -155,7 +155,7 @@ static fn require_simple_in_pipeline(std::unique_ptr<Command> command)
   return static_cast<SimpleCommand *>(command.release());
 }
 
-pure static fn is_compound_terminator(Token::Kind kind) wontthrow -> bool
+hot pure static fn is_compound_terminator(Token::Kind kind) wontthrow -> bool
 {
   switch (kind) {
   case Token::Kind::RightParen:
@@ -172,13 +172,13 @@ pure static fn is_compound_terminator(Token::Kind kind) wontthrow -> bool
   }
 }
 
-fn Parser::construct_ast() throws -> std::unique_ptr<Expression>
+flatten fn Parser::construct_ast() throws -> std::unique_ptr<Expression>
 {
   /* The top-level list ends only at the end of input. */
   return parse_command_list({});
 }
 
-fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
+hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     throws -> std::unique_ptr<Expression>
 {
   std::unique_ptr<Command> lhs{};
@@ -332,7 +332,7 @@ fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
 /* return: a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position introduces a
    compound command. */
-fn Parser::parse_simple_command() throws -> std::unique_ptr<Command>
+hot fn Parser::parse_simple_command() throws -> std::unique_ptr<Command>
 {
   Maybe<SourceLocation> source_location;
   ArrayList<std::unique_ptr<Token>> args_accumulator{};
@@ -608,7 +608,7 @@ fn Parser::parse_simple_command() throws -> std::unique_ptr<Command>
   unreachable();
 }
 
-fn Parser::parse_if() throws -> std::unique_ptr<Command>
+hot fn Parser::parse_if() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> if_token{m_lexer.next_shell_token()};
   ASSERT(if_token != NULL);
@@ -674,7 +674,7 @@ fn Parser::parse_if() throws -> std::unique_ptr<Command>
   return node;
 }
 
-fn Parser::parse_while_or_until(bool is_until)
+hot fn Parser::parse_while_or_until(bool is_until)
     throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
@@ -704,7 +704,7 @@ fn Parser::parse_while_or_until(bool is_until)
       location, condition.release(), body.release(), is_until)};
 }
 
-fn Parser::parse_for() throws -> std::unique_ptr<Command>
+hot fn Parser::parse_for() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   ASSERT(keyword != NULL);
@@ -780,7 +780,7 @@ fn Parser::parse_for() throws -> std::unique_ptr<Command>
       body.release())};
 }
 
-fn Parser::parse_case() throws -> std::unique_ptr<Command>
+hot fn Parser::parse_case() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   ASSERT(keyword != NULL);
@@ -879,7 +879,7 @@ fn Parser::parse_case() throws -> std::unique_ptr<Command>
       location, word.release(), std::move(items))};
 }
 
-fn Parser::parse_brace_group() throws -> std::unique_ptr<Command>
+hot fn Parser::parse_brace_group() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
   ASSERT(open != NULL);
@@ -900,7 +900,7 @@ fn Parser::parse_brace_group() throws -> std::unique_ptr<Command>
       open->source_location(), body.release())};
 }
 
-fn Parser::parse_subshell() throws -> std::unique_ptr<Command>
+hot fn Parser::parse_subshell() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
   ASSERT(open != NULL);
@@ -921,7 +921,7 @@ fn Parser::parse_subshell() throws -> std::unique_ptr<Command>
       open->source_location(), body.release())};
 }
 
-fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
+hot fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
     throws -> std::unique_ptr<Command>
 {
   ASSERT(name_token != NULL);
@@ -964,7 +964,7 @@ fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
 }
 
 /* A standard pratt-parser for expressions. */
-fn Parser::parse_expression(u8 min_precedence)
+hot fn Parser::parse_expression(u8 min_precedence)
     throws -> std::unique_ptr<Expression>
 {
   m_recursion_depth++;

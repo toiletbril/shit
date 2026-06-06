@@ -24,7 +24,7 @@ BumpArena::~BumpArena()
     std::free(block.base);
 }
 
-fn BumpArena::add_block(usize minimum_size) throws -> void
+cold fn BumpArena::add_block(usize minimum_size) throws -> void
 {
   usize size = DEFAULT_BLOCK_SIZE;
   if (minimum_size > size) size = minimum_size;
@@ -38,7 +38,7 @@ fn BumpArena::add_block(usize minimum_size) throws -> void
   m_blocks.push_back(Block{base, size, 0});
 }
 
-fn BumpArena::allocate(usize size, usize alignment) throws -> void *
+hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 {
   for (;;) {
     if (!m_blocks.empty()) {
@@ -59,7 +59,7 @@ fn BumpArena::allocate(usize size, usize alignment) throws -> void *
   }
 }
 
-fn BumpArena::owns(const void *pointer) const wontthrow -> bool
+hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
 {
   let const p = static_cast<const u8 *>(pointer);
   for (const Block &block : m_blocks) {

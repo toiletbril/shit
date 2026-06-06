@@ -37,7 +37,7 @@ struct BumpArena
   fn release(Mark saved) wontthrow -> void;
 
   template <class T, class... Args>
-  fn create(Args &&...args) throws -> T *
+  flatten fn create(Args &&...args) throws -> T *
   {
     void *const storage = allocate(sizeof(T), alignof(T));
     return new (storage) T(std::forward<Args>(args)...);

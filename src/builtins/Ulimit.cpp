@@ -37,7 +37,7 @@ struct Resource
   rlim_t units_per_value;
 };
 
-Resource selected_resource() throws
+cold Resource selected_resource() throws
 {
   if (FLAG_OPEN_FILES.is_enabled()) return {RLIMIT_NOFILE, 1};
   if (FLAG_CPU_TIME.is_enabled()) return {RLIMIT_CPU, 1};
@@ -48,7 +48,7 @@ Resource selected_resource() throws
 
 } /* namespace */
 
-i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
+cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
