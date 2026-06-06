@@ -164,6 +164,6 @@ private:
 #define MAKE_ERROR(msg)                                                        \
   ::shit::Error                                                                \
   {                                                                            \
-    ::shit::String{__FILE__ ":"} +                                             \
-        ::shit::utils::int_to_text(__LINE__) + ": " + (msg)              \
+    ::shit::String{__FILE__ ":"} + ::shit::utils::int_to_text(__LINE__) +      \
+        ": " + (msg)                                                           \
   }

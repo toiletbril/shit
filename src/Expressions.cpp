@@ -1597,7 +1597,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      The backups restore in reverse on every exit path, a normal return, a
      thrown diagnostic, or a pending break, continue, return, or exit that
      propagates through the child. */
-  ArrayList<os::SavedDescriptor> saved_descriptors{heap_allocator()};
+  ArrayList<os::saved_descriptor> saved_descriptors{heap_allocator()};
   defer
   {
     /* Any buffered shell output belongs on the redirected target, so it is
@@ -1636,8 +1636,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        file opened. */
     if (redir.kind == Redirection::Kind::DuplicateOutput) {
       const os::descriptor source = os::descriptor_for_shell_fd(redir.dup_fd);
-      saved_descriptors.push(
-          os::save_and_replace_descriptor(redir.fd, source));
+      saved_descriptors.push(os::save_and_replace_descriptor(redir.fd, source));
       continue;
     }
 
@@ -1669,8 +1668,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     /* The dup leaves a live copy on the shell descriptor, so the opened file
        descriptor itself is closed at once to avoid leaking it. */
-    saved_descriptors.push(
-        os::save_and_replace_descriptor(redir.fd, file_fd));
+    saved_descriptors.push(os::save_and_replace_descriptor(redir.fd, file_fd));
     os::close_fd(file_fd);
   }
 

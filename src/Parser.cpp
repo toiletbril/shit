@@ -564,16 +564,13 @@ hot fn Parser::parse_simple_command() throws -> Command *
        compound command. A list terminator means there is no command here. */
     if (args_accumulator.is_empty() && local_vars.count() == 0) {
       switch (token->kind()) {
-      case Token::Kind::If:
-        return attach_trailing_redirections(parse_if());
+      case Token::Kind::If: return attach_trailing_redirections(parse_if());
       case Token::Kind::While:
         return attach_trailing_redirections(parse_while_or_until(false));
       case Token::Kind::Until:
         return attach_trailing_redirections(parse_while_or_until(true));
-      case Token::Kind::For:
-        return attach_trailing_redirections(parse_for());
-      case Token::Kind::Case:
-        return attach_trailing_redirections(parse_case());
+      case Token::Kind::For: return attach_trailing_redirections(parse_for());
+      case Token::Kind::Case: return attach_trailing_redirections(parse_case());
       case Token::Kind::LeftBracket:
         return attach_trailing_redirections(parse_brace_group());
       case Token::Kind::LeftParen:

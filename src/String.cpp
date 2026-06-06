@@ -23,9 +23,10 @@ String::String(const String &other) throws : m_allocator(other.m_allocator)
   append(other.view());
 }
 
-String::String(String &&other) wontthrow
-    : m_allocator(other.m_allocator), m_data(other.m_data),
-      m_length(other.m_length), m_capacity(other.m_capacity)
+String::String(String &&other) wontthrow : m_allocator(other.m_allocator),
+                                           m_data(other.m_data),
+                                           m_length(other.m_length),
+                                           m_capacity(other.m_capacity)
 {
   other.m_data = nullptr;
   other.m_length = 0;
@@ -143,7 +144,7 @@ fn String::free_storage() wontthrow -> void
   m_capacity = 0;
 }
 
-fn operator+(StringView left, StringView right) throws -> String
+fn operator+(StringView left, StringView right) throws->String
 {
   String result{heap_allocator()};
   result.reserve(left.length + right.length);

@@ -21,13 +21,10 @@ public:
 
   mustuse pure fn count() const wontthrow -> usize { return length; }
   mustuse pure fn is_empty() const wontthrow -> bool { return length == 0; }
-  mustuse pure fn operator[](usize i) const wontthrow -> char
-  {
-    return data[i];
-  }
+  mustuse pure fn operator[](usize i) const wontthrow->char { return data[i]; }
 
-  mustuse pure fn operator==(StringView other) const wontthrow -> bool;
-  mustuse pure fn operator!=(StringView other) const wontthrow -> bool
+  mustuse pure fn operator==(StringView other) const wontthrow->bool;
+  mustuse pure fn operator!=(StringView other) const wontthrow->bool
   {
     return !(*this == other);
   }

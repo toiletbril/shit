@@ -47,10 +47,9 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       cxt.set_last_background_pid(os::process_id_of(p));
       const i32 id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
-        shit::print_error(
-            "[" + int_to_text(id) + "] " +
-            uint_to_text(static_cast<u64>(os::process_id_of(p))) +
-            "\n");
+        shit::print_error("[" + int_to_text(id) + "] " +
+                          uint_to_text(static_cast<u64>(os::process_id_of(p))) +
+                          "\n");
       return 0;
     }
 
@@ -122,10 +121,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_error("[" + int_to_text(id) + "] " +
-                          uint_to_text(
-                              static_cast<u64>(os::process_id_of(last_child))) +
-                          "\n");
+        shit::print_error(
+            "[" + int_to_text(id) + "] " +
+            uint_to_text(static_cast<u64>(os::process_id_of(last_child))) +
+            "\n");
     }
     return ret;
   }

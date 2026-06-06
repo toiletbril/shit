@@ -157,7 +157,7 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void;
    elsewhere. A compound command runs in the shell process, so a trailing
    redirect must save the shell's own descriptor, point it at the target, and
    put it back when the child finishes. */
-struct SavedDescriptor
+struct saved_descriptor
 {
   /* The shell-level descriptor number that was redirected, such as 0, 1, 2, or
      a higher number on POSIX. */
@@ -172,10 +172,10 @@ struct SavedDescriptor
 /* Save shell_fd, then point it at target. The returned backup feeds
    restore_descriptor. The target descriptor is left for the caller to close. */
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
-    -> SavedDescriptor;
+    -> saved_descriptor;
 /* Put shell_fd back the way save_and_replace_descriptor found it, closing the
    backup. */
-fn restore_descriptor(const SavedDescriptor &saved) wontthrow -> void;
+fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
 
 /* The live descriptor currently behind a shell descriptor number, for a
    duplication like 2>&1 that points one shell descriptor at another. */

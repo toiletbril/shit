@@ -3,7 +3,8 @@
 namespace shit {
 
 StringView::StringView(const char *cstr) wontthrow
-    : data(cstr), length(cstr != nullptr ? std::strlen(cstr) : 0)
+    : data(cstr),
+      length(cstr != nullptr ? std::strlen(cstr) : 0)
 {}
 
 fn StringView::operator==(StringView other) const wontthrow -> bool

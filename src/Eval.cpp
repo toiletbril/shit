@@ -109,8 +109,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     -> Maybe<String>
 {
   if (name == "?")
-    return String{heap_allocator(),
-                  utils::int_to_text(m_last_exit_status)};
+    return String{heap_allocator(), utils::int_to_text(m_last_exit_status)};
   if (name == "$")
     return String{heap_allocator(),
                   utils::int_to_text(os::get_shell_process_id())};
@@ -121,8 +120,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                : String{};
   if (name == "-") return String{heap_allocator(), option_flags_string()};
   if (name == "#")
-    return String{heap_allocator(), utils::uint_to_text(
-                                        m_positional_params.count())};
+    return String{heap_allocator(),
+                  utils::uint_to_text(m_positional_params.count())};
   if (name == "0") return String{heap_allocator(), m_shell_name};
 
   /* A purely numeric name selects a positional parameter, $1 upward. An index
@@ -840,13 +839,13 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
     if (name == "@" || name == "*")
-      return String{heap_allocator(), utils::uint_to_text(
-                                          m_positional_params.count())};
+      return String{heap_allocator(),
+                    utils::uint_to_text(m_positional_params.count())};
     let const value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
-    return String{heap_allocator(), utils::uint_to_text(
-                                        value.value_or(String{}).length())};
+    return String{heap_allocator(),
+                  utils::uint_to_text(value.value_or(String{}).length())};
   }
 
   /* Split the parameter name from an optional operator and its word. */
@@ -937,16 +936,13 @@ cold fn EvalContext::make_stats_string() const throws -> String
   s += "[Stats\n";
 
   s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Expansions: " +
-       utils::uint_to_text(last_expansion_count());
+  s += "Expansions: " + utils::uint_to_text(last_expansion_count());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Nodes evaluated: " +
-       utils::uint_to_text(last_expressions_executed());
+  s += "Nodes evaluated: " + utils::uint_to_text(last_expressions_executed());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Total expansions: " +
-       utils::uint_to_text(total_expansion_count());
+  s += "Total expansions: " + utils::uint_to_text(total_expansion_count());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Total nodes evaluated: " +
@@ -1761,9 +1757,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const value = String{
-          heap_allocator(),
-          utils::int_to_text(evaluate_arithmetic(segment.text.view()))};
+      let const value =
+          String{heap_allocator(),
+                 utils::int_to_text(evaluate_arithmetic(segment.text.view()))};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else

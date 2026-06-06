@@ -73,8 +73,7 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (limit.rlim_cur == RLIM_INFINITY)
       out = String{"unlimited"};
     else
-      out = utils::uint_to_text(limit.rlim_cur /
-                                              resource.units_per_value);
+      out = utils::uint_to_text(limit.rlim_cur / resource.units_per_value);
     ec.print_to_stdout(out + "\n");
     return 0;
   }

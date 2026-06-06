@@ -40,8 +40,8 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     os::signal_process(job->pid, *cont);
   job->state = job::State::Running;
 
-  ec.print_to_stdout("[" + utils::int_to_text(job->id) + "] " +
-                     job->command + " &\n");
+  ec.print_to_stdout("[" + utils::int_to_text(job->id) + "] " + job->command +
+                     " &\n");
 
   return 0;
 }

@@ -76,9 +76,9 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
 }
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
-    -> SavedDescriptor
+    -> saved_descriptor
 {
-  SavedDescriptor result{};
+  saved_descriptor result{};
   result.shell_fd = shell_fd;
 
   /* The backup is close-on-exec so a command spawned by the redirected child
@@ -91,7 +91,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   return result;
 }
 
-fn restore_descriptor(const SavedDescriptor &saved) wontthrow -> void
+fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
   if (saved.was_open) {
     dup2(saved.saved, saved.shell_fd);
@@ -407,9 +407,8 @@ fn wait_and_monitor_process(process pid) throws -> i32
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      shit::print("[Process " + utils::int_to_text(pid) + ": " +
-                  sig_desc + ", signal " + utils::int_to_text(sig) +
-                  "]\n");
+      shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
+                  ", signal " + utils::int_to_text(sig) + "]\n");
     } else {
       shit::print("\n");
     }
@@ -651,9 +650,9 @@ static fn std_handle_slot_for_shell_fd(i32 shell_fd) -> Maybe<DWORD>
 }
 
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target)
-    -> SavedDescriptor
+    -> saved_descriptor
 {
-  SavedDescriptor result{};
+  saved_descriptor result{};
   result.shell_fd = shell_fd;
 
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
@@ -665,7 +664,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target)
   return result;
 }
 
-fn restore_descriptor(const SavedDescriptor &saved) -> void
+fn restore_descriptor(const saved_descriptor &saved) -> void
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;

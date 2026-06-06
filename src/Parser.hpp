@@ -40,9 +40,10 @@ private:
 
   /* Build one heredoc redirection. The << operator is already consumed and
      op_location is its position. */
-  fn build_heredoc_redirection(
-      SourceLocation op_location, Maybe<SourceLocation> &first_location,
-      ArrayList<expressions::Redirection> &out) throws -> void;
+  fn build_heredoc_redirection(SourceLocation op_location,
+                               Maybe<SourceLocation> &first_location,
+                               ArrayList<expressions::Redirection> &out) throws
+      -> void;
 
   /* Peek the next token and, when it begins a redirection, consume the whole
      redirection and append it to out. Returns true when one was parsed, false

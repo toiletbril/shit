@@ -30,14 +30,14 @@ public:
   String(const String &other) throws;
   String(String &&other) wontthrow;
 
-  fn operator=(const String &other) throws -> String &;
-  fn operator=(String &&other) wontthrow -> String &;
+  fn operator=(const String &other) throws->String &;
+  fn operator=(String &&other) wontthrow->String &;
 
   ~String() { free_storage(); }
 
   mustuse pure fn count() const wontthrow -> usize { return m_length; }
   mustuse pure fn is_empty() const wontthrow -> bool { return m_length == 0; }
-  mustuse pure fn operator[](usize i) const wontthrow -> char
+  mustuse pure fn operator[](usize i) const wontthrow->char
   {
     return m_data[i];
   }
@@ -73,8 +73,8 @@ public:
   fn pop_back() wontthrow -> void;
 
   fn append(char c) throws -> void { push(c); }
-  fn operator+=(StringView other) throws -> String &;
-  fn operator+=(char c) throws -> String &;
+  fn operator+=(StringView other) throws->String &;
+  fn operator+=(char c) throws->String &;
 
   /* Search and slice forward to the view, so the owned string answers the same
      questions through the view without exposing its buffer. */
@@ -96,17 +96,17 @@ public:
     return view().starts_with(prefix);
   }
 
-  mustuse pure fn operator==(StringView other) const wontthrow -> bool
+  mustuse pure fn operator==(StringView other) const wontthrow->bool
   {
     return view() == other;
   }
-  mustuse pure fn operator!=(StringView other) const wontthrow -> bool
+  mustuse pure fn operator!=(StringView other) const wontthrow->bool
   {
     return !(view() == other);
   }
 
   /* Byte order, so a sort matches the C locale collating order. */
-  mustuse pure fn operator<(const String &other) const wontthrow -> bool;
+  mustuse pure fn operator<(const String &other) const wontthrow->bool;
 
   /* The first byte. The caller guarantees the string is not empty. */
   mustuse pure fn first_character() const wontthrow -> char
@@ -117,8 +117,9 @@ public:
 
   /* The index of the first occurrence of a substring at or after a start, or
      None when it is absent. */
-  mustuse pure fn find_substring(StringView needle, usize from = 0) const
-      wontthrow -> Maybe<usize>;
+  mustuse pure fn find_substring(StringView needle,
+                                 usize from = 0) const wontthrow
+      -> Maybe<usize>;
 
   /* The index of the last occurrence of a byte, or None when it is absent. */
   mustuse pure fn find_last_character(char wanted) const wontthrow
@@ -136,6 +137,6 @@ private:
 /* Concatenate two byte ranges into a fresh heap String. A String and a literal
    both read as a view, so str + "x", "x" + str, and str + str all resolve here.
    The result is heap-backed, the default for an expression temporary. */
-fn operator+(StringView left, StringView right) throws -> String;
+fn operator+(StringView left, StringView right) throws->String;
 
 } /* namespace shit */
