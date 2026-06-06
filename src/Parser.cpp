@@ -612,15 +612,6 @@ hot fn Parser::parse_if() throws -> Command *
 
   ArrayList<if_branch> branches{};
   const Expression *otherwise = nullptr;
-  /* Free the released branch nodes if a later branch fails to parse. */
-  defer
-  {
-    for (auto &[condition, body] : branches) {
-      delete condition;
-      delete body;
-    }
-    delete otherwise;
-  };
 
   for (;;) {
     Expression *condition = parse_command_list({Token::Kind::Then});
@@ -659,12 +650,7 @@ hot fn Parser::parse_if() throws -> Command *
     }
   }
 
-  IfClause *node =
-      m_lexer.arena().create<IfClause>(location, steal(branches), otherwise);
-  /* Ownership of the else body moved into the node, so the cleanup guard must
-     not also free it. The branches vector was moved from and is now empty. */
-  otherwise = nullptr;
-  return node;
+  return m_lexer.arena().create<IfClause>(location, steal(branches), otherwise);
 }
 
 hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
@@ -710,12 +696,6 @@ hot fn Parser::parse_for() throws -> Command *
   const let variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{};
-  /* Free the released word tokens if the loop fails to parse. */
-  defer
-  {
-    for (const Token *word : words)
-      delete word;
-  };
   bool has_in_clause = false;
 
   /* An optional 'in WORDS' clause. The word 'in' is not a keyword token. */
@@ -793,16 +773,6 @@ hot fn Parser::parse_case() throws -> Command *
   }
 
   ArrayList<case_item> items{};
-  /* A parse error before the clause is built abandons these arena nodes, so
-     free their tokens and bodies to keep the leak checker happy. */
-  defer
-  {
-    for (case_item &item : items) {
-      for (const Token *pattern : item.patterns)
-        delete pattern;
-      delete item.body;
-    }
-  };
 
   for (;;) {
     Token *t = m_lexer.peek_shell_token();
@@ -823,11 +793,6 @@ hot fn Parser::parse_case() throws -> Command *
     if (t->kind() == Token::Kind::LeftParen) m_lexer.advance_past_last_peek();
 
     ArrayList<const Token *> patterns{heap_allocator()};
-    defer
-    {
-      for (const Token *pattern : patterns)
-        delete pattern;
-    };
 
     for (;;) {
       Token *pattern = m_lexer.next_shell_token();

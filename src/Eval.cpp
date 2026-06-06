@@ -2008,10 +2008,12 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
 fn EvalContext::clear_retained_sources() wontthrow -> void
 {
-  for (Expression *ast : m_retained_source_asts)
-    delete ast;
+  /* The retained AST nodes live in the arena, which runs every node's
+     destructor on the reset that follows, so this only drops the references. */
   m_retained_source_asts.clear();
 
+  /* The retained source buffers and filenames are heap String copies owned
+     here, so they are freed explicitly. */
   for (String *source : m_retained_sources)
     delete source;
   m_retained_sources.clear();

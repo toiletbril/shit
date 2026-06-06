@@ -225,13 +225,9 @@ IfStatement::IfStatement(SourceLocation location, const Expression *condition,
   /* And *otherwise may be nullptr. */
 }
 
-IfStatement::~IfStatement()
-{
-  delete m_condition;
-  delete m_then;
-
-  if (m_otherwise != nullptr) delete m_otherwise;
-}
+/* The condition, the then branch, and the else branch live in the arena, which
+   runs each node's destructor once on reset. */
+IfStatement::~IfStatement() = default;
 
 hot fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
@@ -321,7 +317,8 @@ AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
     : Command(location), m_assignment(a)
 {}
 
-AssignCommand::~AssignCommand() { delete m_assignment; }
+/* The assignment lives in the arena, torn down once on reset. */
+AssignCommand::~AssignCommand() = default;
 
 pure fn AssignCommand::assignment() const wontthrow -> const Assignment *
 {
@@ -396,15 +393,9 @@ SimpleCommand::SimpleCommand(SourceLocation location,
   }
 }
 
-SimpleCommand::~SimpleCommand()
-{
-  for (const Token *t : m_args) {
-    delete t;
-  }
-  for (const Redirection &redir : m_redirections) {
-    delete redir.target;
-  }
-}
+/* The argument tokens and the redirection target tokens live in the arena,
+   torn down once on reset. */
+SimpleCommand::~SimpleCommand() = default;
 
 fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     -> void
@@ -814,12 +805,8 @@ fn SimpleCommand::redirect_to(usize d, String &f, bool duplicate) throws -> void
 
 CompoundList::CompoundList() : Expression({0, 0}) {}
 
-CompoundList::~CompoundList()
-{
-  for (const CompoundListCondition *e : m_nodes) {
-    delete e;
-  }
-}
+/* The condition nodes live in the arena, torn down once on reset. */
+CompoundList::~CompoundList() = default;
 
 pure fn CompoundList::is_empty() const wontthrow -> bool
 {
@@ -911,7 +898,8 @@ CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
     : Expression(location), m_kind(kind), m_cmd(expr)
 {}
 
-CompoundListCondition::~CompoundListCondition() { delete m_cmd; }
+/* The command lives in the arena, torn down once on reset. */
+CompoundListCondition::~CompoundListCondition() = default;
 
 pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
 
@@ -960,12 +948,8 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
 
 Pipeline::Pipeline(SourceLocation location) : Command(location) {}
 
-Pipeline::~Pipeline()
-{
-  for (const SimpleCommand *e : m_commands) {
-    delete e;
-  }
-}
+/* The stage commands live in the arena, torn down once on reset. */
+Pipeline::~Pipeline() = default;
 
 pure fn Pipeline::is_empty() const wontthrow -> bool
 {
@@ -1089,19 +1073,13 @@ IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
 {
   for (const auto &branch : branches)
     m_branches.push(branch);
-  /* The node now owns the branch nodes. Empty the source so the parser's
-     cleanup guard does not also free them. */
+  /* The branch nodes live in the arena. Empty the moved-from source. */
   branches.clear();
 }
 
-IfClause::~IfClause()
-{
-  for (const auto &[condition, body] : m_branches) {
-    delete condition;
-    delete body;
-  }
-  delete m_otherwise;
-}
+/* The branch conditions, the branch bodies, and the else body live in the
+   arena, torn down once on reset. */
+IfClause::~IfClause() = default;
 
 cold fn IfClause::to_string() const throws -> String { return "IfClause"; }
 
@@ -1171,11 +1149,8 @@ WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
       m_is_until(is_until)
 {}
 
-WhileLoop::~WhileLoop()
-{
-  delete m_condition;
-  delete m_body;
-}
+/* The condition and the body live in the arena, torn down once on reset. */
+WhileLoop::~WhileLoop() = default;
 
 cold fn WhileLoop::to_string() const throws -> String
 {
@@ -1282,17 +1257,12 @@ ForLoop::ForLoop(SourceLocation location, StringView variable_name,
 {
   for (const Token *word : words)
     m_words.push(word);
-  /* The node now references the word tokens. Empty the source so the parser's
-     cleanup guard does not also free them. */
+  /* The word tokens live in the arena. Empty the moved-from source. */
   words.clear();
 }
 
-ForLoop::~ForLoop()
-{
-  for (const Token *t : m_words)
-    delete t;
-  delete m_body;
-}
+/* The word tokens and the body live in the arena, torn down once on reset. */
+ForLoop::~ForLoop() = default;
 
 cold fn ForLoop::to_string() const throws -> String
 {
@@ -1344,20 +1314,14 @@ CaseClause::CaseClause(SourceLocation location, const Token *word,
 {
   for (case_item &item : items)
     m_items.push(steal(item));
-  /* The node now owns the items. Empty the source so the parser's cleanup guard
-     does not also free the bodies. */
+  /* The item tokens and bodies live in the arena. Empty the moved-from source.
+   */
   items.clear();
 }
 
-CaseClause::~CaseClause()
-{
-  delete m_word;
-  for (const case_item &item : m_items) {
-    for (const Token *pattern : item.patterns)
-      delete pattern;
-    delete item.body;
-  }
-}
+/* The subject word, the pattern tokens, and the item bodies live in the arena,
+   torn down once on reset. */
+CaseClause::~CaseClause() = default;
 
 cold fn CaseClause::to_string() const throws -> String { return "CaseClause"; }
 
@@ -1425,7 +1389,8 @@ BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}
 
-BraceGroup::~BraceGroup() { delete m_body; }
+/* The body lives in the arena, torn down once on reset. */
+BraceGroup::~BraceGroup() = default;
 
 cold fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
 
@@ -1456,7 +1421,8 @@ Subshell::Subshell(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}
 
-Subshell::~Subshell() { delete m_body; }
+/* The body lives in the arena, torn down once on reset. */
+Subshell::~Subshell() = default;
 
 cold fn Subshell::to_string() const throws -> String { return "Subshell"; }
 
@@ -1573,7 +1539,8 @@ UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
     : Expression(location), m_rhs(rhs)
 {}
 
-UnaryExpression::~UnaryExpression() { delete m_rhs; }
+/* The operand lives in the arena, torn down once on reset. */
+UnaryExpression::~UnaryExpression() = default;
 
 cold fn UnaryExpression::to_ast_string(usize layer) const throws -> String
 {
@@ -1594,11 +1561,8 @@ BinaryExpression::BinaryExpression(SourceLocation location,
     : Expression(location), m_lhs(lhs), m_rhs(rhs)
 {}
 
-BinaryExpression::~BinaryExpression()
-{
-  delete m_lhs;
-  delete m_rhs;
-}
+/* The operands live in the arena, torn down once on reset. */
+BinaryExpression::~BinaryExpression() = default;
 
 cold fn BinaryExpression::to_ast_string(usize layer) const throws -> String
 {
