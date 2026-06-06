@@ -45,7 +45,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) -> i32
     let const p = os::execute_program(std::move(ec));
     if (is_async) {
       cxt.set_last_background_pid(os::process_id_of(p));
-      const int id = cxt.register_job(p, command);
+      const i32 id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
         shit::print_error(
             "[" + integer_to_string(id) + "] " +
@@ -121,7 +121,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   if (is_async) {
     if (last_child != SHIT_INVALID_PROCESS) {
       cxt.set_last_background_pid(os::process_id_of(last_child));
-      const int id = cxt.register_job(last_child, "pipeline");
+      const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
         shit::print_error("[" + integer_to_string(id) + "] " +
                           unsigned_integer_to_string(
@@ -497,7 +497,7 @@ fn glob_matches(StringView glob, StringView str,
         if (g >= glob.size()) GLOB_GROUP_ERR();
       }
 
-      char prev_glob_ch = glob[g++];
+      u8 prev_glob_ch = glob[g++];
       is_matched |= (prev_glob_ch == str[s]);
 
       while (g < glob.size() && glob[g] != ']') {
@@ -755,7 +755,7 @@ fn read_line_from_fd(os::descriptor fd) -> Maybe<String>
   String line{};
   bool read_any_byte = false;
   for (;;) {
-    char one_byte = 0;
+    u8 one_byte = 0;
     Maybe<usize> read_count = os::read_fd(fd, &one_byte, 1);
     if (!read_count || *read_count == 0) break;
     read_any_byte = true;

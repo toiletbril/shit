@@ -104,7 +104,7 @@ struct Job
     Done,
   };
 
-  int id;
+  i32 id;
   os::process pid;
   String command;
   State state{State::Running};
@@ -172,10 +172,10 @@ struct EvalContext
      jobs, fg, bg, wait, and kill can act on them. register_job adds a running
      job and returns its id. update_jobs polls every job without blocking and
      marks the ones that finished or stopped. */
-  fn register_job(os::process pid, StringView command) -> int;
+  fn register_job(os::process pid, StringView command) -> i32;
   fn update_jobs() -> void;
   fn jobs() -> ArrayList<Job> &;
-  fn find_job(int id) -> Job *;
+  fn find_job(i32 id) -> Job *;
   fn most_recent_job() -> Job *;
   fn forget_done_jobs() -> void;
 
@@ -434,7 +434,7 @@ protected:
 
   /* The background jobs and the id to give the next one. */
   ArrayList<Job> m_jobs{heap_allocator()};
-  int m_next_job_id{1};
+  i32 m_next_job_id{1};
   bool m_monitor{false};
   bool m_enable_path_expansion;
   bool m_enable_echo;

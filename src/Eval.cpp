@@ -1358,7 +1358,7 @@ struct ArithmeticParser
       struct CompoundOperator
       {
         StringView token;
-        char kind;
+        u8 kind;
       };
       static const CompoundOperator compound_operators[] = {
           {"<<=", 'L'},

@@ -233,7 +233,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       out += prompt[i];
       continue;
     }
-    char escaped = prompt[++i];
+    u8 escaped = prompt[++i];
     switch (escaped) {
     case 'u': out += user; break;
     case 'h':
