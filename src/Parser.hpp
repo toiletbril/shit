@@ -24,8 +24,7 @@ public:
      error rather than stopping at the first. The located errors are appended to
      errors, and the returned tree is meant to run only when errors stays empty.
    */
-  fn construct_ast_recovering(ArrayList<ErrorWithLocation> &errors) throws
-      -> Expression *;
+  fn construct_ast(ArrayList<ErrorWithLocation> &errors) throws -> Expression *;
 
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
 

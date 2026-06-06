@@ -306,8 +306,9 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
   return Pipe{p[0], p[1]};
 }
 
-/* pthread_create wants a void *(*)(void *) entry, so this trampoline carries the
-   C-style entry and its context across that signature and returns nullptr. */
+/* pthread_create wants a void *(*)(void *) entry, so this trampoline carries
+   the C-style entry and its context across that signature and returns nullptr.
+ */
 struct thread_start_context
 {
   void (*entry)(void *);
@@ -913,7 +914,8 @@ fn join_thread(thread t) -> void
   CloseHandle(t.handle);
 }
 
-fn open_file_descriptor(StringView path, file_open_mode mode) -> Maybe<descriptor>
+fn open_file_descriptor(StringView path, file_open_mode mode)
+    -> Maybe<descriptor>
 {
   DWORD access = (mode == file_open_mode::Read) ? GENERIC_READ : GENERIC_WRITE;
   DWORD disposition = OPEN_EXISTING;

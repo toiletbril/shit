@@ -1849,8 +1849,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
   /* Drain the read end on a thread so output larger than the pipe buffer cannot
      deadlock the commands writing into it. */
   let captured = String{heap_allocator()};
-  let drain_context =
-      command_substitution_drain_context{&captured, pipe->in};
+  let drain_context = command_substitution_drain_context{&captured, pipe->in};
   let const reader =
       os::start_thread(drain_command_substitution_pipe, &drain_context);
   if (!reader) {

@@ -211,11 +211,11 @@ cold fn Parser::recover_to_next_statement() throws -> void
 /* Parse every top-level command, recovering from a syntax error instead of
    aborting at the first. Each top-level parse runs under a try, and a thrown
    located error is pushed into errors and parsing resumes at the next statement
-   boundary. A clean file parses in a single iteration whose tree is returned for
-   the caller to run. Once any error is recorded the tree never runs, so the
+   boundary. A clean file parses in a single iteration whose tree is returned
+   for the caller to run. Once any error is recorded the tree never runs, so the
    remaining iterations only keep parsing to collect more errors. */
-cold fn Parser::construct_ast_recovering(ArrayList<ErrorWithLocation> &errors)
-    throws -> Expression *
+cold fn Parser::construct_ast(ArrayList<ErrorWithLocation> &errors) throws
+    -> Expression *
 {
   Expression *first_piece = nullptr;
   SourceLocation last_location{};
@@ -759,8 +759,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       } else {
         /* Single-command variable. */
-        local_vars.set(a->key(),
-                       prefix_assignment{Word{a->value_word()}, a->is_append()});
+        local_vars.set(
+            a->key(), prefix_assignment{Word{a->value_word()}, a->is_append()});
       }
     } break;
 
@@ -1112,7 +1112,8 @@ fn Parser::consume_bash_array_assignment() throws -> void
       throw ErrorWithLocation{open->source_location(),
                               "Unterminated array assignment, expected ')'"};
     }
-    if (t->kind() == Token::Kind::LeftParen) depth++;
+    if (t->kind() == Token::Kind::LeftParen)
+      depth++;
     else if (t->kind() == Token::Kind::RightParen) {
       depth--;
       if (depth == 0) break;
@@ -1142,7 +1143,8 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
   switch (t->kind()) {
   case Token::Kind::Number: {
     const let parsed = utils::parse_decimal_integer(t->raw_string());
-    if (parsed.is_error()) throw parsed.error();
+    if (parsed.is_error())
+      throw ErrorWithLocation{t->source_location(), parsed.error().message()};
     lhs = m_lexer.arena().create<ConstantNumber>(t->source_location(),
                                                  parsed.value());
   } break;

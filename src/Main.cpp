@@ -168,7 +168,7 @@ static fn run_script_contents(const String &script_contents,
        file with any parse error must not run, so a non-empty error list prints
        every error and fails without evaluating the partial tree. */
     ArrayList<ErrorWithLocation> parse_errors{heap_allocator()};
-    Expression *ast = p.construct_ast_recovering(parse_errors);
+    Expression *ast = p.construct_ast(parse_errors);
 
     if (!parse_errors.is_empty()) {
       for (const ErrorWithLocation &e : parse_errors)
