@@ -36,6 +36,7 @@
 #include "Path.hpp"
 #include "String.hpp"
 
+#include <csignal>
 #include <string>
 
 namespace shit {
@@ -176,6 +177,11 @@ fn get_home_directory() -> Maybe<Path>;
 fn set_default_signal_handlers() -> void;
 
 fn reset_signal_handlers() -> void;
+
+/* Set to one by the SIGINT handler and polled by the evaluator, so a Ctrl-C
+   aborts the running command, such as a loop that would otherwise spin forever.
+   The main loop clears it before each interactive command. */
+extern volatile sig_atomic_t INTERRUPT_REQUESTED;
 
 fn execute_program(ExecContext &&ec) -> process;
 

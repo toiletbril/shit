@@ -508,15 +508,33 @@ fn reset_signal_handlers() -> void
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
 }
 
+volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
+
+static fn handle_interrupt(int s) -> void
+{
+  SHIT_UNUSED(s);
+  /* Setting the flag is the only async-signal-safe action. The evaluator polls
+     it and aborts the running command, so a shell-internal loop is stoppable. */
+  INTERRUPT_REQUESTED = 1;
+}
+
 fn set_default_signal_handlers() -> void
 {
-  sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
+  /* The terminal-generated signals that would kill the shell stay blocked, but
+     SIGINT gets a handler instead, so a Ctrl-C in a shell loop sets the flag the
+     evaluator polls rather than spinning forever. An external command resets the
+     handler to the default through execv and so still dies on Ctrl-C. */
+  sigset_t sm = make_sigset(SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
 
   struct sigaction sa = {};
   sa.sa_flags = SA_SIGINFO;
   sa.sa_sigaction = sigchild_handler;
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
+
+  struct sigaction si = {};
+  si.sa_handler = handle_interrupt;
+  check_syscall(sigaction(SIGINT, &si, nullptr));
 }
 
 } /* namespace os */
@@ -927,11 +945,15 @@ fn last_system_error_message() -> String
   return err;
 }
 
+volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
+
 static fn handle_interrupt(int s) -> void
 {
   SHIT_UNUSED(s);
-  shit::print("\n");
-  /* TODO: Ignore error? */
+  /* Only set the flag, since printing or any non-async-signal-safe work inside a
+     handler is undefined. The evaluator polls the flag and aborts the running
+     command, so an infinite loop can be stopped from the keyboard. */
+  INTERRUPT_REQUESTED = 1;
   signal(SIGINT, handle_interrupt);
 }
 

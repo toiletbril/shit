@@ -580,6 +580,10 @@ fn main(int argc, char **argv) -> int
       shit::utils::quit(EXIT_FAILURE);
     }
 
+    /* Drop any interrupt that landed while the prompt was waiting, so a Ctrl-C
+       used to clear the input line does not abort the command about to run. */
+    shit::os::INTERRUPT_REQUESTED = 0;
+
     /* Execute the contents through the shared pipeline. */
     exit_code = run_script_contents(script_contents, context, ast_arena);
 

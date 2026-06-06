@@ -31,6 +31,13 @@ fn Expression::to_ast_string(usize layer) const -> String
 
 fn Expression::evaluate(EvalContext &cxt) const -> i64
 {
+  /* A Ctrl-C sets the interrupt flag, and the check here runs before every node,
+     so a running command, including a loop body or condition, stops promptly and
+     control returns to the prompt. */
+  if (os::INTERRUPT_REQUESTED) {
+    os::INTERRUPT_REQUESTED = 0;
+    throw Error{"Interrupted"};
+  }
   cxt.add_evaluated_expression();
   return evaluate_impl(cxt);
 }
