@@ -70,8 +70,9 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
    function, or sourced script to consume it. The jump carries the source and
    the origin it was made in, so the caret points at the exact builtin and the
    note names where it ran. */
-static void report_escaped_control_flow(shit::EvalContext &context,
-                                        const shit::String &fallback_source)
+static fn report_escaped_control_flow(shit::EvalContext &context,
+                                      const shit::String &fallback_source)
+    -> void
 {
   if (!context.has_pending_control_flow()) return;
 
@@ -117,9 +118,9 @@ static void report_escaped_control_flow(shit::EvalContext &context,
 /* Lex, parse, validate, and evaluate one chunk of shell source in the given
    context. The main loop and source_file share this so a sourced file runs the
    same pipeline as an interactive line. Returns the resulting exit code. */
-static int run_script_contents(const shit::String &script_contents,
-                               shit::EvalContext &context,
-                               shit::BumpArena &ast_arena)
+static fn run_script_contents(const shit::String &script_contents,
+                              shit::EvalContext &context,
+                              shit::BumpArena &ast_arena) -> int
 {
   int exit_code = EXIT_FAILURE;
 
@@ -204,8 +205,8 @@ static int run_script_contents(const shit::String &script_contents,
 
 /* Read a whole file and run it in the given context. A missing file is not an
    error, since a login shell sources profiles that may not exist. */
-static void source_file(const shit::Path &path, shit::EvalContext &context,
-                        shit::BumpArena &ast_arena)
+static fn source_file(const shit::Path &path, shit::EvalContext &context,
+                      shit::BumpArena &ast_arena) -> void
 {
   shit::Maybe<shit::String> contents =
       shit::utils::read_entire_file(path.text());
@@ -215,9 +216,9 @@ static void source_file(const shit::Path &path, shit::EvalContext &context,
 }
 
 /* Expand the common prompt escapes in PS1 and PS2. */
-static shit::String expand_prompt_escapes(shit::StringView prompt,
-                                          shit::StringView user,
-                                          shit::StringView working_directory)
+static fn expand_prompt_escapes(shit::StringView prompt, shit::StringView user,
+                                shit::StringView working_directory)
+    -> shit::String
 {
   shit::String out{};
   for (usize i = 0; i < prompt.length; i++) {
@@ -257,7 +258,7 @@ static shit::String expand_prompt_escapes(shit::StringView prompt,
   return out;
 }
 
-int main(int argc, char **argv)
+fn main(int argc, char **argv) -> int
 {
 #if SHIT_PLATFORM_IS COSMO
   ShowCrashReports();

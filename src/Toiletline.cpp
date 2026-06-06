@@ -34,13 +34,13 @@ struct TlFreeBlock
 };
 TlFreeBlock *TOILETLINE_FREE_LIST = nullptr;
 
-usize &tl_block_capacity(void *payload)
+fn tl_block_capacity(void *payload) -> usize &
 {
   return *reinterpret_cast<usize *>(static_cast<char *>(payload) -
                                     TL_ALLOC_HEADER);
 }
 
-void *tl_arena_malloc(usize length)
+fn tl_arena_malloc(usize length) -> void *
 {
   /* Reuse the first free block large enough, so repeated same-size line-buffer
      allocations do not keep growing the arena. */
@@ -60,7 +60,7 @@ void *tl_arena_malloc(usize length)
   return base + TL_ALLOC_HEADER;
 }
 
-void tl_arena_free(void *pointer)
+fn tl_arena_free(void *pointer) -> void
 {
   if (pointer == NULL) return;
   TlFreeBlock *block = static_cast<TlFreeBlock *>(pointer);
@@ -68,7 +68,7 @@ void tl_arena_free(void *pointer)
   TOILETLINE_FREE_LIST = block;
 }
 
-void *tl_arena_realloc(void *pointer, usize length)
+fn tl_arena_realloc(void *pointer, usize length) -> void *
 {
   if (pointer == NULL) return tl_arena_malloc(length);
   usize old_capacity = tl_block_capacity(pointer);
@@ -118,21 +118,21 @@ static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
 static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
 
-void set_title(const String &title)
+fn set_title(const String &title) -> void
 {
   if (::tl_set_title(title.c_str()) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Could not set the title for the terminal"};
 }
 
-usize utf8_strlen(const String &s, usize count)
+fn utf8_strlen(const String &s, usize count) -> usize
 {
   return (count != static_cast<usize>(-1)) ? ::tl_utf8_strnlen(s.c_str(), count)
                                            : ::tl_utf8_strlen(s.c_str());
 }
 
-bool is_active() { return ::itl_g_is_active; }
+fn is_active() -> bool { return ::itl_g_is_active; }
 
-void initialize()
+fn initialize() -> void
 {
   /* Load history. */
   if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
@@ -160,7 +160,7 @@ void initialize()
   }
 }
 
-void exit()
+fn exit() -> void
 {
   /* Dump history. */
   if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
@@ -181,7 +181,7 @@ void exit()
   }
 }
 
-InputResult get_input(const String &prompt)
+fn get_input(const String &prompt) -> InputResult
 {
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   if (code == TL_ERROR) {
@@ -191,18 +191,18 @@ InputResult get_input(const String &prompt)
   return InputResult{code, String{TL_BUFFER}};
 }
 
-void set_input(const String &input)
+fn set_input(const String &input) -> void
 {
   ::tl_set_predefined_input(input.c_str());
 }
 
-void enter_raw_mode()
+fn enter_raw_mode() -> void
 {
   if (::tl_enter_raw_mode() != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't force the terminal into raw mode"};
 }
 
-void exit_raw_mode()
+fn exit_raw_mode() -> void
 {
   if (::tl_exit_raw_mode() != TL_SUCCESS) {
     throw shit::Error{
@@ -210,7 +210,7 @@ void exit_raw_mode()
   }
 }
 
-void emit_newlines(StringView buffer)
+fn emit_newlines(StringView buffer) -> void
 {
   if (::tl_emit_newlines(buffer.data) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
@@ -234,37 +234,37 @@ struct InputResult
   String text;
 };
 
-void set_title(const String &title) { SHIT_UNUSED(title); }
+fn set_title(const String &title) -> void { SHIT_UNUSED(title); }
 
-usize utf8_strlen(const String &s, usize count)
+fn utf8_strlen(const String &s, usize count) -> usize
 {
   return (count != static_cast<usize>(-1) && count < s.length()) ? count
                                                                  : s.length();
 }
 
-bool is_active() { return false; }
+fn is_active() -> bool { return false; }
 
-void initialize()
+fn initialize() -> void
 {
   throw shit::Error{
       "This build has no line editor, use '-c', '-s', or a file argument"};
 }
 
-void exit() {}
+fn exit() -> void {}
 
-InputResult get_input(const String &prompt)
+fn get_input(const String &prompt) -> InputResult
 {
   SHIT_UNUSED(prompt);
   throw shit::Error{"This build has no line editor"};
 }
 
-void set_input(const String &input) { SHIT_UNUSED(input); }
+fn set_input(const String &input) -> void { SHIT_UNUSED(input); }
 
-void enter_raw_mode() {}
+fn enter_raw_mode() -> void {}
 
-void exit_raw_mode() {}
+fn exit_raw_mode() -> void {}
 
-void emit_newlines(StringView buffer) { SHIT_UNUSED(buffer); }
+fn emit_newlines(StringView buffer) -> void { SHIT_UNUSED(buffer); }
 
 } /* namespace toiletline */
 

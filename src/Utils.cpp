@@ -211,7 +211,7 @@ static fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
   return static_cast<i64>(magnitude);
 }
 
-static Error not_an_integer_error(StringView text)
+static fn not_an_integer_error(StringView text) -> Error
 {
   return Error{
       "'" + std::string{text.data, text.length}
@@ -219,7 +219,7 @@ static Error not_an_integer_error(StringView text)
   };
 }
 
-String unsigned_integer_to_string(u64 value)
+fn unsigned_integer_to_string(u64 value) -> String
 {
   /* The digits are written into a fixed buffer from the least significant end,
      since a u64 never needs more than twenty decimal digits, then copied out in
@@ -235,7 +235,7 @@ String unsigned_integer_to_string(u64 value)
   };
 }
 
-String integer_to_string(i64 value)
+fn integer_to_string(i64 value) -> String
 {
   if (value >= 0) return unsigned_integer_to_string(static_cast<u64>(value));
   /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
@@ -245,7 +245,7 @@ String integer_to_string(i64 value)
   return result;
 }
 
-ErrorOr<i64> parse_decimal_integer(StringView text)
+fn parse_decimal_integer(StringView text) -> ErrorOr<i64>
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -280,7 +280,7 @@ ErrorOr<i64> parse_decimal_integer(StringView text)
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-ErrorOr<i64> parse_octal_integer(StringView text)
+fn parse_octal_integer(StringView text) -> ErrorOr<i64>
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -315,7 +315,7 @@ ErrorOr<i64> parse_octal_integer(StringView text)
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-ErrorOr<i64> parse_hexadecimal_integer(StringView text)
+fn parse_hexadecimal_integer(StringView text) -> ErrorOr<i64>
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -365,7 +365,7 @@ ErrorOr<i64> parse_hexadecimal_integer(StringView text)
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-usize find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
+fn find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted) -> usize
 {
   for (usize i = 0; i < suffixes.size(); i++) {
     if (suffixes[i] == wanted) return i;
@@ -373,7 +373,7 @@ usize find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
   return NOT_FOUND_INDEX;
 }
 
-Maybe<Path> canonicalize_path(StringView path)
+fn canonicalize_path(StringView path) -> Maybe<Path>
 {
   Path candidate{path};
 
@@ -403,13 +403,14 @@ Maybe<Path> canonicalize_path(StringView path)
 
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
-static bool is_glob_char_active(const ArrayList<bool> &glob_active, usize index)
+static fn is_glob_char_active(const ArrayList<bool> &glob_active, usize index)
+    -> bool
 {
   return index < glob_active.size() && glob_active[index];
 }
 
-bool glob_matches(StringView glob, StringView str,
-                  const ArrayList<bool> &glob_active, usize mask_offset)
+fn glob_matches(StringView glob, StringView str,
+                const ArrayList<bool> &glob_active, usize mask_offset) -> bool
 {
   usize s = 0;
   usize g = 0;
@@ -531,7 +532,7 @@ bool glob_matches(StringView glob, StringView str,
   return false;
 }
 
-[[noreturn]] void quit(i32 code, bool should_goodbye)
+[[noreturn]] fn quit(i32 code, bool should_goodbye) -> void
 {
   const u8 actual_code = static_cast<u8>(code);
 
@@ -570,12 +571,12 @@ static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
-static void cache_resolved_path(StringView name, const Path &full_path)
+static fn cache_resolved_path(StringView name, const Path &full_path) -> void
 {
   PATH_CACHE.get_or_create(name, ArrayList<Path>{}).push(full_path);
 }
 
-void clear_path_map()
+fn clear_path_map() -> void
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
@@ -584,7 +585,7 @@ void clear_path_map()
 /* Split PATH into its directory components. The last component carries no
    trailing delimiter, so a plain delimiter scan drops it and the directory is
    never searched. POSIX treats an empty component as the current directory. */
-static ArrayList<String> split_path_dirs(StringView path_var)
+static fn split_path_dirs(StringView path_var) -> ArrayList<String>
 {
   ArrayList<String> dirs{};
   String current{};
@@ -603,7 +604,7 @@ static ArrayList<String> split_path_dirs(StringView path_var)
   return dirs;
 }
 
-void initialize_path_map()
+fn initialize_path_map() -> void
 {
   if (!MAYBE_PATH) return;
 
@@ -628,7 +629,7 @@ void initialize_path_map()
   }
 }
 
-ArrayList<Path> search_and_cache(StringView program_name)
+fn search_and_cache(StringView program_name) -> ArrayList<Path>
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   if (!MAYBE_PATH) return ArrayList<Path>{};
@@ -673,7 +674,7 @@ ArrayList<Path> search_and_cache(StringView program_name)
   return result;
 }
 
-ArrayList<Path> search_program_path(StringView program_name)
+fn search_program_path(StringView program_name) -> ArrayList<Path>
 {
   std::string sp{program_name.data, program_name.length};
   ArrayList<Path> result{};
@@ -707,7 +708,7 @@ ArrayList<Path> search_program_path(StringView program_name)
   return search_and_cache(program_name);
 }
 
-Maybe<String> read_entire_file(StringView path)
+fn read_entire_file(StringView path) -> Maybe<String>
 {
   const Maybe<os::descriptor> file =
       os::open_file_descriptor(path, os::FileOpenMode::Read);
@@ -724,7 +725,7 @@ Maybe<String> read_entire_file(StringView path)
   return contents;
 }
 
-String read_entire_standard_input()
+fn read_entire_standard_input() -> String
 {
   String contents{};
   char buffer[4096];
@@ -736,7 +737,7 @@ String read_entire_standard_input()
   return contents;
 }
 
-Maybe<String> read_line_from_fd(os::descriptor fd)
+fn read_line_from_fd(os::descriptor fd) -> Maybe<String>
 {
   String line{};
   bool read_any_byte = false;

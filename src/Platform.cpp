@@ -152,7 +152,7 @@ fn check_syscall_impl(i32 status, StringView invocation) -> i32
 
 #define check_syscall(call) check_syscall_impl(call, #call)
 
-process execute_program(ExecContext &&ec)
+fn execute_program(ExecContext &&ec) -> process
 {
   SHIT_DEFER { ec.close_fds(); };
 
@@ -203,7 +203,7 @@ process execute_program(ExecContext &&ec)
   return child_pid;
 }
 
-void replace_process(ExecContext &&ec)
+fn replace_process(ExecContext &&ec) -> void
 {
   os_args child_args = make_os_args(ec.args());
 
@@ -235,14 +235,14 @@ void replace_process(ExecContext &&ec)
                     last_system_error_message()};
 }
 
-void redirect_self(const ExecContext &ec)
+fn redirect_self(const ExecContext &ec) -> void
 {
   if (ec.in_fd) check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
   if (ec.out_fd) check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
   if (ec.err_fd) check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
 }
 
-Maybe<Pipe> make_pipe()
+fn make_pipe() -> Maybe<Pipe>
 {
   descriptor p[2] = {SHIT_INVALID_FD, SHIT_INVALID_FD};
 
@@ -262,7 +262,7 @@ Maybe<Pipe> make_pipe()
   return Pipe{p[0], p[1]};
 }
 
-Maybe<descriptor> open_file_descriptor(StringView path, FileOpenMode mode)
+fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
 {
   int flags = 0;
   switch (mode) {
@@ -286,7 +286,7 @@ Maybe<descriptor> open_file_descriptor(StringView path, FileOpenMode mode)
   return fd;
 }
 
-Maybe<descriptor> write_to_temp_file(StringView content)
+fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 {
   /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
      so a cosmo binary running on Windows writes to the Windows temp directory
@@ -326,7 +326,7 @@ Maybe<descriptor> write_to_temp_file(StringView content)
   return fd;
 }
 
-u32 get_file_creation_mask()
+fn get_file_creation_mask() -> u32
 {
   /* umask only reads through a set, so the old value is read and put back. */
   mode_t old = umask(0);
@@ -334,9 +334,9 @@ u32 get_file_creation_mask()
   return static_cast<u32>(old);
 }
 
-void set_file_creation_mask(u32 mask) { umask(static_cast<mode_t>(mask)); }
+fn set_file_creation_mask(u32 mask) -> void { umask(static_cast<mode_t>(mask)); }
 
-i32 wait_and_monitor_process(process pid)
+fn wait_and_monitor_process(process pid) -> i32
 {
   SHIT_ASSERT(pid >= 0);
 
@@ -390,7 +390,7 @@ i32 wait_and_monitor_process(process pid)
   SHIT_UNREACHABLE();
 }
 
-ProcessState poll_process(process p, i32 &status_out)
+fn poll_process(process p, i32 &status_out) -> ProcessState
 {
   i32 status = 0;
   pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
@@ -413,14 +413,14 @@ ProcessState poll_process(process p, i32 &status_out)
   return ProcessState::Exited;
 }
 
-bool signal_process(process p, i32 signal_number)
+fn signal_process(process p, i32 signal_number) -> bool
 {
   return kill(p, signal_number) == 0;
 }
 
-process process_from_pid(i64 pid) { return static_cast<process>(pid); }
+fn process_from_pid(i64 pid) -> process { return static_cast<process>(pid); }
 
-Maybe<i32> signal_number_from_name(StringView name)
+fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
   /* A bare number names the signal directly. */
   if (!name.empty() &&
@@ -455,7 +455,7 @@ Maybe<i32> signal_number_from_name(StringView name)
   return NAMES.find(bare);
 }
 
-os_args make_os_args(const ArrayList<String> &args)
+fn make_os_args(const ArrayList<String> &args) -> os_args
 {
   os_args result{};
   result.reserve(args.size() + 1);
@@ -468,12 +468,12 @@ os_args make_os_args(const ArrayList<String> &args)
   return result;
 }
 
-String last_system_error_message()
+fn last_system_error_message() -> String
 {
   return String{StringView{strerror(errno)}};
 }
 
-static sigset_t make_sigset_impl(int first, ...)
+static fn make_sigset_impl(int first, ...) -> sigset_t
 {
   va_list va;
 
@@ -490,14 +490,14 @@ static sigset_t make_sigset_impl(int first, ...)
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
-static void sigchild_handler(int n, siginfo_t *siginfo, void *ctx)
+static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) -> void
 {
   SHIT_UNUSED(n);
   SHIT_UNUSED(ctx);
   SHIT_UNUSED(siginfo);
 }
 
-void reset_signal_handlers()
+fn reset_signal_handlers() -> void
 {
   sigset_t sm;
   sigfillset(&sm);
@@ -508,7 +508,7 @@ void reset_signal_handlers()
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
 }
 
-void set_default_signal_handlers()
+fn set_default_signal_handlers() -> void
 {
   sigset_t sm = make_sigset(SIGINT, SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
@@ -531,7 +531,7 @@ namespace shit {
 
 namespace os {
 
-Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size)
+fn write_fd(os::descriptor fd, const void *buf, usize size) -> Maybe<usize>
 {
   DWORD w = -1;
   if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
@@ -539,7 +539,7 @@ Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size)
   return static_cast<usize>(w);
 }
 
-Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size)
+fn read_fd(os::descriptor fd, void *buf, usize size) -> Maybe<usize>
 {
   DWORD r = -1;
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
@@ -547,21 +547,21 @@ Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size)
   return static_cast<usize>(r);
 }
 
-bool close_fd(os::descriptor fd) { return CloseHandle(fd); }
+fn close_fd(os::descriptor fd) -> bool { return CloseHandle(fd); }
 
-os::descriptor redirect_stdout(os::descriptor target)
+fn redirect_stdout(os::descriptor target) -> os::descriptor
 {
   os::descriptor saved = GetStdHandle(STD_OUTPUT_HANDLE);
   SetStdHandle(STD_OUTPUT_HANDLE, target);
   return saved;
 }
 
-void restore_stdout(os::descriptor saved)
+fn restore_stdout(os::descriptor saved) -> void
 {
   SetStdHandle(STD_OUTPUT_HANDLE, saved);
 }
 
-Maybe<String> get_current_user()
+fn get_current_user() -> Maybe<String>
 {
   DWORD size = 0;
   GetUserNameA(nullptr, &size);
@@ -578,7 +578,7 @@ Maybe<String> get_current_user()
   return shit::None;
 }
 
-Maybe<Path> get_home_directory()
+fn get_home_directory() -> Maybe<Path>
 {
   if (Maybe<String> home = get_environment_variable("USERPROFILE"))
     return Path{StringView{*home}};
@@ -587,19 +587,19 @@ Maybe<Path> get_home_directory()
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
-bool is_child_process() { return GetCurrentProcessId() != PARENT_SHELL_PID; }
+fn is_child_process() -> bool { return GetCurrentProcessId() != PARENT_SHELL_PID; }
 
-i64 get_shell_process_id() { return static_cast<i64>(PARENT_SHELL_PID); }
+fn get_shell_process_id() -> i64 { return static_cast<i64>(PARENT_SHELL_PID); }
 
-i64 process_id_of(process p) { return static_cast<i64>(GetProcessId(p)); }
+fn process_id_of(process p) -> i64 { return static_cast<i64>(GetProcessId(p)); }
 
-bool is_stdin_a_tty() { return _isatty(_fileno(stdin)); }
+fn is_stdin_a_tty() -> bool { return _isatty(_fileno(stdin)); }
 
-bool is_stdout_a_tty() { return _isatty(_fileno(stdout)); }
+fn is_stdout_a_tty() -> bool { return _isatty(_fileno(stdout)); }
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
 
-Maybe<String> get_environment_variable(StringView key)
+fn get_environment_variable(StringView key) -> Maybe<String>
 {
   String key_string{key};
   char buffer[WIN32_MAX_ENV_SIZE] = {0};
@@ -608,20 +608,20 @@ Maybe<String> get_environment_variable(StringView key)
   return String{StringView{buffer}};
 }
 
-void set_environment_variable(StringView key, StringView value)
+fn set_environment_variable(StringView key, StringView value) -> void
 {
   String key_string{key};
   String value_string{value};
   SetEnvironmentVariableA(key_string.c_str(), value_string.c_str());
 }
 
-void unset_environment_variable(StringView key)
+fn unset_environment_variable(StringView key) -> void
 {
   String key_string{key};
   SetEnvironmentVariableA(key_string.c_str(), nullptr);
 }
 
-process execute_program(ExecContext &&ec)
+fn execute_program(ExecContext &&ec) -> process
 {
   std::string command_line = make_os_args(ec.args());
 
@@ -674,7 +674,7 @@ process execute_program(ExecContext &&ec)
   return process_info.hProcess;
 }
 
-void replace_process(ExecContext &&ec)
+fn replace_process(ExecContext &&ec) -> void
 {
   /* Windows cannot replace a process in place, so the program runs to
      completion and the shell exits with its status, which behaves like exec for
@@ -685,7 +685,7 @@ void replace_process(ExecContext &&ec)
   SHIT_UNREACHABLE();
 }
 
-void redirect_self(const ExecContext &ec)
+fn redirect_self(const ExecContext &ec) -> void
 {
   /* Duplicate each redirect handle into the standard slot, so the caller's
      close of the original handles leaves the shell's new standard handles
@@ -703,7 +703,7 @@ void redirect_self(const ExecContext &ec)
     SetStdHandle(STD_ERROR_HANDLE, duplicate);
 }
 
-Maybe<Pipe> make_pipe()
+fn make_pipe() -> Maybe<Pipe>
 {
   SECURITY_ATTRIBUTES att{};
 
@@ -726,7 +726,7 @@ Maybe<Pipe> make_pipe()
   return Pipe{in, out};
 }
 
-Maybe<descriptor> open_file_descriptor(StringView path, FileOpenMode mode)
+fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
 {
   DWORD access = (mode == FileOpenMode::Read) ? GENERIC_READ : GENERIC_WRITE;
   DWORD disposition = OPEN_EXISTING;
@@ -759,7 +759,7 @@ Maybe<descriptor> open_file_descriptor(StringView path, FileOpenMode mode)
   return handle;
 }
 
-Maybe<descriptor> write_to_temp_file(StringView content)
+fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 {
   char temp_dir[MAX_PATH];
   if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
@@ -784,16 +784,16 @@ Maybe<descriptor> write_to_temp_file(StringView content)
   return handle;
 }
 
-u32 get_file_creation_mask()
+fn get_file_creation_mask() -> u32
 {
   int old = _umask(0);
   _umask(old);
   return static_cast<u32>(old);
 }
 
-void set_file_creation_mask(u32 mask) { _umask(static_cast<int>(mask)); }
+fn set_file_creation_mask(u32 mask) -> void { _umask(static_cast<int>(mask)); }
 
-i32 wait_and_monitor_process(process p)
+fn wait_and_monitor_process(process p) -> i32
 {
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
     throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
@@ -805,7 +805,7 @@ i32 wait_and_monitor_process(process p)
   return code;
 }
 
-ProcessState poll_process(process p, i32 &status_out)
+fn poll_process(process p, i32 &status_out) -> ProcessState
 {
   /* Windows has no stopped state, so a process is either alive or finished. */
   DWORD code = 0;
@@ -818,7 +818,7 @@ ProcessState poll_process(process p, i32 &status_out)
   return ProcessState::Exited;
 }
 
-bool signal_process(process p, i32 signal_number)
+fn signal_process(process p, i32 signal_number) -> bool
 {
   /* Windows cannot deliver a POSIX signal, so only a terminate is honored and a
      resume or a stop is a no-op the caller treats as unsupported. */
@@ -827,14 +827,14 @@ bool signal_process(process p, i32 signal_number)
   return false;
 }
 
-process process_from_pid(i64 pid)
+fn process_from_pid(i64 pid) -> process
 {
   return OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE |
                          PROCESS_QUERY_INFORMATION,
                      FALSE, static_cast<DWORD>(pid));
 }
 
-Maybe<i32> signal_number_from_name(StringView name)
+fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
   if (!name.empty() &&
       std::all_of(name.data, name.data + name.length,
@@ -852,7 +852,7 @@ Maybe<i32> signal_number_from_name(StringView name)
   return None;
 }
 
-os_args make_os_args(const ArrayList<String> &args)
+fn make_os_args(const ArrayList<String> &args) -> os_args
 {
   SHIT_ASSERT(args.size() > 0);
 
@@ -875,7 +875,7 @@ os_args make_os_args(const ArrayList<String> &args)
   return s;
 }
 
-String last_system_error_message()
+fn last_system_error_message() -> String
 {
   LPSTR errno_str{};
   DWORD win_errno = GetLastError();
@@ -927,7 +927,7 @@ String last_system_error_message()
   return err;
 }
 
-static void handle_interrupt(int s)
+static fn handle_interrupt(int s) -> void
 {
   SHIT_UNUSED(s);
   shit::print("\n");
@@ -936,7 +936,7 @@ static void handle_interrupt(int s)
 }
 
 /* TODO: Use Windows events. */
-void set_default_signal_handlers()
+fn set_default_signal_handlers() -> void
 {
   if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||
       signal(SIGINT, handle_interrupt) == SIG_ERR)
@@ -945,7 +945,7 @@ void set_default_signal_handlers()
   }
 }
 
-void reset_signal_handlers()
+fn reset_signal_handlers() -> void
 {
   if (signal(SIGTERM, SIG_DFL) == SIG_ERR || signal(SIGINT, SIG_DFL) == SIG_ERR)
   {
@@ -975,7 +975,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
 
 constexpr static usize MIN_SUFFIX_LEN = 3;
 
-ExtIndex erase_extension_and_get_its_index(std::string &program_name)
+fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex
 {
 #if SHIT_PLATFORM_IS COSMO
   if (IsWindows())

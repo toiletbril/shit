@@ -760,18 +760,18 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
   return out;
 }
 
-String EvalContext::apply_parameter_expansion(StringView spec)
+fn EvalContext::apply_parameter_expansion(StringView spec) -> String
 {
   if (spec.empty()) return String{heap_allocator()};
 
   /* ${#name} is the length of the value, distinct from $# which is the count of
      positional parameters. */
   if (spec.length > 1 && spec[0] == '#') {
-    const StringView name = spec.substring(1);
+    let const name = spec.substring(1);
     if (name == "@" || name == "*")
       return String{heap_allocator(), utils::unsigned_integer_to_string(
                                           m_positional_params.size())};
-    const Maybe<String> value = get_variable_value(name);
+    let const value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
     return String{heap_allocator(), utils::unsigned_integer_to_string(
@@ -791,8 +791,8 @@ String EvalContext::apply_parameter_expansion(StringView spec)
     name_end = 1;
   }
 
-  const StringView name = spec.substring_of_length(0, name_end);
-  const StringView rest = spec.substring(name_end);
+  let const name = spec.substring_of_length(0, name_end);
+  let const rest = spec.substring(name_end);
   if (rest.empty()) {
     /* Under set -u a plain reference to a variable that is not set is an error,
        while a form with a modifier such as ${x:-w} handles the unset case
@@ -804,20 +804,20 @@ String EvalContext::apply_parameter_expansion(StringView spec)
 
   /* A leading colon makes the default, assign, alternate, and error forms treat
      an empty value as unset. */
-  const bool is_colon_form = rest[0] == ':';
+  let const is_colon_form = rest[0] == ':';
   const usize op_index = is_colon_form ? 1 : 0;
   if (op_index >= rest.length) return expand_variable(name);
 
-  const char op = rest[op_index];
-  const bool is_doubled =
+  let const op = rest[op_index];
+  let const is_doubled =
       (op_index + 1 < rest.length && rest[op_index + 1] == op &&
        (op == '#' || op == '%'));
-  const StringView word = rest.substring(op_index + (is_doubled ? 2 : 1));
+  let const word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
-  const Maybe<String> current = get_variable_value(name);
-  const bool is_set = current.has_value();
-  const bool is_empty = !is_set || current->empty();
-  const bool treat_as_unset = is_colon_form ? is_empty : !is_set;
+  let const current = get_variable_value(name);
+  let const is_set = current.has_value();
+  let const is_empty = !is_set || current->empty();
+  let const treat_as_unset = is_colon_form ? is_empty : !is_set;
 
   switch (op) {
   case '-':
@@ -825,7 +825,7 @@ String EvalContext::apply_parameter_expansion(StringView spec)
     return String{heap_allocator(), current->view()};
   case '=':
     if (treat_as_unset) {
-      const String assigned = expand_modifier_word(word);
+      let const assigned = expand_modifier_word(word);
       set_shell_variable(name, assigned);
       return assigned;
     }
@@ -840,12 +840,12 @@ String EvalContext::apply_parameter_expansion(StringView spec)
     }
     return String{heap_allocator(), current->view()};
   case '#': {
-    const String value = current.value_or(String{});
+    let const value = current.value_or(String{});
     return trim_matching_prefix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
   case '%': {
-    const String value = current.value_or(String{});
+    let const value = current.value_or(String{});
     return trim_matching_suffix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
@@ -853,9 +853,9 @@ String EvalContext::apply_parameter_expansion(StringView spec)
   }
 }
 
-String EvalContext::make_stats_string() const
+fn EvalContext::make_stats_string() const -> String
 {
-  String s{};
+  let s = String{};
 
   s += "[Stats\n";
 
@@ -881,57 +881,58 @@ String EvalContext::make_stats_string() const
   return s;
 }
 
-bool EvalContext::should_echo() const { return m_enable_echo; }
+fn EvalContext::should_echo() const -> bool { return m_enable_echo; }
 
-bool EvalContext::should_echo_expanded() const
+fn EvalContext::should_echo_expanded() const -> bool
 {
   return m_enable_echo_expanded;
 }
 
-bool EvalContext::shell_is_interactive() const
+fn EvalContext::shell_is_interactive() const -> bool
 {
   return m_shell_is_interactive;
 }
 
-usize EvalContext::last_expressions_executed() const
+fn EvalContext::last_expressions_executed() const -> usize
 {
   return m_expressions_executed_last;
 }
 
-usize EvalContext::total_expressions_executed() const
+fn EvalContext::total_expressions_executed() const -> usize
 {
   return m_expressions_executed_total + m_expressions_executed_last;
 }
 
-usize EvalContext::last_expansion_count() const { return m_expansions_last; }
+fn EvalContext::last_expansion_count() const -> usize { return m_expansions_last; }
 
-usize EvalContext::total_expansion_count() const
+fn EvalContext::total_expansion_count() const -> usize
 {
   return m_expansions_total + m_expansions_last;
 }
 
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
-ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
-                                                   bool should_expand_files)
+fn EvalContext::expand_path_once(const GlobField &field,
+                                 bool should_expand_files)
+    -> ArrayList<GlobField>
 {
-  const Allocator scratch = scratch_allocator();
-  ArrayList<GlobField> expanded{scratch};
+  let const scratch = scratch_allocator();
+  let expanded = ArrayList<GlobField>{scratch};
 
   /* This runs only for a field that holds a real glob, which is rare. The path
      text is split on its last separator into a parent directory and the glob
      stem. */
-  const StringView path = field.text.view();
+  let const path = field.text.view();
 
-  Maybe<usize> last_slash{};
+  let last_slash = Maybe<usize>{};
   for (usize i = path.length; i > 0; i--)
     if (path[i - 1] == '/') {
       last_slash = i - 1;
       break;
     }
-  const bool has_slashes = last_slash.has_value();
+  let const has_slashes = last_slash.has_value();
 
-  Path parent_dir{};
+  let parent_dir = Path{};
   if (has_slashes)
     parent_dir =
         Path{*last_slash != 0 ? path.substring_of_length(0, *last_slash)
@@ -942,31 +943,31 @@ ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
   /* Stem of the glob after the last slash. Its mask starts at stem_start in the
      field, so glob_matches reads field.glob_active from there. */
   const usize stem_start = has_slashes ? *last_slash + 1 : 0;
-  const bool has_glob = stem_start < path.length;
-  StringView glob{};
+  let const has_glob = stem_start < path.length;
+  let glob = StringView{};
   if (has_glob) glob = path.substring(stem_start);
 
-  const Maybe<ArrayList<String>> entries = Path::read_directory(parent_dir);
+  let const entries = Path::read_directory(parent_dir);
   if (!entries.has_value())
     throw Error{"Could not descend into '" + parent_dir.text() +
                 "': " + os::last_system_error_message()};
 
   if (!has_glob) {
-    GlobField copy{scratch};
+    let copy = GlobField{scratch};
     copy.text.append(field.text.view());
     copy.glob_active = field.glob_active;
     expanded.push(std::move(copy));
     return expanded;
   }
 
-  const bool parent_is_dot = parent_dir.text() == StringView{"."};
+  let const parent_is_dot = parent_dir.text() == StringView{"."};
 
   for (const String &entry_name : *entries) {
-    const StringView filename = entry_name.view();
+    let const filename = entry_name.view();
 
     /* The full path joins the parent and the filename, the way the directory
        walk needs it for the is_directory test and the result text. */
-    Path full_path = parent_dir;
+    let full_path = parent_dir;
     full_path.push_component(filename);
 
     if (!should_expand_files && !full_path.is_directory()) continue;
@@ -981,7 +982,7 @@ ArrayList<GlobField> EvalContext::expand_path_once(const GlobField &field,
          The empty mask is the all-literal convention, so it carries no
          per-result allocation. A parent of "." is dropped to keep the result
          relative. */
-      GlobField result_field{scratch};
+      let result_field = GlobField{scratch};
       if (parent_is_dot)
         result_field.text.append(filename);
       else
@@ -999,12 +1000,13 @@ namespace {
    without a later ']' is a literal bracket, not a glob, so a field such as the
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
-Maybe<usize> first_active_glob(StringView text, const ArrayList<bool> &mask)
+fn first_active_glob(StringView text, const ArrayList<bool> &mask)
+    -> Maybe<usize>
 {
-  Maybe<usize> open_bracket{};
+  let open_bracket = Maybe<usize>{};
   for (usize i = 0; i < mask.size(); i++) {
     if (!mask[i]) continue;
-    const char ch = text.data[i];
+    let const ch = text.data[i];
     if (ch == '*' || ch == '?') return i;
     if (ch == '[') {
       if (!open_bracket) open_bracket = i;
@@ -1017,18 +1019,18 @@ Maybe<usize> first_active_glob(StringView text, const ArrayList<bool> &mask)
 
 } /* namespace */
 
-ArrayList<GlobField>
-EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
+fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
+    -> ArrayList<GlobField>
 {
-  const Allocator scratch = scratch_allocator();
-  ArrayList<GlobField> result{scratch};
+  let const scratch = scratch_allocator();
+  let result = ArrayList<GlobField>{scratch};
 
   for (GlobField &field : fields) {
-    const StringView text = field.text.view();
+    let const text = field.text.view();
 
     /* An empty mask is the all-literal convention, so a field without one holds
        no live glob metacharacter. */
-    const Maybe<usize> expand_ch = first_active_glob(text, field.glob_active);
+    let const expand_ch = first_active_glob(text, field.glob_active);
 
     if (!expand_ch) {
       /* No glob remains. This field is a literal suffix appended after an
@@ -1039,7 +1041,7 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
       continue;
     }
 
-    Maybe<usize> slash_after{};
+    let slash_after = Maybe<usize>{};
     for (usize k = *expand_ch; k < text.length; k++) {
       if (text.data[k] == '/') {
         slash_after = k;
@@ -1050,7 +1052,7 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
     /* The glob is the last component, so expand it against files and emit the
        matches as is. */
     if (!slash_after) {
-      ArrayList<GlobField> once = expand_path_once(field, true);
+      let once = expand_path_once(field, true);
       for (GlobField &f : once)
         result.push(std::move(f));
       continue;
@@ -1059,26 +1061,25 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
     /* Split off the first globbed directory component and the literal-or-glob
        suffix after it, building each from a substring rather than copying the
        whole field. */
-    const std::ptrdiff_t slash_offset =
-        static_cast<std::ptrdiff_t>(*slash_after);
-    GlobField operating{scratch};
+    let const slash_offset = static_cast<std::ptrdiff_t>(*slash_after);
+    let operating = GlobField{scratch};
     operating.text.append(StringView{text.data, *slash_after});
     for (std::ptrdiff_t k = 0; k < slash_offset; k++)
       operating.glob_active.push(field.glob_active[static_cast<usize>(k)]);
-    GlobField removed_suffix{scratch};
+    let removed_suffix = GlobField{scratch};
     removed_suffix.text.append(
         StringView{text.data + *slash_after, text.length - *slash_after});
     for (usize k = static_cast<usize>(slash_offset);
          k < field.glob_active.size(); k++)
       removed_suffix.glob_active.push(field.glob_active[k]);
 
-    ArrayList<GlobField> once = expand_path_once(operating, false);
+    let once = expand_path_once(operating, false);
 
     /* Bring back the removed suffix and recurse on the expanded entries. Each
        match came back all-literal with an empty mask, so restore its false
        entries before the suffix mask to keep the mask aligned with the text. */
     for (GlobField &f : once) {
-      const usize matched_length = f.text.size();
+      let const matched_length = f.text.size();
       f.text.append(removed_suffix.text.view());
       f.glob_active.clear();
       for (usize k = 0; k < matched_length; k++)
@@ -1090,7 +1091,7 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
     /* The recurse validates each level through the directory read or, for a
        literal suffix, the existence check above, so no extra stat is needed
        here. */
-    ArrayList<GlobField> twice = expand_path_recurse(std::move(once));
+    let twice = expand_path_recurse(std::move(once));
     for (GlobField &f : twice)
       result.push(std::move(f));
   }
@@ -1098,58 +1099,58 @@ EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
   return result;
 }
 
-void EvalContext::expand_tilde(WordSegment &leading_segment) const
+fn EvalContext::expand_tilde(WordSegment &leading_segment) const -> void
 {
   /* A tilde only expands when it is unquoted. An escaped or quoted tilde is a
      literal segment and stays as is. */
   if (!leading_segment.is_tilde_candidate()) return;
 
-  String &text = leading_segment.text;
+  let &text = leading_segment.text;
   if (text.empty() || text[0] != '~') return;
 
   /* TODO: There may be several separators supported. */
   /* Only a bare ~ or a ~/ prefix expands. ~user is left alone for now. */
   if (text.length() > 1 && text[1] != '/') return;
 
-  Maybe<Path> home = os::get_home_directory();
+  let home = os::get_home_directory();
   if (!home) throw Error{"Could not figure out home directory"};
 
   /* String has no in-place erase or insert, so the home path and the remainder
      after the tilde are joined into a fresh buffer and moved back. */
-  String expanded{heap_allocator()};
+  let expanded = String{heap_allocator()};
   expanded.append(home->text().view());
   expanded.append(text.substring(1));
   text = std::move(expanded);
 }
 
-ArrayList<String> EvalContext::expand_path(GlobField field)
+fn EvalContext::expand_path(GlobField field) -> ArrayList<String>
 {
-  const Allocator scratch = scratch_allocator();
+  let const scratch = scratch_allocator();
 
   /* Fast path. A field with no glob that actually matches paths is its own
      single result, so it skips the recursion, the directory scan, and every
      copy. A bare command word such as '[' lands here instead of scanning the
      current directory. */
-  const bool has_glob =
+  let const has_glob =
       m_enable_path_expansion &&
       first_active_glob(field.text.view(), field.glob_active).has_value();
 
   if (!has_glob) {
-    ArrayList<String> single{scratch};
+    let single = ArrayList<String>{scratch};
     single.push(std::move(field.text));
     return single;
   }
 
   /* The pattern is kept so a glob that matches None falls back to it, since
      the field moves into the recurse. */
-  String pattern{scratch};
+  let pattern = String{scratch};
   pattern.append(field.text.view());
 
-  ArrayList<GlobField> input{scratch};
+  let input = ArrayList<GlobField>{scratch};
   input.push(std::move(field));
-  ArrayList<GlobField> fields = expand_path_recurse(std::move(input));
+  let fields = expand_path_recurse(std::move(input));
 
-  ArrayList<String> values{scratch};
+  let values = ArrayList<String>{scratch};
   for (GlobField &f : fields)
     values.push(std::move(f.text));
 
@@ -1170,11 +1171,11 @@ namespace {
 /* The count of leading bytes that are digits in the given radix, so a value
    with trailing non-digit bytes reads only its numeric prefix the way base-0
    strtoll did. A hexadecimal scan accepts both letter cases. */
-usize count_leading_digits(StringView text, u32 radix)
+fn count_leading_digits(StringView text, u32 radix) -> usize
 {
   usize length = 0;
   while (length < text.length) {
-    const char c = text[length];
+    let const c = text[length];
     u32 digit;
     if (c >= '0' && c <= '9')
       digit = static_cast<u32>(c - '0');
@@ -1198,20 +1199,20 @@ usize count_leading_digits(StringView text, u32 radix)
    the old strtoll path produced after its throw was caught. The utils parsers
    take no base argument, so the radix is chosen here from the prefix and the
    matching parser runs on the scanned digit run. */
-i64 parse_arithmetic_operand(StringView text)
+fn parse_arithmetic_operand(StringView text) -> i64
 {
-  StringView body = text;
-  bool is_negative = false;
+  let body = text;
+  let is_negative = false;
   if (body.length > 0 && (body[0] == '+' || body[0] == '-')) {
     is_negative = body[0] == '-';
     body = body.substring(1);
   }
 
-  const ErrorOr<i64> parsed = [&]() -> ErrorOr<i64> {
+  let const parsed = [&]() -> ErrorOr<i64> {
     if (body.length >= 2 && body[0] == '0' &&
         (body[1] == 'x' || body[1] == 'X'))
     {
-      const StringView digits = body.substring(2);
+      let const digits = body.substring(2);
       return utils::parse_hexadecimal_integer(
           digits.substring_of_length(0, count_leading_digits(digits, 16)));
     }
@@ -1234,57 +1235,57 @@ struct ArithmeticParser
   StringView source;
   usize pos;
 
-  [[noreturn]] void fail(StringView message)
+  [[noreturn]] fn fail(StringView message) -> void
   {
     throw Error{"Arithmetic: " + message};
   }
 
-  void skip_spaces()
+  fn skip_spaces() -> void
   {
     while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
                                    source[pos] == '\n' || source[pos] == '\r'))
       pos++;
   }
 
-  bool starts_with(StringView op)
+  fn starts_with(StringView op) -> bool
   {
     skip_spaces();
     return pos + op.length <= source.length &&
            source.substring_of_length(pos, op.length) == op;
   }
 
-  bool consume(StringView op)
+  fn consume(StringView op) -> bool
   {
     if (!starts_with(op)) return false;
     pos += op.length;
     return true;
   }
 
-  i64 read_variable_value(StringView name)
+  fn read_variable_value(StringView name) -> i64
   {
     /* A plain shell variable, the common operand, reads its digits straight
        from the stored value with no copy. The operand parser stops at the first
        non-digit and reads a non-numeric value as zero, which matches the old
        strtoll path. */
-    if (const String *stored = context.lookup_shell_variable(name)) {
+    if (let const *stored = context.lookup_shell_variable(name)) {
       if (stored->size() == 0) return 0;
       return parse_arithmetic_operand(stored->view());
     }
 
-    String value = context.get_variable_value(name).value_or(String{});
+    let value = context.get_variable_value(name).value_or(String{});
     if (value.empty()) return 0;
     return parse_arithmetic_operand(value.view());
   }
 
-  i64 parse()
+  fn parse() -> i64
   {
-    const i64 result = parse_assignment();
+    let const result = parse_assignment();
     skip_spaces();
     if (pos != source.length) fail("unexpected trailing characters");
     return result;
   }
 
-  i64 apply_compound(i64 lhs, i64 rhs, char kind)
+  fn apply_compound(i64 lhs, i64 rhs, char kind) -> i64
   {
     switch (kind) {
     case '+': return lhs + rhs;
@@ -1305,14 +1306,14 @@ struct ArithmeticParser
     }
   }
 
-  i64 parse_assignment()
+  fn parse_assignment() -> i64
   {
     /* An assignment has a bare variable name on the left, so try it and rewind
        when the name is not followed by an assignment operator. */
-    const usize save = pos;
+    let const save = pos;
     skip_spaces();
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
-      String name{};
+      let name = String{};
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         name += source[pos++];
 
@@ -1335,8 +1336,8 @@ struct ArithmeticParser
       };
       for (const auto &[op, kind] : compound_operators) {
         if (consume(op)) {
-          const i64 rhs = parse_assignment();
-          const i64 result =
+          let const rhs = parse_assignment();
+          let const result =
               apply_compound(read_variable_value(name), rhs, kind);
           context.set_shell_variable(name, utils::integer_to_string(result));
           return result;
@@ -1344,7 +1345,7 @@ struct ArithmeticParser
       }
       if (starts_with("=") && !starts_with("==")) {
         consume("=");
-        const i64 rhs = parse_assignment();
+        let const rhs = parse_assignment();
         context.set_shell_variable(name, utils::integer_to_string(rhs));
         return rhs;
       }
@@ -1353,37 +1354,37 @@ struct ArithmeticParser
     return parse_ternary();
   }
 
-  i64 parse_ternary()
+  fn parse_ternary() -> i64
   {
-    const i64 condition = parse_logical_or();
+    let const condition = parse_logical_or();
     if (consume("?")) {
-      const i64 if_true = parse_assignment();
+      let const if_true = parse_assignment();
       if (!consume(":")) fail("expected ':' in a conditional");
-      const i64 if_false = parse_ternary();
+      let const if_false = parse_ternary();
       return condition != 0 ? if_true : if_false;
     }
     return condition;
   }
 
-  i64 parse_logical_or()
+  fn parse_logical_or() -> i64
   {
-    i64 lhs = parse_logical_and();
+    let lhs = parse_logical_and();
     while (consume("||"))
       lhs = (lhs != 0 || parse_logical_and() != 0) ? 1 : 0;
     return lhs;
   }
 
-  i64 parse_logical_and()
+  fn parse_logical_and() -> i64
   {
-    i64 lhs = parse_bitwise_or();
+    let lhs = parse_bitwise_or();
     while (consume("&&"))
       lhs = (lhs != 0 && parse_bitwise_or() != 0) ? 1 : 0;
     return lhs;
   }
 
-  i64 parse_bitwise_or()
+  fn parse_bitwise_or() -> i64
   {
-    i64 lhs = parse_bitwise_xor();
+    let lhs = parse_bitwise_xor();
     while (starts_with("|") && !starts_with("||")) {
       consume("|");
       lhs |= parse_bitwise_xor();
@@ -1391,17 +1392,17 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_bitwise_xor()
+  fn parse_bitwise_xor() -> i64
   {
-    i64 lhs = parse_bitwise_and();
+    let lhs = parse_bitwise_and();
     while (consume("^"))
       lhs ^= parse_bitwise_and();
     return lhs;
   }
 
-  i64 parse_bitwise_and()
+  fn parse_bitwise_and() -> i64
   {
-    i64 lhs = parse_equality();
+    let lhs = parse_equality();
     while (starts_with("&") && !starts_with("&&")) {
       consume("&");
       lhs &= parse_equality();
@@ -1409,9 +1410,9 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_equality()
+  fn parse_equality() -> i64
   {
-    i64 lhs = parse_relational();
+    let lhs = parse_relational();
     for (;;) {
       if (consume("=="))
         lhs = (lhs == parse_relational()) ? 1 : 0;
@@ -1423,9 +1424,9 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_relational()
+  fn parse_relational() -> i64
   {
-    i64 lhs = parse_shift();
+    let lhs = parse_shift();
     for (;;) {
       if (consume("<="))
         lhs = (lhs <= parse_shift()) ? 1 : 0;
@@ -1443,9 +1444,9 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_shift()
+  fn parse_shift() -> i64
   {
-    i64 lhs = parse_additive();
+    let lhs = parse_additive();
     for (;;) {
       if (consume("<<"))
         lhs <<= parse_additive();
@@ -1457,9 +1458,9 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_additive()
+  fn parse_additive() -> i64
   {
-    i64 lhs = parse_multiplicative();
+    let lhs = parse_multiplicative();
     for (;;) {
       if (consume("+"))
         lhs += parse_multiplicative();
@@ -1471,18 +1472,18 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_multiplicative()
+  fn parse_multiplicative() -> i64
   {
-    i64 lhs = parse_unary();
+    let lhs = parse_unary();
     for (;;) {
       if (consume("*"))
         lhs *= parse_unary();
       else if (consume("/")) {
-        const i64 divisor = parse_unary();
+        let const divisor = parse_unary();
         if (divisor == 0) fail("division by zero");
         lhs /= divisor;
       } else if (consume("%")) {
-        const i64 divisor = parse_unary();
+        let const divisor = parse_unary();
         if (divisor == 0) fail("division by zero");
         lhs %= divisor;
       } else
@@ -1491,7 +1492,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  i64 parse_unary()
+  fn parse_unary() -> i64
   {
     if (consume("!")) return parse_unary() == 0 ? 1 : 0;
     if (consume("~")) return ~parse_unary();
@@ -1500,11 +1501,11 @@ struct ArithmeticParser
     return parse_primary();
   }
 
-  i64 parse_primary()
+  fn parse_primary() -> i64
   {
     skip_spaces();
     if (consume("(")) {
-      const i64 value = parse_assignment();
+      let const value = parse_assignment();
       if (!consume(")")) fail("expected ')'");
       return value;
     }
@@ -1514,7 +1515,7 @@ struct ArithmeticParser
          that base-0 strtoll reported. The utils parsers take no base and report
          no consumed length, so the run is measured here and the matching parser
          runs on the scanned slice. */
-      const StringView rest = source.substring(pos);
+      let const rest = source.substring(pos);
       usize consumed = 0;
       if (rest.length >= 2 && rest[0] == '0' &&
           (rest[1] == 'x' || rest[1] == 'X'))
@@ -1524,13 +1525,13 @@ struct ArithmeticParser
       else
         consumed = count_leading_digits(rest, 10);
 
-      const i64 value =
+      let const value =
           parse_arithmetic_operand(rest.substring_of_length(0, consumed));
       pos += consumed;
       return value;
     }
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
-      String name{};
+      let name = String{};
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         name += source[pos++];
       return read_variable_value(name);
@@ -1541,7 +1542,7 @@ struct ArithmeticParser
 
 } /* namespace */
 
-i64 EvalContext::evaluate_arithmetic(StringView expression)
+fn EvalContext::evaluate_arithmetic(StringView expression) -> i64
 {
   /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
      arithmetic becomes its value before the expression is parsed. A bare name
@@ -1551,25 +1552,25 @@ i64 EvalContext::evaluate_arithmetic(StringView expression)
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
-    ArithmeticParser parser{*this, expression, 0};
+    let parser = ArithmeticParser{*this, expression, 0};
     return parser.parse();
   }
 
   /* The expanded word owns the bytes the parser views, so it outlives the
      parser below. */
-  const String expanded_word = expand_modifier_word(expression);
-  ArithmeticParser parser{*this, expanded_word.view(), 0};
+  let const expanded_word = expand_modifier_word(expression);
+  let parser = ArithmeticParser{*this, expanded_word.view(), 0};
   return parser.parse();
 }
 
-ArrayList<GlobField> EvalContext::expand_word(const Word &word)
+fn EvalContext::expand_word(const Word &word) -> ArrayList<GlobField>
 {
-  const Allocator scratch = scratch_allocator();
+  let const scratch = scratch_allocator();
 
   /* Only copy the segments when a leading tilde must be rewritten. The common
      word has no tilde and reads its segments in place. */
-  const ArrayList<WordSegment> *segments = &word.segments;
-  ArrayList<WordSegment> tilde_expanded_segments{heap_allocator()};
+  let const *segments = &word.segments;
+  let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
   if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.empty() &&
       word.segments.front().text.first_character() == '~')
@@ -1579,9 +1580,9 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
     segments = &tilde_expanded_segments;
   }
 
-  ArrayList<GlobField> fields{scratch};
-  GlobField current{scratch};
-  bool has_current = false;
+  let fields = ArrayList<GlobField>{scratch};
+  let current = GlobField{scratch};
+  let has_current = false;
 
   auto flush = [&]() {
     if (has_current) {
@@ -1617,7 +1618,7 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
   };
 
   for (const WordSegment &segment : *segments) {
-    const StringView segment_text{segment.text.data(), segment.text.size()};
+    let const segment_text = StringView{segment.text.data(), segment.text.size()};
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
@@ -1638,8 +1639,8 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
         }
         break;
       }
-      const String value{heap_allocator(),
-                         apply_parameter_expansion(segment.text.view())};
+      let const value = String{heap_allocator(),
+                               apply_parameter_expansion(segment.text.view())};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1648,15 +1649,15 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
         append_split_run(value, true);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
-      const String output{heap_allocator(),
-                          capture_command_substitution(segment.text)};
+      let const output = String{heap_allocator(),
+                                capture_command_substitution(segment.text)};
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
         append_split_run(output, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      const String value{
+      let const value = String{
           heap_allocator(),
           utils::integer_to_string(evaluate_arithmetic(segment.text.view()))};
       if (segment.is_in_double_quotes)
@@ -1672,12 +1673,12 @@ ArrayList<GlobField> EvalContext::expand_word(const Word &word)
   return fields;
 }
 
-String EvalContext::expand_word_for_assignment(const Word &word)
+fn EvalContext::expand_word_for_assignment(const Word &word) -> String
 {
   /* Only copy the segments when a leading tilde must be rewritten, so the
      common assignment reads its segments in place with no per-command copy. */
-  const ArrayList<WordSegment> *segments = &word.segments;
-  ArrayList<WordSegment> tilde_expanded_segments{heap_allocator()};
+  let const *segments = &word.segments;
+  let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
   if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.empty() &&
       word.segments.front().text.first_character() == '~')
@@ -1687,9 +1688,9 @@ String EvalContext::expand_word_for_assignment(const Word &word)
     segments = &tilde_expanded_segments;
   }
 
-  String result{heap_allocator()};
+  let result = String{heap_allocator()};
   for (const WordSegment &segment : *segments) {
-    const StringView segment_text = segment.text.view();
+    let const segment_text = segment.text.view();
     if (segment.kind == WordSegment::Kind::VariableReference)
       result += apply_parameter_expansion(segment_text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
@@ -1702,35 +1703,35 @@ String EvalContext::expand_word_for_assignment(const Word &word)
   return result;
 }
 
-String EvalContext::capture_command_substitution(const String &source)
+fn EvalContext::capture_command_substitution(const String &source) -> String
 {
   /* Parse the inner command into the active parse arena. It coexists with the
      outer tree and is reclaimed when the arena resets. */
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
-  Parser parser{
+  let parser = Parser{
       Lexer{String{source.view()}, *AST_ARENA}
   };
-  std::unique_ptr<Expression> ast = parser.construct_ast();
+  let ast = parser.construct_ast();
   SHIT_ASSERT(ast != nullptr);
 
   /* A cd or an assignment inside the substitution must not leak. */
-  EvalStateSnapshot snapshot = snapshot_state();
+  let snapshot = snapshot_state();
 
-  const Maybe<os::Pipe> pipe = os::make_pipe();
+  let const pipe = os::make_pipe();
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
 
   /* Drain the read end on a thread so output larger than the pipe buffer cannot
      deadlock the commands writing into it. */
-  String captured{heap_allocator()};
-  std::thread reader([&captured, read_fd = pipe->in]() {
+  let captured = String{heap_allocator()};
+  let reader = std::thread([&captured, read_fd = pipe->in]() {
     /* A failed allocation here must not escape the thread and call terminate.
      */
     try {
       char buffer[4096];
       for (;;) {
-        Maybe<usize> n = os::read_fd(read_fd, buffer, sizeof(buffer));
+        let n = os::read_fd(read_fd, buffer, sizeof(buffer));
         if (!n.has_value() || *n == 0) break;
         captured.append(StringView{buffer, static_cast<usize>(*n)});
       }
@@ -1738,11 +1739,11 @@ String EvalContext::capture_command_substitution(const String &source)
   });
 
   shit::flush();
-  const os::descriptor saved = os::redirect_stdout(pipe->out);
+  let const saved = os::redirect_stdout(pipe->out);
 
   /* The inner commands write to the pipe, not the terminal, so suppress the
      interactive title updates while the substitution runs. */
-  const bool was_interactive = m_shell_is_interactive;
+  let const was_interactive = m_shell_is_interactive;
   m_shell_is_interactive = false;
 
   /* Run the inner command, then always tear down, even on an error. A break,
@@ -1780,8 +1781,8 @@ String EvalContext::capture_command_substitution(const String &source)
   return captured;
 }
 
-i32 EvalContext::run_source(StringView source, StringView origin,
-                            bool consume_return)
+fn EvalContext::run_source(StringView source, StringView origin,
+                           bool consume_return) -> i32
 {
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
@@ -1793,7 +1794,7 @@ i32 EvalContext::run_source(StringView source, StringView origin,
      marked with its origin. Otherwise the caller would print the caret against
      the wrong line. */
   try {
-    Parser parser{
+    let parser = Parser{
         Lexer{String{source}, *AST_ARENA}
     };
 
@@ -1801,7 +1802,7 @@ i32 EvalContext::run_source(StringView source, StringView origin,
        call and a control-flow exception thrown inside still leaves it owned.
        The destructor runs at the next top-level command, freeing the node
        members while the arena storage is reclaimed by the reset. */
-    Expression *const ast = parser.construct_ast().release();
+    let const ast = parser.construct_ast().release();
     SHIT_ASSERT(ast != nullptr);
     m_retained_source_asts.push(ast);
 
@@ -1810,11 +1811,11 @@ i32 EvalContext::run_source(StringView source, StringView origin,
        call returns and the jump propagates to the caller. The pointer below
        indexes this retained buffer, which survives until clear_retained_sources
        runs at the next top-level command. */
-    String *const retained_source = new String{source};
+    let const retained_source = new String{source};
     m_retained_sources.push(retained_source);
 
-    const String *const previous_source = m_current_source;
-    const String previous_origin = m_current_origin;
+    let const previous_source = m_current_source;
+    let const previous_origin = m_current_origin;
     set_current_source(retained_source, String{origin});
     SHIT_DEFER { set_current_source(previous_source, previous_origin); };
 
@@ -1826,7 +1827,7 @@ i32 EvalContext::run_source(StringView source, StringView origin,
     if (consume_return && has_pending_control_flow() &&
         pending_control_flow().kind == ControlFlow::Kind::Return)
     {
-      const i32 source_status = static_cast<i32>(pending_control_flow().value);
+      let const source_status = static_cast<i32>(pending_control_flow().value);
       clear_control_flow();
       set_last_exit_status(source_status);
       return source_status;
@@ -1848,7 +1849,7 @@ i32 EvalContext::run_source(StringView source, StringView origin,
   }
 }
 
-void EvalContext::clear_retained_sources()
+fn EvalContext::clear_retained_sources() -> void
 {
   for (Expression *ast : m_retained_source_asts)
     delete ast;
@@ -1864,37 +1865,37 @@ void EvalContext::clear_retained_sources()
   m_current_origin.clear();
 }
 
-void EvalContext::retain_ast(Expression *ast)
+fn EvalContext::retain_ast(Expression *ast) -> void
 {
   m_retained_source_asts.push(ast);
 }
 
-String EvalContext::expand_heredoc_body(StringView body)
+fn EvalContext::expand_heredoc_body(StringView body) -> String
 {
   /* A heredoc body keeps its quote characters literally. */
   return expand_modifier_word(body, false);
 }
 
-ArrayList<String>
-EvalContext::process_args(const ArrayList<const Token *> &args)
+fn EvalContext::process_args(const ArrayList<const Token *> &args)
+    -> ArrayList<String>
 {
   /* The expansion fields live on the scratch arena only until the heap argument
      vector is built, so the arena is released back to here on return. The mark
      nests, so a command substitution inside one of these words reclaims only
      its own fields and leaves this word's in-progress fields alone. */
-  BumpArena::Mark scratch_mark = m_scratch_arena.mark();
+  let scratch_mark = m_scratch_arena.mark();
   SHIT_DEFER { m_scratch_arena.release(scratch_mark); };
 
-  ArrayList<String> expanded_args{};
+  let expanded_args = ArrayList<String>{};
   expanded_args.reserve(args.size());
 
   for (const Token *t : args) {
-    const SourceLocation l = t->source_location();
+    let const l = t->source_location();
     try {
       /* A word token is expanded in place. Any other token is wrapped as one
          unquoted literal word, which is the only case that needs a temporary.
        */
-      Word fallback_word{};
+      let fallback_word = Word{};
       const Word *word = nullptr;
       if (t->kind() == Token::Kind::Word) {
         word = &static_cast<const tokens::WordToken *>(t)->word();
@@ -1903,14 +1904,13 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
            ordinary word. Rebuild it as the literal key, an equals sign, and the
            value segments, so the value still expands instead of staying
            literal. */
-        const tokens::Assignment *const a =
-            static_cast<const tokens::Assignment *>(t);
+        let const a = static_cast<const tokens::Assignment *>(t);
         SHIT_ASSERT(a != nullptr);
-        String key_literal{StringView{a->key()}};
+        let key_literal = String{StringView{a->key()}};
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
                                                 std::move(key_literal), false});
-        const Word &value = a->value_word();
+        let const &value = a->value_word();
         for (const WordSegment &value_segment : value.segments)
           fallback_word.segments.push(value_segment);
         word = &fallback_word;
@@ -1936,7 +1936,7 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
      enclosing subshell, so the top shell shows '+', a substitution '++', and a
      nested one '+++'. */
   if (should_echo_expanded()) {
-    String trace{};
+    let trace = String{};
     for (usize i = 0; i < m_subshell_depth + 1; i++)
       trace.push('+');
     trace.push(' ');
@@ -1953,24 +1953,24 @@ ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
     : m_kind(std::move(kind)), m_location(location), m_args(args)
 {}
 
-const SourceLocation &ExecContext::source_location() const
+fn ExecContext::source_location() const -> const SourceLocation &
 {
   return m_location;
 }
 
-const String &ExecContext::program() const { return m_args[0]; }
+fn ExecContext::program() const -> const String & { return m_args[0]; }
 
-const ArrayList<String> &ExecContext::args() const { return m_args; }
+fn ExecContext::args() const -> const ArrayList<String> & { return m_args; }
 
-bool ExecContext::is_builtin() const { return m_kind.is_builtin(); }
+fn ExecContext::is_builtin() const -> bool { return m_kind.is_builtin(); }
 
-const Path &ExecContext::program_path() const
+fn ExecContext::program_path() const -> const Path &
 {
   SHIT_ASSERT(!is_builtin());
   return m_kind.program_path;
 }
 
-void ExecContext::close_fds()
+fn ExecContext::close_fds() -> void
 {
   if (in_fd) {
     os::close_fd(*in_fd);
@@ -1986,13 +1986,13 @@ void ExecContext::close_fds()
   }
 }
 
-const Builtin::Kind &ExecContext::builtin_kind() const
+fn ExecContext::builtin_kind() const -> const Builtin::Kind &
 {
   SHIT_ASSERT(is_builtin());
   return m_kind.builtin_kind;
 }
 
-void ExecContext::print_to_stdout(StringView s) const
+fn ExecContext::print_to_stdout(StringView s) const -> void
 {
   if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data, s.length).has_value())
   {
@@ -2001,13 +2001,13 @@ void ExecContext::print_to_stdout(StringView s) const
   }
 }
 
-ExecContext ExecContext::make_from(SourceLocation location,
-                                   const ArrayList<String> &args)
+fn ExecContext::make_from(SourceLocation location,
+                          const ArrayList<String> &args) -> ExecContext
 {
   /* Make sure we always include at least one argument, the program path. */
   SHIT_ASSERT(args.size() > 0);
 
-  const String &program = args[0];
+  let const &program = args[0];
 
   Maybe<Builtin::Kind> bk;
   Maybe<Path> p;
@@ -2016,7 +2016,7 @@ ExecContext ExecContext::make_from(SourceLocation location,
     bk = search_builtin(std::string_view{program.c_str(), program.size()});
 
     if (!bk) {
-      ArrayList<Path> ps = utils::search_program_path(program.view());
+      let ps = utils::search_program_path(program.view());
       if (ps.size() > 0) p = std::move(ps[0]);
     }
   } else {
@@ -2040,9 +2040,8 @@ ExecContext ExecContext::make_from(SourceLocation location,
   return {location, std::move(kind), args};
 }
 
-ExecContext ExecContext::from_resolved(SourceLocation location,
-                                       ResolvedCommand kind,
-                                       const ArrayList<String> &args)
+fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
+                              const ArrayList<String> &args) -> ExecContext
 {
   SHIT_ASSERT(args.size() > 0);
   return {location, std::move(kind), args};
@@ -2052,10 +2051,10 @@ SourceLocation::SourceLocation(usize position, usize length)
     : m_position(position), m_length(length)
 {}
 
-usize SourceLocation::position() const { return m_position; }
+fn SourceLocation::position() const -> usize { return m_position; }
 
-usize SourceLocation::length() const { return m_length; }
+fn SourceLocation::length() const -> usize { return m_length; }
 
-void SourceLocation::add_length(usize n) { m_length += n; }
+fn SourceLocation::add_length(usize n) -> void { m_length += n; }
 
 } /* namespace shit */

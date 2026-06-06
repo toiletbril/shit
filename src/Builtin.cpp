@@ -12,9 +12,9 @@
 
 namespace shit {
 
-void show_builtin_help_impl(const ExecContext &ec,
-                            const std::vector<std::string> &hs,
-                            const ArrayList<Flag *> &fl)
+fn show_builtin_help_impl(const ExecContext &ec,
+                          const std::vector<std::string> &hs,
+                          const ArrayList<Flag *> &fl) -> void
 {
   String help_text{};
   help_text += StringView{make_synopsis(
@@ -25,7 +25,7 @@ void show_builtin_help_impl(const ExecContext &ec,
   ec.print_to_stdout(help_text);
 }
 
-Maybe<Builtin::Kind> search_builtin(std::string_view builtin_name)
+fn search_builtin(std::string_view builtin_name) -> Maybe<Builtin::Kind>
 {
   return BUILTINS.find(StringView{builtin_name.data(), builtin_name.size()});
 }
@@ -39,7 +39,7 @@ struct BuiltinHelp
   String description;
 };
 
-static BuiltinHelp builtin_help(Builtin::Kind kind)
+static fn builtin_help(Builtin::Kind kind) -> BuiltinHelp
 {
   switch (kind) {
   case Builtin::Kind::Echo:
@@ -144,7 +144,7 @@ static BuiltinHelp builtin_help(Builtin::Kind kind)
   return {"", ""};
 }
 
-i32 execute_builtin(ExecContext &&ec, EvalContext &cxt)
+fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
 {
   /* Every builtin answers --help with its synopsis and a short explanation. */
   if (ec.args().size() > 1 && ec.args()[1] == "--help") {
