@@ -222,10 +222,73 @@ struct String
     m_capacity = new_capacity;
   }
 
+  /* The byte buffer, always null terminated. */
+  [[nodiscard]] const char *
+  data() const
+  {
+    return c_str();
+  }
+  [[nodiscard]] usize
+  length() const
+  {
+    return m_length;
+  }
+  [[nodiscard]] char
+  back() const
+  {
+    return m_data[m_length - 1];
+  }
+
+  void
+  append(char c)
+  {
+    push(c);
+  }
+  String &
+  operator+=(StringView other)
+  {
+    append(other);
+    return *this;
+  }
+  String &
+  operator+=(char c)
+  {
+    push(c);
+    return *this;
+  }
+
+  /* Search and slice forward to the view, so the owned string answers the same
+     questions a std::string does without exposing its buffer. */
+  [[nodiscard]] Maybe<usize>
+  find_character(char wanted) const
+  {
+    return view().find_character(wanted);
+  }
+  [[nodiscard]] StringView
+  substring(usize start) const
+  {
+    return view().substring(start);
+  }
+  [[nodiscard]] StringView
+  substring_of_length(usize start, usize count) const
+  {
+    return view().substring_of_length(start, count);
+  }
+  [[nodiscard]] bool
+  starts_with(StringView prefix) const
+  {
+    return view().starts_with(prefix);
+  }
+
   [[nodiscard]] bool
   operator==(StringView other) const
   {
     return view() == other;
+  }
+  [[nodiscard]] bool
+  operator!=(StringView other) const
+  {
+    return !(view() == other);
   }
 
   /* Byte order, so a sort matches the C locale collating order. */
