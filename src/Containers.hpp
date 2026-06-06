@@ -257,6 +257,9 @@ private:
 template <class T>
 struct ArrayList
 {
+  /* A default list is heap-backed and empty, so it can serve as the value a
+     HashMap slot holds before a real list is placed into it. */
+  ArrayList() : m_allocator(heap_allocator()) {}
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
 
   ArrayList(const ArrayList &other) : m_allocator(other.m_allocator)
@@ -417,10 +420,59 @@ private:
   usize m_capacity{0};
 };
 
+/* A short byte string packed into a fixed sixteen-byte block held in two machine
+   words. A lookup compares two integers rather than walking bytes, which the
+   compiler lowers to a couple of wide register compares, and the layout is
+   contiguous so a later pass can scan many keys with one SIMD instruction. A key
+   longer than sixteen bytes keeps only its first sixteen bytes here and relies on
+   a full compare to disambiguate. */
+struct PackedStringKey
+{
+  u64 low_word{0};
+  u64 high_word{0};
+
+  /* Pack a NUL-terminated literal at compile time, so a static table entry
+     becomes a constant with no runtime initialization. */
+  static constexpr PackedStringKey
+  from_literal(const char *text)
+  {
+    PackedStringKey key{};
+    usize i = 0;
+    for (; text[i] != '\0' && i < 8; i++)
+      key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
+    for (; text[i] != '\0' && i < 16; i++)
+      key.high_word |= static_cast<u64>(static_cast<u8>(text[i]))
+                       << (8 * (i - 8));
+    return key;
+  }
+
+  /* Pack the first sixteen bytes of a view at lookup time. */
+  static PackedStringKey
+  from_view(StringView text)
+  {
+    PackedStringKey key{};
+    usize count = text.size() < 16 ? text.size() : 16;
+    for (usize i = 0; i < count && i < 8; i++)
+      key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
+    for (usize i = 8; i < count; i++)
+      key.high_word |= static_cast<u64>(static_cast<u8>(text[i]))
+                       << (8 * (i - 8));
+    return key;
+  }
+
+  [[nodiscard]] bool
+  operator==(const PackedStringKey &other) const
+  {
+    return low_word == other.low_word && high_word == other.high_word;
+  }
+};
+
 /* An open-addressing hash table from a string key to a Value over an explicit
    allocator, the std::unordered_map replacement. The value defaults to String
    for the variable store and the traps, and takes a pointer for the function
-   table. Linear probing, power-of-two capacity, grows past a load of three
+   table. Each slot caches a PackedStringKey of the key's first sixteen bytes, so
+   a probe rejects a mismatch with a two-word compare before the full byte
+   compare. Linear probing, power-of-two capacity, grows past a load of three
    quarters, and counts tombstones toward the load so an insert is never
    dropped. */
 template <class Value = String>
@@ -487,12 +539,17 @@ struct HashMap
   find(StringView key) const
   {
     if (m_capacity == 0) return nullptr;
+    PackedStringKey wanted = PackedStringKey::from_view(key);
     usize mask = m_capacity - 1;
     usize i = hash_bytes(key) & mask;
     for (usize probe = 0; probe < m_capacity; probe++) {
       const Slot &slot = m_slots[i];
       if (slot.state == Slot::Empty) return nullptr;
-      if (slot.state == Slot::Occupied && slot.key == key) return &slot.value;
+      /* The packed compare rejects a mismatch in two words before the byte
+         compare runs, and the byte compare confirms a key past sixteen bytes. */
+      if (slot.state == Slot::Occupied && slot.packed == wanted &&
+          slot.key == key)
+        return &slot.value;
       i = (i + 1) & mask;
     }
     return nullptr;
@@ -503,6 +560,19 @@ struct HashMap
   set(StringView key, Value value)
   {
     set_value(key, std::move(value));
+  }
+
+  /* The value for a key, inserting the supplied default when the key is absent,
+     then returning a mutable reference. The caller passes the default already
+     built with the right allocator. The reference is valid until the next set
+     that grows the table. */
+  Value &
+  get_or_create(StringView key, Value default_value)
+  {
+    if (const Value *existing = find(key))
+      return *const_cast<Value *>(existing);
+    set_value(key, std::move(default_value));
+    return *const_cast<Value *>(find(key));
   }
 
   /* Store a String value built from a view, the form the variable store and the
@@ -564,6 +634,7 @@ private:
       Tombstone,
     };
     State state{Empty};
+    PackedStringKey packed{};
     String key{};
     Value value{};
   };
@@ -577,12 +648,15 @@ private:
     if (m_count + m_tombstones + 1 > (m_capacity >> 1) + (m_capacity >> 2))
       rehash(m_capacity == 0 ? 16 : m_capacity * 2);
 
+    PackedStringKey wanted = PackedStringKey::from_view(key);
     usize mask = m_capacity - 1;
     usize i = hash_bytes(key) & mask;
     usize first_tombstone = m_capacity;
     for (usize probe = 0; probe < m_capacity; probe++) {
       Slot &slot = m_slots[i];
-      if (slot.state == Slot::Occupied && slot.key == key) {
+      if (slot.state == Slot::Occupied && slot.packed == wanted &&
+          slot.key == key)
+      {
         slot.value = std::move(value);
         return;
       }
@@ -610,6 +684,7 @@ private:
   {
     Slot &slot = m_slots[index];
     slot.key = String{m_allocator, key};
+    slot.packed = PackedStringKey::from_view(key);
     slot.value = std::move(value);
     slot.state = Slot::Occupied;
     m_count++;
@@ -689,54 +764,6 @@ struct HashSet
 
 private:
   HashMap<None> m_map;
-};
-
-/* A short byte string packed into a fixed sixteen-byte block held in two machine
-   words. A static lookup table compares two integers per entry rather than
-   walking bytes, which the compiler lowers to a couple of wide register
-   compares. A key longer than sixteen bytes does not fit and never matches,
-   which suits the keyword and builtin tables whose longest entry is eight
-   bytes. */
-struct PackedStringKey
-{
-  u64 low_word{0};
-  u64 high_word{0};
-
-  /* Pack a NUL-terminated literal at compile time, so the table entries become
-     constants with no runtime initialization. */
-  static constexpr PackedStringKey
-  from_literal(const char *text)
-  {
-    PackedStringKey key{};
-    usize i = 0;
-    for (; text[i] != '\0' && i < 8; i++)
-      key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
-    for (; text[i] != '\0' && i < 16; i++)
-      key.high_word |= static_cast<u64>(static_cast<u8>(text[i]))
-                       << (8 * (i - 8));
-    return key;
-  }
-
-  /* Pack a view at lookup time. A view longer than sixteen bytes is the caller's
-     responsibility to reject, since it cannot match any table key. */
-  static PackedStringKey
-  from_view(StringView text)
-  {
-    PackedStringKey key{};
-    usize count = text.size() < 16 ? text.size() : 16;
-    for (usize i = 0; i < count && i < 8; i++)
-      key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
-    for (usize i = 8; i < count; i++)
-      key.high_word |= static_cast<u64>(static_cast<u8>(text[i]))
-                       << (8 * (i - 8));
-    return key;
-  }
-
-  [[nodiscard]] bool
-  operator==(const PackedStringKey &other) const
-  {
-    return low_word == other.low_word && high_word == other.high_word;
-  }
 };
 
 /* A frozen map from a short byte string to a value, stored in static storage as

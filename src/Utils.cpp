@@ -16,7 +16,6 @@
 #include <filesystem>
 #include <list>
 #include <optional>
-#include <unordered_map>
 
 /* FIXME: std::filesystem::exists() is VERY slow. */
 
@@ -384,30 +383,24 @@ quit(i32 code, bool should_goodbye)
   std::exit(actual_code);
 }
 
-using DirIndex = usize;
-
-static std::vector<std::string> PATH_CACHE_DIRS{};
-
-/* Program name without extension maps into indexes i and j for
- * PATH_DIRS and PATH_EXTENSIONS, so the path can be recreated as:
- * `PATH_DIRS[i] / (program_name + PATH_EXTENSIONS[j])` */
-static std::unordered_map<std::string,
-                          std::list<std::tuple<DirIndex, os::ExtIndex>>>
-    PATH_CACHE{};
+/* The program name without its extension maps to every absolute path where it
+   was found. The resolved path is stored directly, so a lookup returns it
+   without rebuilding from a directory index. The resizable map carries a packed
+   key per slot, so a lookup rejects a mismatch in two words before the byte
+   compare. */
+static HashMap<ArrayList<String>> PATH_CACHE{heap_allocator()};
 
 static std::optional<std::string> MAYBE_PATH =
     os::get_environment_variable("PATH");
 
-template <class T>
-static usize
-cache_path_into(std::vector<T> &cache, T &&p)
+/* Append one resolved absolute path under a program name, creating the list on
+   the first hit. */
+static void
+cache_resolved_path(StringView name, const std::string &full_path)
 {
-  usize n = find_pos_in_vec(cache, p);
-  if (n == std::string::npos) {
-    n = cache.size();
-    cache.push_back(p);
-  }
-  return n;
+  PATH_CACHE.get_or_create(name, ArrayList<String>{})
+      .push(String{heap_allocator(),
+                   StringView{full_path.data(), full_path.size()}});
 }
 
 void
@@ -415,7 +408,6 @@ clear_path_map()
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
-  PATH_CACHE_DIRS.clear();
 }
 
 /* Split PATH into its directory components. The last component carries no
@@ -445,21 +437,20 @@ initialize_path_map()
 {
   if (!MAYBE_PATH) return;
 
-  for (std::string &dir_string : split_path_dirs(*MAYBE_PATH)) {
+  for (const std::string &dir_string : split_path_dirs(*MAYBE_PATH)) {
     try {
       /* What the heck? A path in PATH that does not exist? Are you a
        * Windows user? */
       if (std::filesystem::exists(dir_string)) {
-        std::filesystem::directory_iterator di{dir_string};
-
-        usize dir_index =
-            cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-
-        /* Initialize every file in the directory. */
-        for (const std::filesystem::directory_entry &f : di) {
-          std::string fs = f.path().filename().string();
-          PATH_CACHE[fs].push_back(
-              {dir_index, os::erase_extension_and_get_its_index(fs)});
+        /* Cache every file in the directory under its name without an omitted
+           extension, pointing at its full path. */
+        for (const std::filesystem::directory_entry &f :
+             std::filesystem::directory_iterator{dir_string})
+        {
+          std::string name = f.path().filename().string();
+          os::erase_extension_and_get_its_index(name);
+          cache_resolved_path(StringView{name.data(), name.size()},
+                              f.path().string());
         }
       }
     } catch (const std::filesystem::filesystem_error &e) {
@@ -499,26 +490,13 @@ search_and_cache(const std::string &program_name)
 
     if (!is_valid_dir) continue;
 
-    std::filesystem::path dir_path{dir_string};
+    /* The cache key is the program name without an omitted extension, the same
+       key the lookup uses. */
+    std::string key{program_name};
+    os::erase_extension_and_get_its_index(key);
 
-    /* Cache the directory if it was not present before. */
-    bool found = false;
-    usize dir_index = 0;
-
-    for (usize dir_i = 0; dir_i < PATH_CACHE_DIRS.size(); dir_i++) {
-      if (PATH_CACHE_DIRS[dir_i] == dir_string) {
-        found = true;
-        dir_index = dir_i;
-        break;
-      }
-    }
-
-    if (!found) {
-      dir_index = cache_path_into(PATH_CACHE_DIRS, std::move(dir_string));
-    }
-
-    /* Actually try to find the file. */
-    std::filesystem::path full_path = dir_path / program_name;
+    std::filesystem::path full_path =
+        std::filesystem::path{dir_string} / program_name;
     std::string full_path_str = full_path.string();
 
     /* This file already has an extesion specified? */
@@ -533,12 +511,13 @@ search_and_cache(const std::string &program_name)
             full_path.string() + os::OMITTED_SUFFIXES[ext_index];
 
         if (std::filesystem::exists(try_path)) {
-          PATH_CACHE[program_name].push_back({dir_index, ext_index});
+          cache_resolved_path(StringView{key.data(), key.size()}, try_path);
           result.emplace_back(try_path);
         }
       }
     } else if (std::filesystem::exists(full_path)) {
-      PATH_CACHE[program_name].push_back({dir_index, explicit_ext});
+      cache_resolved_path(StringView{key.data(), key.size()},
+                          full_path.string());
       result.emplace_back(full_path);
     }
   }
@@ -546,40 +525,22 @@ search_and_cache(const std::string &program_name)
   return result;
 }
 
-std::filesystem::path
-make_absolute_path_from_cache(const std::filesystem::path &program_name,
-                              DirIndex d, os::ExtIndex e)
-{
-  std::filesystem::path full_path = PATH_CACHE_DIRS[d] / program_name;
-  if (e != 0) full_path.replace_extension(os::OMITTED_SUFFIXES[e]);
-  return full_path;
-}
-
-/* TODO: Optimization. */
 std::list<std::filesystem::path>
 search_program_path(const std::string &program_name)
 {
   std::string sp{program_name};
   std::list<std::filesystem::path> result{};
 
-  os::ExtIndex ext = os::erase_extension_and_get_its_index(sp);
+  os::erase_extension_and_get_its_index(sp);
 
-  if (auto cache_entry = PATH_CACHE.find(sp); cache_entry != PATH_CACHE.end()) {
-    auto &prefixes = cache_entry->second;
-    auto p = prefixes.begin();
-
-    while (p != prefixes.end()) {
-      auto &[dir, cache_ext] = *p;
-
-      std::filesystem::path tp = make_absolute_path_from_cache(
-          program_name, dir, (ext == 0) ? cache_ext : ext);
-
-      if (std::filesystem::exists(tp)) {
-        result.emplace_back(tp);
-        ++p;
-      } else {
-        p = prefixes.erase(p);
-      }
+  if (const ArrayList<String> *cached =
+          PATH_CACHE.find(StringView{sp.data(), sp.size()}))
+  {
+    for (usize i = 0; i < cached->size(); i++) {
+      const String &path_string = (*cached)[i];
+      std::filesystem::path tp{
+          std::string{path_string.c_str(), path_string.size()}};
+      if (std::filesystem::exists(tp)) result.emplace_back(std::move(tp));
     }
   }
 
