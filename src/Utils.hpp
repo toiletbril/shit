@@ -60,14 +60,14 @@ std::string lowercase_string(std::string_view s);
 Maybe<std::filesystem::path> canonicalize_path(const std::string &path);
 
 /* Read a whole file into a string through the os descriptor layer, so no
-   iostream file stream is pulled in. Returns nothing when the open fails. */
+   iostream file stream is pulled in. Returns None when the open fails. */
 Maybe<std::string> read_entire_file(const std::string &path);
 
 /* Read everything still available on standard input into a string. */
 std::string read_entire_standard_input();
 
 /* Read one line from a descriptor, without the trailing newline. Returns
-   nothing at end of input with no bytes read. The read builtin passes the
+   None at end of input with no bytes read. The read builtin passes the
    command's input descriptor so a redirection or a heredoc is honored. */
 Maybe<std::string> read_line_from_fd(os::descriptor fd);
 

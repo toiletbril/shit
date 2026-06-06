@@ -394,7 +394,7 @@ Lexer::lex_identifier()
 
     if (should_escape) {
       /* The previous character was a backslash. A backslash before a newline
-         continues the line and leaves nothing behind. */
+         continues the line and leaves None behind. */
       should_escape = false;
       if (ch == '\n')
         escaped_newline_count++;
@@ -578,7 +578,7 @@ Lexer::lex_identifier()
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        std::string{next}, is_in_double_quotes});
       } else {
-        /* A dollar sign that names nothing stays a literal dollar sign. */
+        /* A dollar sign that names None stays a literal dollar sign. */
         append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
                                         : WordSegment::Kind::UnquotedText,
                     '$');
@@ -659,7 +659,7 @@ Lexer::lex_identifier()
 /* Only single-character operators are defined here. Further parsing is done in
  * related routines. */
 
-/* The token kind a single operator character begins, or nothing when the
+/* The token kind a single operator character begins, or None when the
    character is not an operator. The switch keeps this allocation free and the
    compiler lowers it to a jump table. */
 static Maybe<Token::Kind>
@@ -688,7 +688,7 @@ lookup_operator(char ch)
   case '<':  return Token::Kind::Less;
   case '|':  return Token::Kind::Pipe;
   case '=':  return Token::Kind::Equals;
-  default:   return nothing;
+  default:   return None;
   }
 }
 

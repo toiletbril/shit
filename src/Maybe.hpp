@@ -7,14 +7,14 @@
 
 namespace shit {
 
-/* The empty state of a Maybe. A function returns this to say it produced no
+/* The empty state of a Maybe. A function returns None to say it produced no
    value, and the caller decides what that means. */
-struct None
+struct Nothing
 {};
 
-inline constexpr None nothing{};
+inline constexpr Nothing None{};
 
-/* A value or nothing, the replacement for std::optional. There is no failure
+/* A value or None, the replacement for std::optional. There is no failure
    reason inside, so the caller handles the empty case itself. Reading the value
    out of an empty Maybe traps in the debug build. The value is stored inline,
    so no allocation happens. */
@@ -22,7 +22,7 @@ template <class T>
 struct [[nodiscard]] Maybe
 {
   Maybe() noexcept : m_has_value(false) {}
-  Maybe(None) noexcept : m_has_value(false) {}
+  Maybe(Nothing) noexcept : m_has_value(false) {}
   Maybe(T value) : m_has_value(true) { new (&m_storage) T(std::move(value)); }
 
   Maybe(const Maybe &other) : m_has_value(other.m_has_value)
@@ -157,13 +157,13 @@ private:
   alignas(T) unsigned char m_storage[sizeof(T)];
 };
 
-/* Evaluate a Maybe expression, return nothing from the enclosing function when
+/* Evaluate a Maybe expression, return None from the enclosing function when
    it is empty, otherwise yield the value. The enclosing function must itself
    return a Maybe. */
 #define SHIT_TRY(maybe_expr)                                                   \
   ({                                                                           \
     auto t__result = (maybe_expr);                                             \
-    if (!t__result) return ::shit::nothing;                                    \
+    if (!t__result) return ::shit::None;                                       \
     t__result.take();                                                          \
   })
 

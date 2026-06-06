@@ -81,7 +81,7 @@ struct ControlFlow
 };
 
 /* A variable binding saved when a local shadows it. The previous value is
-   nothing when the name was unset, so leaving the scope restores the unset
+   None when the name was unset, so leaving the scope restores the unset
    state rather than an empty string. */
 struct LocalBinding
 {

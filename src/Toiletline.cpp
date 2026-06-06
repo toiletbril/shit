@@ -20,7 +20,7 @@ namespace {
 /* The line editor allocates its history and line buffers through these hooks,
    which draw from one arena that lives for the whole interactive session, since
    the history persists across lines. A non-interactive run never starts the
-   editor, so it pays nothing. The bump arena cannot resize or free a single
+   editor, so it pays None. The bump arena cannot resize or free a single
    block, so a free or a grown realloc returns the old block to a free list that
    the next allocation reuses. That bounds memory to the working set rather than
    growing it on every keystroke. A header before each block records the block's

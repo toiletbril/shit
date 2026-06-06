@@ -160,7 +160,7 @@ EvalContext::get_variable_value(const std::string &name) const
 
   if (std::optional<std::string> env = os::get_environment_variable(name))
     return *env;
-  return shit::nothing;
+  return shit::None;
 }
 
 const ArrayList<String> &
@@ -422,7 +422,7 @@ EvalContext::get_alias(const std::string &name) const
 {
   if (const String *value = m_aliases.find(StringView{name.data(), name.size()}))
     return std::string{value->c_str(), value->size()};
-  return nothing;
+  return None;
 }
 
 ArrayList<String>
@@ -1158,7 +1158,7 @@ first_active_glob(StringView text, const ArrayList<bool> &mask)
       return open_bracket;
     }
   }
-  return shit::nothing;
+  return shit::None;
 }
 
 } /* namespace */
@@ -1285,7 +1285,7 @@ EvalContext::expand_path(GlobField field)
     return single;
   }
 
-  /* The pattern is kept so a glob that matches nothing falls back to it, since
+  /* The pattern is kept so a glob that matches None falls back to it, since
      the field moves into the recurse. */
   String pattern{scratch};
   pattern.append(field.text.view());
@@ -1951,7 +1951,7 @@ EvalContext::clear_retained_sources()
   m_retained_sources.clear();
 
   /* The current source frame may point at a retained copy just freed, so reset
-     it to nothing until the next run sets it. */
+     it to None until the next run sets it. */
   m_current_source = nullptr;
   m_current_origin.clear();
 }

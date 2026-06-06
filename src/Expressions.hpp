@@ -76,7 +76,7 @@ struct Expression
      destructor still runs through the normal delete. */
   static void operator delete(void *pointer);
 
-  /* The prepass entry per node. The base does nothing, the command and the
+  /* The prepass entry per node. The base does None, the command and the
      control flow nodes override it. is_unconditional says whether this node is
      reached on every run, which decides a failure from a warning. */
   virtual void analyze(AnalysisContext &actx, bool is_unconditional) const;

@@ -102,18 +102,18 @@ Word::to_pretty_string() const
 Maybe<std::pair<std::string, Word>>
 Word::get_assignment_split() const
 {
-  if (segments.empty()) return shit::nothing;
+  if (segments.empty()) return shit::None;
 
   const WordSegment &first = segments[0];
-  if (first.kind != WordSegment::Kind::UnquotedText) return shit::nothing;
+  if (first.kind != WordSegment::Kind::UnquotedText) return shit::None;
 
   usize equals_position = first.text.find('=');
   if (equals_position == std::string::npos || equals_position == 0)
-    return shit::nothing;
+    return shit::None;
 
-  if (!lexer::is_variable_name_start(first.text[0])) return shit::nothing;
+  if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
   for (usize i = 1; i < equals_position; i++) {
-    if (!lexer::is_variable_name(first.text[i])) return shit::nothing;
+    if (!lexer::is_variable_name(first.text[i])) return shit::None;
   }
 
   std::string name = first.text.substr(0, equals_position);

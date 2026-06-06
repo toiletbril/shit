@@ -30,7 +30,7 @@ write_fd(os::descriptor fd, const void *buf, usize size)
     /* A signal that lands mid-write interrupts the call before any byte is
        transferred. Retry instead of reporting a spurious write failure. */
     if (w == -1 && errno == EINTR) continue;
-    if (w == -1) return shit::nothing;
+    if (w == -1) return shit::None;
     return static_cast<usize>(w);
   }
 }
@@ -44,7 +44,7 @@ read_fd(os::descriptor fd, void *buf, usize size)
        that changes state, interrupts the call. Retry so the reader does not
        mistake the interruption for end of input. */
     if (r == -1 && errno == EINTR) continue;
-    if (r == -1) return shit::nothing;
+    if (r == -1) return shit::None;
     return static_cast<usize>(r);
   }
 }
@@ -83,7 +83,7 @@ get_current_user()
 {
   struct passwd *pw = getpwuid(getuid());
   if (pw != nullptr) return std::string{pw->pw_name};
-  return shit::nothing;
+  return shit::None;
 }
 
 Maybe<std::filesystem::path>
@@ -91,7 +91,7 @@ get_home_directory()
 {
   if (std::optional<std::string> home = get_environment_variable("HOME"))
     return std::filesystem::path{*home};
-  return shit::nothing;
+  return shit::None;
 }
 
 static const pid_t PARENT_SHELL_PID = getpid();
@@ -272,7 +272,7 @@ make_pipe()
   descriptor p[2] = {SHIT_INVALID_FD, SHIT_INVALID_FD};
 
   if (pipe(p) != 0) {
-    return shit::nothing;
+    return shit::None;
   }
 
   /* Close the pipe ends on exec, so a stage that dups one end onto its stdin or
@@ -305,7 +305,7 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   /* 0666 lets the umask decide the final permissions, as a shell redirection
      does. */
   int fd = ::open(path.c_str(), flags, 0666);
-  if (fd < 0) return shit::nothing;
+  if (fd < 0) return shit::None;
   return fd;
 }
 
@@ -325,7 +325,7 @@ write_to_temp_file(const std::string &content)
   path_template.push_back('\0');
 
   int fd = mkstemp(path_template.data());
-  if (fd < 0) return shit::nothing;
+  if (fd < 0) return shit::None;
 
   /* Unlink at once, so the file is anonymous and is freed when closed. */
   unlink(path_template.data());
@@ -336,7 +336,7 @@ write_to_temp_file(const std::string &content)
         ::write(fd, content.data() + offset, content.size() - offset);
     if (written <= 0) {
       close(fd);
-      return shit::nothing;
+      return shit::None;
     }
     offset += static_cast<usize>(written);
   }
@@ -573,7 +573,7 @@ write_fd(os::descriptor fd, const void *buf, usize size)
 {
   DWORD w = -1;
   if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
-    return shit::nothing;
+    return shit::None;
   return static_cast<usize>(w);
 }
 
@@ -582,7 +582,7 @@ read_fd(os::descriptor fd, void *buf, usize size)
 {
   DWORD r = -1;
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
-    return shit::nothing;
+    return shit::None;
   return static_cast<usize>(r);
 }
 
@@ -617,7 +617,7 @@ get_current_user()
     if (GetUserNameA(buffer.data(), &size))
       return std::string{buffer.data(), size - 1};
   }
-  return shit::nothing;
+  return shit::None;
 }
 
 Maybe<std::filesystem::path>
@@ -625,7 +625,7 @@ get_home_directory()
 {
   if (std::optional<std::string> home = get_environment_variable("USERPROFILE"))
     return std::filesystem::path{*home};
-  return shit::nothing;
+  return shit::None;
 }
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
@@ -787,7 +787,7 @@ make_pipe()
     if (in != INVALID_HANDLE_VALUE) close_fd(in);
     if (out != INVALID_HANDLE_VALUE) close_fd(out);
 
-    return shit::nothing;
+    return shit::None;
   }
 
   return Pipe{in, out};
@@ -816,7 +816,7 @@ open_file_descriptor(const std::string &path, FileOpenMode mode)
   HANDLE handle =
       CreateFileA(path.c_str(), access, FILE_SHARE_READ | FILE_SHARE_WRITE,
                   &att, disposition, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (handle == INVALID_HANDLE_VALUE) return shit::nothing;
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
   /* Append moves the write position to the end of the file. */
   if (mode == FileOpenMode::Append) SetFilePointer(handle, 0, NULL, FILE_END);
@@ -828,23 +828,23 @@ Maybe<descriptor>
 write_to_temp_file(const std::string &content)
 {
   char temp_dir[MAX_PATH];
-  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::nothing;
+  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
 
   char temp_path[MAX_PATH];
   if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0)
-    return shit::nothing;
+    return shit::None;
 
   HANDLE handle = CreateFileA(
       temp_path, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
       FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
-  if (handle == INVALID_HANDLE_VALUE) return shit::nothing;
+  if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
   DWORD written = 0;
   if (WriteFile(handle, content.data(), static_cast<DWORD>(content.size()),
                 &written, NULL) == 0)
   {
     close_fd(handle);
-    return shit::nothing;
+    return shit::None;
   }
 
   SetFilePointer(handle, 0, NULL, FILE_BEGIN);
@@ -925,7 +925,7 @@ signal_number_from_name(const std::string &name)
   if (bare == "KILL") return 9;
   if (bare == "TERM") return 15;
   if (bare == "INT") return 2;
-  return nothing;
+  return None;
 }
 
 os_args

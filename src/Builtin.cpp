@@ -71,7 +71,7 @@ builtin_help(Builtin::Kind kind)
     return {"return [n]",
             "Return from a function or a sourced file with status n."};
   case Builtin::Kind::Colon:
-    return {":", "Do nothing and return a successful status."};
+    return {":", "Do None and return a successful status."};
   case Builtin::Kind::True: return {"true", "Return a successful status."};
   case Builtin::Kind::False: return {"false", "Return a failing status."};
   case Builtin::Kind::Test:

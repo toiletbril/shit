@@ -33,7 +33,7 @@ enum class FileOpenMode : u8
   Read,               /* <  open an existing file for reading */
 };
 
-/* Open path for the given mode and return its descriptor, or nothing on error
+/* Open path for the given mode and return its descriptor, or None on error
    with the reason left in last_system_error_message. */
 Maybe<descriptor> open_file_descriptor(const std::string &path,
                                        FileOpenMode mode);
@@ -72,7 +72,7 @@ ProcessState poll_process(process p, i32 &status_out);
 bool signal_process(process p, i32 signal_number);
 
 /* Resolve a signal name such as TERM, SIGTERM, or KILL to its number, or
-   nothing when the name is not known. */
+   None when the name is not known. */
 Maybe<i32> signal_number_from_name(const std::string &name);
 
 /* Turn a numeric process id into the process handle the os layer uses. On POSIX

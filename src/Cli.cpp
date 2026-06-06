@@ -319,7 +319,7 @@ parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
         case Flag::Kind::String:
         case Flag::Kind::ManyStrings: {
           if (*value_offset == '\0') {
-            /* There is nothing after the flag. Expect next argument
+            /* There is None after the flag. Expect next argument
              * to be the value. */
             next_arg_is_value = true;
           } else {

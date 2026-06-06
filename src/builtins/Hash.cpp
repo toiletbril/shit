@@ -4,7 +4,7 @@
 
 /* hash remembers command locations in shells that cache the PATH search. This
    shell resolves the PATH lazily per command, so there is no table to fill, and
-   hash is accepted for script compatibility with nothing to do. */
+   hash is accepted for script compatibility with None to do. */
 
 FLAG_LIST_DECL();
 

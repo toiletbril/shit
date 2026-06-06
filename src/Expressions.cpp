@@ -90,17 +90,17 @@ namespace {
 Maybe<std::string>
 static_command_name(const Token *token)
 {
-  if (token->kind() != Token::Kind::Word) return shit::nothing;
+  if (token->kind() != Token::Kind::Word) return shit::None;
 
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
 
   std::string name{};
   for (const WordSegment &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::VariableReference)
-      return shit::nothing;
+      return shit::None;
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       for (char ch : segment.text) {
-        if (lexer::is_expandable_char(ch)) return shit::nothing;
+        if (lexer::is_expandable_char(ch)) return shit::None;
       }
     }
     name += segment.text;
@@ -519,7 +519,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   expand_command_aliases(cxt, program_args);
 
   /* Open the redirection targets. A redirection takes effect even when the
-     command expands to nothing, so > file with no command still creates the
+     command expands to None, so > file with no command still creates the
      file. The final descriptors pass to the exec context, which closes them,
      and the guard closes them on any path that does not hand them off. */
   Maybe<os::descriptor> redirect_in_fd;
@@ -601,7 +601,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   }
 
   /* An expansion may drop every word, for example an unset $x used as the whole
-     command. There is nothing to run then, but the redirections above already
+     command. There is None to run then, but the redirections above already
      took effect. */
   if (program_args.empty()) {
     cxt.set_last_exit_status(0);

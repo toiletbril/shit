@@ -69,7 +69,7 @@ find_standalone_keyword(std::string_view source, std::string_view keyword)
     if (left_ok && right_ok) return SourceLocation{pos, keyword.size()};
     pos = end;
   }
-  return shit::nothing;
+  return shit::None;
 }
 
 /* Report a missing terminator. When the keyword is found earlier in the source,

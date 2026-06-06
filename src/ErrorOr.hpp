@@ -46,7 +46,7 @@ private:
 /* Evaluate a fallible expression, return its error early on failure, and yield
    its value otherwise. Used inside a function that itself returns an ErrorOr.
    The name differs from the Maybe SHIT_TRY, since this one propagates an Error
-   rather than nothing. */
+   rather than None. */
 #define SHIT_UNWRAP(expr)                                                      \
   ({                                                                           \
     auto t__result = (expr);                                                   \

@@ -52,7 +52,7 @@ struct StringView
     return !(*this == other);
   }
 
-  /* The index of the first occurrence of a byte, or nothing when it is absent.
+  /* The index of the first occurrence of a byte, or None when it is absent.
      A Maybe keeps the absent case out of band rather than using a sentinel
      index. */
   [[nodiscard]] Maybe<usize>
@@ -60,7 +60,7 @@ struct StringView
   {
     for (usize i = 0; i < length; i++)
       if (data[i] == wanted) return i;
-    return nothing;
+    return None;
   }
 
   /* The view from start to the end. A start past the end yields an empty view. */
@@ -113,6 +113,17 @@ struct String
   String() : m_allocator(heap_allocator()) {}
   explicit String(Allocator allocator) : m_allocator(allocator) {}
   String(Allocator allocator, StringView initial) : m_allocator(allocator)
+  {
+    append(initial);
+  }
+  /* Heap-backed conversions from a literal or a view, so a String stands in for
+     the std::string a conversion replaces. The literal form wins over the view
+     form for a const char*, since it is a single conversion. */
+  String(const char *cstr) : m_allocator(heap_allocator())
+  {
+    append(StringView{cstr});
+  }
+  String(StringView initial) : m_allocator(heap_allocator())
   {
     append(initial);
   }
@@ -308,6 +319,35 @@ struct String
     return m_length < other.m_length;
   }
 
+  /* The first byte. The caller guarantees the string is not empty. */
+  [[nodiscard]] char
+  first_character() const
+  {
+    SHIT_ASSERT(m_length > 0, "first_character() on an empty string");
+    return m_data[0];
+  }
+
+  /* The index of the first occurrence of a substring at or after a start, or
+     None when it is absent. */
+  [[nodiscard]] Maybe<usize>
+  find_substring(StringView needle, usize from = 0) const
+  {
+    if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
+    if (needle.length > m_length) return None;
+    for (usize i = from; i + needle.length <= m_length; i++)
+      if (std::memcmp(m_data + i, needle.data, needle.length) == 0) return i;
+    return None;
+  }
+
+  /* The index of the last occurrence of a byte, or None when it is absent. */
+  [[nodiscard]] Maybe<usize>
+  find_last_character(char wanted) const
+  {
+    for (usize i = m_length; i > 0; i--)
+      if (m_data[i - 1] == wanted) return i - 1;
+    return None;
+  }
+
 private:
   void
   free_storage()
@@ -322,6 +362,19 @@ private:
   usize m_length{0};
   usize m_capacity{0};
 };
+
+/* Concatenate two byte ranges into a fresh heap String. A String and a literal
+   both read as a view, so str + "x", "x" + str, and str + str all resolve here.
+   The result is heap-backed, the default for an expression temporary. */
+inline String
+operator+(StringView left, StringView right)
+{
+  String result{heap_allocator()};
+  result.reserve(left.length + right.length);
+  result.append(left);
+  result.append(right);
+  return result;
+}
 
 /* A growable array over an explicit allocator, the std::vector replacement. */
 template <class T>
@@ -810,7 +863,7 @@ struct HashSet
   void
   add(StringView key)
   {
-    m_map.set(key, None{});
+    m_map.set(key, Nothing{});
   }
 
   [[nodiscard]] bool
@@ -829,11 +882,11 @@ struct HashSet
   void
   for_each(Fn fn) const
   {
-    m_map.for_each([&fn](StringView key, const None &) { fn(key); });
+    m_map.for_each([&fn](StringView key, const Nothing &) { fn(key); });
   }
 
 private:
-  HashMap<None> m_map;
+  HashMap<Nothing> m_map;
 };
 
 /* A frozen map from a short byte string to a value, stored in static storage as
@@ -855,11 +908,11 @@ struct StaticStringMap
   [[nodiscard]] Maybe<Value>
   find(StringView text) const
   {
-    if (text.size() > 16) return nothing;
+    if (text.size() > 16) return None;
     PackedStringKey wanted = PackedStringKey::from_view(text);
     for (usize i = 0; i < entry_count; i++)
       if (entries[i].key == wanted) return entries[i].value;
-    return nothing;
+    return None;
   }
 };
 

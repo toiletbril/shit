@@ -73,7 +73,7 @@ Exec::execute(ExecContext &ec, EvalContext &cxt) const
   /* An external command replaces the shell. replace_process returns only by
      throwing, when the program was found but could not be executed, which ends
      the shell with 126, the status reserved for a command that is present but
-     not executable. A name that resolves to nothing exited 127 above. */
+     not executable. A name that resolves to None exited 127 above. */
   try {
     os::replace_process(std::move(command));
   } catch (const Error &error) {

@@ -49,8 +49,8 @@ t__string_from_struct(const T &x)
 #endif
 #else /* !NDEBUG */
 #define SHIT_STRUCT_STRING(...) std::string{"<optimized out>"}
-#define SHIT_TRACE(...)         /* nothing */
-#define SHIT_TRACELN(...)       /* nothing */
+#define SHIT_TRACE(...)         /* None */
+#define SHIT_TRACELN(...)       /* None */
 #endif
 
 #if !defined SHIT_STRUCT_STRING
@@ -102,5 +102,5 @@ t__string_from_struct(const T &x)
     }                                                                          \
   } while (0)
 #else
-#define SHIT_ASSERT(...) /* nothing */
+#define SHIT_ASSERT(...) /* None */
 #endif

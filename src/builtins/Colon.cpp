@@ -1,6 +1,6 @@
 #include "../Builtin.hpp"
 
-/* No flags. The colon command does nothing and returns success, after its
+/* No flags. The colon command does None and returns success, after its
    arguments are expanded by the caller. */
 
 namespace shit {

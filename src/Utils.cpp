@@ -199,7 +199,7 @@ canonicalize_path(const std::string &path)
       p.replace_extension(os::OMITTED_SUFFIXES[i++]);
   }
 
-  if (!std::filesystem::exists(p)) return shit::nothing;
+  if (!std::filesystem::exists(p)) return shit::None;
 
   return p;
 }
@@ -568,7 +568,7 @@ read_entire_file(const std::string &path)
 {
   Maybe<os::descriptor> file =
       os::open_file_descriptor(path, os::FileOpenMode::Read);
-  if (!file) return nothing;
+  if (!file) return None;
 
   std::string contents{};
   char buffer[4096];
@@ -607,7 +607,7 @@ read_line_from_fd(os::descriptor fd)
     if (one_byte == '\n') return line;
     line += one_byte;
   }
-  if (!read_any_byte) return nothing;
+  if (!read_any_byte) return None;
   return line;
 }
 

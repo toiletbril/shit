@@ -81,8 +81,8 @@ using uintptr = uintptr_t;
 #error Oh no! Segmentation fault. Please download a better compiler that \
        supports GNU extensions!
 #define T__HAS_GCC_EXTENSIONS 0
-#define t__used               /* nothing */
-#define t__forceinline        /* nothing */
+#define t__used               /* None */
+#define t__forceinline        /* None */
 #define t__unreachable()      abort()
 #define t__debugtrap()        abort()
 #endif
