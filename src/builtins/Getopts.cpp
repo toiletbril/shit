@@ -15,19 +15,19 @@ namespace shit {
 
 Getopts::Getopts() = default;
 
-Builtin::Kind Getopts::kind() const { return Kind::Getopts; }
+fn Getopts::kind() const -> Builtin::Kind { return Kind::Getopts; }
 
-i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
+fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
   if (args.size() < 3)
     throw Error{"getopts: usage: getopts optstring name [arg ...]"};
 
-  const String &optstring = args[1];
-  const String &name = args[2];
-  const bool is_silent = !optstring.empty() && optstring[0] == ':';
+  let const &optstring = args[1];
+  let const &name = args[2];
+  let const is_silent = !optstring.empty() && optstring[0] == ':';
 
-  ArrayList<String> operands{};
+  let operands = ArrayList<String>{};
   if (args.size() > 3) {
     for (usize i = 3; i < args.size(); i++)
       operands.push(args[i]);
@@ -38,14 +38,14 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   i64 optind = 1;
   if (Maybe<String> value = cxt.get_variable_value("OPTIND"); value.has_value())
   {
-    ErrorOr<i64> parsed = utils::parse_decimal_integer(*value);
+    let parsed = utils::parse_decimal_integer(*value);
     optind = parsed.is_error() ? 1 : parsed.value();
   }
 
   /* A script that resets OPTIND starts a fresh scan, so the per-argument index
      returns to the first letter. */
   if (optind != cxt.getopts_last_optind()) cxt.set_getopts_char_index(1);
-  usize char_index = cxt.getopts_char_index();
+  let char_index = cxt.getopts_char_index();
 
   auto finish = [&](i32 code) -> i32 {
     cxt.set_shell_variable("OPTIND", std::to_string(optind));
@@ -60,7 +60,7 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   SHIT_ASSERT(static_cast<usize>(optind) - 1 < operands.size());
-  const String &current = operands[static_cast<usize>(optind) - 1];
+  let const &current = operands[static_cast<usize>(optind) - 1];
   if (current.length() < 2 || current[0] != '-') {
     cxt.set_shell_variable(name, "?");
     return finish(1);
@@ -71,10 +71,10 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     return finish(1);
   }
 
-  const char option = current[char_index];
-  String option_as_string{};
+  let const option = current[char_index];
+  let option_as_string = String{};
   option_as_string.push(option);
-  const Maybe<usize> spec = optstring.find_character(option);
+  let const spec = optstring.find_character(option);
 
   auto advance_letter = [&]() {
     char_index++;
@@ -92,21 +92,21 @@ i32 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     } else {
       cxt.unset_shell_variable("OPTARG");
       shit::print_error(StringView{"getopts: illegal option -- "} +
-                                    option_as_string + "\n");
+                        option_as_string + "\n");
     }
     return finish(0);
   }
 
-  const bool wants_argument =
+  let const wants_argument =
       *spec + 1 < optstring.length() && optstring[*spec + 1] == ':';
   if (wants_argument) {
     if (char_index + 1 < current.length()) {
-      const StringView optarg = current.substring(char_index + 1);
+      let const optarg = current.substring(char_index + 1);
       cxt.set_shell_variable("OPTARG", optarg);
       optind++;
       char_index = 1;
     } else if (static_cast<usize>(optind) < operands.size()) {
-      const String &optarg = operands[static_cast<usize>(optind)];
+      let const &optarg = operands[static_cast<usize>(optind)];
       cxt.set_shell_variable("OPTARG", optarg);
       optind += 2;
       char_index = 1;

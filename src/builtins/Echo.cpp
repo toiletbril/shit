@@ -6,38 +6,38 @@ namespace shit {
 
 Echo::Echo() = default;
 
-Builtin::Kind Echo::kind() const { return Kind::Echo; }
+fn Echo::kind() const -> Builtin::Kind { return Kind::Echo; }
 
-i32 Echo::execute(ExecContext &ec, EvalContext &cxt) const
+fn Echo::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   SHIT_UNUSED(cxt);
 
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
 
   /* Match dash, where only a leading -n is an option and everything after it,
      including -e, is literal text, and backslash escapes are always
      interpreted. */
   usize start = 1;
-  bool should_suppress_newline = false;
+  let should_suppress_newline = false;
   while (start < args.size() && args[start] == "-n") {
     should_suppress_newline = true;
     start++;
   }
 
-  String buf{};
-  bool should_stop = false;
+  let buf = String{};
+  let should_stop = false;
 
   for (usize i = start; i < args.size() && !should_stop; i++) {
     if (i > start) buf += ' ';
 
-    const String &arg = args[i];
+    let const &arg = args[i];
     for (usize j = 0; j < arg.length(); j++) {
       if (arg[j] != '\\' || j + 1 >= arg.length()) {
         buf += arg[j];
         continue;
       }
 
-      const char escaped = arg[j + 1];
+      let const escaped = arg[j + 1];
       j++;
       switch (escaped) {
       case 'a': buf += '\a'; break;

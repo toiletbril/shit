@@ -81,7 +81,7 @@ struct Pipe
   descriptor out{SHIT_INVALID_FD};
 };
 
-Maybe<Pipe> make_pipe();
+fn make_pipe() -> Maybe<Pipe>;
 
 /* How a redirection target file is opened. */
 enum class FileOpenMode : u8
@@ -94,22 +94,23 @@ enum class FileOpenMode : u8
 
 /* Open path for the given mode and return its descriptor, or None on error
    with the reason left in last_system_error_message. */
-Maybe<descriptor> open_file_descriptor(StringView path, FileOpenMode mode);
+fn open_file_descriptor(StringView path, FileOpenMode mode)
+    -> Maybe<descriptor>;
 
 /* Write content to an anonymous temporary file and return a descriptor
    positioned at its start, for feeding a heredoc body to a command's input. */
-Maybe<descriptor> write_to_temp_file(StringView content);
+fn write_to_temp_file(StringView content) -> Maybe<descriptor>;
 
 /* Read the file-creation mask without changing it, and set a new one. The umask
    builtin reads and writes the process mask through these. */
-u32 get_file_creation_mask();
-void set_file_creation_mask(u32 mask);
+fn get_file_creation_mask() -> u32;
+fn set_file_creation_mask(u32 mask) -> void;
 
-os_args make_os_args(const ArrayList<String> &args);
+fn make_os_args(const ArrayList<String> &args) -> os_args;
 
-String last_system_error_message();
+fn last_system_error_message() -> String;
 
-i32 wait_and_monitor_process(process p);
+fn wait_and_monitor_process(process p) -> i32;
 
 /* The live state of a process, polled without blocking for the job table. */
 enum class ProcessState : u8
@@ -122,70 +123,70 @@ enum class ProcessState : u8
 /* Check a process without blocking. Returns Running while it is alive, Exited
    with the status placed in status_out once it ends, and Stopped while it is
    suspended. */
-ProcessState poll_process(process p, i32 &status_out);
+fn poll_process(process p, i32 &status_out) -> ProcessState;
 
 /* Send a signal to a process by its numeric signal, for the kill builtin and
    for fg and bg to resume a stopped job with SIGCONT. Returns false on
    failure. */
-bool signal_process(process p, i32 signal_number);
+fn signal_process(process p, i32 signal_number) -> bool;
 
 /* Resolve a signal name such as TERM, SIGTERM, or KILL to its number, or
    None when the name is not known. */
-Maybe<i32> signal_number_from_name(StringView name);
+fn signal_number_from_name(StringView name) -> Maybe<i32>;
 
 /* Turn a numeric process id into the process handle the os layer uses. On POSIX
    the id is the handle. On Windows a handle is opened for it, which may be the
    invalid handle when the process is gone or not permitted. */
-process process_from_pid(i64 pid);
+fn process_from_pid(i64 pid) -> process;
 
 extern const ArrayList<String> OMITTED_SUFFIXES;
 
-Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size);
-Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size);
+fn write_fd(os::descriptor fd, const void *buf, usize size) -> Maybe<usize>;
+fn read_fd(os::descriptor fd, void *buf, usize size) -> Maybe<usize>;
 
-bool close_fd(os::descriptor fd);
+fn close_fd(os::descriptor fd) -> bool;
 
 /* Point the process standard output at target and return a handle to the
    previous output, so a command substitution can capture everything written.
    restore_stdout puts the previous output back. */
-os::descriptor redirect_stdout(os::descriptor target);
-void restore_stdout(os::descriptor saved);
+fn redirect_stdout(os::descriptor target) -> os::descriptor;
+fn restore_stdout(os::descriptor saved) -> void;
 
-Maybe<String> get_environment_variable(StringView key);
-void set_environment_variable(StringView key, StringView value);
-void unset_environment_variable(StringView key);
+fn get_environment_variable(StringView key) -> Maybe<String>;
+fn set_environment_variable(StringView key, StringView value) -> void;
+fn unset_environment_variable(StringView key) -> void;
 
-bool is_child_process();
+fn is_child_process() -> bool;
 
 /* The process id of the shell itself, for $$. */
-i64 get_shell_process_id();
+fn get_shell_process_id() -> i64;
 
 /* The numeric process id of a spawned process, for $!. */
-i64 process_id_of(process p);
+fn process_id_of(process p) -> i64;
 
-bool is_stdin_a_tty();
-bool is_stdout_a_tty();
+fn is_stdin_a_tty() -> bool;
+fn is_stdout_a_tty() -> bool;
 
-ExtIndex erase_extension_and_get_its_index(std::string &program_name);
+fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex;
 
-Maybe<String> get_current_user();
+fn get_current_user() -> Maybe<String>;
 
-Maybe<Path> get_home_directory();
+fn get_home_directory() -> Maybe<Path>;
 
-void set_default_signal_handlers();
+fn set_default_signal_handlers() -> void;
 
-void reset_signal_handlers();
+fn reset_signal_handlers() -> void;
 
-process execute_program(ExecContext &&ec);
+fn execute_program(ExecContext &&ec) -> process;
 
 /* Replace the current shell process with the program, applying its
    redirections, the way exec does. It does not fork, so on success it never
    returns. It throws on failure. */
-[[noreturn]] void replace_process(ExecContext &&ec);
+[[noreturn]] fn replace_process(ExecContext &&ec) -> void;
 
 /* Apply an exec context's redirections to the shell's own descriptors, for an
    exec with redirections and no command. */
-void redirect_self(const ExecContext &ec);
+fn redirect_self(const ExecContext &ec) -> void;
 
 } /* namespace os */
 

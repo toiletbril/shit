@@ -26,15 +26,15 @@ struct HeredocPending
 
 namespace lexer {
 
-bool is_whitespace(char ch);
-bool is_number(char ch);
-bool is_expression_sentinel(char ch);
-bool is_shell_sentinel(char ch);
-bool is_part_of_identifier(char ch);
-bool is_string_quote(char ch);
-bool is_expandable_char(char ch);
-bool is_variable_name_start(char ch);
-bool is_variable_name(char ch);
+fn is_whitespace(char ch) -> bool;
+fn is_number(char ch) -> bool;
+fn is_expression_sentinel(char ch) -> bool;
+fn is_shell_sentinel(char ch) -> bool;
+fn is_part_of_identifier(char ch) -> bool;
+fn is_string_quote(char ch) -> bool;
+fn is_expandable_char(char ch) -> bool;
+fn is_variable_name_start(char ch) -> bool;
+fn is_variable_name(char ch) -> bool;
 
 } /* namespace lexer */
 
@@ -55,24 +55,25 @@ struct Lexer
   Lexer(const Lexer &) = delete;
   Lexer &operator=(const Lexer &) = delete;
 
-  [[nodiscard]] Token *peek_expression_token();
-  [[nodiscard]] Token *peek_shell_token();
-  [[nodiscard]] Token *next_expression_token();
-  [[nodiscard]] Token *next_shell_token();
+  [[nodiscard]] fn peek_expression_token() -> Token *;
+  [[nodiscard]] fn peek_shell_token() -> Token *;
+  [[nodiscard]] fn next_expression_token() -> Token *;
+  [[nodiscard]] fn next_shell_token() -> Token *;
 
-  StringView source() const;
-  const ArrayList<Word> &debug_words() const;
-  BumpArena &arena() const;
+  fn source() const -> StringView;
+  fn debug_words() const -> const ArrayList<Word> &;
+  fn arena() const -> BumpArena &;
   /* Redirect node allocation to another arena, so a function body can be parsed
      into the persistent function arena and restored afterward. */
-  void set_arena(BumpArena &arena);
-  usize advance_past_last_peek();
+  fn set_arena(BumpArena &arena) -> void;
+  fn advance_past_last_peek() -> usize;
 
   /* Reserve a heredoc body for the given delimiter, returning the stable buffer
      the lexer fills when the current line ends. The buffer is a std::string
      because the parsed Redirection field that points at it is read as one by
      the Eval layer. */
-  const std::string *register_heredoc(StringView delimiter, bool strip_tabs);
+  fn register_heredoc(StringView delimiter, bool strip_tabs)
+      -> const std::string *;
 
 protected:
   String m_source{};
@@ -96,18 +97,18 @@ protected:
      of pointers grows. The lexer frees them in its destructor. */
   ArrayList<std::string *> m_heredoc_bodies{heap_allocator()};
   ArrayList<HeredocPending> m_pending_heredocs{heap_allocator()};
-  void collect_pending_heredocs();
+  fn collect_pending_heredocs() -> void;
 
-  Token *lex_expression_token();
-  Token *lex_shell_token();
+  fn lex_expression_token() -> Token *;
+  fn lex_shell_token() -> Token *;
 
-  void skip_whitespace();
-  usize advance_forward(usize offset);
-  char chop_character(usize offset = 0);
+  fn skip_whitespace() -> void;
+  fn advance_forward(usize offset) -> usize;
+  fn chop_character(usize offset = 0) -> char;
 
-  Token *lex_number();
-  Token *lex_identifier();
-  Token *lex_sentinel();
+  fn lex_number() -> Token *;
+  fn lex_identifier() -> Token *;
+  fn lex_sentinel() -> Token *;
 };
 
 } /* namespace shit */

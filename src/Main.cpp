@@ -172,8 +172,7 @@ static int run_script_contents(const shit::String &script_contents,
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
     if (FLAG_EXIT_CODE.is_enabled())
-      shit::print(
-          "[Code " + shit::utils::integer_to_string(exit_code) + "]\n");
+      shit::print("[Code " + shit::utils::integer_to_string(exit_code) + "]\n");
 
     if (FLAG_STATS.is_enabled()) {
       shit::print(context.make_stats_string());

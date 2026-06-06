@@ -15,7 +15,7 @@ namespace shit {
 using namespace tokens;
 using namespace expressions;
 
-static CompoundListCondition::Kind get_sequence_kind(Token::Kind tk)
+static fn get_sequence_kind(Token::Kind tk) -> CompoundListCondition::Kind
 {
   switch (tk) {
   case Token::Kind::Newline:
@@ -34,12 +34,13 @@ Parser::Parser(Lexer &&lexer) : m_lexer(std::move(lexer)) {}
 
 Parser::~Parser() = default;
 
-const ArrayList<Word> &Parser::debug_words() const
+fn Parser::debug_words() const -> const ArrayList<Word> &
 {
   return m_lexer.debug_words();
 }
 
-static bool kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
+static fn kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
+    -> bool
 {
   for (Token::Kind k : set) {
     if (k == kind) return true;
@@ -50,8 +51,8 @@ static bool kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
 /* The byte location of the keyword as a whole word somewhere in the source. A
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
-static Maybe<SourceLocation> find_standalone_keyword(StringView source,
-                                                     StringView keyword)
+static fn find_standalone_keyword(StringView source, StringView keyword)
+    -> Maybe<SourceLocation>
 {
   auto is_boundary = [](char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0 || c == ';' ||
@@ -73,10 +74,10 @@ static Maybe<SourceLocation> find_standalone_keyword(StringView source,
 /* Report a missing terminator. When the keyword is found earlier in the source,
    point the note at it and explain it was read as an argument, otherwise point
    at the token where the terminator was expected. */
-[[noreturn]] static void throw_unterminated(SourceLocation opener,
-                                            StringView what, StringView source,
-                                            StringView keyword,
-                                            SourceLocation fallback)
+[[noreturn]] static fn throw_unterminated(SourceLocation opener,
+                                          StringView what, StringView source,
+                                          StringView keyword,
+                                          SourceLocation fallback) -> void
 {
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
@@ -90,7 +91,7 @@ static Maybe<SourceLocation> find_standalone_keyword(StringView source,
                                     "expected '" + keyword + "'"};
 }
 
-static bool is_empty_list(const Expression *expression)
+static fn is_empty_list(const Expression *expression) -> bool
 {
   SHIT_ASSERT(expression != NULL);
   return expression->is_dummy();
@@ -98,7 +99,7 @@ static bool is_empty_list(const Expression *expression)
 
 /* The reserved word ! is a single unquoted exclamation mark standing alone in
    command position. It is distinct from a != comparison or a quoted literal. */
-static bool is_negation_token(const Token *token)
+static fn is_negation_token(const Token *token) -> bool
 {
   SHIT_ASSERT(token != NULL);
   if (token->kind() != Token::Kind::Word) return false;
@@ -110,7 +111,7 @@ static bool is_negation_token(const Token *token)
 
 /* A friendly message for a token that cannot start a command. A stray control
    keyword almost always means its opener is missing. */
-static String unexpected_command_token_message(const Token *token)
+static fn unexpected_command_token_message(const Token *token) -> String
 {
   SHIT_ASSERT(token != NULL);
   switch (token->kind()) {
@@ -140,8 +141,8 @@ static String unexpected_command_token_message(const Token *token)
 }
 
 /* TODO */
-static SimpleCommand *
-require_simple_in_pipeline(std::unique_ptr<Command> command)
+static fn require_simple_in_pipeline(std::unique_ptr<Command> command)
+    -> SimpleCommand *
 {
   SHIT_ASSERT(command != NULL);
   if (!command->is_simple_command()) {
@@ -152,7 +153,7 @@ require_simple_in_pipeline(std::unique_ptr<Command> command)
   return static_cast<SimpleCommand *>(command.release());
 }
 
-static bool is_compound_terminator(Token::Kind kind)
+static fn is_compound_terminator(Token::Kind kind) -> bool
 {
   switch (kind) {
   case Token::Kind::RightParen:
@@ -169,14 +170,14 @@ static bool is_compound_terminator(Token::Kind kind)
   }
 }
 
-std::unique_ptr<Expression> Parser::construct_ast()
+fn Parser::construct_ast() -> std::unique_ptr<Expression>
 {
   /* The top-level list ends only at the end of input. */
   return parse_command_list({});
 }
 
-std::unique_ptr<Expression>
-Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
+fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
+    -> std::unique_ptr<Expression>
 {
   std::unique_ptr<Command> lhs{};
 
@@ -326,7 +327,7 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
 /* return: a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position introduces a
    compound command. */
-std::unique_ptr<Command> Parser::parse_simple_command()
+fn Parser::parse_simple_command() -> std::unique_ptr<Command>
 {
   Maybe<SourceLocation> source_location;
   ArrayList<std::unique_ptr<Token>> args_accumulator{};
@@ -596,7 +597,7 @@ std::unique_ptr<Command> Parser::parse_simple_command()
   SHIT_UNREACHABLE();
 }
 
-std::unique_ptr<Command> Parser::parse_if()
+fn Parser::parse_if() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> if_token{m_lexer.next_shell_token()};
   const SourceLocation location = if_token->source_location();
@@ -657,7 +658,7 @@ std::unique_ptr<Command> Parser::parse_if()
   return node;
 }
 
-std::unique_ptr<Command> Parser::parse_while_or_until(bool is_until)
+fn Parser::parse_while_or_until(bool is_until) -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   const SourceLocation location = keyword->source_location();
@@ -683,7 +684,7 @@ std::unique_ptr<Command> Parser::parse_while_or_until(bool is_until)
       location, condition.release(), body.release(), is_until)};
 }
 
-std::unique_ptr<Command> Parser::parse_for()
+fn Parser::parse_for() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   const SourceLocation location = keyword->source_location();
@@ -752,7 +753,7 @@ std::unique_ptr<Command> Parser::parse_for()
       body.release())};
 }
 
-std::unique_ptr<Command> Parser::parse_case()
+fn Parser::parse_case() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   const SourceLocation location = keyword->source_location();
@@ -844,7 +845,7 @@ std::unique_ptr<Command> Parser::parse_case()
       location, word.release(), std::move(items))};
 }
 
-std::unique_ptr<Command> Parser::parse_brace_group()
+fn Parser::parse_brace_group() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
 
@@ -862,7 +863,7 @@ std::unique_ptr<Command> Parser::parse_brace_group()
       open->source_location(), body.release())};
 }
 
-std::unique_ptr<Command> Parser::parse_subshell()
+fn Parser::parse_subshell() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
 
@@ -880,8 +881,8 @@ std::unique_ptr<Command> Parser::parse_subshell()
       open->source_location(), body.release())};
 }
 
-std::unique_ptr<Command>
-Parser::parse_function_definition(std::unique_ptr<Token> name_token)
+fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
+    -> std::unique_ptr<Command>
 {
   const SourceLocation location = name_token->source_location();
   const String name = name_token->raw_string();
@@ -920,7 +921,7 @@ Parser::parse_function_definition(std::unique_ptr<Token> name_token)
 }
 
 /* A standard pratt-parser for expressions. */
-std::unique_ptr<Expression> Parser::parse_expression(u8 min_precedence)
+fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
 {
   m_recursion_depth++;
   SHIT_DEFER { m_recursion_depth--; };

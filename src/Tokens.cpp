@@ -10,35 +10,35 @@ namespace shit {
 
 Token::Token(SourceLocation location) : m_location(location) {}
 
-SourceLocation Token::source_location() const { return m_location; }
+fn Token::source_location() const -> SourceLocation { return m_location; }
 
-void Token::operator delete(void *pointer)
+fn Token::operator delete(void *pointer) -> void
 {
   if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);
 }
 
-String Token::to_ast_string() const { return raw_string(); }
+fn Token::to_ast_string() const -> String { return raw_string(); }
 
-bool WordSegment::is_split_eligible() const
+fn WordSegment::is_split_eligible() const -> bool
 {
   return kind == Kind::UnquotedText ||
          (kind == Kind::VariableReference && !is_in_double_quotes);
 }
 
-bool WordSegment::has_live_glob_chars() const
+fn WordSegment::has_live_glob_chars() const -> bool
 {
   return kind == Kind::UnquotedText;
 }
 
-bool WordSegment::is_tilde_candidate() const
+fn WordSegment::is_tilde_candidate() const -> bool
 {
   return kind == Kind::UnquotedText;
 }
 
-bool Word::is_empty() const { return segments.empty(); }
+fn Word::is_empty() const -> bool { return segments.empty(); }
 
-String Word::to_literal_string() const
+fn Word::to_literal_string() const -> String
 {
   String result{};
   for (const WordSegment &segment : segments) {
@@ -60,7 +60,7 @@ String Word::to_literal_string() const
   return result;
 }
 
-String Word::to_pretty_string() const
+fn Word::to_pretty_string() const -> String
 {
   String result{"[Word"};
   for (const WordSegment &segment : segments) {
@@ -85,7 +85,7 @@ String Word::to_pretty_string() const
   return result;
 }
 
-Maybe<std::pair<String, Word>> Word::get_assignment_split() const
+fn Word::get_assignment_split() const -> Maybe<std::pair<String, Word>>
 {
   if (segments.empty()) return shit::None;
 
@@ -177,23 +177,23 @@ Value::Value(SourceLocation location, StringView sv)
     : Token(location), m_value(sv)
 {}
 
-String Value::raw_string() const { return m_value; }
+fn Value::raw_string() const -> String { return m_value; }
 
 Number::Number(SourceLocation location, StringView sv) : Value(location, sv) {}
 
-Token::Kind Number::kind() const { return Token::Kind::Number; }
+fn Number::kind() const -> Token::Kind { return Token::Kind::Number; }
 
-Token::Flags Number::flags() const { return Token::Flag::Value; }
+fn Number::flags() const -> Token::Flags { return Token::Flag::Value; }
 
 Assignment::Assignment(SourceLocation location, StringView key, Word value)
     : Token(location), m_key(key), m_value(std::move(value))
 {}
 
-Token::Kind Assignment::kind() const { return Token::Kind::Assignment; }
+fn Assignment::kind() const -> Token::Kind { return Token::Kind::Assignment; }
 
-Token::Flags Assignment::flags() const { return Token::Flag::Special; }
+fn Assignment::flags() const -> Token::Flags { return Token::Flag::Special; }
 
-String Assignment::raw_string() const
+fn Assignment::raw_string() const -> String
 {
   String result{m_key};
   result += "=";
@@ -201,9 +201,9 @@ String Assignment::raw_string() const
   return result;
 }
 
-const String &Assignment::key() const { return m_key; }
+fn Assignment::key() const -> const String & { return m_key; }
 
-const Word &Assignment::value_word() const { return m_value; }
+fn Assignment::value_word() const -> const Word & { return m_value; }
 
 WordToken::WordToken(SourceLocation location, Word word)
     : Value(location, ""), m_word(std::move(word))
@@ -211,44 +211,44 @@ WordToken::WordToken(SourceLocation location, Word word)
   m_value = m_word.to_literal_string();
 }
 
-Token::Kind WordToken::kind() const { return Token::Kind::Word; }
+fn WordToken::kind() const -> Token::Kind { return Token::Kind::Word; }
 
-Token::Flags WordToken::flags() const { return Token::Flag::Value; }
+fn WordToken::flags() const -> Token::Flags { return Token::Flag::Value; }
 
-const Word &WordToken::word() const { return m_word; }
+fn WordToken::word() const -> const Word & { return m_word; }
 
 Identifier::Identifier(SourceLocation location, StringView sv)
     : Value(location, sv)
 {}
 
-Token::Kind Identifier::kind() const { return Token::Kind::Identifier; }
+fn Identifier::kind() const -> Token::Kind { return Token::Kind::Identifier; }
 
-Token::Flags Identifier::flags() const { return Token::Flag::Value; }
+fn Identifier::flags() const -> Token::Flags { return Token::Flag::Value; }
 
 Redirection::Redirection(SourceLocation location, StringView what_fd,
                          StringView to_file)
     : Token(location), m_from_fd(what_fd), m_to_file(to_file)
 {}
 
-Token::Kind Redirection::kind() const { return Token::Kind::Redirection; }
+fn Redirection::kind() const -> Token::Kind { return Token::Kind::Redirection; }
 
-Token::Flags Redirection::flags() const { return Token::Flag::Special; }
+fn Redirection::flags() const -> Token::Flags { return Token::Flag::Special; }
 
-const String &Redirection::from_fd() const { return m_from_fd; }
+fn Redirection::from_fd() const -> const String & { return m_from_fd; }
 
-const String &Redirection::to_file() const { return m_to_file; }
+fn Redirection::to_file() const -> const String & { return m_to_file; }
 
 Operator::Operator(SourceLocation location) : Token(location) {}
 
-u8 Operator::left_precedence() const { return 0; }
+fn Operator::left_precedence() const -> u8 { return 0; }
 
-u8 Operator::unary_precedence() const { return 0; }
+fn Operator::unary_precedence() const -> u8 { return 0; }
 
-bool Operator::binary_left_associative() const { return true; }
+fn Operator::binary_left_associative() const -> bool { return true; }
 
-std::unique_ptr<Expression>
-Operator::construct_binary_expression(const Expression *lhs,
-                                      const Expression *rhs) const
+fn Operator::construct_binary_expression(const Expression *lhs,
+                                         const Expression *rhs) const
+    -> std::unique_ptr<Expression>
 {
   SHIT_UNUSED(lhs);
   SHIT_UNUSED(rhs);
@@ -256,8 +256,8 @@ Operator::construct_binary_expression(const Expression *lhs,
                    SHIT_ENUM(kind()));
 }
 
-std::unique_ptr<Expression>
-Operator::construct_unary_expression(const Expression *rhs) const
+fn Operator::construct_unary_expression(const Expression *rhs) const
+    -> std::unique_ptr<Expression>
 {
   SHIT_UNUSED(rhs);
   SHIT_UNREACHABLE("Invalid unary operator construction of type %d",

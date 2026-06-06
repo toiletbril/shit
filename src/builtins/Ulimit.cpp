@@ -3,7 +3,6 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-#include "../Platform.hpp"
 
 #if SHIT_PLATFORM_IS POSIX
 #include <sys/resource.h>

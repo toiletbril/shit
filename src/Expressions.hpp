@@ -32,14 +32,15 @@ struct AnalysisContext
 
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
-  void warn(SourceLocation location, StringView message);
-  void fail(SourceLocation location, StringView message);
+  fn warn(SourceLocation location, StringView message) -> void;
+  fn fail(SourceLocation location, StringView message) -> void;
 };
 
 /* Walk the tree and report. Returns true when execution may proceed, false when
    an unconditional command failed to resolve. */
-bool analyze_ast(const Expression *root, StringView source,
-                 const HashSet &known_functions, const HashSet &known_aliases);
+fn analyze_ast(const Expression *root, StringView source,
+               const HashSet &known_functions, const HashSet &known_aliases)
+    -> bool;
 
 struct Expression
 {
@@ -48,10 +49,10 @@ struct Expression
 
   virtual ~Expression() = default;
 
-  SourceLocation source_location() const;
+  fn source_location() const -> SourceLocation;
   /* Expressions should override evaluate_impl() instead. This method is used
    * mainly for initialization before the actual evaluation. */
-  i64 evaluate(EvalContext &cxt) const;
+  fn evaluate(EvalContext &cxt) const -> i64;
 
   /* Each expression should provide it's own way to copy it. */
   Expression(const Expression &) = delete;
@@ -59,24 +60,25 @@ struct Expression
   Expression &operator=(const Expression &) = delete;
   Expression &operator=(Expression &&) noexcept = delete;
 
-  virtual String to_string() const = 0;
-  virtual String to_ast_string(usize layer = 0) const;
+  virtual fn to_string() const -> String = 0;
+  virtual fn to_ast_string(usize layer = 0) const -> String;
 
-  virtual bool is_simple_command() const;
-  virtual bool is_dummy() const;
+  virtual fn is_simple_command() const -> bool;
+  virtual fn is_dummy() const -> bool;
 
   /* A node lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap node otherwise. The
      destructor still runs through the normal delete. */
-  static void operator delete(void *pointer);
+  static fn operator delete(void *pointer)->void;
 
   /* The prepass entry per node. The base does None, the command and the
      control flow nodes override it. is_unconditional says whether this node is
      reached on every run, which decides a failure from a warning. */
-  virtual void analyze(AnalysisContext &actx, bool is_unconditional) const;
+  virtual fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void;
 
 protected:
-  virtual i64 evaluate_impl(EvalContext &cxt) const = 0;
+  virtual fn evaluate_impl(EvalContext &cxt) const -> i64 = 0;
 
   SourceLocation m_location;
 };
@@ -90,13 +92,14 @@ struct IfStatement : public Expression
 
   ~IfStatement() override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const Expression *m_condition;
   const Expression *m_then;
@@ -107,31 +110,31 @@ struct DummyExpression : public Expression
 {
   DummyExpression(SourceLocation location);
 
-  bool is_dummy() const override;
+  fn is_dummy() const -> bool override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 };
 
 struct Command : public Expression
 {
   Command(SourceLocation location);
 
-  void make_async();
-  bool is_async() const;
-  void set_local_vars(HashMap<Word> &&vars);
+  fn make_async() -> void;
+  fn is_async() const -> bool;
+  fn set_local_vars(HashMap<Word> &&vars) -> void;
 
   /* The ! reserved word in front of a pipeline inverts its exit status. */
-  void set_negated();
-  bool is_negated() const;
+  fn set_negated() -> void;
+  fn is_negated() const -> bool;
 
-  virtual bool is_assignment() const;
+  virtual fn is_assignment() const -> bool;
 
-  virtual void append_to(usize d, String &f, bool duplicate) = 0;
-  virtual void redirect_to(usize d, String &f, bool duplicate) = 0;
+  virtual fn append_to(usize d, String &f, bool duplicate) -> void = 0;
+  virtual fn redirect_to(usize d, String &f, bool duplicate) -> void = 0;
 
 protected:
   bool m_is_async{false};
@@ -144,18 +147,18 @@ struct AssignCommand : public Command
   AssignCommand(SourceLocation location, const Assignment *a);
   ~AssignCommand() override;
 
-  const Assignment *assignment() const;
+  fn assignment() const -> const Assignment *;
 
-  bool is_assignment() const override;
+  fn is_assignment() const -> bool override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
-  void append_to(usize d, String &f, bool duplicate) override;
-  void redirect_to(usize d, String &f, bool duplicate) override;
+  fn append_to(usize d, String &f, bool duplicate) -> void override;
+  fn redirect_to(usize d, String &f, bool duplicate) -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const Assignment *m_assignment;
 };
@@ -189,26 +192,27 @@ struct SimpleCommand : public Command
   SimpleCommand(SourceLocation location, ArrayList<const Token *> &&args);
   ~SimpleCommand() override;
 
-  void set_redirections(ArrayList<Redirection> &&redirections);
+  fn set_redirections(ArrayList<Redirection> &&redirections) -> void;
 
   /* Open this command's redirections into an exec context, for a pipeline stage
      that does not go through evaluate_impl. */
-  void redirect_exec_context(ExecContext &ec, EvalContext &cxt) const;
+  fn redirect_exec_context(ExecContext &ec, EvalContext &cxt) const -> void;
 
-  bool is_simple_command() const override;
+  fn is_simple_command() const -> bool override;
 
-  const ArrayList<const Token *> &args() const;
+  fn args() const -> const ArrayList<const Token *> &;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
-  void append_to(usize d, String &f, bool duplicate) override;
-  void redirect_to(usize d, String &f, bool duplicate) override;
+  fn append_to(usize d, String &f, bool duplicate) -> void override;
+  fn redirect_to(usize d, String &f, bool duplicate) -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   ArrayList<const Token *> m_args{heap_allocator()};
 
@@ -234,15 +238,16 @@ struct CompoundListCondition : public Expression
                         const Command *expr);
   ~CompoundListCondition() override;
 
-  Kind kind() const;
+  fn kind() const -> Kind;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   Kind m_kind;
   const Command *m_cmd;
@@ -254,16 +259,17 @@ struct CompoundList : public Expression
 
   ~CompoundList() override;
 
-  bool is_empty() const;
-  void append_node(const CompoundListCondition *node);
+  fn is_empty() const -> bool;
+  fn append_node(const CompoundListCondition *node) -> void;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   ArrayList<const CompoundListCondition *> m_nodes{heap_allocator()};
 };
@@ -274,19 +280,20 @@ struct Pipeline : public Command
 
   ~Pipeline() override;
 
-  bool is_empty() const;
-  void append_command(const SimpleCommand *node);
+  fn is_empty() const -> bool;
+  fn append_command(const SimpleCommand *node) -> void;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
-  void append_to(usize d, String &f, bool duplicate) override;
-  void redirect_to(usize d, String &f, bool duplicate) override;
+  fn append_to(usize d, String &f, bool duplicate) -> void override;
+  fn redirect_to(usize d, String &f, bool duplicate) -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   ArrayList<const SimpleCommand *> m_commands{heap_allocator()};
 };
@@ -298,8 +305,8 @@ struct CompoundCommand : public Command
 {
   CompoundCommand(SourceLocation location);
 
-  void append_to(usize d, String &f, bool duplicate) override;
-  void redirect_to(usize d, String &f, bool duplicate) override;
+  fn append_to(usize d, String &f, bool duplicate) -> void override;
+  fn redirect_to(usize d, String &f, bool duplicate) -> void override;
 };
 
 struct IfClause : public CompoundCommand
@@ -313,12 +320,13 @@ struct IfClause : public CompoundCommand
       const Expression *otherwise);
   ~IfClause() override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   ArrayList<std::pair<const Expression *, const Expression *>> m_branches{
       heap_allocator()};
@@ -331,12 +339,13 @@ struct WhileLoop : public CompoundCommand
             const Expression *body, bool is_until);
   ~WhileLoop() override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const Expression *m_condition;
   const Expression *m_body;
@@ -351,12 +360,13 @@ struct ForLoop : public CompoundCommand
           const Expression *body);
   ~ForLoop() override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   String m_variable_name;
   ArrayList<const Token *> m_words{heap_allocator()};
@@ -378,12 +388,13 @@ struct CaseClause : public CompoundCommand
              ArrayList<CaseItem> &&items);
   ~CaseClause() override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const Token *m_word;
   ArrayList<CaseItem> m_items{heap_allocator()};
@@ -394,12 +405,13 @@ struct BraceGroup : public CompoundCommand
   BraceGroup(SourceLocation location, const Expression *body);
   ~BraceGroup() override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const Expression *m_body;
 };
@@ -409,12 +421,13 @@ struct Subshell : public CompoundCommand
   Subshell(SourceLocation location, const Expression *body);
   ~Subshell() override;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const Expression *m_body;
 };
@@ -425,15 +438,16 @@ struct FunctionDefinition : public CompoundCommand
                      const Expression *body);
   ~FunctionDefinition() override;
 
-  const String &name() const;
-  const Expression *body() const;
+  fn name() const -> const String &;
+  fn body() const -> const Expression *;
 
-  String to_string() const override;
-  String to_ast_string(usize layer = 0) const override;
-  void analyze(AnalysisContext &actx, bool is_unconditional) const override;
+  fn to_string() const -> String override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const
+      -> void override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   String m_name;
   const Expression *m_body;
@@ -444,11 +458,11 @@ struct ConstantNumber : public Expression
   ConstantNumber(SourceLocation location, i64 value);
   ~ConstantNumber() override;
 
-  String to_ast_string(usize layer = 0) const override;
-  String to_string() const override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn to_string() const -> String override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const i64 m_value;
 };
@@ -458,11 +472,11 @@ struct ConstantString : public Expression
   ConstantString(SourceLocation location, StringView value);
   ~ConstantString() override;
 
-  String to_ast_string(usize layer = 0) const override;
-  String to_string() const override;
+  fn to_ast_string(usize layer = 0) const -> String override;
+  fn to_string() const -> String override;
 
 protected:
-  i64 evaluate_impl(EvalContext &cxt) const override;
+  fn evaluate_impl(EvalContext &cxt) const -> i64 override;
 
   const String m_value;
 };
@@ -472,7 +486,7 @@ struct UnaryExpression : public Expression
   UnaryExpression(SourceLocation location, const Expression *rhs);
   ~UnaryExpression() override;
 
-  String to_ast_string(usize layer = 0) const override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
 protected:
   const Expression *m_rhs;
@@ -499,7 +513,7 @@ struct BinaryExpression : public Expression
                    const Expression *rhs);
   ~BinaryExpression() override;
 
-  String to_ast_string(usize layer = 0) const override;
+  fn to_ast_string(usize layer = 0) const -> String override;
 
 protected:
   const Expression *m_lhs;

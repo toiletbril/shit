@@ -39,11 +39,14 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_field_separators(m_field_separators.view());
 }
 
-void EvalContext::add_evaluated_expression() { m_expressions_executed_last++; }
+fn EvalContext::add_evaluated_expression() -> void
+{
+  m_expressions_executed_last++;
+}
 
-void EvalContext::add_expansion() { m_expansions_last++; }
+fn EvalContext::add_expansion() -> void { m_expansions_last++; }
 
-void EvalContext::end_command()
+fn EvalContext::end_command() -> void
 {
   m_expansions_total += m_expansions_last;
   m_expressions_executed_total += m_expressions_executed_last;
@@ -51,7 +54,7 @@ void EvalContext::end_command()
   m_expansions_last = m_expressions_executed_last = 0;
 }
 
-void EvalContext::assign_variable(StringView name, StringView value)
+fn EvalContext::assign_variable(StringView name, StringView value) -> void
 {
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
@@ -59,7 +62,7 @@ void EvalContext::assign_variable(StringView name, StringView value)
   m_shell_variables.set(name, value);
 }
 
-void EvalContext::set_field_separators(StringView value)
+fn EvalContext::set_field_separators(StringView value) -> void
 {
   /* The table is built before m_field_separators is touched, since the
      constructor seeds it from m_field_separators' own view, so value may alias
@@ -74,12 +77,12 @@ void EvalContext::set_field_separators(StringView value)
   }
 }
 
-bool EvalContext::is_field_separator(char c) const
+fn EvalContext::is_field_separator(char c) const -> bool
 {
   return m_field_separator_table[static_cast<u8>(c)];
 }
 
-void EvalContext::set_shell_variable(StringView name, StringView value)
+fn EvalContext::set_shell_variable(StringView name, StringView value) -> void
 {
   /* A read-only variable rejects the assignment. The common case has no
      read-only names, so the scan is skipped entirely. */
@@ -89,7 +92,7 @@ void EvalContext::set_shell_variable(StringView name, StringView value)
   assign_variable(name, value);
 }
 
-void EvalContext::unset_shell_variable(StringView name)
+fn EvalContext::unset_shell_variable(StringView name) -> void
 {
   m_shell_variables.erase(name);
   /* An exported variable also lives in the process environment, so it is
@@ -100,7 +103,7 @@ void EvalContext::unset_shell_variable(StringView name)
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
-Maybe<String> EvalContext::get_variable_value(StringView name) const
+fn EvalContext::get_variable_value(StringView name) const -> Maybe<String>
 {
   if (name == "?")
     return String{heap_allocator(),
@@ -121,7 +124,7 @@ Maybe<String> EvalContext::get_variable_value(StringView name) const
 
   /* A purely numeric name selects a positional parameter, $1 upward. An index
      too large to fit, or beyond the count, has no value. */
-  bool is_all_digits = !name.empty();
+  let is_all_digits = !name.empty();
   for (usize i = 0; i < name.size(); i++)
     if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
       is_all_digits = false;
@@ -129,9 +132,9 @@ Maybe<String> EvalContext::get_variable_value(StringView name) const
     }
   if (is_all_digits) {
     if (name.size() > 9) return String{};
-    const ErrorOr<i64> parsed_index = utils::parse_decimal_integer(name);
+    let const parsed_index = utils::parse_decimal_integer(name);
     if (parsed_index.is_error()) return String{};
-    const usize index = static_cast<usize>(parsed_index.value());
+    let const index = static_cast<usize>(parsed_index.value());
     if (index >= 1 && index <= m_positional_params.size())
       return m_positional_params[index - 1];
     return String{};
@@ -140,14 +143,14 @@ Maybe<String> EvalContext::get_variable_value(StringView name) const
   /* $* and $@ outside the special quoted handling join into a single word. $*
      joins with the first IFS character, $@ joins with a space. */
   if (name == "*" || name == "@") {
-    char separator = ' ';
-    bool has_separator = true;
+    let separator = ' ';
+    let has_separator = true;
     if (name == "*") {
-      const String &ifs = m_field_separators;
+      let const &ifs = m_field_separators;
       has_separator = !ifs.empty();
       if (has_separator) separator = ifs.first_character();
     }
-    String joined{};
+    let joined = String{};
     for (usize i = 0; i < m_positional_params.size(); i++) {
       if (i > 0 && has_separator) joined.push(separator);
       joined.append(m_positional_params[i].view());
@@ -155,31 +158,31 @@ Maybe<String> EvalContext::get_variable_value(StringView name) const
     return joined;
   }
 
-  if (const String *stored = m_shell_variables.find(name)) return *stored;
+  if (let const *stored = m_shell_variables.find(name)) return *stored;
 
-  if (Maybe<String> env = os::get_environment_variable(name))
+  if (let env = os::get_environment_variable(name))
     return String{heap_allocator(), env->view()};
   return shit::None;
 }
 
-const ArrayList<String> &EvalContext::positional_params() const
+fn EvalContext::positional_params() const -> const ArrayList<String> &
 {
   return m_positional_params;
 }
 
-void EvalContext::set_positional_params(ArrayList<String> params)
+fn EvalContext::set_positional_params(ArrayList<String> params) -> void
 {
   m_positional_params = std::move(params);
 }
 
-void EvalContext::set_last_background_pid(i64 pid)
+fn EvalContext::set_last_background_pid(i64 pid) -> void
 {
   m_last_background_pid = pid;
 }
 
-int EvalContext::register_job(os::process pid, StringView command)
+fn EvalContext::register_job(os::process pid, StringView command) -> int
 {
-  Job job{};
+  let job = Job{};
   job.id = m_next_job_id++;
   job.pid = pid;
   job.command = command;
@@ -189,13 +192,13 @@ int EvalContext::register_job(os::process pid, StringView command)
   return m_jobs.back().id;
 }
 
-void EvalContext::update_jobs()
+fn EvalContext::update_jobs() -> void
 {
   for (Job &job : m_jobs) {
     if (job.state == Job::State::Done) continue;
 
     i32 status = 0;
-    const os::ProcessState state = os::poll_process(job.pid, status);
+    let const state = os::poll_process(job.pid, status);
     if (state == os::ProcessState::Exited) {
       job.state = Job::State::Done;
       job.last_status = status;
@@ -207,16 +210,16 @@ void EvalContext::update_jobs()
   }
 }
 
-ArrayList<Job> &EvalContext::jobs() { return m_jobs; }
+fn EvalContext::jobs() -> ArrayList<Job> & { return m_jobs; }
 
-Job *EvalContext::find_job(int id)
+fn EvalContext::find_job(int id) -> Job *
 {
   for (Job &job : m_jobs)
     if (job.id == id) return &job;
   return nullptr;
 }
 
-Job *EvalContext::most_recent_job()
+fn EvalContext::most_recent_job() -> Job *
 {
   /* Skip a finished job, so a bare fg or bg acts on a job that is still
      running or stopped rather than a dead pid. */
@@ -225,9 +228,9 @@ Job *EvalContext::most_recent_job()
   return nullptr;
 }
 
-void EvalContext::forget_done_jobs()
+fn EvalContext::forget_done_jobs() -> void
 {
-  ArrayList<Job> kept{};
+  let kept = ArrayList<Job>{};
   for (Job &job : m_jobs) {
     if (job.state == Job::State::Done) continue;
     kept.push(std::move(job));
@@ -235,28 +238,35 @@ void EvalContext::forget_done_jobs()
   m_jobs = std::move(kept);
 }
 
-void EvalContext::set_monitor(bool enabled) { m_monitor = enabled; }
+fn EvalContext::set_monitor(bool enabled) -> void { m_monitor = enabled; }
 
-bool EvalContext::monitor() const { return m_monitor; }
+fn EvalContext::monitor() const -> bool { return m_monitor; }
 
-void EvalContext::register_function(StringView name, const Expression *body)
+fn EvalContext::register_function(StringView name, const Expression *body)
+    -> void
 {
   m_functions.set(name, body);
 }
 
-const Expression *EvalContext::find_function(StringView name) const
+fn EvalContext::find_function(StringView name) const -> const Expression *
 {
-  if (const Expression *const *slot = m_functions.find(name)) return *slot;
+  if (let const *const *slot = m_functions.find(name)) return *slot;
   return nullptr;
 }
 
-bool EvalContext::has_functions() const { return m_functions.size() != 0; }
-
-void EvalContext::unset_function(StringView name) { m_functions.erase(name); }
-
-HashSet EvalContext::function_names() const
+fn EvalContext::has_functions() const -> bool
 {
-  HashSet names{heap_allocator()};
+  return m_functions.size() != 0;
+}
+
+fn EvalContext::unset_function(StringView name) -> void
+{
+  m_functions.erase(name);
+}
+
+fn EvalContext::function_names() const -> HashSet
+{
+  let names = HashSet{heap_allocator()};
   m_functions.for_each([&](StringView name, const Expression *body) {
     SHIT_UNUSED(body);
     names.add(name);
@@ -264,34 +274,34 @@ HashSet EvalContext::function_names() const
   return names;
 }
 
-void EvalContext::set_trap(StringView condition, StringView action)
+fn EvalContext::set_trap(StringView condition, StringView action) -> void
 {
   m_traps.set(condition, action);
 }
 
-void EvalContext::remove_trap(StringView condition)
+fn EvalContext::remove_trap(StringView condition) -> void
 {
   m_traps.erase(condition);
 }
 
-const HashMap<String> &EvalContext::traps() const { return m_traps; }
+fn EvalContext::traps() const -> const HashMap<String> & { return m_traps; }
 
-void EvalContext::run_exit_trap()
+fn EvalContext::run_exit_trap() -> void
 {
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
 
-  if (const String *action = m_traps.find(StringView{"EXIT", 4}))
+  if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->size() > 0) run_source(action->view(), "the EXIT trap");
 }
 
-void EvalContext::mark_readonly(StringView name)
+fn EvalContext::mark_readonly(StringView name) -> void
 {
   if (is_readonly(name)) return;
   m_readonly_names.push(String{heap_allocator(), name});
 }
 
-bool EvalContext::is_readonly(StringView name) const
+fn EvalContext::is_readonly(StringView name) const -> bool
 {
   if (m_readonly_names.size() == 0) return false;
   for (const String &readonly_name : m_readonly_names)
@@ -300,9 +310,9 @@ bool EvalContext::is_readonly(StringView name) const
   return false;
 }
 
-ArrayList<String> EvalContext::readonly_names() const
+fn EvalContext::readonly_names() const -> ArrayList<String>
 {
-  ArrayList<String> out{};
+  let out = ArrayList<String>{};
   for (const String &name : m_readonly_names)
     out.push(String{
         heap_allocator(), StringView{name.c_str(), name.size()}
@@ -311,20 +321,20 @@ ArrayList<String> EvalContext::readonly_names() const
   return out;
 }
 
-void EvalContext::enter_function_scope()
+fn EvalContext::enter_function_scope() -> void
 {
   m_local_scopes.push(ArrayList<LocalBinding>{});
 }
 
-void EvalContext::leave_function_scope()
+fn EvalContext::leave_function_scope() -> void
 {
   if (m_local_scopes.empty()) return;
 
   /* Restore each shadowed binding in reverse, so a name declared local twice
      ends with the value it held before the function ran. */
-  ArrayList<LocalBinding> &scope = m_local_scopes.back();
+  let &scope = m_local_scopes.back();
   for (usize i = scope.size(); i > 0; i--) {
-    LocalBinding &binding = scope[i - 1];
+    let &binding = scope[i - 1];
     /* Restore through assign_variable, not set_shell_variable, since this runs
        inside a noexcept defer and a readonly name would otherwise throw from a
        destructor and terminate the shell. A local marked readonly in the body
@@ -334,45 +344,48 @@ void EvalContext::leave_function_scope()
     else
       unset_shell_variable(binding.name);
   }
-  ArrayList<ArrayList<LocalBinding>> kept{};
+  let kept = ArrayList<ArrayList<LocalBinding>>{};
   for (usize i = 0; i + 1 < m_local_scopes.size(); i++)
     kept.push(std::move(m_local_scopes[i]));
   m_local_scopes = std::move(kept);
 }
 
-bool EvalContext::in_function_scope() const { return !m_local_scopes.empty(); }
+fn EvalContext::in_function_scope() const -> bool
+{
+  return !m_local_scopes.empty();
+}
 
-void EvalContext::declare_local(StringView name)
+fn EvalContext::declare_local(StringView name) -> void
 {
   if (m_local_scopes.empty()) return;
   m_local_scopes.back().push(
       LocalBinding{String{name}, get_variable_value(name)});
 }
 
-void EvalContext::set_alias(StringView name, StringView value)
+fn EvalContext::set_alias(StringView name, StringView value) -> void
 {
   m_aliases.set(name, value);
 }
 
-bool EvalContext::remove_alias(StringView name)
+fn EvalContext::remove_alias(StringView name) -> bool
 {
   if (m_aliases.find(name) == nullptr) return false;
   m_aliases.erase(name);
   return true;
 }
 
-Maybe<String> EvalContext::get_alias(StringView name) const
+fn EvalContext::get_alias(StringView name) const -> Maybe<String>
 {
-  if (const String *value = m_aliases.find(name))
+  if (let const *value = m_aliases.find(name))
     return String{heap_allocator(), value->view()};
   return None;
 }
 
-ArrayList<String> EvalContext::alias_definitions() const
+fn EvalContext::alias_definitions() const -> ArrayList<String>
 {
-  ArrayList<String> out{};
+  let out = ArrayList<String>{};
   m_aliases.for_each([&out](StringView key, const String &value) {
-    String definition{heap_allocator(), key};
+    let definition = String{heap_allocator(), key};
     definition.append(StringView{"='", 2});
     definition.append(StringView{value.c_str(), value.size()});
     definition.push('\'');
@@ -382,9 +395,9 @@ ArrayList<String> EvalContext::alias_definitions() const
   return out;
 }
 
-HashSet EvalContext::alias_names() const
+fn EvalContext::alias_names() const -> HashSet
 {
-  HashSet out{heap_allocator()};
+  let out = HashSet{heap_allocator()};
   m_aliases.for_each([&out](StringView key, const String &value) {
     SHIT_UNUSED(value);
     out.add(key);
@@ -392,20 +405,20 @@ HashSet EvalContext::alias_names() const
   return out;
 }
 
-void EvalContext::enter_subshell() { m_subshell_depth++; }
+fn EvalContext::enter_subshell() -> void { m_subshell_depth++; }
 
-void EvalContext::leave_subshell() { m_subshell_depth--; }
+fn EvalContext::leave_subshell() -> void { m_subshell_depth--; }
 
-bool EvalContext::in_subshell() const { return m_subshell_depth > 0; }
+fn EvalContext::in_subshell() const -> bool { return m_subshell_depth > 0; }
 
-void EvalContext::request_break(i64 level, SourceLocation location)
+fn EvalContext::request_break(i64 level, SourceLocation location) -> void
 {
   SHIT_LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
                                m_current_source, String{m_current_origin}};
 }
 
-void EvalContext::request_continue(i64 level, SourceLocation location)
+fn EvalContext::request_continue(i64 level, SourceLocation location) -> void
 {
   SHIT_LOG(Verbosity::Debug, "continue requested, level %lld",
            (long long) level);
@@ -413,7 +426,7 @@ void EvalContext::request_continue(i64 level, SourceLocation location)
                                m_current_source, String{m_current_origin}};
 }
 
-void EvalContext::request_return(i64 status, SourceLocation location)
+fn EvalContext::request_return(i64 status, SourceLocation location) -> void
 {
   SHIT_LOG(Verbosity::Debug, "return requested, status %lld",
            (long long) status);
@@ -421,98 +434,116 @@ void EvalContext::request_return(i64 status, SourceLocation location)
                                m_current_source, String{m_current_origin}};
 }
 
-void EvalContext::request_exit(i64 status, SourceLocation location)
+fn EvalContext::request_exit(i64 status, SourceLocation location) -> void
 {
   SHIT_LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
                                m_current_source, String{m_current_origin}};
 }
 
-bool EvalContext::has_pending_control_flow() const
+fn EvalContext::has_pending_control_flow() const -> bool
 {
   return m_control_flow.kind != ControlFlow::Kind::Normal;
 }
 
-ControlFlow &EvalContext::pending_control_flow() { return m_control_flow; }
-
-const ControlFlow &EvalContext::pending_control_flow() const
+fn EvalContext::pending_control_flow() -> ControlFlow &
 {
   return m_control_flow;
 }
 
-void EvalContext::clear_control_flow()
+fn EvalContext::pending_control_flow() const -> const ControlFlow &
+{
+  return m_control_flow;
+}
+
+fn EvalContext::clear_control_flow() -> void
 {
   m_control_flow.kind = ControlFlow::Kind::Normal;
 }
 
-void EvalContext::set_current_source(const String *source, String origin)
+fn EvalContext::set_current_source(const String *source, String origin) -> void
 {
   m_current_source = source;
   m_current_origin = std::move(origin);
 }
 
-const String *EvalContext::current_source() const { return m_current_source; }
+fn EvalContext::current_source() const -> const String *
+{
+  return m_current_source;
+}
 
-const String &EvalContext::current_origin() const { return m_current_origin; }
+fn EvalContext::current_origin() const -> const String &
+{
+  return m_current_origin;
+}
 
-void EvalContext::set_error_exit(bool enabled) { m_error_exit = enabled; }
+fn EvalContext::set_error_exit(bool enabled) -> void { m_error_exit = enabled; }
 
-bool EvalContext::error_exit() const { return m_error_exit; }
+fn EvalContext::error_exit() const -> bool { return m_error_exit; }
 
-void EvalContext::set_echo_expanded(bool enabled)
+fn EvalContext::set_echo_expanded(bool enabled) -> void
 {
   m_enable_echo_expanded = enabled;
 }
 
-void EvalContext::set_error_unset(bool enabled) { m_error_unset = enabled; }
+fn EvalContext::set_error_unset(bool enabled) -> void
+{
+  m_error_unset = enabled;
+}
 
-bool EvalContext::error_unset() const { return m_error_unset; }
+fn EvalContext::error_unset() const -> bool { return m_error_unset; }
 
-void EvalContext::set_no_clobber(bool enabled) { m_no_clobber = enabled; }
+fn EvalContext::set_no_clobber(bool enabled) -> void { m_no_clobber = enabled; }
 
-bool EvalContext::no_clobber() const { return m_no_clobber; }
+fn EvalContext::no_clobber() const -> bool { return m_no_clobber; }
 
-void EvalContext::set_export_all(bool enabled) { m_export_all = enabled; }
+fn EvalContext::set_export_all(bool enabled) -> void { m_export_all = enabled; }
 
-bool EvalContext::export_all() const { return m_export_all; }
+fn EvalContext::export_all() const -> bool { return m_export_all; }
 
-void EvalContext::set_no_glob(bool enabled)
+fn EvalContext::set_no_glob(bool enabled) -> void
 {
   m_enable_path_expansion = !enabled;
 }
 
-bool EvalContext::no_glob() const { return !m_enable_path_expansion; }
+fn EvalContext::no_glob() const -> bool { return !m_enable_path_expansion; }
 
-void EvalContext::set_no_exec(bool enabled) { m_no_exec = enabled; }
+fn EvalContext::set_no_exec(bool enabled) -> void { m_no_exec = enabled; }
 
-bool EvalContext::no_exec() const { return m_no_exec; }
+fn EvalContext::no_exec() const -> bool { return m_no_exec; }
 
-void EvalContext::enter_condition() { m_condition_depth++; }
+fn EvalContext::enter_condition() -> void { m_condition_depth++; }
 
-void EvalContext::leave_condition() { m_condition_depth--; }
+fn EvalContext::leave_condition() -> void { m_condition_depth--; }
 
-bool EvalContext::in_condition() const { return m_condition_depth > 0; }
+fn EvalContext::in_condition() const -> bool { return m_condition_depth > 0; }
 
-usize EvalContext::getopts_char_index() const { return m_getopts_char_index; }
+fn EvalContext::getopts_char_index() const -> usize
+{
+  return m_getopts_char_index;
+}
 
-void EvalContext::set_getopts_char_index(usize index)
+fn EvalContext::set_getopts_char_index(usize index) -> void
 {
   m_getopts_char_index = index;
 }
 
-i64 EvalContext::getopts_last_optind() const { return m_getopts_last_optind; }
+fn EvalContext::getopts_last_optind() const -> i64
+{
+  return m_getopts_last_optind;
+}
 
-void EvalContext::set_getopts_last_optind(i64 optind)
+fn EvalContext::set_getopts_last_optind(i64 optind) -> void
 {
   m_getopts_last_optind = optind;
 }
 
-ArrayList<String> EvalContext::sorted_variable_assignments() const
+fn EvalContext::sorted_variable_assignments() const -> ArrayList<String>
 {
-  ArrayList<String> assignments{};
+  let assignments = ArrayList<String>{};
   assignments.reserve(m_shell_variables.size());
   m_shell_variables.for_each([&](StringView name, const String &value) {
-    String entry{heap_allocator(), name};
+    let entry = String{heap_allocator(), name};
     entry.push('=');
     entry.append(StringView{value.c_str(), value.size()});
     assignments.push(std::move(entry));
@@ -521,15 +552,15 @@ ArrayList<String> EvalContext::sorted_variable_assignments() const
   return assignments;
 }
 
-void EvalContext::clear_functions() { m_functions.clear(); }
+fn EvalContext::clear_functions() -> void { m_functions.clear(); }
 
-EvalStateSnapshot EvalContext::snapshot_state() const
+fn EvalContext::snapshot_state() const -> EvalStateSnapshot
 {
   return EvalStateSnapshot{m_shell_variables, m_functions, m_positional_params,
                            Path::current_directory()};
 }
 
-void EvalContext::restore_state(EvalStateSnapshot snapshot)
+fn EvalContext::restore_state(EvalStateSnapshot snapshot) -> void
 {
   m_shell_variables = std::move(snapshot.shell_variables);
   m_functions = std::move(snapshot.functions);
@@ -541,7 +572,7 @@ void EvalContext::restore_state(EvalStateSnapshot snapshot)
   /* The cached field separators track the restored map, so an IFS change inside
      the subshell or the command substitution does not leak its split behavior
      to the parent. */
-  if (const String *ifs = m_shell_variables.find(StringView{"IFS", 3}))
+  if (let const *ifs = m_shell_variables.find(StringView{"IFS", 3}))
     set_field_separators(ifs->view());
   else
     set_field_separators(" \t\n");
@@ -550,9 +581,9 @@ void EvalContext::restore_state(EvalStateSnapshot snapshot)
      substitution propagate the status of their last command to the parent. */
 }
 
-String EvalContext::option_flags_string() const
+fn EvalContext::option_flags_string() const -> String
 {
-  String flags{};
+  let flags = String{};
   if (m_error_exit) flags += 'e';
   if (!m_enable_path_expansion) flags += 'f';
   if (m_enable_echo) flags += 'v';
@@ -561,14 +592,14 @@ String EvalContext::option_flags_string() const
   return flags;
 }
 
-void EvalContext::set_last_exit_status(i32 status)
+fn EvalContext::set_last_exit_status(i32 status) -> void
 {
   m_last_exit_status = status;
 }
 
-i32 EvalContext::last_exit_status() const { return m_last_exit_status; }
+fn EvalContext::last_exit_status() const -> i32 { return m_last_exit_status; }
 
-String EvalContext::expand_variable(StringView name) const
+fn EvalContext::expand_variable(StringView name) const -> String
 {
   return get_variable_value(name).value_or(String{});
 }
@@ -577,9 +608,10 @@ namespace {
 
 /* Remove the shortest or longest prefix of value that matches pattern as a
    glob, returning the remainder. */
-String trim_matching_prefix(StringView value, StringView pattern, bool longest)
+fn trim_matching_prefix(StringView value, StringView pattern, bool longest)
+    -> String
 {
-  ArrayList<bool> active{heap_allocator()};
+  let active = ArrayList<bool>{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
     active.push(true);
   if (longest) {
@@ -601,9 +633,10 @@ String trim_matching_prefix(StringView value, StringView pattern, bool longest)
 
 /* Remove the shortest or longest suffix of value that matches pattern as a
    glob, returning the head. */
-String trim_matching_suffix(StringView value, StringView pattern, bool longest)
+fn trim_matching_suffix(StringView value, StringView pattern, bool longest)
+    -> String
 {
-  ArrayList<bool> active{heap_allocator()};
+  let active = ArrayList<bool>{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
     active.push(true);
   if (longest) {
@@ -623,11 +656,12 @@ String trim_matching_suffix(StringView value, StringView pattern, bool longest)
 
 } /* namespace */
 
-String EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
+fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
+    -> String
 {
-  String out{heap_allocator()};
-  bool in_single_quote = false;
-  bool in_double_quote = false;
+  let out = String{heap_allocator()};
+  let in_single_quote = false;
+  let in_double_quote = false;
   for (usize i = 0; i < word.length; i++) {
     /* In a default or a pattern word the quotes are removed, so a quoted
        expansion such as ${x%"$suffix"} matches the value of suffix literally.
@@ -775,8 +809,9 @@ String EvalContext::apply_parameter_expansion(StringView spec)
   if (op_index >= rest.length) return expand_variable(name);
 
   const char op = rest[op_index];
-  const bool is_doubled = (op_index + 1 < rest.length &&
-                           rest[op_index + 1] == op && (op == '#' || op == '%'));
+  const bool is_doubled =
+      (op_index + 1 < rest.length && rest[op_index + 1] == op &&
+       (op == '#' || op == '%'));
   const StringView word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
   const Maybe<String> current = get_variable_value(name);
@@ -1301,7 +1336,8 @@ struct ArithmeticParser
       for (const auto &[op, kind] : compound_operators) {
         if (consume(op)) {
           const i64 rhs = parse_assignment();
-          const i64 result = apply_compound(read_variable_value(name), rhs, kind);
+          const i64 result =
+              apply_compound(read_variable_value(name), rhs, kind);
           context.set_shell_variable(name, utils::integer_to_string(result));
           return result;
         }
@@ -1750,8 +1786,7 @@ i32 EvalContext::run_source(StringView source, StringView origin,
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
      so a return or a break inside the evaluated source reaches the caller. */
-  if (AST_ARENA == nullptr)
-    throw Error{"Cannot run source outside of a parse"};
+  if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
 
   /* A located error from the sourced text carries an offset into that text, not
      into the caller's command, so it is formatted here against the source and
@@ -1786,7 +1821,8 @@ i32 EvalContext::run_source(StringView source, StringView origin,
     ast->evaluate(*this);
     /* A return at the top of a sourced file or an eval returns from that source
        with its status, the way a return ends a function. Break, continue, and
-       exit keep propagating, so an enclosing loop or the shell consumes them. */
+       exit keep propagating, so an enclosing loop or the shell consumes them.
+     */
     if (consume_return && has_pending_control_flow() &&
         pending_control_flow().kind == ControlFlow::Kind::Return)
     {

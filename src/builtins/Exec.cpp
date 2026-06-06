@@ -14,12 +14,12 @@ namespace shit {
 
 Exec::Exec() = default;
 
-Builtin::Kind Exec::kind() const { return Kind::Exec; }
+fn Exec::kind() const -> Builtin::Kind { return Kind::Exec; }
 
-i32 Exec::execute(ExecContext &ec, EvalContext &cxt) const
+fn Exec::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   SHIT_UNUSED(cxt);
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
 
   /* exec with only redirections changes the shell's own descriptors and
      returns, so the rest of the session inherits them. */
@@ -28,20 +28,20 @@ i32 Exec::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  const String &command_name = args[1];
+  let const &command_name = args[1];
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the
      status a command-not-found leaves. */
-  Path program_path{};
+  let program_path = Path{};
   if (command_name.find_character('/').has_value()) {
-    Maybe<Path> resolved = utils::canonicalize_path(command_name);
+    let resolved = utils::canonicalize_path(command_name);
     if (!resolved) {
       show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);
     }
     program_path = resolved.take();
   } else {
-    ArrayList<Path> found = utils::search_program_path(command_name);
+    let found = utils::search_program_path(command_name);
     if (found.size() == 0) {
       show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);
@@ -49,10 +49,10 @@ i32 Exec::execute(ExecContext &ec, EvalContext &cxt) const
     program_path = found[0];
   }
 
-  ArrayList<String> command_args{};
+  let command_args = ArrayList<String>{};
   for (usize i = 1; i < args.size(); i++)
     command_args.push(String{heap_allocator(), args[i]});
-  ExecContext command = ExecContext::from_resolved(
+  let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(program_path),
       command_args);
   if (ec.in_fd) command.in_fd = ec.in_fd.take();

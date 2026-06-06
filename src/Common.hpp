@@ -127,6 +127,11 @@ struct t__exit_scope_help
 /* The length of statically allocated array. */
 #define COUNTOF(arr) (sizeof(arr) / sizeof(*(arr)))
 
+/* Every function is written `fn name(args) -> ret` and every variable `let x`,
+   so the name leads and the type trails, matching the oo style. */
+#define fn  auto
+#define let auto
+
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";
 constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";

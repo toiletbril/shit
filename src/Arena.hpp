@@ -21,9 +21,9 @@ struct BumpArena
   BumpArena(const BumpArena &) = delete;
   BumpArena &operator=(const BumpArena &) = delete;
 
-  void *allocate(usize size, usize alignment);
-  bool owns(const void *pointer) const;
-  void reset();
+  fn allocate(usize size, usize alignment) -> void *;
+  fn owns(const void *pointer) const -> bool;
+  fn reset() -> void;
 
   /* A saved bump position, so a scope can reclaim everything it allocated above
      the mark while leaving earlier allocations alone. The marks nest, so a
@@ -33,11 +33,11 @@ struct BumpArena
     usize block_count;
     usize used_in_last;
   };
-  Mark mark() const;
-  void release(Mark saved);
+  fn mark() const -> Mark;
+  fn release(Mark saved) -> void;
 
   template <class T, class... Args>
-  T *create(Args &&...args)
+  fn create(Args &&...args) -> T *
   {
     void *storage = allocate(sizeof(T), alignof(T));
     return new (storage) T(std::forward<Args>(args)...);
@@ -55,7 +55,7 @@ private:
 
   std::vector<Block> m_blocks{};
 
-  void add_block(usize minimum_size);
+  fn add_block(usize minimum_size) -> void;
 };
 
 /* The arena that the lexer and parser allocate nodes from while a command is
@@ -71,6 +71,6 @@ extern BumpArena *FUNCTION_ARENA;
 
 /* True when the pointer belongs to either arena, so a node delete knows to
    leave the storage to the arena. */
-bool is_arena_pointer(const void *pointer);
+fn is_arena_pointer(const void *pointer) -> bool;
 
 } /* namespace shit */

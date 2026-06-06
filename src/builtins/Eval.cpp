@@ -9,11 +9,11 @@ namespace shit {
 
 Eval::Eval() = default;
 
-Builtin::Kind Eval::kind() const { return Kind::Eval; }
+fn Eval::kind() const -> Builtin::Kind { return Kind::Eval; }
 
-i32 Eval::execute(ExecContext &ec, EvalContext &cxt) const
+fn Eval::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  std::string joined{};
+  let joined = std::string{};
   for (usize i = 1; i < ec.args().size(); i++) {
     if (i > 1) joined += ' ';
     joined.append(ec.args()[i].c_str(), ec.args()[i].size());

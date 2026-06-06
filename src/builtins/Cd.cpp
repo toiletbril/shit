@@ -1,6 +1,6 @@
 #include "../Builtin.hpp"
-#include "../Eval.hpp"
 #include "../Errors.hpp"
+#include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
@@ -9,11 +9,11 @@ namespace shit {
 
 Cd::Cd() = default;
 
-Builtin::Kind Cd::kind() const { return Kind::Cd; }
+fn Cd::kind() const -> Builtin::Kind { return Kind::Cd; }
 
-i32 Cd::execute(ExecContext &ec, EvalContext &cxt) const
+fn Cd::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  String arg_path{};
+  let arg_path = String{};
 
   if (ec.args().size() > 1) {
     arg_path.append(ec.args()[1]);
@@ -23,7 +23,7 @@ i32 Cd::execute(ExecContext &ec, EvalContext &cxt) const
     }
   } else {
     /* Empty cd should go to the home directory. */
-    const Maybe<Path> p = os::get_home_directory();
+    let const p = os::get_home_directory();
     if (!p) throw Error{"Could not figure out home directory"};
     arg_path.append(p->text());
   }
@@ -35,8 +35,8 @@ i32 Cd::execute(ExecContext &ec, EvalContext &cxt) const
     /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. An
        unreadable current directory yields an empty path, so OLDPWD stays as it
        was. */
-    const Path old_directory = Path::current_directory();
-    const ErrorOr<Ok> changed = Path::set_current_directory(target);
+    let const old_directory = Path::current_directory();
+    let const changed = Path::set_current_directory(target);
     SHIT_UNUSED(changed);
     if (!old_directory.empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());

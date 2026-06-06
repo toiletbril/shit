@@ -8,14 +8,14 @@ namespace shit {
 
 Exit::Exit() = default;
 
-Builtin::Kind Exit::kind() const { return Kind::Exit; }
+fn Exit::kind() const -> Builtin::Kind { return Kind::Exit; }
 
-i32 Exit::execute(ExecContext &ec, EvalContext &cxt) const
+fn Exit::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   /* exit with no argument uses the status of the last command. */
   i64 status = cxt.last_exit_status();
   if (ec.args().size() > 1) {
-    const ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    let const parsed = utils::parse_decimal_integer(ec.args()[1]);
     if (parsed.is_error()) throw parsed.error();
     status = parsed.value();
   }

@@ -22,23 +22,26 @@ namespace shit {
 
 CommandBuiltin::CommandBuiltin() = default;
 
-Builtin::Kind CommandBuiltin::kind() const { return Kind::CommandBuiltin; }
-
-i32 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
+fn CommandBuiltin::kind() const -> Builtin::Kind
 {
-  const ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
+  return Kind::CommandBuiltin;
+}
+
+fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+{
+  let const args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (args.size() < 2) return 0;
 
-  const String &name = args[1];
+  let const &name = args[1];
 
   /* -v and -V resolve the name without running it, against a builtin and the
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
-    const bool verbose = FLAG_SHOW_VERBOSE.is_enabled();
+    let const verbose = FLAG_SHOW_VERBOSE.is_enabled();
     if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
     {
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n"
@@ -48,7 +51,7 @@ i32 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
     if (ArrayList<Path> paths = utils::search_program_path(name);
         paths.size() != 0)
     {
-      String resolved{};
+      let resolved = String{};
       if (verbose) {
         resolved += name;
         resolved += " is ";
@@ -67,10 +70,10 @@ i32 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* The bare form runs the operand and its arguments as a command, which
      resolves against a builtin or the PATH and never a function. */
-  ArrayList<String> operand_args{};
+  let operand_args = ArrayList<String>{};
   for (usize i = 1; i < args.size(); i++)
     operand_args.push(String{heap_allocator(), args[i]});
-  ExecContext sub = ExecContext::make_from(ec.source_location(), operand_args);
+  let sub = ExecContext::make_from(ec.source_location(), operand_args);
   return utils::execute_context(std::move(sub), cxt, false);
 }
 

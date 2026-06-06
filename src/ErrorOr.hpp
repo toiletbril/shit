@@ -160,6 +160,6 @@ private:
 #define SHIT_MAKE_ERROR(msg)                                                   \
   ::shit::Error                                                                \
   {                                                                            \
-    ::shit::String{__FILE__ ":"} +                                            \
+    ::shit::String{__FILE__ ":"} +                                             \
         ::shit::utils::integer_to_string(__LINE__) + ": " + (msg)              \
   }

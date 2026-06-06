@@ -17,13 +17,13 @@ namespace shit {
 
 Hash::Hash() = default;
 
-Builtin::Kind Hash::kind() const { return Kind::Hash; }
+fn Hash::kind() const -> Builtin::Kind { return Kind::Hash; }
 
-i32 Hash::execute(ExecContext &ec, EvalContext &cxt) const
+fn Hash::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   SHIT_UNUSED(cxt);
 
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 

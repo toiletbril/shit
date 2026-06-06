@@ -6,14 +6,14 @@ namespace shit {
 
 Break::Break() = default;
 
-Builtin::Kind Break::kind() const { return Kind::Break; }
+fn Break::kind() const -> Builtin::Kind { return Kind::Break; }
 
-i32 Break::execute(ExecContext &ec, EvalContext &cxt) const
+fn Break::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   /* The optional argument is how many enclosing loops to break, default one. */
   i64 level = 1;
   if (ec.args().size() > 1) {
-    const ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    let const parsed = utils::parse_decimal_integer(ec.args()[1]);
     if (parsed.is_error()) throw parsed.error();
     level = parsed.value();
   }

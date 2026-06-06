@@ -23,7 +23,7 @@ namespace shit {
 
 namespace os {
 
-Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size)
+fn write_fd(os::descriptor fd, const void *buf, usize size) -> Maybe<usize>
 {
   for (;;) {
     ssize_t w = write(fd, buf, size);
@@ -35,7 +35,7 @@ Maybe<usize> write_fd(os::descriptor fd, const void *buf, usize size)
   }
 }
 
-Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size)
+fn read_fd(os::descriptor fd, void *buf, usize size) -> Maybe<usize>
 {
   for (;;) {
     ssize_t r = read(fd, buf, size);
@@ -48,9 +48,9 @@ Maybe<usize> read_fd(os::descriptor fd, void *buf, usize size)
   }
 }
 
-bool close_fd(os::descriptor fd) { return close(fd) != -1; }
+fn close_fd(os::descriptor fd) -> bool { return close(fd) != -1; }
 
-os::descriptor redirect_stdout(os::descriptor target)
+fn redirect_stdout(os::descriptor target) -> os::descriptor
 {
   /* The saved copy of the real stdout is close-on-exec, so a forked command
      does not inherit it and hold the shell's own output open. An immortal
@@ -65,13 +65,13 @@ os::descriptor redirect_stdout(os::descriptor target)
   return saved;
 }
 
-void restore_stdout(os::descriptor saved)
+fn restore_stdout(os::descriptor saved) -> void
 {
   dup2(saved, STDOUT_FILENO);
   close(saved);
 }
 
-Maybe<String> get_current_user()
+fn get_current_user() -> Maybe<String>
 {
   /* The name comes from the environment rather than getpwuid, which a static
      build cannot call without pulling in the runtime glibc and which the linker
@@ -83,7 +83,7 @@ Maybe<String> get_current_user()
   return shit::None;
 }
 
-Maybe<Path> get_home_directory()
+fn get_home_directory() -> Maybe<Path>
 {
   if (Maybe<String> home = get_environment_variable("HOME"))
     return Path{StringView{*home}};
@@ -92,15 +92,15 @@ Maybe<Path> get_home_directory()
 
 static const pid_t PARENT_SHELL_PID = getpid();
 
-bool is_child_process() { return getpid() != PARENT_SHELL_PID; }
+fn is_child_process() -> bool { return getpid() != PARENT_SHELL_PID; }
 
-i64 get_shell_process_id() { return static_cast<i64>(PARENT_SHELL_PID); }
+fn get_shell_process_id() -> i64 { return static_cast<i64>(PARENT_SHELL_PID); }
 
-i64 process_id_of(process p) { return static_cast<i64>(p); }
+fn process_id_of(process p) -> i64 { return static_cast<i64>(p); }
 
-bool is_stdin_a_tty() { return isatty(SHIT_STDIN); }
+fn is_stdin_a_tty() -> bool { return isatty(SHIT_STDIN); }
 
-bool is_stdout_a_tty() { return isatty(SHIT_STDOUT); }
+fn is_stdout_a_tty() -> bool { return isatty(SHIT_STDOUT); }
 
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
@@ -111,7 +111,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
   return suffixes;
 }();
 
-ExtIndex erase_extension_and_get_its_index(std::string &program_name)
+fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex
 {
   /* POSIX does not really make use of extensions for executable files. */
   SHIT_UNUSED(program_name);
@@ -119,7 +119,7 @@ ExtIndex erase_extension_and_get_its_index(std::string &program_name)
 }
 #endif /* !COSMO */
 
-Maybe<String> get_environment_variable(StringView key)
+fn get_environment_variable(StringView key) -> Maybe<String>
 {
   String key_string{key};
   const char *e = std::getenv(key_string.c_str());
@@ -127,20 +127,20 @@ Maybe<String> get_environment_variable(StringView key)
   return shit::None;
 }
 
-void set_environment_variable(StringView key, StringView value)
+fn set_environment_variable(StringView key, StringView value) -> void
 {
   String key_string{key};
   String value_string{value};
   setenv(key_string.c_str(), value_string.c_str(), 1);
 }
 
-void unset_environment_variable(StringView key)
+fn unset_environment_variable(StringView key) -> void
 {
   String key_string{key};
   unsetenv(key_string.c_str());
 }
 
-i32 check_syscall_impl(i32 status, StringView invocation)
+fn check_syscall_impl(i32 status, StringView invocation) -> i32
 {
   if (status == -1) {
     throw shit::Error{"'" + invocation +
@@ -150,7 +150,7 @@ i32 check_syscall_impl(i32 status, StringView invocation)
   return status;
 }
 
-#define check_syscall(fn) check_syscall_impl(fn, #fn)
+#define check_syscall(call) check_syscall_impl(call, #call)
 
 process execute_program(ExecContext &&ec)
 {
@@ -358,9 +358,9 @@ i32 wait_and_monitor_process(process pid)
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      shit::print(
-          "[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
-          ", signal " + utils::integer_to_string(sig) + "]\n");
+      shit::print("[Process " + utils::integer_to_string(pid) + ": " +
+                  sig_desc + ", signal " + utils::integer_to_string(sig) +
+                  "]\n");
     } else {
       shit::print("\n");
     }
@@ -372,9 +372,8 @@ i32 wait_and_monitor_process(process pid)
     String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
                                         : String{StringView{"Unknown"}};
 
-    shit::print(
-        "[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
-        ", signal " + utils::integer_to_string(sig) + " and killed]\n");
+    shit::print("[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
+                ", signal " + utils::integer_to_string(sig) + " and killed]\n");
 
     /* We can't handle suspended processes yet, so goodbye. */
     check_syscall(kill(pid, SIGKILL));

@@ -15,10 +15,10 @@ struct SourceLocation
   SourceLocation(usize position, usize length);
 
   /* Both variables are byte-offsets and do not account for unicode. */
-  usize position() const;
-  usize length() const;
+  fn position() const -> usize;
+  fn length() const -> usize;
 
-  void add_length(usize n);
+  fn add_length(usize n) -> void;
 
 private:
   usize m_position;
@@ -33,13 +33,13 @@ struct ErrorBase
 
   operator bool &();
 
-  String message() const;
+  fn message() const -> String;
 
   /* The word printed before the message, Error by default. A warning subclass
      overrides i
      t to Warning, so the reporting code reads the severity from the
      object rather than taking it as an argument. */
-  virtual String severity_word() const;
+  virtual fn severity_word() const -> String;
 
 protected:
   bool m_is_active{false};
@@ -51,7 +51,7 @@ struct Error : public ErrorBase
   Error();
   Error(StringView message);
 
-  String to_string() const;
+  fn to_string() const -> String;
 
   /* Convert to the formatted message, so a call site passes an Error where a
      string is expected without spelling out to_string. */
@@ -63,7 +63,7 @@ struct Warning : public Error
 {
   Warning(StringView message);
 
-  String severity_word() const override;
+  fn severity_word() const -> String override;
 };
 
 /* An Error that prints as a note and is shown rather than thrown. It carries no
@@ -72,7 +72,7 @@ struct Note : public Error
 {
   Note(StringView message);
 
-  String severity_word() const override;
+  fn severity_word() const -> String override;
 };
 
 /**
@@ -87,7 +87,7 @@ struct ErrorWithLocation : public ErrorBase
 
   /* The severity word comes from severity_word, so a warning subclass prints
      Warning over the same caret without passing the word in. */
-  virtual String to_string(StringView source) const;
+  virtual fn to_string(StringView source) const -> String;
 
 protected:
   SourceLocation m_location;
@@ -99,7 +99,7 @@ struct WarningWithLocation : public ErrorWithLocation
 {
   WarningWithLocation(SourceLocation location, StringView message);
 
-  String severity_word() const override;
+  fn severity_word() const -> String override;
 };
 
 struct ErrorWithLocationAndDetails : public ErrorWithLocation
@@ -110,7 +110,7 @@ struct ErrorWithLocationAndDetails : public ErrorWithLocation
                               SourceLocation details_location,
                               StringView details_message);
 
-  String details_to_string(StringView source) const;
+  fn details_to_string(StringView source) const -> String;
 
 protected:
   SourceLocation m_details_location;

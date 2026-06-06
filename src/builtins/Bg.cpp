@@ -16,15 +16,15 @@ namespace shit {
 
 Bg::Bg() = default;
 
-Builtin::Kind Bg::kind() const { return Kind::Bg; }
+fn Bg::kind() const -> Builtin::Kind { return Kind::Bg; }
 
-i32 Bg::execute(ExecContext &ec, EvalContext &cxt) const
+fn Bg::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
 
   Job *job = nullptr;
   if (args.size() > 1 && !args[1].empty() && args[1][0] == '%') {
-    const ErrorOr<i64> parsed =
+    let const parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
     if (parsed.is_error())
       throw Error{"bg: '" + args[1] + "' is not a valid job"};

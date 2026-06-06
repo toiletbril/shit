@@ -23,9 +23,10 @@ struct HashSet
   [[nodiscard]] usize size() const { return m_map.size(); }
 
   template <class Fn>
-  void for_each(Fn fn) const
+  void for_each(Fn callback) const
   {
-    m_map.for_each([&fn](StringView key, const Nothing &) { fn(key); });
+    m_map.for_each(
+        [&callback](StringView key, const Nothing &) { callback(key); });
   }
 
 private:

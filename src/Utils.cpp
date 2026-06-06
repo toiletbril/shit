@@ -22,7 +22,7 @@ namespace shit {
 
 namespace utils {
 
-String merge_tokens_to_string(const ArrayList<const Token *> &v)
+fn merge_tokens_to_string(const ArrayList<const Token *> &v) -> String
 {
   String r{};
   for (const shit::Token *t : v) {
@@ -35,14 +35,14 @@ String merge_tokens_to_string(const ArrayList<const Token *> &v)
   return r;
 }
 
-i32 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
+fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) -> i32
 {
   if (!ec.is_builtin()) {
     /* The command word is kept for the job table before the context is moved
        into the spawn. */
     String command = is_async ? String{ec.program().view()} : String{};
 
-    const os::process p = os::execute_program(std::move(ec));
+    let const p = os::execute_program(std::move(ec));
     if (is_async) {
       cxt.set_last_background_pid(os::process_id_of(p));
       const int id = cxt.register_job(p, command);
@@ -61,8 +61,8 @@ i32 execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
   SHIT_UNREACHABLE();
 }
 
-i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
-                                bool is_async)
+fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
+                               bool is_async) -> i32
 {
   SHIT_ASSERT(ecs.size() > 1);
 
@@ -80,7 +80,7 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   for (ExecContext &ec : ecs) {
     Maybe<os::Pipe> pipe;
 
-    const bool is_last = (&ec == &ecs.back());
+    let const is_last = (&ec == &ecs.back());
 
     if (!is_last) {
       pipe = os::make_pipe();
@@ -106,7 +106,7 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     }
 
     if (!ec.is_builtin()) {
-      const os::process child = os::execute_program(std::move(ec));
+      let const child = os::execute_program(std::move(ec));
       children.push(child);
       last_child = child;
     } else {
@@ -123,11 +123,10 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const int id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_error(
-            "[" + integer_to_string(id) + "] " +
-            unsigned_integer_to_string(
-                static_cast<u64>(os::process_id_of(last_child))) +
-            "\n");
+        shit::print_error("[" + integer_to_string(id) + "] " +
+                          unsigned_integer_to_string(
+                              static_cast<u64>(os::process_id_of(last_child))) +
+                          "\n");
     }
     return ret;
   }
@@ -146,7 +145,8 @@ i32 execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
    NOT_FOUND_INDEX when no occurrence remains. The bytes carry no null
    terminator, so the match is a plain byte scan rather than a C string search.
  */
-static usize find_subview(StringView haystack, StringView needle, usize start)
+static fn find_subview(StringView haystack, StringView needle, usize start)
+    -> usize
 {
   if (needle.length == 0)
     return start <= haystack.length ? start : NOT_FOUND_INDEX;
@@ -158,13 +158,13 @@ static usize find_subview(StringView haystack, StringView needle, usize start)
   return NOT_FOUND_INDEX;
 }
 
-void string_replace(String &s, const StringView to_replace,
-                    const StringView replace_with)
+fn string_replace(String &s, const StringView to_replace,
+                  const StringView replace_with) -> void
 {
   String result{};
   result.reserve(s.size());
 
-  const StringView source = s.view();
+  let const source = s.view();
   usize i = 0;
   usize previous = 0;
 
@@ -181,7 +181,7 @@ void string_replace(String &s, const StringView to_replace,
   s = std::move(result);
 }
 
-String lowercase_string(StringView s)
+fn lowercase_string(StringView s) -> String
 {
   String l{};
   l.reserve(s.size());
@@ -190,7 +190,7 @@ String lowercase_string(StringView s)
   return l;
 }
 
-static bool is_ascii_whitespace(char c)
+static fn is_ascii_whitespace(char c) -> bool
 {
   return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' ||
          c == '\r';
@@ -198,8 +198,8 @@ static bool is_ascii_whitespace(char c)
 
 /* Turn an accumulated magnitude and sign into a saturating signed result. The
    per-base parsers share this so only the digit loop stays base-specific. */
-static i64 saturate_signed_magnitude(u64 magnitude, bool is_negative,
-                                     bool has_overflowed)
+static fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
+                                    bool has_overflowed) -> i64
 {
   if (is_negative) {
     if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX) + 1)

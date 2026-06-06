@@ -10,7 +10,7 @@ namespace shit {
 BumpArena *AST_ARENA = nullptr;
 BumpArena *FUNCTION_ARENA = nullptr;
 
-bool is_arena_pointer(const void *pointer)
+fn is_arena_pointer(const void *pointer) -> bool
 {
   return (AST_ARENA != nullptr && AST_ARENA->owns(pointer)) ||
          (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
@@ -24,18 +24,18 @@ BumpArena::~BumpArena()
     std::free(block.base);
 }
 
-void BumpArena::add_block(usize minimum_size)
+fn BumpArena::add_block(usize minimum_size) -> void
 {
   usize size = DEFAULT_BLOCK_SIZE;
   if (minimum_size > size) size = minimum_size;
 
-  u8 *base = static_cast<u8 *>(std::malloc(size));
+  let base = static_cast<u8 *>(std::malloc(size));
   if (base == nullptr) throw std::bad_alloc{};
 
   m_blocks.push_back(Block{base, size, 0});
 }
 
-void *BumpArena::allocate(usize size, usize alignment)
+fn BumpArena::allocate(usize size, usize alignment) -> void *
 {
   for (;;) {
     if (!m_blocks.empty()) {
@@ -51,22 +51,22 @@ void *BumpArena::allocate(usize size, usize alignment)
   }
 }
 
-bool BumpArena::owns(const void *pointer) const
+fn BumpArena::owns(const void *pointer) const -> bool
 {
-  const u8 *p = static_cast<const u8 *>(pointer);
+  let p = static_cast<const u8 *>(pointer);
   for (const Block &block : m_blocks) {
     if (p >= block.base && p < block.base + block.size) return true;
   }
   return false;
 }
 
-BumpArena::Mark BumpArena::mark() const
+fn BumpArena::mark() const -> BumpArena::Mark
 {
   if (m_blocks.empty()) return Mark{0, 0};
   return Mark{m_blocks.size(), m_blocks.back().used};
 }
 
-void BumpArena::release(Mark saved)
+fn BumpArena::release(Mark saved) -> void
 {
   /* Reset the bump pointer to the marked position, keeping the blocks so a loop
      body reuses the same storage each turn instead of asking the system again.
@@ -77,7 +77,7 @@ void BumpArena::release(Mark saved)
     m_blocks[saved.block_count - 1].used = saved.used_in_last;
 }
 
-void BumpArena::reset()
+fn BumpArena::reset() -> void
 {
   /* Keep the first block and drop the rest, so a typical command reuses one
      block without asking the system for memory again. */

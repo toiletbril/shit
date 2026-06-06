@@ -7,9 +7,9 @@ namespace shit {
 
 False::False() = default;
 
-Builtin::Kind False::kind() const { return Kind::False; }
+fn False::kind() const -> Builtin::Kind { return Kind::False; }
 
-i32 False::execute(ExecContext &ec, EvalContext &cxt) const
+fn False::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   SHIT_UNUSED(ec);
   SHIT_UNUSED(cxt);

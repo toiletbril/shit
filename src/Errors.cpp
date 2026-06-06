@@ -17,8 +17,8 @@ struct PreciseLocation
   usize last_newline_location;
 };
 
-static PreciseLocation calc_precise_position(StringView source,
-                                             usize byte_position)
+static fn calc_precise_position(StringView source, usize byte_position)
+    -> PreciseLocation
 {
   SHIT_ASSERT(byte_position <= source.size(),
               "byte position: %zu, source length: %zu", byte_position,
@@ -37,7 +37,7 @@ static PreciseLocation calc_precise_position(StringView source,
 }
 
 template <class T>
-static usize number_string_length(T n)
+static fn number_string_length(T n) -> usize
 {
   usize len = 0;
   while (n > 0) {
@@ -47,11 +47,11 @@ static usize number_string_length(T n)
   return len;
 }
 
-static String get_context_pointing_to(StringView source, usize byte_position,
-                                      usize byte_count, usize line_number,
-                                      usize last_newline_location,
-                                      usize unicode_position,
-                                      Maybe<StringView> message)
+static fn get_context_pointing_to(StringView source, usize byte_position,
+                                  usize byte_count, usize line_number,
+                                  usize last_newline_location,
+                                  usize unicode_position,
+                                  Maybe<StringView> message) -> String
 {
   usize start_offset = byte_position - last_newline_location;
 
@@ -81,7 +81,7 @@ static String get_context_pointing_to(StringView source, usize byte_position,
   msg += std::to_string(line_number + 1) + " |  ";
 
   /* Line that caused the error. */
-  const StringView context =
+  let const context =
       source.substring_of_length(byte_position - start_offset, line_byte_count);
 
   /* We don't need accidental newlines in the middle of the context.
@@ -141,13 +141,13 @@ ErrorBase::~ErrorBase() = default;
 
 ErrorBase::operator bool &() { return m_is_active; }
 
-String ErrorBase::message() const { return m_message; }
+fn ErrorBase::message() const -> String { return m_message; }
 
-String ErrorBase::severity_word() const { return "Error"; }
+fn ErrorBase::severity_word() const -> String { return "Error"; }
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
-String Error::to_string() const
+fn Error::to_string() const -> String
 {
   return severity_word() + ": " + message() + ".";
 }
@@ -156,18 +156,18 @@ Error::operator String() const { return to_string(); }
 
 Warning::Warning(StringView message) : Error(message) {}
 
-String Warning::severity_word() const { return "Warning"; }
+fn Warning::severity_word() const -> String { return "Warning"; }
 
 Note::Note(StringView message) : Error(message) {}
 
-String Note::severity_word() const { return "Note"; }
+fn Note::severity_word() const -> String { return "Note"; }
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
     : ErrorBase(message), m_location(location)
 {}
 
-String ErrorWithLocation::to_string(StringView source) const
+fn ErrorWithLocation::to_string(StringView source) const -> String
 {
   usize byte_position = m_location.position();
   const usize byte_count = m_location.length();
@@ -194,9 +194,9 @@ String ErrorWithLocation::to_string(StringView source) const
   /* Our count starts from 0. If there's only a single line, we need to use the
    * raw location for the correct offset. Otherwise, newline counts as an extra
    * character. */
-  const usize line_byte_position = (last_newline_location > 0)
-                                 ? unicode_position - last_newline_location
-                                 : unicode_position + 1;
+  const usize line_byte_position =
+      (last_newline_location > 0) ? unicode_position - last_newline_location
+                                  : unicode_position + 1;
 
   String result{};
   result += std::to_string(line_number + 1);
@@ -218,7 +218,7 @@ WarningWithLocation::WarningWithLocation(SourceLocation location,
     : ErrorWithLocation(location, message)
 {}
 
-String WarningWithLocation::severity_word() const { return "Warning"; }
+fn WarningWithLocation::severity_word() const -> String { return "Warning"; }
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message,
@@ -227,7 +227,8 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
       m_details_location(details_location), m_details_message(details_message)
 {}
 
-String ErrorWithLocationAndDetails::details_to_string(StringView source) const
+fn ErrorWithLocationAndDetails::details_to_string(StringView source) const
+    -> String
 {
   usize byte_position = m_details_location.position();
   const usize byte_count = m_details_location.length();

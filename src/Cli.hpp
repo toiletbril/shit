@@ -34,15 +34,15 @@ struct Flag
     ManyStrings,
   };
 
-  Kind kind() const;
-  usize position() const;
-  void set_position(u32 n);
-  char short_name() const;
-  StringView long_name() const;
-  StringView description() const;
+  fn kind() const -> Kind;
+  fn position() const -> usize;
+  fn set_position(u32 n) -> void;
+  fn short_name() const -> char;
+  fn long_name() const -> StringView;
+  fn description() const -> StringView;
 
   /* Reset the flag state, mainly for builtins. */
-  virtual void reset() = 0;
+  virtual fn reset() -> void = 0;
 
 protected:
   Flag(Kind type, char short_name, StringView long_name,
@@ -59,10 +59,10 @@ struct FlagBool : public Flag
 {
   FlagBool(char short_name, StringView long_name, StringView description);
 
-  void toggle();
-  bool is_enabled() const;
+  fn toggle() -> void;
+  fn is_enabled() const -> bool;
 
-  void reset() override;
+  fn reset() -> void override;
 
 private:
   bool m_value{false};
@@ -72,11 +72,11 @@ struct FlagString : public Flag
 {
   FlagString(char short_name, StringView long_name, StringView description);
 
-  void set(StringView v);
-  bool is_set() const;
-  StringView value() const;
+  fn set(StringView v) -> void;
+  fn is_set() const -> bool;
+  fn value() const -> StringView;
 
-  void reset() override;
+  fn reset() -> void override;
 
 private:
   bool m_is_set{false};
@@ -88,16 +88,16 @@ struct FlagManyStrings : public Flag
   FlagManyStrings(char short_name, StringView long_name,
                   StringView description);
 
-  void append(StringView v);
-  usize size() const;
-  bool is_empty() const;
+  fn append(StringView v) -> void;
+  fn size() const -> usize;
+  fn is_empty() const -> bool;
 
-  StringView get(usize i) const;
+  fn get(usize i) const -> StringView;
 
-  StringView next();
-  bool at_end() const;
+  fn next() -> StringView;
+  fn at_end() const -> bool;
 
-  void reset() override;
+  fn reset() -> void override;
 
 private:
   ArrayList<String> m_values{};
@@ -106,27 +106,27 @@ private:
 
 /* These return arguments which are not flags. */
 
-ArrayList<String> parse_flags_vec(const ArrayList<Flag *> &flags,
-                                  const ArrayList<String> &args);
-ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,
-                              const char *const *argv);
+fn parse_flags_vec(const ArrayList<Flag *> &flags,
+                   const ArrayList<String> &args) -> ArrayList<String>;
+fn parse_flags(const ArrayList<Flag *> &flags, int argc,
+               const char *const *argv) -> ArrayList<String>;
 
-void reset_flags(const ArrayList<Flag *> &flags);
+fn reset_flags(const ArrayList<Flag *> &flags) -> void;
 
-void show_version();
-void show_short_version();
+fn show_version() -> void;
+fn show_short_version() -> void;
 
-std::string make_synopsis(std::string_view program_name,
-                          const std::vector<std::string> &lines);
-std::string make_flag_help(const ArrayList<Flag *> &flags);
+fn make_synopsis(std::string_view program_name,
+                 const std::vector<std::string> &lines) -> std::string;
+fn make_flag_help(const ArrayList<Flag *> &flags) -> std::string;
 
-void show_message(StringView err);
+fn show_message(StringView err) -> void;
 
 /* Write bytes to the standard streams without going through the iostream
    layer. The shell uses these instead of std::cout and std::cerr so the binary
    does not pull in the stream machinery. */
-void print(StringView text);
-void print_error(StringView text);
-void flush();
+fn print(StringView text) -> void;
+fn print_error(StringView text) -> void;
+fn flush() -> void;
 
 } /* namespace shit */

@@ -29,8 +29,7 @@ struct TestEvaluator
 
   void fail(StringView message)
   {
-    if (!had_error)
-      shit::print_error(StringView{"test: "} + message + "\n");
+    if (!had_error) shit::print_error(StringView{"test: "} + message + "\n");
     had_error = true;
   }
 
@@ -192,7 +191,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
   if (evaluator.had_error) return 2;
   if (evaluator.pos != operands.size()) {
     shit::print_error(StringView{"test: unexpected argument '"} +
-                                  operands[evaluator.pos] + "'\n");
+                      operands[evaluator.pos] + "'\n");
     return 2;
   }
   return result ? 0 : 1;

@@ -141,11 +141,11 @@ struct HashMap
 
   /* Visit each key and value in unspecified order. */
   template <class Fn>
-  void for_each(Fn fn) const
+  void for_each(Fn callback) const
   {
     for (usize i = 0; i < m_capacity; i++) {
       if (m_slots[i].state == Slot::Occupied)
-        fn(m_slots[i].key.view(), m_slots[i].value);
+        callback(m_slots[i].key.view(), m_slots[i].value);
     }
   }
 

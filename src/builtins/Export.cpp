@@ -13,21 +13,21 @@ namespace shit {
 
 Export::Export() = default;
 
-Builtin::Kind Export::kind() const { return Kind::Export; }
+fn Export::kind() const -> Builtin::Kind { return Kind::Export; }
 
-i32 Export::execute(ExecContext &ec, EvalContext &cxt) const
+fn Export::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  const ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
+  let const args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   for (usize i = 1; i < args.size(); i++) {
-    const String &arg = args[i];
-    const Maybe<usize> equals_position = arg.find_character('=');
+    let const &arg = args[i];
+    let const equals_position = arg.find_character('=');
 
-    String name{};
-    String value{};
+    let name = String{};
+    let value = String{};
     if (!equals_position.has_value()) {
       /* Export an existing variable by its current value. */
       name = arg;

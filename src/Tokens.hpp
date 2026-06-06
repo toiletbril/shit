@@ -37,9 +37,9 @@ struct WordSegment
   String text;
   bool is_in_double_quotes{false};
 
-  bool is_split_eligible() const;
-  bool has_live_glob_chars() const;
-  bool is_tilde_candidate() const;
+  fn is_split_eligible() const -> bool;
+  fn has_live_glob_chars() const -> bool;
+  fn is_tilde_candidate() const -> bool;
 };
 
 /* A lexed word carries its quoting structure as ordered segments. The evaluator
@@ -49,15 +49,15 @@ struct Word
 {
   ArrayList<WordSegment> segments{heap_allocator()};
 
-  bool is_empty() const;
-  String to_literal_string() const;
-  String to_pretty_string() const;
+  fn is_empty() const -> bool;
+  fn to_literal_string() const -> String;
+  fn to_pretty_string() const -> String;
 
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. The pair
      stays std::pair here, since a named struct holding a Word by value cannot
      complete inside Word's own definition. */
-  Maybe<std::pair<String, Word>> get_assignment_split() const;
+  fn get_assignment_split() const -> Maybe<std::pair<String, Word>>;
 };
 
 /**
@@ -160,18 +160,18 @@ struct Token
   Token &operator=(const Token &) = delete;
   Token &operator=(Token &&) noexcept = delete;
 
-  virtual Kind kind() const = 0;
-  virtual Flags flags() const = 0;
-  virtual String raw_string() const = 0;
+  virtual fn kind() const -> Kind = 0;
+  virtual fn flags() const -> Flags = 0;
+  virtual fn raw_string() const -> String = 0;
 
-  virtual String to_ast_string() const;
+  virtual fn to_ast_string() const -> String;
 
-  SourceLocation source_location() const;
+  fn source_location() const -> SourceLocation;
 
   /* A token lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap token otherwise. The
      destructor still runs through the normal delete. */
-  static void operator delete(void *pointer);
+  static fn operator delete(void *pointer)->void;
 
 protected:
   Token(SourceLocation location);
@@ -275,11 +275,11 @@ struct Redirection : Token
 {
   Redirection(SourceLocation location, StringView what_fd, StringView to_file);
 
-  Kind kind() const override;
-  Flags flags() const override;
+  fn kind() const -> Kind override;
+  fn flags() const -> Flags override;
 
-  const String &from_fd() const;
-  const String &to_file() const;
+  fn from_fd() const -> const String &;
+  fn to_file() const -> const String &;
 
 protected:
   String m_from_fd{};
@@ -290,13 +290,13 @@ struct Assignment : public Token
 {
   Assignment(SourceLocation location, StringView key, Word value);
 
-  Kind kind() const override;
-  Flags flags() const override;
+  fn kind() const -> Kind override;
+  fn flags() const -> Flags override;
 
-  String raw_string() const override;
+  fn raw_string() const -> String override;
 
-  const String &key() const;
-  const Word &value_word() const;
+  fn key() const -> const String &;
+  fn value_word() const -> const Word &;
 
 protected:
   String m_key;
@@ -308,7 +308,7 @@ struct Value : public Token
 {
   Value(SourceLocation location, StringView sv);
 
-  String raw_string() const override;
+  fn raw_string() const -> String override;
 
 protected:
   String m_value;
@@ -330,10 +330,10 @@ struct WordToken : public Value
 {
   WordToken(SourceLocation location, Word word);
 
-  Kind kind() const override;
-  Flags flags() const override;
+  fn kind() const -> Kind override;
+  fn flags() const -> Flags override;
 
-  const Word &word() const;
+  fn word() const -> const Word &;
 
 protected:
   Word m_word;
@@ -343,16 +343,16 @@ struct Operator : public Token
 {
   Operator(SourceLocation location);
 
-  virtual bool binary_left_associative() const;
+  virtual fn binary_left_associative() const -> bool;
 
-  virtual u8 left_precedence() const;
-  virtual std::unique_ptr<Expression>
-  construct_binary_expression(const Expression *lhs,
-                              const Expression *rhs) const;
+  virtual fn left_precedence() const -> u8;
+  virtual fn construct_binary_expression(const Expression *lhs,
+                                         const Expression *rhs) const
+      -> std::unique_ptr<Expression>;
 
-  virtual u8 unary_precedence() const;
-  virtual std::unique_ptr<Expression>
-  construct_unary_expression(const Expression *rhs) const;
+  virtual fn unary_precedence() const -> u8;
+  virtual fn construct_unary_expression(const Expression *rhs) const
+      -> std::unique_ptr<Expression>;
 };
 
 #define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \

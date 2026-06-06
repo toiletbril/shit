@@ -15,19 +15,19 @@ namespace shit {
 
 Alias::Alias() = default;
 
-Builtin::Kind Alias::kind() const { return Kind::Alias; }
+fn Alias::kind() const -> Builtin::Kind { return Kind::Alias; }
 
-i32 Alias::execute(ExecContext &ec, EvalContext &cxt) const
+fn Alias::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  const ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
+  let const args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* alias with no operand lists every definition. */
   if (args.size() == 1) {
-    String out{};
-    for (const String &definition : cxt.alias_definitions()) {
+    let out = String{};
+    for (let const &definition : cxt.alias_definitions()) {
       out += "alias ";
       out += definition;
       out += "\n";
@@ -38,8 +38,8 @@ i32 Alias::execute(ExecContext &ec, EvalContext &cxt) const
 
   i32 status = 0;
   for (usize i = 1; i < args.size(); i++) {
-    const String &arg = args[i];
-    const Maybe<usize> equals_position = arg.find_character('=');
+    let const &arg = args[i];
+    let const equals_position = arg.find_character('=');
 
     if (equals_position.has_value()) {
       cxt.set_alias(arg.substring_of_length(0, *equals_position),

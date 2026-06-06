@@ -19,7 +19,7 @@ namespace lexer {
 
 static constexpr char CEOF = static_cast<char>(EOF);
 
-bool is_whitespace(char ch)
+fn is_whitespace(char ch) -> bool
 {
   switch (ch) {
   case ' ':
@@ -30,9 +30,9 @@ bool is_whitespace(char ch)
   }
 }
 
-bool is_number(char ch) { return ch >= '0' && ch <= '9'; }
+fn is_number(char ch) -> bool { return ch >= '0' && ch <= '9'; }
 
-bool is_expression_sentinel(char ch)
+fn is_expression_sentinel(char ch) -> bool
 {
   switch (ch) {
   case '\n':
@@ -58,7 +58,7 @@ bool is_expression_sentinel(char ch)
 }
 
 /* TODO: Separate redirections from here. */
-bool is_shell_sentinel(char ch)
+fn is_shell_sentinel(char ch) -> bool
 {
   switch (ch) {
   case '\n':
@@ -75,12 +75,12 @@ bool is_shell_sentinel(char ch)
   };
 }
 
-bool is_part_of_identifier(char ch)
+fn is_part_of_identifier(char ch) -> bool
 {
   return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
 }
 
-bool is_string_quote(char ch)
+fn is_string_quote(char ch) -> bool
 {
   /* A backtick is intentionally not a quote here. It stays a literal character
      so the prepass can warn and point at $(...), rather than failing the lex.
@@ -92,12 +92,12 @@ bool is_string_quote(char ch)
   }
 }
 
-bool is_ascii_char(char ch)
+fn is_ascii_char(char ch) -> bool
 {
   return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
 
-bool is_expandable_char(char ch)
+fn is_expandable_char(char ch) -> bool
 {
   switch (ch) {
   case '[':
@@ -107,9 +107,12 @@ bool is_expandable_char(char ch)
   }
 }
 
-bool is_variable_name_start(char ch) { return is_ascii_char(ch) || ch == '_'; }
+fn is_variable_name_start(char ch) -> bool
+{
+  return is_ascii_char(ch) || ch == '_';
+}
 
-bool is_variable_name(char ch)
+fn is_variable_name(char ch) -> bool
 {
   return is_variable_name_start(ch) || is_number(ch);
 }
@@ -127,19 +130,19 @@ Lexer::~Lexer()
     delete body;
 }
 
-Token *Lexer::peek_expression_token()
+fn Lexer::peek_expression_token() -> Token *
 {
   skip_whitespace();
   return lex_expression_token();
 }
 
-Token *Lexer::peek_shell_token()
+fn Lexer::peek_shell_token() -> Token *
 {
   skip_whitespace();
   return lex_shell_token();
 }
 
-Token *Lexer::next_expression_token()
+fn Lexer::next_expression_token() -> Token *
 {
   skip_whitespace();
   Token *const t = lex_expression_token();
@@ -147,7 +150,7 @@ Token *Lexer::next_expression_token()
   return t;
 }
 
-Token *Lexer::next_shell_token()
+fn Lexer::next_shell_token() -> Token *
 {
   skip_whitespace();
   Token *const t = lex_shell_token();
@@ -155,15 +158,18 @@ Token *Lexer::next_shell_token()
   return t;
 }
 
-StringView Lexer::source() const { return m_source.view(); }
+fn Lexer::source() const -> StringView { return m_source.view(); }
 
-const ArrayList<Word> &Lexer::debug_words() const { return m_debug_words; }
+fn Lexer::debug_words() const -> const ArrayList<Word> &
+{
+  return m_debug_words;
+}
 
-BumpArena &Lexer::arena() const { return *m_arena; }
+fn Lexer::arena() const -> BumpArena & { return *m_arena; }
 
-void Lexer::set_arena(BumpArena &arena) { m_arena = &arena; }
+fn Lexer::set_arena(BumpArena &arena) -> void { m_arena = &arena; }
 
-usize Lexer::advance_past_last_peek()
+fn Lexer::advance_past_last_peek() -> usize
 {
   const usize r = advance_forward(m_cached_offset);
   m_cached_offset = 0;
@@ -178,8 +184,8 @@ usize Lexer::advance_past_last_peek()
   return r;
 }
 
-const std::string *Lexer::register_heredoc(StringView delimiter,
-                                           bool strip_tabs)
+fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
+    -> const std::string *
 {
   std::string *body = new std::string{};
   m_heredoc_bodies.push(body);
@@ -187,7 +193,7 @@ const std::string *Lexer::register_heredoc(StringView delimiter,
   return body;
 }
 
-void Lexer::collect_pending_heredocs()
+fn Lexer::collect_pending_heredocs() -> void
 {
   for (HeredocPending &pending : m_pending_heredocs) {
     /* The body is written into the lexer-owned std::string the parsed
@@ -224,7 +230,7 @@ void Lexer::collect_pending_heredocs()
   m_pending_heredocs.clear();
 }
 
-Token *Lexer::lex_expression_token()
+fn Lexer::lex_expression_token() -> Token *
 {
   if (char ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_number(ch))
@@ -244,7 +250,7 @@ Token *Lexer::lex_expression_token()
       SourceLocation{m_cursor_position, 1});
 }
 
-Token *Lexer::lex_shell_token()
+fn Lexer::lex_shell_token() -> Token *
 {
   Token *t{};
   if (char ch = chop_character(); ch != lexer::CEOF) {
@@ -266,7 +272,7 @@ Token *Lexer::lex_shell_token()
   return t;
 }
 
-void Lexer::skip_whitespace()
+fn Lexer::skip_whitespace() -> void
 {
   usize i = 0;
   for (;;) {
@@ -285,14 +291,14 @@ void Lexer::skip_whitespace()
   advance_forward(i);
 }
 
-usize Lexer::advance_forward(usize offset)
+fn Lexer::advance_forward(usize offset) -> usize
 {
   SHIT_ASSERT(m_cursor_position + offset <= m_source.length());
   m_cursor_position += offset;
   return offset;
 }
 
-char Lexer::chop_character(usize offset)
+fn Lexer::chop_character(usize offset) -> char
 {
   if (m_cursor_position + offset < m_source.length())
     return m_source[m_cursor_position + offset];
@@ -300,7 +306,7 @@ char Lexer::chop_character(usize offset)
   return lexer::CEOF;
 }
 
-Token *Lexer::lex_number()
+fn Lexer::lex_number() -> Token *
 {
   char ch;
   String digits{};
@@ -318,7 +324,7 @@ Token *Lexer::lex_number()
   return num;
 }
 
-Token *Lexer::lex_identifier()
+fn Lexer::lex_identifier() -> Token *
 {
   Word word{};
 
@@ -631,7 +637,7 @@ Token *Lexer::lex_identifier()
 /* The token kind a single operator character begins, or None when the
    character is not an operator. The switch keeps this allocation free and the
    compiler lowers it to a jump table. */
-static Maybe<Token::Kind> lookup_operator(char ch)
+static fn lookup_operator(char ch) -> Maybe<Token::Kind>
 {
   switch (ch) {
   case ')': return Token::Kind::RightParen;
@@ -660,7 +666,7 @@ static Maybe<Token::Kind> lookup_operator(char ch)
   }
 }
 
-Token *Lexer::lex_sentinel()
+fn Lexer::lex_sentinel() -> Token *
 {
   const char ch = chop_character();
   usize extra_length = 0;

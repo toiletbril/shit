@@ -17,19 +17,19 @@ namespace shit {
 
 Kill::Kill() = default;
 
-Builtin::Kind Kill::kind() const { return Kind::Kill; }
+fn Kill::kind() const -> Builtin::Kind { return Kind::Kill; }
 
-i32 Kill::execute(ExecContext &ec, EvalContext &cxt) const
+fn Kill::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
 
   usize first_target = 1;
-  i32 signal_number = os::signal_number_from_name("TERM").value_or(15);
+  let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
   /* A leading -name or -number names the signal to send. */
   if (args.size() > 1 && args[1].length() > 1 && args[1][0] == '-') {
-    const String name = String{args[1].substring(1)};
-    const Maybe<i32> resolved = os::signal_number_from_name(name);
+    let const name = String{args[1].substring(1)};
+    let const resolved = os::signal_number_from_name(name);
     if (!resolved) throw Error{"kill: '" + name + "' is not a valid signal"};
     signal_number = *resolved;
     first_target = 2;

@@ -6,14 +6,14 @@ namespace shit {
 
 Continue::Continue() = default;
 
-Builtin::Kind Continue::kind() const { return Kind::Continue; }
+fn Continue::kind() const -> Builtin::Kind { return Kind::Continue; }
 
-i32 Continue::execute(ExecContext &ec, EvalContext &cxt) const
+fn Continue::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   /* The optional argument is how many enclosing loops to skip, default one. */
   i64 level = 1;
   if (ec.args().size() > 1) {
-    const ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    let const parsed = utils::parse_decimal_integer(ec.args()[1]);
     if (parsed.is_error()) throw parsed.error();
     level = parsed.value();
   }
