@@ -26,7 +26,7 @@ static fn get_sequence_kind(Token::Kind tk) -> CompoundListCondition::Kind
   case Token::Kind::DoubleAmpersand: return CompoundListCondition::Kind::And;
   case Token::Kind::DoublePipe: return CompoundListCondition::Kind::Or; break;
 
-  default: SHIT_UNREACHABLE("Invalid shell sequence token: %d", SHIT_ENUM(tk));
+  default: unreachable("Invalid shell sequence token: %d", SHIT_ENUM(tk));
   }
 }
 
@@ -93,7 +93,7 @@ static fn find_standalone_keyword(StringView source, StringView keyword)
 
 static fn is_empty_list(const Expression *expression) -> bool
 {
-  SHIT_ASSERT(expression != NULL);
+  ASSERT(expression != NULL);
   return expression->is_dummy();
 }
 
@@ -101,7 +101,7 @@ static fn is_empty_list(const Expression *expression) -> bool
    command position. It is distinct from a != comparison or a quoted literal. */
 static fn is_negation_token(const Token *token) -> bool
 {
-  SHIT_ASSERT(token != NULL);
+  ASSERT(token != NULL);
   if (token->kind() != Token::Kind::Word) return false;
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
   return word.segments.size() == 1 &&
@@ -113,7 +113,7 @@ static fn is_negation_token(const Token *token) -> bool
    keyword almost always means its opener is missing. */
 static fn unexpected_command_token_message(const Token *token) -> String
 {
-  SHIT_ASSERT(token != NULL);
+  ASSERT(token != NULL);
   switch (token->kind()) {
   case Token::Kind::Then:
   case Token::Kind::Else:
@@ -144,7 +144,7 @@ static fn unexpected_command_token_message(const Token *token) -> String
 static fn require_simple_in_pipeline(std::unique_ptr<Command> command)
     -> SimpleCommand *
 {
-  SHIT_ASSERT(command != NULL);
+  ASSERT(command != NULL);
   if (!command->is_simple_command()) {
     throw ErrorWithLocation{
         command->source_location(),
@@ -321,7 +321,7 @@ fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     }
   }
 
-  SHIT_UNREACHABLE();
+  unreachable();
 }
 
 /* return: a command, a compound command, or nullptr when a list terminator is
@@ -594,7 +594,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
     }
   }
 
-  SHIT_UNREACHABLE();
+  unreachable();
 }
 
 fn Parser::parse_if() -> std::unique_ptr<Command>
@@ -605,7 +605,7 @@ fn Parser::parse_if() -> std::unique_ptr<Command>
   ArrayList<std::pair<const Expression *, const Expression *>> branches{};
   const Expression *otherwise = nullptr;
   /* Free the released branch nodes if a later branch fails to parse. */
-  SHIT_DEFER
+  defer
   {
     for (auto &[condition, body] : branches) {
       delete condition;
@@ -698,7 +698,7 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
 
   ArrayList<const Token *> words{};
   /* Free the released word tokens if the loop fails to parse. */
-  SHIT_DEFER
+  defer
   {
     for (const Token *word : words)
       delete word;
@@ -775,7 +775,7 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
   ArrayList<CaseItem> items{};
   /* A parse error before the clause is built abandons these arena nodes, so
      free their tokens and bodies to keep the leak checker happy. */
-  SHIT_DEFER
+  defer
   {
     for (CaseItem &item : items) {
       for (const Token *pattern : item.patterns)
@@ -802,7 +802,7 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
     if (t->kind() == Token::Kind::LeftParen) m_lexer.advance_past_last_peek();
 
     ArrayList<const Token *> patterns{heap_allocator()};
-    SHIT_DEFER
+    defer
     {
       for (const Token *pattern : patterns)
         delete pattern;
@@ -924,7 +924,7 @@ fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
 fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
 {
   m_recursion_depth++;
-  SHIT_DEFER { m_recursion_depth--; };
+  defer { m_recursion_depth--; };
 
   std::unique_ptr<Token> t{m_lexer.next_expression_token()};
 

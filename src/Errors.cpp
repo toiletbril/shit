@@ -20,7 +20,7 @@ struct PreciseLocation
 static fn calc_precise_position(StringView source, usize byte_position)
     -> PreciseLocation
 {
-  SHIT_ASSERT(byte_position <= source.size(),
+  ASSERT(byte_position <= source.size(),
               "byte position: %zu, source length: %zu", byte_position,
               source.size());
 
@@ -67,12 +67,12 @@ static fn get_context_pointing_to(StringView source, usize byte_position,
     line_byte_count++;
   }
 
-  SHIT_ASSERT(byte_position - start_offset + line_byte_count == source.size() ||
+  ASSERT(byte_position - start_offset + line_byte_count == source.size() ||
               source[byte_position - start_offset + line_byte_count] == '\n');
 
   /* Add spacer before line number. */
   String msg{};
-  for (usize i = 0; i < SHIT_SUB_SAT(6, number_string_length(line_number + 1));
+  for (usize i = 0; i < sub_sat(6, number_string_length(line_number + 1));
        i++)
   {
     msg += ' ';
@@ -86,7 +86,7 @@ static fn get_context_pointing_to(StringView source, usize byte_position,
 
   /* We don't need accidental newlines in the middle of the context.
    * *pulls hair out* */
-  SHIT_ASSERT(!context.find_character('\n').has_value(),
+  ASSERT(!context.find_character('\n').has_value(),
               "'%s', start: %zu, end: %zu", context.data, start_offset,
               line_byte_count);
 
@@ -172,8 +172,8 @@ fn ErrorWithLocation::to_string(StringView source) const -> String
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;
 
-  SHIT_LOG_VARS(Verbosity::Debug, byte_position, byte_count);
-  SHIT_LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
+  LOG_VARS(Verbosity::Debug, byte_position, byte_count);
+  LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
 
   /* FIXME: Below are two dirty hacks. */
   if (byte_position + 2 < source.size() && source[byte_position] == '\\' &&

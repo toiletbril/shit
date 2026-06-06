@@ -64,8 +64,8 @@ fn AnalysisContext::fail(SourceLocation location, StringView message) -> void
 fn Expression::analyze(AnalysisContext &actx, bool is_unconditional) const
     -> void
 {
-  SHIT_UNUSED(actx);
-  SHIT_UNUSED(is_unconditional);
+  unused(actx);
+  unused(is_unconditional);
 }
 
 fn Expression::is_simple_command() const -> bool { return false; }
@@ -141,8 +141,8 @@ IfStatement::IfStatement(SourceLocation location, const Expression *condition,
     : Expression(location), m_condition(condition), m_then(then),
       m_otherwise(otherwise)
 {
-  SHIT_ASSERT(condition != nullptr);
-  SHIT_ASSERT(then != nullptr);
+  ASSERT(condition != nullptr);
+  ASSERT(then != nullptr);
   /* And *otherwise may be NULL. */
 }
 
@@ -217,7 +217,7 @@ fn DummyExpression::is_dummy() const -> bool { return true; }
 
 fn DummyExpression::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
   return 0;
 }
 
@@ -281,9 +281,9 @@ fn AssignCommand::to_ast_string(usize layer) const -> String
 
 fn AssignCommand::redirect_to(usize d, String &f, bool duplicate) -> void
 {
-  SHIT_UNUSED(d);
-  SHIT_UNUSED(f);
-  SHIT_UNUSED(duplicate);
+  unused(d);
+  unused(f);
+  unused(duplicate);
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
@@ -450,7 +450,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
 {
   /* A command may have no words when it is only a redirection, such as > file,
      so the redirections still run below. */
-  SHIT_ASSERT(m_args.size() > 0 || !m_redirections.empty());
+  ASSERT(m_args.size() > 0 || !m_redirections.empty());
 
   if (cxt.should_echo()) {
     shit::print(utils::merge_tokens_to_string(m_args) + "\n");
@@ -470,7 +470,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
   bool dup_err_to_out = false;
   bool dup_out_to_err = false;
   bool redirect_fds_handed_off = false;
-  SHIT_DEFER
+  defer
   {
     if (!redirect_fds_handed_off) {
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
@@ -569,7 +569,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
     String expanded_value = cxt.expand_word_for_assignment(value_word);
     os::set_environment_variable(name, expanded_value.view());
   });
-  SHIT_DEFER
+  defer
   {
     for (const auto &[name, old_value] : saved_env) {
       if (old_value)
@@ -595,12 +595,12 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
           StringView{program_args[i].c_str(), program_args[i].size()}
       });
     cxt.set_positional_params(std::move(call_params));
-    SHIT_DEFER { cxt.set_positional_params(std::move(saved_params)); };
+    defer { cxt.set_positional_params(std::move(saved_params)); };
 
     /* Open a local scope so a local builtin in the body shadows a variable and
        the old value returns when the call ends. */
     cxt.enter_function_scope();
-    SHIT_DEFER { cxt.leave_function_scope(); };
+    defer { cxt.leave_function_scope(); };
 
     let function_ret = function_body->evaluate(cxt);
 
@@ -689,17 +689,17 @@ fn SimpleCommand::to_ast_string(usize layer) const -> String
 
 fn SimpleCommand::append_to(usize d, String &f, bool duplicate) -> void
 {
-  SHIT_UNUSED(d);
-  SHIT_UNUSED(f);
-  SHIT_UNUSED(duplicate);
+  unused(d);
+  unused(f);
+  unused(duplicate);
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
 fn SimpleCommand::redirect_to(usize d, String &f, bool duplicate) -> void
 {
-  SHIT_UNUSED(d);
-  SHIT_UNUSED(f);
-  SHIT_UNUSED(duplicate);
+  unused(d);
+  unused(f);
+  unused(duplicate);
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
@@ -740,7 +740,7 @@ fn CompoundList::to_ast_string(usize layer) const -> String
 
 fn CompoundList::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_ASSERT(m_nodes.size() > 0);
+  ASSERT(m_nodes.size() > 0);
 
   static const i64 NOTHING_WAS_EXECUTED = -256;
 
@@ -782,7 +782,7 @@ fn CompoundList::evaluate_impl(EvalContext &cxt) const -> i64
     }
   }
 
-  SHIT_ASSERT(ret != NOTHING_WAS_EXECUTED);
+  ASSERT(ret != NOTHING_WAS_EXECUTED);
 
   return ret;
 }
@@ -803,7 +803,7 @@ fn CompoundListCondition::to_string() const -> String
   case Kind::None: k = "None"; break;
   case Kind::And: k = "&&"; break;
   case Kind::Or: k = "||"; break;
-  default: SHIT_UNREACHABLE();
+  default: unreachable();
   }
   return "CompoundListCondition, " + k;
 }
@@ -823,7 +823,7 @@ fn CompoundListCondition::to_ast_string(usize layer) const -> String
 
 fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_ASSERT(m_cmd != nullptr);
+  ASSERT(m_cmd != nullptr);
   let status = m_cmd->evaluate(cxt);
 
   /* A pipeline prefixed with ! reports the inverse of its status, and that
@@ -879,7 +879,7 @@ fn Pipeline::to_ast_string(usize layer) const -> String
 
 fn Pipeline::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_ASSERT(m_commands.size() > 1);
+  ASSERT(m_commands.size() > 1);
 
   let ecs = ArrayList<ExecContext>{heap_allocator()};
   ecs.reserve(m_commands.size());
@@ -912,17 +912,17 @@ fn Pipeline::evaluate_impl(EvalContext &cxt) const -> i64
 
 fn Pipeline::append_to(usize d, String &f, bool duplicate) -> void
 {
-  SHIT_UNUSED(d);
-  SHIT_UNUSED(f);
-  SHIT_UNUSED(duplicate);
+  unused(d);
+  unused(f);
+  unused(duplicate);
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
 fn Pipeline::redirect_to(usize d, String &f, bool duplicate) -> void
 {
-  SHIT_UNUSED(d);
-  SHIT_UNUSED(f);
-  SHIT_UNUSED(duplicate);
+  unused(d);
+  unused(f);
+  unused(duplicate);
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
@@ -930,18 +930,18 @@ CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
 
 fn CompoundCommand::append_to(usize d, String &f, bool duplicate) -> void
 {
-  SHIT_UNUSED(d);
-  SHIT_UNUSED(f);
-  SHIT_UNUSED(duplicate);
+  unused(d);
+  unused(f);
+  unused(duplicate);
   throw ErrorWithLocation{source_location(),
                           "Redirection on a compound command is not supported"};
 }
 
 fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) -> void
 {
-  SHIT_UNUSED(d);
-  SHIT_UNUSED(f);
-  SHIT_UNUSED(duplicate);
+  unused(d);
+  unused(f);
+  unused(duplicate);
   throw ErrorWithLocation{source_location(),
                           "Redirection on a compound command is not supported"};
 }
@@ -998,7 +998,7 @@ fn IfClause::evaluate_impl(EvalContext &cxt) const -> i64
     i64 condition_status;
     {
       cxt.enter_condition();
-      SHIT_DEFER { cxt.leave_condition(); };
+      defer { cxt.leave_condition(); };
       condition_status = condition->evaluate(cxt);
     }
     /* A jump inside the condition stops the if and stays pending. */
@@ -1092,14 +1092,14 @@ fn resolve_loop_control(EvalContext &cxt) -> LoopDisposition
 
 fn WhileLoop::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_ASSERT(m_condition != nullptr);
-  SHIT_ASSERT(m_body != nullptr);
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
   i64 ret = 0;
   for (;;) {
     i64 condition_status;
     {
       cxt.enter_condition();
-      SHIT_DEFER { cxt.leave_condition(); };
+      defer { cxt.leave_condition(); };
       condition_status = m_condition->evaluate(cxt);
     }
     /* A jump inside the condition, such as an exit from a substitution, stops
@@ -1162,7 +1162,7 @@ fn ForLoop::to_ast_string(usize layer) const -> String
 
 fn ForLoop::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_ASSERT(m_body != nullptr);
+  ASSERT(m_body != nullptr);
   /* Without an in clause the loop walks the positional parameters. */
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
@@ -1179,7 +1179,7 @@ fn ForLoop::evaluate_impl(EvalContext &cxt) const -> i64
 
 fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
 {
-  SHIT_UNUSED(is_unconditional);
+  unused(is_unconditional);
   m_body->analyze(actx, false);
 }
 
@@ -1252,7 +1252,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const -> i64
 fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const
     -> void
 {
-  SHIT_UNUSED(is_unconditional);
+  unused(is_unconditional);
   for (const CaseItem &item : m_items)
     item.body->analyze(actx, false);
 }
@@ -1274,7 +1274,7 @@ fn BraceGroup::to_ast_string(usize layer) const -> String
 
 fn BraceGroup::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_ASSERT(m_body != nullptr);
+  ASSERT(m_body != nullptr);
   return m_body->evaluate(cxt);
 }
 
@@ -1376,7 +1376,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const -> i64
 fn FunctionDefinition::analyze(AnalysisContext &actx,
                                bool is_unconditional) const -> void
 {
-  SHIT_UNUSED(is_unconditional);
+  unused(is_unconditional);
   actx.defined_functions.add(m_name);
   m_body->analyze(actx, false);
 }
@@ -1432,7 +1432,7 @@ ConstantNumber::~ConstantNumber() = default;
 
 fn ConstantNumber::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
   return m_value;
 }
 
@@ -1459,8 +1459,8 @@ ConstantString::~ConstantString() = default;
 
 fn ConstantString::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_UNUSED(cxt);
-  SHIT_UNREACHABLE();
+  unused(cxt);
+  unreachable();
 }
 
 fn ConstantString::to_ast_string(usize layer) const -> String
@@ -1503,7 +1503,7 @@ fn BinaryDummyExpression::to_string() const -> String
 
 fn BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const -> i64
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
   return 0;
 }
 

@@ -11,19 +11,19 @@ struct String;
 /* fprintf(stderr, ...) */
 #define SHIT_TRACE(...)                                                        \
   do {                                                                         \
-    SHIT_UNUSED(                                                               \
+    unused(                                                               \
         std::fprintf(stderr, "[SHIT_TRACE] " __FILE__ ":%d: ", __LINE__));     \
-    SHIT_UNUSED(std::fprintf(stderr, __VA_ARGS__));                            \
-    SHIT_UNUSED(fflush(stderr));                                               \
+    unused(std::fprintf(stderr, __VA_ARGS__));                            \
+    unused(fflush(stderr));                                               \
   } while (0)
 /* fprintf(stderr, ... + "\n") */
 #define SHIT_TRACELN(...)                                                      \
   do {                                                                         \
-    SHIT_UNUSED(                                                               \
+    unused(                                                               \
         std::fprintf(stderr, "[SHIT_TRACE] " __FILE__ ":%d: ", __LINE__));     \
-    SHIT_UNUSED(std::fprintf(stderr, __VA_ARGS__));                            \
-    SHIT_UNUSED(fputc('\n', stderr));                                          \
-    SHIT_UNUSED(fflush(stderr));                                               \
+    unused(std::fprintf(stderr, __VA_ARGS__));                            \
+    unused(fputc('\n', stderr));                                          \
+    unused(fflush(stderr));                                               \
   } while (0)
 #if defined __clang__
 #include <cstdarg>
@@ -45,7 +45,7 @@ SHIT_USED void t__strprintf(StringT &s, const char *fmt, ...)
   }
   usize n = static_cast<usize>(written);
   char *b = new char[n + 1];
-  SHIT_UNUSED(vsnprintf(b, n + 1, fmt, a));
+  unused(vsnprintf(b, n + 1, fmt, a));
   s.append(b);
   delete[] b;
   va_end(ac);
@@ -94,7 +94,7 @@ StringT t__string_from_struct(const T &x)
 
 #if !defined NDEBUG
 /* This code path is unreachable. */
-#define SHIT_UNREACHABLE(...)                                                  \
+#define unreachable(...)                                                  \
   do {                                                                         \
     SHIT_TRACELN("Reached an unreachable statement");                          \
     if (!SHIT_VA_ARE_EMPTY(__VA_ARGS__)) {                                     \
@@ -103,14 +103,14 @@ StringT t__string_from_struct(const T &x)
     t__unreachable();                                                          \
   } while (0)
 #else
-#define SHIT_UNREACHABLE(...) t__unreachable()
+#define unreachable(...) t__unreachable()
 #endif
 
 #if !defined NDEBUG
-#define SHIT_ASSERT(x, ...)                                                    \
+#define ASSERT(x, ...)                                                    \
   do {                                                                         \
     if (!(x)) [[unlikely]] {                                                   \
-      SHIT_TRACELN("'SHIT_ASSERT(" #x ")' fail in %s().", __func__);           \
+      SHIT_TRACELN("'ASSERT(" #x ")' fail in %s().", __func__);           \
       if (!SHIT_VA_ARE_EMPTY(__VA_ARGS__)) {                                   \
         SHIT_TRACELN("Details: " __VA_ARGS__);                                 \
       }                                                                        \
@@ -118,5 +118,5 @@ StringT t__string_from_struct(const T &x)
     }                                                                          \
   } while (0)
 #else
-#define SHIT_ASSERT(...) /* None */
+#define ASSERT(...) /* None */
 #endif

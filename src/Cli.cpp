@@ -175,11 +175,11 @@ static fn flag_name(const Flag *f, bool is_long) -> String
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv) -> ArrayList<String>
 {
-  SHIT_ASSERT(argc >= 0);
+  ASSERT(argc >= 0);
 
   if (argc == 0) return ArrayList<String>{};
 
-  SHIT_ASSERT(argv != nullptr);
+  ASSERT(argv != nullptr);
 
   u32 position = 0;
   ArrayList<String> args{};
@@ -190,12 +190,12 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
   bool ignore_rest = false;
 
   for (int i = 0; i < argc; i++) {
-    SHIT_ASSERT(argv[i] != nullptr);
+    ASSERT(argv[i] != nullptr);
 
     if (next_arg_is_value) {
       next_arg_is_value = false;
 
-      SHIT_ASSERT(prev_flag != NULL);
+      ASSERT(prev_flag != NULL);
       if (prev_flag->kind() == Flag::Kind::String)
         static_cast<FlagString *>(prev_flag)->set(argv[i]);
       else

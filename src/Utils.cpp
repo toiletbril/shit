@@ -26,7 +26,7 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &v) -> String
 {
   String r{};
   for (const shit::Token *t : v) {
-    SHIT_ASSERT(t != NULL);
+    ASSERT(t != NULL);
     r += t->raw_string();
     if (t != v.back()) {
       r += ' ';
@@ -58,13 +58,13 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) -> i32
     return execute_builtin(std::move(ec), cxt);
   }
 
-  SHIT_UNREACHABLE();
+  unreachable();
 }
 
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                bool is_async) -> i32
 {
-  SHIT_ASSERT(ecs.size() > 1);
+  ASSERT(ecs.size() > 1);
 
   i32 ret = 0;
 

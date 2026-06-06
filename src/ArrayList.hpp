@@ -79,7 +79,7 @@ struct ArrayList
      empty. */
   void pop_back()
   {
-    SHIT_ASSERT(m_length > 0, "pop_back on an empty list");
+    ASSERT(m_length > 0, "pop_back on an empty list");
     m_length--;
     m_data[m_length].~T();
   }

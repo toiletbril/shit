@@ -114,7 +114,7 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
 fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex
 {
   /* POSIX does not really make use of extensions for executable files. */
-  SHIT_UNUSED(program_name);
+  unused(program_name);
   return false;
 }
 #endif /* !COSMO */
@@ -154,7 +154,7 @@ fn check_syscall_impl(i32 status, StringView invocation) -> i32
 
 fn execute_program(ExecContext &&ec) -> process
 {
-  SHIT_DEFER { ec.close_fds(); };
+  defer { ec.close_fds(); };
 
   pid_t child_pid = check_syscall(fork());
 
@@ -338,7 +338,7 @@ fn set_file_creation_mask(u32 mask) -> void { umask(static_cast<mode_t>(mask)); 
 
 fn wait_and_monitor_process(process pid) -> i32
 {
-  SHIT_ASSERT(pid >= 0);
+  ASSERT(pid >= 0);
 
   i32 status{};
 
@@ -387,7 +387,7 @@ fn wait_and_monitor_process(process pid) -> i32
     return WEXITSTATUS(status);
   }
 
-  SHIT_UNREACHABLE();
+  unreachable();
 }
 
 fn poll_process(process p, i32 &status_out) -> ProcessState
@@ -492,9 +492,9 @@ static fn make_sigset_impl(int first, ...) -> sigset_t
 
 static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) -> void
 {
-  SHIT_UNUSED(n);
-  SHIT_UNUSED(ctx);
-  SHIT_UNUSED(siginfo);
+  unused(n);
+  unused(ctx);
+  unused(siginfo);
 }
 
 fn reset_signal_handlers() -> void
@@ -512,7 +512,7 @@ volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 
 static fn handle_interrupt(int s) -> void
 {
-  SHIT_UNUSED(s);
+  unused(s);
   /* Setting the flag is the only async-signal-safe action. The evaluator polls
      it and aborts the running command, so a shell-internal loop is stoppable. */
   INTERRUPT_REQUESTED = 1;
@@ -662,7 +662,7 @@ fn execute_program(ExecContext &&ec) -> process
   if (ec.dup_err_to_out) startup_info.hStdError = startup_info.hStdOutput;
   if (ec.dup_out_to_err) startup_info.hStdOutput = startup_info.hStdError;
 
-  SHIT_DEFER
+  defer
   {
     if (ec.in_fd) CloseHandle(*ec.in_fd);
     if (ec.out_fd) CloseHandle(*ec.out_fd);
@@ -700,7 +700,7 @@ fn replace_process(ExecContext &&ec) -> void
   process child = execute_program(std::move(ec));
   i32 status = wait_and_monitor_process(child);
   ExitProcess(static_cast<UINT>(status));
-  SHIT_UNREACHABLE();
+  unreachable();
 }
 
 fn redirect_self(const ExecContext &ec) -> void
@@ -872,7 +872,7 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
 
 fn make_os_args(const ArrayList<String> &args) -> os_args
 {
-  SHIT_ASSERT(args.size() > 0);
+  ASSERT(args.size() > 0);
 
   std::string s{};
 
@@ -949,7 +949,7 @@ volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 
 static fn handle_interrupt(int s) -> void
 {
-  SHIT_UNUSED(s);
+  unused(s);
   /* Only set the flag, since printing or any non-async-signal-safe work inside a
      handler is undefined. The evaluator polls the flag and aborts the running
      command, so an infinite loop can be stopped from the keyboard. */

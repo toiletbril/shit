@@ -225,7 +225,7 @@ fn Lexer::collect_pending_heredocs() -> void
       collected.append(line.data, line.length);
       collected += '\n';
     }
-    SHIT_ASSERT(pending.body != NULL);
+    ASSERT(pending.body != NULL);
     *pending.body = std::move(collected);
   }
   m_pending_heredocs.clear();
@@ -292,7 +292,7 @@ fn Lexer::skip_whitespace() -> void
 
 fn Lexer::advance_forward(usize offset) -> usize
 {
-  SHIT_ASSERT(m_cursor_position + offset <= m_source.length());
+  ASSERT(m_cursor_position + offset <= m_source.length());
   m_cursor_position += offset;
   return offset;
 }
@@ -570,7 +570,7 @@ fn Lexer::lex_identifier() -> Token *
     expected_quote += " here";
     throw ErrorWithLocationAndDetails{
         here(m_cursor_position + relative_last_quote_char_pos,
-             SHIT_SUB_SAT(byte_count, relative_last_quote_char_pos)),
+             sub_sat(byte_count, relative_last_quote_char_pos)),
         "Unterminated string literal",
         here(m_cursor_position + byte_count, 1),
         expected_quote
@@ -615,7 +615,7 @@ fn Lexer::lex_identifier() -> Token *
     {
       switch (*kw) {
         KW_SWITCH_CASES();
-      default: SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(*kw));
+      default: unreachable("unhandled keyword of type %d", SHIT_ENUM(*kw));
       }
     }
   }
@@ -729,7 +729,7 @@ fn Lexer::lex_sentinel() -> Token *
       TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
       TOKEN_CASE_THREE(Less, '<', DoubleLess, '=', LessEquals);
 
-    default: SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(*op));
+    default: unreachable("unhandled operator of type %d", SHIT_ENUM(*op));
     }
   } else {
     String s{};

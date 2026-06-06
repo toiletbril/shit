@@ -10,7 +10,7 @@ fn Echo::kind() const -> Builtin::Kind { return Kind::Echo; }
 
 fn Echo::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
 
   let const &args = ec.args();
 

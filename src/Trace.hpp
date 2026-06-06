@@ -1,7 +1,7 @@
 #pragma once
 
 /* A runtime-gated logger, separate from the compile-time SHIT_TRACE in
-   Debug.hpp. SHIT_TRACE compiles out in a release build, while SHIT_LOG stays
+   Debug.hpp. SHIT_TRACE compiles out in a release build, while LOG stays
    in and checks the level against a global, so a helper can trace the runtime
    in any build when the user raises the verbosity. */
 
@@ -136,25 +136,25 @@ String format_named_values(StringView names, Args &&...args)
 } /* namespace shit */
 
 /* Print a printf-style message at the given level when the level is active. */
-#define SHIT_LOG(level, ...)                                                   \
+#define LOG(level, ...)                                                   \
   do {                                                                         \
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
-      SHIT_UNUSED(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): ",          \
+      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): ",          \
                                ::shit::verbosity_to_string(level), __LINE__,   \
                                __func__));                                     \
-      SHIT_UNUSED(std::fprintf(stderr, __VA_ARGS__));                          \
-      SHIT_UNUSED(std::fputc('\n', stderr));                                   \
+      unused(std::fprintf(stderr, __VA_ARGS__));                          \
+      unused(std::fputc('\n', stderr));                                   \
     }                                                                          \
   } while (0)
 
 /* Print the named values of the listed variables, such as
-   SHIT_LOG_VARS(Verbosity::Debug, argument_count, name). */
-#define SHIT_LOG_VARS(level, ...)                                              \
+   LOG_VARS(Verbosity::Debug, argument_count, name). */
+#define LOG_VARS(level, ...)                                              \
   do {                                                                         \
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
       ::shit::String t__vars =                                                 \
           ::shit::log_detail::format_named_values(#__VA_ARGS__, __VA_ARGS__);  \
-      SHIT_UNUSED(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): %s\n",      \
+      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): %s\n",      \
                                ::shit::verbosity_to_string(level), __LINE__,   \
                                __func__, t__vars.c_str()));                    \
     }                                                                          \

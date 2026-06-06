@@ -20,7 +20,7 @@ fn Alias::kind() const -> Builtin::Kind { return Kind::Alias; }
 fn Alias::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   let const args = parse_flags_vec(FLAG_LIST, ec.args());
-  SHIT_DEFER { reset_flags(FLAG_LIST); };
+  defer { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 

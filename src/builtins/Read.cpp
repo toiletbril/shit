@@ -25,7 +25,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const
      raw either way. The first returned element is the command name, so the
      operand names begin at index 1. */
   const ArrayList<String> names = parse_flags_vec(FLAG_LIST, ec.args());
-  SHIT_DEFER { reset_flags(FLAG_LIST); };
+  defer { reset_flags(FLAG_LIST); };
 
   /* With no operand the line goes to REPLY, otherwise to the operands in
      order. The operand names are addressed by an offset into names. */

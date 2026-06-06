@@ -127,13 +127,13 @@ struct String
   [[nodiscard]] usize length() const { return m_length; }
   [[nodiscard]] char back() const
   {
-    SHIT_ASSERT(m_length > 0, "back() on an empty string");
+    ASSERT(m_length > 0, "back() on an empty string");
     return m_data[m_length - 1];
   }
 
   void pop_back()
   {
-    SHIT_ASSERT(m_length > 0, "pop_back on empty string");
+    ASSERT(m_length > 0, "pop_back on empty string");
     m_length--;
     m_data[m_length] = '\0';
   }
@@ -190,7 +190,7 @@ struct String
   /* The first byte. The caller guarantees the string is not empty. */
   [[nodiscard]] char first_character() const
   {
-    SHIT_ASSERT(m_length > 0, "first_character() on an empty string");
+    ASSERT(m_length > 0, "first_character() on an empty string");
     return m_data[0];
   }
 

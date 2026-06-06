@@ -11,8 +11,8 @@ Builtin::Kind True::kind() const { return Kind::True; }
 
 i32 True::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  SHIT_UNUSED(ec);
-  SHIT_UNUSED(cxt);
+  unused(ec);
+  unused(cxt);
   return 0;
 }
 

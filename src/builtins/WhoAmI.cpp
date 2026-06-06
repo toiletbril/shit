@@ -16,7 +16,7 @@ Builtin::Kind WhoAmI::kind() const { return Kind::WhoAmI; }
 
 i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
 
   const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 

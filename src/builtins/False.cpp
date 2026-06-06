@@ -11,8 +11,8 @@ fn False::kind() const -> Builtin::Kind { return Kind::False; }
 
 fn False::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  SHIT_UNUSED(ec);
-  SHIT_UNUSED(cxt);
+  unused(ec);
+  unused(cxt);
   return 1;
 }
 

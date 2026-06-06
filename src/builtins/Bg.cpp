@@ -33,7 +33,7 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const -> i32
     job = cxt.most_recent_job();
 
   if (job == nullptr) throw Error{"bg: there is no such job"};
-  SHIT_ASSERT(job != NULL);
+  ASSERT(job != NULL);
 
   if (Maybe<i32> cont = os::signal_number_from_name("CONT"))
     os::signal_process(job->pid, *cont);

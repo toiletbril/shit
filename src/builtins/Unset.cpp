@@ -21,7 +21,7 @@ Builtin::Kind Unset::kind() const { return Kind::Unset; }
 i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> names = parse_flags_vec(FLAG_LIST, ec.args());
-  SHIT_DEFER { reset_flags(FLAG_LIST); };
+  defer { reset_flags(FLAG_LIST); };
 
   const bool unset_function = FLAG_UNSET_FUNCTION.is_enabled();
   for (usize i = 1; i < names.size(); i++) {

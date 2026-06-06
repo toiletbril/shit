@@ -31,7 +31,7 @@ fn Jobs::kind() const -> Builtin::Kind { return Kind::Jobs; }
 
 fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  SHIT_UNUSED(ec);
+  unused(ec);
 
   cxt.update_jobs();
 

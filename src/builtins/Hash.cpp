@@ -21,7 +21,7 @@ fn Hash::kind() const -> Builtin::Kind { return Kind::Hash; }
 
 fn Hash::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
 
   let const args = PARSE_BUILTIN_ARGS(ec);
 

@@ -17,7 +17,7 @@ Builtin::Kind Umask::kind() const { return Kind::Umask; }
 
 i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
   const ArrayList<String> &args = ec.args();
 
   if (args.size() == 1) {

@@ -60,12 +60,12 @@ struct [[nodiscard]] Maybe
 
   [[nodiscard]] T &value()
   {
-    SHIT_ASSERT(m_has_value);
+    ASSERT(m_has_value);
     return reference();
   }
   [[nodiscard]] const T &value() const
   {
-    SHIT_ASSERT(m_has_value);
+    ASSERT(m_has_value);
     return reference();
   }
   [[nodiscard]] T &operator*() { return value(); }
@@ -76,7 +76,7 @@ struct [[nodiscard]] Maybe
   /* Move the value out, leaving the Maybe empty. */
   [[nodiscard]] T take()
   {
-    SHIT_ASSERT(m_has_value);
+    ASSERT(m_has_value);
     T moved = std::move(reference());
     reset();
     return moved;
@@ -122,7 +122,7 @@ private:
 /* Evaluate a Maybe expression, return None from the enclosing function when
    it is empty, otherwise yield the value. The enclosing function must itself
    return a Maybe. */
-#define SHIT_UNWRAP(maybe_expr)                                                \
+#define UNWRAP(maybe_expr)                                                \
   ({                                                                           \
     auto t__result = (maybe_expr);                                             \
     if (!t__result) return ::shit::None;                                       \

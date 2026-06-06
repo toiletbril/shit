@@ -20,7 +20,7 @@ Builtin::Kind Which::kind() const { return Kind::Which; }
 
 i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
 
   const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 

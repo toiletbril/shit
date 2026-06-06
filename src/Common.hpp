@@ -89,7 +89,7 @@ using uintptr = uintptr_t;
 
 #define SHIT_USED        t__used
 #define SHIT_FORCEINLINE t__forceinline
-#define SHIT_UNUSED(x)   (std::ignore = (x))
+#define unused(x)   (std::ignore = (x))
 
 #define t__concat_literal(x, y) x##y
 #define concat_literal(x, y)    t__concat_literal(x, y)
@@ -116,21 +116,34 @@ struct t__exit_scope_help
 };
 
 /* Defer a block until the end of the scope. */
-#define SHIT_DEFER                                                             \
+#define defer                                                             \
   const auto &concat_literal(defer__, __LINE__) = t__exit_scope_help() + [&]()
 
 /* Silence enum warnings. */
 #define SHIT_ENUM(e) static_cast<int>(e)
 
-#define SHIT_SUB_SAT(a, b) ((a) > (b) ? (a) - (b) : 0)
+#define sub_sat(a, b) ((a) > (b) ? (a) - (b) : 0)
 
 /* The length of statically allocated array. */
-#define COUNTOF(arr) (sizeof(arr) / sizeof(*(arr)))
+#define countof(arr) (sizeof(arr) / sizeof(*(arr)))
 
 /* Every function is written `fn name(args) -> ret` and every variable `let x`,
    so the name leads and the type trails, matching the oo style. */
 #define fn  auto
 #define let auto
+
+/* Markers for a function's effect and exception behavior, written next to the
+   fn so the declaration states intent. They map to the matching clang
+   constructs. A pure function's result depends only on its arguments, written
+   before the fn. A wont_throw function never throws and a may_throw one may,
+   written after the parameter list where noexcept goes. */
+#if T__HAS_GCC_EXTENSIONS
+#define pure __attribute__((pure))
+#else
+#define pure
+#endif
+#define wont_throw noexcept
+#define may_throw  noexcept(false)
 
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";

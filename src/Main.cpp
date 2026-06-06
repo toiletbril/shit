@@ -129,7 +129,7 @@ static fn run_script_contents(const String &script_contents,
   int exit_code = EXIT_FAILURE;
 
   try {
-    SHIT_DEFER { context.end_command(); };
+    defer { context.end_command(); };
 
     /* Reclaim the previous command's arena storage before the next parse, and
        destroy the eval and dot ASTs that point into it. Function bodies live in
@@ -271,8 +271,8 @@ fn main(int argc, char **argv) -> int
 {
 #if SHIT_PLATFORM_IS COSMO
   ShowCrashReports();
-  SHIT_UNUSED(FLAG_COSMO_FTRACE);
-  SHIT_UNUSED(FLAG_COSMO_STRACE);
+  unused(FLAG_COSMO_FTRACE);
+  unused(FLAG_COSMO_STRACE);
 #endif
 
   bool is_login_shell = false;
@@ -456,7 +456,7 @@ fn main(int argc, char **argv) -> int
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
   for (;;) {
-    SHIT_ASSERT(!shit::os::is_child_process());
+    ASSERT(!shit::os::is_child_process());
 
     shit::String script_contents{};
 
@@ -571,7 +571,7 @@ fn main(int argc, char **argv) -> int
 
         toiletline::exit_raw_mode();
       } else {
-        SHIT_UNREACHABLE();
+        unreachable();
       }
     } catch (const shit::Error &e) {
       shit::show_message(e.to_string());
@@ -609,5 +609,5 @@ fn main(int argc, char **argv) -> int
     }
   }
 
-  SHIT_UNREACHABLE();
+  unreachable();
 }

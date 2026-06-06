@@ -18,7 +18,7 @@ fn Exec::kind() const -> Builtin::Kind { return Kind::Exec; }
 
 fn Exec::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
   let const &args = ec.args();
 
   /* exec with only redirections changes the shell's own descriptors and

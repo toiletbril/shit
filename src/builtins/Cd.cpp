@@ -37,7 +37,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const -> i32
        was. */
     let const old_directory = Path::current_directory();
     let const changed = Path::set_current_directory(target);
-    SHIT_UNUSED(changed);
+    unused(changed);
     if (!old_directory.empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());

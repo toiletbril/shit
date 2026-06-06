@@ -160,7 +160,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
   switch (ec.builtin_kind()) {
     BUILTIN_SWITCH_CASES();
   default:
-    SHIT_UNREACHABLE("Unhandled builtin of kind %d",
+    unreachable("Unhandled builtin of kind %d",
                      SHIT_ENUM(ec.builtin_kind()));
   }
 
@@ -168,7 +168,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
      handlers. Resetting them to the default here would let a Ctrl-C during a
      builtin terminate the whole shell, and it cost two extra syscalls on every
      builtin command. */
-  SHIT_DEFER { ec.close_fds(); };
+  defer { ec.close_fds(); };
 
   try {
     return b->execute(ec, cxt);

@@ -86,30 +86,30 @@ struct [[nodiscard]] ErrorOr
 
   [[nodiscard]] T &value()
   {
-    SHIT_ASSERT(!m_is_error);
+    ASSERT(!m_is_error);
     return value_reference();
   }
   [[nodiscard]] const T &value() const
   {
-    SHIT_ASSERT(!m_is_error);
+    ASSERT(!m_is_error);
     return value_reference();
   }
 
   [[nodiscard]] Error &error()
   {
-    SHIT_ASSERT(m_is_error);
+    ASSERT(m_is_error);
     return error_reference();
   }
   [[nodiscard]] const Error &error() const
   {
-    SHIT_ASSERT(m_is_error);
+    ASSERT(m_is_error);
     return error_reference();
   }
 
   /* Move the value out, called once the caller has checked is_error. */
   [[nodiscard]] T take()
   {
-    SHIT_ASSERT(!m_is_error);
+    ASSERT(!m_is_error);
     return std::move(value_reference());
   }
 
@@ -146,9 +146,9 @@ private:
 
 /* Evaluate a fallible expression, return its error early on failure, and yield
    its value otherwise. Used inside a function that itself returns an ErrorOr.
-   The name differs from the Maybe SHIT_UNWRAP, since this one propagates an
+   The name differs from the Maybe UNWRAP, since this one propagates an
    Error rather than None. */
-#define SHIT_TRY(expr)                                                         \
+#define TRY(expr)                                                         \
   ({                                                                           \
     auto t__result = (expr);                                                   \
     if (t__result.is_error()) return t__result.error();                        \
@@ -157,7 +157,7 @@ private:
 
 /* Build an Error whose message carries the source file and line, for an
    internal failure that should not normally reach the user. */
-#define SHIT_MAKE_ERROR(msg)                                                   \
+#define MAKE_ERROR(msg)                                                   \
   ::shit::Error                                                                \
   {                                                                            \
     ::shit::String{__FILE__ ":"} +                                             \

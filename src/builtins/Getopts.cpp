@@ -59,7 +59,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const -> i32
     return finish(1);
   }
 
-  SHIT_ASSERT(static_cast<usize>(optind) - 1 < operands.size());
+  ASSERT(static_cast<usize>(optind) - 1 < operands.size());
   let const &current = operands[static_cast<usize>(optind) - 1];
   if (current.length() < 2 || current[0] != '-') {
     cxt.set_shell_variable(name, "?");

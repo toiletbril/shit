@@ -17,7 +17,7 @@ Builtin::Kind Pwd::kind() const { return Kind::Pwd; }
 
 i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
 
   const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 

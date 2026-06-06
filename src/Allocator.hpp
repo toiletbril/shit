@@ -65,20 +65,20 @@ inline void *bump_alloc(void *context, usize length, usize alignment)
 inline bool bump_resize(void *context, void *pointer, usize old_length,
                         usize new_length, usize alignment)
 {
-  SHIT_UNUSED(context);
-  SHIT_UNUSED(pointer);
-  SHIT_UNUSED(old_length);
-  SHIT_UNUSED(new_length);
-  SHIT_UNUSED(alignment);
+  unused(context);
+  unused(pointer);
+  unused(old_length);
+  unused(new_length);
+  unused(alignment);
   return false;
 }
 inline void bump_free(void *context, void *pointer, usize length,
                       usize alignment)
 {
-  SHIT_UNUSED(context);
-  SHIT_UNUSED(pointer);
-  SHIT_UNUSED(length);
-  SHIT_UNUSED(alignment);
+  unused(context);
+  unused(pointer);
+  unused(length);
+  unused(alignment);
 }
 
 inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
@@ -89,26 +89,26 @@ inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
    all. */
 inline void *heap_alloc(void *context, usize length, usize alignment)
 {
-  SHIT_UNUSED(context);
-  SHIT_UNUSED(alignment);
+  unused(context);
+  unused(alignment);
   return std::malloc(length);
 }
 inline bool heap_resize(void *context, void *pointer, usize old_length,
                         usize new_length, usize alignment)
 {
-  SHIT_UNUSED(context);
-  SHIT_UNUSED(pointer);
-  SHIT_UNUSED(old_length);
-  SHIT_UNUSED(new_length);
-  SHIT_UNUSED(alignment);
+  unused(context);
+  unused(pointer);
+  unused(old_length);
+  unused(new_length);
+  unused(alignment);
   return false;
 }
 inline void heap_free(void *context, void *pointer, usize length,
                       usize alignment)
 {
-  SHIT_UNUSED(context);
-  SHIT_UNUSED(length);
-  SHIT_UNUSED(alignment);
+  unused(context);
+  unused(length);
+  unused(alignment);
   std::free(pointer);
 }
 

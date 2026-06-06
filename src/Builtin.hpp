@@ -231,7 +231,7 @@ void show_builtin_help_impl(const ExecContext &ec,
 /* TODO: More granular error location for flags? */
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
   parse_flags_vec(FLAG_LIST, ec.args());                                       \
-  SHIT_DEFER { reset_flags(FLAG_LIST); }
+  defer { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt);
 

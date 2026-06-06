@@ -188,7 +188,7 @@ fn EvalContext::register_job(os::process pid, StringView command) -> int
   job.command = command;
   job.state = Job::State::Running;
   m_jobs.push(std::move(job));
-  SHIT_LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
+  LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
 }
 
@@ -268,7 +268,7 @@ fn EvalContext::function_names() const -> HashSet
 {
   let names = HashSet{heap_allocator()};
   m_functions.for_each([&](StringView name, const Expression *body) {
-    SHIT_UNUSED(body);
+    unused(body);
     names.add(name);
   });
   return names;
@@ -404,7 +404,7 @@ fn EvalContext::alias_names() const -> HashSet
 {
   let out = HashSet{heap_allocator()};
   m_aliases.for_each([&out](StringView key, const String &value) {
-    SHIT_UNUSED(value);
+    unused(value);
     out.add(key);
   });
   return out;
@@ -418,14 +418,14 @@ fn EvalContext::in_subshell() const -> bool { return m_subshell_depth > 0; }
 
 fn EvalContext::request_break(i64 level, SourceLocation location) -> void
 {
-  SHIT_LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
+  LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
                                m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_continue(i64 level, SourceLocation location) -> void
 {
-  SHIT_LOG(Verbosity::Debug, "continue requested, level %lld",
+  LOG(Verbosity::Debug, "continue requested, level %lld",
            (long long) level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Continue, level, location,
                                m_current_source, String{m_current_origin}};
@@ -433,7 +433,7 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) -> void
 
 fn EvalContext::request_return(i64 status, SourceLocation location) -> void
 {
-  SHIT_LOG(Verbosity::Debug, "return requested, status %lld",
+  LOG(Verbosity::Debug, "return requested, status %lld",
            (long long) status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Return, status, location,
                                m_current_source, String{m_current_origin}};
@@ -441,7 +441,7 @@ fn EvalContext::request_return(i64 status, SourceLocation location) -> void
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) -> void
 {
-  SHIT_LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
+  LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
                                m_current_source, String{m_current_origin}};
 }
@@ -1719,7 +1719,7 @@ fn EvalContext::capture_command_substitution(const String &source) -> String
       Lexer{String{source.view()}, *AST_ARENA}
   };
   let ast = parser.construct_ast();
-  SHIT_ASSERT(ast != nullptr);
+  ASSERT(ast != nullptr);
 
   /* A cd or an assignment inside the substitution must not leak. */
   let snapshot = snapshot_state();
@@ -1808,7 +1808,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
   m_source_frames.push(SourceFrame{
       String{origin}, call_site ? *call_site : SourceLocation{0, 0},
       parent_source});
-  SHIT_DEFER { m_source_frames.pop_back(); };
+  defer { m_source_frames.pop_back(); };
 
   /* The whole chain from the innermost source out to the outermost is printed
      when an error is caught, so every nested call site is named, not only the
@@ -1857,7 +1857,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
        The destructor runs at the next top-level command, freeing the node
        members while the arena storage is reclaimed by the reset. */
     let const ast = parser.construct_ast().release();
-    SHIT_ASSERT(ast != nullptr);
+    ASSERT(ast != nullptr);
     m_retained_source_asts.push(ast);
 
     /* Keep a copy of the source alive for as long as the AST, so a control-flow
@@ -1871,7 +1871,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
     let const previous_source = m_current_source;
     let const previous_origin = m_current_origin;
     set_current_source(retained_source, String{origin});
-    SHIT_DEFER { set_current_source(previous_source, previous_origin); };
+    defer { set_current_source(previous_source, previous_origin); };
 
     ast->evaluate(*this);
     /* A return at the top of a sourced file or an eval returns from that source
@@ -1938,7 +1938,7 @@ fn EvalContext::process_args(const ArrayList<const Token *> &args)
      nests, so a command substitution inside one of these words reclaims only
      its own fields and leaves this word's in-progress fields alone. */
   let scratch_mark = m_scratch_arena.mark();
-  SHIT_DEFER { m_scratch_arena.release(scratch_mark); };
+  defer { m_scratch_arena.release(scratch_mark); };
 
   let expanded_args = ArrayList<String>{};
   expanded_args.reserve(args.size());
@@ -1959,7 +1959,7 @@ fn EvalContext::process_args(const ArrayList<const Token *> &args)
            value segments, so the value still expands instead of staying
            literal. */
         let const a = static_cast<const tokens::Assignment *>(t);
-        SHIT_ASSERT(a != nullptr);
+        ASSERT(a != nullptr);
         let key_literal = String{StringView{a->key()}};
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
@@ -2020,7 +2020,7 @@ fn ExecContext::is_builtin() const -> bool { return m_kind.is_builtin(); }
 
 fn ExecContext::program_path() const -> const Path &
 {
-  SHIT_ASSERT(!is_builtin());
+  ASSERT(!is_builtin());
   return m_kind.program_path;
 }
 
@@ -2042,7 +2042,7 @@ fn ExecContext::close_fds() -> void
 
 fn ExecContext::builtin_kind() const -> const Builtin::Kind &
 {
-  SHIT_ASSERT(is_builtin());
+  ASSERT(is_builtin());
   return m_kind.builtin_kind;
 }
 
@@ -2059,7 +2059,7 @@ fn ExecContext::make_from(SourceLocation location,
                           const ArrayList<String> &args) -> ExecContext
 {
   /* Make sure we always include at least one argument, the program path. */
-  SHIT_ASSERT(args.size() > 0);
+  ASSERT(args.size() > 0);
 
   let const &program = args[0];
 
@@ -2097,7 +2097,7 @@ fn ExecContext::make_from(SourceLocation location,
 fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
                               const ArrayList<String> &args) -> ExecContext
 {
-  SHIT_ASSERT(args.size() > 0);
+  ASSERT(args.size() > 0);
   return {location, std::move(kind), args};
 }
 

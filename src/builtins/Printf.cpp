@@ -96,7 +96,7 @@ Builtin::Kind Printf::kind() const { return Kind::Printf; }
 
 i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
 
   if (ec.args().size() < 2) return 0;
 

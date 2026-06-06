@@ -38,7 +38,7 @@ Builtin::Kind Times::kind() const { return Kind::Times; }
 
 i32 Times::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  SHIT_UNUSED(cxt);
+  unused(cxt);
 
   double self_user = 0, self_system = 0, child_user = 0, child_system = 0;
 

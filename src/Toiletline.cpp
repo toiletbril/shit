@@ -85,7 +85,7 @@ fn tl_arena_realloc(void *pointer, usize length) -> void *
 #define TL_ABORT() std::abort()
 
 #define TL_NO_SUSPEND
-#define TL_ASSERT           SHIT_ASSERT
+#define TL_ASSERT           ASSERT
 #define TL_HISTORY_MAX_SIZE 1024 * 4
 
 #define TOILETLINE_IMPLEMENTATION
@@ -234,7 +234,7 @@ struct InputResult
   String text;
 };
 
-fn set_title(const String &title) -> void { SHIT_UNUSED(title); }
+fn set_title(const String &title) -> void { unused(title); }
 
 fn utf8_strlen(const String &s, usize count) -> usize
 {
@@ -254,17 +254,17 @@ fn exit() -> void {}
 
 fn get_input(const String &prompt) -> InputResult
 {
-  SHIT_UNUSED(prompt);
+  unused(prompt);
   throw shit::Error{"This build has no line editor"};
 }
 
-fn set_input(const String &input) -> void { SHIT_UNUSED(input); }
+fn set_input(const String &input) -> void { unused(input); }
 
 fn enter_raw_mode() -> void {}
 
 fn exit_raw_mode() -> void {}
 
-fn emit_newlines(StringView buffer) -> void { SHIT_UNUSED(buffer); }
+fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 
 } /* namespace toiletline */
 
