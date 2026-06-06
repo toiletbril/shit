@@ -81,6 +81,10 @@ void
 EvalContext::unset_shell_variable(const std::string &name)
 {
   m_shell_variables.erase(StringView{name.data(), name.size()});
+  /* An exported variable also lives in the process environment, so it is removed
+     there too. Otherwise a later lookup falls back to the stale environment
+     value and the variable appears still set, which dash does not do. */
+  os::unset_environment_variable(name);
   if (name == "IFS") m_field_separators = " \t\n";
 }
 
