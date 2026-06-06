@@ -84,7 +84,10 @@ struct StringView
   starts_with(StringView prefix) const
   {
     if (prefix.length > length) return false;
-    return std::memcmp(data, prefix.data, prefix.length) == 0;
+    /* An empty prefix matches, and the guard keeps a null data pointer out of
+       memcmp, which is undefined even for a zero length. */
+    return prefix.length == 0 ||
+           std::memcmp(data, prefix.data, prefix.length) == 0;
   }
 };
 

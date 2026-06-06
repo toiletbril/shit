@@ -25,17 +25,28 @@ namespace os {
 Maybe<usize>
 write_fd(os::descriptor fd, const void *buf, usize size)
 {
-  ssize_t w = write(fd, buf, size);
-  if (w == -1) return shit::nothing;
-  return static_cast<usize>(w);
+  for (;;) {
+    ssize_t w = write(fd, buf, size);
+    /* A signal that lands mid-write interrupts the call before any byte is
+       transferred. Retry instead of reporting a spurious write failure. */
+    if (w == -1 && errno == EINTR) continue;
+    if (w == -1) return shit::nothing;
+    return static_cast<usize>(w);
+  }
 }
 
 Maybe<usize>
 read_fd(os::descriptor fd, void *buf, usize size)
 {
-  ssize_t r = read(fd, buf, size);
-  if (r == -1) return shit::nothing;
-  return static_cast<usize>(r);
+  for (;;) {
+    ssize_t r = read(fd, buf, size);
+    /* A signal that lands while the read blocks, such as SIGCHLD from a job
+       that changes state, interrupts the call. Retry so the reader does not
+       mistake the interruption for end of input. */
+    if (r == -1 && errno == EINTR) continue;
+    if (r == -1) return shit::nothing;
+    return static_cast<usize>(r);
+  }
 }
 
 bool
