@@ -773,7 +773,7 @@ Lexer::lex_sentinel()
       SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(*op));
     }
   } else {
-    std::string s{};
+    String s{};
     s += "unknown operator '";
     s += ch;
     s += "'";

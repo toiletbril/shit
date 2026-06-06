@@ -12,7 +12,7 @@ static constexpr usize ERROR_CONTEXT_SIZE = 24;
 struct ErrorBase
 {
   ErrorBase();
-  ErrorBase(const std::string &message);
+  ErrorBase(StringView message);
   virtual ~ErrorBase();
 
   operator bool &();
@@ -32,7 +32,7 @@ protected:
 struct Error : public ErrorBase
 {
   Error();
-  Error(const std::string &message);
+  Error(StringView message);
 
   std::string to_string() const;
 
@@ -44,7 +44,7 @@ struct Error : public ErrorBase
 /* An Error that prints as a warning and is shown rather than thrown. */
 struct Warning : public Error
 {
-  Warning(const std::string &message);
+  Warning(StringView message);
 
   std::string severity_word() const override;
 };
@@ -53,7 +53,7 @@ struct Warning : public Error
    location, so it adds plain context under a primary error. */
 struct Note : public Error
 {
-  Note(const std::string &message);
+  Note(StringView message);
 
   std::string severity_word() const override;
 };
@@ -66,7 +66,7 @@ struct ErrorWithLocation : public ErrorBase
 {
   ErrorWithLocation();
 
-  ErrorWithLocation(SourceLocation location, const std::string &message);
+  ErrorWithLocation(SourceLocation location, StringView message);
 
   /* The severity word comes from severity_word, so a warning subclass prints
      Warning over the same caret without passing the word in. */
@@ -80,7 +80,7 @@ protected:
    thrown. The prepass builds it to point a caret at a non-fatal issue. */
 struct WarningWithLocation : public ErrorWithLocation
 {
-  WarningWithLocation(SourceLocation location, const std::string &message);
+  WarningWithLocation(SourceLocation location, StringView message);
 
   std::string severity_word() const override;
 };
@@ -89,10 +89,9 @@ struct ErrorWithLocationAndDetails : public ErrorWithLocation
 {
   ErrorWithLocationAndDetails();
 
-  ErrorWithLocationAndDetails(SourceLocation location,
-                              const std::string &message,
+  ErrorWithLocationAndDetails(SourceLocation location, StringView message,
                               SourceLocation details_location,
-                              const std::string &details_message);
+                              StringView details_message);
 
   std::string details_to_string(std::string_view source) const;
 

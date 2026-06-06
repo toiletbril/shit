@@ -124,13 +124,13 @@ std::string make_synopsis(std::string_view program_name,
                           const std::vector<std::string> &lines);
 std::string make_flag_help(const ArrayList<Flag *> &flags);
 
-void show_message(std::string_view err);
+void show_message(StringView err);
 
 /* Write bytes to the standard streams without going through the iostream
    layer. The shell uses these instead of std::cout and std::cerr so the binary
    does not pull in the stream machinery. */
-void print_to_standard_output(std::string_view text);
-void print_to_standard_error(std::string_view text);
+void print_to_standard_output(StringView text);
+void print_to_standard_error(StringView text);
 void flush_standard_output();
 
 } /* namespace shit */

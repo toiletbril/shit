@@ -154,7 +154,7 @@ initialize()
     {
       /* Don't count non-existent history file as an error. */
       if (ret != -ENOENT) {
-        std::string err_message = "Toiletline: Could not load history: ";
+        shit::String err_message = "Toiletline: Could not load history: ";
         err_message += (errno == EINVAL)
                            ? std::string{"Non-text byte detected in history "
                                          "file. Truncate it manually"}

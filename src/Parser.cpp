@@ -730,7 +730,7 @@ Parser::parse_for()
 
   std::unique_ptr<Token> do_token{m_lexer.next_shell_token()};
   if (do_token->kind() != Token::Kind::Do) {
-    std::string detail = "expected 'do'";
+    String detail = "expected 'do'";
     if (!has_in_clause) {
       detail = "expected 'do', or 'in WORDS' before it; without 'in' the loop "
                "walks the positional parameters";

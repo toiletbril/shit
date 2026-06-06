@@ -172,11 +172,11 @@ string_replace(std::string &s, const std::string_view to_replace,
 std::string
 lowercase_string(std::string_view s)
 {
-  std::string l{};
+  String l{};
   l.reserve(s.length());
   for (usize i = 0; i < s.length(); i++)
-    l += std::tolower(s[i]);
-  return l;
+    l.push(static_cast<char>(std::tolower(s[i])));
+  return std::string{l.c_str(), l.size()};
 }
 
 Maybe<std::filesystem::path>

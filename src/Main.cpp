@@ -76,7 +76,7 @@ report_escaped_control_flow(shit::EvalContext &context,
   if (!context.has_pending_control_flow()) return;
 
   const shit::ControlFlow &control = context.pending_control_flow();
-  std::string what;
+  shit::String what{};
   switch (control.kind) {
   case shit::ControlFlow::Kind::Break:
     what = "'break' used outside of a loop";
@@ -212,7 +212,7 @@ static std::string
 expand_prompt_escapes(const std::string &prompt, const std::string &user,
                       const std::string &working_directory)
 {
-  std::string out{};
+  shit::String out{};
   for (usize i = 0; i < prompt.length(); i++) {
     if (prompt[i] != '\\' || i + 1 >= prompt.length()) {
       out += prompt[i];
@@ -245,7 +245,7 @@ expand_prompt_escapes(const std::string &prompt, const std::string &user,
       break;
     }
   }
-  return out;
+  return std::string{out.c_str(), out.size()};
 }
 
 int
@@ -305,7 +305,7 @@ main(int argc, char **argv)
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
     bool is_tty = shit::os::is_stdin_a_tty();
 
-    std::string s{};
+    shit::String s{};
     s += "Both '-s' and '-i' options were specified. Falling back to ";
     s += is_tty ? "'-i'" : "'-s' because stdin is not a tty.";
     shit::show_message(s);

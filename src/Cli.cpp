@@ -227,11 +227,18 @@ parse_flags_vec(const ArrayList<Flag *> &flags, const ArrayList<String> &args)
                      const_cast<char const *const *>(os_argv.data()));
 }
 
-static std::string
+static String
 flag_name(const Flag *f, bool is_long)
 {
-  return "-" + (is_long ? "-" + std::string{f->long_name()}
-                        : std::string{f->short_name()});
+  String name{};
+  name += "-";
+  if (is_long) {
+    name += "-";
+    name += StringView{f->long_name().data(), f->long_name().size()};
+  } else {
+    name.push(f->short_name());
+  }
+  return name;
 }
 
 ArrayList<String>
@@ -369,19 +376,19 @@ parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
           throw Error{"Missing space between '-' and other options"};
         } else {
           /* Trim the value before '=' and report unknown flag. */
-          std::string s;
+          String s{};
           s += "Unknown flag '-";
 
           if (!is_long) {
-            s += std::string{*flag_offset};
+            s.push(*flag_offset);
           } else {
             s += "-";
 
-            std::string_view flag_sv = flag_offset;
-            usize equals_pos = flag_sv.find('=');
+            StringView flag_sv = flag_offset;
+            Maybe<usize> equals_pos = flag_sv.find_character('=');
 
-            if (equals_pos != std::string::npos)
-              s += flag_sv.substr(0, equals_pos);
+            if (equals_pos)
+              s += flag_sv.substring_of_length(0, equals_pos.value());
             else
               s += flag_sv;
           }
@@ -444,25 +451,25 @@ std::string
 make_synopsis(std::string_view program_name,
               const std::vector<std::string> &lines)
 {
-  std::string s{};
+  String s{};
 
   s += "SYNOPSIS\n";
 
   for (std::string_view l : lines) {
     s += "  ";
-    s += program_name;
+    s += StringView{program_name.data(), program_name.size()};
     s += ' ';
-    s += l;
+    s += StringView{l.data(), l.size()};
     s += '\n';
   }
 
-  return s;
+  return std::string{s.c_str(), s.size()};
 }
 
 std::string
 make_flag_help(const ArrayList<Flag *> &flags)
 {
-  std::string s{};
+  String s{};
 
   static constexpr usize MAX_WIDTH = 24;
   static constexpr usize LONG_PADDING = 9;
@@ -492,7 +499,7 @@ make_flag_help(const ArrayList<Flag *> &flags)
 
       /* '-E, --exit-code' */
       s += "--";
-      s += f->long_name();
+      s += StringView{f->long_name().data(), f->long_name().size()};
 
       switch (f->kind()) {
       /* '-E, --exit-code=<...>' */
@@ -518,25 +525,25 @@ make_flag_help(const ArrayList<Flag *> &flags)
     }
 
     /* NOTE: This does not wrap long descriptions. */
-    s += f->description();
+    s += StringView{f->description().data(), f->description().size()};
   }
 
-  return s;
+  return std::string{s.c_str(), s.size()};
 }
 
 void
-print_to_standard_output(std::string_view text)
+print_to_standard_output(StringView text)
 {
   /* The output is flushed at once so it interleaves with the unbuffered
      write_fd path the builtins use, keeping the order a reader sees correct. */
-  std::fwrite(text.data(), 1, text.size(), stdout);
+  std::fwrite(text.data, 1, text.size(), stdout);
   std::fflush(stdout);
 }
 
 void
-print_to_standard_error(std::string_view text)
+print_to_standard_error(StringView text)
 {
-  std::fwrite(text.data(), 1, text.size(), stderr);
+  std::fwrite(text.data, 1, text.size(), stderr);
   std::fflush(stderr);
 }
 
@@ -547,7 +554,7 @@ flush_standard_output()
 }
 
 void
-show_message(std::string_view err)
+show_message(StringView err)
 {
   print_to_standard_error("shit: ");
   print_to_standard_error(err);

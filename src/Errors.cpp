@@ -140,8 +140,8 @@ get_context_pointing_to(std::string_view source, usize byte_position,
 
 ErrorBase::ErrorBase() = default;
 
-ErrorBase::ErrorBase(const std::string &message)
-    : m_is_active(true), m_message(message)
+ErrorBase::ErrorBase(StringView message)
+    : m_is_active(true), m_message(message.data, message.length)
 {}
 
 ErrorBase::~ErrorBase() = default;
@@ -164,7 +164,7 @@ ErrorBase::severity_word() const
   return "Error";
 }
 
-Error::Error(const std::string &message) : ErrorBase(message) {}
+Error::Error(StringView message) : ErrorBase(message) {}
 
 std::string
 Error::to_string() const
@@ -177,7 +177,7 @@ Error::operator std::string() const
   return to_string();
 }
 
-Warning::Warning(const std::string &message) : Error(message) {}
+Warning::Warning(StringView message) : Error(message) {}
 
 std::string
 Warning::severity_word() const
@@ -185,7 +185,7 @@ Warning::severity_word() const
   return "Warning";
 }
 
-Note::Note(const std::string &message) : Error(message) {}
+Note::Note(StringView message) : Error(message) {}
 
 std::string
 Note::severity_word() const
@@ -194,7 +194,7 @@ Note::severity_word() const
 }
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
-                                     const std::string &message)
+                                     StringView message)
     : ErrorBase(message), m_location(location)
 {}
 
@@ -240,7 +240,7 @@ ErrorWithLocation::to_string(std::string_view source) const
 }
 
 WarningWithLocation::WarningWithLocation(SourceLocation location,
-                                         const std::string &message)
+                                         StringView message)
     : ErrorWithLocation(location, message)
 {}
 
@@ -251,10 +251,11 @@ WarningWithLocation::severity_word() const
 }
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
-    SourceLocation location, const std::string &message,
-    SourceLocation details_location, const std::string &details_message)
+    SourceLocation location, StringView message,
+    SourceLocation details_location, StringView details_message)
     : ErrorWithLocation(location, message),
-      m_details_location(details_location), m_details_message(details_message)
+      m_details_location(details_location),
+      m_details_message(details_message.data, details_message.length)
 {}
 
 std::string
