@@ -7,5 +7,6 @@
 [Word
   Unquoted "word*"
 ]
-word*
-[Code 0]
+shit: 2:1: Error: No matches for the glob pattern 'word*'.
+     2 |  word*
+       |  ^~~~~ here.

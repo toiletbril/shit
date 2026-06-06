@@ -471,7 +471,8 @@ protected:
       -> ArrayList<glob_field>;
   fn expand_path_recurse(ArrayList<glob_field> fields) throws
       -> ArrayList<glob_field>;
-  fn expand_path(glob_field field) throws -> ArrayList<String>;
+  fn expand_path(glob_field field, SourceLocation location) throws
+      -> ArrayList<String>;
 
   fn expand_tilde(WordSegment &leading_segment) const throws -> void;
 };

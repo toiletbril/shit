@@ -1212,7 +1212,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   text = std::move(expanded);
 }
 
-hot fn EvalContext::expand_path(glob_field field) throws -> ArrayList<String>
+hot fn EvalContext::expand_path(glob_field field, SourceLocation location) throws -> ArrayList<String>
 {
   let const scratch = scratch_allocator();
 
@@ -1248,9 +1248,12 @@ hot fn EvalContext::expand_path(glob_field field) throws -> ArrayList<String>
      from spending most of its time in the sort comparator. */
   std::sort(values.begin(), values.end());
 
-  /* A pattern that matches no file expands to itself, the POSIX behavior dash
-     follows, rather than being dropped or raising an error. */
-  if (values.size() == 0) values.push(std::move(pattern));
+  /* A glob that matches no file is a hard error here, unlike the POSIX fallback
+     of expanding to the literal pattern. The caret points at the offending
+     word. */
+  if (values.size() == 0)
+    throw ErrorWithLocation{location,
+                            "No matches for the glob pattern '" + pattern + "'"};
 
   return values;
 }
@@ -2063,7 +2066,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
       }
 
       for (glob_field &field : expand_word(*word)) {
-        for (String &g : expand_path(std::move(field)))
+        for (String &g : expand_path(std::move(field), l))
           expanded_args.push(String{
               heap_allocator(), StringView{g.c_str(), g.size()}
           });
