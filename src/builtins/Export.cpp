@@ -22,7 +22,11 @@ Export::kind() const
 i32
 Export::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  std::vector<std::string> raw_args{};
+  for (usize i = 0; i < ec.args().size(); i++)
+    raw_args.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
+  std::vector<std::string> args = parse_flags_vec(FLAG_LIST, raw_args);
+  SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 

@@ -26,7 +26,7 @@ Fg::kind() const
 i32
 Fg::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
 
   Job *job = nullptr;
   if (args.size() > 1 && !args[1].empty() && args[1][0] == '%')

@@ -25,7 +25,7 @@ i32
 Exec::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
 
   /* exec with only redirections changes the shell's own descriptors and
      returns, so the rest of the session inherits them. */
@@ -34,30 +34,34 @@ Exec::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  const std::string &command_name = args[1];
+  const String &command_name = args[1];
+  std::string command_name_string{command_name.c_str(), command_name.size()};
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the
      status a command-not-found leaves. */
   std::filesystem::path program_path{};
-  if (command_name.find('/') != std::string::npos) {
+  if (command_name.find_character('/').has_value()) {
     Maybe<std::filesystem::path> resolved =
-        utils::canonicalize_path(command_name);
+        utils::canonicalize_path(command_name_string);
     if (!resolved) {
-      show_message("exec: '" + command_name + "': not found");
+      show_message("exec: '" + command_name_string + "': not found");
       utils::quit(127, true);
     }
     program_path = resolved.take();
   } else {
     ArrayList<std::filesystem::path> found =
-        utils::search_program_path(command_name);
+        utils::search_program_path(command_name_string);
     if (found.size() == 0) {
-      show_message("exec: '" + command_name + "': not found");
+      show_message("exec: '" + command_name_string + "': not found");
       utils::quit(127, true);
     }
     program_path = found[0];
   }
 
-  std::vector<std::string> command_args{args.begin() + 1, args.end()};
+  ArrayList<String> command_args{};
+  for (usize i = 1; i < args.size(); i++)
+    command_args.push(
+        String{heap_allocator(), StringView{args[i].c_str(), args[i].size()}});
   ExecContext command = ExecContext::from_resolved(ec.source_location(),
                                                    program_path, command_args);
   if (ec.in_fd) command.in_fd = ec.in_fd.take();

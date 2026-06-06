@@ -25,8 +25,14 @@ Unset::kind() const
 i32
 Unset::execute(ExecContext &ec, EvalContext &cxt) const
 {
+  const ArrayList<String> &args = ec.args();
+  std::vector<std::string> args_without_program{};
+  args_without_program.reserve(args.size() > 0 ? args.size() - 1 : 0);
+  for (usize i = 1; i < args.size(); i++)
+    args_without_program.emplace_back(args[i].c_str(), args[i].size());
+
   std::vector<std::string> names =
-      parse_flags_vec(FLAG_LIST, {ec.args().begin() + 1, ec.args().end()});
+      parse_flags_vec(FLAG_LIST, args_without_program);
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   bool unset_function = FLAG_UNSET_FUNCTION.is_enabled();

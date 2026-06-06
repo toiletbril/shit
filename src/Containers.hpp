@@ -177,6 +177,12 @@ struct String
   {
     return StringView{m_data, m_length};
   }
+  /* A String reads as a view wherever one is expected, so an owned string passes
+     to a comparison or a function taking a view without spelling out view(). */
+  operator StringView() const
+  {
+    return StringView{m_data, m_length};
+  }
   [[nodiscard]] const char *
   c_str() const
   {

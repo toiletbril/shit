@@ -47,7 +47,7 @@ Maybe<descriptor> write_to_temp_file(const std::string &content);
 u32 get_file_creation_mask();
 void set_file_creation_mask(u32 mask);
 
-os_args make_os_args(const std::vector<std::string> &args);
+os_args make_os_args(const ArrayList<String> &args);
 
 std::string last_system_error_message();
 

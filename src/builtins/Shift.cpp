@@ -20,18 +20,24 @@ Shift::execute(ExecContext &ec, EvalContext &cxt) const
 {
   i64 count = 1;
   if (ec.args().size() > 1) {
+    const String &count_argument = ec.args()[1];
+    std::string count_text{count_argument.c_str(), count_argument.size()};
     try {
-      count = std::stoll(ec.args()[1]);
+      count = std::stoll(count_text);
     } catch (...) {
-      throw Error{"'" + ec.args()[1] + "' is not a number"};
+      throw Error{"'" + count_text + "' is not a number"};
     }
   }
 
-  std::vector<std::string> params = cxt.positional_params();
+  const ArrayList<String> &params = cxt.positional_params();
   if (count < 0 || static_cast<usize>(count) > params.size()) return 1;
 
-  params.erase(params.begin(), params.begin() + count);
-  cxt.set_positional_params(std::move(params));
+  /* ArrayList has no erase, so the kept tail is copied into a fresh list from
+     index count onward. */
+  ArrayList<String> shifted{heap_allocator()};
+  for (usize i = static_cast<usize>(count); i < params.size(); i++)
+    shifted.push(String{heap_allocator(), params[i]});
+  cxt.set_positional_params(std::move(shifted));
   return 0;
 }
 

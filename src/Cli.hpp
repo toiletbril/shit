@@ -110,6 +110,8 @@ private:
 
 std::vector<std::string> parse_flags_vec(const ArrayList<Flag *> &flags,
                                          const std::vector<std::string> &args);
+std::vector<std::string> parse_flags_vec(const ArrayList<Flag *> &flags,
+                                         const ArrayList<String> &args);
 std::vector<std::string> parse_flags(const ArrayList<Flag *> &flags, int argc,
                                      const char *const *argv);
 

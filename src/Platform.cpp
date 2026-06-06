@@ -487,12 +487,12 @@ signal_number_from_name(const std::string &name)
 }
 
 os_args
-make_os_args(const std::vector<std::string> &args)
+make_os_args(const ArrayList<String> &args)
 {
   std::vector<const char *> os_args;
   os_args.reserve(args.size() + 1);
 
-  for (const std::string &arg : args)
+  for (const String &arg : args)
     os_args.push_back(arg.c_str());
 
   os_args.push_back(nullptr);
@@ -929,19 +929,23 @@ signal_number_from_name(const std::string &name)
 }
 
 os_args
-make_os_args(const std::vector<std::string> &args)
+make_os_args(const ArrayList<String> &args)
 {
   SHIT_ASSERT(args.size() > 0);
 
   std::string s{};
 
-  s += '"' + args[0] + '"';
+  s += '"';
+  s.append(args[0].c_str(), args[0].size());
+  s += '"';
 
   /* TODO: Remove CVE and escape quotes. */
   if (args.size() > 1) {
     for (usize i = 1; i < args.size(); i++) {
       s += ' ';
-      s += '"' + args[i] + '"';
+      s += '"';
+      s.append(args[i].c_str(), args[i].size());
+      s += '"';
     }
   }
 

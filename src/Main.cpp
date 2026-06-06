@@ -346,14 +346,23 @@ main(int argc, char **argv)
   }
 
   /* Main loop state. The program name is $0 and the remaining arguments are the
-     positional parameters $1 upward. */
+     positional parameters $1 upward. The argument names come from parse_flags as
+     a std::vector, so they are copied into the ArrayList the context holds. */
+  shit::ArrayList<shit::String> positional_params{};
+  positional_params.reserve(file_names.size());
+  for (const std::string &file_name : file_names)
+    positional_params.push(shit::String{
+        shit::heap_allocator(),
+        shit::StringView{file_name.data(), file_name.size()}
+    });
+
   shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
                             FLAG_VERBOSE.is_enabled(),
                             FLAG_EXPAND_VERBOSE.is_enabled(),
                             should_be_interactive,
                             FLAG_ERROR_EXIT.is_enabled(),
                             program_path,
-                            file_names};
+                            std::move(positional_params)};
 
   /* Apply the remaining option flags that the constructor does not take. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());

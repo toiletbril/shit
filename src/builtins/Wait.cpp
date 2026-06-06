@@ -40,7 +40,7 @@ Wait::kind() const
 i32
 Wait::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
 
   i32 status = 0;
 
@@ -52,14 +52,22 @@ Wait::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   for (usize i = 1; i < args.size(); i++) {
-    const std::string &target = args[i];
+    const String &target = args[i];
+
+    bool is_all_digits = !target.empty();
+    for (usize position = 0; position < target.size(); position++) {
+      char character = target[position];
+      if (character < '0' || character > '9') {
+        is_all_digits = false;
+        break;
+      }
+    }
+
     if (!target.empty() && target[0] == '%') {
       int id = static_cast<int>(std::atoll(target.c_str() + 1));
       if (Job *job = cxt.find_job(id))
         status = wait_for_job(*job);
-    } else if (!target.empty() &&
-               target.find_first_not_of("0123456789") == std::string::npos)
-    {
+    } else if (is_all_digits) {
       os::process pid = os::process_from_pid(std::atoll(target.c_str()));
       status = os::wait_and_monitor_process(pid);
     }

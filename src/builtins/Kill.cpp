@@ -27,14 +27,15 @@ Kill::kind() const
 i32
 Kill::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
 
   usize first_target = 1;
   i32 signal_number = os::signal_number_from_name("TERM").value_or(15);
 
   /* A leading -name or -number names the signal to send. */
   if (args.size() > 1 && args[1].length() > 1 && args[1][0] == '-') {
-    std::string name = args[1].substr(1);
+    StringView name_view = args[1].substring(1);
+    std::string name = std::string{name_view.data, name_view.size()};
     Maybe<i32> resolved = os::signal_number_from_name(name);
     if (!resolved)
       throw Error{"kill: '" + name + "' is not a valid signal"};
@@ -47,7 +48,16 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
 
   i32 status = 0;
   for (usize i = first_target; i < args.size(); i++) {
-    const std::string &target = args[i];
+    const String &target = args[i];
+    std::string target_text = std::string{target.c_str(), target.size()};
+
+    bool is_all_digits = !target.empty();
+    for (usize d = 0; d < target.size(); d++) {
+      if (target[d] < '0' || target[d] > '9') {
+        is_all_digits = false;
+        break;
+      }
+    }
 
     os::process pid{};
     if (!target.empty() && target[0] == '%') {
@@ -55,27 +65,25 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
       Job *job = cxt.find_job(id);
       if (job == nullptr) {
         show_message(
-            Error{"kill: '" + target + "' is not a known job"}.to_string());
+            Error{"kill: '" + target_text + "' is not a known job"}.to_string());
         status = 1;
         continue;
       }
       pid = job->pid;
-    } else if (!target.empty() &&
-               target.find_first_not_of("0123456789") == std::string::npos)
-    {
+    } else if (is_all_digits) {
       pid = os::process_from_pid(std::atoll(target.c_str()));
     } else {
       /* A non-numeric target must not fall through to kill(0), which would
          signal the whole process group including this shell. */
       show_message(
-          Error{"kill: '" + target + "' is not a valid job or process id"}
+          Error{"kill: '" + target_text + "' is not a valid job or process id"}
               .to_string());
       status = 1;
       continue;
     }
 
     if (!os::signal_process(pid, signal_number)) {
-      show_message(Error{"kill: could not signal '" + target +
+      show_message(Error{"kill: could not signal '" + target_text +
                          "': " + os::last_system_error_message()}
                        .to_string());
       status = 1;

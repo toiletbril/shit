@@ -44,7 +44,9 @@ execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
   if (!ec.is_builtin()) {
     /* The command word is kept for the job table before the context is moved
        into the spawn. */
-    std::string command = is_async ? ec.program() : std::string{};
+    std::string command =
+        is_async ? std::string{ec.program().c_str(), ec.program().size()}
+                 : std::string{};
 
     os::process p = os::execute_program(std::move(ec));
     if (is_async) {

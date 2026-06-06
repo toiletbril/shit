@@ -18,14 +18,17 @@ namespace utils {
 
 std::string merge_tokens_to_string(const ArrayList<const Token *> &v);
 
-template <class T>
-std::string
-merge_args_to_string(const std::vector<T> &v)
+/* Join the argument list into a single space-separated string. The container is
+   the ArrayList<String> the exec-argv path now carries, so each element is
+   appended through its byte view. */
+inline std::string
+merge_args_to_string(const ArrayList<String> &v)
 {
   std::string r{};
-  for (const std::string &s : v) {
-    r += s;
-    if (s != v.back()) {
+  for (usize i = 0; i < v.size(); i++) {
+    const String &s = v[i];
+    r.append(s.c_str(), s.size());
+    if (i + 1 < v.size()) {
       r += ' ';
     }
   }

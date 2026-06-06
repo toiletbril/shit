@@ -24,15 +24,22 @@ Alias::kind() const
 i32
 Alias::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  std::vector<std::string> raw_args{};
+  for (usize i = 0; i < ec.args().size(); i++)
+    raw_args.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
+  std::vector<std::string> args = parse_flags_vec(FLAG_LIST, raw_args);
+  SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* alias with no operand lists every definition. */
   if (args.size() == 1) {
     std::string out{};
-    for (const std::string &definition : cxt.alias_definitions())
-      out += "alias " + definition + "\n";
+    for (const String &definition : cxt.alias_definitions()) {
+      out += "alias ";
+      out.append(definition.c_str(), definition.size());
+      out += "\n";
+    }
     ec.print_to_stdout(out);
     return 0;
   }

@@ -23,19 +23,21 @@ Getopts::kind() const
 i32
 Getopts::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
   if (args.size() < 3)
     throw Error{"getopts: usage: getopts optstring name [arg ...]"};
 
-  const std::string &optstring = args[1];
-  const std::string &name = args[2];
+  const String &optstring = args[1];
+  std::string name = std::string{args[2].c_str(), args[2].size()};
   bool is_silent = !optstring.empty() && optstring[0] == ':';
 
-  std::vector<std::string> operands{};
-  if (args.size() > 3)
-    operands.assign(args.begin() + 3, args.end());
-  else
+  ArrayList<String> operands{};
+  if (args.size() > 3) {
+    for (usize i = 3; i < args.size(); i++)
+      operands.push(args[i]);
+  } else {
     operands = cxt.positional_params();
+  }
 
   i64 optind = 1;
   if (Maybe<std::string> value = cxt.get_variable_value("OPTIND");
@@ -65,7 +67,7 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     return finish(1);
   }
 
-  const std::string &current = operands[static_cast<usize>(optind) - 1];
+  const String &current = operands[static_cast<usize>(optind) - 1];
   if (current.length() < 2 || current[0] != '-') {
     cxt.set_shell_variable(name, "?");
     return finish(1);
@@ -77,7 +79,7 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   char option = current[char_index];
-  std::string::size_type spec = optstring.find(option);
+  Maybe<usize> spec = optstring.find_character(option);
 
   auto advance_letter = [&]() {
     char_index++;
@@ -87,7 +89,7 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     }
   };
 
-  if (option == ':' || spec == std::string::npos) {
+  if (option == ':' || !spec.has_value()) {
     advance_letter();
     cxt.set_shell_variable(name, "?");
     if (is_silent) {
@@ -101,14 +103,18 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   bool wants_argument =
-      spec + 1 < optstring.length() && optstring[spec + 1] == ':';
+      *spec + 1 < optstring.length() && optstring[*spec + 1] == ':';
   if (wants_argument) {
     if (char_index + 1 < current.length()) {
-      cxt.set_shell_variable("OPTARG", current.substr(char_index + 1));
+      StringView optarg = current.substring(char_index + 1);
+      cxt.set_shell_variable("OPTARG",
+                             std::string{optarg.data, optarg.size()});
       optind++;
       char_index = 1;
     } else if (static_cast<usize>(optind) < operands.size()) {
-      cxt.set_shell_variable("OPTARG", operands[static_cast<usize>(optind)]);
+      const String &optarg = operands[static_cast<usize>(optind)];
+      cxt.set_shell_variable("OPTARG",
+                             std::string{optarg.c_str(), optarg.size()});
       optind += 2;
       char_index = 1;
     } else {

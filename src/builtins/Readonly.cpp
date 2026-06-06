@@ -31,9 +31,10 @@ Readonly::execute(ExecContext &ec, EvalContext &cxt) const
   /* readonly with no operand lists the read-only variables and their values. */
   if (args.size() == 1) {
     std::string out{};
-    for (const std::string &name : cxt.readonly_names()) {
-      out += "readonly " + name;
-      if (Maybe<std::string> value = cxt.get_variable_value(name))
+    for (const String &name : cxt.readonly_names()) {
+      std::string name_text{name.c_str(), name.size()};
+      out += "readonly " + name_text;
+      if (Maybe<std::string> value = cxt.get_variable_value(name_text))
         out += "='" + *value + "'";
       out += "\n";
     }

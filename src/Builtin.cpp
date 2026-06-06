@@ -18,7 +18,8 @@ show_builtin_help_impl(const ExecContext &ec,
                        const ArrayList<Flag *> &fl)
 {
   std::string h{};
-  h += make_synopsis(ec.args()[0], hs);
+  h += make_synopsis(std::string{ec.args()[0].c_str(), ec.args()[0].size()},
+                     hs);
   h += '\n';
   h += make_flag_help(fl);
   h += '\n';
@@ -177,8 +178,10 @@ execute_builtin(ExecContext &&ec, EvalContext &cxt)
   try {
     return b->execute(ec, cxt);
   } catch (const Error &e) {
-    throw ErrorWithLocation{ec.source_location(),
-                            "Builtin '" + ec.program() + "': " + e.message()};
+    throw ErrorWithLocation{
+        ec.source_location(),
+        "Builtin '" + std::string{ec.program().c_str(), ec.program().size()} +
+            "': " + e.message()};
   }
 }
 

@@ -21,7 +21,7 @@ Source::execute(ExecContext &ec, EvalContext &cxt) const
 {
   if (ec.args().size() < 2) throw Error{"filename argument is required"};
 
-  const std::string &path = ec.args()[1];
+  std::string path{ec.args()[1].c_str(), ec.args()[1].size()};
   Maybe<std::string> contents = utils::read_entire_file(path);
   if (!contents) throw Error{"could not open '" + path + "'"};
 

@@ -39,7 +39,7 @@ normalize_condition(const std::string &raw)
 i32
 Trap::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
 
   if (args.size() == 1) {
     std::string out{};
@@ -54,13 +54,14 @@ Trap::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  const std::string &action = args[1];
+  std::string action{args[1].c_str(), args[1].size()};
   /* A lone dash, or a first operand that is itself a condition, resets the
      conditions to their defaults. */
   bool is_reset = action == "-";
 
   for (usize i = 2; i < args.size(); i++) {
-    std::string condition = normalize_condition(args[i]);
+    std::string condition =
+        normalize_condition(std::string{args[i].c_str(), args[i].size()});
     if (is_reset)
       cxt.remove_trap(condition);
     else

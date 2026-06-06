@@ -29,9 +29,14 @@ i32
 Read::execute(ExecContext &ec, EvalContext &cxt) const
 {
   /* -r is accepted, and since backslash processing is not done here the read is
-     raw either way. */
-  std::vector<std::string> names =
-      parse_flags_vec(FLAG_LIST, {ec.args().begin() + 1, ec.args().end()});
+     raw either way. The String arguments are copied into std::string for the
+     flag parser, which works over std::string. */
+  std::vector<std::string> arguments{};
+  for (usize i = 1; i < ec.args().size(); i++) {
+    const String &argument = ec.args()[i];
+    arguments.emplace_back(argument.c_str(), argument.size());
+  }
+  std::vector<std::string> names = parse_flags_vec(FLAG_LIST, arguments);
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (names.empty()) names.emplace_back("REPLY");

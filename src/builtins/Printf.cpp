@@ -82,8 +82,10 @@ Printf::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (ec.args().size() < 2) return 0;
 
-  const std::string &fmt = ec.args()[1];
-  std::vector<std::string> operands{ec.args().begin() + 2, ec.args().end()};
+  std::string fmt = std::string{ec.args()[1].c_str(), ec.args()[1].size()};
+  std::vector<std::string> operands{};
+  for (usize i = 2; i < ec.args().size(); i++)
+    operands.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
 
   std::string out{};
   usize operand_index = 0;

@@ -30,8 +30,13 @@ Unalias::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_ALL.is_enabled()) {
     /* alias_definitions yields name='value', so the name ends at the equals. */
-    for (const std::string &definition : cxt.alias_definitions())
-      cxt.remove_alias(definition.substr(0, definition.find('=')));
+    for (const String &definition : cxt.alias_definitions()) {
+      Maybe<usize> equals_position = definition.find_character('=');
+      usize name_length =
+          equals_position.has_value() ? *equals_position : definition.size();
+      StringView name = definition.substring_of_length(0, name_length);
+      cxt.remove_alias(std::string{name.data, name.length});
+    }
     return 0;
   }
 

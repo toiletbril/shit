@@ -21,10 +21,10 @@ Cd::execute(ExecContext &ec, EvalContext &cxt) const
   std::string arg_path{};
 
   if (ec.args().size() > 1) {
-    arg_path += ec.args()[1];
+    arg_path.append(ec.args()[1].c_str(), ec.args()[1].size());
     for (usize i = 2; i < ec.args().size(); i++) {
       arg_path += ' ';
-      arg_path += ec.args()[i];
+      arg_path.append(ec.args()[i].c_str(), ec.args()[i].size());
     }
   } else {
     /* Empty cd should go to the home directory. */

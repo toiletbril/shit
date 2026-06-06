@@ -29,7 +29,11 @@ CommandBuiltin::kind() const
 i32
 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  std::vector<std::string> raw_args{};
+  for (usize i = 0; i < ec.args().size(); i++)
+    raw_args.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
+  std::vector<std::string> args = parse_flags_vec(FLAG_LIST, raw_args);
+  SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -59,7 +63,10 @@ CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* The bare form runs the operand and its arguments as a command, which
      resolves against a builtin or the PATH and never a function. */
-  std::vector<std::string> operand_args{args.begin() + 1, args.end()};
+  ArrayList<String> operand_args{};
+  for (usize i = 1; i < args.size(); i++)
+    operand_args.push(
+        String{heap_allocator(), StringView{args[i].c_str(), args[i].size()}});
   ExecContext sub = ExecContext::make_from(ec.source_location(), operand_args);
   return utils::execute_context(std::move(sub), cxt, false);
 }

@@ -90,26 +90,28 @@ Set::kind() const
 i32
 Set::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
 
   /* set with no arguments lists the shell variables. */
   if (args.size() == 1) {
     std::string out{};
-    for (const std::string &assignment : cxt.sorted_variable_assignments())
-      out += assignment + "\n";
+    for (const String &assignment : cxt.sorted_variable_assignments()) {
+      out.append(assignment.c_str(), assignment.size());
+      out += "\n";
+    }
     ec.print_to_stdout(out);
     return 0;
   }
 
-  std::vector<std::string> operands{};
+  ArrayList<String> operands{heap_allocator()};
   bool collecting_operands = false;
   bool should_rebind = false;
 
   for (usize i = 1; i < args.size(); i++) {
-    const std::string &arg = args[i];
+    const String &arg = args[i];
 
     if (collecting_operands) {
-      operands.push_back(arg);
+      operands.push(String{heap_allocator(), arg});
       continue;
     }
 
@@ -127,10 +129,11 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
         ec.print_to_stdout(list_options(cxt));
         continue;
       }
-      const std::string &name = args[++i];
-      const SetOption *option = find_option_by_name(name);
+      const String &name = args[++i];
+      std::string name_text{name.c_str(), name.size()};
+      const SetOption *option = find_option_by_name(name_text);
       if (option == nullptr)
-        throw Error{"set: '" + name + "' is not a valid option name"};
+        throw Error{"set: '" + name_text + "' is not a valid option name"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
       continue;
     }
@@ -154,7 +157,7 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
        positional parameters. */
     collecting_operands = true;
     should_rebind = true;
-    operands.push_back(arg);
+    operands.push(String{heap_allocator(), arg});
   }
 
   if (should_rebind) cxt.set_positional_params(std::move(operands));

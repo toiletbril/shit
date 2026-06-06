@@ -207,8 +207,14 @@ Test::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  /* Strip the program name, and for the [ form the required trailing ]. */
-  std::vector<std::string> operands{ec.args().begin() + 1, ec.args().end()};
+  /* Strip the program name, and for the [ form the required trailing ]. The
+     evaluator works over std::string, so the String arguments are copied into
+     std::string operands once here. */
+  std::vector<std::string> operands{};
+  for (usize i = 1; i < ec.args().size(); i++) {
+    const String &argument = ec.args()[i];
+    operands.emplace_back(argument.c_str(), argument.size());
+  }
   if (ec.program() == "[") {
     if (operands.empty() || operands.back() != "]") {
       shit::print_to_standard_error("[: missing closing ']'\n");

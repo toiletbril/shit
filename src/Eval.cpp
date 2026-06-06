@@ -26,7 +26,7 @@ namespace shit {
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
                          bool should_error_exit, std::string shell_name,
-                         std::vector<std::string> positional_params)
+                         ArrayList<String> positional_params)
     : m_shell_name(std::move(shell_name)),
       m_positional_params(std::move(positional_params)),
       m_enable_path_expansion(!should_disable_path_expansion),
@@ -104,8 +104,10 @@ EvalContext::get_variable_value(const std::string &name) const
   {
     if (name.size() > 9) return std::string{};
     usize index = std::stoul(name);
-    if (index >= 1 && index <= m_positional_params.size())
-      return m_positional_params[index - 1];
+    if (index >= 1 && index <= m_positional_params.size()) {
+      const String &param = m_positional_params[index - 1];
+      return std::string{param.c_str(), param.size()};
+    }
     return std::string{};
   }
 
@@ -120,7 +122,8 @@ EvalContext::get_variable_value(const std::string &name) const
     std::string joined{};
     for (usize i = 0; i < m_positional_params.size(); i++) {
       if (i > 0) joined += separator;
-      joined += m_positional_params[i];
+      const String &param = m_positional_params[i];
+      joined += std::string{param.c_str(), param.size()};
     }
     return joined;
   }
@@ -134,14 +137,14 @@ EvalContext::get_variable_value(const std::string &name) const
   return shit::nothing;
 }
 
-const std::vector<std::string> &
+const ArrayList<String> &
 EvalContext::positional_params() const
 {
   return m_positional_params;
 }
 
 void
-EvalContext::set_positional_params(std::vector<std::string> params)
+EvalContext::set_positional_params(ArrayList<String> params)
 {
   m_positional_params = std::move(params);
 }
@@ -318,12 +321,12 @@ EvalContext::is_readonly(const std::string &name) const
   return false;
 }
 
-std::vector<std::string>
+ArrayList<String>
 EvalContext::readonly_names() const
 {
-  std::vector<std::string> out{};
+  ArrayList<String> out{};
   for (const String &name : m_readonly_names)
-    out.push_back(std::string{name.c_str(), name.size()});
+    out.push(String{heap_allocator(), StringView{name.c_str(), name.size()}});
   std::sort(out.begin(), out.end());
   return out;
 }
@@ -396,13 +399,16 @@ EvalContext::get_alias(const std::string &name) const
   return nothing;
 }
 
-std::vector<std::string>
+ArrayList<String>
 EvalContext::alias_definitions() const
 {
-  std::vector<std::string> out{};
+  ArrayList<String> out{};
   m_aliases.for_each([&out](StringView key, const String &value) {
-    out.push_back(std::string{key.data, key.size()} + "='" +
-                  std::string{value.c_str(), value.size()} + "'");
+    String definition{heap_allocator(), key};
+    definition.append(StringView{"='", 2});
+    definition.append(StringView{value.c_str(), value.size()});
+    definition.push('\'');
+    out.push(std::move(definition));
   });
   std::sort(out.begin(), out.end());
   return out;
@@ -634,16 +640,16 @@ EvalContext::set_getopts_last_optind(i64 optind)
   m_getopts_last_optind = optind;
 }
 
-std::vector<std::string>
+ArrayList<String>
 EvalContext::sorted_variable_assignments() const
 {
-  std::vector<std::string> assignments{};
+  ArrayList<String> assignments{};
   assignments.reserve(m_shell_variables.size());
   m_shell_variables.for_each([&](StringView name, const String &value) {
-    std::string entry{name.data, name.length};
-    entry += '=';
-    entry.append(value.c_str(), value.size());
-    assignments.push_back(std::move(entry));
+    String entry{heap_allocator(), name};
+    entry.push('=');
+    entry.append(StringView{value.c_str(), value.size()});
+    assignments.push(std::move(entry));
   });
   std::sort(assignments.begin(), assignments.end());
   return assignments;
@@ -1937,7 +1943,7 @@ EvalContext::expand_heredoc_body(const std::string &body)
   return expand_modifier_word(body, false);
 }
 
-std::vector<std::string>
+ArrayList<String>
 EvalContext::process_args(const ArrayList<const Token *> &args)
 {
   /* The expansion fields live on the scratch arena only until the heap argument
@@ -1947,7 +1953,7 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
   BumpArena::Mark scratch_mark = m_scratch_arena.mark();
   SHIT_DEFER { m_scratch_arena.release(scratch_mark); };
 
-  std::vector<std::string> expanded_args{};
+  ArrayList<String> expanded_args{};
   expanded_args.reserve(args.size());
 
   for (const Token *t : args) {
@@ -1981,7 +1987,8 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
 
       for (GlobField &field : expand_word(*word)) {
         for (String &g : expand_path(std::move(field)))
-          expanded_args.emplace_back(g.c_str(), g.size());
+          expanded_args.push(
+              String{heap_allocator(), StringView{g.c_str(), g.size()}});
       }
     } catch (const Error &e) {
       throw ErrorWithLocation{l, e.message()};
@@ -2005,7 +2012,7 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
 ExecContext::ExecContext(
     SourceLocation location,
     std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
-    const std::vector<std::string> &args)
+    const ArrayList<String> &args)
     : m_kind(kind), m_location(location), m_args(args)
 {}
 /* clang-format on */
@@ -2016,13 +2023,13 @@ ExecContext::source_location() const
   return m_location;
 }
 
-const std::string &
+const String &
 ExecContext::program() const
 {
   return m_args[0];
 }
 
-const std::vector<std::string> &
+const ArrayList<String> &
 ExecContext::args() const
 {
   return m_args;
@@ -2078,31 +2085,33 @@ ExecContext::print_to_stdout(const std::string &s) const
 
 ExecContext
 ExecContext::make_from(SourceLocation location,
-                       const std::vector<std::string> &args)
+                       const ArrayList<String> &args)
 {
   /* Make sure we always include at least one argument, the program path. */
   SHIT_ASSERT(args.size() > 0);
 
   std::variant<shit::Builtin::Kind, std::filesystem::path> kind;
 
-  const std::string &program = args[0];
+  const String &program = args[0];
+  std::string program_string{program.c_str(), program.size()};
 
   Maybe<Builtin::Kind> bk;
   Maybe<std::filesystem::path> p;
 
   /* This isn't a path? */
-  if (program.find('/') == std::string::npos) {
-    bk = search_builtin(program);
+  if (!program.find_character('/').has_value()) {
+    bk = search_builtin(std::string_view{program.c_str(), program.size()});
 
     if (!bk) {
       /* Not a builtin, try to search PATH. */
-      ArrayList<std::filesystem::path> ps = utils::search_program_path(program);
+      ArrayList<std::filesystem::path> ps =
+          utils::search_program_path(program_string);
       if (ps.size() > 0) p = ps[0];
     }
   } else {
     /* This is a path. */
     /* TODO: Sanitize extensions here too. */
-    p = utils::canonicalize_path(program);
+    p = utils::canonicalize_path(program_string);
   }
 
   /* Builtins take precedence over programs. */
@@ -2111,7 +2120,7 @@ ExecContext::make_from(SourceLocation location,
       kind = *p;
     } else {
       throw ErrorWithLocation{location,
-                              "Program '" + program + "' wasn't found"};
+                              "Program '" + program_string + "' wasn't found"};
     }
   } else {
     kind = *bk;
@@ -2124,7 +2133,7 @@ ExecContext
 ExecContext::from_resolved(
     SourceLocation location,
     std::variant<shit::Builtin::Kind, std::filesystem::path> kind,
-    const std::vector<std::string> &args)
+    const ArrayList<String> &args)
 {
   SHIT_ASSERT(args.size() > 0);
   return {location, std::move(kind), args};

@@ -401,7 +401,7 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redirection.target);
-    std::vector<std::string> target = cxt.process_args(target_tokens);
+    ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Redirection target is not a single file"};
@@ -414,10 +414,11 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    Maybe<os::descriptor> opened = os::open_file_descriptor(target[0], mode);
+    std::string target_path{target[0].c_str(), target[0].size()};
+    Maybe<os::descriptor> opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
-                              "Could not open '" + target[0] +
+                              "Could not open '" + target_path +
                                   "': " + os::last_system_error_message()};
     }
     os::descriptor file_fd = opened.take();
@@ -455,38 +456,48 @@ namespace {
    self-referential alias terminates. A quoted space inside the body is not
    preserved, since this expansion does not re-run the full tokenizer. */
 void
-expand_command_aliases(EvalContext &cxt, std::vector<std::string> &args)
+expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
 {
-  std::vector<std::string> already_expanded{};
+  ArrayList<String> already_expanded{};
 
   while (!args.empty()) {
-    const std::string &word = args[0];
+    const String &word = args[0];
 
     bool seen = false;
-    for (const std::string &name : already_expanded)
-      if (name == word) seen = true;
+    for (const String &name : already_expanded)
+      if (name == StringView{word.c_str(), word.size()}) seen = true;
     if (seen) break;
 
-    Maybe<std::string> body = cxt.get_alias(word);
+    std::string word_string{word.c_str(), word.size()};
+    Maybe<std::string> body = cxt.get_alias(word_string);
     if (!body.has_value()) break;
-    already_expanded.push_back(word);
+    already_expanded.push(
+        String{heap_allocator(), StringView{word.c_str(), word.size()}});
 
-    std::vector<std::string> words{};
+    /* The alias body replaces the first word, so the split words go in front of
+       the remaining arguments. ArrayList has no in-place erase, so the new list
+       is built and swapped in. */
+    ArrayList<String> rebuilt{};
     std::string current{};
     for (char c : *body) {
       if (c == ' ' || c == '\t') {
         if (!current.empty()) {
-          words.push_back(current);
+          rebuilt.push(
+              String{heap_allocator(), StringView{current.data(), current.size()}});
           current.clear();
         }
       } else {
         current += c;
       }
     }
-    if (!current.empty()) words.push_back(current);
+    if (!current.empty())
+      rebuilt.push(
+          String{heap_allocator(), StringView{current.data(), current.size()}});
 
-    args.erase(args.begin());
-    args.insert(args.begin(), words.begin(), words.end());
+    for (usize i = 1; i < args.size(); i++)
+      rebuilt.push(std::move(args[i]));
+
+    args = std::move(rebuilt);
   }
 }
 
@@ -504,7 +515,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     shit::flush_standard_output();
   }
 
-  std::vector<std::string> program_args = cxt.process_args(m_args);
+  ArrayList<String> program_args = cxt.process_args(m_args);
   expand_command_aliases(cxt, program_args);
 
   /* Open the redirection targets. A redirection takes effect even when the
@@ -553,7 +564,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redirection.target);
-    std::vector<std::string> target = cxt.process_args(target_tokens);
+    ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
       throw ErrorWithLocation{redirection.target->source_location(),
                               "Redirection target is not a single file"};
@@ -566,10 +577,11 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     else if (redirection.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    Maybe<os::descriptor> opened = os::open_file_descriptor(target[0], mode);
+    std::string target_path{target[0].c_str(), target[0].size()};
+    Maybe<os::descriptor> opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redirection.target->source_location(),
-                              "Could not open '" + target[0] +
+                              "Could not open '" + target_path +
                                   "': " + os::last_system_error_message()};
     }
     os::descriptor file_fd = opened.take();
@@ -626,13 +638,18 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   /* A function shadows a builtin and a program. Run its body with the call
      words as the positional parameters, restoring them afterwards. A return
      builtin unwinds here and supplies the function exit status. */
+  std::string program_name{program_args[0].c_str(), program_args[0].size()};
   if (const Expression *function_body =
-          cxt.has_functions() ? cxt.find_function(program_args[0]) : nullptr;
+          cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
       function_body != nullptr)
   {
-    std::vector<std::string> saved_params = cxt.positional_params();
-    cxt.set_positional_params(
-        std::vector<std::string>{program_args.begin() + 1, program_args.end()});
+    ArrayList<String> saved_params = cxt.positional_params();
+    ArrayList<String> call_params{};
+    for (usize i = 1; i < program_args.size(); i++)
+      call_params.push(String{heap_allocator(),
+                              StringView{program_args[i].c_str(),
+                                         program_args[i].size()}});
+    cxt.set_positional_params(std::move(call_params));
     SHIT_DEFER { cxt.set_positional_params(std::move(saved_params)); };
 
     /* Open a local scope so a local builtin in the body shadows a variable and
@@ -668,7 +685,9 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   /* Reuse a memoized resolution when the command word is unchanged, otherwise
      search PATH once and remember the result for the next run. */
   bool is_cache_valid =
-      m_resolved_kind.has_value() && m_resolved_name == program_args[0];
+      m_resolved_kind.has_value() &&
+      program_args[0] == StringView{m_resolved_name.data(),
+                                    m_resolved_name.size()};
 
   ExecContext ec =
       is_cache_valid ? ExecContext::from_resolved(
@@ -681,7 +700,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
       m_resolved_kind = ResolvedKind{ec.builtin_kind()};
     else
       m_resolved_kind = ResolvedKind{ec.program_path()};
-    m_resolved_name = program_args[0];
+    m_resolved_name = program_name;
   }
 
   /* The redirections override the inherited descriptors for this command. The
@@ -955,7 +974,7 @@ Pipeline::evaluate_impl(EvalContext &cxt) const
   for (const SimpleCommand *e : m_commands) {
     cxt.add_evaluated_expression();
 
-    std::vector<std::string> stage_args = cxt.process_args(e->args());
+    ArrayList<String> stage_args = cxt.process_args(e->args());
 
     /* A stage that expands to no command word, such as a bare assignment or an
        unset variable, has no program to run. Report it instead of building an
@@ -1246,12 +1265,13 @@ i64
 ForLoop::evaluate_impl(EvalContext &cxt) const
 {
   /* Without an in clause the loop walks the positional parameters. */
-  std::vector<std::string> values =
-      m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
+  ArrayList<String> values = m_has_in_clause ? cxt.process_args(m_words)
+                                             : cxt.positional_params();
 
   i64 ret = 0;
-  for (const std::string &value : values) {
-    cxt.set_shell_variable(m_variable_name, value);
+  for (const String &value : values) {
+    cxt.set_shell_variable(m_variable_name,
+                           std::string{value.c_str(), value.size()});
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
   }

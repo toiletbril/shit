@@ -114,7 +114,7 @@ struct EvalStateSnapshot
 {
   HashMap<String> shell_variables;
   HashMap<const Expression *> functions;
-  std::vector<std::string> positional_params;
+  ArrayList<String> positional_params;
   std::filesystem::path working_directory;
 };
 
@@ -123,7 +123,7 @@ struct EvalContext
   EvalContext(bool should_disable_path_expansion, bool should_echo,
               bool should_echo_expanded, bool shell_is_interactive,
               bool should_error_exit = false, std::string shell_name = {},
-              std::vector<std::string> positional_params = {});
+              ArrayList<String> positional_params = {});
 
   void add_expansion();
   void add_evaluated_expression();
@@ -131,7 +131,7 @@ struct EvalContext
   void end_command();
 
   /* Variable expand, tilde expand, field split, and glob each token. */
-  std::vector<std::string> process_args(const ArrayList<const Token *> &args);
+  ArrayList<String> process_args(const ArrayList<const Token *> &args);
 
   /* The allocator for transient expansion data, which a bump arena hands out
      and reclaims whole when the command ends. */
@@ -162,8 +162,8 @@ struct EvalContext
 
   /* The positional parameters, $1 upward, with $0 separate as the shell name.
    */
-  const std::vector<std::string> &positional_params() const;
-  void set_positional_params(std::vector<std::string> params);
+  const ArrayList<String> &positional_params() const;
+  void set_positional_params(ArrayList<String> params);
 
   void set_last_exit_status(i32 status);
   i32 last_exit_status() const;
@@ -212,7 +212,7 @@ struct EvalContext
      usually empty, so set_shell_variable only scans it when it is not. */
   void mark_readonly(const std::string &name);
   bool is_readonly(const std::string &name) const;
-  std::vector<std::string> readonly_names() const;
+  ArrayList<String> readonly_names() const;
 
   /* A function call pushes a local scope so a local builtin inside it can
      shadow a variable and have the old value restored when the call returns.
@@ -228,7 +228,7 @@ struct EvalContext
   void set_alias(const std::string &name, const std::string &value);
   bool remove_alias(const std::string &name);
   Maybe<std::string> get_alias(const std::string &name) const;
-  std::vector<std::string> alias_definitions() const;
+  ArrayList<String> alias_definitions() const;
   /* The defined alias names, so the prepass treats a use of one as resolvable. */
   HashSet alias_names() const;
 
@@ -296,7 +296,7 @@ struct EvalContext
   bool in_condition() const;
 
   /* The name=value lines that set with no argument prints, sorted. */
-  std::vector<std::string> sorted_variable_assignments() const;
+  ArrayList<String> sorted_variable_assignments() const;
 
   /* Expand a word in assignment context, with variable, tilde, and command
      substitution but no field splitting and no globbing. */
@@ -365,7 +365,7 @@ protected:
   i32 m_last_exit_status{0};
 
   std::string m_shell_name{};
-  std::vector<std::string> m_positional_params{};
+  ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   HashMap<const Expression *> m_functions{heap_allocator()};
   usize m_subshell_depth{0};
@@ -449,7 +449,7 @@ protected:
 struct ExecContext
 {
   static ExecContext make_from(SourceLocation location,
-                               const std::vector<std::string> &args);
+                               const ArrayList<String> &args);
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and
@@ -457,7 +457,7 @@ struct ExecContext
   static ExecContext
   from_resolved(SourceLocation location,
                 std::variant<shit::Builtin::Kind, std::filesystem::path> kind,
-                const std::vector<std::string> &args);
+                const ArrayList<String> &args);
 
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
@@ -470,8 +470,8 @@ struct ExecContext
 
   bool is_builtin() const;
 
-  const std::vector<std::string> &args() const;
-  const std::string &program() const;
+  const ArrayList<String> &args() const;
+  const String &program() const;
   const SourceLocation &source_location() const;
 
   void close_fds();
@@ -486,13 +486,13 @@ private:
   /* clang-format off */
   ExecContext(SourceLocation location,
               std::variant<shit::Builtin::Kind, std::filesystem::path> &&kind,
-              const std::vector<std::string> &args);
+              const ArrayList<String> &args);
   /* clang-format on */
 
   std::variant<shit::Builtin::Kind, std::filesystem::path> m_kind;
 
   SourceLocation m_location;
-  std::vector<std::string> m_args;
+  ArrayList<String> m_args{heap_allocator()};
 };
 
 } /* namespace shit */

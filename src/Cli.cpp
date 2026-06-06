@@ -214,6 +214,19 @@ parse_flags_vec(const ArrayList<Flag *> &flags,
                      const_cast<char const *const *>(os_argv.data()));
 }
 
+std::vector<std::string>
+parse_flags_vec(const ArrayList<Flag *> &flags, const ArrayList<String> &args)
+{
+  std::vector<const char *> os_argv;
+  os_argv.reserve(args.size());
+
+  for (const String &arg : args)
+    os_argv.emplace_back(arg.c_str());
+
+  return parse_flags(flags, os_argv.size(),
+                     const_cast<char const *const *>(os_argv.data()));
+}
+
 static std::string
 flag_name(const Flag *f, bool is_long)
 {

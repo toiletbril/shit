@@ -16,7 +16,7 @@ Echo::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  const std::vector<std::string> &args = ec.args();
+  const ArrayList<String> &args = ec.args();
 
   /* Match dash, where only a leading -n is an option and everything after it,
      including -e, is literal text, and backslash escapes are always
@@ -34,7 +34,7 @@ Echo::execute(ExecContext &ec, EvalContext &cxt) const
   for (usize i = start; i < args.size() && !should_stop; i++) {
     if (i > start) buf += ' ';
 
-    const std::string &arg = args[i];
+    const String &arg = args[i];
     for (usize j = 0; j < arg.length(); j++) {
       if (arg[j] != '\\' || j + 1 >= arg.length()) {
         buf += arg[j];
