@@ -1813,7 +1813,9 @@ fn EvalContext::run_source(StringView source, StringView origin,
     for (usize i = m_source_frames.size(); i > 0; i--) {
       const SourceFrame &frame = m_source_frames[i - 1];
       if (frame.parent_source != nullptr) {
-        let const sourced_here = ErrorWithLocation{frame.call_site,
+        /* A frame is context under the primary error, not an error of its own,
+           so it prints with the Trace severity rather than Error. */
+        let const sourced_here = TraceWithLocation{frame.call_site,
                                                    "sourced here"};
         show_message(sourced_here.to_string(*frame.parent_source));
       } else {
@@ -1823,13 +1825,26 @@ fn EvalContext::run_source(StringView source, StringView origin,
     }
   };
 
+  /* Retain an owned copy of the filename, so the views the lexer stamps onto
+     every location stay valid after this call returns. The caller passes a view
+     into transient storage, such as the dot builtin's local path, while a
+     control-flow jump can carry a stamped location out to the top level where
+     that storage is already gone. The copy lives as long as the retained
+     source, freed together at the next top-level command. */
+  Maybe<StringView> stable_filename = None;
+  if (filename.has_value()) {
+    let const retained_filename = new String{*filename};
+    m_retained_sources.push(retained_filename);
+    stable_filename = retained_filename->view();
+  }
+
   /* A located error from the sourced text carries an offset into that text, not
      into the caller's command, so it is formatted here against the source and
      marked with its origin. Otherwise the caller would print the caret against
      the wrong line. */
   try {
     let parser = Parser{
-        Lexer{String{source}, *AST_ARENA, false, filename}
+        Lexer{String{source}, *AST_ARENA, false, stable_filename}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this

@@ -226,6 +226,12 @@ WarningWithLocation::WarningWithLocation(SourceLocation location,
 
 fn WarningWithLocation::severity_word() const -> String { return "Warning"; }
 
+TraceWithLocation::TraceWithLocation(SourceLocation location, StringView message)
+    : ErrorWithLocation(location, message)
+{}
+
+fn TraceWithLocation::severity_word() const -> String { return "Trace"; }
+
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message,
     SourceLocation details_location, StringView details_message)

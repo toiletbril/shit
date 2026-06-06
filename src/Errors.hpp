@@ -109,6 +109,16 @@ struct WarningWithLocation : public ErrorWithLocation
   fn severity_word() const -> String override;
 };
 
+/* An ErrorWithLocation that prints as a trace and is shown rather than thrown.
+   A source backtrace frame builds it so a call site reads as context under the
+   primary error rather than as an error of its own. */
+struct TraceWithLocation : public ErrorWithLocation
+{
+  TraceWithLocation(SourceLocation location, StringView message);
+
+  fn severity_word() const -> String override;
+};
+
 struct ErrorWithLocationAndDetails : public ErrorWithLocation
 {
   ErrorWithLocationAndDetails();

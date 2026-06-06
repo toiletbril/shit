@@ -120,7 +120,9 @@ static fn report_escaped_control_flow(shit::EvalContext &context,
    same pipeline as an interactive line. Returns the resulting exit code. */
 static fn run_script_contents(const shit::String &script_contents,
                               shit::EvalContext &context,
-                              shit::BumpArena &ast_arena) -> int
+                              shit::BumpArena &ast_arena,
+                              shit::Maybe<shit::StringView> filename = shit::None)
+    -> int
 {
   int exit_code = EXIT_FAILURE;
 
@@ -137,7 +139,7 @@ static fn run_script_contents(const shit::String &script_contents,
 
     shit::Parser p{
         shit::Lexer{shit::String{script_contents.view()}, ast_arena,
-                    FLAG_ESCAPE_MAP.is_enabled()}
+                    FLAG_ESCAPE_MAP.is_enabled(), filename}
     };
     std::unique_ptr<shit::Expression> ast = p.construct_ast();
 
@@ -212,7 +214,10 @@ static fn source_file(const shit::Path &path, shit::EvalContext &context,
       shit::utils::read_entire_file(path.text());
   if (!contents) return;
 
-  run_script_contents(*contents, context, ast_arena);
+  /* The profile path names the source, so a parse error in it and a backtrace
+     caret for a file it sources both carry the file rather than a bare
+     line:col. */
+  run_script_contents(*contents, context, ast_arena, path.text().view());
 }
 
 /* Expand the common prompt escapes in PS1 and PS2. */
