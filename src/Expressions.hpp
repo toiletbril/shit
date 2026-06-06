@@ -128,7 +128,7 @@ struct Command : public Expression
 
   void make_async();
   bool is_async() const;
-  void set_local_vars(std::unordered_map<std::string, Word> &&vars);
+  void set_local_vars(HashMap<Word> &&vars);
 
   /* The ! reserved word in front of a pipeline inverts its exit status. */
   void set_negated();

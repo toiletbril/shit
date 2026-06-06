@@ -333,7 +333,7 @@ Parser::parse_simple_command()
 {
   Maybe<SourceLocation> source_location;
   std::vector<std::unique_ptr<Token>> args_accumulator{};
-  std::unordered_map<std::string, Word> local_vars{};
+  HashMap<Word> local_vars{heap_allocator()};
   std::vector<expressions::Redirection> redirections{};
 
   auto build_command = [&]() -> std::unique_ptr<Command> {
@@ -346,7 +346,7 @@ Parser::parse_simple_command()
 
     std::unique_ptr<SimpleCommand> c{m_lexer.arena().create<SimpleCommand>(
         *source_location, std::move(args))};
-    if (!local_vars.empty()) c->set_local_vars(std::move(local_vars));
+    if (local_vars.size() != 0) c->set_local_vars(std::move(local_vars));
     if (!redirections.empty()) c->set_redirections(std::move(redirections));
     return c;
   };
@@ -413,7 +413,7 @@ Parser::parse_simple_command()
 
     /* A reserved word or a group opener in command position introduces a
        compound command. A list terminator means there is no command here. */
-    if (args_accumulator.empty() && local_vars.empty()) {
+    if (args_accumulator.empty() && local_vars.size() == 0) {
       switch (token->kind()) {
       case Token::Kind::If: return parse_if();
       case Token::Kind::While: return parse_while_or_until(false);
@@ -492,7 +492,7 @@ Parser::parse_simple_command()
 
     case Token::Kind::LeftParen:
       /* A single word followed by () is a function definition. */
-      if (args_accumulator.size() == 1 && local_vars.empty() &&
+      if (args_accumulator.size() == 1 && local_vars.size() == 0 &&
           args_accumulator[0]->kind() == Token::Kind::Word)
       {
         return parse_function_definition(std::move(args_accumulator[0]));
@@ -524,7 +524,9 @@ Parser::parse_simple_command()
                                                   a.release())};
       } else {
         /* Single-command variable. */
-        local_vars[a->key()] = a->value_word();
+        const std::string &assignment_key = a->key();
+        local_vars.set(StringView{assignment_key.data(), assignment_key.size()},
+                       Word{a->value_word()});
       }
     } break;
 

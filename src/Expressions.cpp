@@ -238,10 +238,9 @@ Command::is_negated() const
 }
 
 void
-Command::set_local_vars(std::unordered_map<std::string, Word> &&vars)
+Command::set_local_vars(HashMap<Word> &&vars)
 {
-  for (auto &[name, word] : vars)
-    m_local_vars.set(StringView{name.data(), name.size()}, std::move(word));
+  m_local_vars = std::move(vars);
 }
 
 bool
