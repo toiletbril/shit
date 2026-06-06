@@ -4,7 +4,6 @@
 #include "Containers.hpp"
 #include "Tokens.hpp"
 
-#include <list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -80,7 +79,10 @@ protected:
   /* Heredoc bodies are filled once the line ends, so the last shell token kind
      is tracked to detect that the consumed token was a newline. */
   bool m_last_shell_token_was_newline{false};
-  std::list<std::string> m_heredoc_bodies{};
+  /* Each body is heap-allocated so its address is stable. A parsed redirection
+     holds a pointer into one, and the pointer must stay valid while the array
+     of pointers grows. The lexer frees them in its destructor. */
+  ArrayList<std::string *> m_heredoc_bodies{heap_allocator()};
   ArrayList<HeredocPending> m_pending_heredocs{heap_allocator()};
   void collect_pending_heredocs();
 

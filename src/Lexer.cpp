@@ -138,7 +138,11 @@ Lexer::Lexer(std::string source, BumpArena &arena,
       m_should_collect_debug_words(should_collect_debug_words)
 {}
 
-Lexer::~Lexer() = default;
+Lexer::~Lexer()
+{
+  for (std::string *body : m_heredoc_bodies)
+    delete body;
+}
 
 Token *
 Lexer::peek_expression_token()
@@ -215,8 +219,8 @@ Lexer::advance_past_last_peek()
 const std::string *
 Lexer::register_heredoc(std::string delimiter, bool strip_tabs)
 {
-  m_heredoc_bodies.emplace_back();
-  std::string *body = &m_heredoc_bodies.back();
+  std::string *body = new std::string{};
+  m_heredoc_bodies.push(body);
   m_pending_heredocs.push({std::move(delimiter), strip_tabs, body});
   return body;
 }
