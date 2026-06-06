@@ -56,11 +56,11 @@ fn redirect_stdout(os::descriptor target) -> os::descriptor
      does not inherit it and hold the shell's own output open. An immortal
      pipeline stage like yes would otherwise keep a downstream reader from ever
      seeing end of input. */
-  os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
+  const os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
   dup2(target, STDOUT_FILENO);
   /* The original write end is close-on-exec for the same reason. The duplicate
      now living on STDOUT_FILENO stays open for the command to write to. */
-  if (int flags = fcntl(target, F_GETFD); flags != -1)
+  if (const int flags = fcntl(target, F_GETFD); flags != -1)
     fcntl(target, F_SETFD, flags | FD_CLOEXEC);
   return saved;
 }
@@ -85,7 +85,7 @@ fn get_current_user() -> Maybe<String>
 
 fn get_home_directory() -> Maybe<Path>
 {
-  if (Maybe<String> home = get_environment_variable("HOME"))
+  if (const Maybe<String> home = get_environment_variable("HOME"))
     return Path{StringView{*home}};
   return shit::None;
 }
@@ -121,7 +121,7 @@ fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex
 
 fn get_environment_variable(StringView key) -> Maybe<String>
 {
-  String key_string{key};
+  const String key_string{key};
   const char *e = std::getenv(key_string.c_str());
   if (e != NULL) return String{StringView{e}};
   return shit::None;
@@ -129,14 +129,14 @@ fn get_environment_variable(StringView key) -> Maybe<String>
 
 fn set_environment_variable(StringView key, StringView value) -> void
 {
-  String key_string{key};
-  String value_string{value};
+  const String key_string{key};
+  const String value_string{value};
   setenv(key_string.c_str(), value_string.c_str(), 1);
 }
 
 fn unset_environment_variable(StringView key) -> void
 {
-  String key_string{key};
+  const String key_string{key};
   unsetenv(key_string.c_str());
 }
 
@@ -156,10 +156,10 @@ fn execute_program(ExecContext &&ec) -> process
 {
   defer { ec.close_fds(); };
 
-  pid_t child_pid = check_syscall(fork());
+  const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
-    os_args child_args = make_os_args(ec.args());
+    const os_args child_args = make_os_args(ec.args());
 
     if (ec.in_fd) {
       check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
@@ -205,7 +205,7 @@ fn execute_program(ExecContext &&ec) -> process
 
 fn replace_process(ExecContext &&ec) -> void
 {
-  os_args child_args = make_os_args(ec.args());
+  const os_args child_args = make_os_args(ec.args());
 
   /* Place each redirected file and close the original descriptor, the way the
      forked child does, so the opened file does not leak into the exec'd
@@ -255,7 +255,7 @@ fn make_pipe() -> Maybe<Pipe>
      keeps a read end open and never sees the pipe close. The dup2 onto a
      standard descriptor clears the flag there, so the redirection survives. */
   for (descriptor end : p) {
-    int flags = fcntl(end, F_GETFD);
+    const int flags = fcntl(end, F_GETFD);
     if (flags != -1) fcntl(end, F_SETFD, flags | FD_CLOEXEC);
   }
 
@@ -278,10 +278,10 @@ fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
 
   /* ::open needs a null-terminated path, so the view is copied into a String
      that owns a trailing null. */
-  String path_string{path};
+  const String path_string{path};
   /* 0666 lets the umask decide the final permissions, as a shell redirection
      does. */
-  int fd = ::open(path_string.c_str(), flags, 0666);
+  const int fd = ::open(path_string.c_str(), flags, 0666);
   if (fd < 0) return shit::None;
   return fd;
 }
@@ -291,9 +291,9 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
      so a cosmo binary running on Windows writes to the Windows temp directory
      where /tmp does not exist. */
-  Path temp_dir = Path::temp_directory();
+  const Path temp_dir = Path::temp_directory();
 
-  Path path_template_path =
+  const Path path_template_path =
       PathBuilder{temp_dir.text()}.append("shit_heredoc_XXXXXX").build();
 
   /* mkstemp rewrites the XXXXXX suffix in place, so the template lives in a
@@ -305,7 +305,7 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
     path_template.push(path_template_text.c_str()[i]);
   path_template.push('\0');
 
-  int fd = mkstemp(path_template.begin());
+  const int fd = mkstemp(path_template.begin());
   if (fd < 0) return shit::None;
 
   /* Unlink at once, so the file is anonymous and is freed when closed. */
@@ -329,7 +329,7 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
 fn get_file_creation_mask() -> u32
 {
   /* umask only reads through a set, so the old value is read and put back. */
-  mode_t old = umask(0);
+  const mode_t old = umask(0);
   umask(old);
   return static_cast<u32>(old);
 }
@@ -351,10 +351,10 @@ fn wait_and_monitor_process(process pid) -> i32
 
   /* Print appropriate message if the process was sent a signal. */
   if (WIFSIGNALED(status)) {
-    i32 sig = WTERMSIG(status);
+    const i32 sig = WTERMSIG(status);
     const char *sig_str = strsignal(sig);
-    String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
-                                        : String{StringView{"Unknown"}};
+    const String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
+                                              : String{StringView{"Unknown"}};
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
@@ -367,10 +367,10 @@ fn wait_and_monitor_process(process pid) -> i32
 
     return 128 + sig;
   } else if (WIFSTOPPED(status)) {
-    i32 sig = WSTOPSIG(status);
+    const i32 sig = WSTOPSIG(status);
     const char *sig_str = strsignal(sig);
-    String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
-                                        : String{StringView{"Unknown"}};
+    const String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
+                                              : String{StringView{"Unknown"}};
 
     shit::print("[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
                 ", signal " + utils::integer_to_string(sig) + " and killed]\n");
@@ -393,7 +393,7 @@ fn wait_and_monitor_process(process pid) -> i32
 fn poll_process(process p, i32 &status_out) -> ProcessState
 {
   i32 status = 0;
-  pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
+  const pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
   /* Still running, or already reaped, which the job table also treats as done.
    */
@@ -427,7 +427,7 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
       std::all_of(name.data, name.data + name.length,
                   [](unsigned char c) { return std::isdigit(c) != 0; }))
   {
-    ErrorOr<i64> parsed = utils::parse_decimal_integer(name);
+    const ErrorOr<i64> parsed = utils::parse_decimal_integer(name);
     if (parsed.is_error()) return shit::None;
     return static_cast<i32>(parsed.value());
   }

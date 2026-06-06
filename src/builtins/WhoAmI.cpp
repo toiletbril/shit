@@ -24,7 +24,7 @@ i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
 
   String p{};
 
-  if (Maybe<String> u = os::get_current_user(); u.has_value()) {
+  if (const Maybe<String> u = os::get_current_user(); u.has_value()) {
     p.append(u->view());
     p += '\n';
     ec.print_to_stdout(p);

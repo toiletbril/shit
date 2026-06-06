@@ -29,7 +29,7 @@ fn BumpArena::add_block(usize minimum_size) -> void
   usize size = DEFAULT_BLOCK_SIZE;
   if (minimum_size > size) size = minimum_size;
 
-  let base = static_cast<u8 *>(std::malloc(size));
+  let const base = static_cast<u8 *>(std::malloc(size));
   if (base == nullptr) throw std::bad_alloc{};
 
   m_blocks.push_back(Block{base, size, 0});
@@ -40,9 +40,9 @@ fn BumpArena::allocate(usize size, usize alignment) -> void *
   for (;;) {
     if (!m_blocks.empty()) {
       Block &block = m_blocks.back();
-      usize aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
+      const usize aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
       if (aligned + size <= block.size) {
-        void *pointer = block.base + aligned;
+        void *const pointer = block.base + aligned;
         block.used = aligned + size;
         return pointer;
       }
@@ -53,7 +53,7 @@ fn BumpArena::allocate(usize size, usize alignment) -> void *
 
 fn BumpArena::owns(const void *pointer) const -> bool
 {
-  let p = static_cast<const u8 *>(pointer);
+  let const p = static_cast<const u8 *>(pointer);
   for (const Block &block : m_blocks) {
     if (p >= block.base && p < block.base + block.size) return true;
   }

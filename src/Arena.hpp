@@ -39,7 +39,7 @@ struct BumpArena
   template <class T, class... Args>
   fn create(Args &&...args) -> T *
   {
-    void *storage = allocate(sizeof(T), alignof(T));
+    void *const storage = allocate(sizeof(T), alignof(T));
     return new (storage) T(std::forward<Args>(args)...);
   }
 

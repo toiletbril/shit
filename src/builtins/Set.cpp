@@ -121,7 +121,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
         continue;
       }
       const String &name = args[++i];
-      const SetOption *option = find_option_by_name(name);
+      const SetOption *const option = find_option_by_name(name);
       if (option == nullptr)
         throw Error{"set: '" + name + "' is not a valid option name"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
@@ -133,7 +133,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
       const bool enable = arg[0] == '-';
       for (usize c = 1; c < arg.length(); c++) {
         const char letter = arg[c];
-        const SetOption *option = find_option_by_letter(letter);
+        const SetOption *const option = find_option_by_letter(letter);
         if (option == nullptr) {
           String invalid_option{};
           invalid_option += arg[0];

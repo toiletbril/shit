@@ -407,7 +407,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) -> void
       if (name == word) seen = true;
     if (seen) break;
 
-    let body = cxt.get_alias(word);
+    let const body = cxt.get_alias(word);
     if (!body.has_value()) break;
     already_expanded.push(String{
         heap_allocator(), StringView{word.c_str(), word.size()}
@@ -566,7 +566,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
   m_local_vars.for_each([&](StringView name, const Word &value_word) {
     saved_env.push(
         SavedEnvVar{String{name}, os::get_environment_variable(name)});
-    String expanded_value = cxt.expand_word_for_assignment(value_word);
+    const String expanded_value = cxt.expand_word_for_assignment(value_word);
     os::set_environment_variable(name, expanded_value.view());
   });
   defer
@@ -609,7 +609,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
        escape into a caller's loop and is consumed here. An exit is not ours and
        stays pending for the shell. */
     if (cxt.has_pending_control_flow()) {
-      ControlFlow::Kind kind = cxt.pending_control_flow().kind;
+      const ControlFlow::Kind kind = cxt.pending_control_flow().kind;
       if (kind == ControlFlow::Kind::Return) {
         function_ret = cxt.pending_control_flow().value;
         cxt.clear_control_flow();

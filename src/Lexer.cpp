@@ -233,7 +233,7 @@ fn Lexer::collect_pending_heredocs() -> void
 
 fn Lexer::lex_expression_token() -> Token *
 {
-  if (char ch = chop_character(); ch != lexer::CEOF) {
+  if (const char ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_number(ch))
       return lex_number();
     else if (lexer::is_expression_sentinel(ch))
@@ -253,7 +253,7 @@ fn Lexer::lex_expression_token() -> Token *
 fn Lexer::lex_shell_token() -> Token *
 {
   Token *t{};
-  if (char ch = chop_character(); ch != lexer::CEOF) {
+  if (const char ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_shell_sentinel(ch))
       t = lex_sentinel();
     else if (lexer::is_part_of_identifier(ch))

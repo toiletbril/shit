@@ -41,7 +41,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const -> i32
     }
     program_path = resolved.take();
   } else {
-    let found = utils::search_program_path(command_name);
+    let const found = utils::search_program_path(command_name);
     if (found.size() == 0) {
       show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);

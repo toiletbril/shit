@@ -39,7 +39,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
     {
       out += name;
       out += " is a shell builtin\n";
-    } else if (ArrayList<Path> paths = utils::search_program_path(name);
+    } else if (const ArrayList<Path> paths = utils::search_program_path(name);
                paths.size() != 0)
     {
       out += name;

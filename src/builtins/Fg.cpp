@@ -45,7 +45,7 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 
   /* Resume a stopped job before waiting, so fg works after a Ctrl-Z. */
   if (job->state == Job::State::Stopped) {
-    if (Maybe<i32> cont = os::signal_number_from_name("CONT"))
+    if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))
       os::signal_process(job->pid, *cont);
   }
 

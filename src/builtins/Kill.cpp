@@ -54,7 +54,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const -> i32
         status = 1;
         continue;
       }
-      Job *job = cxt.find_job(static_cast<int>(parsed.value()));
+      Job *const job = cxt.find_job(static_cast<int>(parsed.value()));
       if (job == nullptr) {
         show_message(Error{"kill: '" + target_text + "' is not a known job"}
                          .to_string());

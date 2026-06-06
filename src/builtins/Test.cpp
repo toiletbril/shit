@@ -137,7 +137,7 @@ struct TestEvaluator
     bool result = parse_factor();
     while (!at_end() && current() == "-a") {
       pos++;
-      bool right = parse_factor();
+      const bool right = parse_factor();
       result = result && right;
     }
     return result;
@@ -148,7 +148,7 @@ struct TestEvaluator
     bool result = parse_term();
     while (!at_end() && current() == "-o") {
       pos++;
-      bool right = parse_term();
+      const bool right = parse_term();
       result = result || right;
     }
     return result;

@@ -51,7 +51,7 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const
       const ErrorOr<i64> parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (!parsed.is_error()) {
-        if (Job *job = cxt.find_job(static_cast<int>(parsed.value())))
+        if (Job *const job = cxt.find_job(static_cast<int>(parsed.value())))
           status = wait_for_job(*job);
       }
     } else {

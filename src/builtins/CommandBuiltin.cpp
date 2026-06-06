@@ -48,7 +48,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const -> i32
                                  : name + "\n");
       return 0;
     }
-    if (ArrayList<Path> paths = utils::search_program_path(name);
+    if (const ArrayList<Path> paths = utils::search_program_path(name);
         paths.size() != 0)
     {
       let resolved = String{};

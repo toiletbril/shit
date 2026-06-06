@@ -40,7 +40,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) -> i32
   if (!ec.is_builtin()) {
     /* The command word is kept for the job table before the context is moved
        into the spawn. */
-    String command = is_async ? String{ec.program().view()} : String{};
+    const String command = is_async ? String{ec.program().view()} : String{};
 
     let const p = os::execute_program(std::move(ec));
     if (is_async) {
@@ -686,7 +686,7 @@ fn search_program_path(StringView program_name) -> ArrayList<Path>
      so the extension-stripped cache key would resolve the wrong file. The cache
      is consulted only when no extension was typed, which on POSIX is always. */
   if (typed_extension == 0) {
-    if (ArrayList<Path> *cached = const_cast<ArrayList<Path> *>(
+    if (ArrayList<Path> *const cached = const_cast<ArrayList<Path> *>(
             PATH_CACHE.find(StringView{sp.data(), sp.size()})))
     {
       ArrayList<Path> kept{};

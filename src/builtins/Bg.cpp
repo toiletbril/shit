@@ -35,7 +35,7 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const -> i32
   if (job == nullptr) throw Error{"bg: there is no such job"};
   ASSERT(job != NULL);
 
-  if (Maybe<i32> cont = os::signal_number_from_name("CONT"))
+  if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))
     os::signal_process(job->pid, *cont);
   job->state = Job::State::Running;
 

@@ -29,7 +29,7 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
     for (const String &name : cxt.readonly_names()) {
       out += "readonly ";
       out += name;
-      if (Maybe<String> value = cxt.get_variable_value(name)) {
+      if (const Maybe<String> value = cxt.get_variable_value(name)) {
         out += "='";
         out += value->view();
         out += "'";

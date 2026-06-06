@@ -70,7 +70,7 @@ void append_conversion(String &out, const String &spec, char conv,
   } else if (conv == 'c') {
     out += arg.empty() ? '\0' : arg[0];
   } else if (conv == 'd' || conv == 'i') {
-    String with_ll = spec + "lld";
+    const String with_ll = spec + "lld";
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<long long>(parse_printf_integer(arg)));
     out += buffer;

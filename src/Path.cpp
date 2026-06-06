@@ -68,13 +68,13 @@ static fn filename_offset(const String &text) -> usize
 
 fn Path::filename() const -> StringView
 {
-  let start = filename_offset(m_text);
+  let const start = filename_offset(m_text);
   return m_text.substring(start);
 }
 
 fn Path::extension() const -> StringView
 {
-  let name = filename();
+  let const name = filename();
   /* The . and .. directory entries have no extension, matching std::filesystem,
      so the trailing dot in .. is not read as one. */
   if (name == StringView{"."} || name == StringView{".."})
@@ -88,7 +88,7 @@ fn Path::extension() const -> StringView
 
 fn Path::parent() const -> Path
 {
-  let end = filename_offset(m_text);
+  let const end = filename_offset(m_text);
   if (end == 0) return Path{};
   /* Keep a lone root separator, otherwise drop the trailing one. */
   if (end == 1) return Path{m_text.substring_of_length(0, 1)};
@@ -109,8 +109,8 @@ fn Path::push_component(StringView component) -> Path &
 
 fn Path::with_extension(StringView new_extension) const -> Path
 {
-  let existing = extension();
-  let keep = m_text.size() - existing.length;
+  let const existing = extension();
+  let const keep = m_text.size() - existing.length;
   Path result{m_text.substring_of_length(0, keep)};
   if (new_extension.length > 0 && new_extension.data[0] != '.')
     result.m_text.push('.');
@@ -120,7 +120,7 @@ fn Path::with_extension(StringView new_extension) const -> Path
 
 fn Path::normalized() const -> Path
 {
-  let absolute = is_absolute();
+  let const absolute = is_absolute();
 
   /* Each kept component is a view into the original text, valid for the life of
      this function while the result is assembled. */
@@ -131,10 +131,10 @@ fn Path::normalized() const -> Path
       i++;
       continue;
     }
-    usize start = i;
+    const usize start = i;
     while (i < m_text.size() && !is_directory_separator(m_text[i]))
       i++;
-    let part = m_text.substring_of_length(start, i - start);
+    let const part = m_text.substring_of_length(start, i - start);
     if (part == StringView{"."}) continue;
     if (part == StringView{".."}) {
       /* A .. pops the last real component, unless none remains or the last was
@@ -233,14 +233,14 @@ fn Path::set_current_directory(const Path &path) -> ErrorOr<Ok>
 
 fn Path::read_directory(const Path &dir) -> Maybe<ArrayList<String>>
 {
-  DIR *handle = ::opendir(dir.c_str());
+  DIR *const handle = ::opendir(dir.c_str());
   if (handle == NULL) return None;
 
   ArrayList<String> names{};
   for (struct dirent *entry = ::readdir(handle); entry != NULL;
        entry = ::readdir(handle))
   {
-    StringView name{entry->d_name};
+    const StringView name{entry->d_name};
     if (name == StringView{"."} || name == StringView{".."}) continue;
     names.push(String{name});
   }

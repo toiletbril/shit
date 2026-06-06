@@ -39,7 +39,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
          the name, which stays machine readable. */
       if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
-    } else if (ArrayList<Path> ps = utils::search_program_path(program_name);
+    } else if (const ArrayList<Path> ps = utils::search_program_path(program_name);
                ps.size() != 0)
     {
       if (FLAG_ALL.is_enabled()) {

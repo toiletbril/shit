@@ -148,7 +148,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
 {
   /* Every builtin answers --help with its synopsis and a short explanation. */
   if (ec.args().size() > 1 && ec.args()[1] == "--help") {
-    BuiltinHelp help = builtin_help(ec.builtin_kind());
+    const BuiltinHelp help = builtin_help(ec.builtin_kind());
     ec.print_to_stdout(StringView{"SYNOPSIS\n  "} + help.synopsis + "\n\n" +
                        help.description + "\n");
     ec.close_fds();

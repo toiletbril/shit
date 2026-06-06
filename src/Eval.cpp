@@ -160,7 +160,7 @@ fn EvalContext::get_variable_value(StringView name) const -> Maybe<String>
 
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
-  if (let env = os::get_environment_variable(name))
+  if (let const env = os::get_environment_variable(name))
     return String{heap_allocator(), env->view()};
   return shit::None;
 }
@@ -1117,7 +1117,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const -> void
   /* Only a bare ~ or a ~/ prefix expands. ~user is left alone for now. */
   if (text.length() > 1 && text[1] != '/') return;
 
-  let home = os::get_home_directory();
+  let const home = os::get_home_directory();
   if (!home) throw Error{"Could not figure out home directory"};
 
   /* String has no in-place erase or insert, so the home path and the remainder
@@ -1277,7 +1277,7 @@ struct ArithmeticParser
       return parse_arithmetic_operand(stored->view());
     }
 
-    let value = context.get_variable_value(name).value_or(String{});
+    let const value = context.get_variable_value(name).value_or(String{});
     if (value.empty()) return 0;
     return parse_arithmetic_operand(value.view());
   }
@@ -1718,7 +1718,7 @@ fn EvalContext::capture_command_substitution(const String &source) -> String
   let parser = Parser{
       Lexer{String{source.view()}, *AST_ARENA}
   };
-  let ast = parser.construct_ast();
+  let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
 
   /* A cd or an assignment inside the substitution must not leak. */
@@ -1736,7 +1736,7 @@ fn EvalContext::capture_command_substitution(const String &source) -> String
     try {
       char buffer[4096];
       for (;;) {
-        let n = os::read_fd(read_fd, buffer, sizeof(buffer));
+        let const n = os::read_fd(read_fd, buffer, sizeof(buffer));
         if (!n.has_value() || *n == 0) break;
         captured.append(StringView{buffer, static_cast<usize>(*n)});
       }
@@ -1814,7 +1814,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      when an error is caught, so every nested call site is named, not only the
      one running now. A frame whose parent source is known renders a caret at
      its call site, otherwise it falls back to naming the origin. */
-  let print_backtrace = [this]() {
+  let const print_backtrace = [this]() {
     for (usize i = m_source_frames.size(); i > 0; i--) {
       const SourceFrame &frame = m_source_frames[i - 1];
       if (frame.parent_source != nullptr) {
@@ -1937,7 +1937,7 @@ fn EvalContext::process_args(const ArrayList<const Token *> &args)
      vector is built, so the arena is released back to here on return. The mark
      nests, so a command substitution inside one of these words reclaims only
      its own fields and leaves this word's in-progress fields alone. */
-  let scratch_mark = m_scratch_arena.mark();
+  let const scratch_mark = m_scratch_arena.mark();
   defer { m_scratch_arena.release(scratch_mark); };
 
   let expanded_args = ArrayList<String>{};
