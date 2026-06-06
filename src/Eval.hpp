@@ -65,6 +65,24 @@ struct ControlFlow
   String origin{};
 };
 
+/* One frame of the source backtrace, pushed when run_source begins and popped
+   when it returns. The origin names the call descriptively, the call_site is
+   where the dot or eval sits in its parent, and parent_source is the text that
+   call site lives in so a caret renders against it. The parent_source is None
+   for a top-level source whose call site has no surrounding text. */
+struct SourceFrame
+{
+  SourceFrame(String origin, SourceLocation call_site,
+              const String *parent_source)
+      : origin(std::move(origin)), call_site(call_site),
+        parent_source(parent_source)
+  {}
+
+  String origin;
+  SourceLocation call_site;
+  const String *parent_source;
+};
+
 /* A variable binding saved when a local shadows it. The previous value is
    None when the name was unset, so leaving the scope restores the unset
    state rather than an empty string. */
@@ -295,8 +313,15 @@ struct EvalContext
      consumes a return at the top of the chunk and ends there, while an eval
      leaves the return pending so it propagates to the enclosing function or the
      shell, which is why consume_return is false for eval. */
+  /* call_site names where the dot or eval that triggered this run sits in its
+     own parent source, so a backtrace frame points a caret at it. It is None
+     for a run with no surrounding source, such as the EXIT trap. filename is
+     the bare path of the source being run, stamped into every location its
+     lexer makes. */
   fn run_source(StringView source, StringView origin = "a sourced command",
-                bool consume_return = true) -> i32;
+                bool consume_return = true,
+                Maybe<SourceLocation> call_site = None,
+                Maybe<StringView> filename = None) -> i32;
 
   /* getopts keeps the position inside the current argument here, so a grouped
      option such as -abc is parsed one letter per call. last_optind detects when
@@ -369,6 +394,13 @@ protected:
   /* The source and name of the text being evaluated, for caret formatting. */
   const String *m_current_source{nullptr};
   String m_current_origin{};
+
+  /* The chain of sourced-file and eval frames from the outermost down to the
+     one running now, so an error deep in a nested source prints every call site
+     rather than only the innermost. Each frame carries the call site and its
+     parent text, so a backtrace renders a caret at the dot or eval in the
+     parent. run_source pushes on entry, pops on exit. */
+  ArrayList<SourceFrame> m_source_frames{heap_allocator()};
 
   /* ASTs from eval and dot, kept alive until the next top-level command so a
      function they define survives the rest of the current one. */

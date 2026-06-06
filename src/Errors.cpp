@@ -199,6 +199,12 @@ fn ErrorWithLocation::to_string(StringView source) const -> String
                                   : unicode_position + 1;
 
   String result{};
+  /* A named source prefixes its path before the line and column, so a sourced
+     error reads path:line:col rather than a bare line:col. */
+  if (let const name = m_location.filename(); name.has_value()) {
+    result += *name;
+    result += ':';
+  }
   result += std::to_string(line_number + 1);
   result += ':';
   result += std::to_string(line_byte_position);

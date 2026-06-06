@@ -1782,12 +1782,46 @@ fn EvalContext::capture_command_substitution(const String &source) -> String
 }
 
 fn EvalContext::run_source(StringView source, StringView origin,
-                           bool consume_return) -> i32
+                           bool consume_return, Maybe<SourceLocation> call_site,
+                           Maybe<StringView> filename) -> i32
 {
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
      so a return or a break inside the evaluated source reaches the caller. */
   if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
+
+  /* The source the call site lives in, captured before set_current_source below
+     changes it, so a backtrace caret renders the dot or eval against the parent
+     text rather than the source about to run. It is NULL when no call site is
+     known, which sends the backtrace to the plain origin message. */
+  const String *const parent_source = call_site ? m_current_source : nullptr;
+
+  /* The frame joins the backtrace stack for the length of this call, so an
+     error deep in a nested source prints every call site. The pop runs at
+     function scope, after the catch below has read the stack. A frame with no
+     call site stores a zero location, unused because parent_source is NULL. */
+  m_source_frames.push(SourceFrame{
+      String{origin}, call_site ? *call_site : SourceLocation{0, 0},
+      parent_source});
+  SHIT_DEFER { m_source_frames.pop_back(); };
+
+  /* The whole chain from the innermost source out to the outermost is printed
+     when an error is caught, so every nested call site is named, not only the
+     one running now. A frame whose parent source is known renders a caret at
+     its call site, otherwise it falls back to naming the origin. */
+  let print_backtrace = [this]() {
+    for (usize i = m_source_frames.size(); i > 0; i--) {
+      const SourceFrame &frame = m_source_frames[i - 1];
+      if (frame.parent_source != nullptr) {
+        let const sourced_here = ErrorWithLocation{frame.call_site,
+                                                   "sourced here"};
+        show_message(sourced_here.to_string(*frame.parent_source));
+      } else {
+        show_message("This error was raised while running " + frame.origin +
+                     ".");
+      }
+    }
+  };
 
   /* A located error from the sourced text carries an offset into that text, not
      into the caller's command, so it is formatted here against the source and
@@ -1795,7 +1829,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      the wrong line. */
   try {
     let parser = Parser{
-        Lexer{String{source}, *AST_ARENA}
+        Lexer{String{source}, *AST_ARENA, false, filename}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this
@@ -1836,15 +1870,15 @@ fn EvalContext::run_source(StringView source, StringView origin,
   } catch (const ErrorWithLocationAndDetails &e) {
     show_message(e.to_string(source));
     show_message(e.details_to_string(source));
-    show_message("This error was raised while running " + origin + ".");
+    print_backtrace();
     return 1;
   } catch (const ErrorWithLocation &e) {
     show_message(e.to_string(source));
-    show_message("This error was raised while running " + origin + ".");
+    print_backtrace();
     return 1;
   } catch (const Error &e) {
     show_message(e.to_string());
-    show_message("This error was raised while running " + origin + ".");
+    print_backtrace();
     return 1;
   }
 }
@@ -2051,9 +2085,16 @@ SourceLocation::SourceLocation(usize position, usize length)
     : m_position(position), m_length(length)
 {}
 
+SourceLocation::SourceLocation(usize position, usize length,
+                               Maybe<StringView> filename)
+    : m_position(position), m_length(length), m_filename(filename)
+{}
+
 fn SourceLocation::position() const -> usize { return m_position; }
 
 fn SourceLocation::length() const -> usize { return m_length; }
+
+fn SourceLocation::filename() const -> Maybe<StringView> { return m_filename; }
 
 fn SourceLocation::add_length(usize n) -> void { m_length += n; }
 

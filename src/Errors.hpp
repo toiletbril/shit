@@ -13,16 +13,23 @@ struct SourceLocation
 {
   SourceLocation() = delete;
   SourceLocation(usize position, usize length);
+  SourceLocation(usize position, usize length, Maybe<StringView> filename);
 
   /* Both variables are byte-offsets and do not account for unicode. */
   fn position() const -> usize;
   fn length() const -> usize;
+
+  /* The name of the file the offset indexes, or None when the source has no
+     name, such as an interactive line. A backtrace frame reads it to prefix the
+     caret header with a path. */
+  fn filename() const -> Maybe<StringView>;
 
   fn add_length(usize n) -> void;
 
 private:
   usize m_position;
   usize m_length;
+  Maybe<StringView> m_filename{};
 };
 
 struct ErrorBase

@@ -44,7 +44,8 @@ fn is_variable_name(char ch) -> bool;
 struct Lexer
 {
   Lexer(String source, BumpArena &arena,
-        bool should_collect_debug_words = false);
+        bool should_collect_debug_words = false,
+        Maybe<StringView> filename = None);
   ~Lexer();
 
   /* The lexer owns the heap-allocated heredoc bodies, so a copy would double
@@ -76,8 +77,19 @@ struct Lexer
       -> const std::string *;
 
 protected:
+  /* Stamp a location in the source being lexed with this lexer's filename, so
+     every token and error the lexer makes points a caret at the named file. */
+  fn here(usize position, usize length) const -> SourceLocation
+  {
+    return SourceLocation{position, length, m_filename};
+  }
+
   String m_source{};
   BumpArena *m_arena;
+  /* The name of the file this source came from, or None for an unnamed source
+     such as an interactive line. It travels into every SourceLocation the lexer
+     stamps. */
+  Maybe<StringView> m_filename{};
   usize m_cursor_position{0};
   usize m_cached_offset{0};
 

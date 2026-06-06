@@ -23,7 +23,8 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 
   /* eval leaves a return pending so it ends the enclosing function or the
      shell, the way dash propagates it, rather than ending the eval itself. */
-  return cxt.run_source(joined, "eval", false);
+  return cxt.run_source(joined, "eval", false, ec.source_location(),
+                        StringView{"eval"});
 }
 
 } /* namespace shit */

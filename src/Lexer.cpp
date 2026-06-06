@@ -119,8 +119,9 @@ fn is_variable_name(char ch) -> bool
 
 } /* namespace lexer */
 
-Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words)
-    : m_source(std::move(source)), m_arena(&arena),
+Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
+             Maybe<StringView> filename)
+    : m_source(std::move(source)), m_arena(&arena), m_filename(filename),
       m_should_collect_debug_words(should_collect_debug_words)
 {}
 
@@ -241,13 +242,12 @@ fn Lexer::lex_expression_token() -> Token *
       return lex_identifier();
     else
       throw ErrorWithLocation{
-          {m_cursor_position, 1},
+          here(m_cursor_position, 1),
           "Unexpected character"
       };
   }
 
-  return m_arena->create<tokens::EndOfFile>(
-      SourceLocation{m_cursor_position, 1});
+  return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
 }
 
 fn Lexer::lex_shell_token() -> Token *
@@ -260,12 +260,11 @@ fn Lexer::lex_shell_token() -> Token *
       t = lex_identifier();
     else
       throw ErrorWithLocation{
-          {m_cursor_position, 1},
+          here(m_cursor_position, 1),
           "Unexpected character"
       };
   } else {
-    t = m_arena->create<tokens::EndOfFile>(
-        SourceLocation{m_cursor_position, 1});
+    t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
 
   m_last_shell_token_was_newline = (t->kind() == Token::Kind::Newline);
@@ -318,7 +317,7 @@ fn Lexer::lex_number() -> Token *
   }
 
   Token *const num = m_arena->create<tokens::Number>(
-      SourceLocation{m_cursor_position, length}, digits);
+      here(m_cursor_position, length), digits);
   m_cached_offset = length;
 
   return num;
@@ -440,9 +439,9 @@ fn Lexer::lex_identifier() -> Token *
             const char c = chop_character(byte_count);
             if (c == lexer::CEOF) {
               throw ErrorWithLocationAndDetails{
-                  {m_cursor_position,              byte_count},
+                  here(m_cursor_position, byte_count),
                   "Unterminated arithmetic expansion",
-                  {m_cursor_position + byte_count, 1         },
+                  here(m_cursor_position + byte_count, 1),
                   "expected )) here"
               };
             }
@@ -475,9 +474,9 @@ fn Lexer::lex_identifier() -> Token *
           const char c = chop_character(byte_count);
           if (c == lexer::CEOF) {
             throw ErrorWithLocationAndDetails{
-                {m_cursor_position,              byte_count},
+                here(m_cursor_position, byte_count),
                 "Unterminated command substitution",
-                {m_cursor_position + byte_count, 1         },
+                here(m_cursor_position + byte_count, 1),
                 "expected ) here"
             };
           }
@@ -519,9 +518,9 @@ fn Lexer::lex_identifier() -> Token *
           const char c = chop_character(byte_count);
           if (c == lexer::CEOF) {
             throw ErrorWithLocationAndDetails{
-                {m_cursor_position + byte_count, 1},
+                here(m_cursor_position + byte_count, 1),
                 "Unterminated variable expansion",
-                {m_cursor_position + byte_count, 1},
+                here(m_cursor_position + byte_count, 1),
                 "expected } here"
             };
           }
@@ -570,19 +569,19 @@ fn Lexer::lex_identifier() -> Token *
     expected_quote += *quote_char;
     expected_quote += " here";
     throw ErrorWithLocationAndDetails{
-        {m_cursor_position + relative_last_quote_char_pos,
-         SHIT_SUB_SAT(byte_count, relative_last_quote_char_pos)},
+        here(m_cursor_position + relative_last_quote_char_pos,
+             SHIT_SUB_SAT(byte_count, relative_last_quote_char_pos)),
         "Unterminated string literal",
-        {m_cursor_position + byte_count, 1},
+        here(m_cursor_position + byte_count, 1),
         expected_quote
     };
   }
 
   if (should_escape) {
     throw ErrorWithLocationAndDetails{
-        {m_cursor_position + byte_count - 1, 1},
+        here(m_cursor_position + byte_count - 1, 1),
         "Nothing to escape",
-        {m_cursor_position + byte_count,     1},
+        here(m_cursor_position + byte_count, 1),
         "expected a character here"
     };
   }
@@ -603,8 +602,8 @@ fn Lexer::lex_identifier() -> Token *
       assignment_split.has_value())
   {
     t = m_arena->create<tokens::Assignment>(
-        SourceLocation{actual_cursor_position, byte_count},
-        assignment_split->first, std::move(assignment_split->second));
+        here(actual_cursor_position, byte_count), assignment_split->first,
+        std::move(assignment_split->second));
   } else if (word.segments.size() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {
@@ -623,7 +622,7 @@ fn Lexer::lex_identifier() -> Token *
 
   if (t == nullptr) {
     t = m_arena->create<tokens::WordToken>(
-        SourceLocation{actual_cursor_position, byte_count}, std::move(word));
+        here(actual_cursor_position, byte_count), std::move(word));
   }
 
   m_cached_offset = byte_count;
@@ -676,41 +675,29 @@ fn Lexer::lex_sentinel() -> Token *
   /* clang-format off */
 #define TOKEN_CASE_ONE(t)                                                      \
   case Token::Kind::t:                                                         \
-    tok = new tokens::t{                                                       \
-        {m_cursor_position, 1}                                                 \
-    };                                                                         \
+    tok = new tokens::t{here(m_cursor_position, 1)};                           \
     break;
 
 #define TOKEN_CASE_TWO(t, ch, t2)                                              \
   case Token::Kind::t: {                                                       \
     if (chop_character(1) == ch) {                                             \
-      tok = new tokens::t2{                                                    \
-          {m_cursor_position, 2}                                               \
-      };                                                                       \
+      tok = new tokens::t2{here(m_cursor_position, 2)};                        \
       extra_length++;                                                          \
     } else {                                                                   \
-      tok = new tokens::t{                                                     \
-          {m_cursor_position, 1}                                               \
-      };                                                                       \
+      tok = new tokens::t{here(m_cursor_position, 1)};                         \
     }                                                                          \
   } break;
 
 #define TOKEN_CASE_THREE(t, ch2, t2, ch3, t3)                                  \
   case Token::Kind::t: {                                                       \
     if (chop_character(1) == ch2) {                                            \
-      tok = new tokens::t2{                                                    \
-          {m_cursor_position, 2}                                               \
-      };                                                                       \
+      tok = new tokens::t2{here(m_cursor_position, 2)};                        \
       extra_length++;                                                          \
     } else if (chop_character(1) == ch3) {                                     \
-      tok = new tokens::t3{                                                    \
-          {m_cursor_position, 2}                                               \
-      };                                                                       \
+      tok = new tokens::t3{here(m_cursor_position, 2)};                        \
       extra_length++;                                                          \
     } else {                                                                   \
-      tok = new tokens::t{                                                     \
-          {m_cursor_position, 1}                                               \
-      };                                                                       \
+      tok = new tokens::t{here(m_cursor_position, 1)};                         \
     }                                                                          \
   } break;
   /* clang-format on */
@@ -750,7 +737,7 @@ fn Lexer::lex_sentinel() -> Token *
     s += ch;
     s += "'";
     throw ErrorWithLocation{
-        {m_cursor_position, extra_length},
+        here(m_cursor_position, extra_length),
         s
     };
   }
