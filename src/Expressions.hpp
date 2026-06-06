@@ -63,8 +63,8 @@ struct Expression
   Expression &operator=(const Expression &) = delete;
   Expression &operator=(Expression &&) noexcept = delete;
 
-  virtual std::string to_string() const = 0;
-  virtual std::string to_ast_string(usize layer = 0) const;
+  virtual String to_string() const = 0;
+  virtual String to_ast_string(usize layer = 0) const;
 
   /* Lightweight kind tags so a caller can recognize a node without RTTI or a
      string compare. The base returns false, the concrete node overrides. */
@@ -96,8 +96,8 @@ struct IfStatement : public Expression
 
   ~IfStatement() override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
 
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
@@ -115,8 +115,8 @@ struct DummyExpression : public Expression
 
   bool is_dummy() const override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -154,8 +154,8 @@ struct AssignCommand : public Command
 
   bool is_assignment() const override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
 
   void append_to(usize d, std::string &f, bool duplicate) override;
   void redirect_to(usize d, std::string &f, bool duplicate) override;
@@ -205,8 +205,8 @@ struct SimpleCommand : public Command
 
   const ArrayList<const Token *> &args() const;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
 
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
@@ -243,8 +243,8 @@ struct CompoundListCondition : public Expression
 
   Kind kind() const;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
 
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
@@ -264,8 +264,8 @@ struct CompoundList : public Expression
   bool is_empty() const;
   void append_node(const CompoundListCondition *node);
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
 
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
@@ -284,8 +284,8 @@ struct Pipeline : public Command
   bool is_empty() const;
   void append_command(const SimpleCommand *node);
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
 
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
@@ -320,8 +320,8 @@ struct IfClause : public CompoundCommand
       const Expression *otherwise);
   ~IfClause() override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
@@ -338,8 +338,8 @@ struct WhileLoop : public CompoundCommand
             const Expression *body, bool is_until);
   ~WhileLoop() override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
@@ -358,8 +358,8 @@ struct ForLoop : public CompoundCommand
           const Expression *body);
   ~ForLoop() override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
@@ -385,8 +385,8 @@ struct CaseClause : public CompoundCommand
              ArrayList<CaseItem> &&items);
   ~CaseClause() override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
@@ -401,8 +401,8 @@ struct BraceGroup : public CompoundCommand
   BraceGroup(SourceLocation location, const Expression *body);
   ~BraceGroup() override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
@@ -416,8 +416,8 @@ struct Subshell : public CompoundCommand
   Subshell(SourceLocation location, const Expression *body);
   ~Subshell() override;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
@@ -435,8 +435,8 @@ struct FunctionDefinition : public CompoundCommand
   const std::string &name() const;
   const Expression *body() const;
 
-  std::string to_string() const override;
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
   void analyze(AnalysisContext &actx, bool is_unconditional) const override;
 
 protected:
@@ -451,8 +451,8 @@ struct ConstantNumber : public Expression
   ConstantNumber(SourceLocation location, i64 value);
   ~ConstantNumber() override;
 
-  std::string to_ast_string(usize layer = 0) const override;
-  std::string to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -465,8 +465,8 @@ struct ConstantString : public Expression
   ConstantString(SourceLocation location, const std::string &value);
   ~ConstantString() override;
 
-  std::string to_ast_string(usize layer = 0) const override;
-  std::string to_string() const override;
+  String to_ast_string(usize layer = 0) const override;
+  String to_string() const override;
 
 protected:
   i64 evaluate_impl(EvalContext &cxt) const override;
@@ -479,7 +479,7 @@ struct UnaryExpression : public Expression
   UnaryExpression(SourceLocation location, const Expression *rhs);
   ~UnaryExpression() override;
 
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_ast_string(usize layer = 0) const override;
 
 protected:
   const Expression *m_rhs;
@@ -489,7 +489,7 @@ protected:
   struct e : public UnaryExpression                                            \
   {                                                                            \
     e(SourceLocation location, const Expression *rhs);                         \
-    std::string to_string() const override;                                    \
+    String to_string() const override;                                         \
                                                                                \
   protected:                                                                   \
     i64 evaluate_impl(EvalContext &cxt) const override;                        \
@@ -506,7 +506,7 @@ struct BinaryExpression : public Expression
                    const Expression *rhs);
   ~BinaryExpression() override;
 
-  std::string to_ast_string(usize layer = 0) const override;
+  String to_ast_string(usize layer = 0) const override;
 
 protected:
   const Expression *m_lhs;
@@ -517,7 +517,7 @@ protected:
   struct e : public BinaryExpression                                           \
   {                                                                            \
     e(SourceLocation location, const Expression *lhs, const Expression *rhs);  \
-    std::string to_string() const override;                                    \
+    String to_string() const override;                                         \
                                                                                \
   protected:                                                                   \
     i64 evaluate_impl(EvalContext &cxt) const override;                        \

@@ -378,7 +378,9 @@ Lexer::lex_identifier()
     {
       word.segments.back().text += ch;
     } else {
-      word.segments.push(WordSegment{kind, std::string{ch}, false});
+      String single{};
+      single.push(ch);
+      word.segments.push(WordSegment{kind, std::move(single), false});
     }
   };
 
@@ -465,7 +467,7 @@ Lexer::lex_identifier()
            space, $( (cmd) ). */
         if (chop_character(byte_count) == '(') {
           byte_count++;
-          std::string arithmetic{};
+          String arithmetic{};
           usize group_depth = 0;
           for (;;) {
             char c = chop_character(byte_count);
@@ -499,7 +501,7 @@ Lexer::lex_identifier()
           continue;
         }
 
-        std::string inner{};
+        String inner{};
         usize depth = 1;
         char quote = 0;
         for (;;) {
@@ -545,7 +547,7 @@ Lexer::lex_identifier()
                                        std::move(inner), is_in_double_quotes});
       } else if (next == '{') {
         byte_count++;
-        std::string name{};
+        String name{};
         for (;;) {
           char c = chop_character(byte_count);
           if (c == lexer::CEOF) {
@@ -563,7 +565,7 @@ Lexer::lex_identifier()
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        std::move(name), is_in_double_quotes});
       } else if (lexer::is_variable_name_start(next)) {
-        std::string name{};
+        String name{};
         while (lexer::is_variable_name(next = chop_character(byte_count))) {
           name += next;
           byte_count++;
@@ -575,8 +577,10 @@ Lexer::lex_identifier()
                  lexer::is_number(next))
       {
         byte_count++;
+        String special{};
+        special.push(next);
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       std::string{next}, is_in_double_quotes});
+                                       std::move(special), is_in_double_quotes});
       } else {
         /* A dollar sign that names None stays a literal dollar sign. */
         append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
@@ -634,7 +638,7 @@ Lexer::lex_identifier()
   {
     /* A bare word may name a keyword. A quoted or escaped word never does, so
        only a single unquoted segment qualifies. */
-    const std::string &word_text = word.segments[0].text;
+    const String &word_text = word.segments[0].text;
     if (Maybe<Token::Kind> kw =
             KEYWORDS.find(StringView{word_text.data(), word_text.size()}))
     {

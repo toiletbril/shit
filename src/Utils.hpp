@@ -16,7 +16,7 @@ namespace shit {
 
 namespace utils {
 
-std::string merge_tokens_to_string(const ArrayList<const Token *> &v);
+String merge_tokens_to_string(const ArrayList<const Token *> &v);
 
 /* Join the argument list into a single space-separated string. The container is
    the ArrayList<String> the exec-argv path now carries, so each element is

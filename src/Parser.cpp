@@ -119,19 +119,28 @@ unexpected_command_token_message(const Token *token)
   case Token::Kind::Then:
   case Token::Kind::Else:
   case Token::Kind::Elif:
-  case Token::Kind::Fi:
-    return "'" + token->to_ast_string() + "' has no matching 'if'";
+  case Token::Kind::Fi: {
+    String ast = token->to_ast_string();
+    return "'" + std::string{ast.c_str(), ast.size()} +
+           "' has no matching 'if'";
+  }
   case Token::Kind::Do:
-  case Token::Kind::Done:
-    return "'" + token->to_ast_string() +
+  case Token::Kind::Done: {
+    String ast = token->to_ast_string();
+    return "'" + std::string{ast.c_str(), ast.size()} +
            "' has no matching 'while', 'until', or 'for'";
+  }
   case Token::Kind::Esac: return "'esac' has no matching 'case'";
   case Token::Kind::DoubleSemicolon:
     return "';;' is only valid between the arms of a 'case'";
   case Token::Kind::RightParen: return "')' has no matching '('";
   case Token::Kind::RightBracket: return "'}' has no matching '{'";
   case Token::Kind::Pipe: return "'|' has no command before it to pipe from";
-  default: return "expected a command, found '" + token->to_ast_string() + "'";
+  default: {
+    String ast = token->to_ast_string();
+    return "expected a command, found '" + std::string{ast.c_str(), ast.size()} +
+           "'";
+  }
   }
 }
 
@@ -235,11 +244,13 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
+        String ast = token->to_ast_string();
         throw shit::ErrorWithLocation{
             token->source_location(),
             "Expected a command " +
                 std::string(compound_list->is_empty() ? "before" : "after") +
-                " operator, found '" + token->to_ast_string() + "'"};
+                " operator, found '" + std::string{ast.c_str(), ast.size()} +
+                "'"};
       }
       [[fallthrough]];
     case Token::Kind::Newline:
@@ -371,11 +382,13 @@ Parser::parse_simple_command()
       {
         m_lexer.advance_past_last_peek();
         std::unique_ptr<Token> from{m_lexer.next_shell_token()};
-        std::string digits = from->kind() == Token::Kind::Word
-                                 ? static_cast<tokens::WordToken *>(from.get())
-                                       ->word()
-                                       .to_literal_string()
-                                 : std::string{};
+        std::string digits{};
+        if (from->kind() == Token::Kind::Word) {
+          String literal = static_cast<tokens::WordToken *>(from.get())
+                               ->word()
+                               .to_literal_string();
+          digits = std::string{literal.c_str(), literal.size()};
+        }
         i32 from_fd = -1;
         try {
           if (!digits.empty()) from_fd = std::stoi(digits);
@@ -459,9 +472,10 @@ Parser::parse_simple_command()
       /* A run of digits touching a redirection operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
-        std::string literal = static_cast<tokens::WordToken *>(token.get())
-                                  ->word()
-                                  .to_literal_string();
+        String literal_string = static_cast<tokens::WordToken *>(token.get())
+                                    ->word()
+                                    .to_literal_string();
+        std::string literal{literal_string.c_str(), literal_string.size()};
         bool is_all_digits =
             !literal.empty() &&
             literal.find_first_not_of("0123456789") == std::string::npos;
@@ -553,7 +567,8 @@ Parser::parse_simple_command()
       const Word &delimiter_word =
           static_cast<tokens::WordToken *>(delimiter_token.get())->word();
 
-      std::string delimiter = delimiter_word.to_literal_string();
+      String delimiter_literal = delimiter_word.to_literal_string();
+      std::string delimiter{delimiter_literal.c_str(), delimiter_literal.size()};
       bool strip_tabs = false;
       /* <<- strips leading tabs, the dash touching the operator. */
       if (!delimiter.empty() && delimiter[0] == '-' &&
@@ -692,7 +707,9 @@ Parser::parse_for()
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
   }
-  std::string variable_name = name_token->raw_string();
+  String variable_name_string = name_token->raw_string();
+  std::string variable_name{variable_name_string.c_str(),
+                            variable_name_string.size()};
 
   ArrayList<const Token *> words{};
   /* Free the released word tokens if the loop fails to parse. */
@@ -882,7 +899,8 @@ std::unique_ptr<Command>
 Parser::parse_function_definition(std::unique_ptr<Token> name_token)
 {
   SourceLocation location = name_token->source_location();
-  std::string name = name_token->raw_string();
+  String name_string = name_token->raw_string();
+  std::string name{name_string.c_str(), name_string.size()};
 
   /* The opening parenthesis was peeked by the caller. Consume the empty pair.
    */
@@ -958,9 +976,10 @@ Parser::parse_expression(u8 min_precedence)
       after.reset(m_lexer.next_expression_token());
     }
     if (after->kind() != Token::Kind::Then) {
+      String ast = after->to_ast_string();
       throw ErrorWithLocation{after->source_location(),
                               "Expected 'Then' after the condition, found '" +
-                                  after->to_ast_string() + "'"};
+                                  std::string{ast.c_str(), ast.size()} + "'"};
     }
 
     /* expression */
@@ -1025,9 +1044,10 @@ Parser::parse_expression(u8 min_precedence)
 
       lhs = op->construct_unary_expression(rhs.release());
     } else {
+      String raw = t->raw_string();
       throw ErrorWithLocation{t->source_location(),
                               "Expected a value or an expression, found '" +
-                                  t->raw_string() + "'"};
+                                  std::string{raw.c_str(), raw.size()} + "'"};
     }
     break;
   }
@@ -1055,8 +1075,10 @@ Parser::parse_expression(u8 min_precedence)
     case Token::Kind::Else:
     case Token::Kind::Fi: {
       if (m_recursion_depth == 0) {
+        String raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
-                                "Unexpected '" + maybe_op->raw_string() +
+                                "Unexpected '" +
+                                    std::string{raw.c_str(), raw.size()} +
                                     "' without matching If condition"};
       }
       return lhs;
@@ -1064,8 +1086,10 @@ Parser::parse_expression(u8 min_precedence)
 
     case Token::Kind::Then: {
       if (m_if_condition_depth == 0) {
+        String raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
-                                "Unexpected '" + maybe_op->raw_string() +
+                                "Unexpected '" +
+                                    std::string{raw.c_str(), raw.size()} +
                                     "' without matching If condition"};
       }
       return lhs;
@@ -1075,9 +1099,10 @@ Parser::parse_expression(u8 min_precedence)
     }
 
     if (!(maybe_op->flags() & Token::Flag::BinaryOperator)) {
+      String raw = maybe_op->raw_string();
       throw ErrorWithLocation{maybe_op->source_location(),
                               "Expected a binary operator, found '" +
-                                  maybe_op->raw_string() + "'"};
+                                  std::string{raw.c_str(), raw.size()} + "'"};
     }
 
     const tokens::Operator *op =

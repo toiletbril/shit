@@ -23,7 +23,7 @@ Token::operator delete(void *pointer)
   ::operator delete(pointer);
 }
 
-std::string
+String
 Token::to_ast_string() const
 {
   return raw_string();
@@ -54,17 +54,21 @@ Word::is_empty() const
   return segments.empty();
 }
 
-std::string
+String
 Word::to_literal_string() const
 {
-  std::string result{};
+  String result{};
   for (const WordSegment &segment : segments) {
     if (segment.kind == WordSegment::Kind::CommandSubstitution) {
-      result += "$(" + segment.text + ")";
+      result += "$(";
+      result += segment.text;
+      result += ")";
       continue;
     }
     if (segment.kind == WordSegment::Kind::ArithmeticExpansion) {
-      result += "$((" + segment.text + "))";
+      result += "$((";
+      result += segment.text;
+      result += "))";
       continue;
     }
     if (segment.kind == WordSegment::Kind::VariableReference) result += '$';
@@ -73,10 +77,10 @@ Word::to_literal_string() const
   return result;
 }
 
-std::string
+String
 Word::to_pretty_string() const
 {
-  std::string result{"[Word"};
+  String result{"[Word"};
   for (const WordSegment &segment : segments) {
     result += "\n  ";
     switch (segment.kind) {
@@ -107,22 +111,22 @@ Word::get_assignment_split() const
   const WordSegment &first = segments[0];
   if (first.kind != WordSegment::Kind::UnquotedText) return shit::None;
 
-  usize equals_position = first.text.find('=');
-  if (equals_position == std::string::npos || equals_position == 0)
-    return shit::None;
+  Maybe<usize> equals_position = first.text.find_character('=');
+  if (!equals_position.has_value() || *equals_position == 0) return shit::None;
 
   if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
-  for (usize i = 1; i < equals_position; i++) {
+  for (usize i = 1; i < *equals_position; i++) {
     if (!lexer::is_variable_name(first.text[i])) return shit::None;
   }
 
-  std::string name = first.text.substr(0, equals_position);
+  StringView name_view = first.text.substring_of_length(0, *equals_position);
+  std::string name{name_view.data, name_view.length};
 
   Word value{};
   /* The value always begins with an unquoted segment, even when empty, so that
      FOO= produces one empty field rather than no field at all. */
   value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
-                                  first.text.substr(equals_position + 1),
+                                  first.text.substring(*equals_position + 1),
                                   false});
   for (usize i = 1; i < segments.size(); i++)
     value.segments.push(segments[i]);
@@ -136,7 +140,7 @@ namespace tokens {
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::Keyword; }               \
-  std::string t::raw_string() const { return s; }
+  String t::raw_string() const { return s; }
 
 KEYWORD_TOKEN_DECLS(If, "if");
 KEYWORD_TOKEN_DECLS(Then, "then");
@@ -163,7 +167,7 @@ KEYWORD_TOKEN_DECLS(Function, "function");
   {                                                                            \
     return Token::Flag::Sentinel | Token::Flag::CompoundList;                  \
   }                                                                            \
-  std::string t::raw_string() const { return s; }
+  String t::raw_string() const { return s; }
 
 SENTINEL_TOKEN_DECLS_COMPOUND(Newline, "newline");
 SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
@@ -172,7 +176,7 @@ SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
   t::t(SourceLocation location) : Token(location) {}                           \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::Sentinel; }              \
-  std::string t::raw_string() const { return s; }
+  String t::raw_string() const { return s; }
 
 SENTINEL_TOKEN_DECLS(EndOfFile, "end of input");
 SENTINEL_TOKEN_DECLS(DoubleSemicolon, ";;");
@@ -191,10 +195,10 @@ Value::Value(SourceLocation location, std::string_view sv)
     : Token(location), m_value(sv)
 {}
 
-std::string
+String
 Value::raw_string() const
 {
-  return m_value;
+  return String{StringView{m_value}};
 }
 
 Number::Number(SourceLocation location, std::string_view sv)
@@ -230,10 +234,13 @@ Assignment::flags() const
   return Token::Flag::Special;
 }
 
-std::string
+String
 Assignment::raw_string() const
 {
-  return m_key + "=" + m_value.to_literal_string();
+  String result{StringView{m_key}};
+  result += "=";
+  result += m_value.to_literal_string();
+  return result;
 }
 
 const std::string &
@@ -251,7 +258,8 @@ Assignment::value_word() const
 WordToken::WordToken(SourceLocation location, Word word)
     : Value(location, ""), m_word(std::move(word))
 {
-  m_value = m_word.to_literal_string();
+  String literal = m_word.to_literal_string();
+  m_value = std::string{literal.c_str(), literal.size()};
 }
 
 Token::Kind
@@ -362,7 +370,7 @@ Operator::construct_unary_expression(const Expression *rhs) const
   {                                                                            \
     return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;           \
   }                                                                            \
-  std::string t::raw_string() const { return s; }                              \
+  String t::raw_string() const { return s; }                                   \
   u8 t::left_precedence() const { return bp; }                                 \
   u8 t::unary_precedence() const { return up; }                                \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
@@ -386,7 +394,7 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
   {                                                                            \
     return Token::Flag::BinaryOperator | Token::Flag::CompoundList;            \
   }                                                                            \
-  std::string t::raw_string() const { return s; }                              \
+  String t::raw_string() const { return s; }                                   \
   u8 t::left_precedence() const { return bp; }                                 \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
       const Expression *lhs, const Expression *rhs) const                      \
@@ -398,7 +406,7 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
   t::t(SourceLocation location) : Operator(location) {}                        \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::BinaryOperator; }        \
-  std::string t::raw_string() const { return s; }                              \
+  String t::raw_string() const { return s; }                                   \
   u8 t::left_precedence() const { return bp; }                                 \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
       const Expression *lhs, const Expression *rhs) const                      \
@@ -429,7 +437,7 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
   t::t(SourceLocation location) : Operator(location) {}                        \
   Token::Kind t::kind() const { return Token::Kind::t; }                       \
   Token::Flags t::flags() const { return Token::Flag::UnaryOperator; }         \
-  std::string t::raw_string() const { return s; }                              \
+  String t::raw_string() const { return s; }                                   \
   u8 t::unary_precedence() const { return up; }                                \
   std::unique_ptr<Expression> t::construct_unary_expression(                   \
       const Expression *rhs) const                                             \

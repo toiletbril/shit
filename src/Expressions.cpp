@@ -25,10 +25,10 @@ Expression::source_location() const
   return m_location;
 }
 
-std::string
+String
 Expression::to_ast_string(usize layer) const
 {
-  std::string pad{};
+  String pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad + "[" + to_string() + "]";
@@ -99,11 +99,11 @@ static_command_name(const Token *token)
     if (segment.kind == WordSegment::Kind::VariableReference)
       return shit::None;
     if (segment.kind == WordSegment::Kind::UnquotedText) {
-      for (char ch : segment.text) {
-        if (lexer::is_expandable_char(ch)) return shit::None;
+      for (usize i = 0; i < segment.text.size(); i++) {
+        if (lexer::is_expandable_char(segment.text[i])) return shit::None;
       }
     }
-    name += segment.text;
+    name.append(segment.text.c_str(), segment.text.size());
   }
   return name;
 }
@@ -125,7 +125,7 @@ bool
 word_has_backtick(const Word &word)
 {
   for (const WordSegment &segment : word.segments) {
-    if (segment.text.find('`') != std::string::npos) return true;
+    if (segment.text.find_character('`').has_value()) return true;
   }
   return false;
 }
@@ -182,17 +182,17 @@ IfStatement::evaluate_impl(EvalContext &cxt) const
   return 0;
 }
 
-std::string
+String
 IfStatement::to_string() const
 {
   return "If";
 }
 
-std::string
+String
 IfStatement::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
 
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
@@ -265,16 +265,16 @@ DummyExpression::evaluate_impl(EvalContext &cxt) const
   return 0;
 }
 
-std::string
+String
 DummyExpression::to_string() const
 {
   return "Dummy";
 }
 
-std::string
+String
 DummyExpression::to_ast_string(usize layer) const
 {
-  std::string pad{};
+  String pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -318,18 +318,18 @@ AssignCommand::evaluate_impl(EvalContext &cxt) const
   return cxt.last_exit_status();
 }
 
-std::string
+String
 AssignCommand::to_string() const
 {
-  std::string s = "Assign " + m_assignment->to_ast_string();
+  String s = "Assign " + m_assignment->to_ast_string();
 
   return s;
 }
 
-std::string
+String
 AssignCommand::to_ast_string(usize layer) const
 {
-  std::string pad{};
+  String pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad + "[" + to_string() + "]";
@@ -717,10 +717,10 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   return ret;
 }
 
-std::string
+String
 SimpleCommand::to_string() const
 {
-  std::string s = "SimpleCommand";
+  String s = "SimpleCommand";
 
   /* A pipeline stage that is a bare assignment carries the assignment in the
      local variables and has no command word, so the argument list is empty. */
@@ -737,10 +737,10 @@ SimpleCommand::to_string() const
   return s;
 }
 
-std::string
+String
 SimpleCommand::to_ast_string(usize layer) const
 {
-  std::string pad{};
+  String pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad + "[" + to_string() + "]";
@@ -786,17 +786,17 @@ CompoundList::append_node(const CompoundListCondition *node)
   m_nodes.push(node);
 }
 
-std::string
+String
 CompoundList::to_string() const
 {
   return "CompoundList";
 }
 
-std::string
+String
 CompoundList::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
 
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
@@ -872,10 +872,10 @@ CompoundListCondition::kind() const
   return m_kind;
 }
 
-std::string
+String
 CompoundListCondition::to_string() const
 {
-  std::string k;
+  String k;
   switch (kind()) {
   case Kind::None: k = "None"; break;
   case Kind::And: k = "&&"; break;
@@ -885,11 +885,11 @@ CompoundListCondition::to_string() const
   return "CompoundListCondition, " + k;
 }
 
-std::string
+String
 CompoundListCondition::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
 
@@ -936,19 +936,19 @@ Pipeline::append_command(const SimpleCommand *node)
   m_commands.push(node);
 }
 
-std::string
+String
 Pipeline::to_string() const
 {
-  std::string s = "Pipeline";
+  String s = "Pipeline";
   if (is_async()) s += ", Async";
   return s;
 }
 
-std::string
+String
 Pipeline::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -1036,10 +1036,10 @@ CompoundCommand::redirect_to(usize d, std::string &f, bool duplicate)
                           "Redirection on a compound command is not supported"};
 }
 
-static std::string
+static String
 indent_for_layer(usize layer)
 {
-  std::string pad{};
+  String pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   return pad;
@@ -1067,24 +1067,24 @@ IfClause::~IfClause()
   delete m_otherwise;
 }
 
-std::string
+String
 IfClause::to_string() const
 {
   return "IfClause";
 }
 
-std::string
+String
 IfClause::to_ast_string(usize layer) const
 {
-  std::string pad = indent_for_layer(layer);
-  std::string child_pad = pad + EXPRESSION_AST_INDENT;
-  std::string s = pad + "[" + to_string() + "]";
+  String pad = indent_for_layer(layer);
+  String child_pad = pad + EXPRESSION_AST_INDENT;
+  String s = pad + "[" + to_string() + "]";
   for (const auto &[condition, body] : m_branches) {
-    s += '\n' + child_pad + condition->to_ast_string(layer + 1);
-    s += '\n' + child_pad + body->to_ast_string(layer + 1);
+    s += "\n" + child_pad + condition->to_ast_string(layer + 1);
+    s += "\n" + child_pad + body->to_ast_string(layer + 1);
   }
   if (m_otherwise != nullptr)
-    s += '\n' + child_pad + m_otherwise->to_ast_string(layer + 1);
+    s += "\n" + child_pad + m_otherwise->to_ast_string(layer + 1);
   return s;
 }
 
@@ -1132,20 +1132,20 @@ WhileLoop::~WhileLoop()
   delete m_body;
 }
 
-std::string
+String
 WhileLoop::to_string() const
 {
   return m_is_until ? "UntilLoop" : "WhileLoop";
 }
 
-std::string
+String
 WhileLoop::to_ast_string(usize layer) const
 {
-  std::string pad = indent_for_layer(layer);
-  std::string child_pad = pad + EXPRESSION_AST_INDENT;
-  std::string s = pad + "[" + to_string() + "]";
-  s += '\n' + child_pad + m_condition->to_ast_string(layer + 1);
-  s += '\n' + child_pad + m_body->to_ast_string(layer + 1);
+  String pad = indent_for_layer(layer);
+  String child_pad = pad + EXPRESSION_AST_INDENT;
+  String s = pad + "[" + to_string() + "]";
+  s += "\n" + child_pad + m_condition->to_ast_string(layer + 1);
+  s += "\n" + child_pad + m_body->to_ast_string(layer + 1);
   return s;
 }
 
@@ -1245,18 +1245,21 @@ ForLoop::~ForLoop()
   delete m_body;
 }
 
-std::string
+String
 ForLoop::to_string() const
 {
-  return "ForLoop \"" + m_variable_name + "\"";
+  String result{"ForLoop \""};
+  result += StringView{m_variable_name};
+  result += "\"";
+  return result;
 }
 
-std::string
+String
 ForLoop::to_ast_string(usize layer) const
 {
-  std::string pad = indent_for_layer(layer);
-  std::string s = pad + "[" + to_string() + "]";
-  s += '\n' + pad + EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
+  String pad = indent_for_layer(layer);
+  String s = pad + "[" + to_string() + "]";
+  s += "\n" + pad + EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
   return s;
 }
 
@@ -1306,20 +1309,20 @@ CaseClause::~CaseClause()
   }
 }
 
-std::string
+String
 CaseClause::to_string() const
 {
   return "CaseClause";
 }
 
-std::string
+String
 CaseClause::to_ast_string(usize layer) const
 {
-  std::string pad = indent_for_layer(layer);
-  std::string child_pad = pad + EXPRESSION_AST_INDENT;
-  std::string s = pad + "[" + to_string() + "]";
+  String pad = indent_for_layer(layer);
+  String child_pad = pad + EXPRESSION_AST_INDENT;
+  String s = pad + "[" + to_string() + "]";
   for (const CaseItem &item : m_items)
-    s += '\n' + child_pad + item.body->to_ast_string(layer + 1);
+    s += "\n" + child_pad + item.body->to_ast_string(layer + 1);
   return s;
 }
 
@@ -1333,7 +1336,8 @@ CaseClause::evaluate_impl(EvalContext &cxt) const
     if (t->kind() == Token::Kind::Word)
       return cxt.expand_word_for_assignment(
           static_cast<const tokens::WordToken *>(t)->word());
-    return t->raw_string();
+    String raw = t->raw_string();
+    return std::string{raw.c_str(), raw.size()};
   };
 
   std::string subject = expand_no_glob(m_word);
@@ -1370,16 +1374,16 @@ BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
 
 BraceGroup::~BraceGroup() { delete m_body; }
 
-std::string
+String
 BraceGroup::to_string() const
 {
   return "BraceGroup";
 }
 
-std::string
+String
 BraceGroup::to_ast_string(usize layer) const
 {
-  std::string pad = indent_for_layer(layer);
+  String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
@@ -1402,16 +1406,16 @@ Subshell::Subshell(SourceLocation location, const Expression *body)
 
 Subshell::~Subshell() { delete m_body; }
 
-std::string
+String
 Subshell::to_string() const
 {
   return "Subshell";
 }
 
-std::string
+String
 Subshell::to_ast_string(usize layer) const
 {
-  std::string pad = indent_for_layer(layer);
+  String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
@@ -1479,16 +1483,19 @@ FunctionDefinition::body() const
   return m_body;
 }
 
-std::string
+String
 FunctionDefinition::to_string() const
 {
-  return "FunctionDefinition \"" + m_name + "\"";
+  String result{"FunctionDefinition \""};
+  result += StringView{m_name};
+  result += "\"";
+  return result;
 }
 
-std::string
+String
 FunctionDefinition::to_ast_string(usize layer) const
 {
-  std::string pad = indent_for_layer(layer);
+  String pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
 }
@@ -1515,11 +1522,11 @@ UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
 
 UnaryExpression::~UnaryExpression() { delete m_rhs; }
 
-std::string
+String
 UnaryExpression::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
   for (usize i = 0; i < layer; i++) {
     pad += EXPRESSION_AST_INDENT;
   }
@@ -1539,11 +1546,11 @@ BinaryExpression::~BinaryExpression()
   delete m_rhs;
 }
 
-std::string
+String
 BinaryExpression::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
 
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
@@ -1567,21 +1574,21 @@ ConstantNumber::evaluate_impl(EvalContext &cxt) const
   return m_value;
 }
 
-std::string
+String
 ConstantNumber::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   s += pad + "[Number " + to_string() + "]";
   return s;
 }
 
-std::string
+String
 ConstantNumber::to_string() const
 {
-  return std::to_string(m_value);
+  return String{StringView{std::to_string(m_value)}};
 }
 
 ConstantString::ConstantString(SourceLocation location,
@@ -1598,28 +1605,28 @@ ConstantString::evaluate_impl(EvalContext &cxt) const
   SHIT_UNREACHABLE();
 }
 
-std::string
+String
 ConstantString::to_ast_string(usize layer) const
 {
-  std::string s{};
-  std::string pad{};
+  String s{};
+  String pad{};
   for (usize i = 0; i < layer; i++)
     pad += EXPRESSION_AST_INDENT;
   s += pad + "[String \"" + to_string() + "\"]";
   return s;
 }
 
-std::string
+String
 ConstantString::to_string() const
 {
-  return m_value;
+  return String{StringView{m_value}};
 }
 
 #define UNARY_EXPRESSION_DECLS(e, expr)                                        \
   e::e(SourceLocation location, const Expression *rhs)                         \
       : UnaryExpression(location, rhs)                                         \
   {}                                                                           \
-  std::string e::to_string() const { return #expr; }                           \
+  String e::to_string() const { return #expr; }                                \
   i64 e::evaluate_impl(EvalContext &cxt) const                                 \
   {                                                                            \
     return expr m_rhs->evaluate(cxt);                                          \
@@ -1636,7 +1643,7 @@ BinaryDummyExpression::BinaryDummyExpression(SourceLocation location,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-std::string
+String
 BinaryDummyExpression::to_string() const
 {
   return "BinaryDummyExpression";
@@ -1654,7 +1661,7 @@ Divide::Divide(SourceLocation location, const Expression *lhs,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-std::string
+String
 Divide::to_string() const
 {
   return "/";
@@ -1674,7 +1681,7 @@ Divide::evaluate_impl(EvalContext &cxt) const
   e::e(SourceLocation location, const Expression *lhs, const Expression *rhs)  \
       : BinaryExpression(location, lhs, rhs)                                   \
   {}                                                                           \
-  std::string e::to_string() const { return #expr; }                           \
+  String e::to_string() const { return #expr; }                                \
   i64 e::evaluate_impl(EvalContext &cxt) const                                 \
   {                                                                            \
     return m_lhs->evaluate(cxt) expr m_rhs->evaluate(cxt);                     \
@@ -1708,7 +1715,7 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   /* The literal command text, used for the test recognition. A name like [
      holds a glob metacharacter, so static_command_name rejects it, but the test
      check still needs to see it. */
-  std::string command_literal =
+  String command_literal =
       m_args[0]->kind() == Token::Kind::Word
           ? static_cast<const tokens::WordToken *>(m_args[0])
                 ->word()
@@ -1728,13 +1735,13 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   if (command_literal == "alias") {
     for (usize i = 1; i < m_args.size(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
-      std::string literal =
+      String literal =
           static_cast<const tokens::WordToken *>(m_args[i])
               ->word()
               .to_literal_string();
-      usize equals_position = literal.find('=');
-      if (equals_position != std::string::npos && equals_position > 0)
-        actx.known_aliases.add(StringView{literal.data(), equals_position});
+      Maybe<usize> equals_position = literal.find_character('=');
+      if (equals_position.has_value() && *equals_position > 0)
+        actx.known_aliases.add(StringView{literal.data(), *equals_position});
     }
   }
 
@@ -1786,7 +1793,8 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
         {
           actx.warn(m_args[i]->source_location(),
                     "The assignment prefix does not affect this command, '" +
-                        segment.text + "' is read before it is set");
+                        std::string{segment.text.c_str(), segment.text.size()} +
+                        "' is read before it is set");
           break;
         }
       }

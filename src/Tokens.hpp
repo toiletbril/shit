@@ -38,7 +38,7 @@ struct WordSegment
   };
 
   Kind kind;
-  std::string text;
+  String text;
   bool is_in_double_quotes{false};
 
   bool is_split_eligible() const;
@@ -54,8 +54,8 @@ struct Word
   ArrayList<WordSegment> segments{heap_allocator()};
 
   bool is_empty() const;
-  std::string to_literal_string() const;
-  std::string to_pretty_string() const;
+  String to_literal_string() const;
+  String to_pretty_string() const;
 
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. The pair
@@ -166,9 +166,9 @@ struct Token
 
   virtual Kind kind() const = 0;
   virtual Flags flags() const = 0;
-  virtual std::string raw_string() const = 0;
+  virtual String raw_string() const = 0;
 
-  virtual std::string to_ast_string() const;
+  virtual String to_ast_string() const;
 
   SourceLocation source_location() const;
 
@@ -240,7 +240,7 @@ namespace tokens {
                                                                                \
     Kind kind() const override;                                                \
     Flags flags() const override;                                              \
-    std::string raw_string() const override;                                   \
+    String raw_string() const override;                                        \
   }
 
 TOKEN_STRUCT(If);
@@ -298,7 +298,7 @@ struct Assignment : public Token
   Kind kind() const override;
   Flags flags() const override;
 
-  std::string raw_string() const override;
+  String raw_string() const override;
 
   const std::string &key() const;
   const Word &value_word() const;
@@ -313,7 +313,7 @@ struct Value : public Token
 {
   Value(SourceLocation location, std::string_view sv);
 
-  std::string raw_string() const override;
+  String raw_string() const override;
 
 protected:
   std::string m_value;
@@ -367,7 +367,7 @@ struct Operator : public Token
                                                                                \
     Kind kind() const override;                                                \
     Flags flags() const override;                                              \
-    std::string raw_string() const override;                                   \
+    String raw_string() const override;                                        \
                                                                                \
     u8 left_precedence() const override;                                       \
     std::unique_ptr<Expression>                                                \
@@ -389,7 +389,7 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
                                                                                \
     Kind kind() const override;                                                \
     Flags flags() const override;                                              \
-    std::string raw_string() const override;                                   \
+    String raw_string() const override;                                        \
                                                                                \
     u8 unary_precedence() const override;                                      \
     std::unique_ptr<Expression>                                                \
@@ -406,7 +406,7 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
                                                                                \
     Kind kind() const override;                                                \
     Flags flags() const override;                                              \
-    std::string raw_string() const override;                                   \
+    String raw_string() const override;                                        \
                                                                                \
     u8 left_precedence() const override;                                       \
     std::unique_ptr<Expression>                                                \

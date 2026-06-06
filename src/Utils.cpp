@@ -25,10 +25,10 @@ namespace shit {
 
 namespace utils {
 
-std::string
+String
 merge_tokens_to_string(const ArrayList<const Token *> &v)
 {
-  std::string r{};
+  String r{};
   for (const shit::Token *t : v) {
     r += t->raw_string();
     if (t != v.back()) {

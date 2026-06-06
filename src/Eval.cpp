@@ -1248,7 +1248,7 @@ EvalContext::expand_tilde(WordSegment &leading_segment) const
      literal segment and stays as is. */
   if (!leading_segment.is_tilde_candidate()) return;
 
-  std::string &text = leading_segment.text;
+  String &text = leading_segment.text;
   if (text.empty() || text[0] != '~') return;
 
   /* TODO: There may be several separators supported. */
@@ -1258,8 +1258,13 @@ EvalContext::expand_tilde(WordSegment &leading_segment) const
   Maybe<std::filesystem::path> home = os::get_home_directory();
   if (!home) throw Error{"Could not figure out home directory"};
 
-  text.erase(0, 1);
-  text.insert(0, home->string());
+  /* String has no in-place erase or insert, so the home path and the remainder
+     after the tilde are joined into a fresh buffer and moved back. */
+  std::string home_string = home->string();
+  String expanded{heap_allocator()};
+  expanded.append(StringView{home_string.data(), home_string.size()});
+  expanded.append(text.substring(1));
+  text = std::move(expanded);
 }
 
 ArrayList<String>
@@ -1671,7 +1676,7 @@ EvalContext::expand_word(const Word &word)
   ArrayList<WordSegment> tilde_expanded_segments{heap_allocator()};
   if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.empty() &&
-      word.segments.front().text.front() == '~')
+      word.segments.front().text.first_character() == '~')
   {
     tilde_expanded_segments = word.segments;
     expand_tilde(tilde_expanded_segments.front());
@@ -1740,7 +1745,10 @@ EvalContext::expand_word(const Word &word)
         }
         break;
       }
-      String value{heap_allocator(), apply_parameter_expansion(segment.text)};
+      String value{
+          heap_allocator(),
+          apply_parameter_expansion(
+              std::string{segment.text.c_str(), segment.text.size()})};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1749,16 +1757,20 @@ EvalContext::expand_word(const Word &word)
         append_split_run(value, true);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
-      String output{heap_allocator(),
-                    capture_command_substitution(segment.text)};
+      String output{
+          heap_allocator(),
+          capture_command_substitution(
+              std::string{segment.text.c_str(), segment.text.size()})};
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
         append_split_run(output, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      String value{heap_allocator(),
-                   std::to_string(evaluate_arithmetic(segment.text))};
+      String value{
+          heap_allocator(),
+          StringView{std::to_string(evaluate_arithmetic(
+              std::string{segment.text.c_str(), segment.text.size()}))}};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1781,7 +1793,7 @@ EvalContext::expand_word_for_assignment(const Word &word)
   ArrayList<WordSegment> tilde_expanded_segments{heap_allocator()};
   if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.empty() &&
-      word.segments.front().text.front() == '~')
+      word.segments.front().text.first_character() == '~')
   {
     tilde_expanded_segments = word.segments;
     expand_tilde(tilde_expanded_segments.front());
@@ -1790,14 +1802,15 @@ EvalContext::expand_word_for_assignment(const Word &word)
 
   std::string result{};
   for (const WordSegment &segment : *segments) {
+    std::string segment_text{segment.text.c_str(), segment.text.size()};
     if (segment.kind == WordSegment::Kind::VariableReference)
-      result += apply_parameter_expansion(segment.text);
+      result += apply_parameter_expansion(segment_text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
-      result += capture_command_substitution(segment.text);
+      result += capture_command_substitution(segment_text);
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
-      result += std::to_string(evaluate_arithmetic(segment.text));
+      result += std::to_string(evaluate_arithmetic(segment_text));
     else
-      result += segment.text;
+      result += segment_text;
   }
   return result;
 }
@@ -1994,8 +2007,10 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
            literal. */
         const tokens::Assignment *a =
             static_cast<const tokens::Assignment *>(t);
-        fallback_word.segments.push(
-            WordSegment{WordSegment::Kind::LiteralText, a->key() + "=", false});
+        String key_literal{StringView{a->key()}};
+        key_literal += "=";
+        fallback_word.segments.push(WordSegment{
+            WordSegment::Kind::LiteralText, std::move(key_literal), false});
         const Word &value = a->value_word();
         for (const WordSegment &value_segment : value.segments)
           fallback_word.segments.push(value_segment);
