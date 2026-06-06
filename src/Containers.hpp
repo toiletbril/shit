@@ -3,6 +3,7 @@
 #include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
+#include "Maybe.hpp"
 
 #include <cstring>
 #include <new>
@@ -49,6 +50,41 @@ struct StringView
   operator!=(StringView other) const
   {
     return !(*this == other);
+  }
+
+  /* The index of the first occurrence of a byte, or nothing when it is absent.
+     A Maybe keeps the absent case out of band rather than using a sentinel
+     index. */
+  [[nodiscard]] Maybe<usize>
+  find_character(char wanted) const
+  {
+    for (usize i = 0; i < length; i++)
+      if (data[i] == wanted) return i;
+    return nothing;
+  }
+
+  /* The view from start to the end. A start past the end yields an empty view. */
+  [[nodiscard]] StringView
+  substring(usize start) const
+  {
+    if (start >= length) return StringView{data + length, 0};
+    return StringView{data + start, length - start};
+  }
+
+  /* The view of count bytes from start, clamped to what remains. */
+  [[nodiscard]] StringView
+  substring_of_length(usize start, usize count) const
+  {
+    if (start >= length) return StringView{data + length, 0};
+    usize remaining = length - start;
+    return StringView{data + start, count < remaining ? count : remaining};
+  }
+
+  [[nodiscard]] bool
+  starts_with(StringView prefix) const
+  {
+    if (prefix.length > length) return false;
+    return std::memcmp(data, prefix.data, prefix.length) == 0;
   }
 };
 
