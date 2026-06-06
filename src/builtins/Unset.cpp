@@ -31,11 +31,10 @@ Unset::execute(ExecContext &ec, EvalContext &cxt) const
   bool unset_function = FLAG_UNSET_FUNCTION.is_enabled();
   for (usize i = 1; i < names.size(); i++) {
     const String &name = names[i];
-    std::string name_string{name.c_str(), name.size()};
     if (unset_function)
-      cxt.unset_function(name_string);
+      cxt.unset_function(name);
     else
-      cxt.unset_shell_variable(name_string);
+      cxt.unset_shell_variable(name);
   }
 
   return 0;

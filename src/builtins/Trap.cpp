@@ -42,19 +42,19 @@ Trap::execute(ExecContext &ec, EvalContext &cxt) const
   const ArrayList<String> &args = ec.args();
 
   if (args.size() == 1) {
-    std::string out{};
+    String out{};
     cxt.traps().for_each([&](StringView condition, const String &action) {
       out += "trap -- '";
-      out.append(action.c_str(), action.size());
+      out += action;
       out += "' ";
-      out.append(condition.data, condition.length);
+      out += condition;
       out += '\n';
     });
     ec.print_to_stdout(out);
     return 0;
   }
 
-  std::string action{args[1].c_str(), args[1].size()};
+  const String &action = args[1];
   /* A lone dash, or a first operand that is itself a condition, resets the
      conditions to their defaults. */
   bool is_reset = action == "-";

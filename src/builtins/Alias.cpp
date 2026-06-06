@@ -31,10 +31,10 @@ Alias::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* alias with no operand lists every definition. */
   if (args.size() == 1) {
-    std::string out{};
+    String out{};
     for (const String &definition : cxt.alias_definitions()) {
       out += "alias ";
-      out.append(definition.c_str(), definition.size());
+      out += definition;
       out += "\n";
     }
     ec.print_to_stdout(out);
@@ -43,14 +43,19 @@ Alias::execute(ExecContext &ec, EvalContext &cxt) const
 
   i32 status = 0;
   for (usize i = 1; i < args.size(); i++) {
-    std::string arg{args[i].c_str(), args[i].size()};
-    usize equals_position = arg.find('=');
+    const String &arg = args[i];
+    Maybe<usize> equals_position = arg.find_character('=');
 
-    if (equals_position != std::string::npos) {
-      cxt.set_alias(arg.substr(0, equals_position),
-                    arg.substr(equals_position + 1));
+    if (equals_position.has_value()) {
+      cxt.set_alias(arg.substring_of_length(0, *equals_position),
+                    arg.substring(*equals_position + 1));
     } else if (Maybe<std::string> value = cxt.get_alias(arg)) {
-      ec.print_to_stdout("alias " + arg + "='" + *value + "'\n");
+      String message = "alias ";
+      message += arg;
+      message += "='";
+      message += *value;
+      message += "'\n";
+      ec.print_to_stdout(message);
     } else {
       ec.print_to_stdout(arg + ": not found\n");
       status = 1;

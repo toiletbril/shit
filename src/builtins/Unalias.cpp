@@ -35,7 +35,7 @@ Unalias::execute(ExecContext &ec, EvalContext &cxt) const
       usize name_length =
           equals_position.has_value() ? *equals_position : definition.size();
       StringView name = definition.substring_of_length(0, name_length);
-      cxt.remove_alias(std::string{name.data, name.length});
+      cxt.remove_alias(name);
     }
     return 0;
   }
@@ -43,9 +43,8 @@ Unalias::execute(ExecContext &ec, EvalContext &cxt) const
   i32 status = 0;
   for (usize i = 1; i < args.size(); i++) {
     const String &name = args[i];
-    std::string name_string{name.c_str(), name.size()};
-    if (!cxt.remove_alias(name_string)) {
-      ec.print_to_stdout(name_string + ": not found\n");
+    if (!cxt.remove_alias(name)) {
+      ec.print_to_stdout(name + ": not found\n");
       status = 1;
     }
   }

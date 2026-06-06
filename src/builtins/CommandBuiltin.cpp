@@ -36,22 +36,33 @@ CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (args.size() < 2) return 0;
 
-  std::string name{args[1].c_str(), args[1].size()};
+  const String &name = args[1];
 
   /* -v and -V resolve the name without running it, against a builtin and the
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     bool verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    if (search_builtin(name).has_value()) {
+    if (search_builtin(std::string_view{name.c_str(), name.size()})
+            .has_value())
+    {
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n" : name + "\n");
       return 0;
     }
     if (ArrayList<std::filesystem::path> paths =
-            utils::search_program_path(name);
+            utils::search_program_path(std::string{name.c_str(), name.size()});
         paths.size() != 0)
     {
-      ec.print_to_stdout(verbose ? name + " is " + paths[0].string() + "\n"
-                                 : paths[0].string() + "\n");
+      String resolved{};
+      if (verbose) {
+        resolved += name;
+        resolved += " is ";
+        resolved += paths[0].string();
+        resolved += "\n";
+      } else {
+        resolved += paths[0].string();
+        resolved += "\n";
+      }
+      ec.print_to_stdout(resolved);
       return 0;
     }
     if (verbose) ec.print_to_stdout(name + ": not found\n");
@@ -62,8 +73,7 @@ CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
      resolves against a builtin or the PATH and never a function. */
   ArrayList<String> operand_args{};
   for (usize i = 1; i < args.size(); i++)
-    operand_args.push(
-        String{heap_allocator(), StringView{args[i].c_str(), args[i].size()}});
+    operand_args.push(String{heap_allocator(), args[i]});
   ExecContext sub = ExecContext::make_from(ec.source_location(), operand_args);
   return utils::execute_context(std::move(sub), cxt, false);
 }

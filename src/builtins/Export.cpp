@@ -36,7 +36,7 @@ Export::execute(ExecContext &ec, EvalContext &cxt) const
     if (!equals_position.has_value()) {
       /* Export an existing variable by its current value. */
       name = std::string{arg.c_str(), arg.size()};
-      value = cxt.get_variable_value(name).value_or("");
+      value = cxt.get_variable_value(arg).value_or("");
     } else {
       StringView name_view = arg.substring_of_length(0, *equals_position);
       StringView value_view = arg.substring(*equals_position + 1);

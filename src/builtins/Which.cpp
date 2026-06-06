@@ -29,18 +29,22 @@ Which::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  std::string buf{};
+  String buf{};
 
   for (usize i = 1; i < args.size(); i++) {
-    std::string program_name{args[i].c_str(), args[i].size()};
-    if (search_builtin(program_name).has_value()) {
+    const String &program_name = args[i];
+    if (search_builtin(std::string_view{program_name.c_str(),
+                                        program_name.size()})
+            .has_value())
+    {
       buf += program_name;
       /* The descriptive suffix is for a human at a terminal. A pipe gets just
          the name, which stays machine readable. */
       if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
     } else if (ArrayList<std::filesystem::path> ps =
-                   utils::search_program_path(program_name);
+                   utils::search_program_path(
+                       std::string{program_name.c_str(), program_name.size()});
                ps.size() != 0)
     {
       if (FLAG_ALL.is_enabled()) {
