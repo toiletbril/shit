@@ -80,7 +80,7 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
     msg += ' ';
   }
 
-  msg += utils::unsigned_integer_to_string(line_number + 1) + " |  ";
+  msg += utils::uint_to_text(line_number + 1) + " |  ";
 
   /* Line that caused the error. */
   let const context =
@@ -230,9 +230,9 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += *name;
     result += ':';
   }
-  result += utils::unsigned_integer_to_string(line_number + 1);
+  result += utils::uint_to_text(line_number + 1);
   result += ':';
-  result += utils::unsigned_integer_to_string(line_byte_position);
+  result += utils::uint_to_text(line_byte_position);
   result += ": ";
   result += severity_word();
   /* A located note with no message, such as a backtrace trace frame, ends at
@@ -302,9 +302,9 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
           : unicode_details_position + 1;
 
   String result{};
-  result += utils::unsigned_integer_to_string(details_line_number + 1);
+  result += utils::uint_to_text(details_line_number + 1);
   result += ':';
-  result += utils::unsigned_integer_to_string(details_line_byte_position);
+  result += utils::uint_to_text(details_line_byte_position);
   result += ": Note:\n";
 
   result += get_context_pointing_to(

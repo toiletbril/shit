@@ -16,7 +16,7 @@ class Expression;
    Word::get_assignment_split. The struct is forward-declared here and defined
    below Word, since its value field holds a Word by value and a Word is not yet
    complete at this point. */
-struct WordAssignmentSplit;
+struct word_assignment_split;
 
 class WordSegment
 {
@@ -63,10 +63,10 @@ public:
 
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. */
-  fn get_assignment_split() const throws -> Maybe<WordAssignmentSplit>;
+  fn get_assignment_split() const throws -> Maybe<word_assignment_split>;
 };
 
-struct WordAssignmentSplit
+struct word_assignment_split
 {
   String name;
   Word value;

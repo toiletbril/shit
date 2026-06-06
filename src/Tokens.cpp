@@ -88,7 +88,7 @@ cold fn Word::to_pretty_string() const throws -> String
   return result;
 }
 
-hot fn Word::get_assignment_split() const throws -> Maybe<WordAssignmentSplit>
+hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 {
   if (segments.is_empty()) return shit::None;
 
@@ -117,7 +117,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<WordAssignmentSplit>
   for (usize i = 1; i < segments.count(); i++)
     value.segments.push(segments[i]);
 
-  return WordAssignmentSplit{steal(name), steal(value)};
+  return word_assignment_split{steal(name), steal(value)};
 }
 
 namespace tokens {

@@ -110,18 +110,18 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 {
   if (name == "?")
     return String{heap_allocator(),
-                  utils::integer_to_string(m_last_exit_status)};
+                  utils::int_to_text(m_last_exit_status)};
   if (name == "$")
     return String{heap_allocator(),
-                  utils::integer_to_string(os::get_shell_process_id())};
+                  utils::int_to_text(os::get_shell_process_id())};
   if (name == "!")
     return m_last_background_pid
                ? String{heap_allocator(),
-                        utils::integer_to_string(*m_last_background_pid)}
+                        utils::int_to_text(*m_last_background_pid)}
                : String{};
   if (name == "-") return String{heap_allocator(), option_flags_string()};
   if (name == "#")
-    return String{heap_allocator(), utils::unsigned_integer_to_string(
+    return String{heap_allocator(), utils::uint_to_text(
                                         m_positional_params.count())};
   if (name == "0") return String{heap_allocator(), m_shell_name};
 
@@ -800,7 +800,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
         }
         inner += word[j];
       }
-      out += utils::integer_to_string(evaluate_arithmetic(inner));
+      out += utils::int_to_text(evaluate_arithmetic(inner));
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). */
@@ -840,12 +840,12 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
     if (name == "@" || name == "*")
-      return String{heap_allocator(), utils::unsigned_integer_to_string(
+      return String{heap_allocator(), utils::uint_to_text(
                                           m_positional_params.count())};
     let const value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
-    return String{heap_allocator(), utils::unsigned_integer_to_string(
+    return String{heap_allocator(), utils::uint_to_text(
                                         value.value_or(String{}).length())};
   }
 
@@ -938,19 +938,19 @@ cold fn EvalContext::make_stats_string() const throws -> String
 
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Expansions: " +
-       utils::unsigned_integer_to_string(last_expansion_count());
+       utils::uint_to_text(last_expansion_count());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Nodes evaluated: " +
-       utils::unsigned_integer_to_string(last_expressions_executed());
+       utils::uint_to_text(last_expressions_executed());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Total expansions: " +
-       utils::unsigned_integer_to_string(total_expansion_count());
+       utils::uint_to_text(total_expansion_count());
   s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Total nodes evaluated: " +
-       utils::unsigned_integer_to_string(total_expressions_executed());
+       utils::uint_to_text(total_expressions_executed());
   s += '\n';
 
   s += "]";
@@ -1439,14 +1439,14 @@ public:
           let const rhs = parse_assignment();
           let const result =
               apply_compound(read_variable_value(name), rhs, kind);
-          context.set_shell_variable(name, utils::integer_to_string(result));
+          context.set_shell_variable(name, utils::int_to_text(result));
           return result;
         }
       }
       if (starts_with("=") && !starts_with("==")) {
         consume("=");
         let const rhs = parse_assignment();
-        context.set_shell_variable(name, utils::integer_to_string(rhs));
+        context.set_shell_variable(name, utils::int_to_text(rhs));
         return rhs;
       }
       pos = save;
@@ -1763,7 +1763,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     case WordSegment::Kind::ArithmeticExpansion: {
       let const value = String{
           heap_allocator(),
-          utils::integer_to_string(evaluate_arithmetic(segment.text.view()))};
+          utils::int_to_text(evaluate_arithmetic(segment.text.view()))};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1801,7 +1801,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
       result += capture_command_substitution(segment.text);
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
-      result += utils::integer_to_string(evaluate_arithmetic(segment_text));
+      result += utils::int_to_text(evaluate_arithmetic(segment_text));
     else
       result += segment_text;
   }

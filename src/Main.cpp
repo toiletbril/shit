@@ -197,7 +197,7 @@ static fn run_script_contents(const String &script_contents,
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
     if (FLAG_EXIT_CODE.is_enabled())
-      print("[Code " + utils::integer_to_string(exit_code) + "]\n");
+      print("[Code " + utils::int_to_text(exit_code) + "]\n");
 
     if (FLAG_STATS.is_enabled()) {
       print(context.make_stats_string());
@@ -403,11 +403,11 @@ fn main(int argc, char **argv) -> int
   context.set_shell_variable("SHELL", program_path);
   context.set_shell_variable("PWD", shit::Path::current_directory().text());
   shit::String version_string{};
-  version_string += shit::utils::integer_to_string(SHIT_VER_MAJOR);
+  version_string += shit::utils::int_to_text(SHIT_VER_MAJOR);
   version_string += ".";
-  version_string += shit::utils::integer_to_string(SHIT_VER_MINOR);
+  version_string += shit::utils::int_to_text(SHIT_VER_MINOR);
   version_string += ".";
-  version_string += shit::utils::integer_to_string(SHIT_VER_PATCH);
+  version_string += shit::utils::int_to_text(SHIT_VER_PATCH);
   version_string += "-" SHIT_VER_EXTRA;
   context.set_shell_variable("SHIT_VERSION", version_string);
   context.set_shell_variable("SHIT_COMMIT", SHIT_COMMIT_HASH);

@@ -368,11 +368,11 @@ cold fn show_version() throws -> void
 {
   String s{};
   s += "Shit Shell ";
-  s += utils::integer_to_string(SHIT_VER_MAJOR);
+  s += utils::int_to_text(SHIT_VER_MAJOR);
   s += '.';
-  s += utils::integer_to_string(SHIT_VER_MINOR);
+  s += utils::int_to_text(SHIT_VER_MINOR);
   s += '.';
-  s += utils::integer_to_string(SHIT_VER_PATCH);
+  s += utils::int_to_text(SHIT_VER_PATCH);
   s += '-';
   s += SHIT_VER_EXTRA;
   s += '\n';
@@ -408,11 +408,11 @@ cold fn show_version() throws -> void
 cold fn show_short_version() throws -> void
 {
   String s{};
-  s += utils::integer_to_string(SHIT_VER_MAJOR);
+  s += utils::int_to_text(SHIT_VER_MAJOR);
   s += '.';
-  s += utils::integer_to_string(SHIT_VER_MINOR);
+  s += utils::int_to_text(SHIT_VER_MINOR);
   s += '.';
-  s += utils::integer_to_string(SHIT_VER_PATCH);
+  s += utils::int_to_text(SHIT_VER_PATCH);
   s += '-';
   s += SHIT_VER_EXTRA;
   s += '\n';

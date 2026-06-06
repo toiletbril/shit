@@ -49,7 +49,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let char_index = cxt.getopts_char_index();
 
   auto finish = [&](i32 code) -> i32 {
-    cxt.set_shell_variable("OPTIND", utils::integer_to_string(optind));
+    cxt.set_shell_variable("OPTIND", utils::int_to_text(optind));
     cxt.set_getopts_char_index(char_index);
     cxt.set_getopts_last_optind(optind);
     return code;

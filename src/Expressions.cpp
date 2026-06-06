@@ -1083,7 +1083,7 @@ static fn indent_for_layer(usize layer) throws -> String
   return pad;
 }
 
-IfClause::IfClause(SourceLocation location, ArrayList<IfBranch> &&branches,
+IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
                    const Expression *otherwise)
     : CompoundCommand(location), m_otherwise(otherwise)
 {
@@ -1641,7 +1641,7 @@ cold fn ConstantNumber::to_ast_string(usize layer) const throws -> String
 
 cold fn ConstantNumber::to_string() const throws -> String
 {
-  return utils::integer_to_string(m_value);
+  return utils::int_to_text(m_value);
 }
 
 ConstantString::ConstantString(SourceLocation location, StringView value)

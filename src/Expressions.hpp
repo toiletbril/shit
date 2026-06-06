@@ -323,7 +323,7 @@ public:
 
 /* One branch of an if clause, the condition list and the body to run when it
    succeeds. The plain if and every elif each form one of these. */
-struct IfBranch
+struct if_branch
 {
   const Expression *condition;
   const Expression *body;
@@ -335,7 +335,7 @@ public:
   /* Each branch pairs a condition list with the body to run when it succeeds.
      The plain if and every elif share this list. The else body has no
      condition and is held separately. */
-  IfClause(SourceLocation location, ArrayList<IfBranch> &&branches,
+  IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
            const Expression *otherwise);
   ~IfClause() override;
 
@@ -347,7 +347,7 @@ public:
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
-  ArrayList<IfBranch> m_branches{heap_allocator()};
+  ArrayList<if_branch> m_branches{heap_allocator()};
   const Expression *m_otherwise;
 };
 

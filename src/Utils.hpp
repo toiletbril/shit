@@ -77,8 +77,8 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 /* Format a signed integer as decimal into a fresh String, the StringView-native
    replacement for std::to_string. The unsigned form is for ids and sizes that
    exceed the i64 range. */
-fn integer_to_string(i64 value) throws -> String;
-fn unsigned_integer_to_string(u64 value) throws -> String;
+fn int_to_text(i64 value) throws -> String;
+fn uint_to_text(u64 value) throws -> String;
 fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>;
 fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 

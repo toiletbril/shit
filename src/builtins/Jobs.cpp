@@ -38,7 +38,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let out = String{};
   for (let const &job : cxt.jobs()) {
-    out += "[" + utils::integer_to_string(job.id) + "] " +
+    out += "[" + utils::int_to_text(job.id) + "] " +
            state_word(job.state) + "\t" + job.command.c_str() + "\n";
   }
   ec.print_to_stdout(out);

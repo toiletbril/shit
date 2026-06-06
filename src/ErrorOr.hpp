@@ -19,7 +19,7 @@ namespace utils {
 /* Declared here rather than included from Utils.hpp, since Utils.hpp includes
    ErrorOr.hpp and the include would close a cycle. The definition lives in
    Utils.cpp. */
-String integer_to_string(i64 value);
+String int_to_text(i64 value);
 } /* namespace utils */
 
 /* The success payload of a fallible function that returns no value. A caller
@@ -165,5 +165,5 @@ private:
   ::shit::Error                                                                \
   {                                                                            \
     ::shit::String{__FILE__ ":"} +                                             \
-        ::shit::utils::integer_to_string(__LINE__) + ": " + (msg)              \
+        ::shit::utils::int_to_text(__LINE__) + ": " + (msg)              \
   }

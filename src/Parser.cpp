@@ -610,7 +610,7 @@ hot fn Parser::parse_if() throws -> Command *
   ASSERT(if_token->kind() == Token::Kind::If);
   const let location = if_token->source_location();
 
-  ArrayList<IfBranch> branches{};
+  ArrayList<if_branch> branches{};
   const Expression *otherwise = nullptr;
   /* Free the released branch nodes if a later branch fails to parse. */
   defer
@@ -636,7 +636,7 @@ hot fn Parser::parse_if() throws -> Command *
 
     Expression *body = parse_command_list(
         {Token::Kind::Elif, Token::Kind::Else, Token::Kind::Fi});
-    branches.push(IfBranch{condition, body});
+    branches.push(if_branch{condition, body});
 
     Token *after = m_lexer.next_shell_token();
     ASSERT(after != nullptr);
@@ -959,7 +959,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     throw ErrorWithLocation{
         t->source_location(),
         "Expression nesting level exceeded maximum of " +
-            utils::integer_to_string(static_cast<i64>(MAX_RECURSION_DEPTH))};
+            utils::int_to_text(static_cast<i64>(MAX_RECURSION_DEPTH))};
   }
 
   Expression *lhs = nullptr;
@@ -1023,7 +1023,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
       throw ErrorWithLocation{
           t->source_location(),
           "Bracket nesting level exceeded maximum of " +
-              utils::integer_to_string(static_cast<i64>(MAX_RECURSION_DEPTH))};
+              utils::int_to_text(static_cast<i64>(MAX_RECURSION_DEPTH))};
     }
 
     m_parentheses_depth++;

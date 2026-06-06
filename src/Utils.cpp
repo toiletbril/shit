@@ -48,8 +48,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       const i32 id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
         shit::print_error(
-            "[" + integer_to_string(id) + "] " +
-            unsigned_integer_to_string(static_cast<u64>(os::process_id_of(p))) +
+            "[" + int_to_text(id) + "] " +
+            uint_to_text(static_cast<u64>(os::process_id_of(p))) +
             "\n");
       return 0;
     }
@@ -123,8 +123,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_error("[" + integer_to_string(id) + "] " +
-                          unsigned_integer_to_string(
+        shit::print_error("[" + int_to_text(id) + "] " +
+                          uint_to_text(
                               static_cast<u64>(os::process_id_of(last_child))) +
                           "\n");
     }
@@ -224,7 +224,7 @@ static fn not_an_integer_error(StringView text) throws -> Error
   return Error{"'" + text + "' is not a valid integer"};
 }
 
-fn unsigned_integer_to_string(u64 value) throws -> String
+fn uint_to_text(u64 value) throws -> String
 {
   /* The digits are written into a fixed buffer from the least significant end,
      since a u64 never needs more than twenty decimal digits, then copied out in
@@ -241,13 +241,13 @@ fn unsigned_integer_to_string(u64 value) throws -> String
   };
 }
 
-fn integer_to_string(i64 value) throws -> String
+fn int_to_text(i64 value) throws -> String
 {
-  if (value >= 0) return unsigned_integer_to_string(static_cast<u64>(value));
+  if (value >= 0) return uint_to_text(static_cast<u64>(value));
   /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
   const u64 magnitude = ~static_cast<u64>(value) + 1;
   String result{"-"};
-  result.append(unsigned_integer_to_string(magnitude));
+  result.append(uint_to_text(magnitude));
   return result;
 }
 
@@ -560,7 +560,7 @@ fn glob_matches(StringView glob, StringView str,
       String code_str{};
       if (code != 0) {
         code_str += " (Code ";
-        code_str += unsigned_integer_to_string(actual_code);
+        code_str += uint_to_text(actual_code);
         code_str += ')';
       }
       show_message("Goodbye :c" + code_str);

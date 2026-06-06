@@ -374,8 +374,8 @@ fn wait_and_monitor_process(process pid) throws -> i32
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      shit::print("[Process " + utils::integer_to_string(pid) + ": " +
-                  sig_desc + ", signal " + utils::integer_to_string(sig) +
+      shit::print("[Process " + utils::int_to_text(pid) + ": " +
+                  sig_desc + ", signal " + utils::int_to_text(sig) +
                   "]\n");
     } else {
       shit::print("\n");
@@ -389,8 +389,8 @@ fn wait_and_monitor_process(process pid) throws -> i32
                                 ? String{StringView{sig_str}}
                                 : String{StringView{"Unknown"}};
 
-    shit::print("[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
-                ", signal " + utils::integer_to_string(sig) + " and killed]\n");
+    shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
+                ", signal " + utils::int_to_text(sig) + " and killed]\n");
 
     /* We can't handle suspended processes yet, so goodbye. */
     check_syscall(kill(pid, SIGKILL));
@@ -934,7 +934,7 @@ fn last_system_error_message() -> String
       reinterpret_cast<LPSTR>(&errno_str), 0, nullptr); /* NOLINT */
 
   if (ret == 0) {
-    return utils::unsigned_integer_to_string(win_errno) +
+    return utils::uint_to_text(win_errno) +
            StringView{" (Error message couldn't be proccessed due to "
                       "FormatMessage() fail)"};
   }
