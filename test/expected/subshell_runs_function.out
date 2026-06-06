@@ -22,19 +22,31 @@
   Unquoted "f"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
   Unquoted "parent"
 ]
 [Word
+  Unquoted "}"
+]
+[Word
   Unquoted "f"
+]
+[Word
+  Unquoted "{"
 ]
 [Word
   Unquoted "echo"
 ]
 [Word
   Unquoted "child"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "f"

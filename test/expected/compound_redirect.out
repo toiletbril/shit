@@ -60,6 +60,9 @@
   Unquoted "back"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -70,6 +73,9 @@
 ]
 [Word
   Unquoted "b"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "/tmp/shit_compound_redir.txt"

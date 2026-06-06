@@ -27,6 +27,9 @@
   Unquoted "fd=5"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -52,6 +55,9 @@
 ]
 [Word
   Variable "fd"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "5"

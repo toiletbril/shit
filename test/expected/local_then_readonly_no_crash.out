@@ -17,6 +17,9 @@
   Unquoted "f"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "local"
 ]
 [Word
@@ -34,6 +37,9 @@
 [Word
   DoubleQuoted "in="
   Variable "X"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "f"

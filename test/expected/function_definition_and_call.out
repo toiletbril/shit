@@ -11,10 +11,16 @@
   Unquoted "greet"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
   Unquoted "hi"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "greet"

@@ -50,6 +50,39 @@ hot pure static fn kind_in(Token::Kind kind,
   return false;
 }
 
+/* A brace is a reserved word only when a token is exactly '{' or '}' as a single
+   unquoted segment. The lexer keeps a brace inside a larger word literal, so
+   'a{b}c' is one word and never matches here. A quoted or escaped brace carries
+   a non-unquoted segment and is also rejected. */
+hot pure static fn is_brace_word(const Token *token, char brace) wontthrow
+    -> bool
+{
+  ASSERT(token != nullptr);
+  if (token->kind() != Token::Kind::Word) return false;
+  const Word &word = static_cast<const tokens::WordToken *>(token)->word();
+  return word.segments.count() == 1 &&
+         word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+         word.segments[0].text.count() == 1 &&
+         word.segments[0].text[0] == brace;
+}
+
+/* Whether the peeked token terminates a command list. The closing brace of a
+   brace group is a '}' word rather than a token kind, so RightBracket in the
+   terminator set stands for a standalone '}' word here. */
+hot pure static fn is_list_terminator(
+    const Token *token, std::initializer_list<Token::Kind> terminators) wontthrow
+    -> bool
+{
+  ASSERT(token != nullptr);
+  if (kind_in(token->kind(), terminators)) return true;
+  if (kind_in(Token::Kind::RightBracket, terminators) &&
+      is_brace_word(token, '}'))
+  {
+    return true;
+  }
+  return false;
+}
+
 /* The byte location of the keyword as a whole word somewhere in the source. A
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
@@ -118,6 +151,8 @@ cold static fn unexpected_command_token_message(const Token *token) throws
     -> String
 {
   ASSERT(token != nullptr);
+  /* A '}' word in command position with no matching open brace. */
+  if (is_brace_word(token, '}')) return "'}' has no matching '{'";
   switch (token->kind()) {
   case Token::Kind::Then:
   case Token::Kind::Else:
@@ -272,7 +307,7 @@ hot fn Parser::parse_command_list(
 
     /* A terminator keyword ends this list. Append the pending command and leave
        the terminator for the caller to consume. */
-    if (kind_in(token->kind(), terminators)) {
+    if (is_list_terminator(token, terminators)) {
       if (lhs != nullptr) {
         if (should_negate_pending) {
           lhs->set_negated();
@@ -655,6 +690,15 @@ hot fn Parser::parse_simple_command() throws -> Command *
     /* A reserved word or a group opener in command position introduces a
        compound command. A list terminator means there is no command here. */
     if (args_accumulator.is_empty() && local_vars.count() == 0) {
+      /* A standalone '{' in command position opens a brace group, and a
+         standalone '}' closes the enclosing one. Both arrive as words, so they
+         are matched on the text before the kind switch. A '}' with no open group
+         is left for the caller, which reports it as unexpected. */
+      if (is_brace_word(token, '{')) {
+        return attach_trailing_redirections(parse_brace_group());
+      }
+      if (is_brace_word(token, '}')) return nullptr;
+
       switch (token->kind()) {
       case Token::Kind::If: return attach_trailing_redirections(parse_if());
       case Token::Kind::While:
@@ -663,8 +707,6 @@ hot fn Parser::parse_simple_command() throws -> Command *
         return attach_trailing_redirections(parse_while_or_until(true));
       case Token::Kind::For: return attach_trailing_redirections(parse_for());
       case Token::Kind::Case: return attach_trailing_redirections(parse_case());
-      case Token::Kind::LeftBracket:
-        return attach_trailing_redirections(parse_brace_group());
       case Token::Kind::LeftParen:
         return attach_trailing_redirections(parse_subshell());
 
@@ -675,7 +717,6 @@ hot fn Parser::parse_simple_command() throws -> Command *
       case Token::Kind::Else:
       case Token::Kind::Elif:
       case Token::Kind::Esac:
-      case Token::Kind::RightBracket:
       case Token::Kind::RightParen:
       case Token::Kind::DoubleSemicolon: return nullptr;
 
@@ -1053,13 +1094,15 @@ hot fn Parser::parse_brace_group() throws -> Command *
 {
   Token *open = m_lexer.next_shell_token();
   ASSERT(open != nullptr);
-  ASSERT(open->kind() == Token::Kind::LeftBracket);
+  ASSERT(is_brace_word(open, '{'));
 
+  /* RightBracket in the terminator set stands for a standalone '}' word, which
+     the command list leaves for this parser to consume. */
   Expression *body = parse_command_list({Token::Kind::RightBracket});
 
   Token *close = m_lexer.next_shell_token();
   ASSERT(close != nullptr);
-  if (close->kind() != Token::Kind::RightBracket) {
+  if (!is_brace_word(close, '}')) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated brace group",
                                       close->source_location(), "expected '}'"};

@@ -13,11 +13,17 @@
   Unquoted "f"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
   DoubleQuoted "x is "
   Variable "X"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "X=hi"

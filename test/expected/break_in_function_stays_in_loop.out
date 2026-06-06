@@ -18,7 +18,13 @@
   Unquoted "f"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "break"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "for"

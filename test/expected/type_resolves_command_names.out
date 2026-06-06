@@ -17,7 +17,13 @@
   Unquoted "g"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted ":"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "type"

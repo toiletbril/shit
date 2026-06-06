@@ -27,10 +27,16 @@
   Unquoted "f"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "return"
 ]
 [Word
   Unquoted "3"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "f"
@@ -46,6 +52,9 @@
   Unquoted "g"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -59,6 +68,9 @@
 ]
 [Word
   Unquoted "b"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "g"

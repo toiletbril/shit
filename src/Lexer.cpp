@@ -61,11 +61,13 @@ hot pure fn is_expression_sentinel(char ch) wontthrow -> bool
 /* TODO: Separate redirections from here. */
 hot pure fn is_shell_sentinel(char ch) wontthrow -> bool
 {
+  /* A brace is not a sentinel. POSIX recognizes '{' and '}' as reserved words
+     only when a token is exactly '{' or '}' in command position, so the lexer
+     keeps a brace as an ordinary identifier character and the parser checks the
+     word text. This way 'a{b}c' lexes as one word. */
   switch (ch) {
   case '\n':
   case '|':
-  case '{':
-  case '}':
   case '(':
   case ')':
   case '&':
@@ -688,8 +690,6 @@ hot pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
   case '(': return Token::Kind::LeftParen;
   case ']': return Token::Kind::RightSquareBracket;
   case '[': return Token::Kind::LeftSquareBracket;
-  case '}': return Token::Kind::RightBracket;
-  case '{': return Token::Kind::LeftBracket;
   case ';': return Token::Kind::Semicolon;
   case '.': return Token::Kind::Dot;
   case '\n': return Token::Kind::Newline;
@@ -753,8 +753,6 @@ hot fn Lexer::lex_sentinel() throws -> Token *
     switch (*op) {
       TOKEN_CASE_ONE(RightParen);
       TOKEN_CASE_ONE(LeftParen);
-      TOKEN_CASE_ONE(RightBracket);
-      TOKEN_CASE_ONE(LeftBracket);
       TOKEN_CASE_TWO(Semicolon, ';', DoubleSemicolon);
       TOKEN_CASE_ONE(Dot);
       TOKEN_CASE_ONE(Newline);

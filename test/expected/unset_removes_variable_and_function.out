@@ -44,10 +44,16 @@
   Unquoted "f"
 ]
 [Word
+  Unquoted "{"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
   Unquoted "fn"
+]
+[Word
+  Unquoted "}"
 ]
 [Word
   Unquoted "unset"

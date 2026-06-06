@@ -1,0 +1,92 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a{b}c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x${y}"]
+  [CompoundListCondition, None]
+    [Assign y=5]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x$yz"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "{"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "2}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "{a,b}"]
+  [CompoundListCondition, None]
+    [BraceGroup]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "group"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a{b}c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "x"
+  Literal "$"
+  Unquoted "{y}"
+]
+[Word
+  Unquoted "y=5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "x"
+  Variable "y"
+  Unquoted "z"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "2}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "{a,b}"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "group"
+]
+[Word
+  Unquoted "}"
+]
+a{b}c
+x${y}
+x5z
+}
+{
+2}
+{a,b}
+group
+[Code 0]
