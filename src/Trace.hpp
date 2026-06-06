@@ -13,7 +13,7 @@
 
 namespace shit {
 
-enum class Verbosity : u8
+enum class verbosity : u8
 {
   Nothing = 0,
   Error,
@@ -26,17 +26,17 @@ enum class Verbosity : u8
 /* The active log level. A message prints when its level is at or below this.
    Main sets it from a flag, so a release build that leaves the default pays one
    comparison per call. */
-inline Verbosity LOGGER_VERBOSITY = Verbosity::Warn;
+inline verbosity LOGGER_VERBOSITY = verbosity::Warn;
 
-constexpr const char *verbosity_to_string(Verbosity verbosity)
+constexpr const char *verbosity_to_string(verbosity verbosity)
 {
   switch (verbosity) {
-  case Verbosity::Nothing: return "Nothing";
-  case Verbosity::Error: return "Error";
-  case Verbosity::Warn: return "Warn";
-  case Verbosity::Info: return "Info";
-  case Verbosity::Debug: return "Debug";
-  case Verbosity::All: return "All";
+  case verbosity::Nothing: return "Nothing";
+  case verbosity::Error: return "Error";
+  case verbosity::Warn: return "Warn";
+  case verbosity::Info: return "Info";
+  case verbosity::Debug: return "Debug";
+  case verbosity::All: return "All";
   }
   return "?";
 }
@@ -151,7 +151,7 @@ String format_named_values(StringView names, Args &&...args)
   } while (0)
 
 /* Print the named values of the listed variables, such as
-   LOG_VARS(Verbosity::Debug, argument_count, name). */
+   LOG_VARS(verbosity::Debug, argument_count, name). */
 #define LOG_VARS(level, ...)                                                   \
   do {                                                                         \
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \

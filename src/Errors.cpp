@@ -196,8 +196,8 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
          "byte position: %zu, source length: %zu", byte_position,
          source.count());
 
-  LOG_VARS(Verbosity::Debug, byte_position, byte_count);
-  LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
+  LOG_VARS(verbosity::Debug, byte_position, byte_count);
+  LOG(verbosity::Debug, "formatting located %s", severity_word().c_str());
 
   /* FIXME: Below are two dirty hacks. */
   if (byte_position + 2 < source.count() && source[byte_position] == '\\' &&

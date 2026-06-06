@@ -195,7 +195,7 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> int
   new_job.state = job::State::Running;
   m_jobs.push(steal(new_job));
   ASSERT(!m_jobs.is_empty());
-  LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
+  LOG(verbosity::Debug, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
 }
 
@@ -206,10 +206,10 @@ fn EvalContext::update_jobs() throws -> void
 
     i32 status = 0;
     let const state = os::poll_process(job.pid, status);
-    if (state == os::ProcessState::Exited) {
+    if (state == os::process_state::Exited) {
       job.state = job::State::Done;
       job.last_status = status;
-    } else if (state == os::ProcessState::Stopped) {
+    } else if (state == os::process_state::Stopped) {
       job.state = job::State::Stopped;
     } else {
       job.state = job::State::Running;
@@ -444,7 +444,7 @@ pure fn EvalContext::in_subshell() const wontthrow -> bool
 
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 {
-  LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
+  LOG(verbosity::Debug, "break requested, level %lld", (long long) level);
   m_control_flow = control_flow{control_flow::Kind::Break, level, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -452,7 +452,7 @@ fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 fn EvalContext::request_continue(i64 level, SourceLocation location) throws
     -> void
 {
-  LOG(Verbosity::Debug, "continue requested, level %lld", (long long) level);
+  LOG(verbosity::Debug, "continue requested, level %lld", (long long) level);
   m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -460,14 +460,14 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) throws
 fn EvalContext::request_return(i64 status, SourceLocation location) throws
     -> void
 {
-  LOG(Verbosity::Debug, "return requested, status %lld", (long long) status);
+  LOG(verbosity::Debug, "return requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
                                 m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
-  LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
+  LOG(verbosity::Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
                                 m_current_source, String{m_current_origin}};
 }

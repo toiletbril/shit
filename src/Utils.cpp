@@ -719,7 +719,7 @@ hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
 
 fn read_entire_file(StringView path) throws -> Maybe<String>
 {
-  let const file = os::open_file_descriptor(path, os::FileOpenMode::Read);
+  let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
   if (!file) return None;
 
   String contents{};

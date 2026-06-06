@@ -444,12 +444,12 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                               "Redirection target is not a single file"};
     }
 
-    let mode = os::FileOpenMode::Read;
+    let mode = os::file_open_mode::Read;
     if (redir.kind == Redirection::Kind::TruncateOutput)
-      mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
-                              : os::FileOpenMode::Truncate;
+      mode = cxt.no_clobber() ? os::file_open_mode::TruncateNoClobber
+                              : os::file_open_mode::Truncate;
     else if (redir.kind == Redirection::Kind::AppendOutput)
-      mode = os::FileOpenMode::Append;
+      mode = os::file_open_mode::Append;
 
     const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
@@ -614,12 +614,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                               "Redirection target is not a single file"};
     }
 
-    let mode = os::FileOpenMode::Read;
+    let mode = os::file_open_mode::Read;
     if (redir.kind == Redirection::Kind::TruncateOutput)
-      mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
-                              : os::FileOpenMode::Truncate;
+      mode = cxt.no_clobber() ? os::file_open_mode::TruncateNoClobber
+                              : os::file_open_mode::Truncate;
     else if (redir.kind == Redirection::Kind::AppendOutput)
-      mode = os::FileOpenMode::Append;
+      mode = os::file_open_mode::Append;
 
     const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
@@ -1650,12 +1650,12 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                               "Redirection target is not a single file"};
     }
 
-    let mode = os::FileOpenMode::Read;
+    let mode = os::file_open_mode::Read;
     if (redir.kind == Redirection::Kind::TruncateOutput)
-      mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
-                              : os::FileOpenMode::Truncate;
+      mode = cxt.no_clobber() ? os::file_open_mode::TruncateNoClobber
+                              : os::file_open_mode::Truncate;
     else if (redir.kind == Redirection::Kind::AppendOutput)
-      mode = os::FileOpenMode::Append;
+      mode = os::file_open_mode::Append;
 
     const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);

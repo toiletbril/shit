@@ -306,19 +306,19 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
   return Pipe{p[0], p[1]};
 }
 
-fn open_file_descriptor(StringView path, FileOpenMode mode) throws
+fn open_file_descriptor(StringView path, file_open_mode mode) throws
     -> Maybe<descriptor>
 {
   int flags = 0;
   switch (mode) {
-  case FileOpenMode::Truncate: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
-  case FileOpenMode::TruncateNoClobber:
+  case file_open_mode::Truncate: flags = O_WRONLY | O_CREAT | O_TRUNC; break;
+  case file_open_mode::TruncateNoClobber:
     /* O_EXCL makes the create fail atomically when the file already exists, the
        way noclobber requires. */
     flags = O_WRONLY | O_CREAT | O_EXCL;
     break;
-  case FileOpenMode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
-  case FileOpenMode::Read: flags = O_RDONLY; break;
+  case file_open_mode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
+  case file_open_mode::Read: flags = O_RDONLY; break;
   }
 
   /* ::open needs a null-terminated path, so the view is copied into a String
@@ -439,27 +439,27 @@ fn wait_and_monitor_process(process pid) throws -> i32
   unreachable();
 }
 
-fn poll_process(process p, i32 &status_out) wontthrow -> ProcessState
+fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 {
   i32 status = 0;
   const pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
 
   /* Still running, or already reaped, which the job table also treats as done.
    */
-  if (result == 0) return ProcessState::Running;
+  if (result == 0) return process_state::Running;
   if (result == -1) {
     status_out = 0;
-    return ProcessState::Exited;
+    return process_state::Exited;
   }
 
-  if (WIFSTOPPED(status)) return ProcessState::Stopped;
-  if (WIFCONTINUED(status)) return ProcessState::Running;
+  if (WIFSTOPPED(status)) return process_state::Stopped;
+  if (WIFCONTINUED(status)) return process_state::Running;
   if (WIFSIGNALED(status)) {
     status_out = 128 + WTERMSIG(status);
-    return ProcessState::Exited;
+    return process_state::Exited;
   }
   status_out = WEXITSTATUS(status);
-  return ProcessState::Exited;
+  return process_state::Exited;
 }
 
 fn signal_process(process p, i32 signal_number) wontthrow -> bool
@@ -846,16 +846,16 @@ fn make_pipe() -> Maybe<Pipe>
   return Pipe{in, out};
 }
 
-fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
+fn open_file_descriptor(StringView path, file_open_mode mode) -> Maybe<descriptor>
 {
-  DWORD access = (mode == FileOpenMode::Read) ? GENERIC_READ : GENERIC_WRITE;
+  DWORD access = (mode == file_open_mode::Read) ? GENERIC_READ : GENERIC_WRITE;
   DWORD disposition = OPEN_EXISTING;
   switch (mode) {
-  case FileOpenMode::Truncate: disposition = CREATE_ALWAYS; break;
+  case file_open_mode::Truncate: disposition = CREATE_ALWAYS; break;
   /* CREATE_NEW fails when the file already exists, the way noclobber wants. */
-  case FileOpenMode::TruncateNoClobber: disposition = CREATE_NEW; break;
-  case FileOpenMode::Append: disposition = OPEN_ALWAYS; break;
-  case FileOpenMode::Read: disposition = OPEN_EXISTING; break;
+  case file_open_mode::TruncateNoClobber: disposition = CREATE_NEW; break;
+  case file_open_mode::Append: disposition = OPEN_ALWAYS; break;
+  case file_open_mode::Read: disposition = OPEN_EXISTING; break;
   }
 
   /* The handle is created non-inheritable. execute_program marks it inheritable
@@ -874,7 +874,7 @@ fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
   /* Append moves the write position to the end of the file. */
-  if (mode == FileOpenMode::Append)
+  if (mode == file_open_mode::Append)
     SetFilePointer(handle, 0, nullptr, FILE_END);
 
   return handle;
@@ -926,17 +926,17 @@ fn wait_and_monitor_process(process p) -> i32
   return code;
 }
 
-fn poll_process(process p, i32 &status_out) -> ProcessState
+fn poll_process(process p, i32 &status_out) -> process_state
 {
   /* Windows has no stopped state, so a process is either alive or finished. */
   DWORD code = 0;
   if (GetExitCodeProcess(p, &code) == 0) {
     status_out = 0;
-    return ProcessState::Exited;
+    return process_state::Exited;
   }
-  if (code == STILL_ACTIVE) return ProcessState::Running;
+  if (code == STILL_ACTIVE) return process_state::Running;
   status_out = static_cast<i32>(code);
-  return ProcessState::Exited;
+  return process_state::Exited;
 }
 
 fn signal_process(process p, i32 signal_number) -> bool

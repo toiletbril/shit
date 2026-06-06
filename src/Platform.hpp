@@ -84,7 +84,7 @@ struct Pipe
 fn make_pipe() wontthrow -> Maybe<Pipe>;
 
 /* How a redirection target file is opened. */
-enum class FileOpenMode : u8
+enum class file_open_mode : u8
 {
   Truncate,          /* >  create or truncate for writing */
   TruncateNoClobber, /* >  under noclobber, fail if the file exists */
@@ -94,7 +94,7 @@ enum class FileOpenMode : u8
 
 /* Open path for the given mode and return its descriptor, or None on error
    with the reason left in last_system_error_message. */
-fn open_file_descriptor(StringView path, FileOpenMode mode) throws
+fn open_file_descriptor(StringView path, file_open_mode mode) throws
     -> Maybe<descriptor>;
 
 /* Write content to an anonymous temporary file and return a descriptor
@@ -113,7 +113,7 @@ fn last_system_error_message() throws -> String;
 fn wait_and_monitor_process(process p) throws -> i32;
 
 /* The live state of a process, polled without blocking for the job table. */
-enum class ProcessState : u8
+enum class process_state : u8
 {
   Running,
   Exited,
@@ -123,7 +123,7 @@ enum class ProcessState : u8
 /* Check a process without blocking. Returns Running while it is alive, Exited
    with the status placed in status_out once it ends, and Stopped while it is
    suspended. */
-fn poll_process(process p, i32 &status_out) wontthrow -> ProcessState;
+fn poll_process(process p, i32 &status_out) wontthrow -> process_state;
 
 /* Send a signal to a process by its numeric signal, for the kill builtin and
    for fg and bg to resume a stopped job with SIGCONT. Returns false on
