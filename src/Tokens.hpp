@@ -70,6 +70,9 @@ struct word_assignment_split
 {
   String name;
   Word value;
+  /* The word had the form NAME+=VALUE rather than NAME=VALUE, so evaluation
+     appends the value to the current value of NAME instead of replacing it. */
+  bool is_append;
 };
 
 /**
@@ -303,7 +306,8 @@ protected:
 class Assignment : public Token
 {
 public:
-  Assignment(SourceLocation location, StringView key, Word value);
+  Assignment(SourceLocation location, StringView key, Word value,
+             bool is_append);
 
   fn kind() const wontthrow -> Kind override;
   fn flags() const wontthrow -> Flags override;
@@ -313,9 +317,14 @@ public:
   pure fn key() const wontthrow -> const String &;
   pure fn value_word() const wontthrow -> const Word &;
 
+  /* The source spelled NAME+=VALUE, so the evaluator appends the value to the
+     current value of NAME instead of replacing it. */
+  pure fn is_append() const wontthrow -> bool;
+
 protected:
   String m_key;
   Word m_value;
+  bool m_is_append;
 };
 
 /* Tokens with values. */

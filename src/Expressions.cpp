@@ -284,7 +284,7 @@ fn Command::set_negated() wontthrow -> void { m_is_negated = true; }
 
 pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 
-fn Command::set_local_vars(HashMap<Word> &&vars) throws -> void
+fn Command::set_local_vars(HashMap<prefix_assignment> &&vars) throws -> void
 {
   m_local_vars = steal(vars);
 }
@@ -334,8 +334,15 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  const String value =
-      cxt.expand_word_for_assignment(m_assignment->value_word());
+  String value = cxt.expand_word_for_assignment(m_assignment->value_word());
+
+  /* The append form NAME+=VALUE prepends the current value of NAME, treating an
+     unset name as empty, so the store receives the concatenation. */
+  if (m_assignment->is_append()) {
+    String appended{cxt.get_variable_value(m_assignment->key()).value_or("")};
+    appended += value;
+    value = steal(appended);
+  }
 
   /* The assignment goes through set_shell_variable first, so it still rejects a
      readonly name and refreshes the cached IFS. Under allexport it is then
@@ -662,10 +669,18 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<String> previous_value;
   };
   ArrayList<saved_env_var> saved_env{heap_allocator()};
-  m_local_vars.for_each([&](StringView name, const Word &value_word) {
-    saved_env.push(
-        saved_env_var{String{name}, os::get_environment_variable(name)});
-    let const expanded_value = cxt.expand_word_for_assignment(value_word);
+  m_local_vars.for_each([&](StringView name, const prefix_assignment &var) {
+    Maybe<String> previous = os::get_environment_variable(name);
+    String expanded_value = cxt.expand_word_for_assignment(var.value);
+    /* The append form prepends the current value of NAME, which a prefix reads
+       from the shell store before the environment so a non-exported shell
+       variable still contributes, treating an unset name as empty. */
+    if (var.is_append) {
+      String appended{cxt.get_variable_value(name).value_or("")};
+      appended += expanded_value;
+      expanded_value = steal(appended);
+    }
+    saved_env.push(saved_env_var{String{name}, steal(previous)});
     os::set_environment_variable(name, expanded_value.view());
   });
   defer

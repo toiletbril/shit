@@ -100,12 +100,19 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   ASSERT(*equals_position <= first.text.count());
 
+  /* The append form NAME+=VALUE carries a single trailing plus right before the
+     equals sign. The plus is not part of the name, so the name spans the bytes
+     before it. */
+  const bool is_append = first.text[*equals_position - 1] == '+';
+  const usize name_length = is_append ? *equals_position - 1 : *equals_position;
+  if (name_length == 0) return shit::None;
+
   if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
-  for (usize i = 1; i < *equals_position; i++) {
+  for (usize i = 1; i < name_length; i++) {
     if (!lexer::is_variable_name(first.text[i])) return shit::None;
   }
 
-  const let name_view = first.text.substring_of_length(0, *equals_position);
+  const let name_view = first.text.substring_of_length(0, name_length);
   String name{name_view};
 
   Word value{};
@@ -117,7 +124,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   for (usize i = 1; i < segments.count(); i++)
     value.segments.push(segments[i]);
 
-  return word_assignment_split{steal(name), steal(value)};
+  return word_assignment_split{steal(name), steal(value), is_append};
 }
 
 namespace tokens {
@@ -192,8 +199,9 @@ fn Number::flags() const wontthrow -> Token::Flags
   return Token::Flag::Value;
 }
 
-Assignment::Assignment(SourceLocation location, StringView key, Word value)
-    : Token(location), m_key(key), m_value(steal(value))
+Assignment::Assignment(SourceLocation location, StringView key, Word value,
+                       bool is_append)
+    : Token(location), m_key(key), m_value(steal(value)), m_is_append(is_append)
 {}
 
 fn Assignment::kind() const wontthrow -> Token::Kind
@@ -209,12 +217,14 @@ fn Assignment::flags() const wontthrow -> Token::Flags
 fn Assignment::raw_string() const throws -> String
 {
   String result{m_key};
-  result += "=";
+  result += m_is_append ? "+=" : "=";
   result += m_value.to_literal_string();
   return result;
 }
 
 pure fn Assignment::key() const wontthrow -> const String & { return m_key; }
+
+pure fn Assignment::is_append() const wontthrow -> bool { return m_is_append; }
 
 pure fn Assignment::value_word() const wontthrow -> const Word &
 {

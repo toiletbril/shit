@@ -532,7 +532,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 {
   Maybe<SourceLocation> source_location;
   ArrayList<Token *> args_accumulator{};
-  HashMap<Word> local_vars{heap_allocator()};
+  HashMap<prefix_assignment> local_vars{heap_allocator()};
   ArrayList<expressions::Redirection> redirections{};
 
   auto build_command = [&]() -> Command * {
@@ -675,6 +675,20 @@ hot fn Parser::parse_simple_command() throws -> Command *
        * or the end of input means the assignment stands alone. */
       Token *next = m_lexer.peek_shell_token();
       ASSERT(next != nullptr);
+
+      /* NAME=(...) and NAME+=(...) are bash array assignments. The group is
+         consumed and the scalar assignment of the empty value word stands in,
+         so a login profile that uses one keeps sourcing instead of aborting on
+         the '('. The append form leaves NAME untouched and the plain form
+         clears it, which a scalar read of the array name mirrors. */
+      if (next->kind() == Token::Kind::LeftParen &&
+          next->source_location().position ==
+              a->source_location().position + a->source_location().length)
+      {
+        consume_bash_array_assignment();
+        return m_lexer.arena().create<AssignCommand>(*source_location, a);
+      }
+
       if (next->flags() & Token::Flag::CompoundList ||
           next->kind() == Token::Kind::EndOfFile ||
           is_compound_terminator(next->kind()))
@@ -682,8 +696,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       } else {
         /* Single-command variable. */
-        const String &assignment_key = a->key();
-        local_vars.set(assignment_key, Word{a->value_word()});
+        local_vars.set(a->key(),
+                       prefix_assignment{Word{a->value_word()}, a->is_append()});
       }
     } break;
 
@@ -1017,6 +1031,30 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
 
   return m_lexer.arena().create<FunctionDefinition>(location, name.view(),
                                                     body);
+}
+
+fn Parser::consume_bash_array_assignment() throws -> void
+{
+  Token *open = m_lexer.next_shell_token();
+  ASSERT(open != nullptr);
+  ASSERT(open->kind() == Token::Kind::LeftParen);
+
+  /* The elements are arbitrary words and may nest further parens, so the depth
+     counter tracks the matching close rather than the first one. */
+  usize depth = 1;
+  for (;;) {
+    Token *t = m_lexer.next_shell_token();
+    ASSERT(t != nullptr);
+    if (t->kind() == Token::Kind::EndOfFile) {
+      throw ErrorWithLocation{open->source_location(),
+                              "Unterminated array assignment, expected ')'"};
+    }
+    if (t->kind() == Token::Kind::LeftParen) depth++;
+    else if (t->kind() == Token::Kind::RightParen) {
+      depth--;
+      if (depth == 0) break;
+    }
+  }
 }
 
 /* A standard pratt-parser for expressions. */

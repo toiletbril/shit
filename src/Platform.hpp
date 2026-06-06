@@ -10,6 +10,7 @@
     defined __COSMOPOLITAN__
 #include <cerrno>
 #include <fcntl.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -82,6 +83,27 @@ struct Pipe
 };
 
 fn make_pipe() wontthrow -> Maybe<Pipe>;
+
+/* A handle to one running os thread. The pipe drain in a command substitution
+   reads its end on this thread so output larger than the pipe buffer cannot
+   deadlock the writer. */
+struct thread
+{
+#if SHIT_PLATFORM_IS WIN32
+  HANDLE handle{nullptr};
+#elif SHIT_PLATFORM_IS POSIX
+  pthread_t handle{};
+#endif
+};
+
+/* Start a thread that runs entry with context, or None when the os cannot
+   create it. The entry runs to completion and the thread keeps running until
+   join_thread returns. */
+fn start_thread(void (*entry)(void *), void *context) wontthrow
+    -> Maybe<thread>;
+
+/* Wait for a started thread to finish and release its handle. */
+fn join_thread(thread t) wontthrow -> void;
 
 /* How a redirection target file is opened. */
 enum class file_open_mode : u8

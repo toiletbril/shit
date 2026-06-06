@@ -306,6 +306,37 @@ fn make_pipe() wontthrow -> Maybe<Pipe>
   return Pipe{p[0], p[1]};
 }
 
+/* pthread_create wants a void *(*)(void *) entry, so this trampoline carries the
+   C-style entry and its context across that signature and returns nullptr. */
+struct thread_start_context
+{
+  void (*entry)(void *);
+  void *context;
+};
+
+fn thread_trampoline(void *raw_context) wontthrow -> void *
+{
+  let const start = static_cast<thread_start_context *>(raw_context);
+  let const entry = start->entry;
+  let const context = start->context;
+  delete start;
+  entry(context);
+  return nullptr;
+}
+
+fn start_thread(void (*entry)(void *), void *context) wontthrow -> Maybe<thread>
+{
+  let const start = new thread_start_context{entry, context};
+  pthread_t handle{};
+  if (pthread_create(&handle, nullptr, thread_trampoline, start) != 0) {
+    delete start;
+    return shit::None;
+  }
+  return thread{handle};
+}
+
+fn join_thread(thread t) wontthrow -> void { pthread_join(t.handle, nullptr); }
+
 fn open_file_descriptor(StringView path, file_open_mode mode) throws
     -> Maybe<descriptor>
 {
@@ -844,6 +875,42 @@ fn make_pipe() -> Maybe<Pipe>
   }
 
   return Pipe{in, out};
+}
+
+/* CreateThread wants a DWORD(*)(LPVOID) entry, so this trampoline carries the
+   C-style entry and its context across that signature and returns zero. */
+struct thread_start_context
+{
+  void (*entry)(void *);
+  void *context;
+};
+
+fn thread_trampoline(LPVOID raw_context) -> DWORD
+{
+  let const start = static_cast<thread_start_context *>(raw_context);
+  let const entry = start->entry;
+  let const context = start->context;
+  delete start;
+  entry(context);
+  return 0;
+}
+
+fn start_thread(void (*entry)(void *), void *context) -> Maybe<thread>
+{
+  let const start = new thread_start_context{entry, context};
+  HANDLE handle =
+      CreateThread(nullptr, 0, thread_trampoline, start, 0, nullptr);
+  if (handle == nullptr) {
+    delete start;
+    return shit::None;
+  }
+  return thread{handle};
+}
+
+fn join_thread(thread t) -> void
+{
+  WaitForSingleObject(t.handle, INFINITE);
+  CloseHandle(t.handle);
 }
 
 fn open_file_descriptor(StringView path, file_open_mode mode) -> Maybe<descriptor>

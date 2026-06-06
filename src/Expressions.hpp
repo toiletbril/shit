@@ -122,6 +122,14 @@ protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 };
 
+/* One prefix assignment on a simple command, the right hand side and whether
+   the source spelled it as the appending NAME+=VALUE form. */
+struct prefix_assignment
+{
+  Word value;
+  bool is_append;
+};
+
 class Command : public Expression
 {
 public:
@@ -129,7 +137,7 @@ public:
 
   fn make_async() wontthrow -> void;
   pure fn is_async() const wontthrow -> bool;
-  fn set_local_vars(HashMap<Word> &&vars) throws -> void;
+  fn set_local_vars(HashMap<prefix_assignment> &&vars) throws -> void;
 
   /* The ! reserved word in front of a pipeline inverts its exit status. */
   fn set_negated() wontthrow -> void;
@@ -143,7 +151,7 @@ public:
 protected:
   bool m_is_async{false};
   bool m_is_negated{false};
-  HashMap<Word> m_local_vars{heap_allocator()};
+  HashMap<prefix_assignment> m_local_vars{heap_allocator()};
 };
 
 class AssignCommand : public Command

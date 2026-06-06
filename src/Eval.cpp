@@ -19,7 +19,6 @@
 #include <cerrno>
 #include <cstdlib>
 #include <exception>
-#include <thread>
 
 namespace shit {
 
@@ -1804,6 +1803,29 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
   return result;
 }
 
+/* The drain thread reads the pipe into captured while the inner command writes
+   the other end, so output larger than the pipe buffer cannot deadlock. */
+struct command_substitution_drain_context
+{
+  String *captured;
+  os::descriptor read_fd;
+};
+
+fn drain_command_substitution_pipe(void *raw_context) wontthrow -> void
+{
+  let const drain =
+      static_cast<command_substitution_drain_context *>(raw_context);
+  /* A failed allocation here must not escape the thread and call terminate. */
+  try {
+    char buffer[4096];
+    for (;;) {
+      let const n = os::read_fd(drain->read_fd, buffer, sizeof(buffer));
+      if (!n.has_value() || *n == 0) break;
+      drain->captured->append(StringView{buffer, static_cast<usize>(*n)});
+    }
+  } catch (...) {}
+}
+
 fn EvalContext::capture_command_substitution(const String &source) throws
     -> String
 {
@@ -1827,18 +1849,15 @@ fn EvalContext::capture_command_substitution(const String &source) throws
   /* Drain the read end on a thread so output larger than the pipe buffer cannot
      deadlock the commands writing into it. */
   let captured = String{heap_allocator()};
-  let reader = std::thread([&captured, read_fd = pipe->in]() {
-    /* A failed allocation here must not escape the thread and call terminate.
-     */
-    try {
-      char buffer[4096];
-      for (;;) {
-        let const n = os::read_fd(read_fd, buffer, sizeof(buffer));
-        if (!n.has_value() || *n == 0) break;
-        captured.append(StringView{buffer, static_cast<usize>(*n)});
-      }
-    } catch (...) {}
-  });
+  let drain_context =
+      command_substitution_drain_context{&captured, pipe->in};
+  let const reader =
+      os::start_thread(drain_command_substitution_pipe, &drain_context);
+  if (!reader) {
+    os::close_fd(pipe->in);
+    os::close_fd(pipe->out);
+    throw Error{"Could not start a thread for command substitution"};
+  }
 
   shit::flush();
   let const saved = os::redirect_stdout(pipe->out);
@@ -1872,7 +1891,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
   shit::flush();
   os::restore_stdout(saved);
   os::close_fd(pipe->out);
-  reader.join();
+  os::join_thread(*reader);
   os::close_fd(pipe->in);
   restore_state(steal(snapshot));
 

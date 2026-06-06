@@ -72,6 +72,11 @@ private:
   mustuse fn parse_subshell() throws -> Command *;
   mustuse fn parse_function_definition(Token *name_token) throws -> Command *;
 
+  /* A bash array assignment NAME=(...) or NAME+=(...) is unsupported in this
+     POSIX shell, so the balanced parenthesis group is consumed and the whole
+     assignment evaluates as a no-op rather than aborting the file. */
+  fn consume_bash_array_assignment() throws -> void;
+
   mustuse fn parse_expression(u8 min_precedence = 0) throws -> Expression *;
 };
 

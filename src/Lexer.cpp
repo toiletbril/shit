@@ -610,7 +610,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
   {
     t = m_arena->create<tokens::Assignment>(
         here(actual_cursor_position, byte_count), assignment_split->name,
-        steal(assignment_split->value));
+        steal(assignment_split->value), assignment_split->is_append);
   } else if (word.segments.count() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {

@@ -1,0 +1,35 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=a]
+  [CompoundListCondition, None]
+    [Assign x+=bc]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign n+=z]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$n"]
+[Word
+  Unquoted "x=a"
+]
+[Word
+  Unquoted "x+=bc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "n+=z"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "n"
+]
+abc
+z
+[Code 0]
