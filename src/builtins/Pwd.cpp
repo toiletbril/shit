@@ -26,10 +26,11 @@ Pwd::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  std::string p{};
-  p = utils::get_current_directory().string();
+  String p{};
+  std::string cwd = utils::get_current_directory().string();
+  p.append(StringView{cwd.data(), cwd.size()});
   p += '\n';
-  ec.print_to_stdout(p);
+  ec.print_to_stdout(std::string{p.c_str(), p.size()});
   return 0;
 }
 

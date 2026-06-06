@@ -28,7 +28,7 @@ Echo::execute(ExecContext &ec, EvalContext &cxt) const
     start++;
   }
 
-  std::string buf{};
+  String buf{};
   bool should_stop = false;
 
   for (usize i = start; i < args.size() && !should_stop; i++) {
@@ -79,7 +79,7 @@ Echo::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (!should_suppress_newline && !should_stop) buf += '\n';
 
-  ec.print_to_stdout(buf);
+  ec.print_to_stdout(std::string{buf.c_str(), buf.size()});
 
   return 0;
 }

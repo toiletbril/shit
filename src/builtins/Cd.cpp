@@ -18,22 +18,23 @@ Cd::kind() const
 i32
 Cd::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::string arg_path{};
+  String arg_path{};
 
   if (ec.args().size() > 1) {
-    arg_path.append(ec.args()[1].c_str(), ec.args()[1].size());
+    arg_path.append(ec.args()[1]);
     for (usize i = 2; i < ec.args().size(); i++) {
       arg_path += ' ';
-      arg_path.append(ec.args()[i].c_str(), ec.args()[i].size());
+      arg_path.append(ec.args()[i]);
     }
   } else {
     /* Empty cd should go to the home directory. */
     Maybe<std::filesystem::path> p = os::get_home_directory();
     if (!p) throw Error{"Could not figure out home directory"};
-    arg_path = p->string();
+    std::string home = p->string();
+    arg_path.append(StringView{home.data(), home.size()});
   }
 
-  std::filesystem::path np{arg_path};
+  std::filesystem::path np{std::string{arg_path.c_str(), arg_path.size()}};
   np = std::filesystem::absolute(np).lexically_normal();
 
   if (std::filesystem::exists(np)) {
@@ -46,7 +47,8 @@ Cd::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  throw Error{"Path '" + arg_path + "' does not exist"};
+  throw Error{"Path '" + std::string{arg_path.c_str(), arg_path.size()} +
+              "' does not exist"};
 }
 
 } /* namespace shit */

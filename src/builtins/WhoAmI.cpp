@@ -26,12 +26,12 @@ WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  std::string p{};
+  String p{};
 
   if (Maybe<std::string> u = os::get_current_user(); u.has_value()) {
-    p += *u;
+    p.append(StringView{u->data(), u->size()});
     p += '\n';
-    ec.print_to_stdout(p);
+    ec.print_to_stdout(std::string{p.c_str(), p.size()});
     return 0;
   }
 

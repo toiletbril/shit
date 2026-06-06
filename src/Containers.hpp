@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <new>
+#include <string>
 #include <utility>
 
 namespace shit {
@@ -23,6 +24,10 @@ struct StringView
   StringView(const char *cstr)
       : data(cstr), length(cstr != nullptr ? std::strlen(cstr) : 0)
   {}
+  /* A view of a std::string, so a boundary that still holds one passes it to a
+     function taking a view. This is transitional, removed once std::string is
+     gone from the tree. TODO: drop with the last std::string. */
+  StringView(const std::string &s) : data(s.data()), length(s.size()) {}
 
   [[nodiscard]] usize
   size() const
