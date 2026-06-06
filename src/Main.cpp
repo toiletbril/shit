@@ -133,11 +133,16 @@ run_script_contents(const std::string &script_contents,
     };
     std::unique_ptr<shit::Expression> ast = p.construct_ast();
 
-    if (FLAG_AST.is_enabled()) std::cout << ast->to_ast_string() << std::endl;
+    if (FLAG_AST.is_enabled()) {
+      shit::print_to_standard_output(ast->to_ast_string());
+      shit::print_to_standard_output("\n");
+    }
 
     if (FLAG_ESCAPE_MAP.is_enabled()) {
-      for (const auto &word : p.debug_words())
-        std::cout << word.to_pretty_string() << std::endl;
+      for (const auto &word : p.debug_words()) {
+        shit::print_to_standard_output(word.to_pretty_string());
+        shit::print_to_standard_output("\n");
+      }
     }
 
     /* Validate the whole tree before running anything. An unconditional
@@ -160,10 +165,14 @@ run_script_contents(const std::string &script_contents,
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
     if (FLAG_EXIT_CODE.is_enabled())
-      std::cout << "[Code " << exit_code << ']' << std::endl;
+      shit::print_to_standard_output("[Code " + std::to_string(exit_code) +
+                                     "]\n");
 
     if (FLAG_STATS.is_enabled())
-      std::cout << context.make_stats_string() << std::endl;
+    {
+      shit::print_to_standard_output(context.make_stats_string());
+      shit::print_to_standard_output("\n");
+    }
   } catch (const shit::ErrorWithLocationAndDetails &e) {
     shit::show_message(e.to_string(script_contents));
     shit::show_message(e.details_to_string(script_contents));
@@ -277,7 +286,8 @@ main(int argc, char **argv)
     h += shit::make_synopsis(program_path, HELP_SYNOPSIS);
     h += '\n';
     h += shit::make_flag_help(FLAG_LIST);
-    std::cerr << h << std::endl;
+    h += '\n';
+    shit::print_to_standard_error(h);
     return EXIT_SUCCESS;
   } else if (FLAG_VERSION.is_enabled()) {
     shit::show_version();
@@ -502,22 +512,26 @@ main(int argc, char **argv)
           switch (code) {
           case TL_PRESSED_TAB:
             /* TODO. */
-            std::cout << "^I" << std::flush;
+            shit::print_to_standard_output("^I");
+            shit::flush_standard_output();
             toiletline::set_input(input);
             break;
           case TL_PRESSED_EOF:
             /* Exit on CTRL-D. */
-            std::cout << "^D" << std::flush;
+            shit::print_to_standard_output("^D");
+            shit::flush_standard_output();
             toiletline::emit_newlines(input);
             shit::utils::quit(exit_code, true);
             break;
           case TL_PRESSED_INTERRUPT:
             /* Ignore Ctrl-C. */
-            std::cout << "^C" << std::flush;
+            shit::print_to_standard_output("^C");
+            shit::flush_standard_output();
             break;
           case TL_PRESSED_SUSPEND:
             /* Ignore Ctrl-Z. */
-            std::cout << "^Z" << std::flush;
+            shit::print_to_standard_output("^Z");
+            shit::flush_standard_output();
             break;
           }
 

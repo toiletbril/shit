@@ -1,8 +1,9 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Eval.hpp"
 
 #include <filesystem>
-#include <iostream>
+#include <string>
 
 namespace shit {
 
@@ -55,7 +56,8 @@ struct TestEvaluator
   void
   fail(const std::string &message)
   {
-    if (!had_error) std::cerr << "test: " << message << '\n';
+    if (!had_error)
+      shit::print_to_standard_error("test: " + message + "\n");
     had_error = true;
   }
 
@@ -209,7 +211,7 @@ Test::execute(ExecContext &ec, EvalContext &cxt) const
   std::vector<std::string> operands{ec.args().begin() + 1, ec.args().end()};
   if (ec.program() == "[") {
     if (operands.empty() || operands.back() != "]") {
-      std::cerr << "[: missing closing ']'\n";
+      shit::print_to_standard_error("[: missing closing ']'\n");
       return 2;
     }
     operands.pop_back();
@@ -223,8 +225,8 @@ Test::execute(ExecContext &ec, EvalContext &cxt) const
   bool result = evaluator.parse_expression();
   if (evaluator.had_error) return 2;
   if (evaluator.pos != operands.size()) {
-    std::cerr << "test: unexpected argument '" << operands[evaluator.pos]
-              << "'\n";
+    shit::print_to_standard_error("test: unexpected argument '" +
+                                  operands[evaluator.pos] + "'\n");
     return 2;
   }
   return result ? 0 : 1;

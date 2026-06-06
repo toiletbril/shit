@@ -1,6 +1,7 @@
 #include "Eval.hpp"
 
 #include "Arena.hpp"
+#include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -17,7 +18,6 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <iostream>
 #include <optional>
 #include <thread>
 
@@ -1796,7 +1796,7 @@ EvalContext::capture_command_substitution(const std::string &source)
     } catch (...) {}
   });
 
-  std::cout.flush();
+  shit::flush_standard_output();
   os::descriptor saved = os::redirect_stdout(pipe->out);
 
   /* The inner commands write to the pipe, not the terminal, so suppress the
@@ -1825,7 +1825,7 @@ EvalContext::capture_command_substitution(const std::string &source)
 
   m_shell_is_interactive = was_interactive;
 
-  std::cout.flush();
+  shit::flush_standard_output();
   os::restore_stdout(saved);
   os::close_fd(pipe->out);
   reader.join();
@@ -1980,8 +1980,8 @@ EvalContext::process_args(const ArrayList<const Token *> &args)
      nested one '+++'. */
   if (should_echo_expanded()) {
     std::string prefix(m_subshell_depth + 1, '+');
-    std::cerr << prefix << ' ' << utils::merge_args_to_string(expanded_args)
-              << '\n';
+    shit::print_to_standard_error(
+        prefix + ' ' + utils::merge_args_to_string(expanded_args) + '\n');
   }
 
   return expanded_args;

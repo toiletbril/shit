@@ -4,8 +4,8 @@
 #include "Debug.hpp"
 #include "Errors.hpp"
 
+#include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -403,28 +403,28 @@ reset_flags(const ArrayList<Flag *> &flags)
 void
 show_version()
 {
-  std::cout << "Shit Shell " << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.'
-            << SHIT_VER_PATCH << '-' << SHIT_VER_EXTRA << '\n'
-            << "Built on " << SHIT_BUILD_DATE << '\n'
-            << '\n'
-            << "MODE=" << SHIT_BUILD_MODE << '\n'
-            << "HEAD=" << SHIT_COMMIT_HASH << '\n'
-            << "CXX=" << SHIT_COMPILER << '\n'
-            << "ENVCXXFLAGS="
-            << (*SHIT_ENVCXXFLAGS == '\0' ? "<none>" : SHIT_ENVCXXFLAGS) << '\n'
-            << "OS=" << SHIT_OS_INFO << '\n'
-            << '\n'
-            << SHIT_SHORT_LICENSE << '\n'
-            << "(c) toiletbril "
-               "<https://github.com/toiletbril>"
-            << std::endl;
+  std::string s = "Shit Shell " + std::to_string(SHIT_VER_MAJOR) + '.' +
+                  std::to_string(SHIT_VER_MINOR) + '.' +
+                  std::to_string(SHIT_VER_PATCH) + '-' + SHIT_VER_EXTRA + '\n' +
+                  "Built on " + SHIT_BUILD_DATE + '\n' + '\n' +
+                  "MODE=" + SHIT_BUILD_MODE + '\n' +
+                  "HEAD=" + SHIT_COMMIT_HASH + '\n' + "CXX=" + SHIT_COMPILER +
+                  '\n' + "ENVCXXFLAGS=" +
+                  (*SHIT_ENVCXXFLAGS == '\0' ? "<none>" : SHIT_ENVCXXFLAGS) +
+                  '\n' + "OS=" + SHIT_OS_INFO + '\n' + '\n' + SHIT_SHORT_LICENSE +
+                  '\n' + "(c) toiletbril <https://github.com/toiletbril>" + '\n';
+  print_to_standard_output(s);
+  flush_standard_output();
 }
 
 void
 show_short_version()
 {
-  std::cout << SHIT_VER_MAJOR << '.' << SHIT_VER_MINOR << '.' << SHIT_VER_PATCH
-            << '-' << SHIT_VER_EXTRA << std::endl;
+  std::string s = std::to_string(SHIT_VER_MAJOR) + '.' +
+                  std::to_string(SHIT_VER_MINOR) + '.' +
+                  std::to_string(SHIT_VER_PATCH) + '-' + SHIT_VER_EXTRA + '\n';
+  print_to_standard_output(s);
+  flush_standard_output();
 }
 
 std::string
@@ -512,9 +512,33 @@ make_flag_help(const ArrayList<Flag *> &flags)
 }
 
 void
+print_to_standard_output(std::string_view text)
+{
+  /* The output is flushed at once so it interleaves with the unbuffered
+     write_fd path the builtins use, keeping the order a reader sees correct. */
+  std::fwrite(text.data(), 1, text.size(), stdout);
+  std::fflush(stdout);
+}
+
+void
+print_to_standard_error(std::string_view text)
+{
+  std::fwrite(text.data(), 1, text.size(), stderr);
+  std::fflush(stderr);
+}
+
+void
+flush_standard_output()
+{
+  std::fflush(stdout);
+}
+
+void
 show_message(std::string_view err)
 {
-  std::cerr << "shit: " << err << std::endl;
+  print_to_standard_error("shit: ");
+  print_to_standard_error(err);
+  print_to_standard_error("\n");
 }
 
 } /* namespace shit */

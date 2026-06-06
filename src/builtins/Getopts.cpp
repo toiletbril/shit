@@ -1,8 +1,9 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 
-#include <iostream>
+#include <string>
 
 /* getopts optstring name [arg ...]. It parses one option per call from the
    positional parameters, or from explicit args, tracking progress through
@@ -93,7 +94,8 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
       cxt.set_shell_variable("OPTARG", std::string{option});
     } else {
       cxt.unset_shell_variable("OPTARG");
-      std::cerr << "getopts: illegal option -- " << option << "\n";
+      shit::print_to_standard_error("getopts: illegal option -- " +
+                                    std::string{option} + "\n");
     }
     return finish(0);
   }
@@ -118,8 +120,9 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
       } else {
         cxt.set_shell_variable(name, "?");
         cxt.unset_shell_variable("OPTARG");
-        std::cerr << "getopts: option requires an argument -- " << option
-                  << "\n";
+        shit::print_to_standard_error(
+            "getopts: option requires an argument -- " + std::string{option} +
+            "\n");
       }
       return finish(0);
     }

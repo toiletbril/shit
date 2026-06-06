@@ -9,7 +9,6 @@
 #include <cstdarg>
 #include <cstring>
 #include <functional>
-#include <iostream>
 #include <optional>
 
 #if SHIT_PLATFORM_IS POSIX
@@ -373,10 +372,11 @@ wait_and_monitor_process(process pid)
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
-      std::cout << "[Process " << pid << ": " << sig_desc << ", signal "
-                << std::to_string(sig) << "]" << std::endl;
+      shit::print_to_standard_output("[Process " + std::to_string(pid) + ": " +
+                                     sig_desc + ", signal " +
+                                     std::to_string(sig) + "]\n");
     } else {
-      std::cout << std::endl;
+      shit::print_to_standard_output("\n");
     }
 
     return 128 + sig;
@@ -386,8 +386,9 @@ wait_and_monitor_process(process pid)
     std::string sig_desc =
         (sig_str != nullptr) ? std::string{sig_str} : "Unknown";
 
-    std::cout << "[Process " << pid << ": " << sig_desc << ", signal "
-              << std::to_string(sig) << " and killed]" << std::endl;
+    shit::print_to_standard_output("[Process " + std::to_string(pid) + ": " +
+                                   sig_desc + ", signal " +
+                                   std::to_string(sig) + " and killed]\n");
 
     /* We can't handle suspended processes yet, so goodbye. */
     check_syscall(kill(pid, SIGKILL));
@@ -973,7 +974,7 @@ static void
 handle_interrupt(int s)
 {
   SHIT_UNUSED(s);
-  std::cout << std::endl;
+  shit::print_to_standard_output("\n");
   /* TODO: Ignore error? */
   signal(SIGINT, handle_interrupt);
 }

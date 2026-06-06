@@ -14,7 +14,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <iostream>
 #include <list>
 #include <optional>
 #include <unordered_map>
@@ -54,7 +53,9 @@ execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async)
       cxt.set_last_background_pid(os::process_id_of(p));
       int id = cxt.register_job(p, command);
       if (cxt.shell_is_interactive())
-        std::cerr << "[" << id << "] " << os::process_id_of(p) << std::endl;
+        shit::print_to_standard_error("[" + std::to_string(id) + "] " +
+                                      std::to_string(os::process_id_of(p)) +
+                                      "\n");
       return 0;
     }
     return os::wait_and_monitor_process(p);
@@ -128,8 +129,9 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
       cxt.set_last_background_pid(os::process_id_of(last_child));
       int id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        std::cerr << "[" << id << "] " << os::process_id_of(last_child)
-                  << std::endl;
+        shit::print_to_standard_error(
+            "[" + std::to_string(id) + "] " +
+            std::to_string(os::process_id_of(last_child)) + "\n");
     }
     return ret;
   }

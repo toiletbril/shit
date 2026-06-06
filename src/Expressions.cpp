@@ -12,7 +12,6 @@
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
-#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -500,8 +499,10 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
      so the redirections still run below. */
   SHIT_ASSERT(m_args.size() > 0 || !m_redirections.empty());
 
-  if (cxt.should_echo())
-    std::cout << utils::merge_tokens_to_string(m_args) << std::endl;
+  if (cxt.should_echo()) {
+    shit::print_to_standard_output(utils::merge_tokens_to_string(m_args) + "\n");
+    shit::flush_standard_output();
+  }
 
   std::vector<std::string> program_args = cxt.process_args(m_args);
   expand_command_aliases(cxt, program_args);
