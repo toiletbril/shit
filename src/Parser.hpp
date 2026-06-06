@@ -44,6 +44,10 @@ private:
      one token to guarantee forward progress. */
   fn recover_to_next_statement() throws -> void;
 
+  /* Consume newlines that follow a pipe operator, so a pipeline written across
+     several lines with a trailing '|' continues onto the next command. */
+  fn skip_newlines_after_pipe() throws -> void;
+
   /* Build one file or descriptor-duplication redirection for descriptor fd. The
      operator is already consumed and op_location is its position. Shared by the
      simple command parser and the trailing redirect parser. */

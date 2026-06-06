@@ -214,6 +214,12 @@ flatten fn Parser::construct_ast() throws -> Expression *
   return parse_command_list({});
 }
 
+fn Parser::skip_newlines_after_pipe() throws -> void
+{
+  while (m_lexer.peek_shell_token()->kind() == Token::Kind::Newline)
+    m_lexer.advance_past_last_peek();
+}
+
 /* Skip tokens until the next statement boundary, so parsing can resume after a
    syntax error. The boundary is a newline or a ';', which begins a fresh
    command, or the end of input. At least one token is always consumed, so a
@@ -385,6 +391,7 @@ hot fn Parser::parse_command_list(
       }
 
       m_lexer.advance_past_last_peek();
+      skip_newlines_after_pipe();
 
       Pipeline *pipeline =
           m_lexer.arena().create<Pipeline>(token->source_location());
@@ -402,6 +409,7 @@ hot fn Parser::parse_command_list(
           ASSERT(last_pipe_token != nullptr);
           if (last_pipe_token->kind() == Token::Kind::Pipe) {
             m_lexer.advance_past_last_peek();
+            skip_newlines_after_pipe();
             continue;
           }
         } else {
