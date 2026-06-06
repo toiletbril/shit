@@ -8,9 +8,9 @@ namespace shit {
 
 namespace {
 
-bool parse_integer(StringView text, i64 &out)
+bool parse_integer(StringView text, i64 &out) throws
 {
-  const ErrorOr<i64> parsed = utils::parse_decimal_integer(text);
+  let const parsed = utils::parse_decimal_integer(text);
   if (parsed.is_error()) return false;
   out = parsed.value();
   return true;
@@ -24,20 +24,20 @@ struct TestEvaluator
   usize pos;
   bool had_error;
 
-  const String &current() const
+  pure const String &current() const wontthrow
   {
     ASSERT(pos < args.size());
     return args[pos];
   }
-  bool at_end() const { return pos >= args.size(); }
+  pure bool at_end() const wontthrow { return pos >= args.size(); }
 
-  void fail(StringView message)
+  void fail(StringView message) throws
   {
     if (!had_error) shit::print_error(StringView{"test: "} + message + "\n");
     had_error = true;
   }
 
-  bool evaluate_unary(const String &op, const String &operand)
+  bool evaluate_unary(const String &op, const String &operand) throws
   {
     if (op == "-z") return operand.empty();
     if (op == "-n") return !operand.empty();
@@ -46,7 +46,7 @@ struct TestEvaluator
     if (op == "-f") return operand_path.is_regular_file();
     if (op == "-d") return operand_path.is_directory();
     if (op == "-s") {
-      const Maybe<u64> size = operand_path.file_size();
+      let const size = operand_path.file_size();
       return size.has_value() && size.value() > 0;
     }
     if (op == "-r") return operand_path.is_readable();
@@ -57,7 +57,7 @@ struct TestEvaluator
   }
 
   bool evaluate_binary(const String &left, const String &op,
-                       const String &right)
+                       const String &right) throws
   {
     if (op == "=") return left == right;
     if (op == "!=") return left != right;
@@ -81,19 +81,19 @@ struct TestEvaluator
     return false;
   }
 
-  bool is_unary_operator(const String &s)
+  bool is_unary_operator(const String &s) throws
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
            s == "-s" || s == "-r" || s == "-w" || s == "-x";
   }
 
-  bool is_binary_operator(const String &s)
+  bool is_binary_operator(const String &s) throws
   {
     return s == "=" || s == "!=" || s == "-eq" || s == "-ne" || s == "-lt" ||
            s == "-le" || s == "-gt" || s == "-ge";
   }
 
-  bool parse_factor()
+  bool parse_factor() throws
   {
     if (at_end()) {
       fail("argument expected");
@@ -105,7 +105,7 @@ struct TestEvaluator
     }
     if (current() == "(") {
       pos++;
-      const bool result = parse_expression();
+      let const result = parse_expression();
       if (at_end() || current() != ")")
         fail("expected ')'");
       else
@@ -120,40 +120,40 @@ struct TestEvaluator
         pos = args.size();
         return false;
       }
-      const String &left = args[pos];
-      const String &op = args[pos + 1];
-      const String &right = args[pos + 2];
+      let const &left = args[pos];
+      let const &op = args[pos + 1];
+      let const &right = args[pos + 2];
       pos += 3;
       return evaluate_binary(left, op, right);
     }
     if (is_unary_operator(current()) && pos + 1 < args.size()) {
-      const String &op = args[pos];
-      const String &operand = args[pos + 1];
+      let const &op = args[pos];
+      let const &operand = args[pos + 1];
       pos += 2;
       return evaluate_unary(op, operand);
     }
-    const bool result = !current().empty();
+    let const result = !current().empty();
     pos++;
     return result;
   }
 
-  bool parse_term()
+  bool parse_term() throws
   {
     bool result = parse_factor();
     while (!at_end() && current() == "-a") {
       pos++;
-      const bool right = parse_factor();
+      let const right = parse_factor();
       result = result && right;
     }
     return result;
   }
 
-  bool parse_expression()
+  bool parse_expression() throws
   {
     bool result = parse_term();
     while (!at_end() && current() == "-o") {
       pos++;
-      const bool right = parse_term();
+      let const right = parse_term();
       result = result || right;
     }
     return result;
@@ -164,16 +164,16 @@ struct TestEvaluator
 
 Test::Test() = default;
 
-Builtin::Kind Test::kind() const { return Kind::Test; }
+pure Builtin::Kind Test::kind() const wontthrow { return Kind::Test; }
 
-i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
   /* Strip the program name, and for the [ form the required trailing ]. The
      last operand index ends the expression, one before the trailing ] in the
      bracket form. */
-  const ArrayList<String> &arguments = ec.args();
+  let const &arguments = ec.args();
   ASSERT(!arguments.empty());
 
   usize expression_end = arguments.size();
@@ -194,7 +194,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
   if (operands.empty()) return 1;
 
   TestEvaluator evaluator{operands, 0, false};
-  const bool result = evaluator.parse_expression();
+  let const result = evaluator.parse_expression();
   if (evaluator.had_error) return 2;
   if (evaluator.pos != operands.size()) {
     ASSERT(evaluator.pos < operands.size());

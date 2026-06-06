@@ -59,11 +59,11 @@ struct Builtin
     Kill,
   };
 
-  void set_fds(os::descriptor in, os::descriptor out);
-  void print_to_stdout(StringView s) const;
+  void set_fds(os::descriptor in, os::descriptor out) throws;
+  void print_to_stdout(StringView s) const throws;
 
-  virtual Kind kind() const = 0;
-  virtual i32 execute(ExecContext &ec, EvalContext &cxt) const = 0;
+  pure virtual Kind kind() const wontthrow = 0;
+  virtual i32 execute(ExecContext &ec, EvalContext &cxt) const throws = 0;
 
   virtual ~Builtin() = default;
 
@@ -166,8 +166,8 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   {                                                                            \
     b();                                                                       \
                                                                                \
-    Kind kind() const override;                                                \
-    i32 execute(ExecContext &ec, EvalContext &cxt) const override;             \
+    pure Kind kind() const wontthrow override;                                 \
+    i32 execute(ExecContext &ec, EvalContext &cxt) const throws override;      \
   };
 
 BUILTIN_STRUCT(Echo);
@@ -212,15 +212,15 @@ struct Exit : public Builtin
 {
   Exit();
 
-  Kind kind() const override;
-  i32 execute(ExecContext &ec, EvalContext &cxt) const override;
+  pure Kind kind() const wontthrow override;
+  i32 execute(ExecContext &ec, EvalContext &cxt) const throws override;
 };
 
-Maybe<Builtin::Kind> search_builtin(std::string_view builtin_name);
+Maybe<Builtin::Kind> search_builtin(std::string_view builtin_name) throws;
 
 void show_builtin_help_impl(const ExecContext &ec,
                             const std::vector<std::string> &hs,
-                            const ArrayList<Flag *> &fl);
+                            const ArrayList<Flag *> &fl) throws;
 
 #define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \
   do {                                                                         \
@@ -233,6 +233,6 @@ void show_builtin_help_impl(const ExecContext &ec,
   parse_flags_vec(FLAG_LIST, ec.args());                                       \
   defer { reset_flags(FLAG_LIST); }
 
-i32 execute_builtin(ExecContext &&ec, EvalContext &cxt);
+i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;
 
 } /* namespace shit */

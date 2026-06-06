@@ -16,9 +16,9 @@ namespace shit {
 
 Bg::Bg() = default;
 
-fn Bg::kind() const -> Builtin::Kind { return Kind::Bg; }
+pure fn Bg::kind() const wontthrow -> Builtin::Kind { return Kind::Bg; }
 
-fn Bg::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.empty());

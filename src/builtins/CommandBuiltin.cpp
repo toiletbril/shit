@@ -22,12 +22,12 @@ namespace shit {
 
 CommandBuiltin::CommandBuiltin() = default;
 
-fn CommandBuiltin::kind() const -> Builtin::Kind
+pure fn CommandBuiltin::kind() const wontthrow -> Builtin::Kind
 {
   return Kind::CommandBuiltin;
 }
 
-fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };

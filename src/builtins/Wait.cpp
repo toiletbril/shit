@@ -16,10 +16,10 @@ namespace shit {
 namespace {
 
 /* Wait for one job to finish, reusing a status already collected. */
-i32 wait_for_job(Job &job)
+i32 wait_for_job(Job &job) throws
 {
   if (job.state == Job::State::Done) return job.last_status;
-  const i32 status = os::wait_and_monitor_process(job.pid);
+  let const status = os::wait_and_monitor_process(job.pid);
   job.state = Job::State::Done;
   job.last_status = status;
   return status;
@@ -29,11 +29,11 @@ i32 wait_for_job(Job &job)
 
 Wait::Wait() = default;
 
-Builtin::Kind Wait::kind() const { return Kind::Wait; }
+pure Builtin::Kind Wait::kind() const wontthrow { return Kind::Wait; }
 
-i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
   ASSERT(!args.empty());
 
   i32 status = 0;
@@ -46,19 +46,19 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   for (usize i = 1; i < args.size(); i++) {
-    const String &target = args[i];
+    let const &target = args[i];
 
     if (!target.empty() && target[0] == '%') {
-      const ErrorOr<i64> parsed =
+      let const parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (!parsed.is_error()) {
         if (Job *const job = cxt.find_job(static_cast<int>(parsed.value())))
           status = wait_for_job(*job);
       }
     } else {
-      const ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
+      let const parsed = utils::parse_decimal_integer(target);
       if (!parsed.is_error()) {
-        const os::process pid = os::process_from_pid(parsed.value());
+        let const pid = os::process_from_pid(parsed.value());
         status = os::wait_and_monitor_process(pid);
       }
     }

@@ -15,9 +15,12 @@ namespace shit {
 
 Getopts::Getopts() = default;
 
-fn Getopts::kind() const -> Builtin::Kind { return Kind::Getopts; }
+pure fn Getopts::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Getopts;
+}
 
-fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   if (args.size() < 3)

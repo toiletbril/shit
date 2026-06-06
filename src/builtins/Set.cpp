@@ -42,27 +42,27 @@ const SetOption SET_OPTIONS[] = {
     {'v', "verbose",   nullptr,                         nullptr                  },
 };
 
-const SetOption *find_option_by_letter(char letter)
+const SetOption *find_option_by_letter(char letter) throws
 {
   for (const SetOption &option : SET_OPTIONS)
     if (option.letter == letter) return &option;
   return nullptr;
 }
 
-const SetOption *find_option_by_name(StringView name)
+const SetOption *find_option_by_name(StringView name) throws
 {
   for (const SetOption &option : SET_OPTIONS)
     if (option.name == name) return &option;
   return nullptr;
 }
 
-bool option_is_on(const EvalContext &cxt, const SetOption &option)
+bool option_is_on(const EvalContext &cxt, const SetOption &option) throws
 {
   return option.get != nullptr ? (cxt.*(option.get))() : false;
 }
 
 /* The reusable command form that set -o and set +o print, one line each. */
-String list_options(const EvalContext &cxt)
+String list_options(const EvalContext &cxt) throws
 {
   String out{};
   for (const SetOption &option : SET_OPTIONS) {
@@ -77,17 +77,17 @@ String list_options(const EvalContext &cxt)
 
 Set::Set() = default;
 
-Builtin::Kind Set::kind() const { return Kind::Set; }
+pure Builtin::Kind Set::kind() const wontthrow { return Kind::Set; }
 
-i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
   ASSERT(!args.empty());
 
   /* set with no arguments lists the shell variables. */
   if (args.size() == 1) {
     String out{};
-    for (const String &assignment : cxt.sorted_variable_assignments()) {
+    for (let const &assignment : cxt.sorted_variable_assignments()) {
       out += assignment.view();
       out += "\n";
     }
@@ -100,7 +100,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
   bool should_rebind = false;
 
   for (usize i = 1; i < args.size(); i++) {
-    const String &arg = args[i];
+    let const &arg = args[i];
 
     if (collecting_operands) {
       operands.push(String{heap_allocator(), arg});
@@ -116,14 +116,14 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
     /* The long form -o name and +o name names one option, or lists them all
        when no name follows. */
     if (arg == "-o" || arg == "+o") {
-      const bool enable = arg[0] == '-';
+      let const enable = arg[0] == '-';
       if (i + 1 >= args.size()) {
         ec.print_to_stdout(list_options(cxt));
         continue;
       }
       ASSERT(i + 1 < args.size());
-      const String &name = args[++i];
-      const SetOption *const option = find_option_by_name(name);
+      let const &name = args[++i];
+      let const option = find_option_by_name(name);
       if (option == nullptr)
         throw Error{"set: '" + name + "' is not a valid option name"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
@@ -132,10 +132,10 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
 
     /* A minus enables each following letter, a plus disables each one. */
     if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {
-      const bool enable = arg[0] == '-';
+      let const enable = arg[0] == '-';
       for (usize c = 1; c < arg.length(); c++) {
-        const char letter = arg[c];
-        const SetOption *const option = find_option_by_letter(letter);
+        let const letter = arg[c];
+        let const option = find_option_by_letter(letter);
         if (option == nullptr) {
           String invalid_option{};
           invalid_option += arg[0];

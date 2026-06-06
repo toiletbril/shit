@@ -37,7 +37,7 @@ struct Resource
   rlim_t units_per_value;
 };
 
-Resource selected_resource()
+Resource selected_resource() throws
 {
   if (FLAG_OPEN_FILES.is_enabled()) return {RLIMIT_NOFILE, 1};
   if (FLAG_CPU_TIME.is_enabled()) return {RLIMIT_CPU, 1};
@@ -48,17 +48,17 @@ Resource selected_resource()
 
 } /* namespace */
 
-i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   ASSERT(!args.empty());
 
-  const Resource resource = selected_resource();
+  let const resource = selected_resource();
 
   struct rlimit limit{};
   if (getrlimit(resource.which, &limit) != 0)
@@ -77,12 +77,12 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  const String &requested = args[1];
+  let const &requested = args[1];
   if (requested == "unlimited") {
     limit.rlim_cur = RLIM_INFINITY;
     limit.rlim_max = RLIM_INFINITY;
   } else {
-    const rlim_t value =
+    let const value =
         static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10)) *
         resource.units_per_value;
     limit.rlim_cur = value;
@@ -98,11 +98,11 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 
 #else /* not POSIX */
 
-i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* This platform does not expose resource limits, so report unlimited. */
@@ -114,6 +114,6 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 
 Ulimit::Ulimit() = default;
 
-Builtin::Kind Ulimit::kind() const { return Kind::Ulimit; }
+pure Builtin::Kind Ulimit::kind() const wontthrow { return Kind::Ulimit; }
 
 } /* namespace shit */

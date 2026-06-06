@@ -6,9 +6,12 @@ namespace shit {
 
 Continue::Continue() = default;
 
-fn Continue::kind() const -> Builtin::Kind { return Kind::Continue; }
+pure fn Continue::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Continue;
+}
 
-fn Continue::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().empty());
 

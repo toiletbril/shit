@@ -6,9 +6,9 @@ namespace shit {
 
 Break::Break() = default;
 
-fn Break::kind() const -> Builtin::Kind { return Kind::Break; }
+pure fn Break::kind() const wontthrow -> Builtin::Kind { return Kind::Break; }
 
-fn Break::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().empty());
 

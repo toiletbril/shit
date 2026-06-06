@@ -15,9 +15,9 @@ namespace shit {
 
 Alias::Alias() = default;
 
-fn Alias::kind() const -> Builtin::Kind { return Kind::Alias; }
+pure fn Alias::kind() const wontthrow -> Builtin::Kind { return Kind::Alias; }
 
-fn Alias::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };

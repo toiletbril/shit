@@ -21,10 +21,10 @@ namespace shit {
 namespace {
 
 /* Format a count of seconds as the minutes and seconds form times prints. */
-String format_time(double seconds)
+String format_time(double seconds) throws
 {
-  const long minutes = static_cast<long>(seconds) / 60;
-  const double remainder = seconds - static_cast<double>(minutes * 60);
+  let const minutes = static_cast<long>(seconds) / 60;
+  let const remainder = seconds - static_cast<double>(minutes * 60);
   char buffer[64];
   std::snprintf(buffer, sizeof(buffer), "%ldm%.3fs", minutes, remainder);
   return String{buffer};
@@ -34,9 +34,9 @@ String format_time(double seconds)
 
 Times::Times() = default;
 
-Builtin::Kind Times::kind() const { return Kind::Times; }
+pure Builtin::Kind Times::kind() const wontthrow { return Kind::Times; }
 
-i32 Times::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
@@ -45,7 +45,7 @@ i32 Times::execute(ExecContext &ec, EvalContext &cxt) const
 #if SHIT_PLATFORM_IS POSIX
   struct tms accounting{};
   if (times(&accounting) != static_cast<clock_t>(-1)) {
-    const double ticks = static_cast<double>(sysconf(_SC_CLK_TCK));
+    let const ticks = static_cast<double>(sysconf(_SC_CLK_TCK));
     if (ticks > 0) {
       self_user = static_cast<double>(accounting.tms_utime) / ticks;
       self_system = static_cast<double>(accounting.tms_stime) / ticks;

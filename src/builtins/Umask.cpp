@@ -13,12 +13,12 @@ namespace shit {
 
 Umask::Umask() = default;
 
-Builtin::Kind Umask::kind() const { return Kind::Umask; }
+pure Builtin::Kind Umask::kind() const wontthrow { return Kind::Umask; }
 
-i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
   ASSERT(!args.empty());
 
   if (args.size() == 1) {
@@ -28,8 +28,8 @@ i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  const String &requested = args[1];
-  const ErrorOr<i64> parsed = utils::parse_octal_integer(requested);
+  let const &requested = args[1];
+  let const parsed = utils::parse_octal_integer(requested);
   if (parsed.is_error()) {
     throw Error{"umask: '" + requested + "' is not a valid octal mask"};
   }

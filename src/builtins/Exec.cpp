@@ -14,9 +14,9 @@ namespace shit {
 
 Exec::Exec() = default;
 
-fn Exec::kind() const -> Builtin::Kind { return Kind::Exec; }
+pure fn Exec::kind() const wontthrow -> Builtin::Kind { return Kind::Exec; }
 
-fn Exec::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(cxt);
   let const &args = ec.args();

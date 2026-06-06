@@ -9,9 +9,9 @@ namespace shit {
 
 Eval::Eval() = default;
 
-fn Eval::kind() const -> Builtin::Kind { return Kind::Eval; }
+pure fn Eval::kind() const wontthrow -> Builtin::Kind { return Kind::Eval; }
 
-fn Eval::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().empty());
 

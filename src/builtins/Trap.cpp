@@ -12,13 +12,13 @@ namespace shit {
 
 Trap::Trap() = default;
 
-Builtin::Kind Trap::kind() const { return Kind::Trap; }
+pure Builtin::Kind Trap::kind() const wontthrow { return Kind::Trap; }
 
 namespace {
 
 /* Normalize a condition name to its bare upper-case form, so SIGINT, sigint,
    int, and the number 2 all name the same condition, and 0 names EXIT. */
-String normalize_condition(StringView raw)
+String normalize_condition(StringView raw) throws
 {
   String name{};
   for (usize i = 0; i < raw.size(); i++)
@@ -31,9 +31,9 @@ String normalize_condition(StringView raw)
 
 } /* namespace */
 
-i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  const ArrayList<String> &args = ec.args();
+  let const &args = ec.args();
   ASSERT(!args.empty());
 
   if (args.size() == 1) {
@@ -50,12 +50,12 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   ASSERT(args.size() > 1);
-  const String &action = args[1];
+  let const &action = args[1];
   /* A lone dash resets the named conditions to their defaults. */
-  const bool is_reset = action == "-";
+  let const is_reset = action == "-";
 
   for (usize i = 2; i < args.size(); i++) {
-    const String condition = normalize_condition(args[i]);
+    let const condition = normalize_condition(args[i]);
     if (is_reset)
       cxt.remove_trap(condition);
     else

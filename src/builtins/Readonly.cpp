@@ -15,11 +15,11 @@ namespace shit {
 
 Readonly::Readonly() = default;
 
-Builtin::Kind Readonly::kind() const { return Kind::Readonly; }
+pure Builtin::Kind Readonly::kind() const wontthrow { return Kind::Readonly; }
 
-i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -28,10 +28,10 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
   /* readonly with no operand lists the read-only variables and their values. */
   if (args.size() == 1) {
     String out{};
-    for (const String &name : cxt.readonly_names()) {
+    for (let const &name : cxt.readonly_names()) {
       out += "readonly ";
       out += name;
-      if (const Maybe<String> value = cxt.get_variable_value(name)) {
+      if (let const value = cxt.get_variable_value(name)) {
         out += "='";
         out += value->view();
         out += "'";
@@ -43,14 +43,14 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   for (usize i = 1; i < args.size(); i++) {
-    const String &arg = args[i];
-    const Maybe<usize> equals_position = arg.find_character('=');
+    let const &arg = args[i];
+    let const equals_position = arg.find_character('=');
 
     /* An operand with an equals sign assigns the value first, then marks the
        name. A bare name marks whatever it currently holds. */
     if (equals_position.has_value()) {
-      const StringView name = arg.substring_of_length(0, *equals_position);
-      const StringView value = arg.substring(*equals_position + 1);
+      let const name = arg.substring_of_length(0, *equals_position);
+      let const value = arg.substring(*equals_position + 1);
       cxt.set_shell_variable(name, value);
       cxt.mark_readonly(name);
     } else {

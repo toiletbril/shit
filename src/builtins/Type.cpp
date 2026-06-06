@@ -17,11 +17,11 @@ namespace shit {
 
 Type::Type() = default;
 
-Builtin::Kind Type::kind() const { return Kind::Type; }
+pure Builtin::Kind Type::kind() const wontthrow { return Kind::Type; }
 
-i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -31,7 +31,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
   bool all_found = true;
 
   for (usize i = 1; i < args.size(); i++) {
-    const String &name = args[i];
+    let const &name = args[i];
 
     if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
       out += name;
@@ -41,7 +41,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
     {
       out += name;
       out += " is a shell builtin\n";
-    } else if (const ArrayList<Path> paths = utils::search_program_path(name);
+    } else if (let const paths = utils::search_program_path(name);
                paths.size() != 0)
     {
       ASSERT(paths.size() > 0);

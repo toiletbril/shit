@@ -9,20 +9,20 @@ namespace shit {
 
 Shift::Shift() = default;
 
-Builtin::Kind Shift::kind() const { return Kind::Shift; }
+pure Builtin::Kind Shift::kind() const wontthrow { return Kind::Shift; }
 
-i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   ASSERT(!ec.args().empty());
 
   i64 count = 1;
   if (ec.args().size() > 1) {
-    const ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    let const parsed = utils::parse_decimal_integer(ec.args()[1]);
     if (parsed.is_error()) throw parsed.error();
     count = parsed.value();
   }
 
-  const ArrayList<String> &params = cxt.positional_params();
+  let const &params = cxt.positional_params();
   if (count < 0 || static_cast<usize>(count) > params.size()) return 1;
 
   /* ArrayList has no erase, so the kept tail is copied into a fresh list from

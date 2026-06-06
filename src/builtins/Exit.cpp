@@ -8,9 +8,9 @@ namespace shit {
 
 Exit::Exit() = default;
 
-fn Exit::kind() const -> Builtin::Kind { return Kind::Exit; }
+pure fn Exit::kind() const wontthrow -> Builtin::Kind { return Kind::Exit; }
 
-fn Exit::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().empty());
 

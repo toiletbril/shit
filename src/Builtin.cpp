@@ -14,7 +14,7 @@ namespace shit {
 
 fn show_builtin_help_impl(const ExecContext &ec,
                           const std::vector<std::string> &hs,
-                          const ArrayList<Flag *> &fl) -> void
+                          const ArrayList<Flag *> &fl) throws -> void
 {
   ASSERT(!ec.args().empty());
 
@@ -27,7 +27,7 @@ fn show_builtin_help_impl(const ExecContext &ec,
   ec.print_to_stdout(help_text);
 }
 
-fn search_builtin(std::string_view builtin_name) -> Maybe<Builtin::Kind>
+fn search_builtin(std::string_view builtin_name) throws -> Maybe<Builtin::Kind>
 {
   return BUILTINS.find(StringView{builtin_name.data(), builtin_name.size()});
 }
@@ -41,7 +41,7 @@ struct BuiltinHelp
   String description;
 };
 
-static fn builtin_help(Builtin::Kind kind) -> BuiltinHelp
+static fn builtin_help(Builtin::Kind kind) throws -> BuiltinHelp
 {
   switch (kind) {
   case Builtin::Kind::Echo:
@@ -146,13 +146,13 @@ static fn builtin_help(Builtin::Kind kind) -> BuiltinHelp
   return {"", ""};
 }
 
-fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
+fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 {
   ASSERT(!ec.args().empty());
 
   /* Every builtin answers --help with its synopsis and a short explanation. */
   if (ec.args().size() > 1 && ec.args()[1] == "--help") {
-    const BuiltinHelp help = builtin_help(ec.builtin_kind());
+    let const help = builtin_help(ec.builtin_kind());
     ec.print_to_stdout(StringView{"SYNOPSIS\n  "} + help.synopsis + "\n\n" +
                        help.description + "\n");
     ec.close_fds();

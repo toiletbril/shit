@@ -7,9 +7,9 @@ namespace shit {
 
 True::True() = default;
 
-Builtin::Kind True::kind() const { return Kind::True; }
+pure Builtin::Kind True::kind() const wontthrow { return Kind::True; }
 
-i32 True::execute(ExecContext &ec, EvalContext &cxt) const
+i32 True::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(ec);
   unused(cxt);

@@ -19,9 +19,12 @@ namespace shit {
 
 Expression::Expression(SourceLocation location) : m_location(location) {}
 
-fn Expression::source_location() const -> SourceLocation { return m_location; }
+pure fn Expression::source_location() const wontthrow -> SourceLocation
+{
+  return m_location;
+}
 
-fn Expression::to_ast_string(usize layer) const -> String
+fn Expression::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -29,7 +32,7 @@ fn Expression::to_ast_string(usize layer) const -> String
   return pad + "[" + to_string() + "]";
 }
 
-fn Expression::evaluate(EvalContext &cxt) const -> i64
+fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 {
   /* A Ctrl-C sets the interrupt flag, and the check here runs before every node,
      so a running command, including a loop body or condition, stops promptly and
@@ -42,42 +45,44 @@ fn Expression::evaluate(EvalContext &cxt) const -> i64
   return evaluate_impl(cxt);
 }
 
-fn Expression::operator delete(void *pointer) -> void
+fn Expression::operator delete(void *pointer) wontthrow -> void
 {
   if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);
 }
 
-fn AnalysisContext::warn(SourceLocation location, StringView message) -> void
+fn AnalysisContext::warn(SourceLocation location, StringView message) throws
+    -> void
 {
   const WarningWithLocation located{location, message};
   show_message(located.to_string(source));
 }
 
-fn AnalysisContext::fail(SourceLocation location, StringView message) -> void
+fn AnalysisContext::fail(SourceLocation location, StringView message) throws
+    -> void
 {
   const ErrorWithLocation located{location, message};
   show_message(located.to_string(source));
   has_fatal = true;
 }
 
-fn Expression::analyze(AnalysisContext &actx, bool is_unconditional) const
+fn Expression::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   unused(actx);
   unused(is_unconditional);
 }
 
-fn Expression::is_simple_command() const -> bool { return false; }
+fn Expression::is_simple_command() const wontthrow -> bool { return false; }
 
-fn Expression::is_dummy() const -> bool { return false; }
+fn Expression::is_dummy() const wontthrow -> bool { return false; }
 
 namespace {
 
 /* The literal name of a command when it is statically known. A word that holds
    a variable reference or a live glob metacharacter is dynamic, so its target
    cannot be checked before run time. */
-fn static_command_name(const Token *token) -> Maybe<String>
+fn static_command_name(const Token *token) throws -> Maybe<String>
 {
   ASSERT(token != nullptr);
 
@@ -101,7 +106,7 @@ fn static_command_name(const Token *token) -> Maybe<String>
 /* A command resolves when it is a builtin, a program on PATH, or an existing
    path. This shares the PATH cache with execution, so an unconditional command
    is resolved only once. */
-fn command_resolves(const String &name) -> bool
+fn command_resolves(const String &name) throws -> bool
 {
   if (name.empty()) return false;
   if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
@@ -111,7 +116,7 @@ fn command_resolves(const String &name) -> bool
   return utils::search_program_path(name.view()).size() != 0;
 }
 
-fn word_has_backtick(const Word &word) -> bool
+pure fn word_has_backtick(const Word &word) wontthrow -> bool
 {
   for (const WordSegment &segment : word.segments) {
     if (segment.text.find_character('`').has_value()) return true;
@@ -123,7 +128,7 @@ fn word_has_backtick(const Word &word) -> bool
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases)
-    -> bool
+    throws -> bool
 {
   ASSERT(root != nullptr);
 
@@ -161,7 +166,7 @@ IfStatement::~IfStatement()
   if (m_otherwise != nullptr) delete m_otherwise;
 }
 
-fn IfStatement::evaluate_impl(EvalContext &cxt) const -> i64
+fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
@@ -179,9 +184,9 @@ fn IfStatement::evaluate_impl(EvalContext &cxt) const -> i64
   return 0;
 }
 
-fn IfStatement::to_string() const -> String { return "If"; }
+fn IfStatement::to_string() const throws -> String { return "If"; }
 
-fn IfStatement::to_ast_string(usize layer) const -> String
+fn IfStatement::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
@@ -208,35 +213,35 @@ fn IfStatement::to_ast_string(usize layer) const -> String
 
 Command::Command(SourceLocation location) : Expression(location) {}
 
-fn Command::make_async() -> void { m_is_async = true; }
+fn Command::make_async() wontthrow -> void { m_is_async = true; }
 
-fn Command::is_async() const -> bool { return m_is_async; }
+pure fn Command::is_async() const wontthrow -> bool { return m_is_async; }
 
-fn Command::set_negated() -> void { m_is_negated = true; }
+fn Command::set_negated() wontthrow -> void { m_is_negated = true; }
 
-fn Command::is_negated() const -> bool { return m_is_negated; }
+pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 
-fn Command::set_local_vars(HashMap<Word> &&vars) -> void
+fn Command::set_local_vars(HashMap<Word> &&vars) throws -> void
 {
   m_local_vars = std::move(vars);
 }
 
-fn Command::is_assignment() const -> bool { return false; }
+fn Command::is_assignment() const wontthrow -> bool { return false; }
 
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
 {}
 
-fn DummyExpression::is_dummy() const -> bool { return true; }
+fn DummyExpression::is_dummy() const wontthrow -> bool { return true; }
 
-fn DummyExpression::evaluate_impl(EvalContext &cxt) const -> i64
+fn DummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   unused(cxt);
   return 0;
 }
 
-fn DummyExpression::to_string() const -> String { return "Dummy"; }
+fn DummyExpression::to_string() const throws -> String { return "Dummy"; }
 
-fn DummyExpression::to_ast_string(usize layer) const -> String
+fn DummyExpression::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++) {
@@ -251,21 +256,21 @@ AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
 
 AssignCommand::~AssignCommand() { delete m_assignment; }
 
-fn AssignCommand::assignment() const -> const Assignment *
+pure fn AssignCommand::assignment() const wontthrow -> const Assignment *
 {
   return m_assignment;
 }
 
-fn AssignCommand::is_assignment() const -> bool { return true; }
+fn AssignCommand::is_assignment() const wontthrow -> bool { return true; }
 
-fn AssignCommand::evaluate_impl(EvalContext &cxt) const -> i64
+fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_assignment != nullptr);
 
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  const String expanded_value =
+  let const expanded_value =
       cxt.expand_word_for_assignment(m_assignment->value_word());
   const std::string value{expanded_value.c_str(), expanded_value.size()};
 
@@ -275,18 +280,18 @@ fn AssignCommand::evaluate_impl(EvalContext &cxt) const -> i64
      still finds the shell copy. */
   cxt.set_shell_variable(m_assignment->key(), value);
   if (cxt.export_all()) {
-    const String &key = m_assignment->key();
+    let const &key = m_assignment->key();
     os::set_environment_variable(std::string{key.c_str(), key.size()}, value);
   }
   return cxt.last_exit_status();
 }
 
-fn AssignCommand::to_string() const -> String
+fn AssignCommand::to_string() const throws -> String
 {
   return "Assign " + m_assignment->to_ast_string();
 }
 
-fn AssignCommand::to_ast_string(usize layer) const -> String
+fn AssignCommand::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -294,7 +299,7 @@ fn AssignCommand::to_ast_string(usize layer) const -> String
   return pad + "[" + to_string() + "]";
 }
 
-fn AssignCommand::redirect_to(usize d, String &f, bool duplicate) -> void
+fn AssignCommand::redirect_to(usize d, String &f, bool duplicate) throws -> void
 {
   unused(d);
   unused(f);
@@ -302,7 +307,7 @@ fn AssignCommand::redirect_to(usize d, String &f, bool duplicate) -> void
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-fn AssignCommand::append_to(usize d, String &f, bool duplicate) -> void
+fn AssignCommand::append_to(usize d, String &f, bool duplicate) throws -> void
 {
   redirect_to(d, f, duplicate);
 }
@@ -325,7 +330,7 @@ SimpleCommand::~SimpleCommand()
   }
 }
 
-fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections)
+fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     -> void
 {
   for (const Redirection &redirection : redirections)
@@ -333,7 +338,7 @@ fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections)
 }
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
-    -> void
+    throws -> void
 {
   for (const Redirection &redirection : m_redirections) {
     if (redirection.kind == Redirection::Kind::Heredoc) {
@@ -341,7 +346,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
 
       let body = std::string{*redirection.heredoc_body};
       if (redirection.heredoc_expand) {
-        const String expanded = cxt.expand_heredoc_body(body);
+        let const expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
 
@@ -402,9 +407,9 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
   }
 }
 
-fn SimpleCommand::is_simple_command() const -> bool { return true; }
+fn SimpleCommand::is_simple_command() const wontthrow -> bool { return true; }
 
-fn SimpleCommand::args() const -> const ArrayList<const Token *> &
+pure fn SimpleCommand::args() const wontthrow -> const ArrayList<const Token *> &
 {
   return m_args;
 }
@@ -416,12 +421,13 @@ namespace {
    and its options, and a name already expanded is not expanded again so a
    self-referential alias terminates. A quoted space inside the body is not
    preserved, since this expansion does not re-run the full tokenizer. */
-fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) -> void
+fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
+    -> void
 {
   ArrayList<String> already_expanded{};
 
   while (!args.empty()) {
-    const String &word = args[0];
+    let const &word = args[0];
 
     bool seen = false;
     for (const String &name : already_expanded)
@@ -439,7 +445,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) -> void
        is built and swapped in. */
     ArrayList<String> rebuilt{};
     String current{};
-    const String &body_value = *body;
+    let const &body_value = *body;
     for (usize i = 0; i < body_value.size(); i++) {
       const char c = body_value[i];
       if (c == ' ' || c == '\t') {
@@ -467,7 +473,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) -> void
 
 } /* namespace */
 
-fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
+fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* A command may have no words when it is only a redirection, such as > file,
      so the redirections still run below. */
@@ -508,7 +514,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
 
       let body = std::string{*redirection.heredoc_body};
       if (redirection.heredoc_expand) {
-        const String expanded = cxt.expand_heredoc_body(body);
+        let const expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
 
@@ -593,7 +599,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
   m_local_vars.for_each([&](StringView name, const Word &value_word) {
     saved_env.push(
         SavedEnvVar{String{name}, os::get_environment_variable(name)});
-    const String expanded_value = cxt.expand_word_for_assignment(value_word);
+    let const expanded_value = cxt.expand_word_for_assignment(value_word);
     os::set_environment_variable(name, expanded_value.view());
   });
   defer
@@ -610,7 +616,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
      words as the positional parameters, restoring them afterwards. A return
      builtin unwinds here and supplies the function exit status. */
   ASSERT(!program_args.empty());
-  const String &program_name = program_args[0];
+  let const &program_name = program_args[0];
   if (const Expression *function_body =
           cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
       function_body != nullptr)
@@ -688,7 +694,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
   return ret;
 }
 
-fn SimpleCommand::to_string() const -> String
+fn SimpleCommand::to_string() const throws -> String
 {
   String s = "SimpleCommand";
 
@@ -707,7 +713,7 @@ fn SimpleCommand::to_string() const -> String
   return s;
 }
 
-fn SimpleCommand::to_ast_string(usize layer) const -> String
+fn SimpleCommand::to_ast_string(usize layer) const throws -> String
 {
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -715,7 +721,7 @@ fn SimpleCommand::to_ast_string(usize layer) const -> String
   return pad + "[" + to_string() + "]";
 }
 
-fn SimpleCommand::append_to(usize d, String &f, bool duplicate) -> void
+fn SimpleCommand::append_to(usize d, String &f, bool duplicate) throws -> void
 {
   unused(d);
   unused(f);
@@ -723,7 +729,7 @@ fn SimpleCommand::append_to(usize d, String &f, bool duplicate) -> void
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-fn SimpleCommand::redirect_to(usize d, String &f, bool duplicate) -> void
+fn SimpleCommand::redirect_to(usize d, String &f, bool duplicate) throws -> void
 {
   unused(d);
   unused(f);
@@ -740,9 +746,12 @@ CompoundList::~CompoundList()
   }
 }
 
-fn CompoundList::is_empty() const -> bool { return m_nodes.empty(); }
+pure fn CompoundList::is_empty() const wontthrow -> bool
+{
+  return m_nodes.empty();
+}
 
-fn CompoundList::append_node(const CompoundListCondition *node) -> void
+fn CompoundList::append_node(const CompoundListCondition *node) throws -> void
 {
   ASSERT(node != nullptr);
 
@@ -750,9 +759,9 @@ fn CompoundList::append_node(const CompoundListCondition *node) -> void
   m_nodes.push(node);
 }
 
-fn CompoundList::to_string() const -> String { return "CompoundList"; }
+fn CompoundList::to_string() const throws -> String { return "CompoundList"; }
 
-fn CompoundList::to_ast_string(usize layer) const -> String
+fn CompoundList::to_ast_string(usize layer) const throws -> String
 {
   String s{};
   String pad{};
@@ -768,7 +777,7 @@ fn CompoundList::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn CompoundList::evaluate_impl(EvalContext &cxt) const -> i64
+fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_nodes.size() > 0);
 
@@ -826,9 +835,9 @@ CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
 
 CompoundListCondition::~CompoundListCondition() { delete m_cmd; }
 
-fn CompoundListCondition::kind() const -> Kind { return m_kind; }
+pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
 
-fn CompoundListCondition::to_string() const -> String
+fn CompoundListCondition::to_string() const throws -> String
 {
   String k;
   switch (kind()) {
@@ -840,7 +849,7 @@ fn CompoundListCondition::to_string() const -> String
   return "CompoundListCondition, " + k;
 }
 
-fn CompoundListCondition::to_ast_string(usize layer) const -> String
+fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_cmd != nullptr);
 
@@ -855,7 +864,7 @@ fn CompoundListCondition::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const -> i64
+fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_cmd != nullptr);
   let status = m_cmd->evaluate(cxt);
@@ -879,9 +888,12 @@ Pipeline::~Pipeline()
   }
 }
 
-fn Pipeline::is_empty() const -> bool { return m_commands.empty(); }
+pure fn Pipeline::is_empty() const wontthrow -> bool
+{
+  return m_commands.empty();
+}
 
-fn Pipeline::append_command(const SimpleCommand *node) -> void
+fn Pipeline::append_command(const SimpleCommand *node) throws -> void
 {
   ASSERT(node != nullptr);
 
@@ -889,14 +901,14 @@ fn Pipeline::append_command(const SimpleCommand *node) -> void
   m_commands.push(node);
 }
 
-fn Pipeline::to_string() const -> String
+fn Pipeline::to_string() const throws -> String
 {
   let s = String{"Pipeline"};
   if (is_async()) s += ", Async";
   return s;
 }
 
-fn Pipeline::to_ast_string(usize layer) const -> String
+fn Pipeline::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
   let pad = String{};
@@ -913,7 +925,7 @@ fn Pipeline::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn Pipeline::evaluate_impl(EvalContext &cxt) const -> i64
+fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_commands.size() > 1);
 
@@ -948,7 +960,7 @@ fn Pipeline::evaluate_impl(EvalContext &cxt) const -> i64
   return utils::execute_contexts_with_pipes(std::move(ecs), cxt, is_async());
 }
 
-fn Pipeline::append_to(usize d, String &f, bool duplicate) -> void
+fn Pipeline::append_to(usize d, String &f, bool duplicate) throws -> void
 {
   unused(d);
   unused(f);
@@ -956,7 +968,7 @@ fn Pipeline::append_to(usize d, String &f, bool duplicate) -> void
   throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
-fn Pipeline::redirect_to(usize d, String &f, bool duplicate) -> void
+fn Pipeline::redirect_to(usize d, String &f, bool duplicate) throws -> void
 {
   unused(d);
   unused(f);
@@ -966,7 +978,7 @@ fn Pipeline::redirect_to(usize d, String &f, bool duplicate) -> void
 
 CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
 
-fn CompoundCommand::append_to(usize d, String &f, bool duplicate) -> void
+fn CompoundCommand::append_to(usize d, String &f, bool duplicate) throws -> void
 {
   unused(d);
   unused(f);
@@ -975,7 +987,8 @@ fn CompoundCommand::append_to(usize d, String &f, bool duplicate) -> void
                           "Redirection on a compound command is not supported"};
 }
 
-fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) -> void
+fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
+    -> void
 {
   unused(d);
   unused(f);
@@ -984,7 +997,7 @@ fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) -> void
                           "Redirection on a compound command is not supported"};
 }
 
-static fn indent_for_layer(usize layer) -> String
+static fn indent_for_layer(usize layer) throws -> String
 {
   let pad = String{};
   for (usize i = 0; i < layer; i++)
@@ -1014,9 +1027,9 @@ IfClause::~IfClause()
   delete m_otherwise;
 }
 
-fn IfClause::to_string() const -> String { return "IfClause"; }
+fn IfClause::to_string() const throws -> String { return "IfClause"; }
 
-fn IfClause::to_ast_string(usize layer) const -> String
+fn IfClause::to_ast_string(usize layer) const throws -> String
 {
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
@@ -1035,7 +1048,7 @@ fn IfClause::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn IfClause::evaluate_impl(EvalContext &cxt) const -> i64
+fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   for (const auto &[condition, body] : m_branches) {
     ASSERT(condition != nullptr);
@@ -1058,7 +1071,8 @@ fn IfClause::evaluate_impl(EvalContext &cxt) const -> i64
   return 0;
 }
 
-fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
+fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional, since a branch may not be reached. */
@@ -1087,12 +1101,12 @@ WhileLoop::~WhileLoop()
   delete m_body;
 }
 
-fn WhileLoop::to_string() const -> String
+fn WhileLoop::to_string() const throws -> String
 {
   return m_is_until ? "UntilLoop" : "WhileLoop";
 }
 
-fn WhileLoop::to_ast_string(usize layer) const -> String
+fn WhileLoop::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1117,7 +1131,7 @@ enum class LoopDisposition
   StopLoop,
 };
 
-fn resolve_loop_control(EvalContext &cxt) -> LoopDisposition
+fn resolve_loop_control(EvalContext &cxt) throws -> LoopDisposition
 {
   if (!cxt.has_pending_control_flow()) return LoopDisposition::RunNext;
 
@@ -1146,7 +1160,7 @@ fn resolve_loop_control(EvalContext &cxt) -> LoopDisposition
 
 } /* namespace */
 
-fn WhileLoop::evaluate_impl(EvalContext &cxt) const -> i64
+fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1173,7 +1187,8 @@ fn WhileLoop::evaluate_impl(EvalContext &cxt) const -> i64
   return ret;
 }
 
-fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
+fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1203,7 +1218,7 @@ ForLoop::~ForLoop()
   delete m_body;
 }
 
-fn ForLoop::to_string() const -> String
+fn ForLoop::to_string() const throws -> String
 {
   let result = String{"ForLoop \""};
   result += StringView{m_variable_name};
@@ -1211,7 +1226,7 @@ fn ForLoop::to_string() const -> String
   return result;
 }
 
-fn ForLoop::to_ast_string(usize layer) const -> String
+fn ForLoop::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1221,7 +1236,7 @@ fn ForLoop::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn ForLoop::evaluate_impl(EvalContext &cxt) const -> i64
+fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
   /* Without an in clause the loop walks the positional parameters. */
@@ -1238,7 +1253,8 @@ fn ForLoop::evaluate_impl(EvalContext &cxt) const -> i64
   return ret;
 }
 
-fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
+fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1267,9 +1283,9 @@ CaseClause::~CaseClause()
   }
 }
 
-fn CaseClause::to_string() const -> String { return "CaseClause"; }
+fn CaseClause::to_string() const throws -> String { return "CaseClause"; }
 
-fn CaseClause::to_ast_string(usize layer) const -> String
+fn CaseClause::to_ast_string(usize layer) const throws -> String
 {
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
@@ -1281,7 +1297,7 @@ fn CaseClause::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn CaseClause::evaluate_impl(EvalContext &cxt) const -> i64
+fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_word != nullptr);
 
@@ -1319,7 +1335,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const -> i64
   return 0;
 }
 
-fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const
+fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
     -> void
 {
   unused(is_unconditional);
@@ -1335,9 +1351,9 @@ BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
 
 BraceGroup::~BraceGroup() { delete m_body; }
 
-fn BraceGroup::to_string() const -> String { return "BraceGroup"; }
+fn BraceGroup::to_string() const throws -> String { return "BraceGroup"; }
 
-fn BraceGroup::to_ast_string(usize layer) const -> String
+fn BraceGroup::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1346,13 +1362,14 @@ fn BraceGroup::to_ast_string(usize layer) const -> String
          m_body->to_ast_string(layer + 1);
 }
 
-fn BraceGroup::evaluate_impl(EvalContext &cxt) const -> i64
+fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
   return m_body->evaluate(cxt);
 }
 
-fn BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
+fn BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1365,9 +1382,9 @@ Subshell::Subshell(SourceLocation location, const Expression *body)
 
 Subshell::~Subshell() { delete m_body; }
 
-fn Subshell::to_string() const -> String { return "Subshell"; }
+fn Subshell::to_string() const throws -> String { return "Subshell"; }
 
-fn Subshell::to_ast_string(usize layer) const -> String
+fn Subshell::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1376,7 +1393,7 @@ fn Subshell::to_ast_string(usize layer) const -> String
          m_body->to_ast_string(layer + 1);
 }
 
-fn Subshell::evaluate_impl(EvalContext &cxt) const -> i64
+fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
@@ -1413,7 +1430,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const -> i64
   return ret;
 }
 
-fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
+fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1429,11 +1447,17 @@ FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
    rather than this node, so it is not deleted here. */
 FunctionDefinition::~FunctionDefinition() = default;
 
-fn FunctionDefinition::name() const -> const String & { return m_name; }
+pure fn FunctionDefinition::name() const wontthrow -> const String &
+{
+  return m_name;
+}
 
-fn FunctionDefinition::body() const -> const Expression * { return m_body; }
+pure fn FunctionDefinition::body() const wontthrow -> const Expression *
+{
+  return m_body;
+}
 
-fn FunctionDefinition::to_string() const -> String
+fn FunctionDefinition::to_string() const throws -> String
 {
   let result = String{"FunctionDefinition \""};
   result += StringView{m_name};
@@ -1441,7 +1465,7 @@ fn FunctionDefinition::to_string() const -> String
   return result;
 }
 
-fn FunctionDefinition::to_ast_string(usize layer) const -> String
+fn FunctionDefinition::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_body != nullptr);
 
@@ -1450,7 +1474,7 @@ fn FunctionDefinition::to_ast_string(usize layer) const -> String
          m_body->to_ast_string(layer + 1);
 }
 
-fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const -> i64
+fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
@@ -1460,7 +1484,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const -> i64
 }
 
 fn FunctionDefinition::analyze(AnalysisContext &actx,
-                               bool is_unconditional) const -> void
+                               bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1475,7 +1499,7 @@ UnaryExpression::UnaryExpression(SourceLocation location, const Expression *rhs)
 
 UnaryExpression::~UnaryExpression() { delete m_rhs; }
 
-fn UnaryExpression::to_ast_string(usize layer) const -> String
+fn UnaryExpression::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_rhs != nullptr);
 
@@ -1500,7 +1524,7 @@ BinaryExpression::~BinaryExpression()
   delete m_rhs;
 }
 
-fn BinaryExpression::to_ast_string(usize layer) const -> String
+fn BinaryExpression::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_lhs != nullptr);
   ASSERT(m_rhs != nullptr);
@@ -1523,13 +1547,13 @@ ConstantNumber::ConstantNumber(SourceLocation location, i64 value)
 
 ConstantNumber::~ConstantNumber() = default;
 
-fn ConstantNumber::evaluate_impl(EvalContext &cxt) const -> i64
+fn ConstantNumber::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   unused(cxt);
   return m_value;
 }
 
-fn ConstantNumber::to_ast_string(usize layer) const -> String
+fn ConstantNumber::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
   let pad = String{};
@@ -1539,7 +1563,7 @@ fn ConstantNumber::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn ConstantNumber::to_string() const -> String
+fn ConstantNumber::to_string() const throws -> String
 {
   return utils::integer_to_string(m_value);
 }
@@ -1550,13 +1574,13 @@ ConstantString::ConstantString(SourceLocation location, StringView value)
 
 ConstantString::~ConstantString() = default;
 
-fn ConstantString::evaluate_impl(EvalContext &cxt) const -> i64
+fn ConstantString::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   unused(cxt);
   unreachable();
 }
 
-fn ConstantString::to_ast_string(usize layer) const -> String
+fn ConstantString::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
   let pad = String{};
@@ -1566,14 +1590,14 @@ fn ConstantString::to_ast_string(usize layer) const -> String
   return s;
 }
 
-fn ConstantString::to_string() const -> String { return m_value; }
+fn ConstantString::to_string() const throws -> String { return m_value; }
 
 #define UNARY_EXPRESSION_DECLS(e, expr)                                        \
   e::e(SourceLocation location, const Expression *rhs)                         \
       : UnaryExpression(location, rhs)                                         \
   {}                                                                           \
-  String e::to_string() const { return #expr; }                                \
-  i64 e::evaluate_impl(EvalContext &cxt) const                                 \
+  String e::to_string() const throws { return #expr; }                         \
+  i64 e::evaluate_impl(EvalContext &cxt) const throws                          \
   {                                                                            \
     return expr m_rhs->evaluate(cxt);                                          \
   }
@@ -1589,12 +1613,12 @@ BinaryDummyExpression::BinaryDummyExpression(SourceLocation location,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-fn BinaryDummyExpression::to_string() const -> String
+fn BinaryDummyExpression::to_string() const throws -> String
 {
   return "BinaryDummyExpression";
 }
 
-fn BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const -> i64
+fn BinaryDummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   unused(cxt);
   return 0;
@@ -1605,10 +1629,10 @@ Divide::Divide(SourceLocation location, const Expression *lhs,
     : BinaryExpression(location, lhs, rhs)
 {}
 
-fn Divide::to_string() const -> String { return "/"; }
+fn Divide::to_string() const throws -> String { return "/"; }
 
 /* Custom evaluation, since we can't divide by zero. */
-fn Divide::evaluate_impl(EvalContext &cxt) const -> i64
+fn Divide::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_lhs != nullptr);
   ASSERT(m_rhs != nullptr);
@@ -1624,8 +1648,8 @@ fn Divide::evaluate_impl(EvalContext &cxt) const -> i64
   e::e(SourceLocation location, const Expression *lhs, const Expression *rhs)  \
       : BinaryExpression(location, lhs, rhs)                                   \
   {}                                                                           \
-  String e::to_string() const { return #expr; }                                \
-  i64 e::evaluate_impl(EvalContext &cxt) const                                 \
+  String e::to_string() const throws { return #expr; }                         \
+  i64 e::evaluate_impl(EvalContext &cxt) const throws                          \
   {                                                                            \
     return m_lhs->evaluate(cxt) expr m_rhs->evaluate(cxt);                     \
   }
@@ -1649,7 +1673,7 @@ BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
 fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
-    -> void
+    throws -> void
 {
   if (m_args.empty()) return;
 
@@ -1763,7 +1787,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 }
 
-fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
+fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
+    -> void
 {
   for (const SimpleCommand *command : m_commands) {
     ASSERT(command != nullptr);
@@ -1772,7 +1797,7 @@ fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
 }
 
 fn CompoundListCondition::analyze(AnalysisContext &actx,
-                                  bool is_unconditional) const -> void
+                                  bool is_unconditional) const throws -> void
 {
   ASSERT(m_cmd != nullptr);
 
@@ -1780,7 +1805,7 @@ fn CompoundListCondition::analyze(AnalysisContext &actx,
 }
 
 fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
-    -> void
+    throws -> void
 {
   for (const CompoundListCondition *node : m_nodes) {
     ASSERT(node != nullptr);
@@ -1794,7 +1819,7 @@ fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
 }
 
 fn IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
-    -> void
+    throws -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);

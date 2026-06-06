@@ -15,7 +15,8 @@ namespace shit {
 using namespace tokens;
 using namespace expressions;
 
-static fn get_sequence_kind(Token::Kind tk) -> CompoundListCondition::Kind
+pure static fn get_sequence_kind(Token::Kind tk)
+    wontthrow -> CompoundListCondition::Kind
 {
   switch (tk) {
   case Token::Kind::Newline:
@@ -34,13 +35,13 @@ Parser::Parser(Lexer &&lexer) : m_lexer(std::move(lexer)) {}
 
 Parser::~Parser() = default;
 
-fn Parser::debug_words() const -> const ArrayList<Word> &
+pure fn Parser::debug_words() const wontthrow -> const ArrayList<Word> &
 {
   return m_lexer.debug_words();
 }
 
-static fn kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
-    -> bool
+pure static fn kind_in(Token::Kind kind,
+                       std::initializer_list<Token::Kind> set) wontthrow -> bool
 {
   for (Token::Kind k : set) {
     if (k == kind) return true;
@@ -51,8 +52,8 @@ static fn kind_in(Token::Kind kind, std::initializer_list<Token::Kind> set)
 /* The byte location of the keyword as a whole word somewhere in the source. A
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
-static fn find_standalone_keyword(StringView source, StringView keyword)
-    -> Maybe<SourceLocation>
+pure static fn find_standalone_keyword(StringView source, StringView keyword)
+    wontthrow -> Maybe<SourceLocation>
 {
   auto is_boundary = [](char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0 || c == ';' ||
@@ -63,9 +64,9 @@ static fn find_standalone_keyword(StringView source, StringView keyword)
 
   for (usize pos = 0; pos + keyword.length <= source.length; pos++) {
     if (source.substring_of_length(pos, keyword.length) != keyword) continue;
-    const usize end = pos + keyword.length;
-    const bool left_ok = pos == 0 || is_boundary(source[pos - 1]);
-    const bool right_ok = end == source.length || is_boundary(source[end]);
+    const let end = pos + keyword.length;
+    const let left_ok = pos == 0 || is_boundary(source[pos - 1]);
+    const let right_ok = end == source.length || is_boundary(source[end]);
     if (left_ok && right_ok) return SourceLocation{pos, keyword.length};
   }
   return shit::None;
@@ -77,7 +78,8 @@ static fn find_standalone_keyword(StringView source, StringView keyword)
 [[noreturn]] static fn throw_unterminated(SourceLocation opener,
                                           StringView what, StringView source,
                                           StringView keyword,
-                                          SourceLocation fallback) -> void
+                                          SourceLocation fallback)
+    throws -> void
 {
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
@@ -91,7 +93,7 @@ static fn find_standalone_keyword(StringView source, StringView keyword)
                                     "expected '" + keyword + "'"};
 }
 
-static fn is_empty_list(const Expression *expression) -> bool
+pure static fn is_empty_list(const Expression *expression) wontthrow -> bool
 {
   ASSERT(expression != NULL);
   return expression->is_dummy();
@@ -99,7 +101,7 @@ static fn is_empty_list(const Expression *expression) -> bool
 
 /* The reserved word ! is a single unquoted exclamation mark standing alone in
    command position. It is distinct from a != comparison or a quoted literal. */
-static fn is_negation_token(const Token *token) -> bool
+pure static fn is_negation_token(const Token *token) wontthrow -> bool
 {
   ASSERT(token != NULL);
   if (token->kind() != Token::Kind::Word) return false;
@@ -111,7 +113,7 @@ static fn is_negation_token(const Token *token) -> bool
 
 /* A friendly message for a token that cannot start a command. A stray control
    keyword almost always means its opener is missing. */
-static fn unexpected_command_token_message(const Token *token) -> String
+static fn unexpected_command_token_message(const Token *token) throws -> String
 {
   ASSERT(token != NULL);
   switch (token->kind()) {
@@ -119,12 +121,12 @@ static fn unexpected_command_token_message(const Token *token) -> String
   case Token::Kind::Else:
   case Token::Kind::Elif:
   case Token::Kind::Fi: {
-    const String ast = token->to_ast_string();
+    const let ast = token->to_ast_string();
     return "'" + ast.view() + "' has no matching 'if'";
   }
   case Token::Kind::Do:
   case Token::Kind::Done: {
-    const String ast = token->to_ast_string();
+    const let ast = token->to_ast_string();
     return "'" + ast.view() + "' has no matching 'while', 'until', or 'for'";
   }
   case Token::Kind::Esac: return "'esac' has no matching 'case'";
@@ -134,7 +136,7 @@ static fn unexpected_command_token_message(const Token *token) -> String
   case Token::Kind::RightBracket: return "'}' has no matching '{'";
   case Token::Kind::Pipe: return "'|' has no command before it to pipe from";
   default: {
-    const String ast = token->to_ast_string();
+    const let ast = token->to_ast_string();
     return "expected a command, found '" + ast.view() + "'";
   }
   }
@@ -142,7 +144,7 @@ static fn unexpected_command_token_message(const Token *token) -> String
 
 /* TODO */
 static fn require_simple_in_pipeline(std::unique_ptr<Command> command)
-    -> SimpleCommand *
+    throws -> SimpleCommand *
 {
   ASSERT(command != NULL);
   if (!command->is_simple_command()) {
@@ -153,7 +155,7 @@ static fn require_simple_in_pipeline(std::unique_ptr<Command> command)
   return static_cast<SimpleCommand *>(command.release());
 }
 
-static fn is_compound_terminator(Token::Kind kind) -> bool
+pure static fn is_compound_terminator(Token::Kind kind) wontthrow -> bool
 {
   switch (kind) {
   case Token::Kind::RightParen:
@@ -170,14 +172,14 @@ static fn is_compound_terminator(Token::Kind kind) -> bool
   }
 }
 
-fn Parser::construct_ast() -> std::unique_ptr<Expression>
+fn Parser::construct_ast() throws -> std::unique_ptr<Expression>
 {
   /* The top-level list ends only at the end of input. */
   return parse_command_list({});
 }
 
 fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
-    -> std::unique_ptr<Expression>
+    throws -> std::unique_ptr<Expression>
 {
   std::unique_ptr<Command> lhs{};
 
@@ -235,7 +237,7 @@ fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     case Token::Kind::DoublePipe:
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
-        const String ast = token->to_ast_string();
+        const let ast = token->to_ast_string();
         String msg = "Expected a command ";
         msg += compound_list->is_empty() ? "before" : "after";
         msg += " operator, found '";
@@ -330,7 +332,7 @@ fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
 /* return: a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position introduces a
    compound command. */
-fn Parser::parse_simple_command() -> std::unique_ptr<Command>
+fn Parser::parse_simple_command() throws -> std::unique_ptr<Command>
 {
   Maybe<SourceLocation> source_location;
   ArrayList<std::unique_ptr<Token>> args_accumulator{};
@@ -381,7 +383,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
         }
         i32 from_fd = -1;
         if (!digits.empty()) {
-          const ErrorOr<i64> parsed = utils::parse_decimal_integer(digits);
+          const let parsed = utils::parse_decimal_integer(digits);
           if (parsed.is_error()) throw parsed.error();
           from_fd = static_cast<i32>(parsed.value());
         }
@@ -464,9 +466,9 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
       /* A run of digits touching a redirection operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
-        const String literal = static_cast<tokens::WordToken *>(token.get())
-                                   ->word()
-                                   .to_literal_string();
+        const let literal = static_cast<tokens::WordToken *>(token.get())
+                                ->word()
+                                .to_literal_string();
         bool is_all_digits = !literal.empty();
         for (usize i = 0; i < literal.size(); i++) {
           if (literal[i] < '0' || literal[i] > '9') {
@@ -475,19 +477,19 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
           }
         }
         if (is_all_digits) {
-          const SourceLocation word_location = token->source_location();
+          const let word_location = token->source_location();
           m_lexer.advance_past_last_peek();
           std::unique_ptr<Token> next{m_lexer.peek_shell_token()};
           ASSERT(next != NULL);
-          const Token::Kind nk = next->kind();
+          const let nk = next->kind();
           if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
                nk == Token::Kind::Less) &&
               next->source_location().position ==
                   word_location.position + word_location.length)
           {
-            const SourceLocation op_location = next->source_location();
+            const let op_location = next->source_location();
             m_lexer.advance_past_last_peek();
-            const ErrorOr<i64> parsed = utils::parse_decimal_integer(literal);
+            const let parsed = utils::parse_decimal_integer(literal);
             if (parsed.is_error()) throw parsed.error();
             add_redirection(static_cast<i32>(parsed.value()), nk, op_location);
             break;
@@ -545,15 +547,15 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
     case Token::Kind::Greater:
     case Token::Kind::DoubleGreater:
     case Token::Kind::Less: {
-      const Token::Kind op_kind = token->kind();
-      const SourceLocation op_location = token->source_location();
+      const let op_kind = token->kind();
+      const let op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       add_redirection((op_kind == Token::Kind::Less) ? 0 : 1, op_kind,
                       op_location);
     } break;
 
     case Token::Kind::DoubleLess: {
-      const SourceLocation op_location = token->source_location();
+      const let op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       if (!source_location) source_location = op_location;
 
@@ -566,7 +568,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
       const Word &delimiter_word =
           static_cast<tokens::WordToken *>(delimiter_token.get())->word();
 
-      const String delimiter_literal = delimiter_word.to_literal_string();
+      const let delimiter_literal = delimiter_word.to_literal_string();
       StringView delimiter = delimiter_literal.view();
       bool strip_tabs = false;
       /* <<- strips leading tabs, the dash touching the operator. */
@@ -606,12 +608,12 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
   unreachable();
 }
 
-fn Parser::parse_if() -> std::unique_ptr<Command>
+fn Parser::parse_if() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> if_token{m_lexer.next_shell_token()};
   ASSERT(if_token != NULL);
   ASSERT(if_token->kind() == Token::Kind::If);
-  const SourceLocation location = if_token->source_location();
+  const let location = if_token->source_location();
 
   ArrayList<std::pair<const Expression *, const Expression *>> branches{};
   const Expression *otherwise = nullptr;
@@ -631,9 +633,9 @@ fn Parser::parse_if() -> std::unique_ptr<Command>
     std::unique_ptr<Token> then_token{m_lexer.next_shell_token()};
     ASSERT(then_token != NULL);
     if (then_token->kind() != Token::Kind::Then) {
-      const char *const detail = is_empty_list(condition.get())
-                                     ? "expected a command for the condition"
-                                     : "expected 'then' after the condition";
+      const let detail = is_empty_list(condition.get())
+                             ? "expected a command for the condition"
+                             : "expected 'then' after the condition";
       throw ErrorWithLocationAndDetails{location, "Unterminated if",
                                         then_token->source_location(), detail};
     }
@@ -672,19 +674,20 @@ fn Parser::parse_if() -> std::unique_ptr<Command>
   return node;
 }
 
-fn Parser::parse_while_or_until(bool is_until) -> std::unique_ptr<Command>
+fn Parser::parse_while_or_until(bool is_until)
+    throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   ASSERT(keyword != NULL);
-  const SourceLocation location = keyword->source_location();
+  const let location = keyword->source_location();
 
   std::unique_ptr<Expression> condition{parse_command_list({Token::Kind::Do})};
   std::unique_ptr<Token> do_token{m_lexer.next_shell_token()};
   ASSERT(do_token != NULL);
   if (do_token->kind() != Token::Kind::Do) {
-    const char *const detail = is_empty_list(condition.get())
-                                   ? "expected a command for the loop condition"
-                                   : "expected 'do'";
+    const let detail = is_empty_list(condition.get())
+                           ? "expected a command for the loop condition"
+                           : "expected 'do'";
     throw ErrorWithLocationAndDetails{location, "Unterminated loop",
                                       do_token->source_location(), detail};
   }
@@ -701,11 +704,11 @@ fn Parser::parse_while_or_until(bool is_until) -> std::unique_ptr<Command>
       location, condition.release(), body.release(), is_until)};
 }
 
-fn Parser::parse_for() -> std::unique_ptr<Command>
+fn Parser::parse_for() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   ASSERT(keyword != NULL);
-  const SourceLocation location = keyword->source_location();
+  const let location = keyword->source_location();
 
   std::unique_ptr<Token> name_token{m_lexer.next_shell_token()};
   ASSERT(name_token != NULL);
@@ -713,7 +716,7 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
   }
-  const String variable_name = name_token->raw_string();
+  const let variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{};
   /* Free the released word tokens if the loop fails to parse. */
@@ -777,11 +780,11 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
       body.release())};
 }
 
-fn Parser::parse_case() -> std::unique_ptr<Command>
+fn Parser::parse_case() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
   ASSERT(keyword != NULL);
-  const SourceLocation location = keyword->source_location();
+  const let location = keyword->source_location();
 
   std::unique_ptr<Token> word{m_lexer.next_shell_token()};
   ASSERT(word != NULL);
@@ -876,7 +879,7 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
       location, word.release(), std::move(items))};
 }
 
-fn Parser::parse_brace_group() -> std::unique_ptr<Command>
+fn Parser::parse_brace_group() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
   ASSERT(open != NULL);
@@ -897,7 +900,7 @@ fn Parser::parse_brace_group() -> std::unique_ptr<Command>
       open->source_location(), body.release())};
 }
 
-fn Parser::parse_subshell() -> std::unique_ptr<Command>
+fn Parser::parse_subshell() throws -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
   ASSERT(open != NULL);
@@ -919,11 +922,11 @@ fn Parser::parse_subshell() -> std::unique_ptr<Command>
 }
 
 fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
-    -> std::unique_ptr<Command>
+    throws -> std::unique_ptr<Command>
 {
   ASSERT(name_token != NULL);
-  const SourceLocation location = name_token->source_location();
-  const String name = name_token->raw_string();
+  const let location = name_token->source_location();
+  const let name = name_token->raw_string();
 
   /* The opening parenthesis was peeked by the caller. Consume the empty pair.
    */
@@ -961,7 +964,8 @@ fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
 }
 
 /* A standard pratt-parser for expressions. */
-fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
+fn Parser::parse_expression(u8 min_precedence)
+    throws -> std::unique_ptr<Expression>
 {
   m_recursion_depth++;
   defer { m_recursion_depth--; };
@@ -981,7 +985,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
   /* Handle leaf type. We expect either a value, or an unary operator. */
   switch (t->kind()) {
   case Token::Kind::Number: {
-    const ErrorOr<i64> parsed = utils::parse_decimal_integer(t->raw_string());
+    const let parsed = utils::parse_decimal_integer(t->raw_string());
     if (parsed.is_error()) throw parsed.error();
     lhs =
         std::unique_ptr<ConstantNumber>{m_lexer.arena().create<ConstantNumber>(
@@ -1000,7 +1004,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
       after.reset(m_lexer.next_expression_token());
     }
     if (after->kind() != Token::Kind::Then) {
-      const String ast = after->to_ast_string();
+      const let ast = after->to_ast_string();
       throw ErrorWithLocation{after->source_location(),
                               "Expected 'Then' after the condition, found '" +
                                   ast.view() + "'"};
@@ -1058,15 +1062,14 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
   /* Now it's either a unary operator or something odd */
   default:
     if (t->flags() & Token::Flag::UnaryOperator) {
-      const tokens::Operator *const op =
-          static_cast<const tokens::Operator *>(t.get());
+      const let op = static_cast<const tokens::Operator *>(t.get());
 
       std::unique_ptr<Expression> rhs =
           parse_expression(op->unary_precedence());
 
       lhs = op->construct_unary_expression(rhs.release());
     } else {
-      const String raw = t->raw_string();
+      const let raw = t->raw_string();
       throw ErrorWithLocation{t->source_location(),
                               "Expected a value or an expression, found '" +
                                   raw.view() + "'"};
@@ -1098,7 +1101,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
     case Token::Kind::Else:
     case Token::Kind::Fi: {
       if (m_recursion_depth == 0) {
-        const String raw = maybe_op->raw_string();
+        const let raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
                                 "Unexpected '" + raw.view() +
                                     "' without matching If condition"};
@@ -1108,7 +1111,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
 
     case Token::Kind::Then: {
       if (m_if_condition_depth == 0) {
-        const String raw = maybe_op->raw_string();
+        const let raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
                                 "Unexpected '" + raw.view() +
                                     "' without matching If condition"};
@@ -1120,14 +1123,13 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
     }
 
     if (!(maybe_op->flags() & Token::Flag::BinaryOperator)) {
-      const String raw = maybe_op->raw_string();
+      const let raw = maybe_op->raw_string();
       throw ErrorWithLocation{maybe_op->source_location(),
                               "Expected a binary operator, found '" +
                                   raw.view() + "'"};
     }
 
-    const tokens::Operator *const op =
-        static_cast<const tokens::Operator *>(maybe_op.get());
+    const let op = static_cast<const tokens::Operator *>(maybe_op.get());
     if (op->left_precedence() < min_precedence) break;
     m_lexer.advance_past_last_peek();
 

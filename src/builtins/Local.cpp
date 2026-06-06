@@ -17,11 +17,11 @@ namespace shit {
 
 Local::Local() = default;
 
-Builtin::Kind Local::kind() const { return Kind::Local; }
+pure Builtin::Kind Local::kind() const wontthrow { return Kind::Local; }
 
-i32 Local::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -31,14 +31,14 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const
     throw Error{"'local' can only be used inside a function"};
 
   for (usize i = 1; i < args.size(); i++) {
-    const String &arg = args[i];
-    const Maybe<usize> equals_position = arg.find_character('=');
+    let const &arg = args[i];
+    let const equals_position = arg.find_character('=');
 
     /* Record the shadowed binding before overwriting it, so leaving the
        function restores it. A bare name shadows with an empty value. */
-    const StringView name = equals_position.has_value()
-                                ? arg.substring_of_length(0, *equals_position)
-                                : arg.view();
+    let const name = equals_position.has_value()
+                         ? arg.substring_of_length(0, *equals_position)
+                         : arg.view();
     cxt.declare_local(name);
 
     if (equals_position.has_value())

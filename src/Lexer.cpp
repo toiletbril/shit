@@ -19,7 +19,7 @@ namespace lexer {
 
 static constexpr char CEOF = static_cast<char>(EOF);
 
-fn is_whitespace(char ch) -> bool
+pure fn is_whitespace(char ch) wontthrow -> bool
 {
   switch (ch) {
   case ' ':
@@ -30,9 +30,9 @@ fn is_whitespace(char ch) -> bool
   }
 }
 
-fn is_number(char ch) -> bool { return ch >= '0' && ch <= '9'; }
+pure fn is_number(char ch) wontthrow -> bool { return ch >= '0' && ch <= '9'; }
 
-fn is_expression_sentinel(char ch) -> bool
+pure fn is_expression_sentinel(char ch) wontthrow -> bool
 {
   switch (ch) {
   case '\n':
@@ -58,7 +58,7 @@ fn is_expression_sentinel(char ch) -> bool
 }
 
 /* TODO: Separate redirections from here. */
-fn is_shell_sentinel(char ch) -> bool
+pure fn is_shell_sentinel(char ch) wontthrow -> bool
 {
   switch (ch) {
   case '\n':
@@ -75,12 +75,12 @@ fn is_shell_sentinel(char ch) -> bool
   };
 }
 
-fn is_part_of_identifier(char ch) -> bool
+pure fn is_part_of_identifier(char ch) wontthrow -> bool
 {
   return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
 }
 
-fn is_string_quote(char ch) -> bool
+pure fn is_string_quote(char ch) wontthrow -> bool
 {
   /* A backtick is intentionally not a quote here. It stays a literal character
      so the prepass can warn and point at $(...), rather than failing the lex.
@@ -92,12 +92,12 @@ fn is_string_quote(char ch) -> bool
   }
 }
 
-fn is_ascii_char(char ch) -> bool
+pure fn is_ascii_char(char ch) wontthrow -> bool
 {
   return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
 
-fn is_expandable_char(char ch) -> bool
+pure fn is_expandable_char(char ch) wontthrow -> bool
 {
   switch (ch) {
   case '[':
@@ -107,12 +107,12 @@ fn is_expandable_char(char ch) -> bool
   }
 }
 
-fn is_variable_name_start(char ch) -> bool
+pure fn is_variable_name_start(char ch) wontthrow -> bool
 {
   return is_ascii_char(ch) || ch == '_';
 }
 
-fn is_variable_name(char ch) -> bool
+pure fn is_variable_name(char ch) wontthrow -> bool
 {
   return is_variable_name_start(ch) || is_number(ch);
 }
@@ -131,23 +131,23 @@ Lexer::~Lexer()
     delete body;
 }
 
-fn Lexer::peek_expression_token() -> Token *
+fn Lexer::peek_expression_token() throws -> Token *
 {
   skip_whitespace();
   return lex_expression_token();
 }
 
-fn Lexer::peek_shell_token() -> Token *
+fn Lexer::peek_shell_token() throws -> Token *
 {
   skip_whitespace();
   return lex_shell_token();
 }
 
-fn Lexer::next_expression_token() -> Token *
+fn Lexer::next_expression_token() throws -> Token *
 {
   skip_whitespace();
 
-  Token *const t = lex_expression_token();
+  const let t = lex_expression_token();
   ASSERT(t != NULL);
 
   advance_past_last_peek();
@@ -155,11 +155,11 @@ fn Lexer::next_expression_token() -> Token *
   return t;
 }
 
-fn Lexer::next_shell_token() -> Token *
+fn Lexer::next_shell_token() throws -> Token *
 {
   skip_whitespace();
 
-  Token *const t = lex_shell_token();
+  const let t = lex_shell_token();
   ASSERT(t != NULL);
 
   advance_past_last_peek();
@@ -167,22 +167,22 @@ fn Lexer::next_shell_token() -> Token *
   return t;
 }
 
-fn Lexer::source() const -> StringView { return m_source.view(); }
+pure fn Lexer::source() const wontthrow -> StringView { return m_source.view(); }
 
-fn Lexer::debug_words() const -> const ArrayList<Word> &
+pure fn Lexer::debug_words() const wontthrow -> const ArrayList<Word> &
 {
   return m_debug_words;
 }
 
-fn Lexer::arena() const -> BumpArena & { return *m_arena; }
+pure fn Lexer::arena() const wontthrow -> BumpArena & { return *m_arena; }
 
-fn Lexer::set_arena(BumpArena &arena) -> void { m_arena = &arena; }
+fn Lexer::set_arena(BumpArena &arena) wontthrow -> void { m_arena = &arena; }
 
-fn Lexer::advance_past_last_peek() -> usize
+fn Lexer::advance_past_last_peek() throws -> usize
 {
   ASSERT(m_cursor_position + m_cached_offset <= m_source.length());
 
-  const usize r = advance_forward(m_cached_offset);
+  const let r = advance_forward(m_cached_offset);
   m_cached_offset = 0;
 
   /* Consuming the newline that ends a line with a pending heredoc is where the
@@ -196,9 +196,9 @@ fn Lexer::advance_past_last_peek() -> usize
 }
 
 fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
-    -> const std::string *
+    throws -> const std::string *
 {
-  std::string *body = new std::string{};
+  let body = new std::string{};
   ASSERT(body != NULL);
 
   m_heredoc_bodies.push(body);
@@ -207,7 +207,7 @@ fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
   return body;
 }
 
-fn Lexer::collect_pending_heredocs() -> void
+fn Lexer::collect_pending_heredocs() throws -> void
 {
   for (HeredocPending &pending : m_pending_heredocs) {
     /* The body is written into the lexer-owned std::string the parsed
@@ -216,13 +216,13 @@ fn Lexer::collect_pending_heredocs() -> void
     for (;;) {
       if (m_cursor_position >= m_source.length()) break;
 
-      const usize line_start = m_cursor_position;
+      const let line_start = m_cursor_position;
       ASSERT(line_start <= m_source.length());
 
       usize i = line_start;
       while (i < m_source.length() && m_source[i] != '\n')
         i++;
-      const bool has_newline = (i < m_source.length());
+      const let has_newline = (i < m_source.length());
       m_cursor_position = has_newline ? i + 1 : i;
 
       usize line_offset = line_start;
@@ -234,8 +234,7 @@ fn Lexer::collect_pending_heredocs() -> void
         }
       }
 
-      const StringView line =
-          m_source.substring_of_length(line_offset, line_length);
+      const let line = m_source.substring_of_length(line_offset, line_length);
       if (pending.delimiter == line) break;
       collected.append(line.data, line.length);
       collected += '\n';
@@ -246,9 +245,9 @@ fn Lexer::collect_pending_heredocs() -> void
   m_pending_heredocs.clear();
 }
 
-fn Lexer::lex_expression_token() -> Token *
+fn Lexer::lex_expression_token() throws -> Token *
 {
-  if (const char ch = chop_character(); ch != lexer::CEOF) {
+  if (const let ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_number(ch))
       return lex_number();
     else if (lexer::is_expression_sentinel(ch))
@@ -265,10 +264,10 @@ fn Lexer::lex_expression_token() -> Token *
   return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
 }
 
-fn Lexer::lex_shell_token() -> Token *
+fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *t{};
-  if (const char ch = chop_character(); ch != lexer::CEOF) {
+  if (const let ch = chop_character(); ch != lexer::CEOF) {
     if (lexer::is_shell_sentinel(ch))
       t = lex_sentinel();
     else if (lexer::is_part_of_identifier(ch))
@@ -289,7 +288,7 @@ fn Lexer::lex_shell_token() -> Token *
   return t;
 }
 
-fn Lexer::skip_whitespace() -> void
+fn Lexer::skip_whitespace() wontthrow -> void
 {
   usize i = 0;
   for (;;) {
@@ -308,14 +307,14 @@ fn Lexer::skip_whitespace() -> void
   advance_forward(i);
 }
 
-fn Lexer::advance_forward(usize offset) -> usize
+fn Lexer::advance_forward(usize offset) wontthrow -> usize
 {
   ASSERT(m_cursor_position + offset <= m_source.length());
   m_cursor_position += offset;
   return offset;
 }
 
-fn Lexer::chop_character(usize offset) -> char
+fn Lexer::chop_character(usize offset) wontthrow -> char
 {
   if (m_cursor_position + offset < m_source.length())
     return m_source[m_cursor_position + offset];
@@ -323,7 +322,7 @@ fn Lexer::chop_character(usize offset) -> char
   return lexer::CEOF;
 }
 
-fn Lexer::lex_number() -> Token *
+fn Lexer::lex_number() throws -> Token *
 {
   char ch;
   String digits{};
@@ -343,7 +342,7 @@ fn Lexer::lex_number() -> Token *
   return num;
 }
 
-fn Lexer::lex_identifier() -> Token *
+fn Lexer::lex_identifier() throws -> Token *
 {
   Word word{};
 
@@ -370,9 +369,9 @@ fn Lexer::lex_identifier() -> Token *
   };
 
   for (;;) {
-    const char ch = chop_character(byte_count);
+    const let ch = chop_character(byte_count);
 
-    const bool is_inside_quote_or_escape =
+    const let is_inside_quote_or_escape =
         quote_char.has_value() || should_escape;
     if (!lexer::is_part_of_identifier(ch) &&
         !(is_inside_quote_or_escape && ch != lexer::CEOF))
@@ -408,7 +407,7 @@ fn Lexer::lex_identifier() -> Token *
          "\n" is a backslash and an n, not an escape. Outside double quotes a
          backslash escapes the next character. */
       if (quote_char == '"') {
-        const char escaped_next = chop_character(byte_count + 1);
+        const let escaped_next = chop_character(byte_count + 1);
         if (escaped_next == '$' || escaped_next == '`' || escaped_next == '"' ||
             escaped_next == '\\' || escaped_next == '\n')
         {
@@ -424,7 +423,7 @@ fn Lexer::lex_identifier() -> Token *
       continue;
     }
 
-    const bool is_in_double_quotes = quote_char == '"';
+    const let is_in_double_quotes = quote_char == '"';
 
     if (is_in_double_quotes && ch == '"') {
       quote_char.reset();
@@ -456,7 +455,7 @@ fn Lexer::lex_identifier() -> Token *
           String arithmetic{};
           usize group_depth = 0;
           for (;;) {
-            const char c = chop_character(byte_count);
+            const let c = chop_character(byte_count);
             if (c == lexer::CEOF) {
               throw ErrorWithLocationAndDetails{
                   here(m_cursor_position, byte_count),
@@ -491,7 +490,7 @@ fn Lexer::lex_identifier() -> Token *
         usize depth = 1;
         char quote = 0;
         for (;;) {
-          const char c = chop_character(byte_count);
+          const let c = chop_character(byte_count);
           if (c == lexer::CEOF) {
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position, byte_count),
@@ -509,7 +508,7 @@ fn Lexer::lex_identifier() -> Token *
           }
           if (c == '\\') {
             inner += c;
-            const char escaped = chop_character(byte_count);
+            const let escaped = chop_character(byte_count);
             if (escaped != lexer::CEOF) {
               byte_count++;
               inner += escaped;
@@ -535,7 +534,7 @@ fn Lexer::lex_identifier() -> Token *
         byte_count++;
         String name{};
         for (;;) {
-          const char c = chop_character(byte_count);
+          const let c = chop_character(byte_count);
           if (c == lexer::CEOF) {
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position + byte_count, 1),
@@ -606,7 +605,7 @@ fn Lexer::lex_identifier() -> Token *
     };
   }
 
-  const usize actual_cursor_position =
+  const let actual_cursor_position =
       m_cursor_position + escaped_newline_count;
   ASSERT(actual_cursor_position <= m_source.length());
 
@@ -631,7 +630,7 @@ fn Lexer::lex_identifier() -> Token *
     /* A bare word may name a keyword. A quoted or escaped word never does, so
        only a single unquoted segment qualifies. */
     const String &word_text = word.segments[0].text;
-    if (const Maybe<Token::Kind> kw =
+    if (const let kw =
             KEYWORDS.find(StringView{word_text.data(), word_text.size()}))
     {
       switch (*kw) {
@@ -657,7 +656,7 @@ fn Lexer::lex_identifier() -> Token *
 /* The token kind a single operator character begins, or None when the
    character is not an operator. The switch keeps this allocation free and the
    compiler lowers it to a jump table. */
-static fn lookup_operator(char ch) -> Maybe<Token::Kind>
+pure static fn lookup_operator(char ch) wontthrow -> Maybe<Token::Kind>
 {
   switch (ch) {
   case ')': return Token::Kind::RightParen;
@@ -686,9 +685,9 @@ static fn lookup_operator(char ch) -> Maybe<Token::Kind>
   }
 }
 
-fn Lexer::lex_sentinel() -> Token *
+fn Lexer::lex_sentinel() throws -> Token *
 {
-  const char ch = chop_character();
+  const let ch = chop_character();
   ASSERT(ch != lexer::CEOF);
 
   usize extra_length = 0;
@@ -725,7 +724,7 @@ fn Lexer::lex_sentinel() -> Token *
   } break;
   /* clang-format on */
 
-  if (const Maybe<Token::Kind> op = lookup_operator(ch)) {
+  if (const let op = lookup_operator(ch)) {
     switch (*op) {
       TOKEN_CASE_ONE(RightParen);
       TOKEN_CASE_ONE(LeftParen);

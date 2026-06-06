@@ -13,9 +13,9 @@ namespace shit {
 
 Export::Export() = default;
 
-fn Export::kind() const -> Builtin::Kind { return Kind::Export; }
+pure fn Export::kind() const wontthrow -> Builtin::Kind { return Kind::Export; }
 
-fn Export::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const args = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };

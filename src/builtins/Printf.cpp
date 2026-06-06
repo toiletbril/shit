@@ -16,31 +16,31 @@ namespace {
 /* Parse one signed integer argument the way printf does, in base zero. A
    leading 0x marks hexadecimal, otherwise the digits are decimal. A malformed
    argument yields zero. */
-i64 parse_printf_integer(const String &arg)
+i64 parse_printf_integer(const String &arg) throws
 {
   usize first_digit = 0;
   if (first_digit < arg.size() &&
       (arg[first_digit] == '+' || arg[first_digit] == '-'))
     first_digit++;
-  const bool is_hexadecimal =
+  let const is_hexadecimal =
       first_digit + 1 < arg.size() && arg[first_digit] == '0' &&
       (arg[first_digit + 1] == 'x' || arg[first_digit + 1] == 'X');
   /* A leading zero that is not 0x marks octal, as the C base-zero strtoll the
      old code used did, so printf '%d' 010 yields 8. */
-  const bool is_octal = !is_hexadecimal && first_digit < arg.size() &&
-                        arg[first_digit] == '0' && first_digit + 1 < arg.size();
-  const ErrorOr<i64> parsed = is_hexadecimal
+  let const is_octal = !is_hexadecimal && first_digit < arg.size() &&
+                       arg[first_digit] == '0' && first_digit + 1 < arg.size();
+  let const parsed = is_hexadecimal
                                   ? utils::parse_hexadecimal_integer(arg)
                               : is_octal ? utils::parse_octal_integer(arg)
                                          : utils::parse_decimal_integer(arg);
   return parsed.is_error() ? 0 : parsed.value();
 }
 
-void append_escape(String &out, const String &fmt, usize &i)
+void append_escape(String &out, const String &fmt, usize &i) throws
 {
   ASSERT(i < fmt.length());
 
-  const char e = fmt[i];
+  let const e = fmt[i];
   switch (e) {
   case 'n': out += '\n'; break;
   case 't': out += '\t'; break;
@@ -60,7 +60,7 @@ void append_escape(String &out, const String &fmt, usize &i)
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
 void append_conversion(String &out, const String &spec, char conv,
-                       const String &arg)
+                       const String &arg) throws
 {
   char buffer[256];
 
@@ -72,7 +72,7 @@ void append_conversion(String &out, const String &spec, char conv,
   } else if (conv == 'c') {
     out += arg.empty() ? '\0' : arg[0];
   } else if (conv == 'd' || conv == 'i') {
-    const String with_ll = spec + "lld";
+    let const with_ll = spec + "lld";
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<long long>(parse_printf_integer(arg)));
     out += buffer;
@@ -94,9 +94,9 @@ void append_conversion(String &out, const String &spec, char conv,
 
 Printf::Printf() = default;
 
-Builtin::Kind Printf::kind() const { return Kind::Printf; }
+pure Builtin::Kind Printf::kind() const wontthrow { return Kind::Printf; }
 
-i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
@@ -104,7 +104,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (ec.args().size() < 2) return 0;
 
-  const String &fmt = ec.args()[1];
+  let const &fmt = ec.args()[1];
   ArrayList<String> operands{};
   for (usize i = 2; i < ec.args().size(); i++)
     operands.push(ec.args()[i]);
@@ -142,13 +142,13 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
         break;
       }
 
-      const char conv = fmt[i];
+      let const conv = fmt[i];
       if (conv == '%') {
         out += '%';
         continue;
       }
 
-      const String arg =
+      let const arg =
           operand_index < operands.size() ? operands[operand_index] : String{};
       append_conversion(out, spec, conv, arg);
       operand_index++;

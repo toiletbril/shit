@@ -10,35 +10,38 @@ namespace shit {
 
 Token::Token(SourceLocation location) : m_location(location) {}
 
-fn Token::source_location() const -> SourceLocation { return m_location; }
+pure fn Token::source_location() const wontthrow -> SourceLocation
+{
+  return m_location;
+}
 
-fn Token::operator delete(void *pointer) -> void
+fn Token::operator delete(void *pointer) wontthrow -> void
 {
   if (is_arena_pointer(pointer)) return;
   ::operator delete(pointer);
 }
 
-fn Token::to_ast_string() const -> String { return raw_string(); }
+fn Token::to_ast_string() const throws -> String { return raw_string(); }
 
-fn WordSegment::is_split_eligible() const -> bool
+pure fn WordSegment::is_split_eligible() const wontthrow -> bool
 {
   return kind == Kind::UnquotedText ||
          (kind == Kind::VariableReference && !is_in_double_quotes);
 }
 
-fn WordSegment::has_live_glob_chars() const -> bool
+pure fn WordSegment::has_live_glob_chars() const wontthrow -> bool
 {
   return kind == Kind::UnquotedText;
 }
 
-fn WordSegment::is_tilde_candidate() const -> bool
+pure fn WordSegment::is_tilde_candidate() const wontthrow -> bool
 {
   return kind == Kind::UnquotedText;
 }
 
-fn Word::is_empty() const -> bool { return segments.empty(); }
+pure fn Word::is_empty() const wontthrow -> bool { return segments.empty(); }
 
-fn Word::to_literal_string() const -> String
+fn Word::to_literal_string() const throws -> String
 {
   String result{};
   for (const WordSegment &segment : segments) {
@@ -60,7 +63,7 @@ fn Word::to_literal_string() const -> String
   return result;
 }
 
-fn Word::to_pretty_string() const -> String
+fn Word::to_pretty_string() const throws -> String
 {
   String result{"[Word"};
   for (const WordSegment &segment : segments) {
@@ -85,14 +88,14 @@ fn Word::to_pretty_string() const -> String
   return result;
 }
 
-fn Word::get_assignment_split() const -> Maybe<std::pair<String, Word>>
+fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word>>
 {
   if (segments.empty()) return shit::None;
 
   const WordSegment &first = segments[0];
   if (first.kind != WordSegment::Kind::UnquotedText) return shit::None;
 
-  const Maybe<usize> equals_position = first.text.find_character('=');
+  const let equals_position = first.text.find_character('=');
   if (!equals_position.has_value() || *equals_position == 0) return shit::None;
 
   ASSERT(*equals_position <= first.text.size());
@@ -102,8 +105,7 @@ fn Word::get_assignment_split() const -> Maybe<std::pair<String, Word>>
     if (!lexer::is_variable_name(first.text[i])) return shit::None;
   }
 
-  const StringView name_view =
-      first.text.substring_of_length(0, *equals_position);
+  const let name_view = first.text.substring_of_length(0, *equals_position);
   String name{name_view};
 
   Word value{};
@@ -122,9 +124,9 @@ namespace tokens {
 
 #define KEYWORD_TOKEN_DECLS(t, s)                                              \
   t::t(SourceLocation location) : Token(location) {}                           \
-  Token::Kind t::kind() const { return Token::Kind::t; }                       \
-  Token::Flags t::flags() const { return Token::Flag::Keyword; }               \
-  String t::raw_string() const { return s; }
+  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  Token::Flags t::flags() const wontthrow { return Token::Flag::Keyword; }     \
+  String t::raw_string() const throws { return s; }
 
 KEYWORD_TOKEN_DECLS(If, "if");
 KEYWORD_TOKEN_DECLS(Then, "then");
@@ -146,21 +148,21 @@ KEYWORD_TOKEN_DECLS(Function, "function");
    internal token name. */
 #define SENTINEL_TOKEN_DECLS_COMPOUND(t, s)                                    \
   t::t(SourceLocation location) : Token(location) {}                           \
-  Token::Kind t::kind() const { return Token::Kind::t; }                       \
-  Token::Flags t::flags() const                                                \
+  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  Token::Flags t::flags() const wontthrow                                      \
   {                                                                            \
     return Token::Flag::Sentinel | Token::Flag::CompoundList;                  \
   }                                                                            \
-  String t::raw_string() const { return s; }
+  String t::raw_string() const throws { return s; }
 
 SENTINEL_TOKEN_DECLS_COMPOUND(Newline, "newline");
 SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
 
 #define SENTINEL_TOKEN_DECLS(t, s)                                             \
   t::t(SourceLocation location) : Token(location) {}                           \
-  Token::Kind t::kind() const { return Token::Kind::t; }                       \
-  Token::Flags t::flags() const { return Token::Flag::Sentinel; }              \
-  String t::raw_string() const { return s; }
+  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  Token::Flags t::flags() const wontthrow { return Token::Flag::Sentinel; }    \
+  String t::raw_string() const throws { return s; }
 
 SENTINEL_TOKEN_DECLS(EndOfFile, "end of input");
 SENTINEL_TOKEN_DECLS(DoubleSemicolon, ";;");
@@ -179,23 +181,32 @@ Value::Value(SourceLocation location, StringView sv)
     : Token(location), m_value(sv)
 {}
 
-fn Value::raw_string() const -> String { return m_value; }
+fn Value::raw_string() const throws -> String { return m_value; }
 
 Number::Number(SourceLocation location, StringView sv) : Value(location, sv) {}
 
-fn Number::kind() const -> Token::Kind { return Token::Kind::Number; }
+fn Number::kind() const wontthrow -> Token::Kind { return Token::Kind::Number; }
 
-fn Number::flags() const -> Token::Flags { return Token::Flag::Value; }
+fn Number::flags() const wontthrow -> Token::Flags
+{
+  return Token::Flag::Value;
+}
 
 Assignment::Assignment(SourceLocation location, StringView key, Word value)
     : Token(location), m_key(key), m_value(std::move(value))
 {}
 
-fn Assignment::kind() const -> Token::Kind { return Token::Kind::Assignment; }
+fn Assignment::kind() const wontthrow -> Token::Kind
+{
+  return Token::Kind::Assignment;
+}
 
-fn Assignment::flags() const -> Token::Flags { return Token::Flag::Special; }
+fn Assignment::flags() const wontthrow -> Token::Flags
+{
+  return Token::Flag::Special;
+}
 
-fn Assignment::raw_string() const -> String
+fn Assignment::raw_string() const throws -> String
 {
   String result{m_key};
   result += "=";
@@ -203,9 +214,12 @@ fn Assignment::raw_string() const -> String
   return result;
 }
 
-fn Assignment::key() const -> const String & { return m_key; }
+pure fn Assignment::key() const wontthrow -> const String & { return m_key; }
 
-fn Assignment::value_word() const -> const Word & { return m_value; }
+pure fn Assignment::value_word() const wontthrow -> const Word &
+{
+  return m_value;
+}
 
 WordToken::WordToken(SourceLocation location, Word word)
     : Value(location, ""), m_word(std::move(word))
@@ -213,44 +227,68 @@ WordToken::WordToken(SourceLocation location, Word word)
   m_value = m_word.to_literal_string();
 }
 
-fn WordToken::kind() const -> Token::Kind { return Token::Kind::Word; }
+fn WordToken::kind() const wontthrow -> Token::Kind
+{
+  return Token::Kind::Word;
+}
 
-fn WordToken::flags() const -> Token::Flags { return Token::Flag::Value; }
+fn WordToken::flags() const wontthrow -> Token::Flags
+{
+  return Token::Flag::Value;
+}
 
-fn WordToken::word() const -> const Word & { return m_word; }
+pure fn WordToken::word() const wontthrow -> const Word & { return m_word; }
 
 Identifier::Identifier(SourceLocation location, StringView sv)
     : Value(location, sv)
 {}
 
-fn Identifier::kind() const -> Token::Kind { return Token::Kind::Identifier; }
+fn Identifier::kind() const wontthrow -> Token::Kind
+{
+  return Token::Kind::Identifier;
+}
 
-fn Identifier::flags() const -> Token::Flags { return Token::Flag::Value; }
+fn Identifier::flags() const wontthrow -> Token::Flags
+{
+  return Token::Flag::Value;
+}
 
 Redirection::Redirection(SourceLocation location, StringView what_fd,
                          StringView to_file)
     : Token(location), m_from_fd(what_fd), m_to_file(to_file)
 {}
 
-fn Redirection::kind() const -> Token::Kind { return Token::Kind::Redirection; }
+fn Redirection::kind() const wontthrow -> Token::Kind
+{
+  return Token::Kind::Redirection;
+}
 
-fn Redirection::flags() const -> Token::Flags { return Token::Flag::Special; }
+fn Redirection::flags() const wontthrow -> Token::Flags
+{
+  return Token::Flag::Special;
+}
 
-fn Redirection::from_fd() const -> const String & { return m_from_fd; }
+pure fn Redirection::from_fd() const wontthrow -> const String &
+{
+  return m_from_fd;
+}
 
-fn Redirection::to_file() const -> const String & { return m_to_file; }
+pure fn Redirection::to_file() const wontthrow -> const String &
+{
+  return m_to_file;
+}
 
 Operator::Operator(SourceLocation location) : Token(location) {}
 
-fn Operator::left_precedence() const -> u8 { return 0; }
+fn Operator::left_precedence() const wontthrow -> u8 { return 0; }
 
-fn Operator::unary_precedence() const -> u8 { return 0; }
+fn Operator::unary_precedence() const wontthrow -> u8 { return 0; }
 
-fn Operator::binary_left_associative() const -> bool { return true; }
+fn Operator::binary_left_associative() const wontthrow -> bool { return true; }
 
 fn Operator::construct_binary_expression(const Expression *lhs,
                                          const Expression *rhs) const
-    -> std::unique_ptr<Expression>
+    throws -> std::unique_ptr<Expression>
 {
   unused(lhs);
   unused(rhs);
@@ -259,7 +297,7 @@ fn Operator::construct_binary_expression(const Expression *lhs,
 }
 
 fn Operator::construct_unary_expression(const Expression *rhs) const
-    -> std::unique_ptr<Expression>
+    throws -> std::unique_ptr<Expression>
 {
   unused(rhs);
   unreachable("Invalid unary operator construction of type %d",
@@ -268,21 +306,21 @@ fn Operator::construct_unary_expression(const Expression *rhs) const
 
 #define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \
   t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind t::kind() const { return Token::Kind::t; }                       \
-  Token::Flags t::flags() const                                                \
+  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  Token::Flags t::flags() const wontthrow                                      \
   {                                                                            \
     return Token::Flag::BinaryOperator | Token::Flag::UnaryOperator;           \
   }                                                                            \
-  String t::raw_string() const { return s; }                                   \
-  u8 t::left_precedence() const { return bp; }                                 \
-  u8 t::unary_precedence() const { return up; }                                \
+  String t::raw_string() const throws { return s; }                            \
+  u8 t::left_precedence() const wontthrow { return bp; }                       \
+  u8 t::unary_precedence() const wontthrow { return up; }                      \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
-      const Expression *lhs, const Expression *rhs) const                      \
+      const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
     return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
   }                                                                            \
   std::unique_ptr<Expression> t::construct_unary_expression(                   \
-      const Expression *rhs) const                                             \
+      const Expression *rhs) const throws                                      \
   {                                                                            \
     return std::make_unique<expressions::uexpr>(source_location(), rhs);       \
   }
@@ -292,27 +330,30 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
 
 #define BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(t, s, bp, bexpr)                  \
   t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind t::kind() const { return Token::Kind::t; }                       \
-  Token::Flags t::flags() const                                                \
+  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  Token::Flags t::flags() const wontthrow                                      \
   {                                                                            \
     return Token::Flag::BinaryOperator | Token::Flag::CompoundList;            \
   }                                                                            \
-  String t::raw_string() const { return s; }                                   \
-  u8 t::left_precedence() const { return bp; }                                 \
+  String t::raw_string() const throws { return s; }                            \
+  u8 t::left_precedence() const wontthrow { return bp; }                       \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
-      const Expression *lhs, const Expression *rhs) const                      \
+      const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
     return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
   }
 
 #define BINARY_OPERATOR_TOKEN_DECLS(t, s, bp, bexpr)                           \
   t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind t::kind() const { return Token::Kind::t; }                       \
-  Token::Flags t::flags() const { return Token::Flag::BinaryOperator; }        \
-  String t::raw_string() const { return s; }                                   \
-  u8 t::left_precedence() const { return bp; }                                 \
+  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  Token::Flags t::flags() const wontthrow                                      \
+  {                                                                            \
+    return Token::Flag::BinaryOperator;                                        \
+  }                                                                            \
+  String t::raw_string() const throws { return s; }                            \
+  u8 t::left_precedence() const wontthrow { return bp; }                       \
   std::unique_ptr<Expression> t::construct_binary_expression(                  \
-      const Expression *lhs, const Expression *rhs) const                      \
+      const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
     return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
   }
@@ -338,12 +379,15 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
 
 #define UNARY_OPERATOR_TOKEN_DECLS(t, s, up, uexpr)                            \
   t::t(SourceLocation location) : Operator(location) {}                        \
-  Token::Kind t::kind() const { return Token::Kind::t; }                       \
-  Token::Flags t::flags() const { return Token::Flag::UnaryOperator; }         \
-  String t::raw_string() const { return s; }                                   \
-  u8 t::unary_precedence() const { return up; }                                \
+  Token::Kind t::kind() const wontthrow { return Token::Kind::t; }             \
+  Token::Flags t::flags() const wontthrow                                      \
+  {                                                                            \
+    return Token::Flag::UnaryOperator;                                         \
+  }                                                                            \
+  String t::raw_string() const throws { return s; }                            \
+  u8 t::unary_precedence() const wontthrow { return up; }                      \
   std::unique_ptr<Expression> t::construct_unary_expression(                   \
-      const Expression *rhs) const                                             \
+      const Expression *rhs) const throws                                      \
   {                                                                            \
     return std::make_unique<expressions::uexpr>(source_location(), rhs);       \
   }

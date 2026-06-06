@@ -6,9 +6,9 @@ namespace shit {
 
 Echo::Echo() = default;
 
-fn Echo::kind() const -> Builtin::Kind { return Kind::Echo; }
+pure fn Echo::kind() const wontthrow -> Builtin::Kind { return Kind::Echo; }
 
-fn Echo::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(cxt);
 

@@ -16,18 +16,18 @@ namespace shit {
 
 Unset::Unset() = default;
 
-Builtin::Kind Unset::kind() const { return Kind::Unset; }
+pure Builtin::Kind Unset::kind() const wontthrow { return Kind::Unset; }
 
-i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  const ArrayList<String> names = parse_flags_vec(FLAG_LIST, ec.args());
+  let const names = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };
 
   ASSERT(!names.empty());
 
-  const bool unset_function = FLAG_UNSET_FUNCTION.is_enabled();
+  let const unset_function = FLAG_UNSET_FUNCTION.is_enabled();
   for (usize i = 1; i < names.size(); i++) {
-    const String &name = names[i];
+    let const &name = names[i];
     if (unset_function)
       cxt.unset_function(name);
     else

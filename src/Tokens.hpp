@@ -37,9 +37,9 @@ struct WordSegment
   String text;
   bool is_in_double_quotes{false};
 
-  fn is_split_eligible() const -> bool;
-  fn has_live_glob_chars() const -> bool;
-  fn is_tilde_candidate() const -> bool;
+  pure fn is_split_eligible() const wontthrow -> bool;
+  pure fn has_live_glob_chars() const wontthrow -> bool;
+  pure fn is_tilde_candidate() const wontthrow -> bool;
 };
 
 /* A lexed word carries its quoting structure as ordered segments. The evaluator
@@ -49,15 +49,15 @@ struct Word
 {
   ArrayList<WordSegment> segments{heap_allocator()};
 
-  fn is_empty() const -> bool;
-  fn to_literal_string() const -> String;
-  fn to_pretty_string() const -> String;
+  pure fn is_empty() const wontthrow -> bool;
+  fn to_literal_string() const throws -> String;
+  fn to_pretty_string() const throws -> String;
 
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. The pair
      stays std::pair here, since a named struct holding a Word by value cannot
      complete inside Word's own definition. */
-  fn get_assignment_split() const -> Maybe<std::pair<String, Word>>;
+  fn get_assignment_split() const throws -> Maybe<std::pair<String, Word>>;
 };
 
 /**
@@ -160,18 +160,18 @@ struct Token
   Token &operator=(const Token &) = delete;
   Token &operator=(Token &&) noexcept = delete;
 
-  virtual fn kind() const -> Kind = 0;
-  virtual fn flags() const -> Flags = 0;
-  virtual fn raw_string() const -> String = 0;
+  virtual fn kind() const wontthrow -> Kind = 0;
+  virtual fn flags() const wontthrow -> Flags = 0;
+  virtual fn raw_string() const throws -> String = 0;
 
-  virtual fn to_ast_string() const -> String;
+  virtual fn to_ast_string() const throws -> String;
 
-  fn source_location() const -> SourceLocation;
+  pure fn source_location() const wontthrow -> SourceLocation;
 
   /* A token lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap token otherwise. The
      destructor still runs through the normal delete. */
-  static fn operator delete(void *pointer)->void;
+  static fn operator delete(void *pointer)wontthrow -> void;
 
 protected:
   Token(SourceLocation location);
@@ -234,9 +234,9 @@ namespace tokens {
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind kind() const override;                                                \
-    Flags flags() const override;                                              \
-    String raw_string() const override;                                        \
+    Kind kind() const wontthrow override;                                      \
+    Flags flags() const wontthrow override;                                    \
+    String raw_string() const throws override;                                 \
   }
 
 TOKEN_STRUCT(If);
@@ -275,11 +275,11 @@ struct Redirection : Token
 {
   Redirection(SourceLocation location, StringView what_fd, StringView to_file);
 
-  fn kind() const -> Kind override;
-  fn flags() const -> Flags override;
+  fn kind() const wontthrow -> Kind override;
+  fn flags() const wontthrow -> Flags override;
 
-  fn from_fd() const -> const String &;
-  fn to_file() const -> const String &;
+  pure fn from_fd() const wontthrow -> const String &;
+  pure fn to_file() const wontthrow -> const String &;
 
 protected:
   String m_from_fd{};
@@ -290,13 +290,13 @@ struct Assignment : public Token
 {
   Assignment(SourceLocation location, StringView key, Word value);
 
-  fn kind() const -> Kind override;
-  fn flags() const -> Flags override;
+  fn kind() const wontthrow -> Kind override;
+  fn flags() const wontthrow -> Flags override;
 
-  fn raw_string() const -> String override;
+  fn raw_string() const throws -> String override;
 
-  fn key() const -> const String &;
-  fn value_word() const -> const Word &;
+  pure fn key() const wontthrow -> const String &;
+  pure fn value_word() const wontthrow -> const Word &;
 
 protected:
   String m_key;
@@ -308,7 +308,7 @@ struct Value : public Token
 {
   Value(SourceLocation location, StringView sv);
 
-  fn raw_string() const -> String override;
+  fn raw_string() const throws -> String override;
 
 protected:
   String m_value;
@@ -319,8 +319,8 @@ protected:
   {                                                                            \
     t(SourceLocation location, StringView sv);                                 \
                                                                                \
-    Kind kind() const override;                                                \
-    Flags flags() const override;                                              \
+    Kind kind() const wontthrow override;                                      \
+    Flags flags() const wontthrow override;                                    \
   }
 
 VALUE_TOKEN_STRUCT(Number);
@@ -330,10 +330,10 @@ struct WordToken : public Value
 {
   WordToken(SourceLocation location, Word word);
 
-  fn kind() const -> Kind override;
-  fn flags() const -> Flags override;
+  fn kind() const wontthrow -> Kind override;
+  fn flags() const wontthrow -> Flags override;
 
-  fn word() const -> const Word &;
+  pure fn word() const wontthrow -> const Word &;
 
 protected:
   Word m_word;
@@ -343,16 +343,16 @@ struct Operator : public Token
 {
   Operator(SourceLocation location);
 
-  virtual fn binary_left_associative() const -> bool;
+  virtual fn binary_left_associative() const wontthrow -> bool;
 
-  virtual fn left_precedence() const -> u8;
+  virtual fn left_precedence() const wontthrow -> u8;
   virtual fn construct_binary_expression(const Expression *lhs,
                                          const Expression *rhs) const
-      -> std::unique_ptr<Expression>;
+      throws -> std::unique_ptr<Expression>;
 
-  virtual fn unary_precedence() const -> u8;
+  virtual fn unary_precedence() const wontthrow -> u8;
   virtual fn construct_unary_expression(const Expression *rhs) const
-      -> std::unique_ptr<Expression>;
+      throws -> std::unique_ptr<Expression>;
 };
 
 #define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \
@@ -360,18 +360,18 @@ struct Operator : public Token
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind kind() const override;                                                \
-    Flags flags() const override;                                              \
-    String raw_string() const override;                                        \
+    Kind kind() const wontthrow override;                                      \
+    Flags flags() const wontthrow override;                                    \
+    String raw_string() const throws override;                                 \
                                                                                \
-    u8 left_precedence() const override;                                       \
+    u8 left_precedence() const wontthrow override;                             \
     std::unique_ptr<Expression>                                                \
     construct_binary_expression(const Expression *lhs,                         \
-                                const Expression *rhs) const override;         \
+                                const Expression *rhs) const throws override;  \
                                                                                \
-    u8 unary_precedence() const override;                                      \
+    u8 unary_precedence() const wontthrow override;                            \
     std::unique_ptr<Expression>                                                \
-    construct_unary_expression(const Expression *rhs) const override;          \
+    construct_unary_expression(const Expression *rhs) const throws override;   \
   }
 
 UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Plus);
@@ -382,13 +382,13 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind kind() const override;                                                \
-    Flags flags() const override;                                              \
-    String raw_string() const override;                                        \
+    Kind kind() const wontthrow override;                                      \
+    Flags flags() const wontthrow override;                                    \
+    String raw_string() const throws override;                                 \
                                                                                \
-    u8 unary_precedence() const override;                                      \
+    u8 unary_precedence() const wontthrow override;                            \
     std::unique_ptr<Expression>                                                \
-    construct_unary_expression(const Expression *rhs) const override;          \
+    construct_unary_expression(const Expression *rhs) const throws override;   \
   }
 
 UNARY_OPERATOR_TOKEN_STRUCT(Tilde);
@@ -399,14 +399,14 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
   {                                                                            \
     t(SourceLocation location);                                                \
                                                                                \
-    Kind kind() const override;                                                \
-    Flags flags() const override;                                              \
-    String raw_string() const override;                                        \
+    Kind kind() const wontthrow override;                                      \
+    Flags flags() const wontthrow override;                                    \
+    String raw_string() const throws override;                                 \
                                                                                \
-    u8 left_precedence() const override;                                       \
+    u8 left_precedence() const wontthrow override;                             \
     std::unique_ptr<Expression>                                                \
     construct_binary_expression(const Expression *lhs,                         \
-                                const Expression *rhs) const override;         \
+                                const Expression *rhs) const throws override;  \
   }
 
 BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);

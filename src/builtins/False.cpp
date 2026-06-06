@@ -7,9 +7,9 @@ namespace shit {
 
 False::False() = default;
 
-fn False::kind() const -> Builtin::Kind { return Kind::False; }
+pure fn False::kind() const wontthrow -> Builtin::Kind { return Kind::False; }
 
-fn False::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn False::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(ec);
   unused(cxt);

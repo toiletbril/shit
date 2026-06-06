@@ -10,16 +10,16 @@ namespace shit {
 
 Source::Source() = default;
 
-Builtin::Kind Source::kind() const { return Kind::Source; }
+pure Builtin::Kind Source::kind() const wontthrow { return Kind::Source; }
 
-i32 Source::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   ASSERT(!ec.args().empty());
 
   if (ec.args().size() < 2) throw Error{"filename argument is required"};
 
   const std::string path{ec.args()[1].c_str(), ec.args()[1].size()};
-  const Maybe<String> contents = utils::read_entire_file(path);
+  let const contents = utils::read_entire_file(path);
   if (!contents) throw Error{"could not open '" + path + "'"};
 
   return cxt.run_source(*contents, "the file '" + path + "'", true,

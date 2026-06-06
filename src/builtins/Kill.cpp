@@ -17,9 +17,9 @@ namespace shit {
 
 Kill::Kill() = default;
 
-fn Kill::kind() const -> Builtin::Kind { return Kind::Kill; }
+pure fn Kill::kind() const wontthrow -> Builtin::Kind { return Kind::Kill; }
 
-fn Kill::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.empty());

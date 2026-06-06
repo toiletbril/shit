@@ -39,14 +39,14 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_field_separators(m_field_separators.view());
 }
 
-fn EvalContext::add_evaluated_expression() -> void
+fn EvalContext::add_evaluated_expression() wontthrow -> void
 {
   m_expressions_executed_last++;
 }
 
-fn EvalContext::add_expansion() -> void { m_expansions_last++; }
+fn EvalContext::add_expansion() wontthrow -> void { m_expansions_last++; }
 
-fn EvalContext::end_command() -> void
+fn EvalContext::end_command() wontthrow -> void
 {
   m_expansions_total += m_expansions_last;
   m_expressions_executed_total += m_expressions_executed_last;
@@ -54,7 +54,7 @@ fn EvalContext::end_command() -> void
   m_expansions_last = m_expressions_executed_last = 0;
 }
 
-fn EvalContext::assign_variable(StringView name, StringView value) -> void
+fn EvalContext::assign_variable(StringView name, StringView value) throws -> void
 {
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
@@ -62,7 +62,7 @@ fn EvalContext::assign_variable(StringView name, StringView value) -> void
   m_shell_variables.set(name, value);
 }
 
-fn EvalContext::set_field_separators(StringView value) -> void
+fn EvalContext::set_field_separators(StringView value) throws -> void
 {
   /* The table is built before m_field_separators is touched, since the
      constructor seeds it from m_field_separators' own view, so value may alias
@@ -77,12 +77,13 @@ fn EvalContext::set_field_separators(StringView value) -> void
   }
 }
 
-fn EvalContext::is_field_separator(char c) const -> bool
+pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
 {
   return m_field_separator_table[static_cast<u8>(c)];
 }
 
-fn EvalContext::set_shell_variable(StringView name, StringView value) -> void
+fn EvalContext::set_shell_variable(StringView name, StringView value) throws
+    -> void
 {
   /* A read-only variable rejects the assignment. The common case has no
      read-only names, so the scan is skipped entirely. */
@@ -92,7 +93,7 @@ fn EvalContext::set_shell_variable(StringView name, StringView value) -> void
   assign_variable(name, value);
 }
 
-fn EvalContext::unset_shell_variable(StringView name) -> void
+fn EvalContext::unset_shell_variable(StringView name) throws -> void
 {
   m_shell_variables.erase(name);
   /* An exported variable also lives in the process environment, so it is
@@ -103,7 +104,7 @@ fn EvalContext::unset_shell_variable(StringView name) -> void
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
-fn EvalContext::get_variable_value(StringView name) const -> Maybe<String>
+fn EvalContext::get_variable_value(StringView name) const throws -> Maybe<String>
 {
   if (name == "?")
     return String{heap_allocator(),
@@ -167,22 +168,23 @@ fn EvalContext::get_variable_value(StringView name) const -> Maybe<String>
   return shit::None;
 }
 
-fn EvalContext::positional_params() const -> const ArrayList<String> &
+pure fn EvalContext::positional_params() const wontthrow
+    -> const ArrayList<String> &
 {
   return m_positional_params;
 }
 
-fn EvalContext::set_positional_params(ArrayList<String> params) -> void
+fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow -> void
 {
   m_positional_params = std::move(params);
 }
 
-fn EvalContext::set_last_background_pid(i64 pid) -> void
+fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
 {
   m_last_background_pid = pid;
 }
 
-fn EvalContext::register_job(os::process pid, StringView command) -> int
+fn EvalContext::register_job(os::process pid, StringView command) throws -> int
 {
   let job = Job{};
   job.id = m_next_job_id++;
@@ -195,7 +197,7 @@ fn EvalContext::register_job(os::process pid, StringView command) -> int
   return m_jobs.back().id;
 }
 
-fn EvalContext::update_jobs() -> void
+fn EvalContext::update_jobs() throws -> void
 {
   for (Job &job : m_jobs) {
     if (job.state == Job::State::Done) continue;
@@ -213,16 +215,16 @@ fn EvalContext::update_jobs() -> void
   }
 }
 
-fn EvalContext::jobs() -> ArrayList<Job> & { return m_jobs; }
+fn EvalContext::jobs() wontthrow -> ArrayList<Job> & { return m_jobs; }
 
-fn EvalContext::find_job(int id) -> Job *
+fn EvalContext::find_job(int id) wontthrow -> Job *
 {
   for (Job &job : m_jobs)
     if (job.id == id) return &job;
   return nullptr;
 }
 
-fn EvalContext::most_recent_job() -> Job *
+fn EvalContext::most_recent_job() wontthrow -> Job *
 {
   /* Skip a finished job, so a bare fg or bg acts on a job that is still
      running or stopped rather than a dead pid. */
@@ -233,7 +235,7 @@ fn EvalContext::most_recent_job() -> Job *
   return nullptr;
 }
 
-fn EvalContext::forget_done_jobs() -> void
+fn EvalContext::forget_done_jobs() throws -> void
 {
   let kept = ArrayList<Job>{};
   for (Job &job : m_jobs) {
@@ -243,33 +245,37 @@ fn EvalContext::forget_done_jobs() -> void
   m_jobs = std::move(kept);
 }
 
-fn EvalContext::set_monitor(bool enabled) -> void { m_monitor = enabled; }
+fn EvalContext::set_monitor(bool enabled) wontthrow -> void
+{
+  m_monitor = enabled;
+}
 
-fn EvalContext::monitor() const -> bool { return m_monitor; }
+pure fn EvalContext::monitor() const wontthrow -> bool { return m_monitor; }
 
-fn EvalContext::register_function(StringView name, const Expression *body)
+fn EvalContext::register_function(StringView name, const Expression *body) throws
     -> void
 {
   m_functions.set(name, body);
 }
 
-fn EvalContext::find_function(StringView name) const -> const Expression *
+fn EvalContext::find_function(StringView name) const wontthrow
+    -> const Expression *
 {
   if (let const *const *slot = m_functions.find(name)) return *slot;
   return nullptr;
 }
 
-fn EvalContext::has_functions() const -> bool
+pure fn EvalContext::has_functions() const wontthrow -> bool
 {
   return m_functions.size() != 0;
 }
 
-fn EvalContext::unset_function(StringView name) -> void
+fn EvalContext::unset_function(StringView name) throws -> void
 {
   m_functions.erase(name);
 }
 
-fn EvalContext::function_names() const -> HashSet
+fn EvalContext::function_names() const throws -> HashSet
 {
   let names = HashSet{heap_allocator()};
   m_functions.for_each([&](StringView name, const Expression *body) {
@@ -279,19 +285,22 @@ fn EvalContext::function_names() const -> HashSet
   return names;
 }
 
-fn EvalContext::set_trap(StringView condition, StringView action) -> void
+fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
   m_traps.set(condition, action);
 }
 
-fn EvalContext::remove_trap(StringView condition) -> void
+fn EvalContext::remove_trap(StringView condition) throws -> void
 {
   m_traps.erase(condition);
 }
 
-fn EvalContext::traps() const -> const HashMap<String> & { return m_traps; }
+pure fn EvalContext::traps() const wontthrow -> const HashMap<String> &
+{
+  return m_traps;
+}
 
-fn EvalContext::run_exit_trap() -> void
+fn EvalContext::run_exit_trap() throws -> void
 {
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
@@ -305,13 +314,13 @@ fn EvalContext::run_exit_trap() -> void
     if (action->size() > 0) run_source(action->view(), "the EXIT trap");
 }
 
-fn EvalContext::mark_readonly(StringView name) -> void
+fn EvalContext::mark_readonly(StringView name) throws -> void
 {
   if (is_readonly(name)) return;
   m_readonly_names.push(String{heap_allocator(), name});
 }
 
-fn EvalContext::is_readonly(StringView name) const -> bool
+fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
   if (m_readonly_names.size() == 0) return false;
   for (const String &readonly_name : m_readonly_names)
@@ -320,7 +329,7 @@ fn EvalContext::is_readonly(StringView name) const -> bool
   return false;
 }
 
-fn EvalContext::readonly_names() const -> ArrayList<String>
+fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{};
   for (const String &name : m_readonly_names)
@@ -331,12 +340,12 @@ fn EvalContext::readonly_names() const -> ArrayList<String>
   return out;
 }
 
-fn EvalContext::enter_function_scope() -> void
+fn EvalContext::enter_function_scope() throws -> void
 {
   m_local_scopes.push(ArrayList<LocalBinding>{});
 }
 
-fn EvalContext::leave_function_scope() -> void
+fn EvalContext::leave_function_scope() throws -> void
 {
   if (m_local_scopes.empty()) return;
 
@@ -362,12 +371,12 @@ fn EvalContext::leave_function_scope() -> void
   m_local_scopes = std::move(kept);
 }
 
-fn EvalContext::in_function_scope() const -> bool
+pure fn EvalContext::in_function_scope() const wontthrow -> bool
 {
   return !m_local_scopes.empty();
 }
 
-fn EvalContext::declare_local(StringView name) -> void
+fn EvalContext::declare_local(StringView name) throws -> void
 {
   if (m_local_scopes.empty()) return;
   ASSERT(!m_local_scopes.empty());
@@ -375,26 +384,26 @@ fn EvalContext::declare_local(StringView name) -> void
       LocalBinding{String{name}, get_variable_value(name)});
 }
 
-fn EvalContext::set_alias(StringView name, StringView value) -> void
+fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 {
   m_aliases.set(name, value);
 }
 
-fn EvalContext::remove_alias(StringView name) -> bool
+fn EvalContext::remove_alias(StringView name) throws -> bool
 {
   if (m_aliases.find(name) == nullptr) return false;
   m_aliases.erase(name);
   return true;
 }
 
-fn EvalContext::get_alias(StringView name) const -> Maybe<String>
+fn EvalContext::get_alias(StringView name) const throws -> Maybe<String>
 {
   if (let const *value = m_aliases.find(name))
     return String{heap_allocator(), value->view()};
   return None;
 }
 
-fn EvalContext::alias_definitions() const -> ArrayList<String>
+fn EvalContext::alias_definitions() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{};
   m_aliases.for_each([&out](StringView key, const String &value) {
@@ -408,7 +417,7 @@ fn EvalContext::alias_definitions() const -> ArrayList<String>
   return out;
 }
 
-fn EvalContext::alias_names() const -> HashSet
+fn EvalContext::alias_names() const throws -> HashSet
 {
   let out = HashSet{heap_allocator()};
   m_aliases.for_each([&out](StringView key, const String &value) {
@@ -418,24 +427,28 @@ fn EvalContext::alias_names() const -> HashSet
   return out;
 }
 
-fn EvalContext::enter_subshell() -> void { m_subshell_depth++; }
+fn EvalContext::enter_subshell() wontthrow -> void { m_subshell_depth++; }
 
-fn EvalContext::leave_subshell() -> void
+fn EvalContext::leave_subshell() wontthrow -> void
 {
   ASSERT(m_subshell_depth > 0);
   m_subshell_depth--;
 }
 
-fn EvalContext::in_subshell() const -> bool { return m_subshell_depth > 0; }
+pure fn EvalContext::in_subshell() const wontthrow -> bool
+{
+  return m_subshell_depth > 0;
+}
 
-fn EvalContext::request_break(i64 level, SourceLocation location) -> void
+fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 {
   LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
                                m_current_source, String{m_current_origin}};
 }
 
-fn EvalContext::request_continue(i64 level, SourceLocation location) -> void
+fn EvalContext::request_continue(i64 level, SourceLocation location) throws
+    -> void
 {
   LOG(Verbosity::Debug, "continue requested, level %lld",
            (long long) level);
@@ -443,7 +456,7 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) -> void
                                m_current_source, String{m_current_origin}};
 }
 
-fn EvalContext::request_return(i64 status, SourceLocation location) -> void
+fn EvalContext::request_return(i64 status, SourceLocation location) throws -> void
 {
   LOG(Verbosity::Debug, "return requested, status %lld",
            (long long) status);
@@ -451,115 +464,144 @@ fn EvalContext::request_return(i64 status, SourceLocation location) -> void
                                m_current_source, String{m_current_origin}};
 }
 
-fn EvalContext::request_exit(i64 status, SourceLocation location) -> void
+fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
                                m_current_source, String{m_current_origin}};
 }
 
-fn EvalContext::has_pending_control_flow() const -> bool
+pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
 {
   return m_control_flow.kind != ControlFlow::Kind::Normal;
 }
 
-fn EvalContext::pending_control_flow() -> ControlFlow &
+fn EvalContext::pending_control_flow() wontthrow -> ControlFlow &
 {
   return m_control_flow;
 }
 
-fn EvalContext::pending_control_flow() const -> const ControlFlow &
+pure fn EvalContext::pending_control_flow() const wontthrow
+    -> const ControlFlow &
 {
   return m_control_flow;
 }
 
-fn EvalContext::clear_control_flow() -> void
+fn EvalContext::clear_control_flow() wontthrow -> void
 {
   m_control_flow.kind = ControlFlow::Kind::Normal;
 }
 
-fn EvalContext::set_current_source(const String *source, String origin) -> void
+fn EvalContext::set_current_source(const String *source, String origin) wontthrow
+    -> void
 {
   m_current_source = source;
   m_current_origin = std::move(origin);
 }
 
-fn EvalContext::current_source() const -> const String *
+pure fn EvalContext::current_source() const wontthrow -> const String *
 {
   return m_current_source;
 }
 
-fn EvalContext::current_origin() const -> const String &
+pure fn EvalContext::current_origin() const wontthrow -> const String &
 {
   return m_current_origin;
 }
 
-fn EvalContext::set_error_exit(bool enabled) -> void { m_error_exit = enabled; }
+fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
+{
+  m_error_exit = enabled;
+}
 
-fn EvalContext::error_exit() const -> bool { return m_error_exit; }
+pure fn EvalContext::error_exit() const wontthrow -> bool { return m_error_exit; }
 
-fn EvalContext::set_echo_expanded(bool enabled) -> void
+fn EvalContext::set_echo_expanded(bool enabled) wontthrow -> void
 {
   m_enable_echo_expanded = enabled;
 }
 
-fn EvalContext::set_error_unset(bool enabled) -> void
+fn EvalContext::set_error_unset(bool enabled) wontthrow -> void
 {
   m_error_unset = enabled;
 }
 
-fn EvalContext::error_unset() const -> bool { return m_error_unset; }
+pure fn EvalContext::error_unset() const wontthrow -> bool
+{
+  return m_error_unset;
+}
 
-fn EvalContext::set_no_clobber(bool enabled) -> void { m_no_clobber = enabled; }
+fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
+{
+  m_no_clobber = enabled;
+}
 
-fn EvalContext::no_clobber() const -> bool { return m_no_clobber; }
+pure fn EvalContext::no_clobber() const wontthrow -> bool
+{
+  return m_no_clobber;
+}
 
-fn EvalContext::set_export_all(bool enabled) -> void { m_export_all = enabled; }
+fn EvalContext::set_export_all(bool enabled) wontthrow -> void
+{
+  m_export_all = enabled;
+}
 
-fn EvalContext::export_all() const -> bool { return m_export_all; }
+pure fn EvalContext::export_all() const wontthrow -> bool
+{
+  return m_export_all;
+}
 
-fn EvalContext::set_no_glob(bool enabled) -> void
+fn EvalContext::set_no_glob(bool enabled) wontthrow -> void
 {
   m_enable_path_expansion = !enabled;
 }
 
-fn EvalContext::no_glob() const -> bool { return !m_enable_path_expansion; }
+pure fn EvalContext::no_glob() const wontthrow -> bool
+{
+  return !m_enable_path_expansion;
+}
 
-fn EvalContext::set_no_exec(bool enabled) -> void { m_no_exec = enabled; }
+fn EvalContext::set_no_exec(bool enabled) wontthrow -> void
+{
+  m_no_exec = enabled;
+}
 
-fn EvalContext::no_exec() const -> bool { return m_no_exec; }
+pure fn EvalContext::no_exec() const wontthrow -> bool { return m_no_exec; }
 
-fn EvalContext::enter_condition() -> void { m_condition_depth++; }
+fn EvalContext::enter_condition() wontthrow -> void { m_condition_depth++; }
 
-fn EvalContext::leave_condition() -> void
+fn EvalContext::leave_condition() wontthrow -> void
 {
   ASSERT(m_condition_depth > 0);
   m_condition_depth--;
 }
 
-fn EvalContext::in_condition() const -> bool { return m_condition_depth > 0; }
+pure fn EvalContext::in_condition() const wontthrow -> bool
+{
+  return m_condition_depth > 0;
+}
 
-fn EvalContext::getopts_char_index() const -> usize
+pure fn EvalContext::getopts_char_index() const wontthrow -> usize
 {
   return m_getopts_char_index;
 }
 
-fn EvalContext::set_getopts_char_index(usize index) -> void
+fn EvalContext::set_getopts_char_index(usize index) wontthrow -> void
 {
   m_getopts_char_index = index;
 }
 
-fn EvalContext::getopts_last_optind() const -> i64
+pure fn EvalContext::getopts_last_optind() const wontthrow -> i64
 {
   return m_getopts_last_optind;
 }
 
-fn EvalContext::set_getopts_last_optind(i64 optind) -> void
+fn EvalContext::set_getopts_last_optind(i64 optind) wontthrow -> void
 {
   m_getopts_last_optind = optind;
 }
 
-fn EvalContext::sorted_variable_assignments() const -> ArrayList<String>
+fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
 {
   let assignments = ArrayList<String>{};
   assignments.reserve(m_shell_variables.size());
@@ -573,15 +615,15 @@ fn EvalContext::sorted_variable_assignments() const -> ArrayList<String>
   return assignments;
 }
 
-fn EvalContext::clear_functions() -> void { m_functions.clear(); }
+fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
 
-fn EvalContext::snapshot_state() const -> EvalStateSnapshot
+fn EvalContext::snapshot_state() const throws -> EvalStateSnapshot
 {
   return EvalStateSnapshot{m_shell_variables, m_functions, m_positional_params,
                            Path::current_directory()};
 }
 
-fn EvalContext::restore_state(EvalStateSnapshot snapshot) -> void
+fn EvalContext::restore_state(EvalStateSnapshot snapshot) throws -> void
 {
   m_shell_variables = std::move(snapshot.shell_variables);
   m_functions = std::move(snapshot.functions);
@@ -602,7 +644,7 @@ fn EvalContext::restore_state(EvalStateSnapshot snapshot) -> void
      substitution propagate the status of their last command to the parent. */
 }
 
-fn EvalContext::option_flags_string() const -> String
+fn EvalContext::option_flags_string() const throws -> String
 {
   let flags = String{};
   if (m_error_exit) flags += 'e';
@@ -613,14 +655,17 @@ fn EvalContext::option_flags_string() const -> String
   return flags;
 }
 
-fn EvalContext::set_last_exit_status(i32 status) -> void
+fn EvalContext::set_last_exit_status(i32 status) wontthrow -> void
 {
   m_last_exit_status = status;
 }
 
-fn EvalContext::last_exit_status() const -> i32 { return m_last_exit_status; }
+pure fn EvalContext::last_exit_status() const wontthrow -> i32
+{
+  return m_last_exit_status;
+}
 
-fn EvalContext::expand_variable(StringView name) const -> String
+fn EvalContext::expand_variable(StringView name) const throws -> String
 {
   return get_variable_value(name).value_or(String{});
 }
@@ -629,7 +674,7 @@ namespace {
 
 /* Remove the shortest or longest prefix of value that matches pattern as a
    glob, returning the remainder. */
-fn trim_matching_prefix(StringView value, StringView pattern, bool longest)
+fn trim_matching_prefix(StringView value, StringView pattern, bool longest) throws
     -> String
 {
   let active = ArrayList<bool>{heap_allocator()};
@@ -654,7 +699,7 @@ fn trim_matching_prefix(StringView value, StringView pattern, bool longest)
 
 /* Remove the shortest or longest suffix of value that matches pattern as a
    glob, returning the head. */
-fn trim_matching_suffix(StringView value, StringView pattern, bool longest)
+fn trim_matching_suffix(StringView value, StringView pattern, bool longest) throws
     -> String
 {
   let active = ArrayList<bool>{heap_allocator()};
@@ -677,7 +722,7 @@ fn trim_matching_suffix(StringView value, StringView pattern, bool longest)
 
 } /* namespace */
 
-fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
+fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
     -> String
 {
   let out = String{heap_allocator()};
@@ -709,7 +754,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
       break;
     }
 
-    const char next = word[i + 1];
+    let const next = word[i + 1];
     if (next == '{') {
       String inner{heap_allocator()};
       usize j = i + 2;
@@ -781,7 +826,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
   return out;
 }
 
-fn EvalContext::apply_parameter_expansion(StringView spec) -> String
+fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 {
   if (spec.empty()) return String{heap_allocator()};
 
@@ -881,7 +926,7 @@ fn EvalContext::apply_parameter_expansion(StringView spec) -> String
   }
 }
 
-fn EvalContext::make_stats_string() const -> String
+fn EvalContext::make_stats_string() const throws -> String
 {
   let s = String{};
 
@@ -909,31 +954,37 @@ fn EvalContext::make_stats_string() const -> String
   return s;
 }
 
-fn EvalContext::should_echo() const -> bool { return m_enable_echo; }
+pure fn EvalContext::should_echo() const wontthrow -> bool
+{
+  return m_enable_echo;
+}
 
-fn EvalContext::should_echo_expanded() const -> bool
+pure fn EvalContext::should_echo_expanded() const wontthrow -> bool
 {
   return m_enable_echo_expanded;
 }
 
-fn EvalContext::shell_is_interactive() const -> bool
+pure fn EvalContext::shell_is_interactive() const wontthrow -> bool
 {
   return m_shell_is_interactive;
 }
 
-fn EvalContext::last_expressions_executed() const -> usize
+pure fn EvalContext::last_expressions_executed() const wontthrow -> usize
 {
   return m_expressions_executed_last;
 }
 
-fn EvalContext::total_expressions_executed() const -> usize
+pure fn EvalContext::total_expressions_executed() const wontthrow -> usize
 {
   return m_expressions_executed_total + m_expressions_executed_last;
 }
 
-fn EvalContext::last_expansion_count() const -> usize { return m_expansions_last; }
+pure fn EvalContext::last_expansion_count() const wontthrow -> usize
+{
+  return m_expansions_last;
+}
 
-fn EvalContext::total_expansion_count() const -> usize
+pure fn EvalContext::total_expansion_count() const wontthrow -> usize
 {
   return m_expansions_total + m_expansions_last;
 }
@@ -941,7 +992,7 @@ fn EvalContext::total_expansion_count() const -> usize
 /* TODO: Test symlinks. */
 /* TODO: What the fuck is happening. */
 fn EvalContext::expand_path_once(const GlobField &field,
-                                 bool should_expand_files)
+                                 bool should_expand_files) throws
     -> ArrayList<GlobField>
 {
   let const scratch = scratch_allocator();
@@ -970,7 +1021,7 @@ fn EvalContext::expand_path_once(const GlobField &field,
 
   /* Stem of the glob after the last slash. Its mask starts at stem_start in the
      field, so glob_matches reads field.glob_active from there. */
-  const usize stem_start = has_slashes ? *last_slash + 1 : 0;
+  let const stem_start = has_slashes ? *last_slash + 1 : 0;
   let const has_glob = stem_start < path.length;
   let glob = StringView{};
   if (has_glob) glob = path.substring(stem_start);
@@ -1033,7 +1084,7 @@ namespace {
    without a later ']' is a literal bracket, not a glob, so a field such as the
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
-fn first_active_glob(StringView text, const ArrayList<bool> &mask)
+pure fn first_active_glob(StringView text, const ArrayList<bool> &mask) wontthrow
     -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};
@@ -1052,7 +1103,7 @@ fn first_active_glob(StringView text, const ArrayList<bool> &mask)
 
 } /* namespace */
 
-fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
+fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields) throws
     -> ArrayList<GlobField>
 {
   let const scratch = scratch_allocator();
@@ -1137,7 +1188,7 @@ fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
   return result;
 }
 
-fn EvalContext::expand_tilde(WordSegment &leading_segment) const -> void
+fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
 {
   /* A tilde only expands when it is unquoted. An escaped or quoted tilde is a
      literal segment and stays as is. */
@@ -1161,7 +1212,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const -> void
   text = std::move(expanded);
 }
 
-fn EvalContext::expand_path(GlobField field) -> ArrayList<String>
+fn EvalContext::expand_path(GlobField field) throws -> ArrayList<String>
 {
   let const scratch = scratch_allocator();
 
@@ -1209,7 +1260,7 @@ namespace {
 /* The count of leading bytes that are digits in the given radix, so a value
    with trailing non-digit bytes reads only its numeric prefix the way base-0
    strtoll did. A hexadecimal scan accepts both letter cases. */
-fn count_leading_digits(StringView text, u32 radix) -> usize
+pure fn count_leading_digits(StringView text, u32 radix) wontthrow -> usize
 {
   usize length = 0;
   while (length < text.length) {
@@ -1237,7 +1288,7 @@ fn count_leading_digits(StringView text, u32 radix) -> usize
    the old strtoll path produced after its throw was caught. The utils parsers
    take no base argument, so the radix is chosen here from the prefix and the
    matching parser runs on the scanned digit run. */
-fn parse_arithmetic_operand(StringView text) -> i64
+pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
 {
   let body = text;
   let is_negative = false;
@@ -1273,33 +1324,33 @@ struct ArithmeticParser
   StringView source;
   usize pos;
 
-  [[noreturn]] fn fail(StringView message) -> void
+  [[noreturn]] fn fail(StringView message) throws -> void
   {
     throw Error{"Arithmetic: " + message};
   }
 
-  fn skip_spaces() -> void
+  fn skip_spaces() wontthrow -> void
   {
     while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
                                    source[pos] == '\n' || source[pos] == '\r'))
       pos++;
   }
 
-  fn starts_with(StringView op) -> bool
+  fn starts_with(StringView op) wontthrow -> bool
   {
     skip_spaces();
     return pos + op.length <= source.length &&
            source.substring_of_length(pos, op.length) == op;
   }
 
-  fn consume(StringView op) -> bool
+  fn consume(StringView op) wontthrow -> bool
   {
     if (!starts_with(op)) return false;
     pos += op.length;
     return true;
   }
 
-  fn read_variable_value(StringView name) -> i64
+  fn read_variable_value(StringView name) throws -> i64
   {
     /* A plain shell variable, the common operand, reads its digits straight
        from the stored value with no copy. The operand parser stops at the first
@@ -1315,7 +1366,7 @@ struct ArithmeticParser
     return parse_arithmetic_operand(value.view());
   }
 
-  fn parse() -> i64
+  fn parse() throws -> i64
   {
     let const result = parse_assignment();
     skip_spaces();
@@ -1323,7 +1374,7 @@ struct ArithmeticParser
     return result;
   }
 
-  fn apply_compound(i64 lhs, i64 rhs, char kind) -> i64
+  fn apply_compound(i64 lhs, i64 rhs, char kind) throws -> i64
   {
     switch (kind) {
     case '+': return lhs + rhs;
@@ -1344,7 +1395,7 @@ struct ArithmeticParser
     }
   }
 
-  fn parse_assignment() -> i64
+  fn parse_assignment() throws -> i64
   {
     /* An assignment has a bare variable name on the left, so try it and rewind
        when the name is not followed by an assignment operator. */
@@ -1392,7 +1443,7 @@ struct ArithmeticParser
     return parse_ternary();
   }
 
-  fn parse_ternary() -> i64
+  fn parse_ternary() throws -> i64
   {
     let const condition = parse_logical_or();
     if (consume("?")) {
@@ -1404,7 +1455,7 @@ struct ArithmeticParser
     return condition;
   }
 
-  fn parse_logical_or() -> i64
+  fn parse_logical_or() throws -> i64
   {
     let lhs = parse_logical_and();
     while (consume("||"))
@@ -1412,7 +1463,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_logical_and() -> i64
+  fn parse_logical_and() throws -> i64
   {
     let lhs = parse_bitwise_or();
     while (consume("&&"))
@@ -1420,7 +1471,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_bitwise_or() -> i64
+  fn parse_bitwise_or() throws -> i64
   {
     let lhs = parse_bitwise_xor();
     while (starts_with("|") && !starts_with("||")) {
@@ -1430,7 +1481,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_bitwise_xor() -> i64
+  fn parse_bitwise_xor() throws -> i64
   {
     let lhs = parse_bitwise_and();
     while (consume("^"))
@@ -1438,7 +1489,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_bitwise_and() -> i64
+  fn parse_bitwise_and() throws -> i64
   {
     let lhs = parse_equality();
     while (starts_with("&") && !starts_with("&&")) {
@@ -1448,7 +1499,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_equality() -> i64
+  fn parse_equality() throws -> i64
   {
     let lhs = parse_relational();
     for (;;) {
@@ -1462,7 +1513,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_relational() -> i64
+  fn parse_relational() throws -> i64
   {
     let lhs = parse_shift();
     for (;;) {
@@ -1482,7 +1533,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_shift() -> i64
+  fn parse_shift() throws -> i64
   {
     let lhs = parse_additive();
     for (;;) {
@@ -1496,7 +1547,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_additive() -> i64
+  fn parse_additive() throws -> i64
   {
     let lhs = parse_multiplicative();
     for (;;) {
@@ -1510,7 +1561,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_multiplicative() -> i64
+  fn parse_multiplicative() throws -> i64
   {
     let lhs = parse_unary();
     for (;;) {
@@ -1530,7 +1581,7 @@ struct ArithmeticParser
     return lhs;
   }
 
-  fn parse_unary() -> i64
+  fn parse_unary() throws -> i64
   {
     if (consume("!")) return parse_unary() == 0 ? 1 : 0;
     if (consume("~")) return ~parse_unary();
@@ -1539,7 +1590,7 @@ struct ArithmeticParser
     return parse_primary();
   }
 
-  fn parse_primary() -> i64
+  fn parse_primary() throws -> i64
   {
     skip_spaces();
     if (consume("(")) {
@@ -1580,7 +1631,7 @@ struct ArithmeticParser
 
 } /* namespace */
 
-fn EvalContext::evaluate_arithmetic(StringView expression) -> i64
+fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 {
   /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
      arithmetic becomes its value before the expression is parsed. A bare name
@@ -1601,7 +1652,7 @@ fn EvalContext::evaluate_arithmetic(StringView expression) -> i64
   return parser.parse();
 }
 
-fn EvalContext::expand_word(const Word &word) -> ArrayList<GlobField>
+fn EvalContext::expand_word(const Word &word) throws -> ArrayList<GlobField>
 {
   let const scratch = scratch_allocator();
 
@@ -1713,7 +1764,7 @@ fn EvalContext::expand_word(const Word &word) -> ArrayList<GlobField>
   return fields;
 }
 
-fn EvalContext::expand_word_for_assignment(const Word &word) -> String
+fn EvalContext::expand_word_for_assignment(const Word &word) throws -> String
 {
   /* Only copy the segments when a leading tilde must be rewritten, so the
      common assignment reads its segments in place with no per-command copy. */
@@ -1743,7 +1794,8 @@ fn EvalContext::expand_word_for_assignment(const Word &word) -> String
   return result;
 }
 
-fn EvalContext::capture_command_substitution(const String &source) -> String
+fn EvalContext::capture_command_substitution(const String &source) throws
+    -> String
 {
   /* Parse the inner command into the active parse arena. It coexists with the
      outer tree and is reclaimed when the arena resets. */
@@ -1823,7 +1875,7 @@ fn EvalContext::capture_command_substitution(const String &source) -> String
 
 fn EvalContext::run_source(StringView source, StringView origin,
                            bool consume_return, Maybe<SourceLocation> call_site,
-                           Maybe<StringView> filename) -> i32
+                           Maybe<StringView> filename) throws -> i32
 {
   /* Parse into the active arena, coexisting with the outer tree, the same way a
      command substitution does. The control-flow exceptions are not caught here,
@@ -1834,7 +1886,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      changes it, so a backtrace caret renders the dot or eval against the parent
      text rather than the source about to run. It is NULL when no call site is
      known, which sends the backtrace to the plain origin message. */
-  const String *const parent_source = call_site ? m_current_source : nullptr;
+  let const parent_source = call_site ? m_current_source : nullptr;
 
   /* The frame joins the backtrace stack for the length of this call, so an
      error deep in a nested source prints every call site. The pop runs at
@@ -1938,7 +1990,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
   }
 }
 
-fn EvalContext::clear_retained_sources() -> void
+fn EvalContext::clear_retained_sources() wontthrow -> void
 {
   for (Expression *ast : m_retained_source_asts)
     delete ast;
@@ -1954,18 +2006,18 @@ fn EvalContext::clear_retained_sources() -> void
   m_current_origin.clear();
 }
 
-fn EvalContext::retain_ast(Expression *ast) -> void
+fn EvalContext::retain_ast(Expression *ast) throws -> void
 {
   m_retained_source_asts.push(ast);
 }
 
-fn EvalContext::expand_heredoc_body(StringView body) -> String
+fn EvalContext::expand_heredoc_body(StringView body) throws -> String
 {
   /* A heredoc body keeps its quote characters literally. */
   return expand_modifier_word(body, false);
 }
 
-fn EvalContext::process_args(const ArrayList<const Token *> &args)
+fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
     -> ArrayList<String>
 {
   /* The expansion fields live on the scratch arena only until the heap argument
@@ -2042,28 +2094,34 @@ ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
     : m_kind(std::move(kind)), m_location(location), m_args(args)
 {}
 
-fn ExecContext::source_location() const -> const SourceLocation &
+pure fn ExecContext::source_location() const wontthrow -> const SourceLocation &
 {
   return m_location;
 }
 
-fn ExecContext::program() const -> const String &
+pure fn ExecContext::program() const wontthrow -> const String &
 {
   ASSERT(!m_args.empty());
   return m_args[0];
 }
 
-fn ExecContext::args() const -> const ArrayList<String> & { return m_args; }
+pure fn ExecContext::args() const wontthrow -> const ArrayList<String> &
+{
+  return m_args;
+}
 
-fn ExecContext::is_builtin() const -> bool { return m_kind.is_builtin(); }
+pure fn ExecContext::is_builtin() const wontthrow -> bool
+{
+  return m_kind.is_builtin();
+}
 
-fn ExecContext::program_path() const -> const Path &
+pure fn ExecContext::program_path() const wontthrow -> const Path &
 {
   ASSERT(!is_builtin());
   return m_kind.program_path;
 }
 
-fn ExecContext::close_fds() -> void
+fn ExecContext::close_fds() throws -> void
 {
   if (in_fd) {
     os::close_fd(*in_fd);
@@ -2079,13 +2137,13 @@ fn ExecContext::close_fds() -> void
   }
 }
 
-fn ExecContext::builtin_kind() const -> const Builtin::Kind &
+pure fn ExecContext::builtin_kind() const wontthrow -> const Builtin::Kind &
 {
   ASSERT(is_builtin());
   return m_kind.builtin_kind;
 }
 
-fn ExecContext::print_to_stdout(StringView s) const -> void
+fn ExecContext::print_to_stdout(StringView s) const throws -> void
 {
   if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data, s.length).has_value())
   {
@@ -2095,7 +2153,7 @@ fn ExecContext::print_to_stdout(StringView s) const -> void
 }
 
 fn ExecContext::make_from(SourceLocation location,
-                          const ArrayList<String> &args) -> ExecContext
+                          const ArrayList<String> &args) throws -> ExecContext
 {
   /* Make sure we always include at least one argument, the program path. */
   ASSERT(args.size() > 0);
@@ -2134,7 +2192,8 @@ fn ExecContext::make_from(SourceLocation location,
 }
 
 fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
-                              const ArrayList<String> &args) -> ExecContext
+                              const ArrayList<String> &args) throws
+    -> ExecContext
 {
   ASSERT(args.size() > 0);
   return {location, std::move(kind), args};

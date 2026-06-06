@@ -13,7 +13,7 @@ namespace shit {
 
 namespace {
 
-fn state_word(Job::State state) -> const char *
+pure fn state_word(Job::State state) wontthrow -> const char *
 {
   switch (state) {
   case Job::State::Running: return "Running";
@@ -27,9 +27,9 @@ fn state_word(Job::State state) -> const char *
 
 Jobs::Jobs() = default;
 
-fn Jobs::kind() const -> Builtin::Kind { return Kind::Jobs; }
+pure fn Jobs::kind() const wontthrow -> Builtin::Kind { return Kind::Jobs; }
 
-fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const -> i32
+fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(ec);
 

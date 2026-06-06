@@ -16,13 +16,13 @@ namespace shit {
 
 Which::Which() = default;
 
-Builtin::Kind Which::kind() const { return Kind::Which; }
+pure Builtin::Kind Which::kind() const wontthrow { return Kind::Which; }
 
-i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
+i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -31,7 +31,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
   String buf{};
 
   for (usize i = 1; i < args.size(); i++) {
-    const String &program_name = args[i];
+    let const &program_name = args[i];
     if (search_builtin(
             std::string_view{program_name.c_str(), program_name.size()})
             .has_value())
@@ -41,11 +41,11 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
          the name, which stays machine readable. */
       if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
-    } else if (const ArrayList<Path> ps = utils::search_program_path(program_name);
+    } else if (let const ps = utils::search_program_path(program_name);
                ps.size() != 0)
     {
       if (FLAG_ALL.is_enabled()) {
-        for (const Path &p : ps) {
+        for (let const &p : ps) {
           buf += p.text();
           buf += '\n';
         }

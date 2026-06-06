@@ -28,15 +28,15 @@ struct ErrorBase
   ErrorBase(StringView message);
   virtual ~ErrorBase();
 
-  operator bool &();
+  operator bool &() throws;
 
-  fn message() const -> String;
+  pure fn message() const throws -> String;
 
   /* The word printed before the message, Error by default. A warning subclass
      overrides i
      t to Warning, so the reporting code reads the severity from the
      object rather than taking it as an argument. */
-  virtual fn severity_word() const -> String;
+  pure virtual fn severity_word() const wontthrow -> String;
 
 protected:
   bool m_is_active{false};
@@ -48,11 +48,11 @@ struct Error : public ErrorBase
   Error();
   Error(StringView message);
 
-  fn to_string() const -> String;
+  fn to_string() const throws -> String;
 
   /* Convert to the formatted message, so a call site passes an Error where a
      string is expected without spelling out to_string. */
-  operator String() const;
+  operator String() const throws;
 };
 
 /* An Error that prints as a warning and is shown rather than thrown. */
@@ -60,7 +60,7 @@ struct Warning : public Error
 {
   Warning(StringView message);
 
-  fn severity_word() const -> String override;
+  pure fn severity_word() const wontthrow -> String override;
 };
 
 /* An Error that prints as a note and is shown rather than thrown. It carries no
@@ -69,7 +69,7 @@ struct Note : public Error
 {
   Note(StringView message);
 
-  fn severity_word() const -> String override;
+  pure fn severity_word() const wontthrow -> String override;
 };
 
 /**
@@ -84,7 +84,7 @@ struct ErrorWithLocation : public ErrorBase
 
   /* The severity word comes from severity_word, so a warning subclass prints
      Warning over the same caret without passing the word in. */
-  virtual fn to_string(StringView source) const -> String;
+  virtual fn to_string(StringView source) const throws -> String;
 
 protected:
   SourceLocation m_location;
@@ -96,7 +96,7 @@ struct WarningWithLocation : public ErrorWithLocation
 {
   WarningWithLocation(SourceLocation location, StringView message);
 
-  fn severity_word() const -> String override;
+  pure fn severity_word() const wontthrow -> String override;
 };
 
 /* An ErrorWithLocation that prints as a trace and is shown rather than thrown.
@@ -106,7 +106,7 @@ struct TraceWithLocation : public ErrorWithLocation
 {
   TraceWithLocation(SourceLocation location, StringView message);
 
-  fn severity_word() const -> String override;
+  pure fn severity_word() const wontthrow -> String override;
 };
 
 struct ErrorWithLocationAndDetails : public ErrorWithLocation
@@ -117,7 +117,7 @@ struct ErrorWithLocationAndDetails : public ErrorWithLocation
                               SourceLocation details_location,
                               StringView details_message);
 
-  fn details_to_string(StringView source) const -> String;
+  fn details_to_string(StringView source) const throws -> String;
 
 protected:
   SourceLocation m_details_location;

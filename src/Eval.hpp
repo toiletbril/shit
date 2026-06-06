@@ -128,183 +128,184 @@ struct EvalContext
               bool should_error_exit = false, String shell_name = {},
               ArrayList<String> positional_params = {});
 
-  fn add_expansion() -> void;
-  fn add_evaluated_expression() -> void;
+  fn add_expansion() wontthrow -> void;
+  fn add_evaluated_expression() wontthrow -> void;
 
-  fn end_command() -> void;
+  fn end_command() wontthrow -> void;
 
   /* Variable expand, tilde expand, field split, and glob each token. */
-  fn process_args(const ArrayList<const Token *> &args) -> ArrayList<String>;
+  fn process_args(const ArrayList<const Token *> &args) throws
+      -> ArrayList<String>;
 
   /* The allocator for transient expansion data, which a bump arena hands out
      and reclaims whole when the command ends. */
-  fn scratch_allocator() -> Allocator
+  fn scratch_allocator() wontthrow -> Allocator
   {
     return bump_allocator(m_scratch_arena);
   }
   /* Reclaim the scratch arena, called between top-level commands. */
-  fn reset_scratch_arena() -> void { m_scratch_arena.reset(); }
+  fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
 
-  fn set_shell_variable(StringView name, StringView value) -> void;
-  fn unset_shell_variable(StringView name) -> void;
-  fn get_variable_value(StringView name) const -> Maybe<String>;
+  fn set_shell_variable(StringView name, StringView value) throws -> void;
+  fn unset_shell_variable(StringView name) throws -> void;
+  fn get_variable_value(StringView name) const throws -> Maybe<String>;
 
   /* The stored value of a plain shell variable, or nullptr when the name is
      unset or names a special parameter. The pointer reads the value without a
      copy and stays valid until the next assignment to that name. */
-  fn lookup_shell_variable(StringView name) const -> const String *
+  fn lookup_shell_variable(StringView name) const wontthrow -> const String *
   {
     return m_shell_variables.find(name);
   }
 
   /* The positional parameters, $1 upward, with $0 separate as the shell name.
    */
-  fn positional_params() const -> const ArrayList<String> &;
-  fn set_positional_params(ArrayList<String> params) -> void;
+  pure fn positional_params() const wontthrow -> const ArrayList<String> &;
+  fn set_positional_params(ArrayList<String> params) wontthrow -> void;
 
-  fn set_last_exit_status(i32 status) -> void;
-  fn last_exit_status() const -> i32;
+  fn set_last_exit_status(i32 status) wontthrow -> void;
+  pure fn last_exit_status() const wontthrow -> i32;
 
   /* The process id of the most recent background command, for $!. */
-  fn set_last_background_pid(i64 pid) -> void;
+  fn set_last_background_pid(i64 pid) wontthrow -> void;
 
   /* The job table tracks the background commands started with the & operator so
      jobs, fg, bg, wait, and kill can act on them. register_job adds a running
      job and returns its id. update_jobs polls every job without blocking and
      marks the ones that finished or stopped. */
-  fn register_job(os::process pid, StringView command) -> i32;
-  fn update_jobs() -> void;
-  fn jobs() -> ArrayList<Job> &;
-  fn find_job(i32 id) -> Job *;
-  fn most_recent_job() -> Job *;
-  fn forget_done_jobs() -> void;
+  fn register_job(os::process pid, StringView command) throws -> i32;
+  fn update_jobs() throws -> void;
+  fn jobs() wontthrow -> ArrayList<Job> &;
+  fn find_job(i32 id) wontthrow -> Job *;
+  fn most_recent_job() wontthrow -> Job *;
+  fn forget_done_jobs() throws -> void;
 
   /* monitor mode is set -m. It is on by default in an interactive shell, and it
      gates the terminal handoff so a non-interactive run never touches the
      controlling terminal. */
-  fn set_monitor(bool enabled) -> void;
-  fn monitor() const -> bool;
+  fn set_monitor(bool enabled) wontthrow -> void;
+  pure fn monitor() const wontthrow -> bool;
 
   /* Shell functions live in the parse arena, so the table is cleared before
      each top-level parse to avoid pointing at freed storage. A function shadows
      a builtin and a program of the same name. */
-  fn register_function(StringView name, const Expression *body) -> void;
-  fn find_function(StringView name) const -> const Expression *;
-  fn has_functions() const -> bool;
-  fn unset_function(StringView name) -> void;
-  fn clear_functions() -> void;
+  fn register_function(StringView name, const Expression *body) throws -> void;
+  fn find_function(StringView name) const wontthrow -> const Expression *;
+  pure fn has_functions() const wontthrow -> bool;
+  fn unset_function(StringView name) throws -> void;
+  fn clear_functions() wontthrow -> void;
 
   /* The names of every defined function, so the prepass of a later command
      knows a function defined earlier resolves. */
-  fn function_names() const -> HashSet;
+  fn function_names() const throws -> HashSet;
 
   /* trap stores an action to run for a condition, keyed by the condition name
      such as EXIT or INT. The EXIT action runs once when the shell ends. */
-  fn set_trap(StringView condition, StringView action) -> void;
-  fn remove_trap(StringView condition) -> void;
-  fn traps() const -> const HashMap<String> &;
-  fn run_exit_trap() -> void;
+  fn set_trap(StringView condition, StringView action) throws -> void;
+  fn remove_trap(StringView condition) throws -> void;
+  pure fn traps() const wontthrow -> const HashMap<String> &;
+  fn run_exit_trap() throws -> void;
 
   /* readonly marks a variable so a later assignment to it fails. The set is
      usually empty, so set_shell_variable only scans it when it is not. */
-  fn mark_readonly(StringView name) -> void;
-  fn is_readonly(StringView name) const -> bool;
-  fn readonly_names() const -> ArrayList<String>;
+  fn mark_readonly(StringView name) throws -> void;
+  fn is_readonly(StringView name) const wontthrow -> bool;
+  fn readonly_names() const throws -> ArrayList<String>;
 
   /* A function call pushes a local scope so a local builtin inside it can
      shadow a variable and have the old value restored when the call returns.
      declare_local records the current binding of a name in the innermost scope
      before the caller overwrites it. */
-  fn enter_function_scope() -> void;
-  fn leave_function_scope() -> void;
-  fn in_function_scope() const -> bool;
-  fn declare_local(StringView name) -> void;
+  fn enter_function_scope() throws -> void;
+  fn leave_function_scope() throws -> void;
+  pure fn in_function_scope() const wontthrow -> bool;
+  fn declare_local(StringView name) throws -> void;
 
   /* alias maps a command word to its replacement text, consulted by the parser
      before a simple command. */
-  fn set_alias(StringView name, StringView value) -> void;
-  fn remove_alias(StringView name) -> bool;
-  fn get_alias(StringView name) const -> Maybe<String>;
-  fn alias_definitions() const -> ArrayList<String>;
+  fn set_alias(StringView name, StringView value) throws -> void;
+  fn remove_alias(StringView name) throws -> bool;
+  fn get_alias(StringView name) const throws -> Maybe<String>;
+  fn alias_definitions() const throws -> ArrayList<String>;
   /* The defined alias names, so the prepass treats a use of one as resolvable.
    */
-  fn alias_names() const -> HashSet;
+  fn alias_names() const throws -> HashSet;
 
   /* Save and restore the mutable state around a subshell or a command
      substitution, so changes inside do not leak to the parent. */
-  fn snapshot_state() const -> EvalStateSnapshot;
-  fn restore_state(EvalStateSnapshot snapshot) -> void;
+  fn snapshot_state() const throws -> EvalStateSnapshot;
+  fn restore_state(EvalStateSnapshot snapshot) throws -> void;
 
   /* Track whether evaluation is inside a subshell or a command substitution, so
      the exit builtin ends only that scope instead of the whole shell. */
-  fn enter_subshell() -> void;
-  fn leave_subshell() -> void;
-  fn in_subshell() const -> bool;
+  fn enter_subshell() wontthrow -> void;
+  fn leave_subshell() wontthrow -> void;
+  pure fn in_subshell() const wontthrow -> bool;
 
   /* The control-flow channel the break, continue, return, and exit builtins
      write instead of throwing. A request records where it was made against the
      current source, so an escaped jump points a caret at the builtin. The
      tree-walk checks has_pending_control_flow after each child and consumes the
      request at the matching loop, function, or subshell boundary. */
-  fn request_break(i64 level, SourceLocation location) -> void;
-  fn request_continue(i64 level, SourceLocation location) -> void;
-  fn request_return(i64 status, SourceLocation location) -> void;
-  fn request_exit(i64 status, SourceLocation location) -> void;
-  fn has_pending_control_flow() const -> bool;
-  fn pending_control_flow() -> ControlFlow &;
-  fn pending_control_flow() const -> const ControlFlow &;
-  fn clear_control_flow() -> void;
+  fn request_break(i64 level, SourceLocation location) throws -> void;
+  fn request_continue(i64 level, SourceLocation location) throws -> void;
+  fn request_return(i64 status, SourceLocation location) throws -> void;
+  fn request_exit(i64 status, SourceLocation location) throws -> void;
+  pure fn has_pending_control_flow() const wontthrow -> bool;
+  fn pending_control_flow() wontthrow -> ControlFlow &;
+  pure fn pending_control_flow() const wontthrow -> const ControlFlow &;
+  fn clear_control_flow() wontthrow -> void;
 
   /* The source currently being evaluated and its human name, so a control-flow
      request or a deferred report formats a caret against the right text. Set
      around a top-level run and around a sourced run, restoring the previous
      frame afterwards. */
-  fn set_current_source(const String *source, String origin) -> void;
-  fn current_source() const -> const String *;
-  fn current_origin() const -> const String &;
+  fn set_current_source(const String *source, String origin) wontthrow -> void;
+  pure fn current_source() const wontthrow -> const String *;
+  pure fn current_origin() const wontthrow -> const String &;
 
   /* The set builtin toggles these options at run time. error_exit is set -e,
      echo_expanded is set -x, and error_unset is set -u. */
-  fn set_error_exit(bool enabled) -> void;
-  fn error_exit() const -> bool;
-  fn set_echo_expanded(bool enabled) -> void;
-  fn set_error_unset(bool enabled) -> void;
-  fn error_unset() const -> bool;
+  fn set_error_exit(bool enabled) wontthrow -> void;
+  pure fn error_exit() const wontthrow -> bool;
+  fn set_echo_expanded(bool enabled) wontthrow -> void;
+  fn set_error_unset(bool enabled) wontthrow -> void;
+  pure fn error_unset() const wontthrow -> bool;
 
   /* noclobber rejects an overwrite of an existing file through a plain >, set
      by -C and set -o noclobber. */
-  fn set_no_clobber(bool enabled) -> void;
-  fn no_clobber() const -> bool;
+  fn set_no_clobber(bool enabled) wontthrow -> void;
+  pure fn no_clobber() const wontthrow -> bool;
   /* allexport marks every later assignment for the environment, set by -a and
      set -o allexport. */
-  fn set_export_all(bool enabled) -> void;
-  fn export_all() const -> bool;
+  fn set_export_all(bool enabled) wontthrow -> void;
+  pure fn export_all() const wontthrow -> bool;
   /* noglob disables pathname expansion, set by -f and set -o noglob, and shares
      the path-expansion flag the field splitting already reads. */
-  fn set_no_glob(bool enabled) -> void;
-  fn no_glob() const -> bool;
+  fn set_no_glob(bool enabled) wontthrow -> void;
+  pure fn no_glob() const wontthrow -> bool;
   /* noexec parses without running, set by -n and set -o noexec. */
-  fn set_no_exec(bool enabled) -> void;
-  fn no_exec() const -> bool;
+  fn set_no_exec(bool enabled) wontthrow -> void;
+  pure fn no_exec() const wontthrow -> bool;
 
   /* A condition, such as an if test or an && operand, suppresses set -e while
      it runs, since its failure is expected. */
-  fn enter_condition() -> void;
-  fn leave_condition() -> void;
-  fn in_condition() const -> bool;
+  fn enter_condition() wontthrow -> void;
+  fn leave_condition() wontthrow -> void;
+  pure fn in_condition() const wontthrow -> bool;
 
   /* The name=value lines that set with no argument prints, sorted. */
-  fn sorted_variable_assignments() const -> ArrayList<String>;
+  fn sorted_variable_assignments() const throws -> ArrayList<String>;
 
   /* Expand a word in assignment context, with variable, tilde, and command
      substitution but no field splitting and no globbing. */
-  fn expand_word_for_assignment(const Word &word) -> String;
+  fn expand_word_for_assignment(const Word &word) throws -> String;
 
   /* Run the source of a $(...) and return its standard output with trailing
      newlines stripped. The inner command runs in-process with the working
      directory and variables snapshotted, so a cd or an assignment inside does
      not leak to the parent. */
-  fn capture_command_substitution(const String &source) -> String;
+  fn capture_command_substitution(const String &source) throws -> String;
 
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
@@ -321,43 +322,44 @@ struct EvalContext
   fn run_source(StringView source, StringView origin = "a sourced command",
                 bool consume_return = true,
                 Maybe<SourceLocation> call_site = None,
-                Maybe<StringView> filename = None) -> i32;
+                Maybe<StringView> filename = None) throws -> i32;
 
   /* getopts keeps the position inside the current argument here, so a grouped
      option such as -abc is parsed one letter per call. last_optind detects when
      the script reset OPTIND to start a fresh scan. */
-  fn getopts_char_index() const -> usize;
-  fn set_getopts_char_index(usize index) -> void;
-  fn getopts_last_optind() const -> i64;
-  fn set_getopts_last_optind(i64 optind) -> void;
+  pure fn getopts_char_index() const wontthrow -> usize;
+  fn set_getopts_char_index(usize index) wontthrow -> void;
+  pure fn getopts_last_optind() const wontthrow -> i64;
+  fn set_getopts_last_optind(i64 optind) wontthrow -> void;
 
   /* Destroy the ASTs retained from eval and dot. The caller does this before it
      resets the parse arena, so a function those sources defined stays valid for
      the rest of the current top-level command. */
-  fn clear_retained_sources() -> void;
+  fn clear_retained_sources() wontthrow -> void;
 
   /* Keep a top-level command's tree alive past its run, so a function it
      defined stays callable on the next command. The retained trees are
      destroyed by clear_retained_sources while the arena is still valid. */
-  fn retain_ast(Expression *ast) -> void;
+  fn retain_ast(Expression *ast) throws -> void;
 
   /* Expand a heredoc body, its $name and ${...} references, keeping the literal
      text and newlines. */
-  fn expand_heredoc_body(StringView body) -> String;
+  fn expand_heredoc_body(StringView body) throws -> String;
 
-  fn expand_modifier_word(StringView word, bool remove_quotes = true) -> String;
+  fn expand_modifier_word(StringView word, bool remove_quotes = true) throws
+      -> String;
 
-  fn should_echo() const -> bool;
-  fn should_echo_expanded() const -> bool;
-  fn shell_is_interactive() const -> bool;
+  pure fn should_echo() const wontthrow -> bool;
+  pure fn should_echo_expanded() const wontthrow -> bool;
+  pure fn shell_is_interactive() const wontthrow -> bool;
 
-  fn make_stats_string() const -> String;
+  fn make_stats_string() const throws -> String;
 
-  fn last_expressions_executed() const -> usize;
-  fn total_expressions_executed() const -> usize;
+  pure fn last_expressions_executed() const wontthrow -> usize;
+  pure fn total_expressions_executed() const wontthrow -> usize;
 
-  fn last_expansion_count() const -> usize;
-  fn total_expansion_count() const -> usize;
+  pure fn last_expansion_count() const wontthrow -> usize;
+  pure fn total_expansion_count() const wontthrow -> usize;
 
 protected:
   usize m_expressions_executed_last{0};
@@ -378,8 +380,8 @@ protected:
   bool m_field_separator_table[256]{};
   /* Set IFS and refresh the separator table together, so the table never drifts
      from the cached value. */
-  fn set_field_separators(StringView value) -> void;
-  fn is_field_separator(char c) const -> bool;
+  fn set_field_separators(StringView value) throws -> void;
+  pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
 
   String m_shell_name{};
@@ -443,33 +445,34 @@ protected:
   bool m_error_exit;
 
   /* The single-letter option flags for $-, built from the flags above. */
-  fn option_flags_string() const -> String;
+  fn option_flags_string() const throws -> String;
 
-  fn expand_variable(StringView name) const -> String;
+  fn expand_variable(StringView name) const throws -> String;
 
   /* Write a variable without the read-only check, for restoring a shadowed
      local on function return where a throw from a noexcept defer would
      terminate the shell. */
-  fn assign_variable(StringView name, StringView value) -> void;
+  fn assign_variable(StringView name, StringView value) throws -> void;
 
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
-  fn apply_parameter_expansion(StringView spec) -> String;
+  fn apply_parameter_expansion(StringView spec) throws -> String;
 
   /* Compute the integer value of a $((...)) expression, resolving shell
      variables and applying any assignments inside it. */
-  fn evaluate_arithmetic(StringView expression) -> i64;
+  fn evaluate_arithmetic(StringView expression) throws -> i64;
 
   /* Turn a word into fields, applying tilde, variable expansion, command
      substitution, and IFS field splitting, but not globbing. */
-  fn expand_word(const Word &word) -> ArrayList<GlobField>;
+  fn expand_word(const Word &word) throws -> ArrayList<GlobField>;
 
-  fn expand_path_once(const GlobField &field, bool should_expand_files)
+  fn expand_path_once(const GlobField &field, bool should_expand_files) throws
       -> ArrayList<GlobField>;
-  fn expand_path_recurse(ArrayList<GlobField> fields) -> ArrayList<GlobField>;
-  fn expand_path(GlobField field) -> ArrayList<String>;
+  fn expand_path_recurse(ArrayList<GlobField> fields) throws
+      -> ArrayList<GlobField>;
+  fn expand_path(GlobField field) throws -> ArrayList<String>;
 
-  fn expand_tilde(WordSegment &leading_segment) const -> void;
+  fn expand_tilde(WordSegment &leading_segment) const throws -> void;
 };
 
 /* Lower-level execution context. Path is the program path to execute, expanded
@@ -477,13 +480,13 @@ protected:
 struct ExecContext
 {
   static fn make_from(SourceLocation location, const ArrayList<String> &args)
-      -> ExecContext;
+      throws -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and
      reuses it across the iterations of a loop. */
   static fn from_resolved(SourceLocation location, ResolvedCommand kind,
-                          const ArrayList<String> &args) -> ExecContext;
+                          const ArrayList<String> &args) throws -> ExecContext;
 
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
@@ -494,19 +497,19 @@ struct ExecContext
   bool dup_err_to_out{false};
   bool dup_out_to_err{false};
 
-  fn is_builtin() const -> bool;
+  pure fn is_builtin() const wontthrow -> bool;
 
-  fn args() const -> const ArrayList<String> &;
-  fn program() const -> const String &;
-  fn source_location() const -> const SourceLocation &;
+  pure fn args() const wontthrow -> const ArrayList<String> &;
+  pure fn program() const wontthrow -> const String &;
+  pure fn source_location() const wontthrow -> const SourceLocation &;
 
-  fn close_fds() -> void;
-  fn print_to_stdout(StringView s) const -> void;
+  fn close_fds() throws -> void;
+  fn print_to_stdout(StringView s) const throws -> void;
 
-  fn execute(bool is_async) -> i32;
+  fn execute(bool is_async) throws -> i32;
 
-  fn program_path() const -> const Path &;
-  fn builtin_kind() const -> const Builtin::Kind &;
+  pure fn program_path() const wontthrow -> const Path &;
+  pure fn builtin_kind() const wontthrow -> const Builtin::Kind &;
 
 private:
   ExecContext(SourceLocation location, ResolvedCommand &&kind,

@@ -34,15 +34,15 @@ struct Flag
     ManyStrings,
   };
 
-  fn kind() const -> Kind;
-  fn position() const -> usize;
-  fn set_position(u32 n) -> void;
-  fn short_name() const -> char;
-  fn long_name() const -> StringView;
-  fn description() const -> StringView;
+  pure fn kind() const wontthrow -> Kind;
+  pure fn position() const wontthrow -> usize;
+  fn set_position(u32 n) throws -> void;
+  pure fn short_name() const wontthrow -> char;
+  pure fn long_name() const wontthrow -> StringView;
+  pure fn description() const wontthrow -> StringView;
 
   /* Reset the flag state, mainly for builtins. */
-  virtual fn reset() -> void = 0;
+  virtual fn reset() throws -> void = 0;
 
 protected:
   Flag(Kind type, char short_name, StringView long_name,
@@ -59,10 +59,10 @@ struct FlagBool : public Flag
 {
   FlagBool(char short_name, StringView long_name, StringView description);
 
-  fn toggle() -> void;
-  fn is_enabled() const -> bool;
+  fn toggle() throws -> void;
+  pure fn is_enabled() const wontthrow -> bool;
 
-  fn reset() -> void override;
+  fn reset() throws -> void override;
 
 private:
   bool m_value{false};
@@ -72,11 +72,11 @@ struct FlagString : public Flag
 {
   FlagString(char short_name, StringView long_name, StringView description);
 
-  fn set(StringView v) -> void;
-  fn is_set() const -> bool;
-  fn value() const -> StringView;
+  fn set(StringView v) throws -> void;
+  pure fn is_set() const wontthrow -> bool;
+  pure fn value() const wontthrow -> StringView;
 
-  fn reset() -> void override;
+  fn reset() throws -> void override;
 
 private:
   bool m_is_set{false};
@@ -88,16 +88,16 @@ struct FlagManyStrings : public Flag
   FlagManyStrings(char short_name, StringView long_name,
                   StringView description);
 
-  fn append(StringView v) -> void;
-  fn size() const -> usize;
-  fn is_empty() const -> bool;
+  fn append(StringView v) throws -> void;
+  pure fn size() const wontthrow -> usize;
+  pure fn is_empty() const wontthrow -> bool;
 
-  fn get(usize i) const -> StringView;
+  pure fn get(usize i) const wontthrow -> StringView;
 
-  fn next() -> StringView;
-  fn at_end() const -> bool;
+  fn next() throws -> StringView;
+  pure fn at_end() const wontthrow -> bool;
 
-  fn reset() -> void override;
+  fn reset() throws -> void override;
 
 private:
   ArrayList<String> m_values{};
@@ -107,26 +107,26 @@ private:
 /* These return arguments which are not flags. */
 
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
-                   const ArrayList<String> &args) -> ArrayList<String>;
+                   const ArrayList<String> &args) throws -> ArrayList<String>;
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
-               const char *const *argv) -> ArrayList<String>;
+               const char *const *argv) throws -> ArrayList<String>;
 
-fn reset_flags(const ArrayList<Flag *> &flags) -> void;
+fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
 
-fn show_version() -> void;
-fn show_short_version() -> void;
+fn show_version() throws -> void;
+fn show_short_version() throws -> void;
 
 fn make_synopsis(std::string_view program_name,
-                 const std::vector<std::string> &lines) -> std::string;
-fn make_flag_help(const ArrayList<Flag *> &flags) -> std::string;
+                 const std::vector<std::string> &lines) throws -> std::string;
+fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string;
 
-fn show_message(StringView err) -> void;
+fn show_message(StringView err) throws -> void;
 
 /* Write bytes to the standard streams without going through the iostream
    layer. The shell uses these instead of std::cout and std::cerr so the binary
    does not pull in the stream machinery. */
-fn print(StringView text) -> void;
-fn print_error(StringView text) -> void;
-fn flush() -> void;
+fn print(StringView text) throws -> void;
+fn print_error(StringView text) throws -> void;
+fn flush() throws -> void;
 
 } /* namespace shit */

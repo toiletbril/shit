@@ -26,15 +26,15 @@ struct HeredocPending
 
 namespace lexer {
 
-fn is_whitespace(char ch) -> bool;
-fn is_number(char ch) -> bool;
-fn is_expression_sentinel(char ch) -> bool;
-fn is_shell_sentinel(char ch) -> bool;
-fn is_part_of_identifier(char ch) -> bool;
-fn is_string_quote(char ch) -> bool;
-fn is_expandable_char(char ch) -> bool;
-fn is_variable_name_start(char ch) -> bool;
-fn is_variable_name(char ch) -> bool;
+pure fn is_whitespace(char ch) wontthrow -> bool;
+pure fn is_number(char ch) wontthrow -> bool;
+pure fn is_expression_sentinel(char ch) wontthrow -> bool;
+pure fn is_shell_sentinel(char ch) wontthrow -> bool;
+pure fn is_part_of_identifier(char ch) wontthrow -> bool;
+pure fn is_string_quote(char ch) wontthrow -> bool;
+pure fn is_expandable_char(char ch) wontthrow -> bool;
+pure fn is_variable_name_start(char ch) wontthrow -> bool;
+pure fn is_variable_name(char ch) wontthrow -> bool;
 
 } /* namespace lexer */
 
@@ -56,30 +56,30 @@ struct Lexer
   Lexer(const Lexer &) = delete;
   Lexer &operator=(const Lexer &) = delete;
 
-  [[nodiscard]] fn peek_expression_token() -> Token *;
-  [[nodiscard]] fn peek_shell_token() -> Token *;
-  [[nodiscard]] fn next_expression_token() -> Token *;
-  [[nodiscard]] fn next_shell_token() -> Token *;
+  [[nodiscard]] fn peek_expression_token() throws -> Token *;
+  [[nodiscard]] fn peek_shell_token() throws -> Token *;
+  [[nodiscard]] fn next_expression_token() throws -> Token *;
+  [[nodiscard]] fn next_shell_token() throws -> Token *;
 
-  fn source() const -> StringView;
-  fn debug_words() const -> const ArrayList<Word> &;
-  fn arena() const -> BumpArena &;
+  pure fn source() const wontthrow -> StringView;
+  pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
+  pure fn arena() const wontthrow -> BumpArena &;
   /* Redirect node allocation to another arena, so a function body can be parsed
      into the persistent function arena and restored afterward. */
-  fn set_arena(BumpArena &arena) -> void;
-  fn advance_past_last_peek() -> usize;
+  fn set_arena(BumpArena &arena) wontthrow -> void;
+  fn advance_past_last_peek() throws -> usize;
 
   /* Reserve a heredoc body for the given delimiter, returning the stable buffer
      the lexer fills when the current line ends. The buffer is a std::string
      because the parsed Redirection field that points at it is read as one by
      the Eval layer. */
   fn register_heredoc(StringView delimiter, bool strip_tabs)
-      -> const std::string *;
+      throws -> const std::string *;
 
 protected:
   /* Stamp a location in the source being lexed with this lexer's filename, so
      every token and error the lexer makes points a caret at the named file. */
-  fn here(usize position, usize length) const -> SourceLocation
+  pure fn here(usize position, usize length) const wontthrow -> SourceLocation
   {
     return SourceLocation{position, length, m_filename};
   }
@@ -109,18 +109,18 @@ protected:
      of pointers grows. The lexer frees them in its destructor. */
   ArrayList<std::string *> m_heredoc_bodies{heap_allocator()};
   ArrayList<HeredocPending> m_pending_heredocs{heap_allocator()};
-  fn collect_pending_heredocs() -> void;
+  fn collect_pending_heredocs() throws -> void;
 
-  fn lex_expression_token() -> Token *;
-  fn lex_shell_token() -> Token *;
+  fn lex_expression_token() throws -> Token *;
+  fn lex_shell_token() throws -> Token *;
 
-  fn skip_whitespace() -> void;
-  fn advance_forward(usize offset) -> usize;
-  fn chop_character(usize offset = 0) -> char;
+  fn skip_whitespace() wontthrow -> void;
+  fn advance_forward(usize offset) wontthrow -> usize;
+  fn chop_character(usize offset = 0) wontthrow -> char;
 
-  fn lex_number() -> Token *;
-  fn lex_identifier() -> Token *;
-  fn lex_sentinel() -> Token *;
+  fn lex_number() throws -> Token *;
+  fn lex_identifier() throws -> Token *;
+  fn lex_sentinel() throws -> Token *;
 };
 
 } /* namespace shit */

@@ -12,19 +12,19 @@ namespace shit {
 
 WhoAmI::WhoAmI() = default;
 
-Builtin::Kind WhoAmI::kind() const { return Kind::WhoAmI; }
+pure Builtin::Kind WhoAmI::kind() const wontthrow { return Kind::WhoAmI; }
 
-i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
+i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
-  const ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
+  let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   String p{};
 
-  if (const Maybe<String> u = os::get_current_user(); u.has_value()) {
+  if (let const u = os::get_current_user(); u.has_value()) {
     p.append(u->view());
     p += '\n';
     ec.print_to_stdout(p);
