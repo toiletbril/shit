@@ -615,7 +615,7 @@ fn Lexer::lex_identifier() -> Token *
     {
       switch (*kw) {
         KW_SWITCH_CASES();
-      default: unreachable("unhandled keyword of type %d", SHIT_ENUM(*kw));
+      default: unreachable("unhandled keyword of type %d", ENUM(*kw));
       }
     }
   }
@@ -729,7 +729,7 @@ fn Lexer::lex_sentinel() -> Token *
       TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
       TOKEN_CASE_THREE(Less, '<', DoubleLess, '=', LessEquals);
 
-    default: unreachable("unhandled operator of type %d", SHIT_ENUM(*op));
+    default: unreachable("unhandled operator of type %d", ENUM(*op));
     }
   } else {
     String s{};

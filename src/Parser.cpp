@@ -26,7 +26,7 @@ static fn get_sequence_kind(Token::Kind tk) -> CompoundListCondition::Kind
   case Token::Kind::DoubleAmpersand: return CompoundListCondition::Kind::And;
   case Token::Kind::DoublePipe: return CompoundListCondition::Kind::Or; break;
 
-  default: unreachable("Invalid shell sequence token: %d", SHIT_ENUM(tk));
+  default: unreachable("Invalid shell sequence token: %d", ENUM(tk));
   }
 }
 

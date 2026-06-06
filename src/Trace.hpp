@@ -1,7 +1,7 @@
 #pragma once
 
-/* A runtime-gated logger, separate from the compile-time SHIT_TRACE in
-   Debug.hpp. SHIT_TRACE compiles out in a release build, while LOG stays
+/* A runtime-gated logger, separate from the compile-time TRACE in
+   Debug.hpp. TRACE compiles out in a release build, while LOG stays
    in and checks the level against a global, so a helper can trace the runtime
    in any build when the user raises the verbosity. */
 

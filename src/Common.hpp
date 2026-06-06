@@ -88,7 +88,7 @@ using uintptr = uintptr_t;
 #endif
 
 #define SHIT_USED        t__used
-#define SHIT_FORCEINLINE t__forceinline
+#define forceinline t__forceinline
 #define unused(x)   (std::ignore = (x))
 
 #define t__concat_literal(x, y) x##y
@@ -120,7 +120,7 @@ struct t__exit_scope_help
   const auto &concat_literal(defer__, __LINE__) = t__exit_scope_help() + [&]()
 
 /* Silence enum warnings. */
-#define SHIT_ENUM(e) static_cast<int>(e)
+#define ENUM(e) static_cast<int>(e)
 
 #define sub_sat(a, b) ((a) > (b) ? (a) - (b) : 0)
 

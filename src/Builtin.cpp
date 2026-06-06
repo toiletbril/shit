@@ -161,7 +161,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
     BUILTIN_SWITCH_CASES();
   default:
     unreachable("Unhandled builtin of kind %d",
-                     SHIT_ENUM(ec.builtin_kind()));
+                     ENUM(ec.builtin_kind()));
   }
 
   /* A builtin runs inside the shell process, so it keeps the shell's own signal

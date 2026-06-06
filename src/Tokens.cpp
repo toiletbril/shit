@@ -253,7 +253,7 @@ fn Operator::construct_binary_expression(const Expression *lhs,
   unused(lhs);
   unused(rhs);
   unreachable("Invalid binary operator construction of type %d",
-                   SHIT_ENUM(kind()));
+                   ENUM(kind()));
 }
 
 fn Operator::construct_unary_expression(const Expression *rhs) const
@@ -261,7 +261,7 @@ fn Operator::construct_unary_expression(const Expression *rhs) const
 {
   unused(rhs);
   unreachable("Invalid unary operator construction of type %d",
-                   SHIT_ENUM(kind()));
+                   ENUM(kind()));
 }
 
 #define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \

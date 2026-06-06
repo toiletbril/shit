@@ -9,18 +9,18 @@ struct String;
 #if !defined NDEBUG
 #include <cstdio>
 /* fprintf(stderr, ...) */
-#define SHIT_TRACE(...)                                                        \
+#define TRACE(...)                                                        \
   do {                                                                         \
     unused(                                                               \
-        std::fprintf(stderr, "[SHIT_TRACE] " __FILE__ ":%d: ", __LINE__));     \
+        std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));     \
     unused(std::fprintf(stderr, __VA_ARGS__));                            \
     unused(fflush(stderr));                                               \
   } while (0)
 /* fprintf(stderr, ... + "\n") */
-#define SHIT_TRACELN(...)                                                      \
+#define TRACELN(...)                                                      \
   do {                                                                         \
     unused(                                                               \
-        std::fprintf(stderr, "[SHIT_TRACE] " __FILE__ ":%d: ", __LINE__));     \
+        std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));     \
     unused(std::fprintf(stderr, __VA_ARGS__));                            \
     unused(fputc('\n', stderr));                                          \
     unused(fflush(stderr));                                               \
@@ -61,44 +61,44 @@ StringT t__string_from_struct(const T &x)
   __builtin_dump_struct(&x, t__strprintf<StringT>, s);
   return s;
 }
-#define SHIT_STRUCT_STRING(x) ::shit::t__string_from_struct<::shit::String>(x)
+#define STRUCT_STRING(x) ::shit::t__string_from_struct<::shit::String>(x)
 #endif
 #else /* !NDEBUG */
-#define SHIT_STRUCT_STRING(...) ::shit::String{"<optimized out>"}
-#define SHIT_TRACE(...)         /* None */
-#define SHIT_TRACELN(...)       /* None */
+#define STRUCT_STRING(...) ::shit::String{"<optimized out>"}
+#define TRACE(...)         /* None */
+#define TRACELN(...)       /* None */
 #endif
 
-#if !defined SHIT_STRUCT_STRING
-#define SHIT_STRUCT_STRING(...) ::shit::String{"<not supported>"}
+#if !defined STRUCT_STRING
+#define STRUCT_STRING(...) ::shit::String{"<not supported>"}
 #endif
 
 #define t__va_are_empty(...) (sizeof((char[]) {#__VA_ARGS__}) == 1)
 
 /* True if __VA_ARGS__ passed as an argument is empty. */
-#define SHIT_VA_ARE_EMPTY(...) t__va_are_empty(__VA_ARGS__)
+#define VA_ARE_EMPTY(...) t__va_are_empty(__VA_ARGS__)
 
 #if !defined NDEBUG
 /* Cause the debugger to break on this call. */
-#define SHIT_TRAP(...)                                                         \
+#define TRAP(...)                                                         \
   do {                                                                         \
-    SHIT_TRACELN("Encountered a debug trap");                                  \
-    if (!SHIT_VA_ARE_EMPTY(__VA_ARGS__)) {                                     \
-      SHIT_TRACELN("Details: " __VA_ARGS__);                                   \
+    TRACELN("Encountered a debug trap");                                  \
+    if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                     \
+      TRACELN("Details: " __VA_ARGS__);                                   \
     }                                                                          \
     t__debugtrap();                                                            \
   } while (0)
 #else
-#define SHIT_TRAP(...) abort()
+#define TRAP(...) abort()
 #endif
 
 #if !defined NDEBUG
 /* This code path is unreachable. */
 #define unreachable(...)                                                  \
   do {                                                                         \
-    SHIT_TRACELN("Reached an unreachable statement");                          \
-    if (!SHIT_VA_ARE_EMPTY(__VA_ARGS__)) {                                     \
-      SHIT_TRACELN("Details: " __VA_ARGS__);                                   \
+    TRACELN("Reached an unreachable statement");                          \
+    if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                     \
+      TRACELN("Details: " __VA_ARGS__);                                   \
     }                                                                          \
     t__unreachable();                                                          \
   } while (0)
@@ -110,11 +110,11 @@ StringT t__string_from_struct(const T &x)
 #define ASSERT(x, ...)                                                    \
   do {                                                                         \
     if (!(x)) [[unlikely]] {                                                   \
-      SHIT_TRACELN("'ASSERT(" #x ")' fail in %s().", __func__);           \
-      if (!SHIT_VA_ARE_EMPTY(__VA_ARGS__)) {                                   \
-        SHIT_TRACELN("Details: " __VA_ARGS__);                                 \
+      TRACELN("'ASSERT(" #x ")' fail in %s().", __func__);           \
+      if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                   \
+        TRACELN("Details: " __VA_ARGS__);                                 \
       }                                                                        \
-      SHIT_TRAP();                                                             \
+      TRAP();                                                             \
     }                                                                          \
   } while (0)
 #else
