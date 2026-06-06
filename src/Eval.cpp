@@ -291,6 +291,11 @@ fn EvalContext::run_exit_trap() -> void
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
 
+  /* A Ctrl-C that ended the last command leaves the interrupt flag set. The exit
+     trap runs as the shell winds down and must not be aborted by it, so the flag
+     is dropped before the action evaluates. */
+  os::INTERRUPT_REQUESTED = 0;
+
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->size() > 0) run_source(action->view(), "the EXIT trap");
 }
