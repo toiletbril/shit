@@ -87,7 +87,7 @@ EvalContext::is_field_separator(char c) const
 }
 
 void
-EvalContext::set_shell_variable(StringView name, std::string value)
+EvalContext::set_shell_variable(StringView name, StringView value)
 {
   /* A read-only variable rejects the assignment. The common case has no
      read-only names, so the scan is skipped entirely. */

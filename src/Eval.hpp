@@ -147,7 +147,7 @@ struct EvalContext
     m_scratch_arena.reset();
   }
 
-  void set_shell_variable(StringView name, std::string value);
+  void set_shell_variable(StringView name, StringView value);
   void unset_shell_variable(StringView name);
   Maybe<std::string> get_variable_value(StringView name) const;
 
