@@ -652,4 +652,44 @@ private:
   usize m_tombstones{0};
 };
 
+/* An empty payload, so a set reuses the map probing without storing a value. */
+struct EmptyValue
+{};
+
+/* A set of byte-string keys over the HashMap open-addressing table. It owns a
+   copy of every key it holds, so a view passed to add need not outlive it. */
+struct HashSet
+{
+  explicit HashSet(Allocator allocator) : m_map(allocator) {}
+
+  void
+  add(StringView key)
+  {
+    m_map.set(key, EmptyValue{});
+  }
+
+  [[nodiscard]] bool
+  contains(StringView key) const
+  {
+    return m_map.find(key) != nullptr;
+  }
+
+  [[nodiscard]] usize
+  size() const
+  {
+    return m_map.size();
+  }
+
+  template <class Fn>
+  void
+  for_each(Fn fn) const
+  {
+    m_map.for_each(
+        [&fn](StringView key, const EmptyValue &) { fn(key); });
+  }
+
+private:
+  HashMap<EmptyValue> m_map;
+};
+
 } /* namespace shit */

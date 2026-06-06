@@ -134,14 +134,15 @@ word_has_backtick(const Word &word)
 
 bool
 analyze_ast(const Expression *root, std::string_view source,
-            const std::unordered_set<std::string> &known_functions,
-            const std::unordered_set<std::string> &known_aliases)
+            const HashSet &known_functions, const HashSet &known_aliases)
 {
   AnalysisContext actx{source};
   /* A function or alias defined by an earlier command resolves, so seed the
      prepass with the names already registered. */
-  actx.defined_functions = known_functions;
-  actx.known_aliases = known_aliases;
+  known_functions.for_each(
+      [&actx](StringView name) { actx.defined_functions.add(name); });
+  known_aliases.for_each(
+      [&actx](StringView name) { actx.known_aliases.add(name); });
   root->analyze(actx, true);
   return !actx.has_fatal;
 }
@@ -1486,7 +1487,7 @@ void
 FunctionDefinition::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   SHIT_UNUSED(is_unconditional);
-  actx.defined_functions.insert(m_name);
+  actx.defined_functions.add(StringView{m_name.data(), m_name.size()});
   m_body->analyze(actx, false);
 }
 
@@ -1715,7 +1716,7 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
               .to_literal_string();
       usize equals_position = literal.find('=');
       if (equals_position != std::string::npos && equals_position > 0)
-        actx.known_aliases.insert(literal.substr(0, equals_position));
+        actx.known_aliases.add(StringView{literal.data(), equals_position});
     }
   }
 
@@ -1775,8 +1776,8 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
   }
 
   if (name && !command_resolves(*name) &&
-      actx.defined_functions.find(*name) == actx.defined_functions.end() &&
-      actx.known_aliases.find(*name) == actx.known_aliases.end())
+      !actx.defined_functions.contains(StringView{name->data(), name->size()}) &&
+      !actx.known_aliases.contains(StringView{name->data(), name->size()}))
   {
     std::string message = "Command '" + *name + "' was not found";
     /* Point at the command word, not at the whole command. With an assignment

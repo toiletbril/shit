@@ -6,7 +6,6 @@
 
 #include <string>
 #include <string_view>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -28,10 +27,10 @@ struct AnalysisContext
   bool saw_runtime_definer{false};
   /* Names of functions seen so far. A call to one of these resolves, so a
      function defined before its use is not reported as a missing command. */
-  std::unordered_set<std::string> defined_functions{};
+  HashSet defined_functions{heap_allocator()};
   /* Names already defined as aliases. A call to one resolves at runtime through
      the alias expansion, so it is not a missing command. */
-  std::unordered_set<std::string> known_aliases{};
+  HashSet known_aliases{heap_allocator()};
 
   explicit AnalysisContext(std::string_view source_view) : source(source_view)
   {}
@@ -43,8 +42,8 @@ struct AnalysisContext
 /* Walk the tree and report. Returns true when execution may proceed, false when
    an unconditional command failed to resolve. */
 bool analyze_ast(const Expression *root, std::string_view source,
-                 const std::unordered_set<std::string> &known_functions = {},
-                 const std::unordered_set<std::string> &known_aliases = {});
+                 const HashSet &known_functions,
+                 const HashSet &known_aliases);
 
 struct Expression
 {

@@ -9,7 +9,6 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -201,7 +200,7 @@ struct EvalContext
 
   /* The names of every defined function, so the prepass of a later command
      knows a function defined earlier resolves. */
-  std::unordered_set<std::string> function_names() const;
+  HashSet function_names() const;
 
   /* trap stores an action to run for a condition, keyed by the condition name
      such as EXIT or INT. The EXIT action runs once when the shell ends. */
@@ -232,7 +231,7 @@ struct EvalContext
   Maybe<std::string> get_alias(const std::string &name) const;
   std::vector<std::string> alias_definitions() const;
   /* The defined alias names, so the prepass treats a use of one as resolvable. */
-  std::unordered_set<std::string> alias_names() const;
+  HashSet alias_names() const;
 
   /* Save and restore the mutable state around a subshell or a command
      substitution, so changes inside do not leak to the parent. */

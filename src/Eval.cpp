@@ -257,13 +257,13 @@ EvalContext::unset_function(const std::string &name)
   m_functions.erase(StringView{name.data(), name.size()});
 }
 
-std::unordered_set<std::string>
+HashSet
 EvalContext::function_names() const
 {
-  std::unordered_set<std::string> names{};
+  HashSet names{heap_allocator()};
   m_functions.for_each([&](StringView name, const Expression *body) {
     SHIT_UNUSED(body);
-    names.insert(std::string{name.data, name.length});
+    names.add(name);
   });
   return names;
 }
@@ -403,13 +403,13 @@ EvalContext::alias_definitions() const
   return out;
 }
 
-std::unordered_set<std::string>
+HashSet
 EvalContext::alias_names() const
 {
-  std::unordered_set<std::string> out{};
+  HashSet out{heap_allocator()};
   m_aliases.for_each([&out](StringView key, const String &value) {
     SHIT_UNUSED(value);
-    out.insert(std::string{key.data, key.size()});
+    out.add(key);
   });
   return out;
 }
