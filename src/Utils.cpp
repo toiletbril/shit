@@ -595,13 +595,13 @@ read_entire_standard_input()
 }
 
 Maybe<std::string>
-read_line_from_standard_input()
+read_line_from_fd(os::descriptor fd)
 {
   std::string line{};
   bool read_any_byte = false;
   for (;;) {
     char one_byte = 0;
-    Maybe<usize> read_count = os::read_fd(SHIT_STDIN, &one_byte, 1);
+    Maybe<usize> read_count = os::read_fd(fd, &one_byte, 1);
     if (!read_count || *read_count == 0) break;
     read_any_byte = true;
     if (one_byte == '\n') return line;

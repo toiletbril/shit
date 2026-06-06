@@ -66,9 +66,10 @@ Maybe<std::string> read_entire_file(const std::string &path);
 /* Read everything still available on standard input into a string. */
 std::string read_entire_standard_input();
 
-/* Read one line from standard input, without the trailing newline. Returns
-   nothing at end of input with no bytes read. */
-Maybe<std::string> read_line_from_standard_input();
+/* Read one line from a descriptor, without the trailing newline. Returns
+   nothing at end of input with no bytes read. The read builtin passes the
+   command's input descriptor so a redirection or a heredoc is honored. */
+Maybe<std::string> read_line_from_fd(os::descriptor fd);
 
 void initialize_path_map();
 
