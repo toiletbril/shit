@@ -9,7 +9,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 
 namespace shit {
 
@@ -29,10 +28,7 @@ show_builtin_help_impl(const ExecContext &ec,
 Maybe<Builtin::Kind>
 search_builtin(std::string_view builtin_name)
 {
-  if (auto b = BUILTINS.find(std::string{builtin_name}); b != BUILTINS.end())
-    return b->second;
-
-  return shit::nothing;
+  return BUILTINS.find(StringView{builtin_name.data(), builtin_name.size()});
 }
 
 /* A one-line synopsis and a sentence of explanation for each builtin, shown by

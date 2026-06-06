@@ -630,11 +630,14 @@ Lexer::lex_identifier()
   {
     /* A bare word may name a keyword. A quoted or escaped word never does, so
        only a single unquoted segment qualifies. */
-    if (auto kw = KEYWORDS.find(word.segments[0].text); kw != KEYWORDS.end()) {
-      switch (kw->second) {
+    const std::string &word_text = word.segments[0].text;
+    if (Maybe<Token::Kind> kw =
+            KEYWORDS.find(StringView{word_text.data(), word_text.size()}))
+    {
+      switch (*kw) {
         KW_SWITCH_CASES();
       default:
-        SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(kw->second));
+        SHIT_UNREACHABLE("unhandled keyword of type %d", SHIT_ENUM(*kw));
       }
     }
   }
@@ -652,36 +655,38 @@ Lexer::lex_identifier()
 /* Only single-character operators are defined here. Further parsing is done in
  * related routines. */
 
-/* clang-format off */
-static const std::unordered_map<char, Token::Kind> OPERATORS = {
-    /* Sentinels */
-    {')',  Token::Kind::RightParen        },
-    {'(',  Token::Kind::LeftParen         },
-    {']',  Token::Kind::RightSquareBracket},
-    {'[',  Token::Kind::LeftSquareBracket },
-    {'}',  Token::Kind::RightBracket      },
-    {'{',  Token::Kind::LeftBracket       },
-
-    {';',  Token::Kind::Semicolon         },
-    {'.',  Token::Kind::Dot               },
-    {'\n', Token::Kind::Newline           },
-
-    /* Operators */
-    {'+',  Token::Kind::Plus              },
-    {'-',  Token::Kind::Minus             },
-    {'*',  Token::Kind::Asterisk          },
-    {'/',  Token::Kind::Slash             },
-    {'%',  Token::Kind::Percent           },
-    {'~',  Token::Kind::Tilde             },
-    {'^',  Token::Kind::Cap               },
-    {'!',  Token::Kind::ExclamationMark   },
-    {'&',  Token::Kind::Ampersand         },
-    {'>',  Token::Kind::Greater           },
-    {'<',  Token::Kind::Less              },
-    {'|',  Token::Kind::Pipe              },
-    {'=',  Token::Kind::Equals            },
-};
-/* clang-format on */
+/* The token kind a single operator character begins, or nothing when the
+   character is not an operator. The switch keeps this allocation free and the
+   compiler lowers it to a jump table. */
+static Maybe<Token::Kind>
+lookup_operator(char ch)
+{
+  switch (ch) {
+  case ')':  return Token::Kind::RightParen;
+  case '(':  return Token::Kind::LeftParen;
+  case ']':  return Token::Kind::RightSquareBracket;
+  case '[':  return Token::Kind::LeftSquareBracket;
+  case '}':  return Token::Kind::RightBracket;
+  case '{':  return Token::Kind::LeftBracket;
+  case ';':  return Token::Kind::Semicolon;
+  case '.':  return Token::Kind::Dot;
+  case '\n': return Token::Kind::Newline;
+  case '+':  return Token::Kind::Plus;
+  case '-':  return Token::Kind::Minus;
+  case '*':  return Token::Kind::Asterisk;
+  case '/':  return Token::Kind::Slash;
+  case '%':  return Token::Kind::Percent;
+  case '~':  return Token::Kind::Tilde;
+  case '^':  return Token::Kind::Cap;
+  case '!':  return Token::Kind::ExclamationMark;
+  case '&':  return Token::Kind::Ampersand;
+  case '>':  return Token::Kind::Greater;
+  case '<':  return Token::Kind::Less;
+  case '|':  return Token::Kind::Pipe;
+  case '=':  return Token::Kind::Equals;
+  default:   return nothing;
+  }
+}
 
 Token *
 Lexer::lex_sentinel()
@@ -733,8 +738,8 @@ Lexer::lex_sentinel()
   } break;
   /* clang-format on */
 
-  if (auto op = OPERATORS.find(ch); op != OPERATORS.end()) {
-    switch (op->second) {
+  if (Maybe<Token::Kind> op = lookup_operator(ch)) {
+    switch (*op) {
       TOKEN_CASE_ONE(RightParen);
       TOKEN_CASE_ONE(LeftParen);
       TOKEN_CASE_ONE(RightBracket);
@@ -761,7 +766,7 @@ Lexer::lex_sentinel()
       TOKEN_CASE_THREE(Less, '<', DoubleLess, '=', LessEquals);
 
     default:
-      SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(op->second));
+      SHIT_UNREACHABLE("unhandled operator of type %d", SHIT_ENUM(*op));
     }
   } else {
     std::string s{};

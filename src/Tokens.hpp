@@ -9,7 +9,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -185,23 +184,26 @@ private:
   SourceLocation m_location;
 };
 
-const std::unordered_map<std::string, Token::Kind> KEYWORDS = {
-    {"if",       Token::Kind::If      },
-    {"then",     Token::Kind::Then    },
-    {"else",     Token::Kind::Else    },
-    {"elif",     Token::Kind::Elif    },
-    {"fi",       Token::Kind::Fi      },
-    {"when",     Token::Kind::When    },
-    {"case",     Token::Kind::Case    },
-    {"esac",     Token::Kind::Esac    },
-    {"while",    Token::Kind::While   },
-    {"for",      Token::Kind::For     },
-    {"done",     Token::Kind::Done    },
-    {"until",    Token::Kind::Until   },
-    {"time",     Token::Kind::Time    },
-    {"do",       Token::Kind::Do      },
-    {"function", Token::Kind::Function},
+inline constexpr StaticStringMap<Token::Kind>::Entry KEYWORD_ENTRIES[] = {
+    {PackedStringKey::from_literal("if"),       Token::Kind::If      },
+    {PackedStringKey::from_literal("then"),     Token::Kind::Then    },
+    {PackedStringKey::from_literal("else"),     Token::Kind::Else    },
+    {PackedStringKey::from_literal("elif"),     Token::Kind::Elif    },
+    {PackedStringKey::from_literal("fi"),       Token::Kind::Fi      },
+    {PackedStringKey::from_literal("when"),     Token::Kind::When    },
+    {PackedStringKey::from_literal("case"),     Token::Kind::Case    },
+    {PackedStringKey::from_literal("esac"),     Token::Kind::Esac    },
+    {PackedStringKey::from_literal("while"),    Token::Kind::While   },
+    {PackedStringKey::from_literal("for"),      Token::Kind::For     },
+    {PackedStringKey::from_literal("done"),     Token::Kind::Done    },
+    {PackedStringKey::from_literal("until"),    Token::Kind::Until   },
+    {PackedStringKey::from_literal("time"),     Token::Kind::Time    },
+    {PackedStringKey::from_literal("do"),       Token::Kind::Do      },
+    {PackedStringKey::from_literal("function"), Token::Kind::Function},
 };
+
+inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
+    KEYWORD_ENTRIES, sizeof(KEYWORD_ENTRIES) / sizeof(KEYWORD_ENTRIES[0])};
 
 /* clang-format off */
 #define KW_CASE(k)                                                             \

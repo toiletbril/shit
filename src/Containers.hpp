@@ -652,12 +652,9 @@ private:
   usize m_tombstones{0};
 };
 
-/* An empty payload, so a set reuses the map probing without storing a value. */
-struct EmptyValue
-{};
-
-/* A set of byte-string keys over the HashMap open-addressing table. It owns a
-   copy of every key it holds, so a view passed to add need not outlive it. */
+/* A set of byte-string keys over the HashMap open-addressing table. The value is
+   None, so a set stores only keys. It owns a copy of every key it holds, so a
+   view passed to add need not outlive it. */
 struct HashSet
 {
   explicit HashSet(Allocator allocator) : m_map(allocator) {}
@@ -665,7 +662,7 @@ struct HashSet
   void
   add(StringView key)
   {
-    m_map.set(key, EmptyValue{});
+    m_map.set(key, None{});
   }
 
   [[nodiscard]] bool
@@ -684,12 +681,86 @@ struct HashSet
   void
   for_each(Fn fn) const
   {
-    m_map.for_each(
-        [&fn](StringView key, const EmptyValue &) { fn(key); });
+    m_map.for_each([&fn](StringView key, const None &) { fn(key); });
   }
 
 private:
-  HashMap<EmptyValue> m_map;
+  HashMap<None> m_map;
+};
+
+/* A short byte string packed into a fixed sixteen-byte block held in two machine
+   words. A static lookup table compares two integers per entry rather than
+   walking bytes, which the compiler lowers to a couple of wide register
+   compares. A key longer than sixteen bytes does not fit and never matches,
+   which suits the keyword and builtin tables whose longest entry is eight
+   bytes. */
+struct PackedStringKey
+{
+  u64 low_word{0};
+  u64 high_word{0};
+
+  /* Pack a NUL-terminated literal at compile time, so the table entries become
+     constants with no runtime initialization. */
+  static constexpr PackedStringKey
+  from_literal(const char *text)
+  {
+    PackedStringKey key{};
+    usize i = 0;
+    for (; text[i] != '\0' && i < 8; i++)
+      key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
+    for (; text[i] != '\0' && i < 16; i++)
+      key.high_word |= static_cast<u64>(static_cast<u8>(text[i]))
+                       << (8 * (i - 8));
+    return key;
+  }
+
+  /* Pack a view at lookup time. A view longer than sixteen bytes is the caller's
+     responsibility to reject, since it cannot match any table key. */
+  static PackedStringKey
+  from_view(StringView text)
+  {
+    PackedStringKey key{};
+    usize count = text.size() < 16 ? text.size() : 16;
+    for (usize i = 0; i < count && i < 8; i++)
+      key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
+    for (usize i = 8; i < count; i++)
+      key.high_word |= static_cast<u64>(static_cast<u8>(text[i]))
+                       << (8 * (i - 8));
+    return key;
+  }
+
+  [[nodiscard]] bool
+  operator==(const PackedStringKey &other) const
+  {
+    return low_word == other.low_word && high_word == other.high_word;
+  }
+};
+
+/* A frozen map from a short byte string to a value, stored in static storage as
+   a flat array of packed-key entries. A lookup packs the query into two words
+   and scans, so a tiny table resolves in a handful of integer compares with no
+   hashing and no allocation. */
+template <class Value>
+struct StaticStringMap
+{
+  struct Entry
+  {
+    PackedStringKey key;
+    Value value;
+  };
+
+  const Entry *entries;
+  usize entry_count;
+
+  [[nodiscard]] Maybe<Value>
+  find(StringView text) const
+  {
+    if (text.size() > 16) return nothing;
+    PackedStringKey wanted = PackedStringKey::from_view(text);
+    for (usize i = 0; i < entry_count; i++)
+      if (entries[i].key == wanted) return entries[i].value;
+    return nothing;
+  }
 };
 
 } /* namespace shit */

@@ -455,15 +455,24 @@ signal_number_from_name(const std::string &name)
   std::string bare = name;
   if (bare.rfind("SIG", 0) == 0) bare = bare.substr(3);
 
-  static const std::unordered_map<std::string, i32> NAMES = {
-      {"HUP", SIGHUP},   {"INT", SIGINT},   {"QUIT", SIGQUIT},
-      {"KILL", SIGKILL}, {"TERM", SIGTERM}, {"STOP", SIGSTOP},
-      {"TSTP", SIGTSTP}, {"CONT", SIGCONT}, {"USR1", SIGUSR1},
-      {"USR2", SIGUSR2}, {"ABRT", SIGABRT}, {"ALRM", SIGALRM},
-      {"PIPE", SIGPIPE},
+  static constexpr StaticStringMap<i32>::Entry NAME_ENTRIES[] = {
+      {PackedStringKey::from_literal("HUP"),  SIGHUP },
+      {PackedStringKey::from_literal("INT"),  SIGINT },
+      {PackedStringKey::from_literal("QUIT"), SIGQUIT},
+      {PackedStringKey::from_literal("KILL"), SIGKILL},
+      {PackedStringKey::from_literal("TERM"), SIGTERM},
+      {PackedStringKey::from_literal("STOP"), SIGSTOP},
+      {PackedStringKey::from_literal("TSTP"), SIGTSTP},
+      {PackedStringKey::from_literal("CONT"), SIGCONT},
+      {PackedStringKey::from_literal("USR1"), SIGUSR1},
+      {PackedStringKey::from_literal("USR2"), SIGUSR2},
+      {PackedStringKey::from_literal("ABRT"), SIGABRT},
+      {PackedStringKey::from_literal("ALRM"), SIGALRM},
+      {PackedStringKey::from_literal("PIPE"), SIGPIPE},
   };
-  if (auto it = NAMES.find(bare); it != NAMES.end()) return it->second;
-  return nothing;
+  static constexpr StaticStringMap<i32> NAMES{
+      NAME_ENTRIES, sizeof(NAME_ENTRIES) / sizeof(NAME_ENTRIES[0])};
+  return NAMES.find(StringView{bare.data(), bare.size()});
 }
 
 os_args

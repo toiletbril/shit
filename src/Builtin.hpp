@@ -7,7 +7,6 @@
 
 #include <optional>
 #include <string>
-#include <unordered_map>
 
 /* TODO: test */
 
@@ -73,49 +72,52 @@ protected:
   Builtin();
 };
 
-const std::unordered_map<std::string, Builtin::Kind> BUILTINS = {
-    {"echo",     Builtin::Kind::Echo    },
-    {"exit",     Builtin::Kind::Exit    },
-    {"cd",       Builtin::Kind::Cd      },
-    {"pwd",      Builtin::Kind::Pwd     },
-    {"which",    Builtin::Kind::Which   },
-    {"whoami",   Builtin::Kind::WhoAmI  },
-    {"export",   Builtin::Kind::Export  },
-    {"break",    Builtin::Kind::Break   },
-    {"continue", Builtin::Kind::Continue},
-    {"return",   Builtin::Kind::Return  },
-    {":",        Builtin::Kind::Colon   },
-    {"true",     Builtin::Kind::True    },
-    {"false",    Builtin::Kind::False   },
-    {"test",     Builtin::Kind::Test    },
-    {"[",        Builtin::Kind::Test    },
-    {".",        Builtin::Kind::Source  },
-    {"source",   Builtin::Kind::Source  },
-    {"eval",     Builtin::Kind::Eval    },
-    {"set",      Builtin::Kind::Set     },
-    {"shift",    Builtin::Kind::Shift   },
-    {"unset",    Builtin::Kind::Unset   },
-    {"read",     Builtin::Kind::Read    },
-    {"printf",   Builtin::Kind::Printf  },
-    {"umask",    Builtin::Kind::Umask   },
-    {"getopts",  Builtin::Kind::Getopts },
-    {"trap",     Builtin::Kind::Trap    },
-    {"exec",     Builtin::Kind::Exec    },
-    {"type",     Builtin::Kind::Type    },
-    {"command",  Builtin::Kind::CommandBuiltin},
-    {"readonly", Builtin::Kind::Readonly},
-    {"local",    Builtin::Kind::Local   },
-    {"times",    Builtin::Kind::Times   },
-    {"ulimit",   Builtin::Kind::Ulimit  },
-    {"hash",     Builtin::Kind::Hash    },
-    {"alias",    Builtin::Kind::Alias   },
-    {"unalias",  Builtin::Kind::Unalias },
-    {"jobs",     Builtin::Kind::Jobs    },
-    {"fg",       Builtin::Kind::Fg      },
-    {"bg",       Builtin::Kind::Bg      },
-    {"wait",     Builtin::Kind::Wait    },
-    {"kill",     Builtin::Kind::Kill    },
+inline constexpr StaticStringMap<Builtin::Kind>::Entry BUILTIN_ENTRIES[] = {
+    {PackedStringKey::from_literal("echo"),     Builtin::Kind::Echo    },
+    {PackedStringKey::from_literal("exit"),     Builtin::Kind::Exit    },
+    {PackedStringKey::from_literal("cd"),       Builtin::Kind::Cd      },
+    {PackedStringKey::from_literal("pwd"),      Builtin::Kind::Pwd     },
+    {PackedStringKey::from_literal("which"),    Builtin::Kind::Which   },
+    {PackedStringKey::from_literal("whoami"),   Builtin::Kind::WhoAmI  },
+    {PackedStringKey::from_literal("export"),   Builtin::Kind::Export  },
+    {PackedStringKey::from_literal("break"),    Builtin::Kind::Break   },
+    {PackedStringKey::from_literal("continue"), Builtin::Kind::Continue},
+    {PackedStringKey::from_literal("return"),   Builtin::Kind::Return  },
+    {PackedStringKey::from_literal(":"),        Builtin::Kind::Colon   },
+    {PackedStringKey::from_literal("true"),     Builtin::Kind::True    },
+    {PackedStringKey::from_literal("false"),    Builtin::Kind::False   },
+    {PackedStringKey::from_literal("test"),     Builtin::Kind::Test    },
+    {PackedStringKey::from_literal("["),        Builtin::Kind::Test    },
+    {PackedStringKey::from_literal("."),        Builtin::Kind::Source  },
+    {PackedStringKey::from_literal("source"),   Builtin::Kind::Source  },
+    {PackedStringKey::from_literal("eval"),     Builtin::Kind::Eval    },
+    {PackedStringKey::from_literal("set"),      Builtin::Kind::Set     },
+    {PackedStringKey::from_literal("shift"),    Builtin::Kind::Shift   },
+    {PackedStringKey::from_literal("unset"),    Builtin::Kind::Unset   },
+    {PackedStringKey::from_literal("read"),     Builtin::Kind::Read    },
+    {PackedStringKey::from_literal("printf"),   Builtin::Kind::Printf  },
+    {PackedStringKey::from_literal("umask"),    Builtin::Kind::Umask   },
+    {PackedStringKey::from_literal("getopts"),  Builtin::Kind::Getopts },
+    {PackedStringKey::from_literal("trap"),     Builtin::Kind::Trap    },
+    {PackedStringKey::from_literal("exec"),     Builtin::Kind::Exec    },
+    {PackedStringKey::from_literal("type"),     Builtin::Kind::Type    },
+    {PackedStringKey::from_literal("command"),  Builtin::Kind::CommandBuiltin},
+    {PackedStringKey::from_literal("readonly"), Builtin::Kind::Readonly},
+    {PackedStringKey::from_literal("local"),    Builtin::Kind::Local   },
+    {PackedStringKey::from_literal("times"),    Builtin::Kind::Times   },
+    {PackedStringKey::from_literal("ulimit"),   Builtin::Kind::Ulimit  },
+    {PackedStringKey::from_literal("hash"),     Builtin::Kind::Hash    },
+    {PackedStringKey::from_literal("alias"),    Builtin::Kind::Alias   },
+    {PackedStringKey::from_literal("unalias"),  Builtin::Kind::Unalias },
+    {PackedStringKey::from_literal("jobs"),     Builtin::Kind::Jobs    },
+    {PackedStringKey::from_literal("fg"),       Builtin::Kind::Fg      },
+    {PackedStringKey::from_literal("bg"),       Builtin::Kind::Bg      },
+    {PackedStringKey::from_literal("wait"),     Builtin::Kind::Wait    },
+    {PackedStringKey::from_literal("kill"),     Builtin::Kind::Kill    },
 };
+
+inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
+    BUILTIN_ENTRIES, sizeof(BUILTIN_ENTRIES) / sizeof(BUILTIN_ENTRIES[0])};
 
 #define B_CASE(btin)                                                           \
   case Builtin::Kind::btin: b.reset(new btin); break
