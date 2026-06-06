@@ -87,7 +87,7 @@ FlagString::FlagString(char short_name, const std::string &long_name,
 void
 FlagString::set(std::string_view v)
 {
-  m_value = v;
+  m_value = StringView{v.data(), v.size()};
   m_is_set = true;
 }
 
@@ -97,10 +97,10 @@ FlagString::is_set() const
   return m_is_set;
 }
 
-std::string_view
+StringView
 FlagString::value() const
 {
-  return m_value;
+  return m_value.view();
 }
 
 void
@@ -119,7 +119,7 @@ FlagManyStrings::FlagManyStrings(char short_name, const std::string &long_name,
 void
 FlagManyStrings::append(std::string_view v)
 {
-  m_values.emplace_back(v);
+  m_values.push(String{heap_allocator(), StringView{v.data(), v.size()}});
 }
 
 bool
@@ -137,13 +137,14 @@ FlagManyStrings::size() const
 std::string_view
 FlagManyStrings::get(usize i) const
 {
-  return m_values[i];
+  return std::string_view{m_values[i].c_str(), m_values[i].size()};
 }
 
 std::string_view
 FlagManyStrings::next()
 {
-  return m_values[m_value_position++];
+  const String &value = m_values[m_value_position++];
+  return std::string_view{value.c_str(), value.size()};
 }
 
 bool
@@ -423,16 +424,40 @@ reset_flags(const ArrayList<Flag *> &flags)
 void
 show_version()
 {
-  std::string s = "Shit Shell " + std::to_string(SHIT_VER_MAJOR) + '.' +
-                  std::to_string(SHIT_VER_MINOR) + '.' +
-                  std::to_string(SHIT_VER_PATCH) + '-' + SHIT_VER_EXTRA + '\n' +
-                  "Built on " + SHIT_BUILD_DATE + '\n' + '\n' +
-                  "MODE=" + SHIT_BUILD_MODE + '\n' +
-                  "HEAD=" + SHIT_COMMIT_HASH + '\n' + "CXX=" + SHIT_COMPILER +
-                  '\n' + "ENVCXXFLAGS=" +
-                  (*SHIT_ENVCXXFLAGS == '\0' ? "<none>" : SHIT_ENVCXXFLAGS) +
-                  '\n' + "OS=" + SHIT_OS_INFO + '\n' + '\n' + SHIT_SHORT_LICENSE +
-                  '\n' + "(c) toiletbril <https://github.com/toiletbril>" + '\n';
+  String s{};
+  s += "Shit Shell ";
+  s += std::to_string(SHIT_VER_MAJOR);
+  s += '.';
+  s += std::to_string(SHIT_VER_MINOR);
+  s += '.';
+  s += std::to_string(SHIT_VER_PATCH);
+  s += '-';
+  s += SHIT_VER_EXTRA;
+  s += '\n';
+  s += "Built on ";
+  s += SHIT_BUILD_DATE;
+  s += '\n';
+  s += '\n';
+  s += "MODE=";
+  s += SHIT_BUILD_MODE;
+  s += '\n';
+  s += "HEAD=";
+  s += SHIT_COMMIT_HASH;
+  s += '\n';
+  s += "CXX=";
+  s += SHIT_COMPILER;
+  s += '\n';
+  s += "ENVCXXFLAGS=";
+  s += (*SHIT_ENVCXXFLAGS == '\0' ? "<none>" : SHIT_ENVCXXFLAGS);
+  s += '\n';
+  s += "OS=";
+  s += SHIT_OS_INFO;
+  s += '\n';
+  s += '\n';
+  s += SHIT_SHORT_LICENSE;
+  s += '\n';
+  s += "(c) toiletbril <https://github.com/toiletbril>";
+  s += '\n';
   print_to_standard_output(s);
   flush_standard_output();
 }
@@ -440,9 +465,15 @@ show_version()
 void
 show_short_version()
 {
-  std::string s = std::to_string(SHIT_VER_MAJOR) + '.' +
-                  std::to_string(SHIT_VER_MINOR) + '.' +
-                  std::to_string(SHIT_VER_PATCH) + '-' + SHIT_VER_EXTRA + '\n';
+  String s{};
+  s += std::to_string(SHIT_VER_MAJOR);
+  s += '.';
+  s += std::to_string(SHIT_VER_MINOR);
+  s += '.';
+  s += std::to_string(SHIT_VER_PATCH);
+  s += '-';
+  s += SHIT_VER_EXTRA;
+  s += '\n';
   print_to_standard_output(s);
   flush_standard_output();
 }

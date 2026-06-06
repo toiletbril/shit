@@ -184,7 +184,7 @@ EvalContext::set_last_background_pid(i64 pid)
 }
 
 int
-EvalContext::register_job(os::process pid, const std::string &command)
+EvalContext::register_job(os::process pid, StringView command)
 {
   Job job{};
   job.id = m_next_job_id++;
@@ -396,7 +396,7 @@ EvalContext::declare_local(StringView name)
 {
   if (m_local_scopes.empty()) return;
   m_local_scopes.back().push(
-      LocalBinding{std::string{name.data, name.length}, get_variable_value(name)});
+      LocalBinding{String{name}, get_variable_value(name)});
 }
 
 void
@@ -470,7 +470,7 @@ EvalContext::request_break(i64 level, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "break requested, level %lld", (long long)level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Break, level, location,
-                               m_current_source, m_current_origin};
+                               m_current_source, String{m_current_origin}};
 }
 
 void
@@ -479,7 +479,7 @@ EvalContext::request_continue(i64 level, SourceLocation location)
   SHIT_LOG(Verbosity::Debug, "continue requested, level %lld",
            (long long)level);
   m_control_flow = ControlFlow{ControlFlow::Kind::Continue, level, location,
-                               m_current_source, m_current_origin};
+                               m_current_source, String{m_current_origin}};
 }
 
 void
@@ -488,7 +488,7 @@ EvalContext::request_return(i64 status, SourceLocation location)
   SHIT_LOG(Verbosity::Debug, "return requested, status %lld",
            (long long)status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Return, status, location,
-                               m_current_source, m_current_origin};
+                               m_current_source, String{m_current_origin}};
 }
 
 void
@@ -496,7 +496,7 @@ EvalContext::request_exit(i64 status, SourceLocation location)
 {
   SHIT_LOG(Verbosity::Debug, "exit requested, status %lld", (long long)status);
   m_control_flow = ControlFlow{ControlFlow::Kind::Exit, status, location,
-                               m_current_source, m_current_origin};
+                               m_current_source, String{m_current_origin}};
 }
 
 bool

@@ -283,7 +283,7 @@ main(int argc, char **argv)
   }
 
   if (FLAG_HELP.is_enabled()) {
-    std::string h{};
+    shit::String h{};
     h += shit::make_synopsis(program_path, HELP_SYNOPSIS);
     h += '\n';
     h += shit::make_flag_help(FLAG_LIST);

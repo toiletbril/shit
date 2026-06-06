@@ -112,7 +112,7 @@ is_negation_token(const Token *token)
 
 /* A friendly message for a token that cannot start a command. A stray control
    keyword almost always means its opener is missing. */
-static std::string
+static String
 unexpected_command_token_message(const Token *token)
 {
   switch (token->kind()) {
@@ -121,14 +121,12 @@ unexpected_command_token_message(const Token *token)
   case Token::Kind::Elif:
   case Token::Kind::Fi: {
     String ast = token->to_ast_string();
-    return "'" + std::string{ast.c_str(), ast.size()} +
-           "' has no matching 'if'";
+    return "'" + ast.view() + "' has no matching 'if'";
   }
   case Token::Kind::Do:
   case Token::Kind::Done: {
     String ast = token->to_ast_string();
-    return "'" + std::string{ast.c_str(), ast.size()} +
-           "' has no matching 'while', 'until', or 'for'";
+    return "'" + ast.view() + "' has no matching 'while', 'until', or 'for'";
   }
   case Token::Kind::Esac: return "'esac' has no matching 'case'";
   case Token::Kind::DoubleSemicolon:
@@ -138,8 +136,7 @@ unexpected_command_token_message(const Token *token)
   case Token::Kind::Pipe: return "'|' has no command before it to pipe from";
   default: {
     String ast = token->to_ast_string();
-    return "expected a command, found '" + std::string{ast.c_str(), ast.size()} +
-           "'";
+    return "expected a command, found '" + ast.view() + "'";
   }
   }
 }
@@ -245,12 +242,12 @@ Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     case Token::Kind::DoubleAmpersand:
       if (!lhs) {
         String ast = token->to_ast_string();
-        throw shit::ErrorWithLocation{
-            token->source_location(),
-            "Expected a command " +
-                std::string(compound_list->is_empty() ? "before" : "after") +
-                " operator, found '" + std::string{ast.c_str(), ast.size()} +
-                "'"};
+        String message = "Expected a command ";
+        message += compound_list->is_empty() ? "before" : "after";
+        message += " operator, found '";
+        message += ast.view();
+        message += "'";
+        throw shit::ErrorWithLocation{token->source_location(), message};
       }
       [[fallthrough]];
     case Token::Kind::Newline:
@@ -979,7 +976,7 @@ Parser::parse_expression(u8 min_precedence)
       String ast = after->to_ast_string();
       throw ErrorWithLocation{after->source_location(),
                               "Expected 'Then' after the condition, found '" +
-                                  std::string{ast.c_str(), ast.size()} + "'"};
+                                  ast.view() + "'"};
     }
 
     /* expression */
@@ -1047,7 +1044,7 @@ Parser::parse_expression(u8 min_precedence)
       String raw = t->raw_string();
       throw ErrorWithLocation{t->source_location(),
                               "Expected a value or an expression, found '" +
-                                  std::string{raw.c_str(), raw.size()} + "'"};
+                                  raw.view() + "'"};
     }
     break;
   }
@@ -1077,8 +1074,7 @@ Parser::parse_expression(u8 min_precedence)
       if (m_recursion_depth == 0) {
         String raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
-                                "Unexpected '" +
-                                    std::string{raw.c_str(), raw.size()} +
+                                "Unexpected '" + raw.view() +
                                     "' without matching If condition"};
       }
       return lhs;
@@ -1088,8 +1084,7 @@ Parser::parse_expression(u8 min_precedence)
       if (m_if_condition_depth == 0) {
         String raw = maybe_op->raw_string();
         throw ErrorWithLocation{maybe_op->source_location(),
-                                "Unexpected '" +
-                                    std::string{raw.c_str(), raw.size()} +
+                                "Unexpected '" + raw.view() +
                                     "' without matching If condition"};
       }
       return lhs;
@@ -1102,7 +1097,7 @@ Parser::parse_expression(u8 min_precedence)
       String raw = maybe_op->raw_string();
       throw ErrorWithLocation{maybe_op->source_location(),
                               "Expected a binary operator, found '" +
-                                  std::string{raw.c_str(), raw.size()} + "'"};
+                                  raw.view() + "'"};
     }
 
     const tokens::Operator *op =

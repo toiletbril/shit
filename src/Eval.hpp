@@ -77,7 +77,7 @@ struct ControlFlow
      The source the offset indexes lives in source, set when the jump is made. */
   SourceLocation location{0, 0};
   const std::string *source{nullptr};
-  std::string origin{};
+  String origin{};
 };
 
 /* A variable binding saved when a local shadows it. The previous value is
@@ -85,7 +85,7 @@ struct ControlFlow
    state rather than an empty string. */
 struct LocalBinding
 {
-  std::string name;
+  String name;
   Maybe<std::string> previous_value;
 };
 
@@ -103,7 +103,7 @@ struct Job
 
   int id;
   os::process pid;
-  std::string command;
+  String command;
   State state{State::Running};
   i32 last_status{0};
 };
@@ -175,7 +175,7 @@ struct EvalContext
      jobs, fg, bg, wait, and kill can act on them. register_job adds a running
      job and returns its id. update_jobs polls every job without blocking and
      marks the ones that finished or stopped. */
-  int register_job(os::process pid, const std::string &command);
+  int register_job(os::process pid, StringView command);
   void update_jobs();
   ArrayList<Job> &jobs();
   Job *find_job(int id);

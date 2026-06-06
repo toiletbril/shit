@@ -44,7 +44,7 @@ Jobs::execute(ExecContext &ec, EvalContext &cxt) const
   std::string out{};
   for (const Job &job : cxt.jobs()) {
     out += "[" + std::to_string(job.id) + "] " + state_word(job.state) + "\t" +
-           job.command + "\n";
+           job.command.c_str() + "\n";
   }
   ec.print_to_stdout(out);
 

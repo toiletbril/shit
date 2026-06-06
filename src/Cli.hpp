@@ -76,13 +76,13 @@ struct FlagString : public Flag
 
   void set(std::string_view v);
   bool is_set() const;
-  std::string_view value() const;
+  StringView value() const;
 
   void reset() override;
 
 private:
   bool m_is_set{false};
-  std::string m_value{};
+  String m_value{};
 };
 
 struct FlagManyStrings : public Flag
@@ -102,7 +102,7 @@ struct FlagManyStrings : public Flag
   void reset() override;
 
 private:
-  std::vector<std::string> m_values{};
+  ArrayList<String> m_values{};
   usize m_value_position{0};
 };
 
