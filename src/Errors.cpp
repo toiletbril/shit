@@ -17,7 +17,7 @@ struct PreciseLocation
   usize last_newline_location;
 };
 
-static fn calc_precise_position(StringView source, usize byte_position) throws
+cold static fn calc_precise_position(StringView source, usize byte_position) throws
     -> PreciseLocation
 {
   ASSERT(byte_position <= source.size(),
@@ -37,7 +37,7 @@ static fn calc_precise_position(StringView source, usize byte_position) throws
 }
 
 template <class T>
-static fn number_string_length(T n) throws -> usize
+cold static fn number_string_length(T n) throws -> usize
 {
   usize len = 0;
   while (n > 0) {
@@ -47,7 +47,7 @@ static fn number_string_length(T n) throws -> usize
   return len;
 }
 
-static fn get_context_pointing_to(StringView source, usize byte_position,
+cold static fn get_context_pointing_to(StringView source, usize byte_position,
                                   usize byte_count, usize line_number,
                                   usize last_newline_location,
                                   usize unicode_position,
@@ -167,7 +167,7 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
     : ErrorBase(message), m_location(location)
 {}
 
-fn ErrorWithLocation::to_string(StringView source) const throws -> String
+cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 {
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;
@@ -250,7 +250,7 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
       m_details_location(details_location), m_details_message(details_message)
 {}
 
-fn ErrorWithLocationAndDetails::details_to_string(StringView source) const throws
+cold fn ErrorWithLocationAndDetails::details_to_string(StringView source) const throws
     -> String
 {
   usize byte_position = m_details_location.position;

@@ -149,6 +149,23 @@ struct t__exit_scope_help
 #define wontthrow noexcept
 #define throws    noexcept(false)
 
+/* Speed hints written before the fn, mapping to clang attributes. cold marks a
+   rarely-taken path such as error reporting so the compiler keeps it out of the
+   hot icache, hot marks the evaluation core, flatten inlines a small dispatcher's
+   whole call tree, and noinline pins a large cold body out of line. A branch is
+   hinted with the literal [[likely]]/[[unlikely]] where it occurs. */
+#if T__HAS_GCC_EXTENSIONS
+#define cold     [[gnu::cold]]
+#define hot      [[gnu::hot]]
+#define flatten  [[gnu::flatten]]
+#define noinline [[gnu::noinline]]
+#else
+#define cold
+#define hot
+#define flatten
+#define noinline
+#endif
+
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";
 constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";

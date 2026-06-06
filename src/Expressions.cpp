@@ -32,7 +32,7 @@ fn Expression::to_ast_string(usize layer) const throws -> String
   return pad + "[" + to_string() + "]";
 }
 
-fn Expression::evaluate(EvalContext &cxt) const throws -> i64
+hot fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 {
   /* A Ctrl-C sets the interrupt flag, and the check here runs before every node,
      so a running command, including a loop body or condition, stops promptly and
