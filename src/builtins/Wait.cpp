@@ -2,8 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-
-#include <cstdlib>
+#include "../Utils.hpp"
 
 /* wait blocks until the named jobs finish, or until every job finishes when no
    operand is given. The status is that of the last job waited for. */
@@ -54,22 +53,19 @@ Wait::execute(ExecContext &ec, EvalContext &cxt) const
   for (usize i = 1; i < args.size(); i++) {
     const String &target = args[i];
 
-    bool is_all_digits = !target.empty();
-    for (usize position = 0; position < target.size(); position++) {
-      char character = target[position];
-      if (character < '0' || character > '9') {
-        is_all_digits = false;
-        break;
-      }
-    }
-
     if (!target.empty() && target[0] == '%') {
-      int id = static_cast<int>(std::atoll(target.c_str() + 1));
-      if (Job *job = cxt.find_job(id))
-        status = wait_for_job(*job);
-    } else if (is_all_digits) {
-      os::process pid = os::process_from_pid(std::atoll(target.c_str()));
-      status = os::wait_and_monitor_process(pid);
+      ErrorOr<i64> parsed =
+          utils::parse_decimal_integer(StringView{target}.substring(1));
+      if (!parsed.is_error()) {
+        if (Job *job = cxt.find_job(static_cast<int>(parsed.value())))
+          status = wait_for_job(*job);
+      }
+    } else {
+      ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
+      if (!parsed.is_error()) {
+        os::process pid = os::process_from_pid(parsed.value());
+        status = os::wait_and_monitor_process(pid);
+      }
     }
     /* A non-numeric operand is ignored rather than waiting on waitpid(0), which
        would block on the whole process group. */

@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 #include <string>
 
@@ -43,11 +44,8 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   if (Maybe<String> value = cxt.get_variable_value("OPTIND");
       value.has_value())
   {
-    try {
-      optind = std::stoll(std::string{value->c_str(), value->size()});
-    } catch (...) {
-      optind = 1;
-    }
+    ErrorOr<i64> parsed = utils::parse_decimal_integer(*value);
+    optind = parsed.is_error() ? 1 : parsed.value();
   }
 
   /* A script that resets OPTIND starts a fresh scan, so the per-argument index

@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Utils.hpp"
 
 #include <cstdio>
 
@@ -31,13 +32,13 @@ Umask::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  std::string requested{args[1].c_str(), args[1].size()};
-  try {
-    u32 mask = static_cast<u32>(std::stoul(requested, nullptr, 8));
-    os::set_file_creation_mask(mask);
-  } catch (...) {
-    throw Error{"umask: '" + requested + "' is not a valid octal mask"};
+  const String &requested = args[1];
+  ErrorOr<i64> parsed = utils::parse_octal_integer(requested);
+  if (parsed.is_error()) {
+    throw Error{"umask: '" + std::string{requested.c_str(), requested.size()} +
+                "' is not a valid octal mask"};
   }
+  os::set_file_creation_mask(static_cast<u32>(parsed.value()));
 
   return 0;
 }

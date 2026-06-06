@@ -3,8 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-
-#include <cstdlib>
+#include "../Utils.hpp"
 
 /* bg resumes a stopped job in the background. With no operand it acts on the
    most recent job. */
@@ -29,9 +28,15 @@ Bg::execute(ExecContext &ec, EvalContext &cxt) const
   const ArrayList<String> &args = ec.args();
 
   Job *job = nullptr;
-  if (args.size() > 1 && !args[1].empty() && args[1][0] == '%')
-    job = cxt.find_job(static_cast<int>(std::atoll(args[1].c_str() + 1)));
-  else
+  if (args.size() > 1 && !args[1].empty() && args[1][0] == '%') {
+    ErrorOr<i64> parsed =
+        utils::parse_decimal_integer(StringView{args[1]}.substring(1));
+    if (parsed.is_error())
+      throw Error{"bg: '" +
+                  std::string{args[1].c_str(), args[1].size()} +
+                  "' is not a valid job"};
+    job = cxt.find_job(static_cast<int>(parsed.value()));
+  } else
     job = cxt.most_recent_job();
 
   if (job == nullptr)

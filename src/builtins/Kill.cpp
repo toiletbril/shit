@@ -3,8 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-
-#include <cstdlib>
+#include "../Utils.hpp"
 
 /* kill sends a signal to a job or a process. The signal defaults to TERM and is
    named with a leading minus, such as -KILL, -9, or -SIGKILL. A target with a
@@ -51,18 +50,18 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
     const String &target = args[i];
     std::string target_text = std::string{target.c_str(), target.size()};
 
-    bool is_all_digits = !target.empty();
-    for (usize d = 0; d < target.size(); d++) {
-      if (target[d] < '0' || target[d] > '9') {
-        is_all_digits = false;
-        break;
-      }
-    }
-
     os::process pid{};
     if (!target.empty() && target[0] == '%') {
-      int id = static_cast<int>(std::atoll(target.c_str() + 1));
-      Job *job = cxt.find_job(id);
+      ErrorOr<i64> parsed =
+          utils::parse_decimal_integer(StringView{target}.substring(1));
+      if (parsed.is_error()) {
+        show_message(
+            Error{"kill: '" + target_text + "' is not a valid job or process id"}
+                .to_string());
+        status = 1;
+        continue;
+      }
+      Job *job = cxt.find_job(static_cast<int>(parsed.value()));
       if (job == nullptr) {
         show_message(
             Error{"kill: '" + target_text + "' is not a known job"}.to_string());
@@ -70,16 +69,18 @@ Kill::execute(ExecContext &ec, EvalContext &cxt) const
         continue;
       }
       pid = job->pid;
-    } else if (is_all_digits) {
-      pid = os::process_from_pid(std::atoll(target.c_str()));
     } else {
-      /* A non-numeric target must not fall through to kill(0), which would
-         signal the whole process group including this shell. */
-      show_message(
-          Error{"kill: '" + target_text + "' is not a valid job or process id"}
-              .to_string());
-      status = 1;
-      continue;
+      ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
+      if (parsed.is_error()) {
+        /* A non-numeric target must not fall through to kill(0), which would
+           signal the whole process group including this shell. */
+        show_message(
+            Error{"kill: '" + target_text + "' is not a valid job or process id"}
+                .to_string());
+        status = 1;
+        continue;
+      }
+      pid = os::process_from_pid(parsed.value());
     }
 
     if (!os::signal_process(pid, signal_number)) {

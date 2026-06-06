@@ -2,8 +2,6 @@
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
-#include <cstdlib>
-
 /* No flags. */
 
 namespace shit {
@@ -20,8 +18,12 @@ i32
 Exit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   /* exit with no argument uses the status of the last command. */
-  i64 status = ec.args().size() > 1 ? std::atoll(ec.args()[1].c_str())
-                                    : cxt.last_exit_status();
+  i64 status = cxt.last_exit_status();
+  if (ec.args().size() > 1) {
+    ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    if (parsed.is_error()) throw parsed.error();
+    status = parsed.value();
+  }
 
   /* Inside a subshell or a command substitution, exit ends only that scope. */
   if (cxt.in_subshell()) {

@@ -5,6 +5,7 @@
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Tokens.hpp"
+#include "Utils.hpp"
 
 #include <cctype>
 #include <memory>
@@ -379,18 +380,17 @@ Parser::parse_simple_command()
       {
         m_lexer.advance_past_last_peek();
         std::unique_ptr<Token> from{m_lexer.next_shell_token()};
-        std::string digits{};
+        String digits{};
         if (from->kind() == Token::Kind::Word) {
-          String literal = static_cast<tokens::WordToken *>(from.get())
-                               ->word()
-                               .to_literal_string();
-          digits = std::string{literal.c_str(), literal.size()};
+          digits = static_cast<tokens::WordToken *>(from.get())
+                       ->word()
+                       .to_literal_string();
         }
         i32 from_fd = -1;
-        try {
-          if (!digits.empty()) from_fd = std::stoi(digits);
-        } catch (...) {
-          from_fd = -1;
+        if (!digits.empty()) {
+          ErrorOr<i64> parsed = utils::parse_decimal_integer(digits);
+          if (parsed.is_error()) throw parsed.error();
+          from_fd = static_cast<i32>(parsed.value());
         }
         if (from_fd < 0) {
           throw ErrorWithLocation{from->source_location(),
@@ -488,7 +488,9 @@ Parser::parse_simple_command()
           {
             SourceLocation op_location = next->source_location();
             m_lexer.advance_past_last_peek();
-            add_redirection(std::stoi(literal), nk, op_location);
+            ErrorOr<i64> parsed = utils::parse_decimal_integer(literal);
+            if (parsed.is_error()) throw parsed.error();
+            add_redirection(static_cast<i32>(parsed.value()), nk, op_location);
             break;
           }
           if (!source_location) source_location = word_location;
@@ -952,11 +954,13 @@ Parser::parse_expression(u8 min_precedence)
   /* Handle leaf type. We expect either a value, or an unary operator. */
   switch (t->kind()) {
   /* Values */
-  case Token::Kind::Number:
+  case Token::Kind::Number: {
+    ErrorOr<i64> parsed = utils::parse_decimal_integer(t->raw_string());
+    if (parsed.is_error()) throw parsed.error();
     lhs =
         std::unique_ptr<ConstantNumber>{m_lexer.arena().create<ConstantNumber>(
-            t->source_location(), std::atoll(t->raw_string().data()))};
-    break;
+            t->source_location(), parsed.value())};
+  } break;
 
   /* Keywords */
   case Token::Kind::If: {

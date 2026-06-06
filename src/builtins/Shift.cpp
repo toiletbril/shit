@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 /* No flags. shift drops the first n positional parameters, n defaulting to 1.
  */
@@ -20,13 +21,9 @@ Shift::execute(ExecContext &ec, EvalContext &cxt) const
 {
   i64 count = 1;
   if (ec.args().size() > 1) {
-    const String &count_argument = ec.args()[1];
-    std::string count_text{count_argument.c_str(), count_argument.size()};
-    try {
-      count = std::stoll(count_text);
-    } catch (...) {
-      throw Error{"'" + count_text + "' is not a number"};
-    }
+    ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);
+    if (parsed.is_error()) throw parsed.error();
+    count = parsed.value();
   }
 
   const ArrayList<String> &params = cxt.positional_params();

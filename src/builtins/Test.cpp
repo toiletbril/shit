@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 #include <filesystem>
 #include <string>
@@ -12,16 +13,9 @@ namespace {
 bool
 parse_integer(const std::string &text, i64 &out)
 {
-  if (text.empty()) return false;
-  usize start = (text[0] == '+' || text[0] == '-') ? 1 : 0;
-  if (start == text.length()) return false;
-  for (usize i = start; i < text.length(); i++)
-    if (text[i] < '0' || text[i] > '9') return false;
-  try {
-    out = std::stoll(text);
-  } catch (...) {
-    return false;
-  }
+  ErrorOr<i64> parsed = utils::parse_decimal_integer(text);
+  if (parsed.is_error()) return false;
+  out = parsed.value();
   return true;
 }
 
