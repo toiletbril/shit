@@ -22,7 +22,7 @@ namespace shit {
 
 namespace utils {
 
-fn merge_tokens_to_string(const ArrayList<const Token *> &v) -> String
+fn merge_tokens_to_string(const ArrayList<const Token *> &v) throws -> String
 {
   String r{};
   for (const shit::Token *t : v) {
@@ -35,12 +35,13 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &v) -> String
   return r;
 }
 
-fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) -> i32
+fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
+    -> i32
 {
   if (!ec.is_builtin()) {
     /* The command word is kept for the job table before the context is moved
        into the spawn. */
-    const String command = is_async ? String{ec.program().view()} : String{};
+    let const command = is_async ? String{ec.program().view()} : String{};
 
     let const p = os::execute_program(std::move(ec));
     if (is_async) {
@@ -62,7 +63,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) -> i32
 }
 
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
-                               bool is_async) -> i32
+                               bool is_async) throws -> i32
 {
   ASSERT(ecs.size() > 1);
 
@@ -145,8 +146,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
    NOT_FOUND_INDEX when no occurrence remains. The bytes carry no null
    terminator, so the match is a plain byte scan rather than a C string search.
  */
-static fn find_subview(StringView haystack, StringView needle, usize start)
-    -> usize
+static pure fn find_subview(StringView haystack, StringView needle, usize start)
+    wontthrow -> usize
 {
   if (needle.length == 0)
     return start <= haystack.length ? start : NOT_FOUND_INDEX;
@@ -164,7 +165,7 @@ static fn find_subview(StringView haystack, StringView needle, usize start)
 }
 
 fn string_replace(String &s, const StringView to_replace,
-                  const StringView replace_with) -> void
+                  const StringView replace_with) throws -> void
 {
   String result{};
   result.reserve(s.size());
@@ -189,7 +190,7 @@ fn string_replace(String &s, const StringView to_replace,
   s = std::move(result);
 }
 
-fn lowercase_string(StringView s) -> String
+fn lowercase_string(StringView s) throws -> String
 {
   String l{};
   l.reserve(s.size());
@@ -198,7 +199,7 @@ fn lowercase_string(StringView s) -> String
   return l;
 }
 
-static fn is_ascii_whitespace(char c) -> bool
+static pure fn is_ascii_whitespace(char c) wontthrow -> bool
 {
   return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' ||
          c == '\r';
@@ -206,8 +207,8 @@ static fn is_ascii_whitespace(char c) -> bool
 
 /* Turn an accumulated magnitude and sign into a saturating signed result. The
    per-base parsers share this so only the digit loop stays base-specific. */
-static fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
-                                    bool has_overflowed) -> i64
+static pure fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
+                                         bool has_overflowed) wontthrow -> i64
 {
   if (is_negative) {
     if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX) + 1)
@@ -219,7 +220,7 @@ static fn saturate_signed_magnitude(u64 magnitude, bool is_negative,
   return static_cast<i64>(magnitude);
 }
 
-static fn not_an_integer_error(StringView text) -> Error
+static fn not_an_integer_error(StringView text) throws -> Error
 {
   return Error{
       "'" + std::string{text.data, text.length}
@@ -227,7 +228,7 @@ static fn not_an_integer_error(StringView text) -> Error
   };
 }
 
-fn unsigned_integer_to_string(u64 value) -> String
+fn unsigned_integer_to_string(u64 value) throws -> String
 {
   /* The digits are written into a fixed buffer from the least significant end,
      since a u64 never needs more than twenty decimal digits, then copied out in
@@ -244,7 +245,7 @@ fn unsigned_integer_to_string(u64 value) -> String
   };
 }
 
-fn integer_to_string(i64 value) -> String
+fn integer_to_string(i64 value) throws -> String
 {
   if (value >= 0) return unsigned_integer_to_string(static_cast<u64>(value));
   /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
@@ -254,7 +255,7 @@ fn integer_to_string(i64 value) -> String
   return result;
 }
 
-fn parse_decimal_integer(StringView text) -> ErrorOr<i64>
+fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -289,7 +290,7 @@ fn parse_decimal_integer(StringView text) -> ErrorOr<i64>
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-fn parse_octal_integer(StringView text) -> ErrorOr<i64>
+fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -324,7 +325,7 @@ fn parse_octal_integer(StringView text) -> ErrorOr<i64>
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-fn parse_hexadecimal_integer(StringView text) -> ErrorOr<i64>
+fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
@@ -374,7 +375,8 @@ fn parse_hexadecimal_integer(StringView text) -> ErrorOr<i64>
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-fn find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted) -> usize
+fn find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
+    wontthrow -> usize
 {
   for (usize i = 0; i < suffixes.size(); i++) {
     if (suffixes[i] == wanted) return i;
@@ -382,7 +384,7 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted) -> usiz
   return NOT_FOUND_INDEX;
 }
 
-fn canonicalize_path(StringView path) -> Maybe<Path>
+fn canonicalize_path(StringView path) throws -> Maybe<Path>
 {
   Path candidate{path};
 
@@ -412,14 +414,15 @@ fn canonicalize_path(StringView path) -> Maybe<Path>
 
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
-static fn is_glob_char_active(const ArrayList<bool> &glob_active, usize index)
-    -> bool
+static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,
+                                   usize index) wontthrow -> bool
 {
   return index < glob_active.size() && glob_active[index];
 }
 
 fn glob_matches(StringView glob, StringView str,
-                const ArrayList<bool> &glob_active, usize mask_offset) -> bool
+                const ArrayList<bool> &glob_active, usize mask_offset) throws
+    -> bool
 {
   usize s = 0;
   usize g = 0;
@@ -543,7 +546,7 @@ fn glob_matches(StringView glob, StringView str,
   return false;
 }
 
-[[noreturn]] fn quit(i32 code, bool should_goodbye) -> void
+[[noreturn]] fn quit(i32 code, bool should_goodbye) throws -> void
 {
   const u8 actual_code = static_cast<u8>(code);
 
@@ -582,12 +585,13 @@ static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
-static fn cache_resolved_path(StringView name, const Path &full_path) -> void
+static fn cache_resolved_path(StringView name, const Path &full_path) throws
+    -> void
 {
   PATH_CACHE.get_or_create(name, ArrayList<Path>{}).push(full_path);
 }
 
-fn clear_path_map() -> void
+fn clear_path_map() throws -> void
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
@@ -596,7 +600,7 @@ fn clear_path_map() -> void
 /* Split PATH into its directory components. The last component carries no
    trailing delimiter, so a plain delimiter scan drops it and the directory is
    never searched. POSIX treats an empty component as the current directory. */
-static fn split_path_dirs(StringView path_var) -> ArrayList<String>
+static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
 {
   ArrayList<String> dirs{};
   String current{};
@@ -615,7 +619,7 @@ static fn split_path_dirs(StringView path_var) -> ArrayList<String>
   return dirs;
 }
 
-fn initialize_path_map() -> void
+fn initialize_path_map() throws -> void
 {
   if (!MAYBE_PATH) return;
 
@@ -624,7 +628,7 @@ fn initialize_path_map() -> void
 
     /* read_directory returns None for a missing or unreadable directory, so the
        path is skipped without a separate exists check. */
-    const Maybe<ArrayList<String>> entries = Path::read_directory(directory);
+    let const entries = Path::read_directory(directory);
     if (!entries) continue;
 
     /* Cache every file in the directory under its name without an omitted
@@ -633,14 +637,14 @@ fn initialize_path_map() -> void
       std::string name{entry_name.c_str(), entry_name.size()};
       os::erase_extension_and_get_its_index(name);
 
-      Path full_path = directory;
+      let full_path = directory;
       full_path.push_component(entry_name.view());
       cache_resolved_path(StringView{name.data(), name.size()}, full_path);
     }
   }
 }
 
-fn search_and_cache(StringView program_name) -> ArrayList<Path>
+fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   if (!MAYBE_PATH) return ArrayList<Path>{};
@@ -656,7 +660,7 @@ fn search_and_cache(StringView program_name) -> ArrayList<Path>
     std::string key{program_name.data, program_name.length};
     os::erase_extension_and_get_its_index(key);
 
-    Path full_path = directory;
+    let full_path = directory;
     full_path.push_component(program_name);
     std::string full_path_str{full_path.c_str(), full_path.size()};
 
@@ -685,7 +689,7 @@ fn search_and_cache(StringView program_name) -> ArrayList<Path>
   return result;
 }
 
-fn search_program_path(StringView program_name) -> ArrayList<Path>
+fn search_program_path(StringView program_name) throws -> ArrayList<Path>
 {
   std::string sp{program_name.data, program_name.length};
   ArrayList<Path> result{};
@@ -719,10 +723,9 @@ fn search_program_path(StringView program_name) -> ArrayList<Path>
   return search_and_cache(program_name);
 }
 
-fn read_entire_file(StringView path) -> Maybe<String>
+fn read_entire_file(StringView path) throws -> Maybe<String>
 {
-  const Maybe<os::descriptor> file =
-      os::open_file_descriptor(path, os::FileOpenMode::Read);
+  let const file = os::open_file_descriptor(path, os::FileOpenMode::Read);
   if (!file) return None;
 
   String contents{};
@@ -738,7 +741,7 @@ fn read_entire_file(StringView path) -> Maybe<String>
   return contents;
 }
 
-fn read_entire_standard_input() -> String
+fn read_entire_standard_input() throws -> String
 {
   String contents{};
   char buffer[4096];
@@ -750,7 +753,7 @@ fn read_entire_standard_input() -> String
   return contents;
 }
 
-fn read_line_from_fd(os::descriptor fd) -> Maybe<String>
+fn read_line_from_fd(os::descriptor fd) throws -> Maybe<String>
 {
   String line{};
   bool read_any_byte = false;

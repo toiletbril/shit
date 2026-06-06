@@ -23,7 +23,8 @@ namespace shit {
 
 namespace os {
 
-fn write_fd(os::descriptor fd, const void *buf, usize size) -> Maybe<usize>
+fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
+    -> Maybe<usize>
 {
   for (;;) {
     ssize_t w = write(fd, buf, size);
@@ -35,7 +36,7 @@ fn write_fd(os::descriptor fd, const void *buf, usize size) -> Maybe<usize>
   }
 }
 
-fn read_fd(os::descriptor fd, void *buf, usize size) -> Maybe<usize>
+fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>
 {
   for (;;) {
     ssize_t r = read(fd, buf, size);
@@ -48,9 +49,9 @@ fn read_fd(os::descriptor fd, void *buf, usize size) -> Maybe<usize>
   }
 }
 
-fn close_fd(os::descriptor fd) -> bool { return close(fd) != -1; }
+fn close_fd(os::descriptor fd) wontthrow -> bool { return close(fd) != -1; }
 
-fn redirect_stdout(os::descriptor target) -> os::descriptor
+fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
   /* The saved copy of the real stdout is close-on-exec, so a forked command
      does not inherit it and hold the shell's own output open. An immortal
@@ -67,13 +68,13 @@ fn redirect_stdout(os::descriptor target) -> os::descriptor
   return saved;
 }
 
-fn restore_stdout(os::descriptor saved) -> void
+fn restore_stdout(os::descriptor saved) wontthrow -> void
 {
   dup2(saved, STDOUT_FILENO);
   close(saved);
 }
 
-fn get_current_user() -> Maybe<String>
+fn get_current_user() throws -> Maybe<String>
 {
   /* The name comes from the environment rather than getpwuid, which a static
      build cannot call without pulling in the runtime glibc and which the linker
@@ -85,7 +86,7 @@ fn get_current_user() -> Maybe<String>
   return shit::None;
 }
 
-fn get_home_directory() -> Maybe<Path>
+fn get_home_directory() throws -> Maybe<Path>
 {
   if (const Maybe<String> home = get_environment_variable("HOME"))
     return Path{StringView{*home}};
@@ -94,15 +95,21 @@ fn get_home_directory() -> Maybe<Path>
 
 static const pid_t PARENT_SHELL_PID = getpid();
 
-fn is_child_process() -> bool { return getpid() != PARENT_SHELL_PID; }
+fn is_child_process() wontthrow -> bool
+{
+  return getpid() != PARENT_SHELL_PID;
+}
 
-fn get_shell_process_id() -> i64 { return static_cast<i64>(PARENT_SHELL_PID); }
+fn get_shell_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(PARENT_SHELL_PID);
+}
 
-fn process_id_of(process p) -> i64 { return static_cast<i64>(p); }
+fn process_id_of(process p) wontthrow -> i64 { return static_cast<i64>(p); }
 
-fn is_stdin_a_tty() -> bool { return isatty(SHIT_STDIN); }
+fn is_stdin_a_tty() wontthrow -> bool { return isatty(SHIT_STDIN); }
 
-fn is_stdout_a_tty() -> bool { return isatty(SHIT_STDOUT); }
+fn is_stdout_a_tty() wontthrow -> bool { return isatty(SHIT_STDOUT); }
 
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
@@ -113,7 +120,8 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
   return suffixes;
 }();
 
-fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex
+fn erase_extension_and_get_its_index(std::string &program_name) throws
+    -> ExtIndex
 {
   /* POSIX does not really make use of extensions for executable files. */
   unused(program_name);
@@ -121,7 +129,7 @@ fn erase_extension_and_get_its_index(std::string &program_name) -> ExtIndex
 }
 #endif /* !COSMO */
 
-fn get_environment_variable(StringView key) -> Maybe<String>
+fn get_environment_variable(StringView key) throws -> Maybe<String>
 {
   const String key_string{key};
   const char *e = std::getenv(key_string.c_str());
@@ -129,20 +137,20 @@ fn get_environment_variable(StringView key) -> Maybe<String>
   return shit::None;
 }
 
-fn set_environment_variable(StringView key, StringView value) -> void
+fn set_environment_variable(StringView key, StringView value) throws -> void
 {
   const String key_string{key};
   const String value_string{value};
   setenv(key_string.c_str(), value_string.c_str(), 1);
 }
 
-fn unset_environment_variable(StringView key) -> void
+fn unset_environment_variable(StringView key) throws -> void
 {
   const String key_string{key};
   unsetenv(key_string.c_str());
 }
 
-fn check_syscall_impl(i32 status, StringView invocation) -> i32
+fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 {
   if (status == -1) {
     throw shit::Error{"'" + invocation +
@@ -154,7 +162,7 @@ fn check_syscall_impl(i32 status, StringView invocation) -> i32
 
 #define check_syscall(call) check_syscall_impl(call, #call)
 
-fn execute_program(ExecContext &&ec) -> process
+fn execute_program(ExecContext &&ec) throws -> process
 {
   ASSERT(ec.args().size() > 0, "a program needs at least argv[0]");
 
@@ -163,7 +171,7 @@ fn execute_program(ExecContext &&ec) -> process
   const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
-    const os_args child_args = make_os_args(ec.args());
+    let const child_args = make_os_args(ec.args());
 
     if (ec.in_fd) {
       check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
@@ -207,11 +215,11 @@ fn execute_program(ExecContext &&ec) -> process
   return child_pid;
 }
 
-fn replace_process(ExecContext &&ec) -> void
+fn replace_process(ExecContext &&ec) throws -> void
 {
   ASSERT(ec.args().size() > 0, "a program needs at least argv[0]");
 
-  const os_args child_args = make_os_args(ec.args());
+  let const child_args = make_os_args(ec.args());
 
   /* Place each redirected file and close the original descriptor, the way the
      forked child does, so the opened file does not leak into the exec'd
@@ -241,14 +249,14 @@ fn replace_process(ExecContext &&ec) -> void
                     last_system_error_message()};
 }
 
-fn redirect_self(const ExecContext &ec) -> void
+fn redirect_self(const ExecContext &ec) throws -> void
 {
   if (ec.in_fd) check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
   if (ec.out_fd) check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
   if (ec.err_fd) check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
 }
 
-fn make_pipe() -> Maybe<Pipe>
+fn make_pipe() wontthrow -> Maybe<Pipe>
 {
   descriptor p[2] = {SHIT_INVALID_FD, SHIT_INVALID_FD};
 
@@ -268,7 +276,8 @@ fn make_pipe() -> Maybe<Pipe>
   return Pipe{p[0], p[1]};
 }
 
-fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
+fn open_file_descriptor(StringView path, FileOpenMode mode) throws
+    -> Maybe<descriptor>
 {
   int flags = 0;
   switch (mode) {
@@ -292,14 +301,14 @@ fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
   return fd;
 }
 
-fn write_to_temp_file(StringView content) -> Maybe<descriptor>
+fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 {
   /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
      so a cosmo binary running on Windows writes to the Windows temp directory
      where /tmp does not exist. */
-  const Path temp_dir = Path::temp_directory();
+  let const temp_dir = Path::temp_directory();
 
-  const Path path_template_path =
+  let const path_template_path =
       PathBuilder{temp_dir.text()}.append("shit_heredoc_XXXXXX").build();
 
   /* mkstemp rewrites the XXXXXX suffix in place, so the template lives in a
@@ -332,7 +341,7 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   return fd;
 }
 
-fn get_file_creation_mask() -> u32
+fn get_file_creation_mask() wontthrow -> u32
 {
   /* umask only reads through a set, so the old value is read and put back. */
   const mode_t old = umask(0);
@@ -340,9 +349,12 @@ fn get_file_creation_mask() -> u32
   return static_cast<u32>(old);
 }
 
-fn set_file_creation_mask(u32 mask) -> void { umask(static_cast<mode_t>(mask)); }
+fn set_file_creation_mask(u32 mask) wontthrow -> void
+{
+  umask(static_cast<mode_t>(mask));
+}
 
-fn wait_and_monitor_process(process pid) -> i32
+fn wait_and_monitor_process(process pid) throws -> i32
 {
   ASSERT(pid >= 0);
 
@@ -396,7 +408,7 @@ fn wait_and_monitor_process(process pid) -> i32
   unreachable();
 }
 
-fn poll_process(process p, i32 &status_out) -> ProcessState
+fn poll_process(process p, i32 &status_out) wontthrow -> ProcessState
 {
   i32 status = 0;
   const pid_t result = waitpid(p, &status, WNOHANG | WUNTRACED | WCONTINUED);
@@ -419,14 +431,17 @@ fn poll_process(process p, i32 &status_out) -> ProcessState
   return ProcessState::Exited;
 }
 
-fn signal_process(process p, i32 signal_number) -> bool
+fn signal_process(process p, i32 signal_number) wontthrow -> bool
 {
   return kill(p, signal_number) == 0;
 }
 
-fn process_from_pid(i64 pid) -> process { return static_cast<process>(pid); }
+fn process_from_pid(i64 pid) wontthrow -> process
+{
+  return static_cast<process>(pid);
+}
 
-fn signal_number_from_name(StringView name) -> Maybe<i32>
+fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
   /* A bare number names the signal directly. */
   if (!name.empty() &&
@@ -461,7 +476,7 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
   return NAMES.find(bare);
 }
 
-fn make_os_args(const ArrayList<String> &args) -> os_args
+fn make_os_args(const ArrayList<String> &args) throws -> os_args
 {
   ASSERT(args.size() > 0, "argv must carry at least the program name");
 
@@ -476,12 +491,12 @@ fn make_os_args(const ArrayList<String> &args) -> os_args
   return result;
 }
 
-fn last_system_error_message() -> String
+fn last_system_error_message() throws -> String
 {
   return String{StringView{strerror(errno)}};
 }
 
-static fn make_sigset_impl(int first, ...) -> sigset_t
+static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t
 {
   va_list va;
 
@@ -498,14 +513,15 @@ static fn make_sigset_impl(int first, ...) -> sigset_t
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
-static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) -> void
+static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) wontthrow
+    -> void
 {
   unused(n);
   unused(ctx);
   unused(siginfo);
 }
 
-fn reset_signal_handlers() -> void
+fn reset_signal_handlers() throws -> void
 {
   sigset_t sm;
   sigfillset(&sm);
@@ -518,7 +534,7 @@ fn reset_signal_handlers() -> void
 
 volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 
-static fn handle_interrupt(int s) -> void
+static fn handle_interrupt(int s) wontthrow -> void
 {
   unused(s);
   /* Setting the flag is the only async-signal-safe action. The evaluator polls
@@ -526,7 +542,7 @@ static fn handle_interrupt(int s) -> void
   INTERRUPT_REQUESTED = 1;
 }
 
-fn set_default_signal_handlers() -> void
+fn set_default_signal_handlers() throws -> void
 {
   /* The terminal-generated signals that would kill the shell stay blocked, but
      SIGINT gets a handler instead, so a Ctrl-C in a shell loop sets the flag the

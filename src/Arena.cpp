@@ -10,7 +10,7 @@ namespace shit {
 BumpArena *AST_ARENA = nullptr;
 BumpArena *FUNCTION_ARENA = nullptr;
 
-fn is_arena_pointer(const void *pointer) -> bool
+fn is_arena_pointer(const void *pointer) wontthrow -> bool
 {
   return (AST_ARENA != nullptr && AST_ARENA->owns(pointer)) ||
          (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
@@ -24,7 +24,7 @@ BumpArena::~BumpArena()
     std::free(block.base);
 }
 
-fn BumpArena::add_block(usize minimum_size) -> void
+fn BumpArena::add_block(usize minimum_size) throws -> void
 {
   usize size = DEFAULT_BLOCK_SIZE;
   if (minimum_size > size) size = minimum_size;
@@ -38,7 +38,7 @@ fn BumpArena::add_block(usize minimum_size) -> void
   m_blocks.push_back(Block{base, size, 0});
 }
 
-fn BumpArena::allocate(usize size, usize alignment) -> void *
+fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 {
   for (;;) {
     if (!m_blocks.empty()) {
@@ -59,7 +59,7 @@ fn BumpArena::allocate(usize size, usize alignment) -> void *
   }
 }
 
-fn BumpArena::owns(const void *pointer) const -> bool
+fn BumpArena::owns(const void *pointer) const wontthrow -> bool
 {
   let const p = static_cast<const u8 *>(pointer);
   for (const Block &block : m_blocks) {
@@ -68,13 +68,13 @@ fn BumpArena::owns(const void *pointer) const -> bool
   return false;
 }
 
-fn BumpArena::mark() const -> BumpArena::Mark
+fn BumpArena::mark() const wontthrow -> BumpArena::Mark
 {
   if (m_blocks.empty()) return Mark{0, 0};
   return Mark{m_blocks.size(), m_blocks.back().used};
 }
 
-fn BumpArena::release(Mark saved) -> void
+fn BumpArena::release(Mark saved) wontthrow -> void
 {
   ASSERT(saved.block_count <= m_blocks.size(),
          "mark cannot name more blocks than the arena holds");
@@ -91,7 +91,7 @@ fn BumpArena::release(Mark saved) -> void
   }
 }
 
-fn BumpArena::reset() -> void
+fn BumpArena::reset() wontthrow -> void
 {
   /* Keep the first block and drop the rest, so a typical command reuses one
      block without asking the system for memory again. */

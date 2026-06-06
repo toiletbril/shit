@@ -24,7 +24,7 @@ static constexpr char DIRECTORY_SEPARATOR = '/';
 
 /* A forward slash is always a separator so a POSIX-style path keeps working
    everywhere, and a backslash is one on Windows too. */
-static fn is_directory_separator(char c) -> bool
+static pure fn is_directory_separator(char c) wontthrow -> bool
 {
 #if SHIT_PLATFORM_IS WIN32
   return c == '/' || c == '\\';
@@ -35,15 +35,15 @@ static fn is_directory_separator(char c) -> bool
 
 Path::Path(StringView text) : m_text(text) {}
 
-fn Path::text() const -> const String & { return m_text; }
+fn Path::text() const wontthrow -> const String & { return m_text; }
 
-fn Path::c_str() const -> const char * { return m_text.c_str(); }
+fn Path::c_str() const wontthrow -> const char * { return m_text.c_str(); }
 
-fn Path::size() const -> usize { return m_text.size(); }
+fn Path::size() const wontthrow -> usize { return m_text.size(); }
 
-fn Path::empty() const -> bool { return m_text.empty(); }
+fn Path::empty() const wontthrow -> bool { return m_text.empty(); }
 
-fn Path::is_absolute() const -> bool
+fn Path::is_absolute() const wontthrow -> bool
 {
   if (m_text.empty()) return false;
 #if SHIT_PLATFORM_IS WIN32
@@ -55,25 +55,25 @@ fn Path::is_absolute() const -> bool
 #endif
 }
 
-fn Path::is_relative() const -> bool { return !is_absolute(); }
+fn Path::is_relative() const wontthrow -> bool { return !is_absolute(); }
 
 /* The offset just past the last separator, so the filename starts there. Zero
    when there is no separator. */
-static fn filename_offset(const String &text) -> usize
+static pure fn filename_offset(const String &text) wontthrow -> usize
 {
   for (usize i = text.size(); i > 0; i--)
     if (is_directory_separator(text[i - 1])) return i;
   return 0;
 }
 
-fn Path::filename() const -> StringView
+fn Path::filename() const wontthrow -> StringView
 {
   let const start = filename_offset(m_text);
   ASSERT(start <= m_text.size());
   return m_text.substring(start);
 }
 
-fn Path::extension() const -> StringView
+fn Path::extension() const wontthrow -> StringView
 {
   let const name = filename();
   /* The . and .. directory entries have no extension, matching std::filesystem,
@@ -87,7 +87,7 @@ fn Path::extension() const -> StringView
   return StringView{name.data + name.length, 0};
 }
 
-fn Path::parent() const -> Path
+fn Path::parent() const throws -> Path
 {
   let const end = filename_offset(m_text);
   if (end == 0) return Path{};
@@ -96,7 +96,7 @@ fn Path::parent() const -> Path
   return Path{m_text.substring_of_length(0, end - 1)};
 }
 
-fn Path::push_component(StringView component) -> Path &
+fn Path::push_component(StringView component) throws -> Path &
 {
   if (component.length == 0) return *this;
   if (!m_text.empty() && !is_directory_separator(m_text.back()) &&
@@ -108,7 +108,7 @@ fn Path::push_component(StringView component) -> Path &
   return *this;
 }
 
-fn Path::with_extension(StringView new_extension) const -> Path
+fn Path::with_extension(StringView new_extension) const throws -> Path
 {
   let const existing = extension();
 
@@ -124,7 +124,7 @@ fn Path::with_extension(StringView new_extension) const -> Path
   return result;
 }
 
-fn Path::normalized() const -> Path
+fn Path::normalized() const throws -> Path
 {
   let const absolute = is_absolute();
 
@@ -166,7 +166,7 @@ fn Path::normalized() const -> Path
   return Path{built};
 }
 
-fn Path::to_absolute() const -> Path
+fn Path::to_absolute() const throws -> Path
 {
   if (is_absolute()) return normalized();
   let result = current_directory();
@@ -174,70 +174,70 @@ fn Path::to_absolute() const -> Path
   return result.normalized();
 }
 
-fn Path::operator==(const Path &other) const -> bool
+fn Path::operator==(const Path &other) const wontthrow -> bool
 {
   return m_text == other.m_text;
 }
 
 #if SHIT_PLATFORM_IS POSIX
 
-fn Path::exists() const -> bool
+fn Path::exists() const wontthrow -> bool
 {
   struct stat info{};
   return ::stat(m_text.c_str(), &info) == 0;
 }
 
-fn Path::is_directory() const -> bool
+fn Path::is_directory() const wontthrow -> bool
 {
   struct stat info{};
   if (::stat(m_text.c_str(), &info) != 0) return false;
   return S_ISDIR(info.st_mode);
 }
 
-fn Path::is_regular_file() const -> bool
+fn Path::is_regular_file() const wontthrow -> bool
 {
   struct stat info{};
   if (::stat(m_text.c_str(), &info) != 0) return false;
   return S_ISREG(info.st_mode);
 }
 
-fn Path::file_size() const -> Maybe<u64>
+fn Path::file_size() const wontthrow -> Maybe<u64>
 {
   struct stat info{};
   if (::stat(m_text.c_str(), &info) != 0 || !S_ISREG(info.st_mode)) return None;
   return static_cast<u64>(info.st_size);
 }
 
-fn Path::is_readable() const -> bool
+fn Path::is_readable() const wontthrow -> bool
 {
   return ::access(m_text.c_str(), R_OK) == 0;
 }
 
-fn Path::is_writable() const -> bool
+fn Path::is_writable() const wontthrow -> bool
 {
   return ::access(m_text.c_str(), W_OK) == 0;
 }
 
-fn Path::is_executable() const -> bool
+fn Path::is_executable() const wontthrow -> bool
 {
   return ::access(m_text.c_str(), X_OK) == 0;
 }
 
-fn Path::current_directory() -> Path
+fn Path::current_directory() throws -> Path
 {
   char buffer[4096];
   if (::getcwd(buffer, sizeof(buffer)) != NULL) return Path{StringView{buffer}};
   return Path{};
 }
 
-fn Path::set_current_directory(const Path &path) -> ErrorOr<Ok>
+fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
   if (::chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
   return Ok{};
 }
 
-fn Path::read_directory(const Path &dir) -> Maybe<ArrayList<String>>
+fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
   DIR *const handle = ::opendir(dir.c_str());
   if (handle == NULL) return None;
@@ -335,7 +335,7 @@ fn Path::read_directory(const Path &dir) -> Maybe<ArrayList<String>>
 
 #endif
 
-fn Path::temp_directory() -> Path
+fn Path::temp_directory() throws -> Path
 {
 #if SHIT_PLATFORM_IS WIN32
   if (const char *from_env = std::getenv("TEMP"))
@@ -350,7 +350,7 @@ fn Path::temp_directory() -> Path
 
 PathBuilder::PathBuilder(StringView root) : m_text(root) {}
 
-fn PathBuilder::append(StringView component) -> PathBuilder &
+fn PathBuilder::append(StringView component) throws -> PathBuilder &
 {
   if (component.length == 0) return *this;
   if (!m_text.empty() && !is_directory_separator(m_text.back()) &&
@@ -362,12 +362,12 @@ fn PathBuilder::append(StringView component) -> PathBuilder &
   return *this;
 }
 
-fn PathBuilder::append_raw(StringView bytes) -> PathBuilder &
+fn PathBuilder::append_raw(StringView bytes) throws -> PathBuilder &
 {
   m_text.append(bytes);
   return *this;
 }
 
-fn PathBuilder::build() const -> Path { return Path{m_text}; }
+fn PathBuilder::build() const throws -> Path { return Path{m_text}; }
 
 } /* namespace shit */

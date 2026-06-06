@@ -22,63 +22,64 @@ struct Path
   Path() = default;
   explicit Path(StringView text);
 
-  [[nodiscard]] fn text() const -> const String &;
-  [[nodiscard]] fn c_str() const -> const char *;
-  [[nodiscard]] fn size() const -> usize;
-  [[nodiscard]] fn empty() const -> bool;
+  [[nodiscard]] pure fn text() const wontthrow -> const String &;
+  [[nodiscard]] pure fn c_str() const wontthrow -> const char *;
+  [[nodiscard]] pure fn size() const wontthrow -> usize;
+  [[nodiscard]] pure fn empty() const wontthrow -> bool;
 
   /* The text without a trailing separator, the directory holding this path. An
      empty or root path yields itself. */
-  [[nodiscard]] fn parent() const -> Path;
+  [[nodiscard]] pure fn parent() const throws -> Path;
   /* The final component, after the last separator. */
-  [[nodiscard]] fn filename() const -> StringView;
+  [[nodiscard]] pure fn filename() const wontthrow -> StringView;
   /* The trailing extension of the filename including the dot, or empty when the
      filename has none. A leading dot does not start an extension. */
-  [[nodiscard]] fn extension() const -> StringView;
+  [[nodiscard]] pure fn extension() const wontthrow -> StringView;
 
   /* True when the path starts at a root, a leading separator on POSIX or a
      drive on Windows. */
-  [[nodiscard]] fn is_absolute() const -> bool;
-  [[nodiscard]] fn is_relative() const -> bool;
+  [[nodiscard]] pure fn is_absolute() const wontthrow -> bool;
+  [[nodiscard]] pure fn is_relative() const wontthrow -> bool;
 
   /* Resolve . and .. components and collapse repeated separators, the
      std::filesystem lexically_normal without touching the disk. */
-  [[nodiscard]] fn normalized() const -> Path;
+  [[nodiscard]] pure fn normalized() const throws -> Path;
 
   /* This path joined onto a base when it is relative, the base being the
      current working directory unless one is given. */
-  [[nodiscard]] fn to_absolute() const -> Path;
+  [[nodiscard]] fn to_absolute() const throws -> Path;
 
   /* Append a component with a separator between, so a builder grows a path one
      piece at a time. */
-  fn push_component(StringView component) -> Path &;
+  fn push_component(StringView component) throws -> Path &;
 
   /* Replace the extension of the filename, adding one when absent. */
-  [[nodiscard]] fn with_extension(StringView new_extension) const -> Path;
+  [[nodiscard]] pure fn with_extension(StringView new_extension) const throws
+      -> Path;
 
   /* Disk queries, one syscall each. file_size is None when the path is missing
      or is not a regular file. */
-  [[nodiscard]] fn exists() const -> bool;
-  [[nodiscard]] fn is_directory() const -> bool;
-  [[nodiscard]] fn is_regular_file() const -> bool;
-  [[nodiscard]] fn file_size() const -> Maybe<u64>;
+  [[nodiscard]] fn exists() const wontthrow -> bool;
+  [[nodiscard]] fn is_directory() const wontthrow -> bool;
+  [[nodiscard]] fn is_regular_file() const wontthrow -> bool;
+  [[nodiscard]] fn file_size() const wontthrow -> Maybe<u64>;
 
   /* The access checks the test builtin asks for, each one access() call. */
-  [[nodiscard]] fn is_readable() const -> bool;
-  [[nodiscard]] fn is_writable() const -> bool;
-  [[nodiscard]] fn is_executable() const -> bool;
+  [[nodiscard]] fn is_readable() const wontthrow -> bool;
+  [[nodiscard]] fn is_writable() const wontthrow -> bool;
+  [[nodiscard]] fn is_executable() const wontthrow -> bool;
 
-  [[nodiscard]] fn operator==(const Path &other) const->bool;
+  [[nodiscard]] pure fn operator==(const Path &other) const wontthrow->bool;
 
   /* The working directory of the process. */
-  [[nodiscard]] static fn current_directory() -> Path;
-  static fn set_current_directory(const Path &path) -> ErrorOr<Ok>;
+  [[nodiscard]] static fn current_directory() throws -> Path;
+  static fn set_current_directory(const Path &path) throws -> ErrorOr<Ok>;
   /* The directory for temporary files, from TMPDIR or a platform default. */
-  [[nodiscard]] static fn temp_directory() -> Path;
+  [[nodiscard]] static fn temp_directory() throws -> Path;
 
   /* The immediate children of a directory, filenames only, without . and .. .
      None when the path is not a readable directory. */
-  [[nodiscard]] static fn read_directory(const Path &dir)
+  [[nodiscard]] static fn read_directory(const Path &dir) throws
       -> Maybe<ArrayList<String>>;
 
 private:
@@ -94,11 +95,11 @@ struct PathBuilder
 
   /* Add a component, inserting a separator unless the builder is empty or the
      component itself starts at a root. */
-  fn append(StringView component) -> PathBuilder &;
+  fn append(StringView component) throws -> PathBuilder &;
   /* Add raw bytes with no separator, for extending the last component. */
-  fn append_raw(StringView bytes) -> PathBuilder &;
+  fn append_raw(StringView bytes) throws -> PathBuilder &;
 
-  [[nodiscard]] fn build() const -> Path;
+  [[nodiscard]] pure fn build() const throws -> Path;
 
 private:
   String m_text{};
