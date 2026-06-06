@@ -1,0 +1,23 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%d %d %x %o\n" "42" "010" "0x1f" "8"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%d %d %x %o\n"
+]
+[Word
+  Unquoted "42"
+]
+[Word
+  Unquoted "010"
+]
+[Word
+  Unquoted "0x1f"
+]
+[Word
+  Unquoted "8"
+]
+42 8 1f 10
+[Code 0]

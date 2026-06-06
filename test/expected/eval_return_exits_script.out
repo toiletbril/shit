@@ -1,0 +1,27 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "before"]
+  [CompoundListCondition, None]
+    [SimpleCommand "eval" "return 5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "before"
+]
+[Word
+  Unquoted "eval"
+]
+[Word
+  DoubleQuoted "return 5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+before
+shit: Goodbye :c (Code 5)
