@@ -71,6 +71,9 @@ CXXFLAGS := \
 	-fno-semantic-interposition \
 	-Bsymbolic \
 	-fno-strict-aliasing \
+	-nostdlib++ \
+	-lsupc++ \
+	-lpthread \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
@@ -130,21 +133,6 @@ CXXFLAGS += \
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo_dbg)
 endif
-else ifeq ($(SHIT_MODE), nostdlibpp)
-# Optimized like rel, but link without libstdc++. libsupc++ supplies the
-# exception runtime and operator new and delete, pthread the drain thread, and
-# libc the rest, so the binary needs no C++ standard library. The libraries go
-# in LINK_LIBS so the link rule places them after the objects, where a static
-# archive is searched only for symbols the objects already reference.
-CXXFLAGS += \
-	-s \
-	-DNDEBUG \
-	-O3 \
-	-flto \
-	-nostdlib++
-LINK_LIBS := \
-	-lsupc++ \
-	-lpthread
 else ifeq ($(SHIT_MODE), prof)
 # Optimized like rel, but keep frame pointers and symbols so a profiler can
 # unwind, and drop the line editor so the terminal handling does not perturb
@@ -157,7 +145,7 @@ CXXFLAGS += \
 	-O3 \
 	-flto
 else
-$(error Invalid SHIT_MODE=$(SHIT_MODE). Available modes are "dbg", "rel", "prof", "nostdlibpp", "cosmo")
+$(error Invalid SHIT_MODE=$(SHIT_MODE). Available modes are "dbg", "rel", "prof", "cosmo")
 endif
 
 # Missing Windows libraries.
@@ -176,7 +164,7 @@ o/$(SHIT_MODE)/%.o: %.cpp
 # Linking.
 $(OUT): $(OBJECTS)
 	printf "\t$(OBJECTS) <-> $(OUT)\n"
-	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) $(LINK_LIBS) -o $@
+	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) -o $@
 
 dirs: $(DIRS)
 	mkdir -p o/$(SHIT_MODE)/
