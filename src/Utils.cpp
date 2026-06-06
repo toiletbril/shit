@@ -179,6 +179,158 @@ lowercase_string(std::string_view s)
   return std::string{l.c_str(), l.size()};
 }
 
+static bool
+is_ascii_whitespace(char c)
+{
+  return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' ||
+         c == '\r';
+}
+
+/* Turn an accumulated magnitude and sign into a saturating signed result. The
+   per-base parsers share this so only the digit loop stays base-specific. */
+static i64
+saturate_signed_magnitude(u64 magnitude, bool is_negative, bool has_overflowed)
+{
+  if (is_negative) {
+    if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX) + 1)
+      return INT64_MIN;
+    return -static_cast<i64>(magnitude);
+  }
+  if (has_overflowed || magnitude > static_cast<u64>(INT64_MAX))
+    return INT64_MAX;
+  return static_cast<i64>(magnitude);
+}
+
+static Error
+not_an_integer_error(StringView text)
+{
+  return Error{"'" + std::string{text.data, text.length} +
+               "' is not a valid integer"};
+}
+
+ErrorOr<i64>
+parse_decimal_integer(StringView text)
+{
+  usize offset = 0;
+  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
+    offset++;
+
+  bool is_negative = false;
+  if (offset < text.length &&
+      (text.data[offset] == '+' || text.data[offset] == '-'))
+  {
+    is_negative = text.data[offset] == '-';
+    offset++;
+  }
+
+  u64 magnitude = 0;
+  bool has_digits = false;
+  bool has_overflowed = false;
+  while (offset < text.length && text.data[offset] >= '0' &&
+         text.data[offset] <= '9')
+  {
+    u64 digit = static_cast<u64>(text.data[offset] - '0');
+    has_digits = true;
+    if (magnitude > (UINT64_MAX - digit) / 10)
+      has_overflowed = true;
+    else
+      magnitude = magnitude * 10 + digit;
+    offset++;
+  }
+
+  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
+    offset++;
+  if (!has_digits || offset != text.length) return not_an_integer_error(text);
+  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
+}
+
+ErrorOr<i64>
+parse_octal_integer(StringView text)
+{
+  usize offset = 0;
+  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
+    offset++;
+
+  bool is_negative = false;
+  if (offset < text.length &&
+      (text.data[offset] == '+' || text.data[offset] == '-'))
+  {
+    is_negative = text.data[offset] == '-';
+    offset++;
+  }
+
+  u64 magnitude = 0;
+  bool has_digits = false;
+  bool has_overflowed = false;
+  while (offset < text.length && text.data[offset] >= '0' &&
+         text.data[offset] <= '7')
+  {
+    u64 digit = static_cast<u64>(text.data[offset] - '0');
+    has_digits = true;
+    if (magnitude > (UINT64_MAX - digit) / 8)
+      has_overflowed = true;
+    else
+      magnitude = magnitude * 8 + digit;
+    offset++;
+  }
+
+  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
+    offset++;
+  if (!has_digits || offset != text.length) return not_an_integer_error(text);
+  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
+}
+
+ErrorOr<i64>
+parse_hexadecimal_integer(StringView text)
+{
+  usize offset = 0;
+  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
+    offset++;
+
+  bool is_negative = false;
+  if (offset < text.length &&
+      (text.data[offset] == '+' || text.data[offset] == '-'))
+  {
+    is_negative = text.data[offset] == '-';
+    offset++;
+  }
+
+  /* A leading 0x is the conventional hexadecimal marker and is consumed before
+     the digits, as std::stoll with base 16 accepts it. */
+  if (offset + 1 < text.length && text.data[offset] == '0' &&
+      (text.data[offset + 1] == 'x' || text.data[offset + 1] == 'X'))
+  {
+    offset += 2;
+  }
+
+  u64 magnitude = 0;
+  bool has_digits = false;
+  bool has_overflowed = false;
+  for (; offset < text.length; offset++) {
+    char current = text.data[offset];
+    u64 digit = 0;
+    if (current >= '0' && current <= '9')
+      digit = static_cast<u64>(current - '0');
+    else if (current >= 'a' && current <= 'f')
+      digit = static_cast<u64>(current - 'a' + 10);
+    else if (current >= 'A' && current <= 'F')
+      digit = static_cast<u64>(current - 'A' + 10);
+    else
+      break;
+
+    has_digits = true;
+    if (magnitude > (UINT64_MAX - digit) / 16)
+      has_overflowed = true;
+    else
+      magnitude = magnitude * 16 + digit;
+  }
+
+  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
+    offset++;
+  if (!has_digits || offset != text.length) return not_an_integer_error(text);
+  return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
+}
+
 Maybe<std::filesystem::path>
 canonicalize_path(const std::string &path)
 {

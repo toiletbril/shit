@@ -2,6 +2,7 @@
 
 #include "Builtin.hpp"
 #include "Common.hpp"
+#include "ErrorOr.hpp"
 #include "Eval.hpp"
 #include "Os.hpp"
 #include "Tokens.hpp"
@@ -56,6 +57,16 @@ void string_replace(std::string &s, std::string_view to_replace,
                     std::string_view replace_with);
 
 std::string lowercase_string(std::string_view s);
+
+/* Parse a whole view as a signed integer, the StringView-native replacement for
+   std::stoll. Each base has its own function so the digit loop carries no base
+   branch and the compiler keeps the divisor a constant. Leading and trailing
+   ASCII whitespace and one optional sign are allowed, the value saturates to the
+   i64 range on overflow, and any other content yields an Error. The hexadecimal
+   form also accepts a leading 0x. */
+ErrorOr<i64> parse_decimal_integer(StringView text);
+ErrorOr<i64> parse_octal_integer(StringView text);
+ErrorOr<i64> parse_hexadecimal_integer(StringView text);
 
 Maybe<std::filesystem::path> canonicalize_path(const std::string &path);
 
