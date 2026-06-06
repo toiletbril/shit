@@ -1,0 +1,50 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "g"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "g"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "nonexistent_xyz"]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "nonexistent_xyz"
+]
+echo is a shell builtin
+g is a shell function
+true is a shell builtin
+nonexistent_xyz: not found
+[Code 1]

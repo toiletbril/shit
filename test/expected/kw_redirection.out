@@ -1,0 +1,45 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "first"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "second"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-f" "/tmp/shit_test_redir.txt"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "/tmp/shit_test_redir.txt"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "second"
+]
+[Word
+  Unquoted "/tmp/shit_test_redir.txt"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/tmp/shit_test_redir.txt"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "/tmp/shit_test_redir.txt"
+]
+first
+second
+[Code 0]

@@ -1,0 +1,41 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "FOO=bar"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$FOO"]
+  [CompoundListCondition, None]
+    [Assign BAZ=qux]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "BAZ"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$BAZ"]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "FOO=bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "FOO"
+]
+[Word
+  Unquoted "BAZ=qux"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "BAZ"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "BAZ"
+]
+bar
+qux
+[Code 0]

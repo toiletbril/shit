@@ -1,0 +1,47 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign v=outer]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "v=inner"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "in=$v"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "out=$v"]
+[Word
+  Unquoted "v=outer"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "v=inner"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "in="
+  Variable "v"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "out="
+  Variable "v"
+]
+in=inner
+out=outer
+[Code 0]

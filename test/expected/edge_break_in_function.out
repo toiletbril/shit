@@ -1,0 +1,66 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [ForLoop "i"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "f"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$i"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "loop_done"]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "i"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "loop_done"
+]
+1
+2
+3
+loop_done
+[Code 0]

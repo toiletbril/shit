@@ -1,0 +1,68 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "a" "b" "c" "d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$# $1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shift"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$# $1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "shift" "2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$# $1"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#"
+  DoubleQuoted " "
+  Variable "1"
+]
+[Word
+  Unquoted "shift"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#"
+  DoubleQuoted " "
+  Variable "1"
+]
+[Word
+  Unquoted "shift"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#"
+  DoubleQuoted " "
+  Variable "1"
+]
+4 a
+3 b
+1 d
+[Code 0]

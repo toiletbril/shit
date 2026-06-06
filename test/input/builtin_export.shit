@@ -1,0 +1,5 @@
+export FOO=bar
+echo "$FOO"
+BAZ=qux
+export BAZ
+echo "$BAZ"

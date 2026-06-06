@@ -1,0 +1,5 @@
+true; echo "true=$?"
+false; echo "false=$?"
+:; echo "colon=$?"
+if true; then echo yes; fi
+if false; then echo no; else echo else; fi

@@ -1,0 +1,34 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "readonly" "R=5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "R=$R"]
+  [CompoundListCondition, None]
+    [Assign R=9]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after=$R"]
+[Word
+  Unquoted "readonly"
+]
+[Word
+  Unquoted "R=5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "R="
+  Variable "R"
+]
+[Word
+  Unquoted "R=9"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after="
+  Variable "R"
+]
+R=5
+shit: Error: 'R' is read only and cannot be assigned.

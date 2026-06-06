@@ -1,0 +1,39 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias" "greet=echo hello"]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias"]
+  [CompoundListCondition, None]
+    [SimpleCommand "greet"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unalias" "greet"]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias"]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "greet="
+  DoubleQuoted "echo hello"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "greet"
+]
+[Word
+  Unquoted "unalias"
+]
+[Word
+  Unquoted "greet"
+]
+[Word
+  Unquoted "alias"
+]
+shit: 3:1: Warning: Command 'greet' was not found.
+     3 |  greet
+       |  ^~~~~ here.
+alias greet='echo hello'
+hello
+[Code 0]

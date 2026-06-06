@@ -1,0 +1,151 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "1" "-eq" "1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "eq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "1" "-ne" "2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ne=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "abc" "=" "abc" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "streq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-z" "" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-n" "x" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "nonempty=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "5" "-gt" "3" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "gt=$?"]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "eq="
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-ne"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ne="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "streq="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  DoubleQuoted "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "nonempty="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "gt="
+  Variable "?"
+]
+eq=0
+ne=0
+streq=0
+empty=0
+nonempty=0
+gt=0
+[Code 0]

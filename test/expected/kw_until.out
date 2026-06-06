@@ -1,0 +1,55 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign i=0]
+  [CompoundListCondition, None]
+    [UntilLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$i" "-ge" "3" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "until $i"]
+        [CompoundListCondition, None]
+          [Assign i=$((i + 1))]
+[Word
+  Unquoted "i=0"
+]
+[Word
+  Unquoted "until"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "i"
+]
+[Word
+  Unquoted "-ge"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "until "
+  Variable "i"
+]
+[Word
+  Unquoted "i="
+  ArithmeticExpansion "i + 1"
+]
+[Word
+  Unquoted "done"
+]
+until 0
+until 1
+until 2
+[Code 0]

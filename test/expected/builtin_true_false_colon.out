@@ -1,0 +1,113 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "true=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "false=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "colon=$?"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "yes"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "no"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "else"]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "true="
+  Variable "?"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "false="
+  Variable "?"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "colon="
+  Variable "?"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "no"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "fi"
+]
+true=0
+false=1
+colon=0
+yes
+else
+[Code 0]

@@ -1,0 +1,49 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "X=1"]
+          [CompoundListCondition, None]
+            [SimpleCommand "readonly" "X"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "in=$X"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "X=1"
+]
+[Word
+  Unquoted "readonly"
+]
+[Word
+  Unquoted "X"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "in="
+  Variable "X"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after"
+]
+in=1
+after
+[Code 0]

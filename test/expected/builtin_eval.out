@@ -1,0 +1,26 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "eval" "x=5; echo "eval set x=$x""]
+  [CompoundListCondition, None]
+    [Assign cmd=echo evaluated]
+  [CompoundListCondition, None]
+    [SimpleCommand "eval" "$cmd"]
+[Word
+  Unquoted "eval"
+]
+[Word
+  Literal "x=5; echo "eval set x=$x""
+]
+[Word
+  Unquoted "cmd="
+  DoubleQuoted "echo evaluated"
+]
+[Word
+  Unquoted "eval"
+]
+[Word
+  Variable "cmd"
+]
+eval set x=5
+evaluated
+[Code 0]

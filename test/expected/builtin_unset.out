@@ -1,0 +1,67 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=hello]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$x]"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "fn"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "f"]
+[Word
+  Unquoted "x=hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "fn"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "f"
+]
+hello
+[]
+f is a shell function
+[Code 0]

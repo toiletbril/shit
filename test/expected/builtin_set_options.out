@@ -1,0 +1,58 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-u"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$UNSET_VAR_XYZ:-default"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+u"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "noclobber"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "noclobber"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "UNSET_VAR_XYZ:-default"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+u"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "noclobber"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "noclobber"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+default
+done
+[Code 0]
