@@ -34,6 +34,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  ASSERT(!args.empty());
+
   if (args.size() < 2) return 0;
 
   let const &name = args[1];

@@ -27,6 +27,8 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const
   const ArrayList<String> names = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };
 
+  ASSERT(!names.empty());
+
   /* With no operand the line goes to REPLY, otherwise to the operands in
      order. The operand names are addressed by an offset into names. */
   const bool has_operands = names.size() > 1;
@@ -35,6 +37,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const
   const String reply_name = "REPLY";
   auto operand_name = [&](usize index) -> String {
     if (!has_operands) return reply_name;
+    ASSERT(first_operand + index < names.size());
     return names[first_operand + index];
   };
 

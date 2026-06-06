@@ -21,6 +21,7 @@ fn Bg::kind() const -> Builtin::Kind { return Kind::Bg; }
 fn Bg::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   let const &args = ec.args();
+  ASSERT(!args.empty());
 
   Job *job = nullptr;
   if (args.size() > 1 && !args[1].empty() && args[1][0] == '%') {

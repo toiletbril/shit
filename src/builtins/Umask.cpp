@@ -19,6 +19,7 @@ i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const
 {
   unused(cxt);
   const ArrayList<String> &args = ec.args();
+  ASSERT(!args.empty());
 
   if (args.size() == 1) {
     char buffer[8];

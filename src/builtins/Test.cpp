@@ -24,7 +24,11 @@ struct TestEvaluator
   usize pos;
   bool had_error;
 
-  const String &current() const { return args[pos]; }
+  const String &current() const
+  {
+    ASSERT(pos < args.size());
+    return args[pos];
+  }
   bool at_end() const { return pos >= args.size(); }
 
   void fail(StringView message)
@@ -57,6 +61,7 @@ struct TestEvaluator
   {
     if (op == "=") return left == right;
     if (op == "!=") return left != right;
+
     i64 a = 0, b = 0;
     if (op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
         op == "-gt" || op == "-ge")
@@ -169,6 +174,8 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
      last operand index ends the expression, one before the trailing ] in the
      bracket form. */
   const ArrayList<String> &arguments = ec.args();
+  ASSERT(!arguments.empty());
+
   usize expression_end = arguments.size();
   if (ec.program() == "[") {
     if (arguments.size() < 2 || arguments[arguments.size() - 1] != "]") {
@@ -190,6 +197,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const
   const bool result = evaluator.parse_expression();
   if (evaluator.had_error) return 2;
   if (evaluator.pos != operands.size()) {
+    ASSERT(evaluator.pos < operands.size());
     shit::print_error(StringView{"test: unexpected argument '"} +
                       operands[evaluator.pos] + "'\n");
     return 2;

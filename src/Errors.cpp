@@ -172,6 +172,10 @@ fn ErrorWithLocation::to_string(StringView source) const -> String
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;
 
+  ASSERT(byte_position <= source.size(),
+              "byte position: %zu, source length: %zu", byte_position,
+              source.size());
+
   LOG_VARS(Verbosity::Debug, byte_position, byte_count);
   LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
 
@@ -213,6 +217,7 @@ fn ErrorWithLocation::to_string(StringView source) const -> String
   result += ": ";
   result += m_message;
   result += ".\n";
+
   result += get_context_pointing_to(source, byte_position, byte_count,
                                     line_number, last_newline_location,
                                     unicode_position, StringView{"here"});
@@ -245,6 +250,10 @@ fn ErrorWithLocationAndDetails::details_to_string(StringView source) const
   usize byte_position = m_details_location.position;
   const usize byte_count = m_details_location.length;
 
+  ASSERT(byte_position <= source.size(),
+              "byte position: %zu, source length: %zu", byte_position,
+              source.size());
+
   if (byte_position > 0 && byte_position == source.size() &&
       source[byte_position - 1] == '\n')
     byte_position--;
@@ -265,6 +274,7 @@ fn ErrorWithLocationAndDetails::details_to_string(StringView source) const
   result += ':';
   result += std::to_string(details_line_byte_position);
   result += ": Note:\n";
+
   result += get_context_pointing_to(
       source, byte_position, byte_count, details_line_number,
       details_last_newline_location, unicode_details_position,

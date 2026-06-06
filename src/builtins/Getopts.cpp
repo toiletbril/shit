@@ -71,6 +71,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const -> i32
     return finish(1);
   }
 
+  ASSERT(char_index < current.length());
   let const option = current[char_index];
   let option_as_string = String{};
   option_as_string.push(option);

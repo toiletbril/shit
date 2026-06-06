@@ -24,6 +24,8 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  ASSERT(!args.empty());
+
   /* alias with no operand lists every definition. */
   if (args.size() == 1) {
     let out = String{};

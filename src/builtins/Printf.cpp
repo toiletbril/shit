@@ -38,6 +38,8 @@ i64 parse_printf_integer(const String &arg)
 
 void append_escape(String &out, const String &fmt, usize &i)
 {
+  ASSERT(i < fmt.length());
+
   const char e = fmt[i];
   switch (e) {
   case 'n': out += '\n'; break;
@@ -97,6 +99,8 @@ Builtin::Kind Printf::kind() const { return Kind::Printf; }
 i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const
 {
   unused(cxt);
+
+  ASSERT(!ec.args().empty());
 
   if (ec.args().size() < 2) return 0;
 

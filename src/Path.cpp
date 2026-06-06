@@ -69,6 +69,7 @@ static fn filename_offset(const String &text) -> usize
 fn Path::filename() const -> StringView
 {
   let const start = filename_offset(m_text);
+  ASSERT(start <= m_text.size());
   return m_text.substring(start);
 }
 
@@ -110,11 +111,16 @@ fn Path::push_component(StringView component) -> Path &
 fn Path::with_extension(StringView new_extension) const -> Path
 {
   let const existing = extension();
+
+  ASSERT(existing.length <= m_text.size(),
+         "extension is a suffix of the path text");
   let const keep = m_text.size() - existing.length;
+
   Path result{m_text.substring_of_length(0, keep)};
   if (new_extension.length > 0 && new_extension.data[0] != '.')
     result.m_text.push('.');
   result.m_text.append(new_extension);
+
   return result;
 }
 
@@ -240,11 +246,15 @@ fn Path::read_directory(const Path &dir) -> Maybe<ArrayList<String>>
   for (struct dirent *entry = ::readdir(handle); entry != NULL;
        entry = ::readdir(handle))
   {
+    ASSERT(entry != NULL);
+
     const StringView name{entry->d_name};
     if (name == StringView{"."} || name == StringView{".."}) continue;
     names.push(String{name});
   }
+
   ::closedir(handle);
+
   return names;
 }
 

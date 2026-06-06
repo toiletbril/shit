@@ -95,6 +95,8 @@ fn Word::get_assignment_split() const -> Maybe<std::pair<String, Word>>
   const Maybe<usize> equals_position = first.text.find_character('=');
   if (!equals_position.has_value() || *equals_position == 0) return shit::None;
 
+  ASSERT(*equals_position <= first.text.size());
+
   if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
   for (usize i = 1; i < *equals_position; i++) {
     if (!lexer::is_variable_name(first.text[i])) return shit::None;

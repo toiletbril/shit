@@ -25,6 +25,8 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  ASSERT(!args.empty());
+
   String out{};
   bool all_found = true;
 
@@ -42,6 +44,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const
     } else if (const ArrayList<Path> paths = utils::search_program_path(name);
                paths.size() != 0)
     {
+      ASSERT(paths.size() > 0);
       out += name;
       out += " is ";
       out += paths[0].text();

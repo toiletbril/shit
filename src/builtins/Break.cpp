@@ -10,6 +10,8 @@ fn Break::kind() const -> Builtin::Kind { return Kind::Break; }
 
 fn Break::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
+  ASSERT(!ec.args().empty());
+
   /* The optional argument is how many enclosing loops to break, default one. */
   i64 level = 1;
   if (ec.args().size() > 1) {

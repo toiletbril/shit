@@ -82,6 +82,7 @@ Builtin::Kind Set::kind() const { return Kind::Set; }
 i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
+  ASSERT(!args.empty());
 
   /* set with no arguments lists the shell variables. */
   if (args.size() == 1) {
@@ -120,6 +121,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const
         ec.print_to_stdout(list_options(cxt));
         continue;
       }
+      ASSERT(i + 1 < args.size());
       const String &name = args[++i];
       const SetOption *const option = find_option_by_name(name);
       if (option == nullptr)

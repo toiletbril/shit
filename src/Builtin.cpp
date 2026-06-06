@@ -16,6 +16,8 @@ fn show_builtin_help_impl(const ExecContext &ec,
                           const std::vector<std::string> &hs,
                           const ArrayList<Flag *> &fl) -> void
 {
+  ASSERT(!ec.args().empty());
+
   String help_text{};
   help_text += StringView{make_synopsis(
       std::string_view{ec.args()[0].c_str(), ec.args()[0].size()}, hs)};
@@ -146,6 +148,8 @@ static fn builtin_help(Builtin::Kind kind) -> BuiltinHelp
 
 fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
 {
+  ASSERT(!ec.args().empty());
+
   /* Every builtin answers --help with its synopsis and a short explanation. */
   if (ec.args().size() > 1 && ec.args()[1] == "--help") {
     const BuiltinHelp help = builtin_help(ec.builtin_kind());
@@ -170,6 +174,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) -> i32
      builtin command. */
   defer { ec.close_fds(); };
 
+  ASSERT(b != NULL);
   try {
     return b->execute(ec, cxt);
   } catch (const Error &e) {

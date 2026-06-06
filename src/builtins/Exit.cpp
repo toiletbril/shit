@@ -12,6 +12,8 @@ fn Exit::kind() const -> Builtin::Kind { return Kind::Exit; }
 
 fn Exit::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
+  ASSERT(!ec.args().empty());
+
   /* exit with no argument uses the status of the last command. */
   i64 status = cxt.last_exit_status();
   if (ec.args().size() > 1) {

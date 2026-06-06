@@ -34,6 +34,7 @@ Builtin::Kind Wait::kind() const { return Kind::Wait; }
 i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
+  ASSERT(!args.empty());
 
   i32 status = 0;
 

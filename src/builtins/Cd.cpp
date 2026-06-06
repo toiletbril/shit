@@ -13,6 +13,8 @@ fn Cd::kind() const -> Builtin::Kind { return Kind::Cd; }
 
 fn Cd::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
+  ASSERT(!ec.args().empty());
+
   let arg_path = String{};
 
   if (ec.args().size() > 1) {

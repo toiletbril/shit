@@ -23,6 +23,8 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  ASSERT(!args.empty());
+
   /* readonly with no operand lists the read-only variables and their values. */
   if (args.size() == 1) {
     String out{};

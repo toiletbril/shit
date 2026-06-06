@@ -151,10 +151,15 @@ static fn find_subview(StringView haystack, StringView needle, usize start)
   if (needle.length == 0)
     return start <= haystack.length ? start : NOT_FOUND_INDEX;
   if (needle.length > haystack.length) return NOT_FOUND_INDEX;
+
+  ASSERT(haystack.data != NULL);
+  ASSERT(needle.data != NULL);
+
   for (usize i = start; i + needle.length <= haystack.length; i++) {
     if (std::memcmp(haystack.data + i, needle.data, needle.length) == 0)
       return i;
   }
+
   return NOT_FOUND_INDEX;
 }
 
@@ -172,8 +177,11 @@ fn string_replace(String &s, const StringView to_replace,
     previous = i;
     const usize match = find_subview(source, to_replace, i);
     if (match == NOT_FOUND_INDEX) break;
+
+    ASSERT(match >= previous, "match cannot precede the search start");
     result.append(source.substring_of_length(previous, match - previous));
     result.append(replace_with);
+
     i = match + to_replace.length;
   }
 
@@ -227,6 +235,7 @@ fn unsigned_integer_to_string(u64 value) -> String
   char buffer[20];
   usize offset = sizeof(buffer);
   do {
+    ASSERT(offset > 0, "decimal digits cannot exceed the buffer");
     buffer[--offset] = static_cast<char>('0' + value % 10);
     value /= 10;
   } while (value > 0);
@@ -416,6 +425,8 @@ fn glob_matches(StringView glob, StringView str,
   usize g = 0;
 
   while (g < glob.size() && s < str.size()) {
+    ASSERT(g < glob.size() && s < str.size());
+
     if (!is_glob_char_active(glob_active, mask_offset + g)) {
       if (glob[g++] != str[s++])
         return false;
@@ -721,7 +732,9 @@ fn read_entire_file(StringView path) -> Maybe<String>
     if (!read_count || *read_count == 0) break;
     contents.append(StringView{buffer, *read_count});
   }
+
   os::close_fd(*file);
+
   return contents;
 }
 
@@ -749,7 +762,9 @@ fn read_line_from_fd(os::descriptor fd) -> Maybe<String>
     if (one_byte == '\n') return line;
     line.push(one_byte);
   }
+
   if (!read_any_byte) return None;
+
   return line;
 }
 

@@ -58,10 +58,12 @@ fn redirect_stdout(os::descriptor target) -> os::descriptor
      seeing end of input. */
   const os::descriptor saved = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
   dup2(target, STDOUT_FILENO);
+
   /* The original write end is close-on-exec for the same reason. The duplicate
      now living on STDOUT_FILENO stays open for the command to write to. */
   if (const int flags = fcntl(target, F_GETFD); flags != -1)
     fcntl(target, F_SETFD, flags | FD_CLOEXEC);
+
   return saved;
 }
 
@@ -154,6 +156,8 @@ fn check_syscall_impl(i32 status, StringView invocation) -> i32
 
 fn execute_program(ExecContext &&ec) -> process
 {
+  ASSERT(ec.args().size() > 0, "a program needs at least argv[0]");
+
   defer { ec.close_fds(); };
 
   const pid_t child_pid = check_syscall(fork());
@@ -205,6 +209,8 @@ fn execute_program(ExecContext &&ec) -> process
 
 fn replace_process(ExecContext &&ec) -> void
 {
+  ASSERT(ec.args().size() > 0, "a program needs at least argv[0]");
+
   const os_args child_args = make_os_args(ec.args());
 
   /* Place each redirected file and close the original descriptor, the way the
@@ -457,6 +463,8 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
 
 fn make_os_args(const ArrayList<String> &args) -> os_args
 {
+  ASSERT(args.size() > 0, "argv must carry at least the program name");
+
   os_args result{};
   result.reserve(args.size() + 1);
 

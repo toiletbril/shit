@@ -25,6 +25,8 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  ASSERT(!args.empty());
+
   if (!cxt.in_function_scope())
     throw Error{"'local' can only be used inside a function"};
 

@@ -26,6 +26,8 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  ASSERT(!args.empty());
+
   String buf{};
 
   for (usize i = 1; i < args.size(); i++) {
@@ -48,6 +50,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const
           buf += '\n';
         }
       } else {
+        ASSERT(ps.size() > 0);
         buf += ps[0].text();
         buf += '\n';
       }

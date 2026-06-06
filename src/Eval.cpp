@@ -135,8 +135,10 @@ fn EvalContext::get_variable_value(StringView name) const -> Maybe<String>
     let const parsed_index = utils::parse_decimal_integer(name);
     if (parsed_index.is_error()) return String{};
     let const index = static_cast<usize>(parsed_index.value());
-    if (index >= 1 && index <= m_positional_params.size())
+    if (index >= 1 && index <= m_positional_params.size()) {
+      ASSERT(index - 1 < m_positional_params.size());
       return m_positional_params[index - 1];
+    }
     return String{};
   }
 
@@ -188,6 +190,7 @@ fn EvalContext::register_job(os::process pid, StringView command) -> int
   job.command = command;
   job.state = Job::State::Running;
   m_jobs.push(std::move(job));
+  ASSERT(!m_jobs.empty());
   LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
 }
@@ -223,8 +226,10 @@ fn EvalContext::most_recent_job() -> Job *
 {
   /* Skip a finished job, so a bare fg or bg acts on a job that is still
      running or stopped rather than a dead pid. */
-  for (usize i = m_jobs.size(); i > 0; i--)
+  for (usize i = m_jobs.size(); i > 0; i--) {
+    ASSERT(i - 1 < m_jobs.size());
     if (m_jobs[i - 1].state != Job::State::Done) return &m_jobs[i - 1];
+  }
   return nullptr;
 }
 
@@ -337,8 +342,10 @@ fn EvalContext::leave_function_scope() -> void
 
   /* Restore each shadowed binding in reverse, so a name declared local twice
      ends with the value it held before the function ran. */
+  ASSERT(!m_local_scopes.empty());
   let &scope = m_local_scopes.back();
   for (usize i = scope.size(); i > 0; i--) {
+    ASSERT(i - 1 < scope.size());
     let &binding = scope[i - 1];
     /* Restore through assign_variable, not set_shell_variable, since this runs
        inside a noexcept defer and a readonly name would otherwise throw from a
@@ -363,6 +370,7 @@ fn EvalContext::in_function_scope() const -> bool
 fn EvalContext::declare_local(StringView name) -> void
 {
   if (m_local_scopes.empty()) return;
+  ASSERT(!m_local_scopes.empty());
   m_local_scopes.back().push(
       LocalBinding{String{name}, get_variable_value(name)});
 }
@@ -412,7 +420,11 @@ fn EvalContext::alias_names() const -> HashSet
 
 fn EvalContext::enter_subshell() -> void { m_subshell_depth++; }
 
-fn EvalContext::leave_subshell() -> void { m_subshell_depth--; }
+fn EvalContext::leave_subshell() -> void
+{
+  ASSERT(m_subshell_depth > 0);
+  m_subshell_depth--;
+}
 
 fn EvalContext::in_subshell() const -> bool { return m_subshell_depth > 0; }
 
@@ -519,7 +531,11 @@ fn EvalContext::no_exec() const -> bool { return m_no_exec; }
 
 fn EvalContext::enter_condition() -> void { m_condition_depth++; }
 
-fn EvalContext::leave_condition() -> void { m_condition_depth--; }
+fn EvalContext::leave_condition() -> void
+{
+  ASSERT(m_condition_depth > 0);
+  m_condition_depth--;
+}
 
 fn EvalContext::in_condition() const -> bool { return m_condition_depth > 0; }
 
@@ -784,6 +800,7 @@ fn EvalContext::apply_parameter_expansion(StringView spec) -> String
   }
 
   /* Split the parameter name from an optional operator and its word. */
+  ASSERT(!spec.empty());
   usize name_end = 0;
   if (lexer::is_variable_name_start(spec[0])) {
     while (name_end < spec.length && lexer::is_variable_name(spec[name_end]))
@@ -827,6 +844,7 @@ fn EvalContext::apply_parameter_expansion(StringView spec) -> String
   switch (op) {
   case '-':
     if (treat_as_unset) return expand_modifier_word(word);
+    ASSERT(current.has_value());
     return String{heap_allocator(), current->view()};
   case '=':
     if (treat_as_unset) {
@@ -834,6 +852,7 @@ fn EvalContext::apply_parameter_expansion(StringView spec) -> String
       set_shell_variable(name, assigned);
       return assigned;
     }
+    ASSERT(current.has_value());
     return String{heap_allocator(), current->view()};
   case '+':
     if (treat_as_unset) return String{heap_allocator()};
@@ -843,17 +862,21 @@ fn EvalContext::apply_parameter_expansion(StringView spec) -> String
       if (word.empty()) throw Error{name + ": parameter not set or empty"};
       throw Error{expand_modifier_word(word)};
     }
+    ASSERT(current.has_value());
     return String{heap_allocator(), current->view()};
+
   case '#': {
     let const value = current.value_or(String{});
     return trim_matching_prefix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
+
   case '%': {
     let const value = current.value_or(String{});
     return trim_matching_suffix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
+
   default: return expand_variable(name);
   }
 }
@@ -967,6 +990,11 @@ fn EvalContext::expand_path_once(const GlobField &field,
 
   let const parent_is_dot = parent_dir.text() == StringView{"."};
 
+  /* The no-glob field returned above, so the stem is a non-empty glob here and
+     glob[0] reads a real byte. */
+  ASSERT(has_glob);
+  ASSERT(!glob.empty());
+
   for (const String &entry_name : *entries) {
     let const filename = entry_name.view();
 
@@ -1045,6 +1073,11 @@ fn EvalContext::expand_path_recurse(ArrayList<GlobField> fields)
       if (Path{field.text.view()}.exists()) result.push(std::move(field));
       continue;
     }
+
+    /* An active glob index came from the mask, so it points inside the text and
+       the field carries a mask parallel to the text. */
+    ASSERT(*expand_ch < text.length);
+    ASSERT(field.glob_active.size() == text.length);
 
     let slash_after = Maybe<usize>{};
     for (usize k = *expand_ch; k < text.length; k++) {
@@ -1653,6 +1686,7 @@ fn EvalContext::expand_word(const Word &word) -> ArrayList<GlobField>
            expansion, so a * or ? from the value is an active glob. */
         append_split_run(value, true);
     } break;
+
     case WordSegment::Kind::CommandSubstitution: {
       let const output = String{heap_allocator(),
                                 capture_command_substitution(segment.text)};
@@ -1661,6 +1695,7 @@ fn EvalContext::expand_word(const Word &word) -> ArrayList<GlobField>
       else
         append_split_run(output, true);
     } break;
+
     case WordSegment::Kind::ArithmeticExpansion: {
       let const value = String{
           heap_allocator(),
@@ -2012,7 +2047,11 @@ fn ExecContext::source_location() const -> const SourceLocation &
   return m_location;
 }
 
-fn ExecContext::program() const -> const String & { return m_args[0]; }
+fn ExecContext::program() const -> const String &
+{
+  ASSERT(!m_args.empty());
+  return m_args[0];
+}
 
 fn ExecContext::args() const -> const ArrayList<String> & { return m_args; }
 

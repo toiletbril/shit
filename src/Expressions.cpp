@@ -79,6 +79,8 @@ namespace {
    cannot be checked before run time. */
 fn static_command_name(const Token *token) -> Maybe<String>
 {
+  ASSERT(token != nullptr);
+
   if (token->kind() != Token::Kind::Word) return shit::None;
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
@@ -123,14 +125,19 @@ fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases)
     -> bool
 {
+  ASSERT(root != nullptr);
+
   AnalysisContext actx{source};
+
   /* A function or alias defined by an earlier command resolves, so seed the
      prepass with the names already registered. */
   known_functions.for_each(
       [&actx](StringView name) { actx.defined_functions.add(name); });
   known_aliases.for_each(
       [&actx](StringView name) { actx.known_aliases.add(name); });
+
   root->analyze(actx, true);
+
   return !actx.has_fatal;
 }
 
@@ -156,6 +163,9 @@ IfStatement::~IfStatement()
 
 fn IfStatement::evaluate_impl(EvalContext &cxt) const -> i64
 {
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_then != nullptr);
+
   const i64 condition = m_condition->evaluate(cxt);
   /* A jump set while evaluating the condition stops the if and stays pending.
    */
@@ -173,6 +183,9 @@ fn IfStatement::to_string() const -> String { return "If"; }
 
 fn IfStatement::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_then != nullptr);
+
   String s{};
   String pad{};
 
@@ -247,6 +260,8 @@ fn AssignCommand::is_assignment() const -> bool { return true; }
 
 fn AssignCommand::evaluate_impl(EvalContext &cxt) const -> i64
 {
+  ASSERT(m_assignment != nullptr);
+
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
@@ -322,15 +337,19 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
 {
   for (const Redirection &redirection : m_redirections) {
     if (redirection.kind == Redirection::Kind::Heredoc) {
+      ASSERT(redirection.heredoc_body != nullptr);
+
       let body = std::string{*redirection.heredoc_body};
       if (redirection.heredoc_expand) {
         const String expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
+
       let opened = os::write_to_temp_file(body);
       if (!opened)
         throw Error{"could not stage the heredoc body: " +
                     os::last_system_error_message()};
+
       if (ec.in_fd) os::close_fd(*ec.in_fd);
       ec.in_fd = opened.take();
       continue;
@@ -343,6 +362,8 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
         ec.dup_out_to_err = true;
       continue;
     }
+
+    ASSERT(redirection.target != nullptr);
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redirection.target);
@@ -483,15 +504,19 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
     /* A heredoc body becomes the standard input through an anonymous temp
        file, expanded when the delimiter was unquoted. */
     if (redirection.kind == Redirection::Kind::Heredoc) {
+      ASSERT(redirection.heredoc_body != nullptr);
+
       let body = std::string{*redirection.heredoc_body};
       if (redirection.heredoc_expand) {
         const String expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
+
       let opened = os::write_to_temp_file(body);
       if (!opened)
         throw Error{"could not stage the heredoc body: " +
                     os::last_system_error_message()};
+
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
       redirect_in_fd = opened.take();
       continue;
@@ -506,6 +531,8 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
         dup_out_to_err = true;
       continue;
     }
+
+    ASSERT(redirection.target != nullptr);
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redirection.target);
@@ -582,6 +609,7 @@ fn SimpleCommand::evaluate_impl(EvalContext &cxt) const -> i64
   /* A function shadows a builtin and a program. Run its body with the call
      words as the positional parameters, restoring them afterwards. A return
      builtin unwinds here and supplies the function exit status. */
+  ASSERT(!program_args.empty());
   const String &program_name = program_args[0];
   if (const Expression *function_body =
           cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
@@ -716,6 +744,8 @@ fn CompoundList::is_empty() const -> bool { return m_nodes.empty(); }
 
 fn CompoundList::append_node(const CompoundListCondition *node) -> void
 {
+  ASSERT(node != nullptr);
+
   m_location.length += node->source_location().length;
   m_nodes.push(node);
 }
@@ -748,6 +778,8 @@ fn CompoundList::evaluate_impl(EvalContext &cxt) const -> i64
 
   for (usize index = 0; index < m_nodes.size(); index++) {
     const CompoundListCondition *n = m_nodes[index];
+    ASSERT(n != nullptr);
+
     switch (n->kind()) {
     case CompoundListCondition::Kind::None: ret = n->evaluate(cxt); break;
 
@@ -810,6 +842,8 @@ fn CompoundListCondition::to_string() const -> String
 
 fn CompoundListCondition::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_cmd != nullptr);
+
   String s{};
   String pad{};
   for (usize i = 0; i < layer; i++)
@@ -849,6 +883,8 @@ fn Pipeline::is_empty() const -> bool { return m_commands.empty(); }
 
 fn Pipeline::append_command(const SimpleCommand *node) -> void
 {
+  ASSERT(node != nullptr);
+
   m_location.length += node->source_location().length;
   m_commands.push(node);
 }
@@ -885,6 +921,8 @@ fn Pipeline::evaluate_impl(EvalContext &cxt) const -> i64
   ecs.reserve(m_commands.size());
 
   for (const SimpleCommand *e : m_commands) {
+    ASSERT(e != nullptr);
+
     cxt.add_evaluated_expression();
 
     let stage_args = cxt.process_args(e->args());
@@ -984,28 +1022,39 @@ fn IfClause::to_ast_string(usize layer) const -> String
   let const child_pad = pad + EXPRESSION_AST_INDENT;
   let s = pad + "[" + to_string() + "]";
   for (const auto &[condition, body] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+
     s += "\n" + child_pad + condition->to_ast_string(layer + 1);
     s += "\n" + child_pad + body->to_ast_string(layer + 1);
   }
+
   if (m_otherwise != nullptr)
     s += "\n" + child_pad + m_otherwise->to_ast_string(layer + 1);
+
   return s;
 }
 
 fn IfClause::evaluate_impl(EvalContext &cxt) const -> i64
 {
   for (const auto &[condition, body] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+
     i64 condition_status;
     {
       cxt.enter_condition();
       defer { cxt.leave_condition(); };
       condition_status = condition->evaluate(cxt);
     }
+
     /* A jump inside the condition stops the if and stays pending. */
     if (cxt.has_pending_control_flow()) return condition_status;
     if (condition_status == 0) return body->evaluate(cxt);
   }
+
   if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+
   return 0;
 }
 
@@ -1015,10 +1064,14 @@ fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
      bodies are conditional, since a branch may not be reached. */
   let is_first_branch = true;
   for (const auto &[condition, body] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+
     condition->analyze(actx, is_unconditional && is_first_branch);
     body->analyze(actx, false);
     is_first_branch = false;
   }
+
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
 }
 
@@ -1041,6 +1094,9 @@ fn WhileLoop::to_string() const -> String
 
 fn WhileLoop::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
+
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
   let s = pad + "[" + to_string() + "]";
@@ -1119,6 +1175,9 @@ fn WhileLoop::evaluate_impl(EvalContext &cxt) const -> i64
 
 fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
 {
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
+
   /* The condition runs at least once, the body may run zero times. */
   m_condition->analyze(actx, is_unconditional);
   m_body->analyze(actx, false);
@@ -1154,6 +1213,8 @@ fn ForLoop::to_string() const -> String
 
 fn ForLoop::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_body != nullptr);
+
   let const pad = indent_for_layer(layer);
   let s = pad + "[" + to_string() + "]";
   s += "\n" + pad + EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
@@ -1179,6 +1240,8 @@ fn ForLoop::evaluate_impl(EvalContext &cxt) const -> i64
 
 fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
 {
+  ASSERT(m_body != nullptr);
+
   unused(is_unconditional);
   m_body->analyze(actx, false);
 }
@@ -1211,17 +1274,22 @@ fn CaseClause::to_ast_string(usize layer) const -> String
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
   let s = pad + "[" + to_string() + "]";
-  for (const CaseItem &item : m_items)
+  for (const CaseItem &item : m_items) {
+    ASSERT(item.body != nullptr);
     s += "\n" + child_pad + item.body->to_ast_string(layer + 1);
+  }
   return s;
 }
 
 fn CaseClause::evaluate_impl(EvalContext &cxt) const -> i64
 {
+  ASSERT(m_word != nullptr);
+
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no pathname globbing, so a pattern keeps its metacharacters
      for matching. */
   auto expand_no_glob = [&cxt](const Token *t) -> String {
+    ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Word) {
       return cxt.expand_word_for_assignment(
           static_cast<const tokens::WordToken *>(t)->word());
@@ -1232,6 +1300,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const -> i64
   let const subject = expand_no_glob(m_word);
 
   for (const CaseItem &item : m_items) {
+    ASSERT(item.body != nullptr);
+
     for (const Token *pattern_token : item.patterns) {
       let const pattern = expand_no_glob(pattern_token);
       let all_active = ArrayList<bool>{heap_allocator()};
@@ -1253,8 +1323,10 @@ fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const
     -> void
 {
   unused(is_unconditional);
-  for (const CaseItem &item : m_items)
+  for (const CaseItem &item : m_items) {
+    ASSERT(item.body != nullptr);
     item.body->analyze(actx, false);
+  }
 }
 
 BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
@@ -1267,6 +1339,8 @@ fn BraceGroup::to_string() const -> String { return "BraceGroup"; }
 
 fn BraceGroup::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_body != nullptr);
+
   let const pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
@@ -1280,6 +1354,8 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const -> i64
 
 fn BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
 {
+  ASSERT(m_body != nullptr);
+
   m_body->analyze(actx, is_unconditional);
 }
 
@@ -1293,6 +1369,8 @@ fn Subshell::to_string() const -> String { return "Subshell"; }
 
 fn Subshell::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_body != nullptr);
+
   let const pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
@@ -1300,6 +1378,8 @@ fn Subshell::to_ast_string(usize layer) const -> String
 
 fn Subshell::evaluate_impl(EvalContext &cxt) const -> i64
 {
+  ASSERT(m_body != nullptr);
+
   /* This shell has no process-level subshell, so isolate by snapshot. A cd or
      an assignment inside does not leak, but the exit status propagates. An exit
      inside ends only the subshell. */
@@ -1335,6 +1415,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const -> i64
 
 fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
 {
+  ASSERT(m_body != nullptr);
+
   m_body->analyze(actx, is_unconditional);
 }
 
@@ -1361,6 +1443,8 @@ fn FunctionDefinition::to_string() const -> String
 
 fn FunctionDefinition::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_body != nullptr);
+
   let const pad = indent_for_layer(layer);
   return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
          m_body->to_ast_string(layer + 1);
@@ -1368,6 +1452,8 @@ fn FunctionDefinition::to_ast_string(usize layer) const -> String
 
 fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const -> i64
 {
+  ASSERT(m_body != nullptr);
+
   cxt.register_function(m_name, m_body);
   cxt.set_last_exit_status(0);
   return 0;
@@ -1376,6 +1462,8 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const -> i64
 fn FunctionDefinition::analyze(AnalysisContext &actx,
                                bool is_unconditional) const -> void
 {
+  ASSERT(m_body != nullptr);
+
   unused(is_unconditional);
   actx.defined_functions.add(m_name);
   m_body->analyze(actx, false);
@@ -1389,6 +1477,8 @@ UnaryExpression::~UnaryExpression() { delete m_rhs; }
 
 fn UnaryExpression::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_rhs != nullptr);
+
   let s = String{};
   let pad = String{};
   for (usize i = 0; i < layer; i++) {
@@ -1412,6 +1502,9 @@ BinaryExpression::~BinaryExpression()
 
 fn BinaryExpression::to_ast_string(usize layer) const -> String
 {
+  ASSERT(m_lhs != nullptr);
+  ASSERT(m_rhs != nullptr);
+
   let s = String{};
   let pad = String{};
 
@@ -1517,9 +1610,13 @@ fn Divide::to_string() const -> String { return "/"; }
 /* Custom evaluation, since we can't divide by zero. */
 fn Divide::evaluate_impl(EvalContext &cxt) const -> i64
 {
+  ASSERT(m_lhs != nullptr);
+  ASSERT(m_rhs != nullptr);
+
   let const denom = m_rhs->evaluate(cxt);
   if (denom == 0)
     throw ErrorWithLocation{m_rhs->source_location(), "Division by 0"};
+
   return m_lhs->evaluate(cxt) / denom;
 }
 
@@ -1556,6 +1653,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
 {
   if (m_args.empty()) return;
 
+  ASSERT(m_args[0] != nullptr);
   let const name = static_command_name(m_args[0]);
 
   /* The literal command text, used for the test recognition. A name like [
@@ -1667,13 +1765,17 @@ fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
 
 fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const -> void
 {
-  for (const SimpleCommand *command : m_commands)
+  for (const SimpleCommand *command : m_commands) {
+    ASSERT(command != nullptr);
     command->analyze(actx, is_unconditional);
+  }
 }
 
 fn CompoundListCondition::analyze(AnalysisContext &actx,
                                   bool is_unconditional) const -> void
 {
+  ASSERT(m_cmd != nullptr);
+
   m_cmd->analyze(actx, is_unconditional);
 }
 
@@ -1681,6 +1783,8 @@ fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
     -> void
 {
   for (const CompoundListCondition *node : m_nodes) {
+    ASSERT(node != nullptr);
+
     /* A semicolon or newline node runs whenever the list runs. An && or || node
        runs only depending on the previous command, so it is conditional. */
     let const node_unconditional =
@@ -1692,6 +1796,9 @@ fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
 fn IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
     -> void
 {
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_then != nullptr);
+
   /* The condition always runs to decide the branch. The branches do not. */
   m_condition->analyze(actx, is_unconditional);
   m_then->analyze(actx, false);

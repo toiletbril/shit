@@ -20,6 +20,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   unused(cxt);
   let const &args = ec.args();
+  ASSERT(!args.empty());
 
   /* exec with only redirections changes the shell's own descriptors and
      returns, so the rest of the session inherits them. */
@@ -46,6 +47,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const -> i32
       show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);
     }
+    ASSERT(found.size() > 0);
     program_path = found[0];
   }
 

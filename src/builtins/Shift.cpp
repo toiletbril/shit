@@ -13,6 +13,8 @@ Builtin::Kind Shift::kind() const { return Kind::Shift; }
 
 i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const
 {
+  ASSERT(!ec.args().empty());
+
   i64 count = 1;
   if (ec.args().size() > 1) {
     const ErrorOr<i64> parsed = utils::parse_decimal_integer(ec.args()[1]);

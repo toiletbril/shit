@@ -14,6 +14,8 @@ Builtin::Kind Source::kind() const { return Kind::Source; }
 
 i32 Source::execute(ExecContext &ec, EvalContext &cxt) const
 {
+  ASSERT(!ec.args().empty());
+
   if (ec.args().size() < 2) throw Error{"filename argument is required"};
 
   const std::string path{ec.args()[1].c_str(), ec.args()[1].size()};

@@ -146,16 +146,24 @@ fn Lexer::peek_shell_token() -> Token *
 fn Lexer::next_expression_token() -> Token *
 {
   skip_whitespace();
+
   Token *const t = lex_expression_token();
+  ASSERT(t != NULL);
+
   advance_past_last_peek();
+
   return t;
 }
 
 fn Lexer::next_shell_token() -> Token *
 {
   skip_whitespace();
+
   Token *const t = lex_shell_token();
+  ASSERT(t != NULL);
+
   advance_past_last_peek();
+
   return t;
 }
 
@@ -172,6 +180,8 @@ fn Lexer::set_arena(BumpArena &arena) -> void { m_arena = &arena; }
 
 fn Lexer::advance_past_last_peek() -> usize
 {
+  ASSERT(m_cursor_position + m_cached_offset <= m_source.length());
+
   const usize r = advance_forward(m_cached_offset);
   m_cached_offset = 0;
 
@@ -189,8 +199,11 @@ fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
     -> const std::string *
 {
   std::string *body = new std::string{};
+  ASSERT(body != NULL);
+
   m_heredoc_bodies.push(body);
   m_pending_heredocs.push({String{delimiter}, strip_tabs, body});
+
   return body;
 }
 
@@ -204,6 +217,8 @@ fn Lexer::collect_pending_heredocs() -> void
       if (m_cursor_position >= m_source.length()) break;
 
       const usize line_start = m_cursor_position;
+      ASSERT(line_start <= m_source.length());
+
       usize i = line_start;
       while (i < m_source.length() && m_source[i] != '\n')
         i++;
@@ -267,7 +282,10 @@ fn Lexer::lex_shell_token() -> Token *
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
 
+  ASSERT(t != NULL);
+
   m_last_shell_token_was_newline = (t->kind() == Token::Kind::Newline);
+
   return t;
 }
 
@@ -318,6 +336,8 @@ fn Lexer::lex_number() -> Token *
 
   Token *const num = m_arena->create<tokens::Number>(
       here(m_cursor_position, length), digits);
+  ASSERT(num != NULL);
+
   m_cached_offset = length;
 
   return num;
@@ -588,6 +608,7 @@ fn Lexer::lex_identifier() -> Token *
 
   const usize actual_cursor_position =
       m_cursor_position + escaped_newline_count;
+  ASSERT(actual_cursor_position <= m_source.length());
 
   if (m_should_collect_debug_words &&
       m_cursor_position != m_last_collected_word_position)
@@ -668,6 +689,8 @@ static fn lookup_operator(char ch) -> Maybe<Token::Kind>
 fn Lexer::lex_sentinel() -> Token *
 {
   const char ch = chop_character();
+  ASSERT(ch != lexer::CEOF);
+
   usize extra_length = 0;
 
   Token *tok{};
@@ -741,6 +764,8 @@ fn Lexer::lex_sentinel() -> Token *
         s
     };
   }
+
+  ASSERT(tok != NULL);
 
   m_cached_offset = 1 + extra_length;
 

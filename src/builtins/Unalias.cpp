@@ -23,6 +23,8 @@ i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  ASSERT(!args.empty());
+
   if (FLAG_ALL.is_enabled()) {
     /* alias_definitions yields name='value', so the name ends at the equals. */
     for (const String &definition : cxt.alias_definitions()) {

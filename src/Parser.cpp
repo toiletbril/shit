@@ -192,6 +192,7 @@ fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     if (should_parse_command) {
       /* A leading ! negates the pipeline that follows. */
       std::unique_ptr<Token> maybe_negation{m_lexer.peek_shell_token()};
+      ASSERT(maybe_negation != NULL);
       if (is_negation_token(maybe_negation.get())) {
         m_lexer.advance_past_last_peek();
         should_negate_pending = true;
@@ -202,6 +203,7 @@ fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     }
 
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
+    ASSERT(token != NULL);
 
     /* A terminator keyword ends this list. Append the pending command and leave
        the terminator for the caller to consume. */
@@ -298,6 +300,7 @@ fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
         if (rhs) {
           pipeline->append_command(require_simple_in_pipeline(std::move(rhs)));
           last_pipe_token.reset(m_lexer.peek_shell_token());
+          ASSERT(last_pipe_token != NULL);
           if (last_pipe_token->kind() == Token::Kind::Pipe) {
             m_lexer.advance_past_last_peek();
             continue;
@@ -363,6 +366,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
 
     if (op_kind != Token::Kind::Less) {
       std::unique_ptr<Token> after{m_lexer.peek_shell_token()};
+      ASSERT(after != NULL);
       if (after->kind() == Token::Kind::Ampersand &&
           after->source_location().position ==
               op_location.position + op_location.length)
@@ -393,6 +397,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
     }
 
     std::unique_ptr<Token> target{m_lexer.next_shell_token()};
+    ASSERT(target != NULL);
     if (target->kind() != Token::Kind::Word) {
       throw ErrorWithLocation{target->source_location(),
                               "Expected a filename after the redirection"};
@@ -409,6 +414,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
 
   for (;;) {
     std::unique_ptr<Token> token{m_lexer.peek_shell_token()};
+    ASSERT(token != NULL);
 
     /* A reserved word or a group opener in command position introduces a
        compound command. A list terminator means there is no command here. */
@@ -472,6 +478,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
           const SourceLocation word_location = token->source_location();
           m_lexer.advance_past_last_peek();
           std::unique_ptr<Token> next{m_lexer.peek_shell_token()};
+          ASSERT(next != NULL);
           const Token::Kind nk = next->kind();
           if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
                nk == Token::Kind::Less) &&
@@ -520,6 +527,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
       /* Peek the next token. A compound list condition, a compound terminator,
        * or the end of input means the assignment stands alone. */
       std::unique_ptr<Token> next{m_lexer.peek_shell_token()};
+      ASSERT(next != NULL);
       if (next->flags() & Token::Flag::CompoundList ||
           next->kind() == Token::Kind::EndOfFile ||
           is_compound_terminator(next->kind()))
@@ -550,6 +558,7 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
       if (!source_location) source_location = op_location;
 
       std::unique_ptr<Token> delimiter_token{m_lexer.next_shell_token()};
+      ASSERT(delimiter_token != NULL);
       if (delimiter_token->kind() != Token::Kind::Word) {
         throw ErrorWithLocation{delimiter_token->source_location(),
                                 "Expected a heredoc delimiter"};
@@ -600,6 +609,8 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
 fn Parser::parse_if() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> if_token{m_lexer.next_shell_token()};
+  ASSERT(if_token != NULL);
+  ASSERT(if_token->kind() == Token::Kind::If);
   const SourceLocation location = if_token->source_location();
 
   ArrayList<std::pair<const Expression *, const Expression *>> branches{};
@@ -618,6 +629,7 @@ fn Parser::parse_if() -> std::unique_ptr<Command>
     std::unique_ptr<Expression> condition{
         parse_command_list({Token::Kind::Then})};
     std::unique_ptr<Token> then_token{m_lexer.next_shell_token()};
+    ASSERT(then_token != NULL);
     if (then_token->kind() != Token::Kind::Then) {
       const char *const detail = is_empty_list(condition.get())
                                      ? "expected a command for the condition"
@@ -632,11 +644,13 @@ fn Parser::parse_if() -> std::unique_ptr<Command>
         condition.release(), body.release()});
 
     std::unique_ptr<Token> after{m_lexer.next_shell_token()};
+    ASSERT(after != NULL);
     if (after->kind() == Token::Kind::Elif) {
       continue;
     } else if (after->kind() == Token::Kind::Else) {
       otherwise = parse_command_list({Token::Kind::Fi}).release();
       std::unique_ptr<Token> fi_token{m_lexer.next_shell_token()};
+      ASSERT(fi_token != NULL);
       if (fi_token->kind() != Token::Kind::Fi) {
         throw_unterminated(location, "Unterminated if", m_lexer.source(), "fi",
                            fi_token->source_location());
@@ -661,10 +675,12 @@ fn Parser::parse_if() -> std::unique_ptr<Command>
 fn Parser::parse_while_or_until(bool is_until) -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
+  ASSERT(keyword != NULL);
   const SourceLocation location = keyword->source_location();
 
   std::unique_ptr<Expression> condition{parse_command_list({Token::Kind::Do})};
   std::unique_ptr<Token> do_token{m_lexer.next_shell_token()};
+  ASSERT(do_token != NULL);
   if (do_token->kind() != Token::Kind::Do) {
     const char *const detail = is_empty_list(condition.get())
                                    ? "expected a command for the loop condition"
@@ -675,6 +691,7 @@ fn Parser::parse_while_or_until(bool is_until) -> std::unique_ptr<Command>
 
   std::unique_ptr<Expression> body{parse_command_list({Token::Kind::Done})};
   std::unique_ptr<Token> done_token{m_lexer.next_shell_token()};
+  ASSERT(done_token != NULL);
   if (done_token->kind() != Token::Kind::Done) {
     throw_unterminated(location, "Unterminated loop", m_lexer.source(), "done",
                        done_token->source_location());
@@ -687,9 +704,11 @@ fn Parser::parse_while_or_until(bool is_until) -> std::unique_ptr<Command>
 fn Parser::parse_for() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
+  ASSERT(keyword != NULL);
   const SourceLocation location = keyword->source_location();
 
   std::unique_ptr<Token> name_token{m_lexer.next_shell_token()};
+  ASSERT(name_token != NULL);
   if (name_token->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
@@ -707,11 +726,13 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
 
   /* An optional 'in WORDS' clause. The word 'in' is not a keyword token. */
   std::unique_ptr<Token> peeked{m_lexer.peek_shell_token()};
+  ASSERT(peeked != NULL);
   if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
     m_lexer.advance_past_last_peek();
     has_in_clause = true;
     for (;;) {
       std::unique_ptr<Token> word{m_lexer.peek_shell_token()};
+      ASSERT(word != NULL);
       if (word->kind() != Token::Kind::Word) break;
       m_lexer.advance_past_last_peek();
       words.push(word.release());
@@ -721,6 +742,7 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
   /* Skip the separators between the header and 'do'. */
   for (;;) {
     std::unique_ptr<Token> t{m_lexer.peek_shell_token()};
+    ASSERT(t != NULL);
     if (t->kind() == Token::Kind::Semicolon ||
         t->kind() == Token::Kind::Newline)
     {
@@ -731,6 +753,7 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
   }
 
   std::unique_ptr<Token> do_token{m_lexer.next_shell_token()};
+  ASSERT(do_token != NULL);
   if (do_token->kind() != Token::Kind::Do) {
     String detail = "expected 'do'";
     if (!has_in_clause) {
@@ -743,6 +766,7 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
 
   std::unique_ptr<Expression> body{parse_command_list({Token::Kind::Done})};
   std::unique_ptr<Token> done_token{m_lexer.next_shell_token()};
+  ASSERT(done_token != NULL);
   if (done_token->kind() != Token::Kind::Done) {
     throw_unterminated(location, "Unterminated for loop", m_lexer.source(),
                        "done", done_token->source_location());
@@ -756,15 +780,18 @@ fn Parser::parse_for() -> std::unique_ptr<Command>
 fn Parser::parse_case() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> keyword{m_lexer.next_shell_token()};
+  ASSERT(keyword != NULL);
   const SourceLocation location = keyword->source_location();
 
   std::unique_ptr<Token> word{m_lexer.next_shell_token()};
+  ASSERT(word != NULL);
   if (word->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{word->source_location(),
                             "Expected a word to match on after 'case'"};
   }
 
   std::unique_ptr<Token> in_token{m_lexer.next_shell_token()};
+  ASSERT(in_token != NULL);
   if (!(in_token->kind() == Token::Kind::Word &&
         in_token->raw_string() == "in"))
   {
@@ -786,6 +813,7 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
 
   for (;;) {
     std::unique_ptr<Token> t{m_lexer.peek_shell_token()};
+    ASSERT(t != NULL);
 
     if (t->kind() == Token::Kind::Newline ||
         t->kind() == Token::Kind::Semicolon)
@@ -810,6 +838,7 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
 
     for (;;) {
       std::unique_ptr<Token> pattern{m_lexer.next_shell_token()};
+      ASSERT(pattern != NULL);
 
       if (pattern->kind() != Token::Kind::Word) {
         throw ErrorWithLocationAndDetails{
@@ -820,6 +849,7 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
       patterns.push(pattern.release());
 
       std::unique_ptr<Token> separator{m_lexer.next_shell_token()};
+      ASSERT(separator != NULL);
 
       if (separator->kind() == Token::Kind::Pipe) continue;
       if (separator->kind() == Token::Kind::RightParen) break;
@@ -833,6 +863,7 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
     items.push(CaseItem{std::move(patterns), body.release()});
 
     std::unique_ptr<Token> after{m_lexer.peek_shell_token()};
+    ASSERT(after != NULL);
     if (after->kind() == Token::Kind::DoubleSemicolon) {
       m_lexer.advance_past_last_peek();
     } else if (after->kind() == Token::Kind::Esac) {
@@ -848,11 +879,14 @@ fn Parser::parse_case() -> std::unique_ptr<Command>
 fn Parser::parse_brace_group() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
+  ASSERT(open != NULL);
+  ASSERT(open->kind() == Token::Kind::LeftBracket);
 
   std::unique_ptr<Expression> body{
       parse_command_list({Token::Kind::RightBracket})};
 
   std::unique_ptr<Token> close{m_lexer.next_shell_token()};
+  ASSERT(close != NULL);
   if (close->kind() != Token::Kind::RightBracket) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated brace group",
@@ -866,11 +900,14 @@ fn Parser::parse_brace_group() -> std::unique_ptr<Command>
 fn Parser::parse_subshell() -> std::unique_ptr<Command>
 {
   std::unique_ptr<Token> open{m_lexer.next_shell_token()};
+  ASSERT(open != NULL);
+  ASSERT(open->kind() == Token::Kind::LeftParen);
 
   std::unique_ptr<Expression> body{
       parse_command_list({Token::Kind::RightParen})};
 
   std::unique_ptr<Token> close{m_lexer.next_shell_token()};
+  ASSERT(close != NULL);
   if (close->kind() != Token::Kind::RightParen) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated subshell",
@@ -884,6 +921,7 @@ fn Parser::parse_subshell() -> std::unique_ptr<Command>
 fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
     -> std::unique_ptr<Command>
 {
+  ASSERT(name_token != NULL);
   const SourceLocation location = name_token->source_location();
   const String name = name_token->raw_string();
 
@@ -891,6 +929,7 @@ fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
    */
   m_lexer.advance_past_last_peek();
   std::unique_ptr<Token> close{m_lexer.next_shell_token()};
+  ASSERT(close != NULL);
   if (close->kind() != Token::Kind::RightParen) {
     throw ErrorWithLocation{close->source_location(),
                             "Expected ')' in a function definition"};
@@ -899,6 +938,7 @@ fn Parser::parse_function_definition(std::unique_ptr<Token> name_token)
   /* Skip newlines before the body. */
   for (;;) {
     std::unique_ptr<Token> t{m_lexer.peek_shell_token()};
+    ASSERT(t != NULL);
     if (t->kind() != Token::Kind::Newline) break;
     m_lexer.advance_past_last_peek();
   }
@@ -927,6 +967,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
   defer { m_recursion_depth--; };
 
   std::unique_ptr<Token> t{m_lexer.next_expression_token()};
+  ASSERT(t != NULL);
 
   if (m_recursion_depth > MAX_RECURSION_DEPTH) {
     throw ErrorWithLocation{
@@ -954,6 +995,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
     std::unique_ptr<Expression> condition = parse_expression();
 
     std::unique_ptr<Token> after{m_lexer.next_expression_token()};
+    ASSERT(after != NULL);
     if (after->kind() == Token::Kind::Semicolon) {
       after.reset(m_lexer.next_expression_token());
     }
@@ -1005,6 +1047,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
     m_parentheses_depth--;
 
     std::unique_ptr<Token> rp{m_lexer.next_expression_token()};
+    ASSERT(rp != NULL);
     if (rp->kind() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated parenthesis",
@@ -1037,6 +1080,7 @@ fn Parser::parse_expression(u8 min_precedence) -> std::unique_ptr<Expression>
    * higher precedence. */
   for (;;) {
     std::unique_ptr<Token> maybe_op{m_lexer.peek_expression_token()};
+    ASSERT(maybe_op != NULL);
 
     /* Check for tokens that terminate the parser. */
     switch (maybe_op->kind()) {

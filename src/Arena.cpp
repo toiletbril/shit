@@ -32,6 +32,9 @@ fn BumpArena::add_block(usize minimum_size) -> void
   let const base = static_cast<u8 *>(std::malloc(size));
   if (base == nullptr) throw std::bad_alloc{};
 
+  ASSERT(size >= minimum_size,
+         "fresh block must fit the requested allocation");
+
   m_blocks.push_back(Block{base, size, 0});
 }
 
@@ -41,12 +44,17 @@ fn BumpArena::allocate(usize size, usize alignment) -> void *
     if (!m_blocks.empty()) {
       Block &block = m_blocks.back();
       const usize aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
+
       if (aligned + size <= block.size) {
+        ASSERT(block.base != NULL);
+
         void *const pointer = block.base + aligned;
         block.used = aligned + size;
+
         return pointer;
       }
     }
+
     add_block(size + alignment);
   }
 }
@@ -68,13 +76,19 @@ fn BumpArena::mark() const -> BumpArena::Mark
 
 fn BumpArena::release(Mark saved) -> void
 {
+  ASSERT(saved.block_count <= m_blocks.size(),
+         "mark cannot name more blocks than the arena holds");
+
   /* Reset the bump pointer to the marked position, keeping the blocks so a loop
      body reuses the same storage each turn instead of asking the system again.
      The blocks past the mark stay allocated but become free space. */
   for (usize i = saved.block_count; i < m_blocks.size(); i++)
     m_blocks[i].used = 0;
-  if (saved.block_count > 0)
+
+  if (saved.block_count > 0) {
+    ASSERT(saved.used_in_last <= m_blocks[saved.block_count - 1].size);
     m_blocks[saved.block_count - 1].used = saved.used_in_last;
+  }
 }
 
 fn BumpArena::reset() -> void

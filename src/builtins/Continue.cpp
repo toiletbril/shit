@@ -10,6 +10,8 @@ fn Continue::kind() const -> Builtin::Kind { return Kind::Continue; }
 
 fn Continue::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
+  ASSERT(!ec.args().empty());
+
   /* The optional argument is how many enclosing loops to skip, default one. */
   i64 level = 1;
   if (ec.args().size() > 1) {

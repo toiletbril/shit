@@ -85,11 +85,13 @@ fn FlagManyStrings::size() const -> usize { return m_values.size(); }
 
 fn FlagManyStrings::get(usize i) const -> StringView
 {
+  ASSERT(i < m_values.size());
   return m_values[i].view();
 }
 
 fn FlagManyStrings::next() -> StringView
 {
+  ASSERT(m_value_position < m_values.size());
   const String &value = m_values[m_value_position++];
   return value.view();
 }
@@ -338,6 +340,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
   /* Previous flag expected a value after space. */
   if (next_arg_is_value) {
+    ASSERT(prev_flag != NULL);
     throw Error{"No value provided for '" + flag_name(prev_flag, prev_is_long) +
                 "' flag"};
   }
@@ -388,6 +391,7 @@ fn show_version() -> void
   s += '\n';
   s += "(c) toiletbril <https://github.com/toiletbril>";
   s += '\n';
+
   print(s);
   flush();
 }
@@ -403,6 +407,7 @@ fn show_short_version() -> void
   s += '-';
   s += SHIT_VER_EXTRA;
   s += '\n';
+
   print(s);
   flush();
 }

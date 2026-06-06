@@ -23,6 +23,8 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const
   const ArrayList<String> names = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };
 
+  ASSERT(!names.empty());
+
   const bool unset_function = FLAG_UNSET_FUNCTION.is_enabled();
   for (usize i = 1; i < names.size(); i++) {
     const String &name = names[i];

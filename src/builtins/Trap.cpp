@@ -34,6 +34,7 @@ String normalize_condition(StringView raw)
 i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const
 {
   const ArrayList<String> &args = ec.args();
+  ASSERT(!args.empty());
 
   if (args.size() == 1) {
     String out{};
@@ -48,6 +49,7 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
+  ASSERT(args.size() > 1);
   const String &action = args[1];
   /* A lone dash resets the named conditions to their defaults. */
   const bool is_reset = action == "-";

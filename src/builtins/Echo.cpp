@@ -13,6 +13,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const -> i32
   unused(cxt);
 
   let const &args = ec.args();
+  ASSERT(!args.empty());
 
   /* Match dash, where only a leading -n is an option and everything after it,
      including -e, is literal text, and backslash escapes are always

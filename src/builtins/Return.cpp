@@ -10,6 +10,8 @@ Builtin::Kind Return::kind() const { return Kind::Return; }
 
 i32 Return::execute(ExecContext &ec, EvalContext &cxt) const
 {
+  ASSERT(!ec.args().empty());
+
   /* return with no argument uses the status of the last command. */
   i64 status = cxt.last_exit_status();
   if (ec.args().size() > 1) {

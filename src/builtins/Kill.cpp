@@ -22,6 +22,7 @@ fn Kill::kind() const -> Builtin::Kind { return Kind::Kill; }
 fn Kill::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
   let const &args = ec.args();
+  ASSERT(!args.empty());
 
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
@@ -61,6 +62,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const -> i32
         status = 1;
         continue;
       }
+      ASSERT(job != NULL);
       pid = job->pid;
     } else {
       const ErrorOr<i64> parsed = utils::parse_decimal_integer(target);

@@ -13,6 +13,8 @@ fn Eval::kind() const -> Builtin::Kind { return Kind::Eval; }
 
 fn Eval::execute(ExecContext &ec, EvalContext &cxt) const -> i32
 {
+  ASSERT(!ec.args().empty());
+
   let joined = std::string{};
   for (usize i = 1; i < ec.args().size(); i++) {
     if (i > 1) joined += ' ';
