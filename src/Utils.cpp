@@ -14,7 +14,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <list>
 #include <optional>
 
 /* FIXME: std::filesystem::exists() is VERY slow. */
@@ -465,13 +464,13 @@ initialize_path_map()
   }
 }
 
-std::list<std::filesystem::path>
+ArrayList<std::filesystem::path>
 search_and_cache(const std::string &program_name)
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
-  if (!MAYBE_PATH) return {};
+  if (!MAYBE_PATH) return ArrayList<std::filesystem::path>{};
 
-  std::list<std::filesystem::path> result{};
+  ArrayList<std::filesystem::path> result{};
 
   for (std::string &dir_string : split_path_dirs(*MAYBE_PATH)) {
     bool is_valid_dir = false;
@@ -512,24 +511,24 @@ search_and_cache(const std::string &program_name)
 
         if (std::filesystem::exists(try_path)) {
           cache_resolved_path(StringView{key.data(), key.size()}, try_path);
-          result.emplace_back(try_path);
+          result.push(std::filesystem::path{try_path});
         }
       }
     } else if (std::filesystem::exists(full_path)) {
       cache_resolved_path(StringView{key.data(), key.size()},
                           full_path.string());
-      result.emplace_back(full_path);
+      result.push(std::move(full_path));
     }
   }
 
   return result;
 }
 
-std::list<std::filesystem::path>
+ArrayList<std::filesystem::path>
 search_program_path(const std::string &program_name)
 {
   std::string sp{program_name};
-  std::list<std::filesystem::path> result{};
+  ArrayList<std::filesystem::path> result{};
 
   os::erase_extension_and_get_its_index(sp);
 
@@ -540,11 +539,11 @@ search_program_path(const std::string &program_name)
       const String &path_string = (*cached)[i];
       std::filesystem::path tp{
           std::string{path_string.c_str(), path_string.size()}};
-      if (std::filesystem::exists(tp)) result.emplace_back(std::move(tp));
+      if (std::filesystem::exists(tp)) result.push(std::move(tp));
     }
   }
 
-  if (result.empty()) {
+  if (result.size() == 0) {
     result = search_and_cache(program_name);
   }
 

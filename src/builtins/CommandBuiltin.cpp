@@ -45,12 +45,12 @@ CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n" : name + "\n");
       return 0;
     }
-    if (std::list<std::filesystem::path> paths =
+    if (ArrayList<std::filesystem::path> paths =
             utils::search_program_path(name);
-        !paths.empty())
+        paths.size() != 0)
     {
-      ec.print_to_stdout(verbose ? name + " is " + paths.front().string() + "\n"
-                                 : paths.front().string() + "\n");
+      ec.print_to_stdout(verbose ? name + " is " + paths[0].string() + "\n"
+                                 : paths[0].string() + "\n");
       return 0;
     }
     if (verbose) ec.print_to_stdout(name + ": not found\n");

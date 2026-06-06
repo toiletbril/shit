@@ -38,7 +38,7 @@ Which::execute(ExecContext &ec, EvalContext &cxt) const
          the name, which stays machine readable. */
       if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
-    } else if (std::list<std::filesystem::path> ps =
+    } else if (ArrayList<std::filesystem::path> ps =
                    utils::search_program_path(args[i]);
                ps.size() != 0)
     {
@@ -48,7 +48,7 @@ Which::execute(ExecContext &ec, EvalContext &cxt) const
           buf += '\n';
         }
       } else {
-        buf += ps.front().string();
+        buf += ps[0].string();
         buf += '\n';
       }
     }

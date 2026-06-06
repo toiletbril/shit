@@ -6,7 +6,6 @@
 #include "../Utils.hpp"
 
 #include <filesystem>
-#include <list>
 
 /* exec replaces the shell with the named program, so it does not fork. With no
    command it applies its redirections to the shell itself and returns. exec
@@ -49,13 +48,13 @@ Exec::execute(ExecContext &ec, EvalContext &cxt) const
     }
     program_path = resolved.take();
   } else {
-    std::list<std::filesystem::path> found =
+    ArrayList<std::filesystem::path> found =
         utils::search_program_path(command_name);
-    if (found.empty()) {
+    if (found.size() == 0) {
       show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);
     }
-    program_path = found.front();
+    program_path = found[0];
   }
 
   std::vector<std::string> command_args{args.begin() + 1, args.end()};

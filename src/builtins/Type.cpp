@@ -39,11 +39,11 @@ Type::execute(ExecContext &ec, EvalContext &cxt) const
       out += name + " is a shell function\n";
     } else if (search_builtin(name).has_value()) {
       out += name + " is a shell builtin\n";
-    } else if (std::list<std::filesystem::path> paths =
+    } else if (ArrayList<std::filesystem::path> paths =
                    utils::search_program_path(name);
-               !paths.empty())
+               paths.size() != 0)
     {
-      out += name + " is " + paths.front().string() + "\n";
+      out += name + " is " + paths[0].string() + "\n";
     } else {
       out += name + ": not found\n";
       all_found = false;

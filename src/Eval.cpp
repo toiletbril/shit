@@ -2091,8 +2091,8 @@ ExecContext::make_from(SourceLocation location,
 
     if (!bk) {
       /* Not a builtin, try to search PATH. */
-      std::list<std::filesystem::path> ps = utils::search_program_path(program);
-      if (ps.size() > 0) p = ps.front();
+      ArrayList<std::filesystem::path> ps = utils::search_program_path(program);
+      if (ps.size() > 0) p = ps[0];
     }
   } else {
     /* This is a path. */

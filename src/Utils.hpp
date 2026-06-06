@@ -7,7 +7,6 @@
 #include "Tokens.hpp"
 
 #include <filesystem>
-#include <list>
 #include <optional>
 #include <string>
 #include <variant>
@@ -73,7 +72,7 @@ void initialize_path_map();
 void clear_path_map();
 
 /* Searches PATH for program binary. Returns absolute paths to the program. */
-std::list<std::filesystem::path>
+ArrayList<std::filesystem::path>
 search_program_path(const std::string &program_name);
 
 void set_current_directory(const std::filesystem::path &path);
