@@ -258,7 +258,7 @@ main(int argc, char **argv)
 #endif
 
   bool is_login_shell = false;
-  std::vector<std::string> file_names{};
+  shit::ArrayList<shit::String> file_names{};
 
   try {
     file_names = shit::parse_flags(FLAG_LIST, argc, argv);
@@ -271,8 +271,13 @@ main(int argc, char **argv)
   std::string program_path{};
 
   if (file_names.size() > 0) {
-    program_path = file_names[0];
-    file_names.erase(file_names.begin());
+    program_path = std::string{file_names[0].c_str(), file_names[0].size()};
+    /* Drop the program path, the first element. The list has no erase, so the
+       rest is rebuilt from the second element on. */
+    shit::ArrayList<shit::String> rest{};
+    for (usize i = 1; i < file_names.size(); i++)
+      rest.push(shit::String{shit::heap_allocator(), file_names[i]});
+    file_names = std::move(rest);
   } else {
     program_path = "<unknown>";
   }
@@ -350,7 +355,7 @@ main(int argc, char **argv)
      a std::vector, so they are copied into the ArrayList the context holds. */
   shit::ArrayList<shit::String> positional_params{};
   positional_params.reserve(file_names.size());
-  for (const std::string &file_name : file_names)
+  for (const shit::String &file_name : file_names)
     positional_params.push(shit::String{
         shit::heap_allocator(),
         shit::StringView{file_name.data(), file_name.size()}
@@ -442,10 +447,12 @@ main(int argc, char **argv)
           should_quit = should_quit || should_read_stdin;
           script_contents = shit::utils::read_entire_standard_input();
         } else {
+          std::string file_name{file_names[arg_index].c_str(),
+                                file_names[arg_index].size()};
           shit::Maybe<std::string> contents =
-              shit::utils::read_entire_file(file_names[arg_index]);
+              shit::utils::read_entire_file(file_name);
           if (!contents) {
-            throw shit::Error{"Could not open '" + file_names[arg_index] +
+            throw shit::Error{"Could not open '" + file_name +
                               "': " + shit::os::last_system_error_message()};
           }
           script_contents = *contents;

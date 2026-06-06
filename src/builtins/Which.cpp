@@ -25,21 +25,22 @@ Which::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   std::string buf{};
 
   for (usize i = 1; i < args.size(); i++) {
-    if (search_builtin(args[i]).has_value()) {
-      buf += args[i];
+    std::string program_name{args[i].c_str(), args[i].size()};
+    if (search_builtin(program_name).has_value()) {
+      buf += program_name;
       /* The descriptive suffix is for a human at a terminal. A pipe gets just
          the name, which stays machine readable. */
       if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
     } else if (ArrayList<std::filesystem::path> ps =
-                   utils::search_program_path(args[i]);
+                   utils::search_program_path(program_name);
                ps.size() != 0)
     {
       if (FLAG_ALL.is_enabled()) {

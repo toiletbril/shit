@@ -54,7 +54,7 @@ Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -77,7 +77,7 @@ Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
     return 0;
   }
 
-  const std::string &requested = args[1];
+  const String &requested = args[1];
   if (requested == "unlimited") {
     limit.rlim_cur = RLIM_INFINITY;
     limit.rlim_max = RLIM_INFINITY;
@@ -103,7 +103,7 @@ Ulimit::execute(ExecContext &ec, EvalContext &cxt) const
 {
   SHIT_UNUSED(cxt);
 
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* This platform does not expose resource limits, so report unlimited. */

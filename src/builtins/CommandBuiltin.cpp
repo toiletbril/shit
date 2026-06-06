@@ -29,17 +29,14 @@ CommandBuiltin::kind() const
 i32
 CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> raw_args{};
-  for (usize i = 0; i < ec.args().size(); i++)
-    raw_args.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
-  std::vector<std::string> args = parse_flags_vec(FLAG_LIST, raw_args);
+  ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (args.size() < 2) return 0;
 
-  const std::string &name = args[1];
+  std::string name{args[1].c_str(), args[1].size()};
 
   /* -v and -V resolve the name without running it, against a builtin and the
      PATH but not a function, the way command is meant to. */

@@ -200,7 +200,7 @@ find_flag(const ArrayList<Flag *> &flags, const char *flag_start, bool is_long,
   return longest_length > 0;
 }
 
-std::vector<std::string>
+ArrayList<String>
 parse_flags_vec(const ArrayList<Flag *> &flags,
                 const std::vector<std::string> &args)
 {
@@ -214,7 +214,7 @@ parse_flags_vec(const ArrayList<Flag *> &flags,
                      const_cast<char const *const *>(os_argv.data()));
 }
 
-std::vector<std::string>
+ArrayList<String>
 parse_flags_vec(const ArrayList<Flag *> &flags, const ArrayList<String> &args)
 {
   std::vector<const char *> os_argv;
@@ -234,17 +234,17 @@ flag_name(const Flag *f, bool is_long)
                         : std::string{f->short_name()});
 }
 
-std::vector<std::string>
+ArrayList<String>
 parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
 {
   SHIT_ASSERT(argc >= 0);
 
-  if (argc == 0) return {};
+  if (argc == 0) return ArrayList<String>{};
 
   SHIT_ASSERT(argv != nullptr);
 
   u32 position = 0;
-  std::vector<std::string> args{};
+  ArrayList<String> args{};
 
   Flag *prev_flag{};
   bool next_arg_is_value = false;
@@ -266,7 +266,7 @@ parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
     }
 
     if (ignore_rest || argv[i][0] != '-') {
-      args.push_back(argv[i]);
+      args.push(String{heap_allocator(), StringView{argv[i]}});
       continue;
     }
 
@@ -285,7 +285,7 @@ parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv)
       if (is_long)
         ignore_rest = true;
       else
-        args.push_back(argv[i]);
+        args.push(String{heap_allocator(), StringView{argv[i]}});
 
       continue;
     }

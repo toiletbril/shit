@@ -27,7 +27,7 @@ Alias::execute(ExecContext &ec, EvalContext &cxt) const
   std::vector<std::string> raw_args{};
   for (usize i = 0; i < ec.args().size(); i++)
     raw_args.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
-  std::vector<std::string> args = parse_flags_vec(FLAG_LIST, raw_args);
+  ArrayList<String> args = parse_flags_vec(FLAG_LIST, raw_args);
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
@@ -46,7 +46,7 @@ Alias::execute(ExecContext &ec, EvalContext &cxt) const
 
   i32 status = 0;
   for (usize i = 1; i < args.size(); i++) {
-    const std::string &arg = args[i];
+    std::string arg{args[i].c_str(), args[i].size()};
     usize equals_position = arg.find('=');
 
     if (equals_position != std::string::npos) {

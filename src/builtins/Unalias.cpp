@@ -24,7 +24,7 @@ Unalias::kind() const
 i32
 Unalias::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -42,8 +42,10 @@ Unalias::execute(ExecContext &ec, EvalContext &cxt) const
 
   i32 status = 0;
   for (usize i = 1; i < args.size(); i++) {
-    if (!cxt.remove_alias(args[i])) {
-      ec.print_to_stdout(args[i] + ": not found\n");
+    const String &name = args[i];
+    std::string name_string{name.c_str(), name.size()};
+    if (!cxt.remove_alias(name_string)) {
+      ec.print_to_stdout(name_string + ": not found\n");
       status = 1;
     }
   }

@@ -26,7 +26,7 @@ Local::kind() const
 i32
 Local::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -34,7 +34,7 @@ Local::execute(ExecContext &ec, EvalContext &cxt) const
     throw Error{"'local' can only be used inside a function"};
 
   for (usize i = 1; i < args.size(); i++) {
-    const std::string &arg = args[i];
+    std::string arg{args[i].c_str(), args[i].size()};
     usize equals_position = arg.find('=');
 
     /* Record the shadowed binding before overwriting it, so leaving the

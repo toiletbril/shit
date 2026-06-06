@@ -108,11 +108,11 @@ private:
 
 /* These return arguments which are not flags. */
 
-std::vector<std::string> parse_flags_vec(const ArrayList<Flag *> &flags,
+ArrayList<String> parse_flags_vec(const ArrayList<Flag *> &flags,
                                          const std::vector<std::string> &args);
-std::vector<std::string> parse_flags_vec(const ArrayList<Flag *> &flags,
+ArrayList<String> parse_flags_vec(const ArrayList<Flag *> &flags,
                                          const ArrayList<String> &args);
-std::vector<std::string> parse_flags(const ArrayList<Flag *> &flags, int argc,
+ArrayList<String> parse_flags(const ArrayList<Flag *> &flags, int argc,
                                      const char *const *argv);
 
 void reset_flags(const ArrayList<Flag *> &flags);

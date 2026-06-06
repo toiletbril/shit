@@ -25,7 +25,7 @@ Type::kind() const
 i32
 Type::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> args = PARSE_BUILTIN_ARGS(ec);
+  ArrayList<String> args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -33,7 +33,7 @@ Type::execute(ExecContext &ec, EvalContext &cxt) const
   bool all_found = true;
 
   for (usize i = 1; i < args.size(); i++) {
-    const std::string &name = args[i];
+    std::string name{args[i].c_str(), args[i].size()};
 
     if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
       out += name + " is a shell function\n";
