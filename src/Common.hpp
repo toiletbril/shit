@@ -143,13 +143,11 @@ struct t__exit_scope_help
 #define pure
 #endif
 
-/* A free function states wont_throw or may_throw, a method states this_wont_throw
-   or this_may_throw, both written where noexcept goes. They map to the noexcept
-   keyword and its negation. */
-#define wont_throw      noexcept
-#define may_throw       noexcept(false)
-#define this_wont_throw noexcept
-#define this_may_throw  noexcept(false)
+/* Every function and method states wontthrow or throws where noexcept goes, both
+   for free functions and members since noexcept applies to both. They map to the
+   noexcept keyword and its negation. */
+#define wontthrow noexcept
+#define throws    noexcept(false)
 
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";
