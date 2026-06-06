@@ -1,0 +1,74 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "match"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "match"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "default"]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "match"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "z"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "match"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "default"
+]
+[Word
+  Unquoted "esac"
+]
+match
+default
+[Code 0]

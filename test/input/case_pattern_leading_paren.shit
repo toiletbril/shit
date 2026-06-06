@@ -1,0 +1,2 @@
+case a in (a) echo match;; esac
+case b in (a) echo match;; (*) echo default;; esac

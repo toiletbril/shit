@@ -295,6 +295,15 @@ hot fn Lexer::skip_whitespace() wontthrow -> void
   for (;;) {
     while (lexer::is_whitespace(chop_character(i)))
       i++;
+    /* A backslash before a newline continues the line and both bytes vanish.
+       Stripping it here at the token boundary means a continuation between a
+       case-pattern '|' and the next alternative reads as the join it is, the
+       same as dash. A backslash before any other byte is left for the
+       identifier lexer to treat as an escape. */
+    if (chop_character(i) == '\\' && chop_character(i + 1) == '\n') {
+      i += 2;
+      continue;
+    }
     /* A '#' at a token boundary begins a comment that runs to the end of the
        line. The newline is left in place so it still terminates the command,
        and a leading '#!' shebang is just the first such comment. */
