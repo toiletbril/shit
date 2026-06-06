@@ -75,8 +75,8 @@ static fn print_help_or_version_status(const String &program_path)
 {
   if (FLAG_HELP.is_enabled()) {
     String h{};
-    h += "shit, a super-fast and awesome posix-compatible command line "
-         "interpreter\nor an interactive shell for gigachads.\n\n";
+    h += "shit, a pedantic, super-fast and awesome posix-compatible command "
+         "line interpreter\nor a friendly interactive shell for gigachads.\n\n";
     /* make_synopsis remains on the std::string_view Cli boundary, so spell the
        view from the program path String here. */
     h += make_synopsis(
