@@ -87,7 +87,7 @@ using uintptr = uintptr_t;
 #define t__debugtrap()        abort()
 #endif
 
-#define SHIT_USED        t__used
+#define donteliminate        t__used
 #define forceinline t__forceinline
 #define unused(x)   (std::ignore = (x))
 

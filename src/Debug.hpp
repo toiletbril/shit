@@ -31,7 +31,7 @@ class String;
    only at the call site. Debug.hpp can not include String.hpp, since String.hpp
    includes Debug.hpp, so naming String here would close an include cycle. */
 template <class StringT>
-SHIT_USED void t__strprintf(StringT &s, const char *fmt, ...)
+donteliminate void t__strprintf(StringT &s, const char *fmt, ...)
 {
   va_list a;
   va_start(a, fmt);
