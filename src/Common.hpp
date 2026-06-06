@@ -87,9 +87,9 @@ using uintptr = uintptr_t;
 #define t__debugtrap()        abort()
 #endif
 
-#define donteliminate        t__used
-#define forceinline t__forceinline
-#define unused(x)   (std::ignore = (x))
+#define donteliminate t__used
+#define forceinline   t__forceinline
+#define unused(x)     (std::ignore = (x))
 
 #define t__concat_literal(x, y) x##y
 #define concat_literal(x, y)    t__concat_literal(x, y)
@@ -118,7 +118,7 @@ public:
 };
 
 /* Defer a block until the end of the scope. */
-#define defer                                                             \
+#define defer                                                                  \
   const auto &concat_literal(defer__, __LINE__) = t__exit_scope_help() + [&]()
 
 /* Silence enum warnings. */
@@ -148,17 +148,18 @@ public:
 #define pure
 #endif
 
-/* Every function and method states wontthrow or throws where noexcept goes, both
-   for free functions and members since noexcept applies to both. They map to the
-   noexcept keyword and its negation. */
+/* Every function and method states wontthrow or throws where noexcept goes,
+   both for free functions and members since noexcept applies to both. They map
+   to the noexcept keyword and its negation. */
 #define wontthrow noexcept
 #define throws    noexcept(false)
 
 /* Speed hints written before the fn, mapping to clang attributes. cold marks a
    rarely-taken path such as error reporting so the compiler keeps it out of the
-   hot icache, hot marks the evaluation core, flatten inlines a small dispatcher's
-   whole call tree, and noinline pins a large cold body out of line. A branch is
-   hinted with the literal [[likely]]/[[unlikely]] where it occurs. */
+   hot icache, hot marks the evaluation core, flatten inlines a small
+   dispatcher's whole call tree, and noinline pins a large cold body out of
+   line. A branch is hinted with the literal [[likely]]/[[unlikely]] where it
+   occurs. */
 #if T__HAS_GCC_EXTENSIONS
 #define cold     [[gnu::cold]]
 #define hot      [[gnu::hot]]

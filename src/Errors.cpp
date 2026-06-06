@@ -17,12 +17,13 @@ struct precise_location
   usize last_newline_location;
 };
 
-cold static fn calc_precise_position(StringView source, usize byte_position) throws
+cold static fn calc_precise_position(StringView source,
+                                     usize byte_position) throws
     -> precise_location
 {
   ASSERT(byte_position <= source.count(),
-              "byte position: %zu, source length: %zu", byte_position,
-              source.count());
+         "byte position: %zu, source length: %zu", byte_position,
+         source.count());
 
   usize line_number = 0;
   usize last_newline_location = 0;
@@ -48,10 +49,11 @@ cold static fn number_string_length(T n) throws -> usize
 }
 
 cold static fn get_context_pointing_to(StringView source, usize byte_position,
-                                  usize byte_count, usize line_number,
-                                  usize last_newline_location,
-                                  usize unicode_position,
-                                  Maybe<StringView> message) throws -> String
+                                       usize byte_count, usize line_number,
+                                       usize last_newline_location,
+                                       usize unicode_position,
+                                       Maybe<StringView> message) throws
+    -> String
 {
   usize start_offset = byte_position - last_newline_location;
 
@@ -68,12 +70,11 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
   }
 
   ASSERT(byte_position - start_offset + line_byte_count == source.count() ||
-              source[byte_position - start_offset + line_byte_count] == '\n');
+         source[byte_position - start_offset + line_byte_count] == '\n');
 
   /* Add spacer before line number. */
   String msg{};
-  for (usize i = 0; i < sub_sat(6, number_string_length(line_number + 1));
-       i++)
+  for (usize i = 0; i < sub_sat(6, number_string_length(line_number + 1)); i++)
   {
     msg += ' ';
   }
@@ -87,10 +88,27 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
   /* We don't need accidental newlines in the middle of the context.
    * *pulls hair out* */
   ASSERT(!context.find_character('\n').has_value(),
-              "'%s', start: %zu, end: %zu", context.data, start_offset,
-              line_byte_count);
+         "'%s', start: %zu, end: %zu", context.data, start_offset,
+         line_byte_count);
 
-  msg += context;
+  /* A tab is one byte but renders wide, so the caret below, padded by character
+     count, would land short of the token. Each tab is expanded to a fixed width
+     here, and the padding adds the same width per tab, so the caret lines up.
+   */
+  static constexpr usize TAB_WIDTH = 4;
+  for (usize i = 0; i < context.count(); i++) {
+    if (context[i] == '\t')
+      for (usize t = 0; t < TAB_WIDTH; t++)
+        msg += ' ';
+    else
+      msg += context[i];
+  }
+
+  /* The tabs before the error widen the displayed prefix, so the caret padding
+     gains the extra columns each one renders beyond a single character. */
+  usize tabs_before_error = 0;
+  for (usize i = byte_position - start_offset; i < byte_position; i++)
+    if (source[i] == '\t') tabs_before_error++;
 
   /* Calculate proper unicode offsets and lengths for underline. */
   const usize unicode_start_offset_position =
@@ -110,7 +128,8 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
   const usize added_symbols = 10;
 
   const usize underline_padding_length =
-      (unicode_position - unicode_start_offset_position) + added_symbols - 10;
+      (unicode_position - unicode_start_offset_position) +
+      tabs_before_error * (TAB_WIDTH - 1) + added_symbols - 10;
 
   /* Remaining spaces to pad the underline. */
   for (usize i = 0; i < underline_padding_length; i++)
@@ -143,7 +162,10 @@ ErrorBase::operator bool &() throws { return m_is_active; }
 
 cold pure fn ErrorBase::message() const throws -> String { return m_message; }
 
-cold pure fn ErrorBase::severity_word() const wontthrow -> String { return "Error"; }
+cold pure fn ErrorBase::severity_word() const wontthrow -> String
+{
+  return "Error";
+}
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
@@ -156,7 +178,10 @@ Error::operator String() const throws { return to_string(); }
 
 Warning::Warning(StringView message) : Error(message) {}
 
-cold pure fn Warning::severity_word() const wontthrow -> String { return "Warning"; }
+cold pure fn Warning::severity_word() const wontthrow -> String
+{
+  return "Warning";
+}
 
 Note::Note(StringView message) : Error(message) {}
 
@@ -173,8 +198,8 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   const usize byte_count = m_location.length;
 
   ASSERT(byte_position <= source.count(),
-              "byte position: %zu, source length: %zu", byte_position,
-              source.count());
+         "byte position: %zu, source length: %zu", byte_position,
+         source.count());
 
   LOG_VARS(Verbosity::Debug, byte_position, byte_count);
   LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
@@ -184,7 +209,8 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
       source[byte_position + 1] == '\n')
   {
     byte_position += 2;
-  } else if (byte_position + 1 < source.count() && source[byte_position] == '\n')
+  } else if (byte_position + 1 < source.count() &&
+             source[byte_position] == '\n')
   {
     byte_position++;
   }
@@ -234,7 +260,8 @@ cold pure fn WarningWithLocation::severity_word() const wontthrow -> String
   return "Warning";
 }
 
-TraceWithLocation::TraceWithLocation(SourceLocation location, StringView message)
+TraceWithLocation::TraceWithLocation(SourceLocation location,
+                                     StringView message)
     : ErrorWithLocation(location, message)
 {}
 
@@ -250,15 +277,15 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
       m_details_location(details_location), m_details_message(details_message)
 {}
 
-cold fn ErrorWithLocationAndDetails::details_to_string(StringView source) const throws
-    -> String
+cold fn ErrorWithLocationAndDetails::details_to_string(
+    StringView source) const throws -> String
 {
   usize byte_position = m_details_location.position;
   const usize byte_count = m_details_location.length;
 
   ASSERT(byte_position <= source.count(),
-              "byte position: %zu, source length: %zu", byte_position,
-              source.count());
+         "byte position: %zu, source length: %zu", byte_position,
+         source.count());
 
   if (byte_position > 0 && byte_position == source.count() &&
       source[byte_position - 1] == '\n')

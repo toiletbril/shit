@@ -30,7 +30,10 @@ hot pure fn is_whitespace(char ch) wontthrow -> bool
   }
 }
 
-hot pure fn is_number(char ch) wontthrow -> bool { return ch >= '0' && ch <= '9'; }
+hot pure fn is_number(char ch) wontthrow -> bool
+{
+  return ch >= '0' && ch <= '9';
+}
 
 hot pure fn is_expression_sentinel(char ch) wontthrow -> bool
 {
@@ -167,7 +170,10 @@ hot fn Lexer::next_shell_token() throws -> Token *
   return t;
 }
 
-pure fn Lexer::source() const wontthrow -> StringView { return m_source.view(); }
+pure fn Lexer::source() const wontthrow -> StringView
+{
+  return m_source.view();
+}
 
 pure fn Lexer::debug_words() const wontthrow -> const ArrayList<Word> &
 {
@@ -195,8 +201,8 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
   return r;
 }
 
-cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
-    throws -> const std::string *
+cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
+    -> const std::string *
 {
   let body = new std::string{};
   ASSERT(body != nullptr);
@@ -255,10 +261,8 @@ hot fn Lexer::lex_expression_token() throws -> Token *
     else if (lexer::is_part_of_identifier(ch))
       return lex_identifier();
     else
-      throw ErrorWithLocation{
-          here(m_cursor_position, 1),
-          "Unexpected character"
-      };
+      throw ErrorWithLocation{here(m_cursor_position, 1),
+                              "Unexpected character"};
   }
 
   return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
@@ -273,10 +277,8 @@ hot fn Lexer::lex_shell_token() throws -> Token *
     else if (lexer::is_part_of_identifier(ch))
       t = lex_identifier();
     else
-      throw ErrorWithLocation{
-          here(m_cursor_position, 1),
-          "Unexpected character"
-      };
+      throw ErrorWithLocation{here(m_cursor_position, 1),
+                              "Unexpected character"};
   } else {
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
@@ -333,8 +335,8 @@ hot fn Lexer::lex_number() throws -> Token *
     length++;
   }
 
-  Token *const num = m_arena->create<tokens::Number>(
-      here(m_cursor_position, length), digits);
+  Token *const num =
+      m_arena->create<tokens::Number>(here(m_cursor_position, length), digits);
   ASSERT(num != nullptr);
 
   m_cached_offset = length;
@@ -460,9 +462,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
               throw ErrorWithLocationAndDetails{
                   here(m_cursor_position, byte_count),
                   "Unterminated arithmetic expansion",
-                  here(m_cursor_position + byte_count, 1),
-                  "expected )) here"
-              };
+                  here(m_cursor_position + byte_count, 1), "expected )) here"};
             }
             if (c == '(') {
               group_depth++;
@@ -495,9 +495,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position, byte_count),
                 "Unterminated command substitution",
-                here(m_cursor_position + byte_count, 1),
-                "expected ) here"
-            };
+                here(m_cursor_position + byte_count, 1), "expected ) here"};
           }
           byte_count++;
 
@@ -539,9 +537,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position + byte_count, 1),
                 "Unterminated variable expansion",
-                here(m_cursor_position + byte_count, 1),
-                "expected } here"
-            };
+                here(m_cursor_position + byte_count, 1), "expected } here"};
           }
           byte_count++;
           if (c == '}') break;
@@ -565,8 +561,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
         String special{};
         special.push(next);
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       steal(special),
-                                       is_in_double_quotes});
+                                       steal(special), is_in_double_quotes});
       } else {
         /* A dollar sign that names None stays a literal dollar sign. */
         append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
@@ -590,23 +585,17 @@ hot fn Lexer::lex_identifier() throws -> Token *
     throw ErrorWithLocationAndDetails{
         here(m_cursor_position + relative_last_quote_char_pos,
              sub_sat(byte_count, relative_last_quote_char_pos)),
-        "Unterminated string literal",
-        here(m_cursor_position + byte_count, 1),
-        expected_quote
-    };
+        "Unterminated string literal", here(m_cursor_position + byte_count, 1),
+        expected_quote};
   }
 
   if (should_escape) {
     throw ErrorWithLocationAndDetails{
-        here(m_cursor_position + byte_count - 1, 1),
-        "Nothing to escape",
-        here(m_cursor_position + byte_count, 1),
-        "expected a character here"
-    };
+        here(m_cursor_position + byte_count - 1, 1), "Nothing to escape",
+        here(m_cursor_position + byte_count, 1), "expected a character here"};
   }
 
-  const let actual_cursor_position =
-      m_cursor_position + escaped_newline_count;
+  const let actual_cursor_position = m_cursor_position + escaped_newline_count;
   ASSERT(actual_cursor_position <= m_source.length());
 
   if (m_should_collect_debug_words &&
@@ -758,10 +747,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
     s += "unknown operator '";
     s += ch;
     s += "'";
-    throw ErrorWithLocation{
-        here(m_cursor_position, extra_length),
-        s
-    };
+    throw ErrorWithLocation{here(m_cursor_position, extra_length), s};
   }
 
   ASSERT(tok != nullptr);

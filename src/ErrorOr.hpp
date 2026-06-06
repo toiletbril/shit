@@ -152,7 +152,7 @@ private:
    its value otherwise. Used inside a function that itself returns an ErrorOr.
    The name differs from the Maybe UNWRAP, since this one propagates an
    Error rather than None. */
-#define TRY(expr)                                                         \
+#define TRY(expr)                                                              \
   ({                                                                           \
     auto t__result = (expr);                                                   \
     if (t__result.is_error()) return t__result.error();                        \
@@ -161,7 +161,7 @@ private:
 
 /* Build an Error whose message carries the source file and line, for an
    internal failure that should not normally reach the user. */
-#define MAKE_ERROR(msg)                                                   \
+#define MAKE_ERROR(msg)                                                        \
   ::shit::Error                                                                \
   {                                                                            \
     ::shit::String{__FILE__ ":"} +                                             \

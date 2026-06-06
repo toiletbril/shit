@@ -74,8 +74,8 @@ public:
      the lexer fills when the current line ends. The buffer is a std::string
      because the parsed Redirection field that points at it is read as one by
      the Eval layer. */
-  fn register_heredoc(StringView delimiter, bool strip_tabs)
-      throws -> const std::string *;
+  fn register_heredoc(StringView delimiter, bool strip_tabs) throws
+      -> const std::string *;
 
 protected:
   /* Stamp a location in the source being lexed with this lexer's filename, so

@@ -40,8 +40,8 @@ public:
 /* Walk the tree and report. Returns true when execution may proceed, false when
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
-               const HashSet &known_functions, const HashSet &known_aliases)
-    throws -> bool;
+               const HashSet &known_functions,
+               const HashSet &known_aliases) throws -> bool;
 
 class Expression
 {
@@ -76,8 +76,8 @@ public:
   /* The prepass entry per node. The base does None, the command and the
      control flow nodes override it. is_unconditional says whether this node is
      reached on every run, which decides a failure from a warning. */
-  virtual fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void;
+  virtual fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void;
 
 protected:
   virtual fn evaluate_impl(EvalContext &cxt) const throws -> i64 = 0;
@@ -98,8 +98,8 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -214,8 +214,8 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
@@ -253,8 +253,8 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -276,8 +276,8 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -298,8 +298,8 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
@@ -336,8 +336,8 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -356,8 +356,8 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -378,8 +378,8 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -407,8 +407,8 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -425,8 +425,8 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -442,8 +442,8 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -463,8 +463,8 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
-  fn analyze(AnalysisContext &actx, bool is_unconditional) const
-      throws -> void override;
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;

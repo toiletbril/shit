@@ -13,8 +13,8 @@
 namespace shit {
 
 cold fn show_builtin_help_impl(const ExecContext &ec,
-                          const std::vector<std::string> &hs,
-                          const ArrayList<Flag *> &fl) throws -> void
+                               const std::vector<std::string> &hs,
+                               const ArrayList<Flag *> &fl) throws -> void
 {
   ASSERT(!ec.args().is_empty());
 
@@ -27,7 +27,8 @@ cold fn show_builtin_help_impl(const ExecContext &ec,
   ec.print_to_stdout(help_text);
 }
 
-flatten fn search_builtin(std::string_view builtin_name) throws -> Maybe<Builtin::Kind>
+flatten fn search_builtin(std::string_view builtin_name) throws
+    -> Maybe<Builtin::Kind>
 {
   return BUILTINS.find(StringView{builtin_name.data(), builtin_name.size()});
 }
@@ -163,9 +164,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 
   switch (ec.builtin_kind()) {
     BUILTIN_SWITCH_CASES();
-  default:
-    unreachable("Unhandled builtin of kind %d",
-                     ENUM(ec.builtin_kind()));
+  default: unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
   }
 
   /* A builtin runs inside the shell process, so it keeps the shell's own signal

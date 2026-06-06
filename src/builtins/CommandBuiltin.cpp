@@ -27,7 +27,8 @@ pure fn CommandBuiltin::kind() const wontthrow -> Builtin::Kind
   return Kind::CommandBuiltin;
 }
 
-fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
+fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
+    -> i32
 {
   let const args = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };
@@ -44,7 +45,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws -> i3
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    if (search_builtin(std::string_view{name.c_str(), name.count()}).has_value())
+    if (search_builtin(std::string_view{name.c_str(), name.count()})
+            .has_value())
     {
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n"
                                  : name + "\n");

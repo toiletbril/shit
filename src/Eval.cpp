@@ -54,7 +54,8 @@ fn EvalContext::end_command() wontthrow -> void
   m_expansions_last = m_expressions_executed_last = 0;
 }
 
-hot fn EvalContext::assign_variable(StringView name, StringView value) throws -> void
+hot fn EvalContext::assign_variable(StringView name, StringView value) throws
+    -> void
 {
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
@@ -104,7 +105,8 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
-hot fn EvalContext::get_variable_value(StringView name) const throws -> Maybe<String>
+hot fn EvalContext::get_variable_value(StringView name) const throws
+    -> Maybe<String>
 {
   if (name == "?")
     return String{heap_allocator(),
@@ -174,7 +176,8 @@ pure fn EvalContext::positional_params() const wontthrow
   return m_positional_params;
 }
 
-fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow -> void
+fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow
+    -> void
 {
   m_positional_params = steal(params);
 }
@@ -252,8 +255,8 @@ fn EvalContext::set_monitor(bool enabled) wontthrow -> void
 
 pure fn EvalContext::monitor() const wontthrow -> bool { return m_monitor; }
 
-fn EvalContext::register_function(StringView name, const Expression *body) throws
-    -> void
+fn EvalContext::register_function(StringView name,
+                                  const Expression *body) throws -> void
 {
   m_functions.set(name, body);
 }
@@ -305,9 +308,9 @@ cold fn EvalContext::run_exit_trap() throws -> void
   if (m_exit_trap_ran) return;
   m_exit_trap_ran = true;
 
-  /* A Ctrl-C that ended the last command leaves the interrupt flag set. The exit
-     trap runs as the shell winds down and must not be aborted by it, so the flag
-     is dropped before the action evaluates. */
+  /* A Ctrl-C that ended the last command leaves the interrupt flag set. The
+     exit trap runs as the shell winds down and must not be aborted by it, so
+     the flag is dropped before the action evaluates. */
   os::INTERRUPT_REQUESTED = 0;
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
@@ -444,31 +447,30 @@ fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 {
   LOG(Verbosity::Debug, "break requested, level %lld", (long long) level);
   m_control_flow = control_flow{control_flow::Kind::Break, level, location,
-                               m_current_source, String{m_current_origin}};
+                                m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_continue(i64 level, SourceLocation location) throws
     -> void
 {
-  LOG(Verbosity::Debug, "continue requested, level %lld",
-           (long long) level);
+  LOG(Verbosity::Debug, "continue requested, level %lld", (long long) level);
   m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
-                               m_current_source, String{m_current_origin}};
+                                m_current_source, String{m_current_origin}};
 }
 
-fn EvalContext::request_return(i64 status, SourceLocation location) throws -> void
+fn EvalContext::request_return(i64 status, SourceLocation location) throws
+    -> void
 {
-  LOG(Verbosity::Debug, "return requested, status %lld",
-           (long long) status);
+  LOG(Verbosity::Debug, "return requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
-                               m_current_source, String{m_current_origin}};
+                                m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Verbosity::Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
-                               m_current_source, String{m_current_origin}};
+                                m_current_source, String{m_current_origin}};
 }
 
 pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
@@ -492,8 +494,8 @@ fn EvalContext::clear_control_flow() wontthrow -> void
   m_control_flow.kind = control_flow::Kind::Normal;
 }
 
-fn EvalContext::set_current_source(const String *source, String origin) wontthrow
-    -> void
+fn EvalContext::set_current_source(const String *source,
+                                   String origin) wontthrow -> void
 {
   m_current_source = source;
   m_current_origin = steal(origin);
@@ -514,7 +516,10 @@ fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
   m_error_exit = enabled;
 }
 
-pure fn EvalContext::error_exit() const wontthrow -> bool { return m_error_exit; }
+pure fn EvalContext::error_exit() const wontthrow -> bool
+{
+  return m_error_exit;
+}
 
 fn EvalContext::set_echo_expanded(bool enabled) wontthrow -> void
 {
@@ -619,8 +624,8 @@ fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
 
 fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
-  return eval_state_snapshot{m_shell_variables, m_functions, m_positional_params,
-                           Path::current_directory()};
+  return eval_state_snapshot{m_shell_variables, m_functions,
+                             m_positional_params, Path::current_directory()};
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -674,8 +679,8 @@ namespace {
 
 /* Remove the shortest or longest prefix of value that matches pattern as a
    glob, returning the remainder. */
-fn trim_matching_prefix(StringView value, StringView pattern, bool longest) throws
-    -> String
+fn trim_matching_prefix(StringView value, StringView pattern,
+                        bool longest) throws -> String
 {
   let active = ArrayList<bool>{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
@@ -699,8 +704,8 @@ fn trim_matching_prefix(StringView value, StringView pattern, bool longest) thro
 
 /* Remove the shortest or longest suffix of value that matches pattern as a
    glob, returning the head. */
-fn trim_matching_suffix(StringView value, StringView pattern, bool longest) throws
-    -> String
+fn trim_matching_suffix(StringView value, StringView pattern,
+                        bool longest) throws -> String
 {
   let active = ArrayList<bool>{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
@@ -876,9 +881,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (op_index >= rest.length) return expand_variable(name);
 
   let const op = rest[op_index];
-  let const is_doubled =
-      (op_index + 1 < rest.length && rest[op_index + 1] == op &&
-       (op == '#' || op == '%'));
+  let const is_doubled = (op_index + 1 < rest.length &&
+                          rest[op_index + 1] == op && (op == '#' || op == '%'));
   let const word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
   let const current = get_variable_value(name);
@@ -1084,7 +1088,8 @@ namespace {
    without a later ']' is a literal bracket, not a glob, so a field such as the
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
-hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask) wontthrow
+hot pure fn first_active_glob(StringView text,
+                              const ArrayList<bool> &mask) wontthrow
     -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};
@@ -1212,7 +1217,9 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   text = steal(expanded);
 }
 
-hot fn EvalContext::expand_path(glob_field field, SourceLocation location) throws -> ArrayList<String>
+hot fn EvalContext::expand_path(glob_field field,
+                                SourceLocation location) throws
+    -> ArrayList<String>
 {
   let const scratch = scratch_allocator();
 
@@ -1252,8 +1259,8 @@ hot fn EvalContext::expand_path(glob_field field, SourceLocation location) throw
      of expanding to the literal pattern. The caret points at the offending
      word. */
   if (values.count() == 0)
-    throw ErrorWithLocation{location,
-                            "No matches for the glob pattern '" + pattern + "'"};
+    throw ErrorWithLocation{location, "No matches for the glob pattern '" +
+                                          pattern + "'"};
 
   return values;
 }
@@ -1656,7 +1663,8 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
   return parser.parse();
 }
 
-hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field>
+hot fn EvalContext::expand_word(const Word &word) throws
+    -> ArrayList<glob_field>
 {
   let const scratch = scratch_allocator();
 
@@ -1711,7 +1719,8 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field
   };
 
   for (const WordSegment &segment : *segments) {
-    let const segment_text = StringView{segment.text.data(), segment.text.count()};
+    let const segment_text =
+        StringView{segment.text.data(), segment.text.count()};
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
@@ -1743,8 +1752,8 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field
     } break;
 
     case WordSegment::Kind::CommandSubstitution: {
-      let const output = String{heap_allocator(),
-                                capture_command_substitution(segment.text)};
+      let const output =
+          String{heap_allocator(), capture_command_substitution(segment.text)};
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
@@ -1768,7 +1777,8 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field
   return fields;
 }
 
-hot fn EvalContext::expand_word_for_assignment(const Word &word) throws -> String
+hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
+    -> String
 {
   /* Only copy the segments when a leading tilde must be rewritten, so the
      common assignment reads its segments in place with no per-command copy. */
@@ -1888,17 +1898,20 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
   /* The source the call site lives in, captured before set_current_source below
      changes it, so a backtrace caret renders the dot or eval against the parent
-     text rather than the source about to run. It is nullptr when no call site is
-     known, which sends the backtrace to the plain origin message. */
+     text rather than the source about to run. It is nullptr when no call site
+     is known, which sends the backtrace to the plain origin message. */
   let const parent_source = call_site ? m_current_source : nullptr;
 
   /* The frame joins the backtrace stack for the length of this call, so an
      error deep in a nested source prints every call site. The pop runs at
      function scope, after the catch below has read the stack. A frame with no
-     call site stores a zero location, unused because parent_source is nullptr. */
+     call site stores a zero location, unused because parent_source is nullptr.
+   */
   m_source_frames.push(source_frame{
-      String{origin}, call_site ? *call_site : SourceLocation{0, 0},
-      parent_source});
+      String{origin},
+      call_site ? *call_site : SourceLocation{0, 0},
+      parent_source
+  });
   defer { m_source_frames.pop_back(); };
 
   /* The whole chain from the innermost source out to the outermost is printed
@@ -1911,8 +1924,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
       if (frame.parent_source != nullptr) {
         /* A frame is context under the primary error, not an error of its own,
            so it prints with the Trace severity rather than Error. */
-        let const sourced_here = TraceWithLocation{frame.call_site,
-                                                   "sourced here"};
+        let const sourced_here =
+            TraceWithLocation{frame.call_site, "sourced here"};
         show_message(sourced_here.to_string(*frame.parent_source));
       } else {
         show_message("This error was raised while running " + frame.origin +
@@ -2202,6 +2215,5 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
   ASSERT(args.count() > 0);
   return {location, steal(kind), args};
 }
-
 
 } /* namespace shit */

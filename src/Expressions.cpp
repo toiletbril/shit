@@ -34,9 +34,9 @@ cold fn Expression::to_ast_string(usize layer) const throws -> String
 
 hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 {
-  /* A Ctrl-C sets the interrupt flag, and the check here runs before every node,
-     so a running command, including a loop body or condition, stops promptly and
-     control returns to the prompt. */
+  /* A Ctrl-C sets the interrupt flag, and the check here runs before every
+     node, so a running command, including a loop body or condition, stops
+     promptly and control returns to the prompt. */
   if (os::INTERRUPT_REQUESTED) {
     os::INTERRUPT_REQUESTED = 0;
     throw Error{"Interrupted"};
@@ -51,23 +51,23 @@ fn Expression::operator delete(void *pointer) wontthrow -> void
   ::operator delete(pointer);
 }
 
-cold fn AnalysisContext::warn(SourceLocation location, StringView message) throws
-    -> void
+cold fn AnalysisContext::warn(SourceLocation location,
+                              StringView message) throws -> void
 {
   const WarningWithLocation located{location, message};
   show_message(located.to_string(source));
 }
 
-cold fn AnalysisContext::fail(SourceLocation location, StringView message) throws
-    -> void
+cold fn AnalysisContext::fail(SourceLocation location,
+                              StringView message) throws -> void
 {
   const ErrorWithLocation located{location, message};
   show_message(located.to_string(source));
   has_fatal = true;
 }
 
-cold fn Expression::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn Expression::analyze(AnalysisContext &actx,
+                            bool is_unconditional) const throws -> void
 {
   unused(actx);
   unused(is_unconditional);
@@ -147,10 +147,10 @@ fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<glob_scan_byte>
 
 /* A word's bracket expressions are well-formed when every active '[' that opens
    a character class is closed by a later ']'. The scan mirrors the matcher in
-   utils::glob_matches, an active '[' that has no closing ']' is a literal there,
-   so only a '[' that does open a class and never closes raises an error. A lone
-   trailing '[', such as the test command word, opens nothing and stays literal.
-   Returns true when malformed. */
+   utils::glob_matches, an active '[' that has no closing ']' is a literal
+   there, so only a '[' that does open a class and never closes raises an error.
+   A lone trailing '[', such as the test command word, opens nothing and stays
+   literal. Returns true when malformed. */
 fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 {
   const ArrayList<glob_scan_byte> bytes = collect_glob_scan_bytes(word);
@@ -195,8 +195,8 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 } /* namespace */
 
 fn analyze_ast(const Expression *root, StringView source,
-               const HashSet &known_functions, const HashSet &known_aliases)
-    throws -> bool
+               const HashSet &known_functions,
+               const HashSet &known_aliases) throws -> bool
 {
   ASSERT(root != nullptr);
 
@@ -405,8 +405,8 @@ fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     m_redirections.push(redir);
 }
 
-fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
-    throws -> void
+fn SimpleCommand::redirect_exec_context(ExecContext &ec,
+                                        EvalContext &cxt) const throws -> void
 {
   for (const Redirection &redir : m_redirections) {
     if (redir.kind == Redirection::Kind::Heredoc) {
@@ -477,7 +477,8 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
 
 fn SimpleCommand::is_simple_command() const wontthrow -> bool { return true; }
 
-pure fn SimpleCommand::args() const wontthrow -> const ArrayList<const Token *> &
+pure fn SimpleCommand::args() const wontthrow
+    -> const ArrayList<const Token *> &
 {
   return m_args;
 }
@@ -827,7 +828,10 @@ fn CompoundList::append_node(const CompoundListCondition *node) throws -> void
   m_nodes.push(node);
 }
 
-cold fn CompoundList::to_string() const throws -> String { return "CompoundList"; }
+cold fn CompoundList::to_string() const throws -> String
+{
+  return "CompoundList";
+}
 
 cold fn CompoundList::to_ast_string(usize layer) const throws -> String
 {
@@ -932,7 +936,8 @@ cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
+    -> i64
 {
   ASSERT(m_cmd != nullptr);
   let status = m_cmd->evaluate(cxt);
@@ -1016,8 +1021,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
                               "A pipeline stage expanded to no command to run"};
     }
 
-    let ec =
-        ExecContext::make_from(e->source_location(), steal(stage_args));
+    let ec = ExecContext::make_from(e->source_location(), steal(stage_args));
     /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
        its descriptors. The pipe only sets stdin and stdout, so a stderr
        redirection composes with it. */
@@ -1139,8 +1143,8 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
-cold fn IfClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn IfClause::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
 {
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional, since a branch may not be reached. */
@@ -1255,8 +1259,8 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   return ret;
 }
 
-cold fn WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn WhileLoop::analyze(AnalysisContext &actx,
+                           bool is_unconditional) const throws -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1321,8 +1325,8 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   return ret;
 }
 
-cold fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn ForLoop::analyze(AnalysisContext &actx,
+                         bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1403,8 +1407,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
-cold fn CaseClause::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn CaseClause::analyze(AnalysisContext &actx,
+                            bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
   for (const case_item &item : m_items) {
@@ -1436,8 +1440,8 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
   return m_body->evaluate(cxt);
 }
 
-cold fn BraceGroup::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn BraceGroup::analyze(AnalysisContext &actx,
+                            bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1498,8 +1502,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   return ret;
 }
 
-cold fn Subshell::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn Subshell::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1552,7 +1556,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
 }
 
 cold fn FunctionDefinition::analyze(AnalysisContext &actx,
-                               bool is_unconditional) const throws -> void
+                                    bool is_unconditional) const throws -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -1740,8 +1744,8 @@ BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
-cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
-    throws -> void
+cold fn SimpleCommand::analyze(AnalysisContext &actx,
+                               bool is_unconditional) const throws -> void
 {
   if (m_args.is_empty()) return;
 
@@ -1868,8 +1872,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) con
   }
 }
 
-cold fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const throws
-    -> void
+cold fn Pipeline::analyze(AnalysisContext &actx,
+                          bool is_unconditional) const throws -> void
 {
   for (const SimpleCommand *command : m_commands) {
     ASSERT(command != nullptr);
@@ -1878,15 +1882,16 @@ cold fn Pipeline::analyze(AnalysisContext &actx, bool is_unconditional) const th
 }
 
 cold fn CompoundListCondition::analyze(AnalysisContext &actx,
-                                  bool is_unconditional) const throws -> void
+                                       bool is_unconditional) const throws
+    -> void
 {
   ASSERT(m_cmd != nullptr);
 
   m_cmd->analyze(actx, is_unconditional);
 }
 
-cold fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) const
-    throws -> void
+cold fn CompoundList::analyze(AnalysisContext &actx,
+                              bool is_unconditional) const throws -> void
 {
   for (const CompoundListCondition *node : m_nodes) {
     ASSERT(node != nullptr);
@@ -1899,8 +1904,8 @@ cold fn CompoundList::analyze(AnalysisContext &actx, bool is_unconditional) cons
   }
 }
 
-cold fn IfStatement::analyze(AnalysisContext &actx, bool is_unconditional) const
-    throws -> void
+cold fn IfStatement::analyze(AnalysisContext &actx,
+                             bool is_unconditional) const throws -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);

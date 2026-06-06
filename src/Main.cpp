@@ -70,8 +70,7 @@ namespace shit {
 
 /* Print the help or version text and return the exit code when one of those
    flags is set, otherwise None so the shell proceeds to normal startup. */
-static fn print_help_or_version_status(const String &program_path)
-    -> Maybe<int>
+static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
     String h{};
@@ -103,8 +102,7 @@ static fn print_help_or_version_status(const String &program_path)
    the origin it was made in, so the caret points at the exact builtin and the
    note names where it ran. */
 static fn report_escaped_control_flow(EvalContext &context,
-                                      const String &fallback_source)
-    -> void
+                                      const String &fallback_source) -> void
 {
   if (!context.has_pending_control_flow()) return;
 
@@ -139,9 +137,8 @@ static fn report_escaped_control_flow(EvalContext &context,
   ErrorWithLocation located{control.location, what};
   show_message(located.to_string(*source));
   if (!control.origin.is_empty()) {
-    show_message(
-        Note{"this jump was reached while running " + control.origin}
-            .to_string());
+    show_message(Note{"this jump was reached while running " + control.origin}
+                     .to_string());
   }
 
   context.clear_control_flow();
@@ -151,10 +148,8 @@ static fn report_escaped_control_flow(EvalContext &context,
    context. The main loop and source_file share this so a sourced file runs the
    same pipeline as an interactive line. Returns the resulting exit code. */
 static fn run_script_contents(const String &script_contents,
-                              EvalContext &context,
-                              BumpArena &ast_arena,
-                              Maybe<StringView> filename = None)
-    -> int
+                              EvalContext &context, BumpArena &ast_arena,
+                              Maybe<StringView> filename = None) -> int
 {
   int exit_code = EXIT_FAILURE;
 
@@ -171,7 +166,7 @@ static fn run_script_contents(const String &script_contents,
 
     Parser p{
         Lexer{String{script_contents.view()}, ast_arena,
-                    FLAG_ESCAPE_MAP.is_enabled(), filename}
+              FLAG_ESCAPE_MAP.is_enabled(), filename}
     };
     Expression *ast = p.construct_ast();
 
@@ -190,7 +185,7 @@ static fn run_script_contents(const String &script_contents,
     /* Validate the whole tree before running anything. An unconditional
        problem stops execution, a conditional one only warns. */
     if (!analyze_ast(ast, script_contents, context.function_names(),
-                           context.alias_names()))
+                     context.alias_names()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
@@ -223,14 +218,13 @@ static fn run_script_contents(const String &script_contents,
   } catch (const std::exception &e) {
     show_message(
         "Uncaught exception while executing the AST. Aborting the command.");
-    show_message("Last system message: '" +
-                       os::last_system_error_message() + "'.");
+    show_message("Last system message: '" + os::last_system_error_message() +
+                 "'.");
     show_message("Context: '" + String{e.what()} + "'.");
   } catch (...) {
     show_message(
         "Unexpected system explosion while executing the AST. Exiting.");
-    show_message("Last system message: " +
-                       os::last_system_error_message());
+    show_message("Last system message: " + os::last_system_error_message());
     utils::quit(EXIT_FAILURE);
   }
 
@@ -242,8 +236,7 @@ static fn run_script_contents(const String &script_contents,
 static fn source_file(const Path &path, EvalContext &context,
                       BumpArena &ast_arena) -> void
 {
-  Maybe<String> contents =
-      utils::read_entire_file(path.text());
+  Maybe<String> contents = utils::read_entire_file(path.text());
   if (!contents) return;
 
   /* The profile path names the source, so a parse error in it and a backtrace
@@ -254,8 +247,7 @@ static fn source_file(const Path &path, EvalContext &context,
 
 /* Expand the common prompt escapes in PS1 and PS2. */
 static fn expand_prompt_escapes(StringView prompt, StringView user,
-                                StringView working_directory)
-    -> String
+                                StringView working_directory) -> String
 {
   String out{};
   for (usize i = 0; i < prompt.length; i++) {
@@ -267,8 +259,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     switch (escaped) {
     case 'u': out += user; break;
     case 'h':
-      out +=
-          os::get_environment_variable("HOSTNAME").value_or("localhost");
+      out += os::get_environment_variable("HOSTNAME").value_or("localhost");
       break;
     case 'w': {
       String shown{working_directory};
@@ -395,11 +386,13 @@ fn main(int argc, char **argv) -> int
         shit::StringView{file_name.data(), file_name.count()}
     });
 
-  shit::EvalContext context{
-      FLAG_DISABLE_EXPANSION.is_enabled(), FLAG_VERBOSE.is_enabled(),
-      FLAG_EXPAND_VERBOSE.is_enabled(),    should_be_interactive,
-      FLAG_ERROR_EXIT.is_enabled(),        shit::String{program_path},
-      steal(positional_params)};
+  shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
+                            FLAG_VERBOSE.is_enabled(),
+                            FLAG_EXPAND_VERBOSE.is_enabled(),
+                            should_be_interactive,
+                            FLAG_ERROR_EXIT.is_enabled(),
+                            shit::String{program_path},
+                            steal(positional_params)};
 
   /* Apply the remaining option flags that the constructor does not take. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());

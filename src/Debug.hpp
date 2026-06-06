@@ -9,21 +9,19 @@ class String;
 #if !defined NDEBUG
 #include <cstdio>
 /* fprintf(stderr, ...) */
-#define TRACE(...)                                                        \
+#define TRACE(...)                                                             \
   do {                                                                         \
-    unused(                                                               \
-        std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));     \
-    unused(std::fprintf(stderr, __VA_ARGS__));                            \
-    unused(fflush(stderr));                                               \
+    unused(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
+    unused(std::fprintf(stderr, __VA_ARGS__));                                 \
+    unused(fflush(stderr));                                                    \
   } while (0)
 /* fprintf(stderr, ... + "\n") */
-#define TRACELN(...)                                                      \
+#define TRACELN(...)                                                           \
   do {                                                                         \
-    unused(                                                               \
-        std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));     \
-    unused(std::fprintf(stderr, __VA_ARGS__));                            \
-    unused(fputc('\n', stderr));                                          \
-    unused(fflush(stderr));                                               \
+    unused(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
+    unused(std::fprintf(stderr, __VA_ARGS__));                                 \
+    unused(fputc('\n', stderr));                                               \
+    unused(fflush(stderr));                                                    \
   } while (0)
 #if defined __clang__
 #include <cstdarg>
@@ -80,11 +78,11 @@ StringT t__string_from_struct(const T &x)
 
 #if !defined NDEBUG
 /* Cause the debugger to break on this call. */
-#define TRAP(...)                                                         \
+#define TRAP(...)                                                              \
   do {                                                                         \
-    TRACELN("Encountered a debug trap");                                  \
-    if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                     \
-      TRACELN("Details: " __VA_ARGS__);                                   \
+    TRACELN("Encountered a debug trap");                                       \
+    if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                          \
+      TRACELN("Details: " __VA_ARGS__);                                        \
     }                                                                          \
     t__debugtrap();                                                            \
   } while (0)
@@ -94,11 +92,11 @@ StringT t__string_from_struct(const T &x)
 
 #if !defined NDEBUG
 /* This code path is unreachable. */
-#define unreachable(...)                                                  \
+#define unreachable(...)                                                       \
   do {                                                                         \
-    TRACELN("Reached an unreachable statement");                          \
-    if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                     \
-      TRACELN("Details: " __VA_ARGS__);                                   \
+    TRACELN("Reached an unreachable statement");                               \
+    if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                          \
+      TRACELN("Details: " __VA_ARGS__);                                        \
     }                                                                          \
     t__unreachable();                                                          \
   } while (0)
@@ -107,14 +105,14 @@ StringT t__string_from_struct(const T &x)
 #endif
 
 #if !defined NDEBUG
-#define ASSERT(x, ...)                                                    \
+#define ASSERT(x, ...)                                                         \
   do {                                                                         \
     if (!(x)) [[unlikely]] {                                                   \
-      TRACELN("'ASSERT(" #x ")' fail in %s().", __func__);           \
-      if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                   \
-        TRACELN("Details: " __VA_ARGS__);                                 \
+      TRACELN("'ASSERT(" #x ")' fail in %s().", __func__);                     \
+      if (!VA_ARE_EMPTY(__VA_ARGS__)) {                                        \
+        TRACELN("Details: " __VA_ARGS__);                                      \
       }                                                                        \
-      TRAP();                                                             \
+      TRAP();                                                                  \
     }                                                                          \
   } while (0)
 #else

@@ -162,7 +162,8 @@ fn Path::normalized() const throws -> Path
     if (c > 0) built.push(DIRECTORY_SEPARATOR);
     built.append(components[c]);
   }
-  if (built.is_empty()) built.append(absolute ? StringView{"/"} : StringView{"."});
+  if (built.is_empty())
+    built.append(absolute ? StringView{"/"} : StringView{"."});
   return Path{built};
 }
 
@@ -226,7 +227,8 @@ fn Path::is_executable() const wontthrow -> bool
 fn Path::current_directory() throws -> Path
 {
   char buffer[4096];
-  if (::getcwd(buffer, sizeof(buffer)) != nullptr) return Path{StringView{buffer}};
+  if (::getcwd(buffer, sizeof(buffer)) != nullptr)
+    return Path{StringView{buffer}};
   return Path{};
 }
 
@@ -302,7 +304,8 @@ fn Path::is_executable() const -> bool
 fn Path::current_directory() -> Path
 {
   char buffer[4096];
-  if (_getcwd(buffer, sizeof(buffer)) != nullptr) return Path{StringView{buffer}};
+  if (_getcwd(buffer, sizeof(buffer)) != nullptr)
+    return Path{StringView{buffer}};
   return Path{};
 }
 

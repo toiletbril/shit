@@ -36,7 +36,8 @@ hot fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
   }
 }
 
-hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>
+hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow
+    -> Maybe<usize>
 {
   for (;;) {
     ssize_t r = read(fd, buf, size);
@@ -95,10 +96,7 @@ fn get_home_directory() throws -> Maybe<Path>
 
 static const pid_t PARENT_SHELL_PID = getpid();
 
-fn is_child_process() wontthrow -> bool
-{
-  return getpid() != PARENT_SHELL_PID;
-}
+fn is_child_process() wontthrow -> bool { return getpid() != PARENT_SHELL_PID; }
 
 fn get_shell_process_id() wontthrow -> i64
 {
@@ -371,8 +369,9 @@ fn wait_and_monitor_process(process pid) throws -> i32
   if (WIFSIGNALED(status)) {
     const i32 sig = WTERMSIG(status);
     const char *sig_str = strsignal(sig);
-    const String sig_desc = (sig_str != nullptr) ? String{StringView{sig_str}}
-                                              : String{StringView{"Unknown"}};
+    const String sig_desc = (sig_str != nullptr)
+                                ? String{StringView{sig_str}}
+                                : String{StringView{"Unknown"}};
 
     /* Ignore Ctrl-C. */
     if (sig & ~(SIGINT)) {
@@ -387,8 +386,9 @@ fn wait_and_monitor_process(process pid) throws -> i32
   } else if (WIFSTOPPED(status)) {
     const i32 sig = WSTOPSIG(status);
     const char *sig_str = strsignal(sig);
-    const String sig_desc = (sig_str != nullptr) ? String{StringView{sig_str}}
-                                              : String{StringView{"Unknown"}};
+    const String sig_desc = (sig_str != nullptr)
+                                ? String{StringView{sig_str}}
+                                : String{StringView{"Unknown"}};
 
     shit::print("[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
                 ", signal " + utils::integer_to_string(sig) + " and killed]\n");
@@ -538,16 +538,18 @@ static fn handle_interrupt(int s) wontthrow -> void
 {
   unused(s);
   /* Setting the flag is the only async-signal-safe action. The evaluator polls
-     it and aborts the running command, so a shell-internal loop is stoppable. */
+     it and aborts the running command, so a shell-internal loop is stoppable.
+   */
   INTERRUPT_REQUESTED = 1;
 }
 
 fn set_default_signal_handlers() throws -> void
 {
   /* The terminal-generated signals that would kill the shell stay blocked, but
-     SIGINT gets a handler instead, so a Ctrl-C in a shell loop sets the flag the
-     evaluator polls rather than spinning forever. An external command resets the
-     handler to the default through execv and so still dies on Ctrl-C. */
+     SIGINT gets a handler instead, so a Ctrl-C in a shell loop sets the flag
+     the evaluator polls rather than spinning forever. An external command
+     resets the handler to the default through execv and so still dies on
+     Ctrl-C. */
   sigset_t sm = make_sigset(SIGTERM, SIGQUIT, SIGHUP, SIGSTOP, SIGTSTP);
   check_syscall(sigprocmask(SIG_BLOCK, &sm, nullptr));
 
@@ -629,7 +631,10 @@ fn get_home_directory() -> Maybe<Path>
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
-fn is_child_process() -> bool { return GetCurrentProcessId() != PARENT_SHELL_PID; }
+fn is_child_process() -> bool
+{
+  return GetCurrentProcessId() != PARENT_SHELL_PID;
+}
 
 fn get_shell_process_id() -> i64 { return static_cast<i64>(PARENT_SHELL_PID); }
 
@@ -796,7 +801,8 @@ fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
   /* Append moves the write position to the end of the file. */
-  if (mode == FileOpenMode::Append) SetFilePointer(handle, 0, nullptr, FILE_END);
+  if (mode == FileOpenMode::Append)
+    SetFilePointer(handle, 0, nullptr, FILE_END);
 
   return handle;
 }
@@ -974,8 +980,8 @@ volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 static fn handle_interrupt(int s) -> void
 {
   unused(s);
-  /* Only set the flag, since printing or any non-async-signal-safe work inside a
-     handler is undefined. The evaluator polls the flag and aborts the running
+  /* Only set the flag, since printing or any non-async-signal-safe work inside
+     a handler is undefined. The evaluator polls the flag and aborts the running
      command, so an infinite loop can be stopped from the keyboard. */
   INTERRUPT_REQUESTED = 1;
   signal(SIGINT, handle_interrupt);

@@ -32,8 +32,7 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
   let const base = static_cast<u8 *>(std::malloc(size));
   if (base == nullptr) throw std::bad_alloc{};
 
-  ASSERT(size >= minimum_size,
-         "fresh block must fit the requested allocation");
+  ASSERT(size >= minimum_size, "fresh block must fit the requested allocation");
 
   m_blocks.push_back(block{base, size, 0});
 }

@@ -44,8 +44,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* The command's input descriptor honors a redirection or a heredoc on the
      read, falling back to the shell's standard input when none is present. The
      line is copied into a heap String for the splitting below. */
-  let const read_line =
-      utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN));
+  let const read_line = utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN));
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)
       cxt.set_shell_variable(operand_name(i), "");

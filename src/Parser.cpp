@@ -15,8 +15,8 @@ namespace shit {
 using namespace tokens;
 using namespace expressions;
 
-hot pure static fn get_sequence_kind(Token::Kind tk)
-    wontthrow -> CompoundListCondition::Kind
+hot pure static fn get_sequence_kind(Token::Kind tk) wontthrow
+    -> CompoundListCondition::Kind
 {
   switch (tk) {
   case Token::Kind::Newline:
@@ -41,7 +41,8 @@ pure fn Parser::debug_words() const wontthrow -> const ArrayList<Word> &
 }
 
 hot pure static fn kind_in(Token::Kind kind,
-                       std::initializer_list<Token::Kind> set) wontthrow -> bool
+                           std::initializer_list<Token::Kind> set) wontthrow
+    -> bool
 {
   for (Token::Kind k : set) {
     if (k == kind) return true;
@@ -52,8 +53,9 @@ hot pure static fn kind_in(Token::Kind kind,
 /* The byte location of the keyword as a whole word somewhere in the source. A
    missing terminator usually means the keyword sits earlier in the input but
    was read as an argument, so the caret can point straight at it. */
-cold pure static fn find_standalone_keyword(StringView source, StringView keyword)
-    wontthrow -> Maybe<SourceLocation>
+cold pure static fn find_standalone_keyword(StringView source,
+                                            StringView keyword) wontthrow
+    -> Maybe<SourceLocation>
 {
   auto is_boundary = [](char c) {
     return std::isspace(static_cast<unsigned char>(c)) != 0 || c == ';' ||
@@ -75,11 +77,9 @@ cold pure static fn find_standalone_keyword(StringView source, StringView keywor
 /* Report a missing terminator. When the keyword is found earlier in the source,
    point the note at it and explain it was read as an argument, otherwise point
    at the token where the terminator was expected. */
-cold [[noreturn]] static fn throw_unterminated(SourceLocation opener,
-                                          StringView what, StringView source,
-                                          StringView keyword,
-                                          SourceLocation fallback)
-    throws -> void
+cold [[noreturn]] static fn
+throw_unterminated(SourceLocation opener, StringView what, StringView source,
+                   StringView keyword, SourceLocation fallback) throws -> void
 {
   if (Maybe<SourceLocation> found = find_standalone_keyword(source, keyword);
       found.has_value())
@@ -93,7 +93,8 @@ cold [[noreturn]] static fn throw_unterminated(SourceLocation opener,
                                     "expected '" + keyword + "'"};
 }
 
-cold pure static fn is_empty_list(const Expression *expression) wontthrow -> bool
+cold pure static fn is_empty_list(const Expression *expression) wontthrow
+    -> bool
 {
   ASSERT(expression != nullptr);
   return expression->is_dummy();
@@ -113,7 +114,8 @@ hot pure static fn is_negation_token(const Token *token) wontthrow -> bool
 
 /* A friendly message for a token that cannot start a command. A stray control
    keyword almost always means its opener is missing. */
-cold static fn unexpected_command_token_message(const Token *token) throws -> String
+cold static fn unexpected_command_token_message(const Token *token) throws
+    -> String
 {
   ASSERT(token != nullptr);
   switch (token->kind()) {
@@ -143,8 +145,7 @@ cold static fn unexpected_command_token_message(const Token *token) throws -> St
 }
 
 /* TODO */
-static fn require_simple_in_pipeline(Command *command)
-    throws -> SimpleCommand *
+static fn require_simple_in_pipeline(Command *command) throws -> SimpleCommand *
 {
   ASSERT(command != nullptr);
   if (!command->is_simple_command()) {
@@ -178,8 +179,8 @@ flatten fn Parser::construct_ast() throws -> Expression *
   return parse_command_list({});
 }
 
-hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
-    throws -> Expression *
+hot fn Parser::parse_command_list(
+    std::initializer_list<Token::Kind> terminators) throws -> Expression *
 {
   Command *lhs = nullptr;
 
@@ -345,8 +346,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
     for (Token *t : args_accumulator)
       args.push(t);
 
-    SimpleCommand *c = m_lexer.arena().create<SimpleCommand>(
-        *source_location, steal(args));
+    SimpleCommand *c =
+        m_lexer.arena().create<SimpleCommand>(*source_location, steal(args));
     if (local_vars.count() != 0) c->set_local_vars(steal(local_vars));
     if (!redirections.is_empty()) c->set_redirections(steal(redirections));
     return c;
@@ -464,9 +465,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
       /* A run of digits touching a redir operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
-        const let literal = static_cast<tokens::WordToken *>(token)
-                                ->word()
-                                .to_literal_string();
+        const let literal =
+            static_cast<tokens::WordToken *>(token)->word().to_literal_string();
         bool is_all_digits = !literal.is_empty();
         for (usize i = 0; i < literal.count(); i++) {
           if (literal[i] < '0' || literal[i] > '9') {
@@ -590,8 +590,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
       redir.kind = expressions::Redirection::Kind::Heredoc;
       redir.target = nullptr;
       redir.dup_fd = -1;
-      redir.heredoc_body =
-          m_lexer.register_heredoc(delimiter, strip_tabs);
+      redir.heredoc_body = m_lexer.register_heredoc(delimiter, strip_tabs);
       redir.heredoc_expand = should_expand;
       redirections.push(redir);
     } break;
@@ -637,8 +636,8 @@ hot fn Parser::parse_if() throws -> Command *
 
     Expression *body = parse_command_list(
         {Token::Kind::Elif, Token::Kind::Else, Token::Kind::Fi});
-    branches.push(std::pair<const Expression *, const Expression *>{
-        condition, body});
+    branches.push(
+        std::pair<const Expression *, const Expression *>{condition, body});
 
     Token *after = m_lexer.next_shell_token();
     ASSERT(after != nullptr);
@@ -661,8 +660,8 @@ hot fn Parser::parse_if() throws -> Command *
     }
   }
 
-  IfClause *node = m_lexer.arena().create<IfClause>(
-      location, steal(branches), otherwise);
+  IfClause *node =
+      m_lexer.arena().create<IfClause>(location, steal(branches), otherwise);
   /* Ownership of the else body moved into the node, so the cleanup guard must
      not also free it. The branches vector was moved from and is now empty. */
   otherwise = nullptr;
@@ -944,7 +943,8 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
                             "Expected a compound command as the function body"};
   }
 
-  return m_lexer.arena().create<FunctionDefinition>(location, name.view(), body);
+  return m_lexer.arena().create<FunctionDefinition>(location, name.view(),
+                                                    body);
 }
 
 /* A standard pratt-parser for expressions. */

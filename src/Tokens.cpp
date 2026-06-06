@@ -88,7 +88,8 @@ cold fn Word::to_pretty_string() const throws -> String
   return result;
 }
 
-hot fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word>>
+hot fn Word::get_assignment_split() const throws
+    -> Maybe<std::pair<String, Word>>
 {
   if (segments.is_empty()) return shit::None;
 
@@ -287,21 +288,19 @@ fn Operator::unary_precedence() const wontthrow -> u8 { return 0; }
 fn Operator::binary_left_associative() const wontthrow -> bool { return true; }
 
 fn Operator::construct_binary_expression(const Expression *lhs,
-                                         const Expression *rhs) const
-    throws -> Expression *
+                                         const Expression *rhs) const throws
+    -> Expression *
 {
   unused(lhs);
   unused(rhs);
-  unreachable("Invalid binary operator construction of type %d",
-                   ENUM(kind()));
+  unreachable("Invalid binary operator construction of type %d", ENUM(kind()));
 }
 
-fn Operator::construct_unary_expression(const Expression *rhs) const
-    throws -> Expression *
+fn Operator::construct_unary_expression(const Expression *rhs) const throws
+    -> Expression *
 {
   unused(rhs);
-  unreachable("Invalid unary operator construction of type %d",
-                   ENUM(kind()));
+  unreachable("Invalid unary operator construction of type %d", ENUM(kind()));
 }
 
 #define BINARY_UNARY_OPERATOR_TOKEN_DECLS(t, s, up, bp, uexpr, bexpr)          \
@@ -317,13 +316,13 @@ fn Operator::construct_unary_expression(const Expression *rhs) const
   Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                                 \
+    ASSERT(AST_ARENA != nullptr);                                              \
     return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
   }                                                                            \
   Expression *t::construct_unary_expression(const Expression *rhs)             \
       const throws                                                             \
   {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                                 \
+    ASSERT(AST_ARENA != nullptr);                                              \
     return AST_ARENA->create<expressions::uexpr>(source_location(), rhs);      \
   }
 
@@ -342,7 +341,7 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
   Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                                 \
+    ASSERT(AST_ARENA != nullptr);                                              \
     return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
   }
 
@@ -358,7 +357,7 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
   Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                                 \
+    ASSERT(AST_ARENA != nullptr);                                              \
     return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
   }
 
@@ -393,7 +392,7 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
   Expression *t::construct_unary_expression(const Expression *rhs)             \
       const throws                                                             \
   {                                                                            \
-    ASSERT(AST_ARENA != nullptr);                                                 \
+    ASSERT(AST_ARENA != nullptr);                                              \
     return AST_ARENA->create<expressions::uexpr>(source_location(), rhs);      \
   }
 

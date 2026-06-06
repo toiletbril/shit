@@ -146,8 +146,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
    NOT_FOUND_INDEX when no occurrence remains. The bytes carry no null
    terminator, so the match is a plain byte scan rather than a C string search.
  */
-static pure fn find_subview(StringView haystack, StringView needle, usize start)
-    wontthrow -> usize
+static pure fn find_subview(StringView haystack, StringView needle,
+                            usize start) wontthrow -> usize
 {
   if (needle.length == 0)
     return start <= haystack.length ? start : NOT_FOUND_INDEX;
@@ -375,8 +375,8 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
 
-fn find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
-    wontthrow -> usize
+fn find_pos_in_vec(const ArrayList<String> &suffixes,
+                   StringView wanted) wontthrow -> usize
 {
   for (usize i = 0; i < suffixes.count(); i++) {
     if (suffixes[i] == wanted) return i;

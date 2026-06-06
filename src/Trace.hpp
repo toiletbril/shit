@@ -136,26 +136,26 @@ String format_named_values(StringView names, Args &&...args)
 } /* namespace shit */
 
 /* Print a printf-style message at the given level when the level is active. */
-#define LOG(level, ...)                                                   \
+#define LOG(level, ...)                                                        \
   do {                                                                         \
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
-      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): ",          \
-                               ::shit::verbosity_to_string(level), __LINE__,   \
-                               __func__));                                     \
-      unused(std::fprintf(stderr, __VA_ARGS__));                          \
-      unused(std::fputc('\n', stderr));                                   \
+      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): ",               \
+                          ::shit::verbosity_to_string(level), __LINE__,        \
+                          __func__));                                          \
+      unused(std::fprintf(stderr, __VA_ARGS__));                               \
+      unused(std::fputc('\n', stderr));                                        \
     }                                                                          \
   } while (0)
 
 /* Print the named values of the listed variables, such as
    LOG_VARS(Verbosity::Debug, argument_count, name). */
-#define LOG_VARS(level, ...)                                              \
+#define LOG_VARS(level, ...)                                                   \
   do {                                                                         \
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
       ::shit::String t__vars =                                                 \
           ::shit::log_detail::format_named_values(#__VA_ARGS__, __VA_ARGS__);  \
-      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): %s\n",      \
-                               ::shit::verbosity_to_string(level), __LINE__,   \
-                               __func__, t__vars.c_str()));                    \
+      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): %s\n",           \
+                          ::shit::verbosity_to_string(level), __LINE__,        \
+                          __func__, t__vars.c_str()));                         \
     }                                                                          \
   } while (0)

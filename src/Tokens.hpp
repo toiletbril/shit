@@ -174,7 +174,7 @@ public:
   /* A token lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap token otherwise. The
      destructor still runs through the normal delete. */
-  static fn operator delete(void *pointer)wontthrow -> void;
+  static fn operator delete(void *pointer) wontthrow->void;
 
 protected:
   Token(SourceLocation location);
@@ -356,12 +356,12 @@ public:
 
   virtual fn left_precedence() const wontthrow -> u8;
   virtual fn construct_binary_expression(const Expression *lhs,
-                                         const Expression *rhs) const
-      throws -> Expression *;
+                                         const Expression *rhs) const throws
+      -> Expression *;
 
   virtual fn unary_precedence() const wontthrow -> u8;
-  virtual fn construct_unary_expression(const Expression *rhs) const
-      throws -> Expression *;
+  virtual fn construct_unary_expression(const Expression *rhs) const throws
+      -> Expression *;
 };
 
 #define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \
@@ -375,12 +375,13 @@ public:
     String raw_string() const throws override;                                 \
                                                                                \
     u8 left_precedence() const wontthrow override;                             \
-    Expression *construct_binary_expression(                                   \
-        const Expression *lhs, const Expression *rhs) const throws override;   \
+    Expression *                                                               \
+    construct_binary_expression(const Expression *lhs,                         \
+                                const Expression *rhs) const throws override;  \
                                                                                \
     u8 unary_precedence() const wontthrow override;                            \
-    Expression *construct_unary_expression(const Expression *rhs)              \
-        const throws override;                                                 \
+    Expression *                                                               \
+    construct_unary_expression(const Expression *rhs) const throws override;   \
   }
 
 UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Plus);
@@ -397,8 +398,8 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
     String raw_string() const throws override;                                 \
                                                                                \
     u8 unary_precedence() const wontthrow override;                            \
-    Expression *construct_unary_expression(const Expression *rhs)              \
-        const throws override;                                                 \
+    Expression *                                                               \
+    construct_unary_expression(const Expression *rhs) const throws override;   \
   }
 
 UNARY_OPERATOR_TOKEN_STRUCT(Tilde);
@@ -415,8 +416,9 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
     String raw_string() const throws override;                                 \
                                                                                \
     u8 left_precedence() const wontthrow override;                             \
-    Expression *construct_binary_expression(                                   \
-        const Expression *lhs, const Expression *rhs) const throws override;   \
+    Expression *                                                               \
+    construct_binary_expression(const Expression *lhs,                         \
+                                const Expression *rhs) const throws override;  \
   }
 
 BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);

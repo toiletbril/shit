@@ -121,8 +121,8 @@ fn FlagManyStrings::reset() throws -> void
 }
 
 static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
-                    bool is_long, Flag **result_flag, const char **value_start)
-    throws -> bool
+                    bool is_long, Flag **result_flag,
+                    const char **value_start) throws -> bool
 {
   size_t longest_length = 0;
 
@@ -425,7 +425,8 @@ cold fn show_short_version() throws -> void
 }
 
 cold fn make_synopsis(std::string_view program_name,
-                 const std::vector<std::string> &lines) throws -> std::string
+                      const std::vector<std::string> &lines) throws
+    -> std::string
 {
   String s{};
 

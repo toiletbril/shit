@@ -33,8 +33,8 @@ inline fn merge_args_to_string(const ArrayList<String> &v) throws -> String
    NOT_FOUND_INDEX when none match. */
 inline constexpr usize NOT_FOUND_INDEX = static_cast<usize>(-1);
 
-fn find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
-    wontthrow -> usize;
+fn find_pos_in_vec(const ArrayList<String> &suffixes,
+                   StringView wanted) wontthrow -> usize;
 
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32;
@@ -42,8 +42,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                bool is_async) throws -> i32;
 
-fn string_replace(String &s, StringView to_replace, StringView replace_with)
-    throws -> void;
+fn string_replace(String &s, StringView to_replace,
+                  StringView replace_with) throws -> void;
 
 fn lowercase_string(StringView s) throws -> String;
 

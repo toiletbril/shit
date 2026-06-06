@@ -29,10 +29,9 @@ i64 parse_printf_integer(const String &arg) throws
      old code used did, so printf '%d' 010 yields 8. */
   let const is_octal = !is_hexadecimal && first_digit < arg.count() &&
                        arg[first_digit] == '0' && first_digit + 1 < arg.count();
-  let const parsed = is_hexadecimal
-                                  ? utils::parse_hexadecimal_integer(arg)
-                              : is_octal ? utils::parse_octal_integer(arg)
-                                         : utils::parse_decimal_integer(arg);
+  let const parsed = is_hexadecimal ? utils::parse_hexadecimal_integer(arg)
+                     : is_octal     ? utils::parse_octal_integer(arg)
+                                    : utils::parse_decimal_integer(arg);
   return parsed.is_error() ? 0 : parsed.value();
 }
 

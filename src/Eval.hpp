@@ -73,7 +73,7 @@ struct control_flow
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
-              const String *parent_source)
+               const String *parent_source)
       : origin(steal(origin)), call_site(call_site),
         parent_source(parent_source)
   {}
@@ -154,7 +154,8 @@ public:
   /* The stored value of a plain shell variable, or nullptr when the name is
      unset or names a special parameter. The pointer reads the value without a
      copy and stays valid until the next assignment to that name. */
-  hot fn lookup_shell_variable(StringView name) const wontthrow -> const String *
+  hot fn lookup_shell_variable(StringView name) const wontthrow
+      -> const String *
   {
     return m_shell_variables.find(name);
   }
@@ -482,8 +483,8 @@ protected:
 class ExecContext
 {
 public:
-  static fn make_from(SourceLocation location, const ArrayList<String> &args)
-      throws -> ExecContext;
+  static fn make_from(SourceLocation location,
+                      const ArrayList<String> &args) throws -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and
