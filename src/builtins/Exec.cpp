@@ -60,8 +60,7 @@ Exec::execute(ExecContext &ec, EvalContext &cxt) const
 
   ArrayList<String> command_args{};
   for (usize i = 1; i < args.size(); i++)
-    command_args.push(
-        String{heap_allocator(), StringView{args[i].c_str(), args[i].size()}});
+    command_args.push(String{heap_allocator(), args[i]});
   ExecContext command = ExecContext::from_resolved(ec.source_location(),
                                                    program_path, command_args);
   if (ec.in_fd) command.in_fd = ec.in_fd.take();

@@ -28,7 +28,7 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
     throw Error{"getopts: usage: getopts optstring name [arg ...]"};
 
   const String &optstring = args[1];
-  std::string name = std::string{args[2].c_str(), args[2].size()};
+  const String &name = args[2];
   bool is_silent = !optstring.empty() && optstring[0] == ':';
 
   ArrayList<String> operands{};

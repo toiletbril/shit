@@ -34,18 +34,21 @@ Local::execute(ExecContext &ec, EvalContext &cxt) const
     throw Error{"'local' can only be used inside a function"};
 
   for (usize i = 1; i < args.size(); i++) {
-    std::string arg{args[i].c_str(), args[i].size()};
-    usize equals_position = arg.find('=');
+    const String &arg = args[i];
+    Maybe<usize> equals_position = arg.find_character('=');
 
     /* Record the shadowed binding before overwriting it, so leaving the
        function restores it. A bare name shadows with an empty value. */
-    std::string name = equals_position != std::string::npos
-                           ? arg.substr(0, equals_position)
-                           : arg;
+    StringView name = equals_position.has_value()
+                          ? arg.substring_of_length(0, *equals_position)
+                          : arg.view();
     cxt.declare_local(name);
 
-    if (equals_position != std::string::npos)
-      cxt.set_shell_variable(name, arg.substr(equals_position + 1));
+    if (equals_position.has_value())
+      cxt.set_shell_variable(name, std::string{arg.c_str() + *equals_position +
+                                                   1,
+                                               arg.size() - *equals_position -
+                                                   1});
     else
       cxt.set_shell_variable(name, "");
   }

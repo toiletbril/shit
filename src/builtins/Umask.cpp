@@ -27,7 +27,7 @@ Umask::execute(ExecContext &ec, EvalContext &cxt) const
   if (args.size() == 1) {
     char buffer[8];
     std::snprintf(buffer, sizeof(buffer), "%04o", os::get_file_creation_mask());
-    ec.print_to_stdout(std::string{buffer} + "\n");
+    ec.print_to_stdout(String{buffer} + "\n");
     return 0;
   }
 

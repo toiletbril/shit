@@ -22,7 +22,7 @@ namespace {
 struct SetOption
 {
   char letter;
-  std::string_view name;
+  StringView name;
   void (EvalContext::*set)(bool);
   bool (EvalContext::*get)() const;
 };
@@ -51,7 +51,7 @@ find_option_by_letter(char letter)
 }
 
 const SetOption *
-find_option_by_name(std::string_view name)
+find_option_by_name(StringView name)
 {
   for (const SetOption &option : SET_OPTIONS)
     if (option.name == name) return &option;
@@ -65,10 +65,10 @@ option_is_on(const EvalContext &cxt, const SetOption &option)
 }
 
 /* The reusable command form that set -o and set +o print, one line each. */
-std::string
+String
 list_options(const EvalContext &cxt)
 {
-  std::string out{};
+  String out{};
   for (const SetOption &option : SET_OPTIONS) {
     out += option_is_on(cxt, option) ? "set -o " : "set +o ";
     out += option.name;
@@ -94,9 +94,9 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
 
   /* set with no arguments lists the shell variables. */
   if (args.size() == 1) {
-    std::string out{};
+    String out{};
     for (const String &assignment : cxt.sorted_variable_assignments()) {
-      out.append(assignment.c_str(), assignment.size());
+      out += assignment.view();
       out += "\n";
     }
     ec.print_to_stdout(out);
@@ -130,10 +130,10 @@ Set::execute(ExecContext &ec, EvalContext &cxt) const
         continue;
       }
       const String &name = args[++i];
-      std::string name_text{name.c_str(), name.size()};
-      const SetOption *option = find_option_by_name(name_text);
+      const SetOption *option = find_option_by_name(name);
       if (option == nullptr)
-        throw Error{"set: '" + name_text + "' is not a valid option name"};
+        throw Error{"set: '" + std::string{name.c_str(), name.size()} +
+                    "' is not a valid option name"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
       continue;
     }
