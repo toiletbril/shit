@@ -179,18 +179,6 @@ cold static fn unexpected_command_token_message(const Token *token) throws
   }
 }
 
-/* TODO */
-static fn require_simple_in_pipeline(Command *command) throws -> SimpleCommand *
-{
-  ASSERT(command != nullptr);
-  if (!command->is_simple_command()) {
-    throw ErrorWithLocation{
-        command->source_location(),
-        "A compound command in a pipeline is not supported"};
-  }
-  return static_cast<SimpleCommand *>(command);
-}
-
 hot pure static fn is_compound_terminator(Token::Kind kind) wontthrow -> bool
 {
   switch (kind) {
@@ -395,7 +383,7 @@ hot fn Parser::parse_command_list(
 
       Pipeline *pipeline =
           m_lexer.arena().create<Pipeline>(token->source_location());
-      pipeline->append_command(require_simple_in_pipeline(lhs));
+      pipeline->append_command(lhs);
 
       Token *last_pipe_token = token;
 
@@ -404,7 +392,7 @@ hot fn Parser::parse_command_list(
         Command *rhs = parse_simple_command();
 
         if (rhs != nullptr) {
-          pipeline->append_command(require_simple_in_pipeline(rhs));
+          pipeline->append_command(rhs);
           last_pipe_token = m_lexer.peek_shell_token();
           ASSERT(last_pipe_token != nullptr);
           if (last_pipe_token->kind() == Token::Kind::Pipe) {

@@ -1,0 +1,43 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a\nb\nc\n"]
+      [WhileLoop]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "l"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "got $l"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\nb\nc\n"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "l"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "got "
+  Variable "l"
+]
+[Word
+  Unquoted "done"
+]
+got a
+got b
+got c
+[Code 0]

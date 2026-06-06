@@ -245,6 +245,36 @@ hot fn execute_program(ExecContext &&ec) throws -> process
   return child_pid;
 }
 
+fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                       Maybe<descriptor> err_fd) throws -> process
+{
+  const pid_t child_pid = check_syscall(fork());
+
+  if (child_pid == 0) {
+    if (in_fd) {
+      check_syscall(dup2(*in_fd, STDIN_FILENO));
+      check_syscall(close(*in_fd));
+    }
+    if (out_fd) {
+      check_syscall(dup2(*out_fd, STDOUT_FILENO));
+      check_syscall(close(*out_fd));
+    }
+    if (err_fd) {
+      check_syscall(dup2(*err_fd, STDERR_FILENO));
+      check_syscall(close(*err_fd));
+    }
+
+    reset_signal_handlers();
+  }
+
+  return child_pid;
+}
+
+[[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
+{
+  _exit(status);
+}
+
 fn replace_process(ExecContext &&ec) throws -> void
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
@@ -824,6 +854,24 @@ fn execute_program(ExecContext &&ec) -> process
   }
 
   return process_info.hProcess;
+}
+
+fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                       Maybe<descriptor> err_fd) -> process
+{
+  unused(in_fd);
+  unused(out_fd);
+  unused(err_fd);
+  /* Windows has no fork, so a compound command cannot run as a separate process
+     stage of a pipeline. */
+  throw shit::Error{
+      "A compound command in a pipeline is not supported on this platform"};
+}
+
+[[noreturn]] fn exit_process_immediately(i32 status) -> void
+{
+  ExitProcess(static_cast<UINT>(status));
+  unreachable();
 }
 
 fn replace_process(ExecContext &&ec) -> void

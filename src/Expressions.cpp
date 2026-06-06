@@ -1052,7 +1052,7 @@ pure fn Pipeline::is_empty() const wontthrow -> bool
   return m_commands.is_empty();
 }
 
-fn Pipeline::append_command(const SimpleCommand *node) throws -> void
+fn Pipeline::append_command(const Command *node) throws -> void
 {
   ASSERT(node != nullptr);
 
@@ -1076,7 +1076,7 @@ cold fn Pipeline::to_ast_string(usize layer) const throws -> String
   }
 
   s += pad + "[" + to_string() + "]";
-  for (const SimpleCommand *e : m_commands) {
+  for (const Command *e : m_commands) {
     s += '\n';
     s += pad + EXPRESSION_AST_INDENT + e->to_ast_string(layer + 1);
   }
@@ -1084,15 +1084,132 @@ cold fn Pipeline::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
+/* Run a pipeline that has at least one compound stage. Every stage forks, the
+   way an external command does, so a compound stage evaluates its tree in a
+   child with the pipe already on its standard descriptors. A simple stage forks
+   too here and evaluates in the child, which is the rare mixed pipeline rather
+   than the common all-simple path that execute_contexts_with_pipes serves. */
+cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
+    -> i64
+{
+  ArrayList<os::process> children{};
+  os::process last_child = SHIT_INVALID_PROCESS;
+  os::descriptor last_stdin = SHIT_INVALID_FD;
+
+  for (usize stage_index = 0; stage_index < m_commands.count(); stage_index++) {
+    const Command *stage = m_commands[stage_index];
+    ASSERT(stage != nullptr);
+
+    cxt.add_evaluated_expression();
+
+    let const is_first = (stage_index == 0);
+    let const is_last = (stage_index + 1 == m_commands.count());
+
+    Maybe<os::descriptor> stage_in{};
+    Maybe<os::descriptor> stage_out{};
+    Maybe<os::Pipe> pipe{};
+
+    if (!is_last) {
+      pipe = os::make_pipe();
+      if (!pipe) {
+        throw ErrorWithLocation{stage->source_location(),
+                                "Could not open a pipe"};
+      }
+      stage_out = pipe->out;
+    }
+    if (!is_first) stage_in = last_stdin;
+
+    const os::process child =
+        os::fork_compound_stage(stage_in, stage_out, {});
+
+    if (child == 0) {
+      /* The child evaluates the stage in a subshell, so a variable change such
+         as a while-read does not escape, then exits with its status. A
+         diagnostic or an exit request inside still yields a child status rather
+         than unwinding back into the parent's evaluator. */
+      i32 stage_status = 0;
+      try {
+        cxt.enter_subshell();
+        stage_status = static_cast<i32>(stage->evaluate(cxt));
+        if (cxt.has_pending_control_flow() &&
+            cxt.pending_control_flow().kind == control_flow::Kind::Exit)
+        {
+          stage_status = static_cast<i32>(cxt.pending_control_flow().value);
+        }
+      } catch (const ErrorWithLocation &e) {
+        const String *source = cxt.current_source();
+        shit::show_message(
+            e.to_string(source != nullptr ? source->view() : StringView{}));
+        stage_status = 1;
+      } catch (const Error &e) {
+        shit::show_message(e.to_string());
+        stage_status = 1;
+      } catch (...) {
+        stage_status = 1;
+      }
+      shit::flush();
+      os::exit_process_immediately(stage_status);
+    }
+
+    /* The parent keeps neither pipe end open past the stage that owns it,
+       otherwise a reader never sees the writer close. */
+    if (stage_out) os::close_fd(*stage_out);
+    if (stage_in) os::close_fd(*stage_in);
+    if (!is_last) last_stdin = pipe->in;
+
+    children.push(child);
+    last_child = child;
+  }
+
+  if (is_async()) {
+    if (last_child != SHIT_INVALID_PROCESS) {
+      cxt.set_last_background_pid(os::process_id_of(last_child));
+      const i32 id = cxt.register_job(last_child, "pipeline");
+      if (cxt.shell_is_interactive())
+        shit::print_error(
+            "[" + utils::int_to_text(id) + "] " +
+            utils::uint_to_text(
+                static_cast<u64>(os::process_id_of(last_child))) +
+            "\n");
+    }
+    return 0;
+  }
+
+  i32 ret = 0;
+  for (const os::process child : children) {
+    const i32 status = os::wait_and_monitor_process(child);
+    if (child == last_child) ret = status;
+  }
+
+  cxt.set_last_exit_status(ret);
+  return ret;
+}
+
 hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_commands.count() > 1);
 
+  /* A pipeline of only simple commands keeps the fast path, which wires the
+     pipes once and forks each external directly with no extra subshell. A
+     compound stage cannot run that way, so a pipeline that holds one takes the
+     fork-per-stage path. */
+  bool has_compound_stage = false;
+  for (const Command *stage : m_commands) {
+    if (!stage->is_simple_command()) {
+      has_compound_stage = true;
+      break;
+    }
+  }
+
+  if (has_compound_stage) return evaluate_with_compound_stages(cxt);
+
   let ecs = ArrayList<ExecContext>{heap_allocator()};
   ecs.reserve(m_commands.count());
 
-  for (const SimpleCommand *e : m_commands) {
-    ASSERT(e != nullptr);
+  for (const Command *stage : m_commands) {
+    ASSERT(stage != nullptr);
+    ASSERT(stage->is_simple_command());
+    const SimpleCommand *e = static_cast<const SimpleCommand *>(stage);
 
     cxt.add_evaluated_expression();
 
@@ -2082,7 +2199,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 cold fn Pipeline::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
-  for (const SimpleCommand *command : m_commands) {
+  for (const Command *command : m_commands) {
     ASSERT(command != nullptr);
     command->analyze(actx, is_unconditional);
   }

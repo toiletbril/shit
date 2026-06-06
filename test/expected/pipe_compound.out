@@ -1,3 +1,25 @@
-shit: 1:1: Error: A compound command in a pipeline is not supported.
-     1 |  { echo a; } | cat
-       |  ^~ here.
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a"]
+      [SimpleCommand "cat"]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "cat"
+]
+a
+[Code 0]

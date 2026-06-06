@@ -310,7 +310,7 @@ public:
   ~Pipeline() override;
 
   pure fn is_empty() const wontthrow -> bool;
-  fn append_command(const SimpleCommand *node) throws -> void;
+  fn append_command(const Command *node) throws -> void;
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
@@ -324,7 +324,14 @@ public:
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
-  ArrayList<const SimpleCommand *> m_commands{heap_allocator()};
+  /* The fork-per-stage path taken when a stage is a compound command. The
+     all-simple path stays in evaluate_impl through execute_contexts_with_pipes.
+   */
+  fn evaluate_with_compound_stages(EvalContext &cxt) const throws -> i64;
+
+  /* A stage is any command, either a simple command exec'd in a forked child or
+     a compound command whose tree is evaluated in a forked child. */
+  ArrayList<const Command *> m_commands{heap_allocator()};
 };
 
 /* A compound command groups one or more command lists, like a loop body or an

@@ -1,0 +1,2 @@
+echo x | { cat; }
+seq 1 3 | { read a; read b; echo "$a-$b"; }

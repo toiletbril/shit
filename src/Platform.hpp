@@ -235,6 +235,21 @@ extern volatile sig_atomic_t INTERRUPT_REQUESTED;
 
 fn execute_program(ExecContext &&ec) throws -> process;
 
+/* Fork a child for a compound command used as a pipeline stage. In the child it
+   places the pipe ends onto the standard descriptors, resets the signal
+   handlers the way an exec'd child does, and returns zero so the caller
+   evaluates the compound command's tree and exits. In the parent it returns the
+   child process. The fds are the pipe ends already chosen for this stage, each
+   None when the stage keeps the inherited descriptor. */
+fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
+                       Maybe<descriptor> err_fd) throws -> process;
+
+/* Terminate the current process at once with status, skipping the normal
+   unwinding. A forked pipeline-stage child calls this after it evaluates its
+   command so it never runs the parent's cleanup or unwinds back into the shared
+   evaluator inside the duplicated process. */
+[[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void;
+
 /* Replace the current shell process with the program, applying its
    redirections, the way exec does. It does not fork, so on success it never
    returns. It throws on failure. */
