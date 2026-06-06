@@ -716,7 +716,7 @@ fn CompoundList::is_empty() const -> bool { return m_nodes.empty(); }
 
 fn CompoundList::append_node(const CompoundListCondition *node) -> void
 {
-  m_location.add_length(node->source_location().length());
+  m_location.length += node->source_location().length;
   m_nodes.push(node);
 }
 
@@ -849,7 +849,7 @@ fn Pipeline::is_empty() const -> bool { return m_commands.empty(); }
 
 fn Pipeline::append_command(const SimpleCommand *node) -> void
 {
-  m_location.add_length(node->source_location().length());
+  m_location.length += node->source_location().length;
   m_commands.push(node);
 }
 

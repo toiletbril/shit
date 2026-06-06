@@ -9,27 +9,17 @@ namespace shit {
 
 static constexpr usize ERROR_CONTEXT_SIZE = 24;
 
+/* A byte range in some source, trivially copyable, so it is a plain struct
+   passed and stored by value with no accessors. The position and length are
+   byte offsets and do not account for unicode. The filename is the name of the
+   file the offset indexes, or None when the source has no name, such as an
+   interactive line, and a backtrace frame reads it to prefix the caret header
+   with a path. */
 struct SourceLocation
 {
-  SourceLocation() = delete;
-  SourceLocation(usize position, usize length);
-  SourceLocation(usize position, usize length, Maybe<StringView> filename);
-
-  /* Both variables are byte-offsets and do not account for unicode. */
-  fn position() const -> usize;
-  fn length() const -> usize;
-
-  /* The name of the file the offset indexes, or None when the source has no
-     name, such as an interactive line. A backtrace frame reads it to prefix the
-     caret header with a path. */
-  fn filename() const -> Maybe<StringView>;
-
-  fn add_length(usize n) -> void;
-
-private:
-  usize m_position;
-  usize m_length;
-  Maybe<StringView> m_filename{};
+  usize position{0};
+  usize length{0};
+  Maybe<StringView> filename{};
 };
 
 struct ErrorBase

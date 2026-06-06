@@ -364,8 +364,8 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
     if (op_kind != Token::Kind::Less) {
       std::unique_ptr<Token> after{m_lexer.peek_shell_token()};
       if (after->kind() == Token::Kind::Ampersand &&
-          after->source_location().position() ==
-              op_location.position() + op_location.length())
+          after->source_location().position ==
+              op_location.position + op_location.length)
       {
         m_lexer.advance_past_last_peek();
         std::unique_ptr<Token> from{m_lexer.next_shell_token()};
@@ -475,8 +475,8 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
           const Token::Kind nk = next->kind();
           if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
                nk == Token::Kind::Less) &&
-              next->source_location().position() ==
-                  word_location.position() + word_location.length())
+              next->source_location().position ==
+                  word_location.position + word_location.length)
           {
             const SourceLocation op_location = next->source_location();
             m_lexer.advance_past_last_peek();
@@ -562,8 +562,8 @@ fn Parser::parse_simple_command() -> std::unique_ptr<Command>
       bool strip_tabs = false;
       /* <<- strips leading tabs, the dash touching the operator. */
       if (!delimiter.empty() && delimiter[0] == '-' &&
-          delimiter_token->source_location().position() ==
-              op_location.position() + op_location.length())
+          delimiter_token->source_location().position ==
+              op_location.position + op_location.length)
       {
         strip_tabs = true;
         delimiter = delimiter.substring(1);

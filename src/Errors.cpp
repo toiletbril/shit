@@ -169,8 +169,8 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
 
 fn ErrorWithLocation::to_string(StringView source) const -> String
 {
-  usize byte_position = m_location.position();
-  const usize byte_count = m_location.length();
+  usize byte_position = m_location.position;
+  const usize byte_count = m_location.length;
 
   SHIT_LOG_VARS(Verbosity::Debug, byte_position, byte_count);
   SHIT_LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
@@ -201,7 +201,7 @@ fn ErrorWithLocation::to_string(StringView source) const -> String
   String result{};
   /* A named source prefixes its path before the line and column, so a sourced
      error reads path:line:col rather than a bare line:col. */
-  if (let const name = m_location.filename(); name.has_value()) {
+  if (let const name = m_location.filename; name.has_value()) {
     result += *name;
     result += ':';
   }
@@ -242,8 +242,8 @@ ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
 fn ErrorWithLocationAndDetails::details_to_string(StringView source) const
     -> String
 {
-  usize byte_position = m_details_location.position();
-  const usize byte_count = m_details_location.length();
+  usize byte_position = m_details_location.position;
+  const usize byte_count = m_details_location.length;
 
   if (byte_position > 0 && byte_position == source.size() &&
       source[byte_position - 1] == '\n')

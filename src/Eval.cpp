@@ -2101,21 +2101,5 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
   return {location, std::move(kind), args};
 }
 
-SourceLocation::SourceLocation(usize position, usize length)
-    : m_position(position), m_length(length)
-{}
-
-SourceLocation::SourceLocation(usize position, usize length,
-                               Maybe<StringView> filename)
-    : m_position(position), m_length(length), m_filename(filename)
-{}
-
-fn SourceLocation::position() const -> usize { return m_position; }
-
-fn SourceLocation::length() const -> usize { return m_length; }
-
-fn SourceLocation::filename() const -> Maybe<StringView> { return m_filename; }
-
-fn SourceLocation::add_length(usize n) -> void { m_length += n; }
 
 } /* namespace shit */
