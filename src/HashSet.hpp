@@ -14,7 +14,7 @@ class HashSet
 public:
   explicit HashSet(Allocator allocator) : m_map(allocator) {}
 
-  void add(StringView key) { m_map.set(key, nothing{}); }
+  void add(StringView key) { m_map.set(key, Nothing{}); }
 
   [[nodiscard]] bool contains(StringView key) const
   {
@@ -27,11 +27,11 @@ public:
   void for_each(Fn callback) const
   {
     m_map.for_each(
-        [&callback](StringView key, const nothing &) { callback(key); });
+        [&callback](StringView key, const Nothing &) { callback(key); });
   }
 
 private:
-  HashMap<nothing> m_map;
+  HashMap<Nothing> m_map;
 };
 
 } /* namespace shit */

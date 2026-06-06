@@ -335,7 +335,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
   Maybe<SourceLocation> source_location;
   ArrayList<Token *> args_accumulator{};
   HashMap<Word> local_vars{heap_allocator()};
-  ArrayList<expressions::redirection> redirections{};
+  ArrayList<expressions::Redirection> redirections{};
 
   auto build_command = [&]() -> Command * {
     if (!source_location) return nullptr;
@@ -352,17 +352,17 @@ hot fn Parser::parse_simple_command() throws -> Command *
     return c;
   };
 
-  /* Build one redirection for descriptor fd. The operator is already consumed,
+  /* Build one redir for descriptor fd. The operator is already consumed,
      and op_location is its position. A & touching the operator means a
      descriptor duplication, n>&m, otherwise a filename word follows. */
   auto add_redirection = [&](i32 fd, Token::Kind op_kind,
                              SourceLocation op_location) {
     if (!source_location) source_location = op_location;
 
-    expressions::redirection redirection{};
-    redirection.fd = fd;
-    redirection.target = nullptr;
-    redirection.dup_fd = -1;
+    expressions::Redirection redir{};
+    redir.fd = fd;
+    redir.target = nullptr;
+    redir.dup_fd = -1;
 
     if (op_kind != Token::Kind::Less) {
       Token *after = m_lexer.peek_shell_token();
@@ -389,9 +389,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
           throw ErrorWithLocation{from->source_location(),
                                   "Expected a descriptor after '&'"};
         }
-        redirection.kind = expressions::redirection::Kind::DuplicateOutput;
-        redirection.dup_fd = from_fd;
-        redirections.push(redirection);
+        redir.kind = expressions::Redirection::Kind::DuplicateOutput;
+        redir.dup_fd = from_fd;
+        redirections.push(redir);
         return;
       }
     }
@@ -400,16 +400,16 @@ hot fn Parser::parse_simple_command() throws -> Command *
     ASSERT(target != nullptr);
     if (target->kind() != Token::Kind::Word) {
       throw ErrorWithLocation{target->source_location(),
-                              "Expected a filename after the redirection"};
+                              "Expected a filename after the redir"};
     }
     if (op_kind == Token::Kind::Greater)
-      redirection.kind = expressions::redirection::Kind::TruncateOutput;
+      redir.kind = expressions::Redirection::Kind::TruncateOutput;
     else if (op_kind == Token::Kind::DoubleGreater)
-      redirection.kind = expressions::redirection::Kind::AppendOutput;
+      redir.kind = expressions::Redirection::Kind::AppendOutput;
     else
-      redirection.kind = expressions::redirection::Kind::ReadInput;
-    redirection.target = target;
-    redirections.push(redirection);
+      redir.kind = expressions::Redirection::Kind::ReadInput;
+    redir.target = target;
+    redirections.push(redir);
   };
 
   for (;;) {
@@ -461,7 +461,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     case Token::Kind::Time:
     case Token::Kind::When:
     case Token::Kind::Function: {
-      /* A run of digits touching a redirection operator is a descriptor prefix,
+      /* A run of digits touching a redir operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
         const let literal = static_cast<tokens::WordToken *>(token)
@@ -585,15 +585,15 @@ hot fn Parser::parse_simple_command() throws -> Command *
         }
       }
 
-      expressions::redirection redirection{};
-      redirection.fd = 0;
-      redirection.kind = expressions::redirection::Kind::Heredoc;
-      redirection.target = nullptr;
-      redirection.dup_fd = -1;
-      redirection.heredoc_body =
+      expressions::Redirection redir{};
+      redir.fd = 0;
+      redir.kind = expressions::Redirection::Kind::Heredoc;
+      redir.target = nullptr;
+      redir.dup_fd = -1;
+      redir.heredoc_body =
           m_lexer.register_heredoc(delimiter, strip_tabs);
-      redirection.heredoc_expand = should_expand;
-      redirections.push(redirection);
+      redir.heredoc_expand = should_expand;
+      redirections.push(redir);
     } break;
 
     /* A separator, an operator, or a list terminator ends the command. */

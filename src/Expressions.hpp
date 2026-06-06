@@ -169,10 +169,11 @@ protected:
   const Assignment *m_assignment;
 };
 
-/* One redirection attached to a simple command. The target word is expanded to
+/* One Redirection attached to a simple command. The target word is expanded to
    a filename at evaluation, or for a duplication it names a file descriptor. */
-struct redirection
+class Redirection
 {
+public:
   enum class Kind : u8
   {
     TruncateOutput,  /* >    */
@@ -184,7 +185,7 @@ struct redirection
 
   i32 fd;
   Kind kind;
-  /* The filename word for a file redirection, or null otherwise. */
+  /* The filename word for a file Redirection, or null otherwise. */
   const Token *target;
   /* For a duplication, the descriptor to copy from, as in 2>&1. */
   i32 dup_fd;
@@ -199,7 +200,7 @@ public:
   SimpleCommand(SourceLocation location, ArrayList<const Token *> &&args);
   ~SimpleCommand() override;
 
-  fn set_redirections(ArrayList<redirection> &&redirections) throws -> void;
+  fn set_redirections(ArrayList<Redirection> &&redirections) throws -> void;
 
   /* Open this command's redirections into an exec context, for a pipeline stage
      that does not go through evaluate_impl. */
@@ -230,7 +231,7 @@ protected:
   mutable String m_resolved_name{};
   mutable Maybe<ResolvedCommand> m_resolved_kind{};
 
-  ArrayList<redirection> m_redirections{heap_allocator()};
+  ArrayList<Redirection> m_redirections{heap_allocator()};
 };
 
 class CompoundListCondition : public Expression

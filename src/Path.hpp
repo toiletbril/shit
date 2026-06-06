@@ -74,7 +74,7 @@ public:
 
   /* The working directory of the process. */
   [[nodiscard]] static fn current_directory() throws -> Path;
-  static fn set_current_directory(const Path &path) throws -> ErrorOr<ok>;
+  static fn set_current_directory(const Path &path) throws -> ErrorOr<Ok>;
   /* The directory for temporary files, from TMPDIR or a platform default. */
   [[nodiscard]] static fn temp_directory() throws -> Path;
 

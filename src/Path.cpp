@@ -230,11 +230,11 @@ fn Path::current_directory() throws -> Path
   return Path{};
 }
 
-fn Path::set_current_directory(const Path &path) throws -> ErrorOr<ok>
+fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
   if (::chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
-  return ok{};
+  return Success;
 }
 
 fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
@@ -306,11 +306,11 @@ fn Path::current_directory() -> Path
   return Path{};
 }
 
-fn Path::set_current_directory(const Path &path) -> ErrorOr<ok>
+fn Path::set_current_directory(const Path &path) -> ErrorOr<Ok>
 {
   if (_chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
-  return ok{};
+  return Success;
 }
 
 fn Path::read_directory(const Path &dir) -> Maybe<ArrayList<String>>

@@ -393,27 +393,27 @@ SimpleCommand::~SimpleCommand()
   for (const Token *t : m_args) {
     delete t;
   }
-  for (const redirection &redirection : m_redirections) {
-    delete redirection.target;
+  for (const Redirection &redir : m_redirections) {
+    delete redir.target;
   }
 }
 
-fn SimpleCommand::set_redirections(ArrayList<redirection> &&redirections) throws
+fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     -> void
 {
-  for (const redirection &redirection : redirections)
-    m_redirections.push(redirection);
+  for (const Redirection &redir : redirections)
+    m_redirections.push(redir);
 }
 
 fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     throws -> void
 {
-  for (const redirection &redirection : m_redirections) {
-    if (redirection.kind == redirection::Kind::Heredoc) {
-      ASSERT(redirection.heredoc_body != nullptr);
+  for (const Redirection &redir : m_redirections) {
+    if (redir.kind == Redirection::Kind::Heredoc) {
+      ASSERT(redir.heredoc_body != nullptr);
 
-      let body = std::string{*redirection.heredoc_body};
-      if (redirection.heredoc_expand) {
+      let body = std::string{*redir.heredoc_body};
+      if (redir.heredoc_expand) {
         let const expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
@@ -428,44 +428,44 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
       continue;
     }
 
-    if (redirection.kind == redirection::Kind::DuplicateOutput) {
-      if (redirection.fd == 2 && redirection.dup_fd == 1)
+    if (redir.kind == Redirection::Kind::DuplicateOutput) {
+      if (redir.fd == 2 && redir.dup_fd == 1)
         ec.dup_err_to_out = true;
-      else if (redirection.fd == 1 && redirection.dup_fd == 2)
+      else if (redir.fd == 1 && redir.dup_fd == 2)
         ec.dup_out_to_err = true;
       continue;
     }
 
-    ASSERT(redirection.target != nullptr);
+    ASSERT(redir.target != nullptr);
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
-    target_tokens.push(redirection.target);
+    target_tokens.push(redir.target);
     const ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
-      throw ErrorWithLocation{redirection.target->source_location(),
+      throw ErrorWithLocation{redir.target->source_location(),
                               "Redirection target is not a single file"};
     }
 
     let mode = os::FileOpenMode::Read;
-    if (redirection.kind == redirection::Kind::TruncateOutput)
+    if (redir.kind == Redirection::Kind::TruncateOutput)
       mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
                               : os::FileOpenMode::Truncate;
-    else if (redirection.kind == redirection::Kind::AppendOutput)
+    else if (redir.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
     const std::string target_path{target[0].c_str(), target[0].size()};
     let opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
-      throw ErrorWithLocation{redirection.target->source_location(),
+      throw ErrorWithLocation{redir.target->source_location(),
                               "Could not open '" + target_path +
                                   "': " + os::last_system_error_message()};
     }
     const os::descriptor file_fd = opened.take();
 
-    if (redirection.fd == 0) {
+    if (redir.fd == 0) {
       if (ec.in_fd) os::close_fd(*ec.in_fd);
       ec.in_fd = file_fd;
-    } else if (redirection.fd == 2) {
+    } else if (redir.fd == 2) {
       if (ec.err_fd) os::close_fd(*ec.err_fd);
       ec.err_fd = file_fd;
     } else {
@@ -574,14 +574,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   };
 
-  for (const redirection &redirection : m_redirections) {
+  for (const Redirection &redir : m_redirections) {
     /* A heredoc body becomes the standard input through an anonymous temp
        file, expanded when the delimiter was unquoted. */
-    if (redirection.kind == redirection::Kind::Heredoc) {
-      ASSERT(redirection.heredoc_body != nullptr);
+    if (redir.kind == Redirection::Kind::Heredoc) {
+      ASSERT(redir.heredoc_body != nullptr);
 
-      let body = std::string{*redirection.heredoc_body};
-      if (redirection.heredoc_expand) {
+      let body = std::string{*redir.heredoc_body};
+      if (redir.heredoc_expand) {
         let const expanded = cxt.expand_heredoc_body(body);
         body.assign(expanded.c_str(), expanded.size());
       }
@@ -598,35 +598,35 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     /* A duplication like 2>&1 routes one descriptor to another without a file.
      */
-    if (redirection.kind == redirection::Kind::DuplicateOutput) {
-      if (redirection.fd == 2 && redirection.dup_fd == 1)
+    if (redir.kind == Redirection::Kind::DuplicateOutput) {
+      if (redir.fd == 2 && redir.dup_fd == 1)
         dup_err_to_out = true;
-      else if (redirection.fd == 1 && redirection.dup_fd == 2)
+      else if (redir.fd == 1 && redir.dup_fd == 2)
         dup_out_to_err = true;
       continue;
     }
 
-    ASSERT(redirection.target != nullptr);
+    ASSERT(redir.target != nullptr);
 
     ArrayList<const Token *> target_tokens{heap_allocator()};
-    target_tokens.push(redirection.target);
+    target_tokens.push(redir.target);
     const ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.size() != 1) {
-      throw ErrorWithLocation{redirection.target->source_location(),
+      throw ErrorWithLocation{redir.target->source_location(),
                               "Redirection target is not a single file"};
     }
 
     let mode = os::FileOpenMode::Read;
-    if (redirection.kind == redirection::Kind::TruncateOutput)
+    if (redir.kind == Redirection::Kind::TruncateOutput)
       mode = cxt.no_clobber() ? os::FileOpenMode::TruncateNoClobber
                               : os::FileOpenMode::Truncate;
-    else if (redirection.kind == redirection::Kind::AppendOutput)
+    else if (redir.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
     const std::string target_path{target[0].c_str(), target[0].size()};
     let opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
-      throw ErrorWithLocation{redirection.target->source_location(),
+      throw ErrorWithLocation{redir.target->source_location(),
                               "Could not open '" + target_path +
                                   "': " + os::last_system_error_message()};
     }
@@ -634,10 +634,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     /* The last redirection of a descriptor wins, so a superseded open closes
        at once. */
-    if (redirection.fd == 0) {
+    if (redir.fd == 0) {
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
       redirect_in_fd = file_fd;
-    } else if (redirection.fd == 2) {
+    } else if (redir.fd == 2) {
       if (redirect_err_fd) os::close_fd(*redirect_err_fd);
       redirect_err_fd = file_fd;
     } else {

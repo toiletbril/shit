@@ -23,9 +23,12 @@ String integer_to_string(i64 value);
 } /* namespace utils */
 
 /* The success payload of a fallible function that returns no value. A caller
-   writes ErrorOr<ok> and returns ok{} on success. */
-struct ok
+   writes ErrorOr<Ok> and returns Success on success, the way None is the one
+   instance of Nothing. */
+class Ok
 {};
+
+inline constexpr Ok Success{};
 
 /* A value or an Error, held in one of two members of an explicit tagged union
    rather than a std::variant. The active member is tracked by m_is_error, and
