@@ -19,7 +19,7 @@ inline constexpr Nothing None{};
    out of an empty Maybe traps in the debug build. The value is stored inline,
    so no allocation happens. */
 template <class T>
-class [[nodiscard]] Maybe
+class mustuse Maybe
 {
 public:
   Maybe() noexcept : m_has_value(false) {}
@@ -56,26 +56,26 @@ public:
 
   ~Maybe() { reset(); }
 
-  [[nodiscard]] bool has_value() const noexcept { return m_has_value; }
-  [[nodiscard]] explicit operator bool() const noexcept { return m_has_value; }
+  mustuse bool has_value() const noexcept { return m_has_value; }
+  mustuse explicit operator bool() const noexcept { return m_has_value; }
 
-  [[nodiscard]] T &value()
+  mustuse T &value()
   {
     ASSERT(m_has_value);
     return reference();
   }
-  [[nodiscard]] const T &value() const
+  mustuse const T &value() const
   {
     ASSERT(m_has_value);
     return reference();
   }
-  [[nodiscard]] T &operator*() { return value(); }
-  [[nodiscard]] const T &operator*() const { return value(); }
-  [[nodiscard]] T *operator->() { return &reference(); }
-  [[nodiscard]] const T *operator->() const { return &reference(); }
+  mustuse T &operator*() { return value(); }
+  mustuse const T &operator*() const { return value(); }
+  mustuse T *operator->() { return &reference(); }
+  mustuse const T *operator->() const { return &reference(); }
 
   /* Move the value out, leaving the Maybe empty. */
-  [[nodiscard]] T take()
+  mustuse T take()
   {
     ASSERT(m_has_value);
     T moved = steal(reference());
@@ -84,18 +84,18 @@ public:
   }
 
   /* The value when present, otherwise the fallback. */
-  [[nodiscard]] T value_or(T fallback) const
+  mustuse T value_or(T fallback) const
   {
     return m_has_value ? reference() : steal(fallback);
   }
 
   /* Equal to a bare value only when present and that value matches, so a
      comparison reads like the one against a std::optional. */
-  [[nodiscard]] bool operator==(const T &other) const
+  mustuse bool operator==(const T &other) const
   {
     return m_has_value && reference() == other;
   }
-  [[nodiscard]] bool operator!=(const T &other) const
+  mustuse bool operator!=(const T &other) const
   {
     return !(*this == other);
   }

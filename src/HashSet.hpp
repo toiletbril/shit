@@ -16,12 +16,12 @@ public:
 
   void add(StringView key) { m_map.set(key, Nothing{}); }
 
-  [[nodiscard]] bool contains(StringView key) const
+  mustuse bool contains(StringView key) const
   {
     return m_map.find(key) != nullptr;
   }
 
-  [[nodiscard]] usize count() const { return m_map.count(); }
+  mustuse usize count() const { return m_map.count(); }
 
   template <class Fn>
   void for_each(Fn callback) const

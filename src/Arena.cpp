@@ -16,12 +16,27 @@ fn is_arena_pointer(const void *pointer) wontthrow -> bool
          (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
 }
 
+void *bump_arena_allocate(BumpArena *arena, usize length, usize alignment)
+{
+  return arena->allocate(length, alignment);
+}
+
 BumpArena::BumpArena() = default;
 
 BumpArena::~BumpArena()
 {
+  run_destructors_down_to(0);
   for (block &block : m_blocks)
     std::free(block.base);
+}
+
+fn BumpArena::run_destructors_down_to(usize first) wontthrow -> void
+{
+  while (m_destructors.count() > first) {
+    const pending_destructor pending = m_destructors.back();
+    m_destructors.pop_back();
+    pending.run(pending.object);
+  }
 }
 
 cold fn BumpArena::add_block(usize minimum_size) throws -> void
@@ -34,13 +49,13 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
 
   ASSERT(size >= minimum_size, "fresh block must fit the requested allocation");
 
-  m_blocks.push_back(block{base, size, 0});
+  m_blocks.push(block{base, size, 0});
 }
 
 hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 {
   for (;;) {
-    if (!m_blocks.empty()) {
+    if (!m_blocks.is_empty()) {
       block &block = m_blocks.back();
       const usize aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
 
@@ -69,19 +84,21 @@ hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
 
 fn BumpArena::mark() const wontthrow -> BumpArena::Mark
 {
-  if (m_blocks.empty()) return Mark{0, 0};
-  return Mark{m_blocks.size(), m_blocks.back().used};
+  if (m_blocks.is_empty()) return Mark{0, 0, m_destructors.count()};
+  return Mark{m_blocks.count(), m_blocks.back().used, m_destructors.count()};
 }
 
 fn BumpArena::release(Mark saved) wontthrow -> void
 {
-  ASSERT(saved.block_count <= m_blocks.size(),
+  ASSERT(saved.block_count <= m_blocks.count(),
          "mark cannot name more blocks than the arena holds");
+
+  run_destructors_down_to(saved.destructor_count);
 
   /* Reset the bump pointer to the marked position, keeping the blocks so a loop
      body reuses the same storage each turn instead of asking the system again.
      The blocks past the mark stay allocated but become free space. */
-  for (usize i = saved.block_count; i < m_blocks.size(); i++)
+  for (usize i = saved.block_count; i < m_blocks.count(); i++)
     m_blocks[i].used = 0;
 
   if (saved.block_count > 0) {
@@ -92,12 +109,15 @@ fn BumpArena::release(Mark saved) wontthrow -> void
 
 fn BumpArena::reset() wontthrow -> void
 {
+  run_destructors_down_to(0);
+
   /* Keep the first block and drop the rest, so a typical command reuses one
      block without asking the system for memory again. */
-  for (usize i = 1; i < m_blocks.size(); i++)
+  for (usize i = 1; i < m_blocks.count(); i++)
     std::free(m_blocks[i].base);
-  if (m_blocks.size() > 1) m_blocks.resize(1);
-  if (!m_blocks.empty()) m_blocks.front().used = 0;
+  while (m_blocks.count() > 1)
+    m_blocks.pop_back();
+  if (!m_blocks.is_empty()) m_blocks.front().used = 0;
 }
 
 } /* namespace shit */

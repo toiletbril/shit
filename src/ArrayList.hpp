@@ -60,14 +60,14 @@ public:
 
   ~ArrayList() { destroy_all(); }
 
-  [[nodiscard]] usize count() const { return m_length; }
-  [[nodiscard]] bool is_empty() const { return m_length == 0; }
-  [[nodiscard]] T &operator[](usize i) { return m_data[i]; }
-  [[nodiscard]] const T &operator[](usize i) const { return m_data[i]; }
-  [[nodiscard]] T *begin() { return m_data; }
-  [[nodiscard]] T *end() { return m_data + m_length; }
-  [[nodiscard]] const T *begin() const { return m_data; }
-  [[nodiscard]] const T *end() const { return m_data + m_length; }
+  mustuse usize count() const { return m_length; }
+  mustuse bool is_empty() const { return m_length == 0; }
+  mustuse T &operator[](usize i) { return m_data[i]; }
+  mustuse const T &operator[](usize i) const { return m_data[i]; }
+  mustuse T *begin() { return m_data; }
+  mustuse T *end() { return m_data + m_length; }
+  mustuse const T *begin() const { return m_data; }
+  mustuse const T *end() const { return m_data + m_length; }
 
   void push(T value)
   {
@@ -94,10 +94,10 @@ public:
     m_length = 0;
   }
 
-  [[nodiscard]] T &back() { return m_data[m_length - 1]; }
-  [[nodiscard]] const T &back() const { return m_data[m_length - 1]; }
-  [[nodiscard]] T &front() { return m_data[0]; }
-  [[nodiscard]] const T &front() const { return m_data[0]; }
+  mustuse T &back() { return m_data[m_length - 1]; }
+  mustuse const T &back() const { return m_data[m_length - 1]; }
+  mustuse T &front() { return m_data[0]; }
+  mustuse const T &front() const { return m_data[0]; }
 
   void reserve(usize needed)
   {

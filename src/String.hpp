@@ -75,15 +75,15 @@ public:
 
   ~String() { free_storage(); }
 
-  [[nodiscard]] usize count() const { return m_length; }
-  [[nodiscard]] bool is_empty() const { return m_length == 0; }
-  [[nodiscard]] char operator[](usize i) const { return m_data[i]; }
-  [[nodiscard]] StringView view() const { return StringView{m_data, m_length}; }
+  mustuse usize count() const { return m_length; }
+  mustuse bool is_empty() const { return m_length == 0; }
+  mustuse char operator[](usize i) const { return m_data[i]; }
+  mustuse StringView view() const { return StringView{m_data, m_length}; }
   /* A String reads as a view wherever one is expected, so an owned string
      passes to a comparison or a function taking a view without spelling out
      view(). */
   operator StringView() const { return StringView{m_data, m_length}; }
-  [[nodiscard]] const char *c_str() const
+  mustuse const char *c_str() const
   {
     return m_data != nullptr ? m_data : "";
   }
@@ -124,9 +124,9 @@ public:
   }
 
   /* The byte buffer, always null terminated. */
-  [[nodiscard]] const char *data() const { return c_str(); }
-  [[nodiscard]] usize length() const { return m_length; }
-  [[nodiscard]] char back() const
+  mustuse const char *data() const { return c_str(); }
+  mustuse usize length() const { return m_length; }
+  mustuse char back() const
   {
     ASSERT(m_length > 0, "back() on an empty string");
     return m_data[m_length - 1];
@@ -153,34 +153,34 @@ public:
 
   /* Search and slice forward to the view, so the owned string answers the same
      questions a std::string does without exposing its buffer. */
-  [[nodiscard]] Maybe<usize> find_character(char wanted) const
+  mustuse Maybe<usize> find_character(char wanted) const
   {
     return view().find_character(wanted);
   }
-  [[nodiscard]] StringView substring(usize start) const
+  mustuse StringView substring(usize start) const
   {
     return view().substring(start);
   }
-  [[nodiscard]] StringView substring_of_length(usize start, usize count) const
+  mustuse StringView substring_of_length(usize start, usize count) const
   {
     return view().substring_of_length(start, count);
   }
-  [[nodiscard]] bool starts_with(StringView prefix) const
+  mustuse bool starts_with(StringView prefix) const
   {
     return view().starts_with(prefix);
   }
 
-  [[nodiscard]] bool operator==(StringView other) const
+  mustuse bool operator==(StringView other) const
   {
     return view() == other;
   }
-  [[nodiscard]] bool operator!=(StringView other) const
+  mustuse bool operator!=(StringView other) const
   {
     return !(view() == other);
   }
 
   /* Byte order, so a sort matches the C locale collating order. */
-  [[nodiscard]] bool operator<(const String &other) const
+  mustuse bool operator<(const String &other) const
   {
     usize shared = m_length < other.m_length ? m_length : other.m_length;
     int order = shared == 0 ? 0 : std::memcmp(c_str(), other.c_str(), shared);
@@ -189,7 +189,7 @@ public:
   }
 
   /* The first byte. The caller guarantees the string is not empty. */
-  [[nodiscard]] char first_character() const
+  mustuse char first_character() const
   {
     ASSERT(m_length > 0, "first_character() on an empty string");
     return m_data[0];
@@ -197,7 +197,7 @@ public:
 
   /* The index of the first occurrence of a substring at or after a start, or
      None when it is absent. */
-  [[nodiscard]] Maybe<usize> find_substring(StringView needle,
+  mustuse Maybe<usize> find_substring(StringView needle,
                                             usize from = 0) const
   {
     if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
@@ -208,7 +208,7 @@ public:
   }
 
   /* The index of the last occurrence of a byte, or None when it is absent. */
-  [[nodiscard]] Maybe<usize> find_last_character(char wanted) const
+  mustuse Maybe<usize> find_last_character(char wanted) const
   {
     for (usize i = m_length; i > 0; i--)
       if (m_data[i - 1] == wanted) return i - 1;

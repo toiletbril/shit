@@ -1,12 +1,17 @@
 #pragma once
 
-#include "Arena.hpp"
 #include "Common.hpp"
 
 #include <cstdlib>
 #include <cstring>
 
 namespace shit {
+
+/* Forward declared, so the allocator header does not include the arena header,
+   which would close the ArrayList -> Allocator -> Arena include cycle. The bump
+   adapter reaches the arena through a free function defined in Arena.cpp. */
+class BumpArena;
+void *bump_arena_allocate(BumpArena *arena, usize length, usize alignment);
 
 /* An allocator value, in the manner of Zig's std.mem.Allocator. It carries a
    context and a table of operations, so a data structure is handed the
@@ -61,7 +66,8 @@ namespace allocators {
    lifetime of its allocations is the lifetime of the arena. */
 inline void *bump_alloc(void *context, usize length, usize alignment)
 {
-  return static_cast<BumpArena *>(context)->allocate(length, alignment);
+  return bump_arena_allocate(static_cast<BumpArena *>(context), length,
+                             alignment);
 }
 inline bool bump_resize(void *context, void *pointer, usize old_length,
                         usize new_length, usize alignment)

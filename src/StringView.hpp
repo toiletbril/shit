@@ -26,16 +26,16 @@ public:
      gone from the tree. TODO: drop with the last std::string. */
   StringView(const std::string &s) : data(s.data()), length(s.size()) {}
 
-  [[nodiscard]] usize count() const { return length; }
-  [[nodiscard]] bool is_empty() const { return length == 0; }
-  [[nodiscard]] char operator[](usize i) const { return data[i]; }
+  mustuse usize count() const { return length; }
+  mustuse bool is_empty() const { return length == 0; }
+  mustuse char operator[](usize i) const { return data[i]; }
 
-  [[nodiscard]] bool operator==(StringView other) const
+  mustuse bool operator==(StringView other) const
   {
     return length == other.length &&
            (length == 0 || std::memcmp(data, other.data, length) == 0);
   }
-  [[nodiscard]] bool operator!=(StringView other) const
+  mustuse bool operator!=(StringView other) const
   {
     return !(*this == other);
   }
@@ -43,7 +43,7 @@ public:
   /* The index of the first occurrence of a byte, or None when it is absent.
      A Maybe keeps the absent case out of band rather than using a sentinel
      index. */
-  [[nodiscard]] Maybe<usize> find_character(char wanted) const
+  mustuse Maybe<usize> find_character(char wanted) const
   {
     for (usize i = 0; i < length; i++)
       if (data[i] == wanted) return i;
@@ -52,21 +52,21 @@ public:
 
   /* The view from start to the end. A start past the end yields an empty view.
    */
-  [[nodiscard]] StringView substring(usize start) const
+  mustuse StringView substring(usize start) const
   {
     if (start >= length) return StringView{data + length, 0};
     return StringView{data + start, length - start};
   }
 
   /* The view of count bytes from start, clamped to what remains. */
-  [[nodiscard]] StringView substring_of_length(usize start, usize count) const
+  mustuse StringView substring_of_length(usize start, usize count) const
   {
     if (start >= length) return StringView{data + length, 0};
     usize remaining = length - start;
     return StringView{data + start, count < remaining ? count : remaining};
   }
 
-  [[nodiscard]] bool starts_with(StringView prefix) const
+  mustuse bool starts_with(StringView prefix) const
   {
     if (prefix.length > length) return false;
     /* An empty prefix matches, and the guard keeps a null data pointer out of

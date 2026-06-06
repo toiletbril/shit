@@ -132,6 +132,9 @@ public:
 /* Move a value, reading as taking ownership out of the source. */
 #define steal std::move
 
+/* A return value the caller must not ignore. */
+#define mustuse [[nodiscard]]
+
 /* Every function is written `fn name(args) -> ret` and every variable `let x`,
    so the name leads and the type trails, matching the oo style. */
 #define fn  auto

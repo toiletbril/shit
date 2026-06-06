@@ -1925,7 +1925,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
         /* A frame is context under the primary error, not an error of its own,
            so it prints with the Trace severity rather than Error. */
         let const sourced_here =
-            TraceWithLocation{frame.call_site, "sourced here"};
+            TraceWithLocation{frame.call_site};
         show_message(sourced_here.to_string(*frame.parent_source));
       } else {
         show_message("This error was raised while running " + frame.origin +

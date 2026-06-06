@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Common.hpp"
 #include "Containers.hpp"

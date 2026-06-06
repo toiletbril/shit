@@ -71,11 +71,11 @@ public:
 
   ~HashMap() { destroy_all(); }
 
-  [[nodiscard]] usize count() const { return m_count; }
+  mustuse usize count() const { return m_count; }
 
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */
-  [[nodiscard]] const Value *find(StringView key) const
+  mustuse const Value *find(StringView key) const
   {
     if (m_capacity == 0) return nullptr;
     PackedStringKey wanted = PackedStringKey::from_view(key);

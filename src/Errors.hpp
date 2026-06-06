@@ -111,7 +111,7 @@ public:
 class TraceWithLocation : public ErrorWithLocation
 {
 public:
-  TraceWithLocation(SourceLocation location, StringView message);
+  TraceWithLocation(SourceLocation location);
 
   fn severity_word() const wontthrow -> String override;
 };

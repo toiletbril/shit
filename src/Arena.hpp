@@ -1,18 +1,20 @@
 #pragma once
 
+#include "ArrayList.hpp"
 #include "Common.hpp"
 
 #include <new>
+#include <type_traits>
 #include <utility>
-#include <vector>
 
 namespace shit {
 
 /* A bump arena hands out node storage from large blocks and frees every block
    at once on reset. The AST and its tokens live here for one command, so their
-   many small allocations collapse into a handful of block allocations. The node
-   destructors still run through the normal delete, see the operator delete on
-   Expression and Token that no-ops for arena storage. */
+   many small allocations collapse into a handful of block allocations. An object
+   with a non-trivial destructor, such as a node that owns a heap String, has its
+   destructor registered at create and run on reset or release, since the block
+   reclaim alone would leak those owned members. */
 class BumpArena
 {
 public:
@@ -33,6 +35,7 @@ public:
   {
     usize block_count;
     usize used_in_last;
+    usize destructor_count;
   };
   fn mark() const wontthrow -> Mark;
   fn release(Mark saved) wontthrow -> void;
@@ -41,7 +44,13 @@ public:
   flatten fn create(Args &&...args) throws -> T *
   {
     void *const storage = allocate(sizeof(T), alignof(T));
-    return new (storage) T(std::forward<Args>(args)...);
+    T *const object = new (storage) T(std::forward<Args>(args)...);
+    /* A trivially destructible object needs no teardown, so the registration is
+       skipped and only the genuinely-owning ones cost a slot. */
+    if constexpr (!std::is_trivially_destructible_v<T>)
+      m_destructors.push(
+          pending_destructor{object, [](void *p) { static_cast<T *>(p)->~T(); }});
+    return object;
   }
 
 private:
@@ -52,11 +61,23 @@ private:
     usize used;
   };
 
+  /* One registered teardown, the object and a thunk that calls its destructor,
+     run when the storage above it is reclaimed. */
+  struct pending_destructor
+  {
+    void *object;
+    void (*run)(void *);
+  };
+
   static constexpr usize DEFAULT_BLOCK_SIZE = 64 * 1024;
 
-  std::vector<block> m_blocks{};
+  ArrayList<block> m_blocks{heap_allocator()};
+  ArrayList<pending_destructor> m_destructors{heap_allocator()};
 
   fn add_block(usize minimum_size) throws -> void;
+  /* Run and drop every registered destructor from the index down to first, in
+     reverse of registration so an object tears down before the one it followed. */
+  fn run_destructors_down_to(usize first) wontthrow -> void;
 };
 
 /* The arena that the lexer and parser allocate nodes from while a command is

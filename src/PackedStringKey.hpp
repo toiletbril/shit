@@ -46,7 +46,7 @@ public:
     return key;
   }
 
-  [[nodiscard]] bool operator==(const PackedStringKey &other) const
+  mustuse bool operator==(const PackedStringKey &other) const
   {
     return low_word == other.low_word && high_word == other.high_word;
   }

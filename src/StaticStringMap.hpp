@@ -24,7 +24,7 @@ public:
   const entry *entries;
   usize entry_count;
 
-  [[nodiscard]] Maybe<Value> find(StringView text) const
+  mustuse Maybe<Value> find(StringView text) const
   {
     if (text.count() > 16) return None;
     PackedStringKey wanted = PackedStringKey::from_view(text);

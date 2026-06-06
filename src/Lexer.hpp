@@ -57,10 +57,10 @@ public:
   Lexer(const Lexer &) = delete;
   Lexer &operator=(const Lexer &) = delete;
 
-  [[nodiscard]] fn peek_expression_token() throws -> Token *;
-  [[nodiscard]] fn peek_shell_token() throws -> Token *;
-  [[nodiscard]] fn next_expression_token() throws -> Token *;
-  [[nodiscard]] fn next_shell_token() throws -> Token *;
+  mustuse fn peek_expression_token() throws -> Token *;
+  mustuse fn peek_shell_token() throws -> Token *;
+  mustuse fn next_expression_token() throws -> Token *;
+  mustuse fn next_shell_token() throws -> Token *;
 
   pure fn source() const wontthrow -> StringView;
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;

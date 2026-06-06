@@ -35,7 +35,7 @@ inline constexpr Ok Success{};
    the storage is sized for the larger of the two, so only one is alive at a
    time and no heap allocation happens for the discriminant. */
 template <class T>
-class [[nodiscard]] ErrorOr
+class mustuse ErrorOr
 {
 public:
   ErrorOr(T value) : m_is_error(false) { new (&m_storage) T(steal(value)); }
@@ -86,32 +86,32 @@ public:
 
   ~ErrorOr() { destroy(); }
 
-  [[nodiscard]] bool is_error() const { return m_is_error; }
+  mustuse bool is_error() const { return m_is_error; }
 
-  [[nodiscard]] T &value()
+  mustuse T &value()
   {
     ASSERT(!m_is_error);
     return value_reference();
   }
-  [[nodiscard]] const T &value() const
+  mustuse const T &value() const
   {
     ASSERT(!m_is_error);
     return value_reference();
   }
 
-  [[nodiscard]] Error &error()
+  mustuse Error &error()
   {
     ASSERT(m_is_error);
     return error_reference();
   }
-  [[nodiscard]] const Error &error() const
+  mustuse const Error &error() const
   {
     ASSERT(m_is_error);
     return error_reference();
   }
 
   /* Move the value out, called once the caller has checked is_error. */
-  [[nodiscard]] T take()
+  mustuse T take()
   {
     ASSERT(!m_is_error);
     return steal(value_reference());

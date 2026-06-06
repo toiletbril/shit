@@ -240,9 +240,14 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   result += std::to_string(line_byte_position);
   result += ": ";
   result += severity_word();
-  result += ": ";
-  result += m_message;
-  result += ".\n";
+  /* A located note with no message, such as a backtrace trace frame, ends at the
+     severity word, so nothing follows the colon. */
+  if (!m_message.is_empty()) {
+    result += ": ";
+    result += m_message;
+    result += '.';
+  }
+  result += '\n';
 
   result += get_context_pointing_to(source, byte_position, byte_count,
                                     line_number, last_newline_location,
@@ -260,9 +265,8 @@ cold fn WarningWithLocation::severity_word() const wontthrow -> String
   return "Warning";
 }
 
-TraceWithLocation::TraceWithLocation(SourceLocation location,
-                                     StringView message)
-    : ErrorWithLocation(location, message)
+TraceWithLocation::TraceWithLocation(SourceLocation location)
+    : ErrorWithLocation(location, {})
 {}
 
 cold fn TraceWithLocation::severity_word() const wontthrow -> String

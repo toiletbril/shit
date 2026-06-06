@@ -27,7 +27,7 @@ public:
   Builtin::Kind builtin_kind{};
   Path program_path{};
 
-  [[nodiscard]] static ResolvedCommand
+  mustuse static ResolvedCommand
   from_builtin(Builtin::Kind chosen_builtin)
   {
     ResolvedCommand resolved{};
@@ -36,7 +36,7 @@ public:
     return resolved;
   }
 
-  [[nodiscard]] static ResolvedCommand from_program(Path path)
+  mustuse static ResolvedCommand from_program(Path path)
   {
     ResolvedCommand resolved{};
     resolved.kind = Kind::Program;
@@ -44,7 +44,7 @@ public:
     return resolved;
   }
 
-  [[nodiscard]] bool is_builtin() const { return kind == Kind::Builtin; }
+  mustuse bool is_builtin() const { return kind == Kind::Builtin; }
 };
 
 } /* namespace shit */

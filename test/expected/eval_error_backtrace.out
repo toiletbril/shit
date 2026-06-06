@@ -10,7 +10,7 @@
 shit: eval:1:1: Error: Program 'badcmd_xyzzy' wasn't found.
      1 |  badcmd_xyzzy
        |  ^~~~~~~~~~~~ here.
-shit: 1:1: Trace: sourced here.
+shit: 1:1: Trace
      1 |  eval 'badcmd_xyzzy'
-       |  ^~~~ here.
+       |  ^~~~~~~~~~~~~~~~~~~ here.
 [Code 1]

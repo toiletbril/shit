@@ -386,6 +386,16 @@ SimpleCommand::SimpleCommand(SourceLocation location,
 {
   for (const Token *arg : args)
     m_args.push(arg);
+
+  /* The command's location spans from its first word to the end of its last,
+     so a caret under the whole command, such as a sourced '. file' in a
+     backtrace, covers the argument and not only the command word. */
+  if (!m_args.is_empty()) {
+    const SourceLocation first = m_args[0]->source_location();
+    const SourceLocation last = m_args.back()->source_location();
+    m_location.position = first.position;
+    m_location.length = last.position + last.length - first.position;
+  }
 }
 
 SimpleCommand::~SimpleCommand()
