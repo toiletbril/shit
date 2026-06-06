@@ -2099,9 +2099,9 @@ ExecContext::builtin_kind() const
 }
 
 void
-ExecContext::print_to_stdout(const std::string &s) const
+ExecContext::print_to_stdout(StringView s) const
 {
-  if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data(), s.size())
+  if (!os::write_fd(out_fd.value_or(SHIT_STDOUT), s.data, s.length)
            .has_value())
   {
     throw Error{"Unable to write to stdout: " +

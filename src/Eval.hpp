@@ -485,7 +485,7 @@ struct ExecContext
   const SourceLocation &source_location() const;
 
   void close_fds();
-  void print_to_stdout(const std::string &s) const;
+  void print_to_stdout(StringView s) const;
 
   i32 execute(bool is_async);
 
