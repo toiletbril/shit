@@ -124,6 +124,74 @@ pure fn word_has_backtick(const Word &word) wontthrow -> bool
   return false;
 }
 
+/* A flattened view of a word's bytes paired with whether each byte is an active
+   glob metacharacter. Only an unquoted '[' or ']' is active, so a quoted "[" or
+   an escaped \[ stays literal and never opens a bracket expression. */
+struct GlobScanByte
+{
+  char ch;
+  bool is_glob_active;
+};
+
+fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<GlobScanByte>
+{
+  ArrayList<GlobScanByte> bytes{heap_allocator()};
+  for (const WordSegment &segment : word.segments) {
+    const bool is_active = segment.has_live_glob_chars();
+    for (usize i = 0; i < segment.text.size(); i++) {
+      bytes.push(GlobScanByte{segment.text[i], is_active});
+    }
+  }
+  return bytes;
+}
+
+/* A word's bracket expressions are well-formed when every active '[' that opens
+   a character class is closed by a later ']'. The scan mirrors the matcher in
+   utils::glob_matches, an active '[' that has no closing ']' is a literal there,
+   so only a '[' that does open a class and never closes raises an error. A lone
+   trailing '[', such as the test command word, opens nothing and stays literal.
+   Returns true when malformed. */
+fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
+{
+  const ArrayList<GlobScanByte> bytes = collect_glob_scan_bytes(word);
+
+  usize position = 0;
+  while (position < bytes.size()) {
+    if (!(bytes[position].is_glob_active && bytes[position].ch == '[')) {
+      position++;
+      continue;
+    }
+
+    /* A '[' with nothing after it is the last byte of the word, so it cannot
+       open a character class and stays literal, like the test command word. */
+    usize scan = position + 1;
+    if (scan >= bytes.size()) {
+      position++;
+      continue;
+    }
+
+    /* A leading '^' negates the class and a ']' right after '[' or '[^' is a
+       member, so the search for the closing ']' starts past both, matching the
+       matcher's prescan. */
+    if (scan < bytes.size() && bytes[scan].ch == '^') scan++;
+    if (scan < bytes.size() && bytes[scan].ch == ']') scan++;
+
+    bool has_closing_bracket = false;
+    for (; scan < bytes.size(); scan++) {
+      if (bytes[scan].ch == ']') {
+        has_closing_bracket = true;
+        break;
+      }
+    }
+
+    if (!has_closing_bracket) return true;
+
+    position = scan + 1;
+  }
+
+  return false;
+}
+
 } /* namespace */
 
 fn analyze_ast(const Expression *root, StringView source,
@@ -1720,6 +1788,19 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) con
       actx.warn(t->source_location(),
                 "Backquote command substitution is not supported, use $(...) "
                 "instead");
+    }
+  }
+
+  /* A glob pattern with an unterminated bracket expression can never compile
+     into a matcher, so the expansion would throw at run time. The malformed
+     pattern is visible from the word bytes alone, so the prepass rejects it
+     here at the located word. */
+  for (const Token *t : m_args) {
+    if (t->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(t)->word();
+    if (word_has_malformed_glob_bracket(word)) {
+      actx.fail(t->source_location(),
+                "Malformed glob pattern, unterminated '['");
     }
   }
 

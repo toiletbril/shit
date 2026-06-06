@@ -1,0 +1,13 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[abc"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "[abc"
+]
+shit: 1:6: Error: Malformed glob pattern, unterminated '['.
+     1 |  echo [abc
+       |       ^~~~ here.
+[Code 1]

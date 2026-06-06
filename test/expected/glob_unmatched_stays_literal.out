@@ -1,0 +1,11 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a*.zzznomatch"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a*.zzznomatch"
+]
+a*.zzznomatch
+[Code 0]
