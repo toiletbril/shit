@@ -147,9 +147,9 @@ struct EvalContext
     m_scratch_arena.reset();
   }
 
-  void set_shell_variable(const std::string &name, std::string value);
-  void unset_shell_variable(const std::string &name);
-  Maybe<std::string> get_variable_value(const std::string &name) const;
+  void set_shell_variable(StringView name, std::string value);
+  void unset_shell_variable(StringView name);
+  Maybe<std::string> get_variable_value(StringView name) const;
 
   /* The stored value of a plain shell variable, or nullptr when the name is
      unset or names a special parameter. The pointer reads the value without a
@@ -191,10 +191,10 @@ struct EvalContext
   /* Shell functions live in the parse arena, so the table is cleared before
      each top-level parse to avoid pointing at freed storage. A function shadows
      a builtin and a program of the same name. */
-  void register_function(const std::string &name, const Expression *body);
-  const Expression *find_function(const std::string &name) const;
+  void register_function(StringView name, const Expression *body);
+  const Expression *find_function(StringView name) const;
   bool has_functions() const;
-  void unset_function(const std::string &name);
+  void unset_function(StringView name);
   void clear_functions();
 
   /* The names of every defined function, so the prepass of a later command
@@ -203,15 +203,15 @@ struct EvalContext
 
   /* trap stores an action to run for a condition, keyed by the condition name
      such as EXIT or INT. The EXIT action runs once when the shell ends. */
-  void set_trap(const std::string &condition, const std::string &action);
-  void remove_trap(const std::string &condition);
+  void set_trap(StringView condition, StringView action);
+  void remove_trap(StringView condition);
   const HashMap<String> &traps() const;
   void run_exit_trap();
 
   /* readonly marks a variable so a later assignment to it fails. The set is
      usually empty, so set_shell_variable only scans it when it is not. */
-  void mark_readonly(const std::string &name);
-  bool is_readonly(const std::string &name) const;
+  void mark_readonly(StringView name);
+  bool is_readonly(StringView name) const;
   ArrayList<String> readonly_names() const;
 
   /* A function call pushes a local scope so a local builtin inside it can
@@ -221,13 +221,13 @@ struct EvalContext
   void enter_function_scope();
   void leave_function_scope();
   bool in_function_scope() const;
-  void declare_local(const std::string &name);
+  void declare_local(StringView name);
 
   /* alias maps a command word to its replacement text, consulted by the parser
      before a simple command. */
-  void set_alias(const std::string &name, const std::string &value);
-  bool remove_alias(const std::string &name);
-  Maybe<std::string> get_alias(const std::string &name) const;
+  void set_alias(StringView name, StringView value);
+  bool remove_alias(StringView name);
+  Maybe<std::string> get_alias(StringView name) const;
   ArrayList<String> alias_definitions() const;
   /* The defined alias names, so the prepass treats a use of one as resolvable. */
   HashSet alias_names() const;
@@ -432,7 +432,7 @@ protected:
   /* Write a variable without the read-only check, for restoring a shadowed
      local on function return where a throw from a noexcept defer would
      terminate the shell. */
-  void assign_variable(const std::string &name, const std::string &value);
+  void assign_variable(StringView name, StringView value);
 
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */

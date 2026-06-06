@@ -62,14 +62,12 @@ EvalContext::end_command()
 }
 
 void
-EvalContext::assign_variable(const std::string &name, const std::string &value)
+EvalContext::assign_variable(StringView name, StringView value)
 {
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
-  if (name == "IFS")
-    set_field_separators(StringView{value.data(), value.size()});
-  m_shell_variables.set(StringView{name.data(), name.size()},
-                        StringView{value.data(), value.size()});
+  if (name == "IFS") set_field_separators(value);
+  m_shell_variables.set(name, value);
 }
 
 void
@@ -89,29 +87,30 @@ EvalContext::is_field_separator(char c) const
 }
 
 void
-EvalContext::set_shell_variable(const std::string &name, std::string value)
+EvalContext::set_shell_variable(StringView name, std::string value)
 {
   /* A read-only variable rejects the assignment. The common case has no
      read-only names, so the scan is skipped entirely. */
   if (is_readonly(name))
-    throw Error{"'" + name + "' is read only and cannot be assigned"};
+    throw Error{"'" + std::string{name.data, name.length} +
+                "' is read only and cannot be assigned"};
 
   assign_variable(name, value);
 }
 
 void
-EvalContext::unset_shell_variable(const std::string &name)
+EvalContext::unset_shell_variable(StringView name)
 {
-  m_shell_variables.erase(StringView{name.data(), name.size()});
+  m_shell_variables.erase(name);
   /* An exported variable also lives in the process environment, so it is removed
      there too. Otherwise a later lookup falls back to the stale environment
      value and the variable appears still set, which dash does not do. */
-  os::unset_environment_variable(name);
+  os::unset_environment_variable(std::string{name.data, name.length});
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
 Maybe<std::string>
-EvalContext::get_variable_value(const std::string &name) const
+EvalContext::get_variable_value(StringView name) const
 {
   if (name == "?") return std::to_string(m_last_exit_status);
   if (name == "$") return std::to_string(os::get_shell_process_id());
@@ -124,12 +123,15 @@ EvalContext::get_variable_value(const std::string &name) const
 
   /* A purely numeric name selects a positional parameter, $1 upward. An index
      too large to fit, or beyond the count, has no value. */
-  if (!name.empty() &&
-      std::all_of(name.begin(), name.end(),
-                  [](unsigned char c) { return std::isdigit(c) != 0; }))
-  {
+  bool is_all_digits = !name.empty();
+  for (usize i = 0; i < name.size(); i++)
+    if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
+      is_all_digits = false;
+      break;
+    }
+  if (is_all_digits) {
     if (name.size() > 9) return std::string{};
-    usize index = std::stoul(name);
+    usize index = std::stoul(std::string{name.data, name.length});
     if (index >= 1 && index <= m_positional_params.size()) {
       const String &param = m_positional_params[index - 1];
       return std::string{param.c_str(), param.size()};
@@ -154,11 +156,11 @@ EvalContext::get_variable_value(const std::string &name) const
     return joined;
   }
 
-  if (const String *stored =
-          m_shell_variables.find(StringView{name.data(), name.size()}))
+  if (const String *stored = m_shell_variables.find(name))
     return std::string{stored->c_str(), stored->size()};
 
-  if (std::optional<std::string> env = os::get_environment_variable(name))
+  if (std::optional<std::string> env =
+          os::get_environment_variable(std::string{name.data, name.length}))
     return *env;
   return shit::None;
 }
@@ -261,17 +263,15 @@ EvalContext::monitor() const
 }
 
 void
-EvalContext::register_function(const std::string &name, const Expression *body)
+EvalContext::register_function(StringView name, const Expression *body)
 {
-  m_functions.set(StringView{name.data(), name.size()}, body);
+  m_functions.set(name, body);
 }
 
 const Expression *
-EvalContext::find_function(const std::string &name) const
+EvalContext::find_function(StringView name) const
 {
-  if (const Expression *const *slot =
-          m_functions.find(StringView{name.data(), name.size()}))
-    return *slot;
+  if (const Expression *const *slot = m_functions.find(name)) return *slot;
   return nullptr;
 }
 
@@ -282,9 +282,9 @@ EvalContext::has_functions() const
 }
 
 void
-EvalContext::unset_function(const std::string &name)
+EvalContext::unset_function(StringView name)
 {
-  m_functions.erase(StringView{name.data(), name.size()});
+  m_functions.erase(name);
 }
 
 HashSet
@@ -299,16 +299,15 @@ EvalContext::function_names() const
 }
 
 void
-EvalContext::set_trap(const std::string &condition, const std::string &action)
+EvalContext::set_trap(StringView condition, StringView action)
 {
-  m_traps.set(StringView{condition.data(), condition.size()},
-              StringView{action.data(), action.size()});
+  m_traps.set(condition, action);
 }
 
 void
-EvalContext::remove_trap(const std::string &condition)
+EvalContext::remove_trap(StringView condition)
 {
-  m_traps.erase(StringView{condition.data(), condition.size()});
+  m_traps.erase(condition);
 }
 
 const HashMap<String> &
@@ -329,20 +328,18 @@ EvalContext::run_exit_trap()
 }
 
 void
-EvalContext::mark_readonly(const std::string &name)
+EvalContext::mark_readonly(StringView name)
 {
   if (is_readonly(name)) return;
-  m_readonly_names.push(
-      String{heap_allocator(), StringView{name.data(), name.size()}});
+  m_readonly_names.push(String{heap_allocator(), name});
 }
 
 bool
-EvalContext::is_readonly(const std::string &name) const
+EvalContext::is_readonly(StringView name) const
 {
   if (m_readonly_names.size() == 0) return false;
-  StringView wanted{name.data(), name.size()};
   for (const String &readonly_name : m_readonly_names)
-    if (StringView{readonly_name.c_str(), readonly_name.size()} == wanted)
+    if (StringView{readonly_name.c_str(), readonly_name.size()} == name)
       return true;
   return false;
 }
@@ -395,32 +392,31 @@ EvalContext::in_function_scope() const
 }
 
 void
-EvalContext::declare_local(const std::string &name)
+EvalContext::declare_local(StringView name)
 {
   if (m_local_scopes.empty()) return;
-  m_local_scopes.back().push(LocalBinding{name, get_variable_value(name)});
+  m_local_scopes.back().push(
+      LocalBinding{std::string{name.data, name.length}, get_variable_value(name)});
 }
 
 void
-EvalContext::set_alias(const std::string &name, const std::string &value)
+EvalContext::set_alias(StringView name, StringView value)
 {
-  m_aliases.set(StringView{name.data(), name.size()},
-                StringView{value.data(), value.size()});
+  m_aliases.set(name, value);
 }
 
 bool
-EvalContext::remove_alias(const std::string &name)
+EvalContext::remove_alias(StringView name)
 {
-  StringView key{name.data(), name.size()};
-  if (m_aliases.find(key) == nullptr) return false;
-  m_aliases.erase(key);
+  if (m_aliases.find(name) == nullptr) return false;
+  m_aliases.erase(name);
   return true;
 }
 
 Maybe<std::string>
-EvalContext::get_alias(const std::string &name) const
+EvalContext::get_alias(StringView name) const
 {
-  if (const String *value = m_aliases.find(StringView{name.data(), name.size()}))
+  if (const String *value = m_aliases.find(name))
     return std::string{value->c_str(), value->size()};
   return None;
 }
