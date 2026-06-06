@@ -31,7 +31,7 @@ get_sequence_kind(Token::Kind tk)
   }
 }
 
-Parser::Parser(Lexer &&lexer) : m_lexer(lexer) {}
+Parser::Parser(Lexer &&lexer) : m_lexer(std::move(lexer)) {}
 
 Parser::~Parser() = default;
 

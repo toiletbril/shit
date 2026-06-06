@@ -236,6 +236,7 @@ struct String
   [[nodiscard]] char
   back() const
   {
+    SHIT_ASSERT(m_length > 0, "back() on an empty string");
     return m_data[m_length - 1];
   }
 

@@ -530,24 +530,35 @@ search_program_path(const std::string &program_name)
   std::string sp{program_name};
   ArrayList<std::filesystem::path> result{};
 
-  os::erase_extension_and_get_its_index(sp);
+  os::ExtIndex typed_extension = os::erase_extension_and_get_its_index(sp);
 
-  if (const ArrayList<String> *cached =
-          PATH_CACHE.find(StringView{sp.data(), sp.size()}))
-  {
-    for (usize i = 0; i < cached->size(); i++) {
-      const String &path_string = (*cached)[i];
-      std::filesystem::path tp{
-          std::string{path_string.c_str(), path_string.size()}};
-      if (std::filesystem::exists(tp)) result.push(std::move(tp));
+  /* A name typed with an explicit extension is matched exactly by the search,
+     so the extension-stripped cache key would resolve the wrong file. The cache
+     is consulted only when no extension was typed, which on POSIX is always. */
+  if (typed_extension == 0) {
+    if (ArrayList<String> *cached = const_cast<ArrayList<String> *>(
+            PATH_CACHE.find(StringView{sp.data(), sp.size()})))
+    {
+      ArrayList<String> kept{};
+      for (usize i = 0; i < cached->size(); i++) {
+        const String &path_string = (*cached)[i];
+        std::filesystem::path tp{
+            std::string{path_string.c_str(), path_string.size()}};
+        if (std::filesystem::exists(tp)) {
+          result.push(std::filesystem::path{tp});
+          kept.push(String{heap_allocator(),
+                           StringView{path_string.c_str(), path_string.size()}});
+        }
+      }
+      /* Drop entries that no longer exist, so a later lookup does not stat them
+         again. The directory exists check is slow, so this keeps the cache from
+         growing with dead paths. */
+      if (kept.size() != cached->size()) *cached = std::move(kept);
+      if (result.size() != 0) return result;
     }
   }
 
-  if (result.size() == 0) {
-    result = search_and_cache(program_name);
-  }
-
-  return result;
+  return search_and_cache(program_name);
 }
 
 Maybe<std::string>

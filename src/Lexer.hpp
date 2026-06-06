@@ -45,6 +45,14 @@ struct Lexer
         bool should_collect_debug_words = false);
   ~Lexer();
 
+  /* The lexer owns the heap-allocated heredoc bodies, so a copy would double
+     free them. Moving transfers the pointer array and leaves the source empty,
+     and the copy is deleted so an accidental copy fails to compile. */
+  Lexer(Lexer &&) = default;
+  Lexer &operator=(Lexer &&) = default;
+  Lexer(const Lexer &) = delete;
+  Lexer &operator=(const Lexer &) = delete;
+
   [[nodiscard]] Token *peek_expression_token();
   [[nodiscard]] Token *peek_shell_token();
   [[nodiscard]] Token *next_expression_token();
