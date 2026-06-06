@@ -75,7 +75,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
   /* Every external stage is collected so all of them are reaped, not only the
      last. Otherwise a first stage like yes is left a zombie when the last stage
      exits. */
-  std::vector<os::process> children{};
+  ArrayList<os::process> children{};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
@@ -111,7 +111,7 @@ execute_contexts_with_pipes(std::vector<ExecContext> &&ecs, EvalContext &cxt,
 
     if (!ec.is_builtin()) {
       os::process child = os::execute_program(std::move(ec));
-      children.push_back(child);
+      children.push(child);
       last_child = child;
     } else {
       /* A builtin runs in this process, so its status stands in for the stage.

@@ -351,7 +351,7 @@ AssignCommand::append_to(usize d, std::string &f, bool duplicate)
 }
 
 SimpleCommand::SimpleCommand(SourceLocation location,
-                             const std::vector<const Token *> &&args)
+                             ArrayList<const Token *> &&args)
     : Command(location)
 {
   for (const Token *arg : args)
@@ -369,7 +369,7 @@ SimpleCommand::~SimpleCommand()
 }
 
 void
-SimpleCommand::set_redirections(std::vector<Redirection> &&redirections)
+SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections)
 {
   for (const Redirection &redirection : redirections)
     m_redirections.push(redirection);
@@ -1029,7 +1029,7 @@ indent_for_layer(usize layer)
 
 IfClause::IfClause(
     SourceLocation location,
-    std::vector<std::pair<const Expression *, const Expression *>> &&branches,
+    ArrayList<std::pair<const Expression *, const Expression *>> &&branches,
     const Expression *otherwise)
     : CompoundCommand(location), m_otherwise(otherwise)
 {
@@ -1208,7 +1208,7 @@ WhileLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
 }
 
 ForLoop::ForLoop(SourceLocation location, std::string variable_name,
-                 std::vector<const Token *> &&words, bool has_in_clause,
+                 ArrayList<const Token *> &&words, bool has_in_clause,
                  const Expression *body)
     : CompoundCommand(location), m_variable_name(std::move(variable_name)),
       m_has_in_clause(has_in_clause), m_body(body)
@@ -1267,7 +1267,7 @@ ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const
 }
 
 CaseClause::CaseClause(SourceLocation location, const Token *word,
-                       std::vector<CaseItem> &&items)
+                       ArrayList<CaseItem> &&items)
     : CompoundCommand(location), m_word(word)
 {
   for (CaseItem &item : items)

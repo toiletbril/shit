@@ -192,11 +192,10 @@ struct Redirection
 
 struct SimpleCommand : public Command
 {
-  SimpleCommand(SourceLocation location,
-                const std::vector<const Token *> &&args);
+  SimpleCommand(SourceLocation location, ArrayList<const Token *> &&args);
   ~SimpleCommand() override;
 
-  void set_redirections(std::vector<Redirection> &&redirections);
+  void set_redirections(ArrayList<Redirection> &&redirections);
 
   /* Open this command's redirections into an exec context, for a pipeline stage
      that does not go through evaluate_impl. */
@@ -317,7 +316,7 @@ struct IfClause : public CompoundCommand
      condition and is held separately. */
   IfClause(
       SourceLocation location,
-      std::vector<std::pair<const Expression *, const Expression *>> &&branches,
+      ArrayList<std::pair<const Expression *, const Expression *>> &&branches,
       const Expression *otherwise);
   ~IfClause() override;
 
@@ -355,7 +354,7 @@ protected:
 struct ForLoop : public CompoundCommand
 {
   ForLoop(SourceLocation location, std::string variable_name,
-          std::vector<const Token *> &&words, bool has_in_clause,
+          ArrayList<const Token *> &&words, bool has_in_clause,
           const Expression *body);
   ~ForLoop() override;
 
@@ -383,7 +382,7 @@ struct CaseItem
 struct CaseClause : public CompoundCommand
 {
   CaseClause(SourceLocation location, const Token *word,
-             std::vector<CaseItem> &&items);
+             ArrayList<CaseItem> &&items);
   ~CaseClause() override;
 
   std::string to_string() const override;

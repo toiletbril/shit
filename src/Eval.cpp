@@ -160,7 +160,7 @@ EvalContext::register_job(os::process pid, const std::string &command)
   job.pid = pid;
   job.command = command;
   job.state = Job::State::Running;
-  m_jobs.push_back(std::move(job));
+  m_jobs.push(std::move(job));
   SHIT_LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
 }
@@ -184,7 +184,7 @@ EvalContext::update_jobs()
   }
 }
 
-std::vector<Job> &
+ArrayList<Job> &
 EvalContext::jobs()
 {
   return m_jobs;
@@ -203,19 +203,20 @@ EvalContext::most_recent_job()
 {
   /* Skip a finished job, so a bare fg or bg acts on a job that is still
      running or stopped rather than a dead pid. */
-  for (auto it = m_jobs.rbegin(); it != m_jobs.rend(); ++it)
-    if (it->state != Job::State::Done) return &*it;
+  for (usize i = m_jobs.size(); i > 0; i--)
+    if (m_jobs[i - 1].state != Job::State::Done) return &m_jobs[i - 1];
   return nullptr;
 }
 
 void
 EvalContext::forget_done_jobs()
 {
-  m_jobs.erase(std::remove_if(m_jobs.begin(), m_jobs.end(),
-                              [](const Job &job) {
-                                return job.state == Job::State::Done;
-                              }),
-               m_jobs.end());
+  ArrayList<Job> kept{};
+  for (Job &job : m_jobs) {
+    if (job.state == Job::State::Done) continue;
+    kept.push(std::move(job));
+  }
+  m_jobs = std::move(kept);
 }
 
 void
@@ -330,7 +331,7 @@ EvalContext::readonly_names() const
 void
 EvalContext::enter_function_scope()
 {
-  m_local_scopes.emplace_back();
+  m_local_scopes.push(ArrayList<LocalBinding>{});
 }
 
 void
@@ -340,18 +341,22 @@ EvalContext::leave_function_scope()
 
   /* Restore each shadowed binding in reverse, so a name declared local twice
      ends with the value it held before the function ran. */
-  std::vector<LocalBinding> &scope = m_local_scopes.back();
-  for (auto it = scope.rbegin(); it != scope.rend(); ++it) {
+  ArrayList<LocalBinding> &scope = m_local_scopes.back();
+  for (usize i = scope.size(); i > 0; i--) {
+    LocalBinding &binding = scope[i - 1];
     /* Restore through assign_variable, not set_shell_variable, since this runs
        inside a noexcept defer and a readonly name would otherwise throw from a
        destructor and terminate the shell. A local marked readonly in the body
        is being torn down here, so the restore of the outer value is valid. */
-    if (it->previous_value.has_value())
-      assign_variable(it->name, *it->previous_value);
+    if (binding.previous_value.has_value())
+      assign_variable(binding.name, *binding.previous_value);
     else
-      unset_shell_variable(it->name);
+      unset_shell_variable(binding.name);
   }
-  m_local_scopes.pop_back();
+  ArrayList<ArrayList<LocalBinding>> kept{};
+  for (usize i = 0; i + 1 < m_local_scopes.size(); i++)
+    kept.push(std::move(m_local_scopes[i]));
+  m_local_scopes = std::move(kept);
 }
 
 bool
@@ -364,7 +369,7 @@ void
 EvalContext::declare_local(const std::string &name)
 {
   if (m_local_scopes.empty()) return;
-  m_local_scopes.back().push_back(LocalBinding{name, get_variable_value(name)});
+  m_local_scopes.back().push(LocalBinding{name, get_variable_value(name)});
 }
 
 void

@@ -332,17 +332,17 @@ std::unique_ptr<Command>
 Parser::parse_simple_command()
 {
   Maybe<SourceLocation> source_location;
-  std::vector<std::unique_ptr<Token>> args_accumulator{};
+  ArrayList<std::unique_ptr<Token>> args_accumulator{};
   HashMap<Word> local_vars{heap_allocator()};
-  std::vector<expressions::Redirection> redirections{};
+  ArrayList<expressions::Redirection> redirections{};
 
   auto build_command = [&]() -> std::unique_ptr<Command> {
     if (!source_location) return nullptr;
 
-    std::vector<const Token *> args{};
+    ArrayList<const Token *> args{};
     args.reserve(args_accumulator.size());
     for (std::unique_ptr<Token> &t : args_accumulator)
-      args.emplace_back(t.release());
+      args.push(t.release());
 
     std::unique_ptr<SimpleCommand> c{m_lexer.arena().create<SimpleCommand>(
         *source_location, std::move(args))};
@@ -388,7 +388,7 @@ Parser::parse_simple_command()
         }
         redirection.kind = expressions::Redirection::Kind::DuplicateOutput;
         redirection.dup_fd = from_fd;
-        redirections.push_back(redirection);
+        redirections.push(redirection);
         return;
       }
     }
@@ -405,7 +405,7 @@ Parser::parse_simple_command()
     else
       redirection.kind = expressions::Redirection::Kind::ReadInput;
     redirection.target = target.release();
-    redirections.push_back(redirection);
+    redirections.push(redirection);
   };
 
   for (;;) {
@@ -481,13 +481,13 @@ Parser::parse_simple_command()
             break;
           }
           if (!source_location) source_location = word_location;
-          args_accumulator.emplace_back(std::move(token));
+          args_accumulator.push(std::move(token));
           break;
         }
       }
       m_lexer.advance_past_last_peek();
       if (!source_location) source_location = token->source_location();
-      args_accumulator.emplace_back(std::move(token));
+      args_accumulator.push(std::move(token));
     } break;
 
     case Token::Kind::LeftParen:
@@ -506,7 +506,7 @@ Parser::parse_simple_command()
       /* Once a command word is present, an assignment-looking token is just an
        * ordinary argument. */
       if (!args_accumulator.empty()) {
-        args_accumulator.emplace_back(std::move(token));
+        args_accumulator.push(std::move(token));
         break;
       }
 
@@ -581,7 +581,7 @@ Parser::parse_simple_command()
       redirection.heredoc_body =
           m_lexer.register_heredoc(delimiter, strip_tabs);
       redirection.heredoc_expand = should_expand;
-      redirections.push_back(redirection);
+      redirections.push(redirection);
     } break;
 
     /* A separator, an operator, or a list terminator ends the command. */
@@ -598,7 +598,7 @@ Parser::parse_if()
   std::unique_ptr<Token> if_token{m_lexer.next_shell_token()};
   SourceLocation location = if_token->source_location();
 
-  std::vector<std::pair<const Expression *, const Expression *>> branches{};
+  ArrayList<std::pair<const Expression *, const Expression *>> branches{};
   const Expression *otherwise = nullptr;
   /* Free the released branch nodes if a later branch fails to parse. */
   SHIT_DEFER
@@ -624,7 +624,8 @@ Parser::parse_if()
 
     std::unique_ptr<Expression> body{parse_command_list(
         {Token::Kind::Elif, Token::Kind::Else, Token::Kind::Fi})};
-    branches.emplace_back(condition.release(), body.release());
+    branches.push(std::pair<const Expression *, const Expression *>{
+        condition.release(), body.release()});
 
     std::unique_ptr<Token> after{m_lexer.next_shell_token()};
     if (after->kind() == Token::Kind::Elif) {
@@ -693,7 +694,7 @@ Parser::parse_for()
   }
   std::string variable_name = name_token->raw_string();
 
-  std::vector<const Token *> words{};
+  ArrayList<const Token *> words{};
   /* Free the released word tokens if the loop fails to parse. */
   SHIT_DEFER
   {
@@ -711,7 +712,7 @@ Parser::parse_for()
       std::unique_ptr<Token> word{m_lexer.peek_shell_token()};
       if (word->kind() != Token::Kind::Word) break;
       m_lexer.advance_past_last_peek();
-      words.emplace_back(word.release());
+      words.push(word.release());
     }
   }
 
@@ -770,7 +771,7 @@ Parser::parse_case()
                             "Expected 'in' after the case word"};
   }
 
-  std::vector<CaseItem> items{};
+  ArrayList<CaseItem> items{};
   /* A parse error before the clause is built abandons these arena nodes, so
      free their tokens and bodies to keep the leak checker happy. */
   SHIT_DEFER
@@ -824,7 +825,7 @@ Parser::parse_case()
 
     std::unique_ptr<Expression> body{
         parse_command_list({Token::Kind::DoubleSemicolon, Token::Kind::Esac})};
-    items.push_back(CaseItem{std::move(patterns), body.release()});
+    items.push(CaseItem{std::move(patterns), body.release()});
 
     std::unique_ptr<Token> after{m_lexer.peek_shell_token()};
     if (after->kind() == Token::Kind::DoubleSemicolon) {

@@ -177,7 +177,7 @@ struct EvalContext
      marks the ones that finished or stopped. */
   int register_job(os::process pid, const std::string &command);
   void update_jobs();
-  std::vector<Job> &jobs();
+  ArrayList<Job> &jobs();
   Job *find_job(int id);
   Job *most_recent_job();
   void forget_done_jobs();
@@ -402,10 +402,10 @@ protected:
   HashMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed
      so leaving the call restores them. */
-  std::vector<std::vector<LocalBinding>> m_local_scopes{};
+  ArrayList<ArrayList<LocalBinding>> m_local_scopes{heap_allocator()};
 
   /* The background jobs and the id to give the next one. */
-  std::vector<Job> m_jobs{};
+  ArrayList<Job> m_jobs{heap_allocator()};
   int m_next_job_id{1};
   bool m_monitor{false};
   bool m_enable_path_expansion;
