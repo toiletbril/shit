@@ -1740,30 +1740,29 @@ EvalContext::expand_word(const Word &word)
         }
         break;
       }
-      std::string value = apply_parameter_expansion(segment.text);
-      StringView value_view{value.data(), value.size()};
+      String value{heap_allocator(), apply_parameter_expansion(segment.text)};
       if (segment.is_in_double_quotes)
-        append_run(value_view, false);
+        append_run(value, false);
       else
         /* An unquoted expansion undergoes field splitting and then pathname
            expansion, so a * or ? from the value is an active glob. */
-        append_split_run(value_view, true);
+        append_split_run(value, true);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
-      std::string output = capture_command_substitution(segment.text);
-      StringView output_view{output.data(), output.size()};
+      String output{heap_allocator(),
+                    capture_command_substitution(segment.text)};
       if (segment.is_in_double_quotes)
-        append_run(output_view, false);
+        append_run(output, false);
       else
-        append_split_run(output_view, true);
+        append_split_run(output, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      std::string value = std::to_string(evaluate_arithmetic(segment.text));
-      StringView value_view{value.data(), value.size()};
+      String value{heap_allocator(),
+                   std::to_string(evaluate_arithmetic(segment.text))};
       if (segment.is_in_double_quotes)
-        append_run(value_view, false);
+        append_run(value, false);
       else
-        append_split_run(value_view, false);
+        append_split_run(value, false);
     } break;
     }
   }

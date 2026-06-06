@@ -465,11 +465,10 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
 
     bool seen = false;
     for (const String &name : already_expanded)
-      if (name == StringView{word.c_str(), word.size()}) seen = true;
+      if (name == word) seen = true;
     if (seen) break;
 
-    std::string word_string{word.c_str(), word.size()};
-    Maybe<std::string> body = cxt.get_alias(word_string);
+    Maybe<std::string> body = cxt.get_alias(word);
     if (!body.has_value()) break;
     already_expanded.push(
         String{heap_allocator(), StringView{word.c_str(), word.size()}});
@@ -478,7 +477,7 @@ expand_command_aliases(EvalContext &cxt, ArrayList<String> &args)
        the remaining arguments. ArrayList has no in-place erase, so the new list
        is built and swapped in. */
     ArrayList<String> rebuilt{};
-    std::string current{};
+    String current{};
     for (char c : *body) {
       if (c == ' ' || c == '\t') {
         if (!current.empty()) {
