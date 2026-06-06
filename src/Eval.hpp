@@ -300,7 +300,7 @@ struct EvalContext
 
   /* Expand a word in assignment context, with variable, tilde, and command
      substitution but no field splitting and no globbing. */
-  std::string expand_word_for_assignment(const Word &word);
+  String expand_word_for_assignment(const Word &word);
 
   /* Run the source of a $(...) and return its standard output with trailing
      newlines stripped. The inner command runs in-process with the working
@@ -334,10 +334,10 @@ struct EvalContext
 
   /* Expand a heredoc body, its $name and ${...} references, keeping the literal
      text and newlines. */
-  std::string expand_heredoc_body(const std::string &body);
+  String expand_heredoc_body(const std::string &body);
 
-  std::string expand_modifier_word(const std::string &word,
-                                   bool remove_quotes = true);
+  String expand_modifier_word(const std::string &word,
+                              bool remove_quotes = true);
 
   bool should_echo() const;
   bool should_echo_expanded() const;
@@ -427,7 +427,7 @@ protected:
   /* The single-letter option flags for $-, built from the flags above. */
   std::string option_flags_string() const;
 
-  std::string expand_variable(const std::string &name) const;
+  String expand_variable(const std::string &name) const;
 
   /* Write a variable without the read-only check, for restoring a shadowed
      local on function return where a throw from a noexcept defer would
@@ -436,7 +436,7 @@ protected:
 
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
-  std::string apply_parameter_expansion(const std::string &spec);
+  String apply_parameter_expansion(const std::string &spec);
 
   /* Compute the integer value of a $((...)) expression, resolving shell
      variables and applying any assignments inside it. */

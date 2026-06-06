@@ -214,8 +214,11 @@ execute_program(ExecContext &&ec)
       /* We are the forked child. Report the failure and terminate the child
        * directly. Throwing here would unwind back into the parent's evaluator
        * inside the duplicated process. */
-      std::string msg = ec.program_path().string() + ": " +
-                        last_system_error_message() + "\n";
+      String msg{};
+      msg += ec.program_path().string();
+      msg += ": ";
+      msg += last_system_error_message();
+      msg += '\n';
       (void) write_fd(STDERR_FILENO, msg.data(), msg.size());
       _exit(127);
     }

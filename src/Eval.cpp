@@ -734,68 +734,73 @@ EvalContext::last_exit_status() const
   return m_last_exit_status;
 }
 
-std::string
+String
 EvalContext::expand_variable(const std::string &name) const
 {
-  return get_variable_value(name).value_or("");
+  std::string value = get_variable_value(name).value_or("");
+  return String{heap_allocator(), StringView{value.data(), value.size()}};
 }
 
 namespace {
 
 /* Remove the shortest or longest prefix of value that matches pattern as a
    glob, returning the remainder. */
-std::string
-trim_matching_prefix(const std::string &value, const std::string &pattern,
-                     bool longest)
+String
+trim_matching_prefix(StringView value, StringView pattern, bool longest)
 {
   ArrayList<bool> active{heap_allocator()};
-  for (usize k = 0; k < pattern.length(); k++)
+  for (usize k = 0; k < pattern.length; k++)
     active.push(true);
+  std::string_view value_view{value.data, value.length};
+  std::string_view pattern_view{pattern.data, pattern.length};
   if (longest) {
-    for (usize length = value.length();; length--) {
-      if (utils::glob_matches(pattern, value.substr(0, length), active, 0))
-        return value.substr(length);
+    for (usize length = value.length;; length--) {
+      if (utils::glob_matches(pattern_view, value_view.substr(0, length), active,
+                              0))
+        return String{heap_allocator(), value.substring(length)};
       if (length == 0) break;
     }
   } else {
-    for (usize length = 0; length <= value.length(); length++) {
-      if (utils::glob_matches(pattern, value.substr(0, length), active, 0))
-        return value.substr(length);
+    for (usize length = 0; length <= value.length; length++) {
+      if (utils::glob_matches(pattern_view, value_view.substr(0, length), active,
+                              0))
+        return String{heap_allocator(), value.substring(length)};
     }
   }
-  return value;
+  return String{heap_allocator(), value};
 }
 
 /* Remove the shortest or longest suffix of value that matches pattern as a
    glob, returning the head. */
-std::string
-trim_matching_suffix(const std::string &value, const std::string &pattern,
-                     bool longest)
+String
+trim_matching_suffix(StringView value, StringView pattern, bool longest)
 {
   ArrayList<bool> active{heap_allocator()};
-  for (usize k = 0; k < pattern.length(); k++)
+  for (usize k = 0; k < pattern.length; k++)
     active.push(true);
+  std::string_view value_view{value.data, value.length};
+  std::string_view pattern_view{pattern.data, pattern.length};
   if (longest) {
-    for (usize start = 0; start <= value.length(); start++) {
-      if (utils::glob_matches(pattern, value.substr(start), active, 0))
-        return value.substr(0, start);
+    for (usize start = 0; start <= value.length; start++) {
+      if (utils::glob_matches(pattern_view, value_view.substr(start), active, 0))
+        return String{heap_allocator(), value.substring_of_length(0, start)};
     }
   } else {
-    for (usize start = value.length();; start--) {
-      if (utils::glob_matches(pattern, value.substr(start), active, 0))
-        return value.substr(0, start);
+    for (usize start = value.length;; start--) {
+      if (utils::glob_matches(pattern_view, value_view.substr(start), active, 0))
+        return String{heap_allocator(), value.substring_of_length(0, start)};
       if (start == 0) break;
     }
   }
-  return value;
+  return String{heap_allocator(), value};
 }
 
 } /* namespace */
 
-std::string
+String
 EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
 {
-  std::string out{};
+  String out{heap_allocator()};
   bool in_single_quote = false;
   bool in_double_quote = false;
   for (usize i = 0; i < word.length(); i++) {
@@ -897,21 +902,24 @@ EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
   return out;
 }
 
-std::string
+String
 EvalContext::apply_parameter_expansion(const std::string &spec)
 {
-  if (spec.empty()) return std::string{};
+  if (spec.empty()) return String{heap_allocator()};
 
   /* ${#name} is the length of the value, distinct from $# which is the count of
      positional parameters. */
   if (spec.length() > 1 && spec[0] == '#') {
     std::string name = spec.substr(1);
     if (name == "@" || name == "*")
-      return std::to_string(m_positional_params.size());
+      return String{heap_allocator(),
+                    StringView{std::to_string(m_positional_params.size())}};
     Maybe<std::string> value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
-    return std::to_string(value.value_or("").length());
+    return String{
+        heap_allocator(),
+        StringView{std::to_string(value.value_or("").length())}};
   }
 
   /* Split the parameter name from an optional operator and its word. */
@@ -955,27 +963,36 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
   bool treat_as_unset = is_colon_form ? is_empty : !is_set;
 
   switch (op) {
-  case '-': return treat_as_unset ? expand_modifier_word(word) : *current;
+  case '-':
+    if (treat_as_unset) return expand_modifier_word(word);
+    return String{heap_allocator(), StringView{*current}};
   case '=':
     if (treat_as_unset) {
-      std::string assigned = expand_modifier_word(word);
-      set_shell_variable(name, assigned);
+      String assigned = expand_modifier_word(word);
+      set_shell_variable(name, std::string{assigned.c_str(), assigned.size()});
       return assigned;
     }
-    return *current;
-  case '+': return treat_as_unset ? std::string{} : expand_modifier_word(word);
+    return String{heap_allocator(), StringView{*current}};
+  case '+':
+    if (treat_as_unset) return String{heap_allocator()};
+    return expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {
-      throw Error{word.empty() ? name + ": parameter not set or empty"
-                               : expand_modifier_word(word)};
+      if (word.empty())
+        throw Error{name + ": parameter not set or empty"};
+      throw Error{expand_modifier_word(word)};
     }
-    return *current;
-  case '#':
-    return trim_matching_prefix(current.value_or(""),
-                                expand_modifier_word(word), is_doubled);
-  case '%':
-    return trim_matching_suffix(current.value_or(""),
-                                expand_modifier_word(word), is_doubled);
+    return String{heap_allocator(), StringView{*current}};
+  case '#': {
+    std::string value = current.value_or("");
+    return trim_matching_prefix(StringView{value}, expand_modifier_word(word),
+                                is_doubled);
+  }
+  case '%': {
+    std::string value = current.value_or("");
+    return trim_matching_suffix(StringView{value}, expand_modifier_word(word),
+                                is_doubled);
+  }
   default: return expand_variable(name);
   }
 }
@@ -1660,7 +1677,8 @@ EvalContext::evaluate_arithmetic(const std::string &expression)
     return parser.parse();
   }
 
-  std::string expanded = expand_modifier_word(expression);
+  String expanded_word = expand_modifier_word(expression);
+  std::string expanded{expanded_word.c_str(), expanded_word.size()};
   ArithmeticParser parser{*this, expanded, 0};
   return parser.parse();
 }
@@ -1784,7 +1802,7 @@ EvalContext::expand_word(const Word &word)
   return fields;
 }
 
-std::string
+String
 EvalContext::expand_word_for_assignment(const Word &word)
 {
   /* Only copy the segments when a leading tilde must be rewritten, so the
@@ -1800,7 +1818,7 @@ EvalContext::expand_word_for_assignment(const Word &word)
     segments = &tilde_expanded_segments;
   }
 
-  std::string result{};
+  String result{heap_allocator()};
   for (const WordSegment &segment : *segments) {
     std::string segment_text{segment.text.c_str(), segment.text.size()};
     if (segment.kind == WordSegment::Kind::VariableReference)
@@ -1808,7 +1826,7 @@ EvalContext::expand_word_for_assignment(const Word &word)
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
       result += capture_command_substitution(segment_text);
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
-      result += std::to_string(evaluate_arithmetic(segment_text));
+      result += StringView{std::to_string(evaluate_arithmetic(segment_text))};
     else
       result += segment_text;
   }
@@ -1970,7 +1988,7 @@ EvalContext::retain_ast(Expression *ast)
   m_retained_source_asts.push(ast);
 }
 
-std::string
+String
 EvalContext::expand_heredoc_body(const std::string &body)
 {
   /* A heredoc body keeps its quote characters literally. */

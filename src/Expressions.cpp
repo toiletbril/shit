@@ -49,14 +49,14 @@ Expression::operator delete(void *pointer)
 }
 
 void
-AnalysisContext::warn(SourceLocation location, const std::string &message)
+AnalysisContext::warn(SourceLocation location, StringView message)
 {
   WarningWithLocation located{location, message};
   show_message(located.to_string(source));
 }
 
 void
-AnalysisContext::fail(SourceLocation location, const std::string &message)
+AnalysisContext::fail(SourceLocation location, StringView message)
 {
   ErrorWithLocation located{location, message};
   show_message(located.to_string(source));
@@ -305,8 +305,9 @@ AssignCommand::evaluate_impl(EvalContext &cxt) const
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  std::string value =
+  String expanded_value =
       cxt.expand_word_for_assignment(m_assignment->value_word());
+  std::string value{expanded_value.c_str(), expanded_value.size()};
 
   /* The assignment goes through set_shell_variable first, so it still rejects a
      readonly name and refreshes the cached IFS. Under allexport it is then
@@ -381,7 +382,10 @@ SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
   for (const Redirection &redirection : m_redirections) {
     if (redirection.kind == Redirection::Kind::Heredoc) {
       std::string body = *redirection.heredoc_body;
-      if (redirection.heredoc_expand) body = cxt.expand_heredoc_body(body);
+      if (redirection.heredoc_expand) {
+        String expanded = cxt.expand_heredoc_body(body);
+        body.assign(expanded.c_str(), expanded.size());
+      }
       Maybe<os::descriptor> opened = os::write_to_temp_file(body);
       if (!opened)
         throw Error{"could not stage the heredoc body: " +
@@ -541,7 +545,10 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
        file, expanded when the delimiter was unquoted. */
     if (redirection.kind == Redirection::Kind::Heredoc) {
       std::string body = *redirection.heredoc_body;
-      if (redirection.heredoc_expand) body = cxt.expand_heredoc_body(body);
+      if (redirection.heredoc_expand) {
+        String expanded = cxt.expand_heredoc_body(body);
+        body.assign(expanded.c_str(), expanded.size());
+      }
       Maybe<os::descriptor> opened = os::write_to_temp_file(body);
       if (!opened)
         throw Error{"could not stage the heredoc body: " +
@@ -621,8 +628,9 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
     std::string name_str{name.data, name.length};
     saved_env.push(
         SavedEnvVar{name_str, os::get_environment_variable(name_str)});
-    os::set_environment_variable(name_str,
-                                 cxt.expand_word_for_assignment(value_word));
+    String expanded_value = cxt.expand_word_for_assignment(value_word);
+    os::set_environment_variable(
+        name_str, std::string{expanded_value.c_str(), expanded_value.size()});
   });
   SHIT_DEFER
   {
@@ -637,7 +645,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   /* A function shadows a builtin and a program. Run its body with the call
      words as the positional parameters, restoring them afterwards. A return
      builtin unwinds here and supplies the function exit status. */
-  std::string program_name{program_args[0].c_str(), program_args[0].size()};
+  const String &program_name = program_args[0];
   if (const Expression *function_body =
           cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
       function_body != nullptr)
@@ -684,9 +692,7 @@ SimpleCommand::evaluate_impl(EvalContext &cxt) const
   /* Reuse a memoized resolution when the command word is unchanged, otherwise
      search PATH once and remember the result for the next run. */
   bool is_cache_valid =
-      m_resolved_kind.has_value() &&
-      program_args[0] == StringView{m_resolved_name.data(),
-                                    m_resolved_name.size()};
+      m_resolved_kind.has_value() && program_args[0] == m_resolved_name;
 
   ExecContext ec =
       is_cache_valid ? ExecContext::from_resolved(
@@ -1333,9 +1339,11 @@ CaseClause::evaluate_impl(EvalContext &cxt) const
      splitting and no pathname globbing, so a pattern keeps its metacharacters
      for matching. */
   auto expand_no_glob = [&cxt](const Token *t) -> std::string {
-    if (t->kind() == Token::Kind::Word)
-      return cxt.expand_word_for_assignment(
+    if (t->kind() == Token::Kind::Word) {
+      String expanded = cxt.expand_word_for_assignment(
           static_cast<const tokens::WordToken *>(t)->word());
+      return std::string{expanded.c_str(), expanded.size()};
+    }
     String raw = t->raw_string();
     return std::string{raw.c_str(), raw.size()};
   };
@@ -1791,10 +1799,12 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
             m_local_vars.find(StringView{segment.text.data(),
                                          segment.text.size()}) != nullptr)
         {
-          actx.warn(m_args[i]->source_location(),
-                    "The assignment prefix does not affect this command, '" +
-                        std::string{segment.text.c_str(), segment.text.size()} +
-                        "' is read before it is set");
+          String message =
+              StringView{"The assignment prefix does not affect this "
+                         "command, '"} +
+              segment.text +
+              StringView{"' is read before it is set"};
+          actx.warn(m_args[i]->source_location(), message);
           break;
         }
       }
@@ -1805,7 +1815,8 @@ SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
       !actx.defined_functions.contains(StringView{name->data(), name->size()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->size()}))
   {
-    std::string message = "Command '" + *name + "' was not found";
+    String message =
+        StringView{"Command '"} + StringView{*name} + StringView{"' was not found"};
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. A
        command after a dot, source, or eval may be defined at runtime, so it is

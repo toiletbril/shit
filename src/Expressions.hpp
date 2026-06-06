@@ -35,8 +35,8 @@ struct AnalysisContext
   explicit AnalysisContext(std::string_view source_view) : source(source_view)
   {}
 
-  void warn(SourceLocation location, const std::string &message);
-  void fail(SourceLocation location, const std::string &message);
+  void warn(SourceLocation location, StringView message);
+  void fail(SourceLocation location, StringView message);
 };
 
 /* Walk the tree and report. Returns true when execution may proceed, false when
@@ -221,7 +221,7 @@ protected:
   /* The resolution of the command word, memoized so a command run repeatedly in
      a loop body does not search PATH on every iteration. The name guards the
      cache, since an expanded name from a variable may differ between runs. */
-  mutable std::string m_resolved_name{};
+  mutable String m_resolved_name{};
   mutable Maybe<std::variant<Builtin::Kind, std::filesystem::path>>
       m_resolved_kind{};
 

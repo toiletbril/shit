@@ -76,7 +76,7 @@ get_context_pointing_to(std::string_view source, usize byte_position,
               source[byte_position - start_offset + line_byte_count] == '\n');
 
   /* Add spacer before line number. */
-  std::string msg{};
+  String msg{};
   for (usize i = 0; i < SHIT_SUB_SAT(6, number_string_length(line_number + 1));
        i++)
   {
@@ -95,7 +95,7 @@ get_context_pointing_to(std::string_view source, usize byte_position,
               "'%s', start: %zu, end: %zu", context.data(), start_offset,
               line_byte_count);
 
-  msg += context;
+  msg += StringView{context.data(), context.size()};
 
   /* Calculate proper unicode offsets and lengths for underline. */
   usize unicode_start_offset_position =
@@ -131,11 +131,11 @@ get_context_pointing_to(std::string_view source, usize byte_position,
 
   if (message.has_value()) {
     msg += ' ';
-    msg += *message;
+    msg += StringView{message->data(), message->size()};
     msg += '.';
   }
 
-  return msg;
+  return std::string{msg.c_str(), msg.size()};
 }
 
 ErrorBase::ErrorBase() = default;
@@ -231,12 +231,19 @@ ErrorWithLocation::to_string(std::string_view source) const
                                  ? unicode_position - last_newline_location
                                  : unicode_position + 1;
 
-  return std::to_string(line_number + 1) + ":" +
-         std::to_string(line_byte_position) + ": " + severity_word() +
-         ": " + m_message + ".\n" +
-         get_context_pointing_to(source, byte_position, byte_count, line_number,
-                                 last_newline_location, unicode_position,
-                                 "here");
+  String result{};
+  result += std::to_string(line_number + 1);
+  result += ':';
+  result += std::to_string(line_byte_position);
+  result += ": ";
+  result += severity_word();
+  result += ": ";
+  result += m_message;
+  result += ".\n";
+  result += get_context_pointing_to(source, byte_position, byte_count,
+                                    line_number, last_newline_location,
+                                    unicode_position, "here");
+  return std::string{result.c_str(), result.size()};
 }
 
 WarningWithLocation::WarningWithLocation(SourceLocation location,
@@ -279,12 +286,16 @@ ErrorWithLocationAndDetails::details_to_string(std::string_view source) const
           ? unicode_details_position - details_last_newline_location
           : unicode_details_position + 1;
 
-  return std::to_string(details_line_number + 1) + ":" +
-         std::to_string(details_line_byte_position) + ": Note:" + "\n" +
-         get_context_pointing_to(source, byte_position, byte_count,
-                                 details_line_number,
-                                 details_last_newline_location,
-                                 unicode_details_position, m_details_message);
+  String result{};
+  result += std::to_string(details_line_number + 1);
+  result += ':';
+  result += std::to_string(details_line_byte_position);
+  result += ": Note:\n";
+  result += get_context_pointing_to(
+      source, byte_position, byte_count, details_line_number,
+      details_last_newline_location, unicode_details_position,
+      m_details_message);
+  return std::string{result.c_str(), result.size()};
 }
 
 } /* namespace shit */
