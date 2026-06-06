@@ -288,7 +288,7 @@ fn Operator::binary_left_associative() const wontthrow -> bool { return true; }
 
 fn Operator::construct_binary_expression(const Expression *lhs,
                                          const Expression *rhs) const
-    throws -> std::unique_ptr<Expression>
+    throws -> Expression *
 {
   unused(lhs);
   unused(rhs);
@@ -297,7 +297,7 @@ fn Operator::construct_binary_expression(const Expression *lhs,
 }
 
 fn Operator::construct_unary_expression(const Expression *rhs) const
-    throws -> std::unique_ptr<Expression>
+    throws -> Expression *
 {
   unused(rhs);
   unreachable("Invalid unary operator construction of type %d",
@@ -314,15 +314,17 @@ fn Operator::construct_unary_expression(const Expression *rhs) const
   String t::raw_string() const throws { return s; }                            \
   u8 t::left_precedence() const wontthrow { return bp; }                       \
   u8 t::unary_precedence() const wontthrow { return up; }                      \
-  std::unique_ptr<Expression> t::construct_binary_expression(                  \
+  Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
-    return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
+    ASSERT(AST_ARENA != NULL);                                                 \
+    return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
   }                                                                            \
-  std::unique_ptr<Expression> t::construct_unary_expression(                   \
-      const Expression *rhs) const throws                                      \
+  Expression *t::construct_unary_expression(const Expression *rhs)             \
+      const throws                                                             \
   {                                                                            \
-    return std::make_unique<expressions::uexpr>(source_location(), rhs);       \
+    ASSERT(AST_ARENA != NULL);                                                 \
+    return AST_ARENA->create<expressions::uexpr>(source_location(), rhs);      \
   }
 
 BINARY_UNARY_OPERATOR_TOKEN_DECLS(Plus, "+", 13, 11, Unnegate, Add);
@@ -337,10 +339,11 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
   }                                                                            \
   String t::raw_string() const throws { return s; }                            \
   u8 t::left_precedence() const wontthrow { return bp; }                       \
-  std::unique_ptr<Expression> t::construct_binary_expression(                  \
+  Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
-    return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
+    ASSERT(AST_ARENA != NULL);                                                 \
+    return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
   }
 
 #define BINARY_OPERATOR_TOKEN_DECLS(t, s, bp, bexpr)                           \
@@ -352,10 +355,11 @@ BINARY_UNARY_OPERATOR_TOKEN_DECLS(Minus, "-", 13, 11, Negate, Subtract);
   }                                                                            \
   String t::raw_string() const throws { return s; }                            \
   u8 t::left_precedence() const wontthrow { return bp; }                       \
-  std::unique_ptr<Expression> t::construct_binary_expression(                  \
+  Expression *t::construct_binary_expression(                                  \
       const Expression *lhs, const Expression *rhs) const throws               \
   {                                                                            \
-    return std::make_unique<expressions::bexpr>(source_location(), lhs, rhs);  \
+    ASSERT(AST_ARENA != NULL);                                                 \
+    return AST_ARENA->create<expressions::bexpr>(source_location(), lhs, rhs); \
   }
 
 BINARY_OPERATOR_TOKEN_DECLS_COMPOUND(DoublePipe, "||", 4, LogicalOr);
@@ -386,10 +390,11 @@ BINARY_OPERATOR_TOKEN_DECLS(ExclamationEquals, "!=", 3, NotEqual);
   }                                                                            \
   String t::raw_string() const throws { return s; }                            \
   u8 t::unary_precedence() const wontthrow { return up; }                      \
-  std::unique_ptr<Expression> t::construct_unary_expression(                   \
-      const Expression *rhs) const throws                                      \
+  Expression *t::construct_unary_expression(const Expression *rhs)             \
+      const throws                                                             \
   {                                                                            \
-    return std::make_unique<expressions::uexpr>(source_location(), rhs);       \
+    ASSERT(AST_ARENA != NULL);                                                 \
+    return AST_ARENA->create<expressions::uexpr>(source_location(), rhs);      \
   }
 
 UNARY_OPERATOR_TOKEN_DECLS(ExclamationMark, "!", 13, LogicalNot);

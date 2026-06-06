@@ -697,29 +697,29 @@ hot fn Lexer::lex_sentinel() throws -> Token *
   /* clang-format off */
 #define TOKEN_CASE_ONE(t)                                                      \
   case Token::Kind::t:                                                         \
-    tok = new tokens::t{here(m_cursor_position, 1)};                           \
+    tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));              \
     break;
 
 #define TOKEN_CASE_TWO(t, ch, t2)                                              \
   case Token::Kind::t: {                                                       \
     if (chop_character(1) == ch) {                                             \
-      tok = new tokens::t2{here(m_cursor_position, 2)};                        \
+      tok = m_arena->create<tokens::t2>(here(m_cursor_position, 2));           \
       extra_length++;                                                          \
     } else {                                                                   \
-      tok = new tokens::t{here(m_cursor_position, 1)};                         \
+      tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));            \
     }                                                                          \
   } break;
 
 #define TOKEN_CASE_THREE(t, ch2, t2, ch3, t3)                                  \
   case Token::Kind::t: {                                                       \
     if (chop_character(1) == ch2) {                                            \
-      tok = new tokens::t2{here(m_cursor_position, 2)};                        \
+      tok = m_arena->create<tokens::t2>(here(m_cursor_position, 2));           \
       extra_length++;                                                          \
     } else if (chop_character(1) == ch3) {                                     \
-      tok = new tokens::t3{here(m_cursor_position, 2)};                        \
+      tok = m_arena->create<tokens::t3>(here(m_cursor_position, 2));           \
       extra_length++;                                                          \
     } else {                                                                   \
-      tok = new tokens::t{here(m_cursor_position, 1)};                         \
+      tok = m_arena->create<tokens::t>(here(m_cursor_position, 1));            \
     }                                                                          \
   } break;
   /* clang-format on */

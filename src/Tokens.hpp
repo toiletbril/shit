@@ -204,9 +204,8 @@ inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
 /* clang-format off */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
-    t = new tokens::k{                                                         \
-        {actual_cursor_position, byte_count}                                   \
-    };                                                                         \
+    t = m_arena->create<tokens::k>(                                            \
+        SourceLocation{actual_cursor_position, byte_count});                   \
     break
 /* clang-format on */
 
@@ -348,11 +347,11 @@ struct Operator : public Token
   virtual fn left_precedence() const wontthrow -> u8;
   virtual fn construct_binary_expression(const Expression *lhs,
                                          const Expression *rhs) const
-      throws -> std::unique_ptr<Expression>;
+      throws -> Expression *;
 
   virtual fn unary_precedence() const wontthrow -> u8;
   virtual fn construct_unary_expression(const Expression *rhs) const
-      throws -> std::unique_ptr<Expression>;
+      throws -> Expression *;
 };
 
 #define UNARY_BINARY_OPERATOR_TOKEN_STRUCT(t)                                  \
@@ -365,13 +364,12 @@ struct Operator : public Token
     String raw_string() const throws override;                                 \
                                                                                \
     u8 left_precedence() const wontthrow override;                             \
-    std::unique_ptr<Expression>                                                \
-    construct_binary_expression(const Expression *lhs,                         \
-                                const Expression *rhs) const throws override;  \
+    Expression *construct_binary_expression(                                   \
+        const Expression *lhs, const Expression *rhs) const throws override;   \
                                                                                \
     u8 unary_precedence() const wontthrow override;                            \
-    std::unique_ptr<Expression>                                                \
-    construct_unary_expression(const Expression *rhs) const throws override;   \
+    Expression *construct_unary_expression(const Expression *rhs)              \
+        const throws override;                                                 \
   }
 
 UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Plus);
@@ -387,8 +385,8 @@ UNARY_BINARY_OPERATOR_TOKEN_STRUCT(Minus);
     String raw_string() const throws override;                                 \
                                                                                \
     u8 unary_precedence() const wontthrow override;                            \
-    std::unique_ptr<Expression>                                                \
-    construct_unary_expression(const Expression *rhs) const throws override;   \
+    Expression *construct_unary_expression(const Expression *rhs)              \
+        const throws override;                                                 \
   }
 
 UNARY_OPERATOR_TOKEN_STRUCT(Tilde);
@@ -404,9 +402,8 @@ UNARY_OPERATOR_TOKEN_STRUCT(ExclamationMark);
     String raw_string() const throws override;                                 \
                                                                                \
     u8 left_precedence() const wontthrow override;                             \
-    std::unique_ptr<Expression>                                                \
-    construct_binary_expression(const Expression *lhs,                         \
-                                const Expression *rhs) const throws override;  \
+    Expression *construct_binary_expression(                                   \
+        const Expression *lhs, const Expression *rhs) const throws override;   \
   }
 
 BINARY_OPERATOR_TOKEN_STRUCT(Ampersand);

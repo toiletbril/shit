@@ -60,8 +60,7 @@ private:
 
 /* The arena that the lexer and parser allocate nodes from while a command is
    being built. The operator delete on a node consults it to tell arena storage
-   apart from an ordinary heap node, since a few arithmetic nodes are still
-   built with make_unique. It is null outside a parse. */
+   apart from an ordinary heap node. It is null outside a parse. */
 extern BumpArena *AST_ARENA;
 
 /* The arena that holds function bodies. A function body outlives the command

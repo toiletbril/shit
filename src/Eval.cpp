@@ -1806,7 +1806,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
       Lexer{String{source.view()}, *AST_ARENA}
   };
   let const ast = parser.construct_ast();
-  ASSERT(ast != nullptr);
+  ASSERT(ast != NULL);
 
   /* A cd or an assignment inside the substitution must not leak. */
   let snapshot = snapshot_state();
@@ -1943,8 +1943,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
        call and a control-flow exception thrown inside still leaves it owned.
        The destructor runs at the next top-level command, freeing the node
        members while the arena storage is reclaimed by the reset. */
-    let const ast = parser.construct_ast().release();
-    ASSERT(ast != nullptr);
+    let const ast = parser.construct_ast();
+    ASSERT(ast != NULL);
     m_retained_source_asts.push(ast);
 
     /* Keep a copy of the source alive for as long as the AST, so a control-flow

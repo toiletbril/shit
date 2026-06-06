@@ -171,7 +171,7 @@ static fn run_script_contents(const String &script_contents,
         Lexer{String{script_contents.view()}, ast_arena,
                     FLAG_ESCAPE_MAP.is_enabled(), filename}
     };
-    std::unique_ptr<Expression> ast = p.construct_ast();
+    Expression *ast = p.construct_ast();
 
     if (FLAG_AST.is_enabled()) {
       print(ast->to_ast_string());
@@ -187,7 +187,7 @@ static fn run_script_contents(const String &script_contents,
 
     /* Validate the whole tree before running anything. An unconditional
        problem stops execution, a conditional one only warns. */
-    if (!analyze_ast(ast.get(), script_contents, context.function_names(),
+    if (!analyze_ast(ast, script_contents, context.function_names(),
                            context.alias_names()))
     {
       exit_code = EXIT_FAILURE;
