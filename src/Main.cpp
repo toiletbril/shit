@@ -41,7 +41,7 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
      "Refuse to overwrite an existing file through '>'.");
 FLAG(NO_EXEC, Bool, 'n', "no-exec",
      "Read and parse commands but do not run them.");
-FLAG(NOUNSET, Bool, 'u', "nounset", "Treat an unset variable as an error.");
+FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
 FLAG(LOGIN, Bool, 'l', "login",
      "Act as a login shell and source the profiles.");
 
