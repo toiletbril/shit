@@ -362,6 +362,16 @@ protected:
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
   std::string m_field_separators{" \t\n"};
+
+  /* A byte-indexed table that answers whether a character is a field separator
+     in one load, instead of scanning IFS per byte. The layout is a contiguous
+     256-byte block, the shape a later SIMD scan reads to find separators in
+     bulk. It is rebuilt whenever IFS changes. */
+  bool m_field_separator_table[256]{};
+  /* Set IFS and refresh the separator table together, so the table never drifts
+     from the cached value. */
+  void set_field_separators(StringView value);
+  bool is_field_separator(char c) const;
   i32 m_last_exit_status{0};
 
   std::string m_shell_name{};

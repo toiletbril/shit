@@ -33,7 +33,12 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
       m_enable_echo(should_echo), m_enable_echo_expanded(should_echo_expanded),
       m_shell_is_interactive(shell_is_interactive),
       m_error_exit(should_error_exit)
-{}
+{
+  /* Seed the separator table from the default IFS, since the table starts
+     empty while m_field_separators is initialized to whitespace. */
+  set_field_separators(StringView{m_field_separators.data(),
+                                  m_field_separators.size()});
+}
 
 void
 EvalContext::add_evaluated_expression()
@@ -61,9 +66,26 @@ EvalContext::assign_variable(const std::string &name, const std::string &value)
 {
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
-  if (name == "IFS") m_field_separators = value;
+  if (name == "IFS")
+    set_field_separators(StringView{value.data(), value.size()});
   m_shell_variables.set(StringView{name.data(), name.size()},
                         StringView{value.data(), value.size()});
+}
+
+void
+EvalContext::set_field_separators(StringView value)
+{
+  m_field_separators.assign(value.data, value.length);
+  for (usize i = 0; i < 256; i++)
+    m_field_separator_table[i] = false;
+  for (usize i = 0; i < value.length; i++)
+    m_field_separator_table[static_cast<u8>(value.data[i])] = true;
+}
+
+bool
+EvalContext::is_field_separator(char c) const
+{
+  return m_field_separator_table[static_cast<u8>(c)];
 }
 
 void
@@ -85,7 +107,7 @@ EvalContext::unset_shell_variable(const std::string &name)
      there too. Otherwise a later lookup falls back to the stale environment
      value and the variable appears still set, which dash does not do. */
   os::unset_environment_variable(name);
-  if (name == "IFS") m_field_separators = " \t\n";
+  if (name == "IFS") set_field_separators(" \t\n");
 }
 
 Maybe<std::string>
@@ -684,9 +706,9 @@ EvalContext::restore_state(EvalStateSnapshot snapshot)
      the subshell or the command substitution does not leak its split behavior
      to the parent. */
   if (const String *ifs = m_shell_variables.find(StringView{"IFS", 3}))
-    m_field_separators.assign(ifs->c_str(), ifs->size());
+    set_field_separators(ifs->view());
   else
-    m_field_separators = " \t\n";
+    set_field_separators(" \t\n");
 
   /* The exit status is intentionally not restored. A subshell and a command
      substitution propagate the status of their last command to the parent. */
@@ -1660,8 +1682,8 @@ EvalContext::expand_word(const Word &word)
     segments = &tilde_expanded_segments;
   }
 
-  /* The field separator defaults to whitespace when IFS is unset. */
-  const std::string &ifs = m_field_separators;
+  /* The cached separator table answers each byte in one load. The table
+     defaults to whitespace when IFS is unset. */
 
   ArrayList<GlobField> fields{scratch};
   GlobField current{scratch};
@@ -1687,14 +1709,14 @@ EvalContext::expand_word(const Word &word)
   auto append_split_run = [&](StringView text, bool glob_active) {
     usize i = 0;
     while (i < text.length) {
-      if (ifs.find(text.data[i]) != std::string::npos) {
+      if (is_field_separator(text.data[i])) {
         flush();
-        while (i < text.length && ifs.find(text.data[i]) != std::string::npos)
+        while (i < text.length && is_field_separator(text.data[i]))
           i++;
         continue;
       }
       usize start = i;
-      while (i < text.length && ifs.find(text.data[i]) == std::string::npos)
+      while (i < text.length && !is_field_separator(text.data[i]))
         i++;
       append_run(StringView{text.data + start, i - start}, glob_active);
     }
