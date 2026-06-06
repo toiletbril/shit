@@ -735,7 +735,7 @@ EvalContext::last_exit_status() const
 }
 
 String
-EvalContext::expand_variable(const std::string &name) const
+EvalContext::expand_variable(StringView name) const
 {
   std::string value = get_variable_value(name).value_or("");
   return String{heap_allocator(), StringView{value.data(), value.size()}};
@@ -798,12 +798,12 @@ trim_matching_suffix(StringView value, StringView pattern, bool longest)
 } /* namespace */
 
 String
-EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
+EvalContext::expand_modifier_word(StringView word, bool remove_quotes)
 {
   String out{heap_allocator()};
   bool in_single_quote = false;
   bool in_double_quote = false;
-  for (usize i = 0; i < word.length(); i++) {
+  for (usize i = 0; i < word.length; i++) {
     /* In a default or a pattern word the quotes are removed, so a quoted
        expansion such as ${x%"$suffix"} matches the value of suffix literally.
        Heredoc bodies keep their quotes and pass remove_quotes as false. */
@@ -824,17 +824,17 @@ EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
       out += word[i];
       continue;
     }
-    if (i + 1 >= word.length()) {
+    if (i + 1 >= word.length) {
       out += '$';
       break;
     }
 
     char next = word[i + 1];
     if (next == '{') {
-      std::string inner{};
+      String inner{heap_allocator()};
       usize j = i + 2;
       i32 depth = 1;
-      while (j < word.length()) {
+      while (j < word.length) {
         if (word[j] == '{') {
           depth++;
         } else if (word[j] == '}') {
@@ -847,23 +847,23 @@ EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
       out += apply_parameter_expansion(inner);
       i = j;
     } else if (lexer::is_variable_name_start(next)) {
-      std::string name{};
+      String name{heap_allocator()};
       usize j = i + 1;
-      while (j < word.length() && lexer::is_variable_name(word[j]))
+      while (j < word.length && lexer::is_variable_name(word[j]))
         name += word[j++];
       out += expand_variable(name);
       i = j - 1;
-    } else if (next == '(' && i + 2 < word.length() && word[i + 2] == '(') {
+    } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
       /* Arithmetic $((...)), scanned to the matching )). */
-      std::string inner{};
+      String inner{heap_allocator()};
       usize j = i + 3;
       usize depth = 0;
-      for (; j < word.length(); j++) {
+      for (; j < word.length; j++) {
         if (word[j] == '(') {
           depth++;
         } else if (word[j] == ')' && depth > 0) {
           depth--;
-        } else if (word[j] == ')' && j + 1 < word.length() &&
+        } else if (word[j] == ')' && j + 1 < word.length &&
                    word[j + 1] == ')')
         {
           j += 2;
@@ -875,10 +875,10 @@ EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). */
-      std::string inner{};
+      String inner{heap_allocator()};
       usize j = i + 2;
       usize depth = 1;
-      for (; j < word.length(); j++) {
+      for (; j < word.length; j++) {
         if (word[j] == '(') {
           depth++;
         } else if (word[j] == ')') {
@@ -887,13 +887,14 @@ EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
         }
         inner += word[j];
       }
-      out += capture_command_substitution(inner);
+      out += capture_command_substitution(
+          std::string{inner.c_str(), inner.size()});
       i = j;
     } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                next == '$' || next == '!' || next == '-' ||
                lexer::is_number(next))
     {
-      out += expand_variable(std::string{next});
+      out += expand_variable(StringView{&next, 1});
       i++;
     } else {
       out += '$';
@@ -903,20 +904,20 @@ EvalContext::expand_modifier_word(const std::string &word, bool remove_quotes)
 }
 
 String
-EvalContext::apply_parameter_expansion(const std::string &spec)
+EvalContext::apply_parameter_expansion(StringView spec)
 {
   if (spec.empty()) return String{heap_allocator()};
 
   /* ${#name} is the length of the value, distinct from $# which is the count of
      positional parameters. */
-  if (spec.length() > 1 && spec[0] == '#') {
-    std::string name = spec.substr(1);
+  if (spec.length > 1 && spec[0] == '#') {
+    StringView name = spec.substring(1);
     if (name == "@" || name == "*")
       return String{heap_allocator(),
                     StringView{std::to_string(m_positional_params.size())}};
     Maybe<std::string> value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
-      throw Error{name + ": parameter not set"};
+      throw Error{std::string{name.data, name.length} + ": parameter not set"};
     return String{
         heap_allocator(),
         StringView{std::to_string(value.value_or("").length())}};
@@ -925,24 +926,24 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
   /* Split the parameter name from an optional operator and its word. */
   usize name_end = 0;
   if (lexer::is_variable_name_start(spec[0])) {
-    while (name_end < spec.length() && lexer::is_variable_name(spec[name_end]))
+    while (name_end < spec.length && lexer::is_variable_name(spec[name_end]))
       name_end++;
   } else if (lexer::is_number(spec[0])) {
-    while (name_end < spec.length() && lexer::is_number(spec[name_end]))
+    while (name_end < spec.length && lexer::is_number(spec[name_end]))
       name_end++;
   } else {
     /* A special single-character parameter, such as ? or @. */
     name_end = 1;
   }
 
-  std::string name = spec.substr(0, name_end);
-  std::string rest = spec.substr(name_end);
+  StringView name = spec.substring_of_length(0, name_end);
+  StringView rest = spec.substring(name_end);
   if (rest.empty()) {
     /* Under set -u a plain reference to a variable that is not set is an error,
        while a form with a modifier such as ${x:-w} handles the unset case
        itself. */
     if (m_error_unset && !get_variable_value(name).has_value())
-      throw Error{name + ": parameter not set"};
+      throw Error{std::string{name.data, name.length} + ": parameter not set"};
     return expand_variable(name);
   }
 
@@ -950,12 +951,12 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
      an empty value as unset. */
   bool is_colon_form = rest[0] == ':';
   usize op_index = is_colon_form ? 1 : 0;
-  if (op_index >= rest.length()) return expand_variable(name);
+  if (op_index >= rest.length) return expand_variable(name);
 
   char op = rest[op_index];
-  bool is_doubled = (op_index + 1 < rest.length() && rest[op_index + 1] == op &&
+  bool is_doubled = (op_index + 1 < rest.length && rest[op_index + 1] == op &&
                      (op == '#' || op == '%'));
-  std::string word = rest.substr(op_index + (is_doubled ? 2 : 1));
+  StringView word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
   Maybe<std::string> current = get_variable_value(name);
   bool is_set = current.has_value();
@@ -979,7 +980,8 @@ EvalContext::apply_parameter_expansion(const std::string &spec)
   case '?':
     if (treat_as_unset) {
       if (word.empty())
-        throw Error{name + ": parameter not set or empty"};
+        throw Error{std::string{name.data, name.length} +
+                    ": parameter not set or empty"};
       throw Error{expand_modifier_word(word)};
     }
     return String{heap_allocator(), StringView{*current}};
@@ -1663,17 +1665,18 @@ struct ArithmeticParser
 } /* namespace */
 
 i64
-EvalContext::evaluate_arithmetic(const std::string &expression)
+EvalContext::evaluate_arithmetic(StringView expression)
 {
   /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
      arithmetic becomes its value before the expression is parsed. A bare name
      is still resolved during evaluation. When the source holds no parameter to
      expand, which the d=$((d+1)) hot loop hits every iteration, the expansion
      copy is skipped and the original is parsed directly. */
-  if (expression.find('$') == std::string::npos &&
-      expression.find('`') == std::string::npos)
+  if (!expression.find_character('$').has_value() &&
+      !expression.find_character('`').has_value())
   {
-    ArithmeticParser parser{*this, expression, 0};
+    std::string source{expression.data, expression.length};
+    ArithmeticParser parser{*this, source, 0};
     return parser.parse();
   }
 
@@ -1763,10 +1766,8 @@ EvalContext::expand_word(const Word &word)
         }
         break;
       }
-      String value{
-          heap_allocator(),
-          apply_parameter_expansion(
-              std::string{segment.text.c_str(), segment.text.size()})};
+      String value{heap_allocator(),
+                   apply_parameter_expansion(segment.text.view())};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1785,10 +1786,9 @@ EvalContext::expand_word(const Word &word)
         append_split_run(output, true);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      String value{
-          heap_allocator(),
-          StringView{std::to_string(evaluate_arithmetic(
-              std::string{segment.text.c_str(), segment.text.size()}))}};
+      String value{heap_allocator(),
+                   StringView{std::to_string(
+                       evaluate_arithmetic(segment.text.view()))}};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1820,11 +1820,12 @@ EvalContext::expand_word_for_assignment(const Word &word)
 
   String result{heap_allocator()};
   for (const WordSegment &segment : *segments) {
-    std::string segment_text{segment.text.c_str(), segment.text.size()};
+    StringView segment_text = segment.text.view();
     if (segment.kind == WordSegment::Kind::VariableReference)
       result += apply_parameter_expansion(segment_text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
-      result += capture_command_substitution(segment_text);
+      result += capture_command_substitution(
+          std::string{segment_text.data, segment_text.length});
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
       result += StringView{std::to_string(evaluate_arithmetic(segment_text))};
     else
@@ -1989,7 +1990,7 @@ EvalContext::retain_ast(Expression *ast)
 }
 
 String
-EvalContext::expand_heredoc_body(const std::string &body)
+EvalContext::expand_heredoc_body(StringView body)
 {
   /* A heredoc body keeps its quote characters literally. */
   return expand_modifier_word(body, false);
