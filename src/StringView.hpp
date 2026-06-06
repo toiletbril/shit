@@ -17,66 +17,38 @@ public:
 
   StringView() = default;
   StringView(const char *bytes, usize count) : data(bytes), length(count) {}
-  StringView(const char *cstr)
-      : data(cstr), length(cstr != nullptr ? std::strlen(cstr) : 0)
-  {}
+  StringView(const char *cstr) wontthrow;
 
-  mustuse usize count() const { return length; }
-  mustuse bool is_empty() const { return length == 0; }
-  mustuse char operator[](usize i) const { return data[i]; }
-
-  mustuse bool operator==(StringView other) const
+  mustuse pure fn count() const wontthrow -> usize { return length; }
+  mustuse pure fn is_empty() const wontthrow -> bool { return length == 0; }
+  mustuse pure fn operator[](usize i) const wontthrow -> char
   {
-    return length == other.length &&
-           (length == 0 || std::memcmp(data, other.data, length) == 0);
+    return data[i];
   }
-  mustuse bool operator!=(StringView other) const { return !(*this == other); }
+
+  mustuse pure fn operator==(StringView other) const wontthrow -> bool;
+  mustuse pure fn operator!=(StringView other) const wontthrow -> bool
+  {
+    return !(*this == other);
+  }
 
   /* The index of the first occurrence of a byte, or None when it is absent.
      A Maybe keeps the absent case out of band rather than using a sentinel
      index. */
-  mustuse Maybe<usize> find_character(char wanted) const
-  {
-    for (usize i = 0; i < length; i++)
-      if (data[i] == wanted) return i;
-    return None;
-  }
+  mustuse pure fn find_character(char wanted) const wontthrow -> Maybe<usize>;
 
   /* The view from start to the end. A start past the end yields an empty view.
    */
-  mustuse StringView substring(usize start) const
-  {
-    if (start >= length) return StringView{data + length, 0};
-    return StringView{data + start, length - start};
-  }
+  mustuse pure fn substring(usize start) const wontthrow -> StringView;
 
   /* The view of count bytes from start, clamped to what remains. */
-  mustuse StringView substring_of_length(usize start, usize count) const
-  {
-    if (start >= length) return StringView{data + length, 0};
-    usize remaining = length - start;
-    return StringView{data + start, count < remaining ? count : remaining};
-  }
+  mustuse pure fn substring_of_length(usize start, usize count) const wontthrow
+      -> StringView;
 
-  mustuse bool starts_with(StringView prefix) const
-  {
-    if (prefix.length > length) return false;
-    /* An empty prefix matches, and the guard keeps a null data pointer out of
-       memcmp, which is undefined even for a zero length. */
-    return prefix.length == 0 ||
-           std::memcmp(data, prefix.data, prefix.length) == 0;
-  }
+  mustuse pure fn starts_with(StringView prefix) const wontthrow -> bool;
 };
 
 /* A growable hash of a byte range, FNV-1a over the short keys a shell uses. */
-inline u64 hash_bytes(StringView view)
-{
-  u64 hash = 14695981039346656037ull;
-  for (usize i = 0; i < view.length; i++) {
-    hash ^= static_cast<unsigned char>(view.data[i]);
-    hash *= 1099511628211ull;
-  }
-  return hash;
-}
+pure fn hash_bytes(StringView view) wontthrow -> u64;
 
 } /* namespace shit */

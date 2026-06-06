@@ -84,10 +84,13 @@ USE_LD :=
 endif
 
 ifeq ($(SHIT_MODE), rel)
+# Link-time optimization merges the duplicated header-only template containers
+# across translation units, which the per-unit compile cannot do on its own.
 CXXFLAGS += \
 	-s \
 	-DNDEBUG \
-	-O3
+	-O3 \
+	-flto
 # Link the runtime statically so a -c invocation or a script launch does not
 # pay the dynamic linker on every startup. This nearly halves the startup time
 # and brings it close to dash.
@@ -136,7 +139,8 @@ CXXFLAGS += \
 	-DNDEBUG \
 	-DSHIT_NO_TOILETLINE \
 	-fno-omit-frame-pointer \
-	-O3
+	-O3 \
+	-flto
 else
 $(error Invalid SHIT_MODE=$(SHIT_MODE). Available modes are "dbg", "rel", "prof", "cosmo")
 endif
