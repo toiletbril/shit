@@ -30,7 +30,7 @@ Pwd::execute(ExecContext &ec, EvalContext &cxt) const
   std::string cwd = utils::get_current_directory().string();
   p.append(StringView{cwd.data(), cwd.size()});
   p += '\n';
-  ec.print_to_stdout(std::string{p.c_str(), p.size()});
+  ec.print_to_stdout(p);
   return 0;
 }
 

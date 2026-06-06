@@ -31,7 +31,7 @@ WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const
   if (Maybe<std::string> u = os::get_current_user(); u.has_value()) {
     p.append(StringView{u->data(), u->size()});
     p += '\n';
-    ec.print_to_stdout(std::string{p.c_str(), p.size()});
+    ec.print_to_stdout(p);
     return 0;
   }
 

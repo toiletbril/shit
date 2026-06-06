@@ -79,7 +79,7 @@ Echo::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (!should_suppress_newline && !should_stop) buf += '\n';
 
-  ec.print_to_stdout(std::string{buf.c_str(), buf.size()});
+  ec.print_to_stdout(buf);
 
   return 0;
 }
