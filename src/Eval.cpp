@@ -109,17 +109,21 @@ EvalContext::unset_shell_variable(StringView name)
   if (name == "IFS") set_field_separators(" \t\n");
 }
 
-Maybe<std::string>
+Maybe<String>
 EvalContext::get_variable_value(StringView name) const
 {
-  if (name == "?") return std::to_string(m_last_exit_status);
-  if (name == "$") return std::to_string(os::get_shell_process_id());
+  if (name == "?")
+    return String{heap_allocator(), std::to_string(m_last_exit_status)};
+  if (name == "$")
+    return String{heap_allocator(), std::to_string(os::get_shell_process_id())};
   if (name == "!")
-    return m_last_background_pid ? std::to_string(*m_last_background_pid)
-                                 : std::string{};
-  if (name == "-") return option_flags_string();
-  if (name == "#") return std::to_string(m_positional_params.size());
-  if (name == "0") return m_shell_name;
+    return m_last_background_pid
+               ? String{heap_allocator(), std::to_string(*m_last_background_pid)}
+               : String{};
+  if (name == "-") return String{heap_allocator(), option_flags_string()};
+  if (name == "#")
+    return String{heap_allocator(), std::to_string(m_positional_params.size())};
+  if (name == "0") return String{heap_allocator(), m_shell_name};
 
   /* A purely numeric name selects a positional parameter, $1 upward. An index
      too large to fit, or beyond the count, has no value. */
@@ -130,38 +134,36 @@ EvalContext::get_variable_value(StringView name) const
       break;
     }
   if (is_all_digits) {
-    if (name.size() > 9) return std::string{};
+    if (name.size() > 9) return String{};
     usize index = std::stoul(std::string{name.data, name.length});
-    if (index >= 1 && index <= m_positional_params.size()) {
-      const String &param = m_positional_params[index - 1];
-      return std::string{param.c_str(), param.size()};
-    }
-    return std::string{};
+    if (index >= 1 && index <= m_positional_params.size())
+      return m_positional_params[index - 1];
+    return String{};
   }
 
   /* $* and $@ outside the special quoted handling join into a single word. $*
      joins with the first IFS character, $@ joins with a space. */
   if (name == "*" || name == "@") {
-    std::string separator = " ";
+    char separator = ' ';
+    bool has_separator = true;
     if (name == "*") {
       const std::string &ifs = m_field_separators;
-      separator = ifs.empty() ? std::string{} : std::string{ifs.front()};
+      has_separator = !ifs.empty();
+      if (has_separator) separator = ifs.front();
     }
-    std::string joined{};
+    String joined{};
     for (usize i = 0; i < m_positional_params.size(); i++) {
-      if (i > 0) joined += separator;
-      const String &param = m_positional_params[i];
-      joined += std::string{param.c_str(), param.size()};
+      if (i > 0 && has_separator) joined.push(separator);
+      joined.append(m_positional_params[i].view());
     }
     return joined;
   }
 
-  if (const String *stored = m_shell_variables.find(name))
-    return std::string{stored->c_str(), stored->size()};
+  if (const String *stored = m_shell_variables.find(name)) return *stored;
 
   if (std::optional<std::string> env =
           os::get_environment_variable(std::string{name.data, name.length}))
-    return *env;
+    return String{heap_allocator(), *env};
   return shit::None;
 }
 
@@ -737,8 +739,7 @@ EvalContext::last_exit_status() const
 String
 EvalContext::expand_variable(StringView name) const
 {
-  std::string value = get_variable_value(name).value_or("");
-  return String{heap_allocator(), StringView{value.data(), value.size()}};
+  return get_variable_value(name).value_or(String{});
 }
 
 namespace {
@@ -751,19 +752,17 @@ trim_matching_prefix(StringView value, StringView pattern, bool longest)
   ArrayList<bool> active{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
     active.push(true);
-  std::string_view value_view{value.data, value.length};
-  std::string_view pattern_view{pattern.data, pattern.length};
   if (longest) {
     for (usize length = value.length;; length--) {
-      if (utils::glob_matches(pattern_view, value_view.substr(0, length), active,
-                              0))
+      if (utils::glob_matches(pattern, value.substring_of_length(0, length),
+                              active, 0))
         return String{heap_allocator(), value.substring(length)};
       if (length == 0) break;
     }
   } else {
     for (usize length = 0; length <= value.length; length++) {
-      if (utils::glob_matches(pattern_view, value_view.substr(0, length), active,
-                              0))
+      if (utils::glob_matches(pattern, value.substring_of_length(0, length),
+                              active, 0))
         return String{heap_allocator(), value.substring(length)};
     }
   }
@@ -778,16 +777,14 @@ trim_matching_suffix(StringView value, StringView pattern, bool longest)
   ArrayList<bool> active{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
     active.push(true);
-  std::string_view value_view{value.data, value.length};
-  std::string_view pattern_view{pattern.data, pattern.length};
   if (longest) {
     for (usize start = 0; start <= value.length; start++) {
-      if (utils::glob_matches(pattern_view, value_view.substr(start), active, 0))
+      if (utils::glob_matches(pattern, value.substring(start), active, 0))
         return String{heap_allocator(), value.substring_of_length(0, start)};
     }
   } else {
     for (usize start = value.length;; start--) {
-      if (utils::glob_matches(pattern_view, value_view.substr(start), active, 0))
+      if (utils::glob_matches(pattern, value.substring(start), active, 0))
         return String{heap_allocator(), value.substring_of_length(0, start)};
       if (start == 0) break;
     }
@@ -915,12 +912,12 @@ EvalContext::apply_parameter_expansion(StringView spec)
     if (name == "@" || name == "*")
       return String{heap_allocator(),
                     StringView{std::to_string(m_positional_params.size())}};
-    Maybe<std::string> value = get_variable_value(name);
+    Maybe<String> value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{std::string{name.data, name.length} + ": parameter not set"};
     return String{
         heap_allocator(),
-        StringView{std::to_string(value.value_or("").length())}};
+        StringView{std::to_string(value.value_or(String{}).length())}};
   }
 
   /* Split the parameter name from an optional operator and its word. */
@@ -958,7 +955,7 @@ EvalContext::apply_parameter_expansion(StringView spec)
                      (op == '#' || op == '%'));
   StringView word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
-  Maybe<std::string> current = get_variable_value(name);
+  Maybe<String> current = get_variable_value(name);
   bool is_set = current.has_value();
   bool is_empty = !is_set || current->empty();
   bool treat_as_unset = is_colon_form ? is_empty : !is_set;
@@ -966,14 +963,14 @@ EvalContext::apply_parameter_expansion(StringView spec)
   switch (op) {
   case '-':
     if (treat_as_unset) return expand_modifier_word(word);
-    return String{heap_allocator(), StringView{*current}};
+    return String{heap_allocator(), current->view()};
   case '=':
     if (treat_as_unset) {
       String assigned = expand_modifier_word(word);
       set_shell_variable(name, std::string{assigned.c_str(), assigned.size()});
       return assigned;
     }
-    return String{heap_allocator(), StringView{*current}};
+    return String{heap_allocator(), current->view()};
   case '+':
     if (treat_as_unset) return String{heap_allocator()};
     return expand_modifier_word(word);
@@ -984,15 +981,15 @@ EvalContext::apply_parameter_expansion(StringView spec)
                     ": parameter not set or empty"};
       throw Error{expand_modifier_word(word)};
     }
-    return String{heap_allocator(), StringView{*current}};
+    return String{heap_allocator(), current->view()};
   case '#': {
-    std::string value = current.value_or("");
-    return trim_matching_prefix(StringView{value}, expand_modifier_word(word),
+    String value = current.value_or(String{});
+    return trim_matching_prefix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
   case '%': {
-    std::string value = current.value_or("");
-    return trim_matching_suffix(StringView{value}, expand_modifier_word(word),
+    String value = current.value_or(String{});
+    return trim_matching_suffix(value.view(), expand_modifier_word(word),
                                 is_doubled);
   }
   default: return expand_variable(name);
@@ -1133,7 +1130,10 @@ EvalContext::expand_path_once(const GlobField &field, bool should_expand_files)
     /* TODO: Figure the rules of hidden file expansion. */
     if (glob[0] != '.' && !filename.empty() && filename[0] == '.') continue;
 
-    if (utils::glob_matches(glob, filename, field.glob_active, stem_start)) {
+    if (utils::glob_matches(StringView{glob.data(), glob.size()},
+                            StringView{filename.data(), filename.size()},
+                            field.glob_active, stem_start))
+    {
       add_expansion();
 
       /* A real filename is literal, so the resulting field never globs again.
@@ -1390,13 +1390,12 @@ struct ArithmeticParser
       return parsed;
     }
 
-    std::string value = context.get_variable_value(name).value_or("");
+    String value = context.get_variable_value(name).value_or(String{});
     if (value.empty()) return 0;
-    try {
-      return std::stoll(value, nullptr, 0);
-    } catch (...) {
-      return 0;
-    }
+    errno = 0;
+    i64 parsed = std::strtoll(value.c_str(), nullptr, 0);
+    if (errno == ERANGE) return 0;
+    return parsed;
   }
 
   i64
@@ -1834,7 +1833,7 @@ EvalContext::expand_word_for_assignment(const Word &word)
   return result;
 }
 
-std::string
+String
 EvalContext::capture_command_substitution(const std::string &source)
 {
   /* Parse the inner command into the active parse arena. It coexists with the
@@ -1855,7 +1854,7 @@ EvalContext::capture_command_substitution(const std::string &source)
 
   /* Drain the read end on a thread so output larger than the pipe buffer cannot
      deadlock the commands writing into it. */
-  std::string captured{};
+  String captured{heap_allocator()};
   std::thread reader([&captured, read_fd = pipe->in]() {
     /* A failed allocation here must not escape the thread and call terminate.
      */
@@ -1864,7 +1863,7 @@ EvalContext::capture_command_substitution(const std::string &source)
       for (;;) {
         Maybe<usize> n = os::read_fd(read_fd, buffer, sizeof(buffer));
         if (!n.has_value() || *n == 0) break;
-        captured.append(buffer, *n);
+        captured.append(StringView{buffer, static_cast<usize>(*n)});
       }
     } catch (...) {}
   });

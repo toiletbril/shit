@@ -263,6 +263,14 @@ struct String
   }
 
   void
+  pop_back()
+  {
+    SHIT_ASSERT(m_length > 0, "pop_back on empty string");
+    m_length--;
+    m_data[m_length] = '\0';
+  }
+
+  void
   append(char c)
   {
     push(c);

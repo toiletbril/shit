@@ -1338,21 +1338,19 @@ CaseClause::evaluate_impl(EvalContext &cxt) const
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no pathname globbing, so a pattern keeps its metacharacters
      for matching. */
-  auto expand_no_glob = [&cxt](const Token *t) -> std::string {
+  auto expand_no_glob = [&cxt](const Token *t) -> String {
     if (t->kind() == Token::Kind::Word) {
-      String expanded = cxt.expand_word_for_assignment(
+      return cxt.expand_word_for_assignment(
           static_cast<const tokens::WordToken *>(t)->word());
-      return std::string{expanded.c_str(), expanded.size()};
     }
-    String raw = t->raw_string();
-    return std::string{raw.c_str(), raw.size()};
+    return t->raw_string();
   };
 
-  std::string subject = expand_no_glob(m_word);
+  String subject = expand_no_glob(m_word);
 
   for (const CaseItem &item : m_items) {
     for (const Token *pattern_token : item.patterns) {
-      std::string pattern = expand_no_glob(pattern_token);
+      String pattern = expand_no_glob(pattern_token);
       ArrayList<bool> all_active{heap_allocator()};
       for (usize k = 0; k < pattern.size(); k++)
         all_active.push(true);

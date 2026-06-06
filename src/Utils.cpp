@@ -235,13 +235,13 @@ is_glob_char_active(const ArrayList<bool> &glob_active, usize index)
 }
 
 bool
-glob_matches(std::string_view glob, std::string_view str,
+glob_matches(StringView glob, StringView str,
              const ArrayList<bool> &glob_active, usize mask_offset)
 {
   usize s = 0;
   usize g = 0;
 
-  while (g < glob.length() && s < str.length()) {
+  while (g < glob.size() && s < str.size()) {
     if (!is_glob_char_active(glob_active, mask_offset + g)) {
       if (glob[g++] != str[s++])
         return false;
@@ -259,8 +259,8 @@ glob_matches(std::string_view glob, std::string_view str,
       /* A star at the end of the glob matches the entire rest of the string, so
          there is no need to try every split. This keeps a plain * component,
          the common case, linear in the string instead of quadratic. */
-      if (g + 1 >= glob.length()) return true;
-      if (glob_matches(glob.substr(g + 1), str.substr(s), glob_active,
+      if (g + 1 >= glob.size()) return true;
+      if (glob_matches(glob.substring(g + 1), str.substring(s), glob_active,
                        mask_offset + g + 1))
       {
         return true;
@@ -286,10 +286,10 @@ glob_matches(std::string_view glob, std::string_view str,
          literal character, as POSIX specifies. A ] right after [ or [^ is a
          member, so the scan for the closing ] starts past it. */
       usize close_scan = g + 1;
-      if (close_scan < glob.length() && glob[close_scan] == '^') close_scan++;
-      if (close_scan < glob.length() && glob[close_scan] == ']') close_scan++;
+      if (close_scan < glob.size() && glob[close_scan] == '^') close_scan++;
+      if (close_scan < glob.size() && glob[close_scan] == ']') close_scan++;
       bool has_closing_bracket = false;
-      for (; close_scan < glob.length(); close_scan++) {
+      for (; close_scan < glob.size(); close_scan++) {
         if (glob[close_scan] == ']') {
           has_closing_bracket = true;
           break;
@@ -303,22 +303,22 @@ glob_matches(std::string_view glob, std::string_view str,
       }
 
       g++; /* skip [ */
-      if (g >= glob.length()) GLOB_GROUP_ERR();
+      if (g >= glob.size()) GLOB_GROUP_ERR();
 
       if (glob[g] == '^') {
         g++;
         should_negate = true;
 
-        if (g >= glob.length()) GLOB_GROUP_ERR();
+        if (g >= glob.size()) GLOB_GROUP_ERR();
       }
 
       char prev_glob_ch = glob[g++];
       is_matched |= (prev_glob_ch == str[s]);
 
-      while (g < glob.length() && glob[g] != ']') {
+      while (g < glob.size() && glob[g] != ']') {
         if (glob[g] == '-') {
           g++;
-          if (g >= glob.length()) GLOB_GROUP_ERR();
+          if (g >= glob.size()) GLOB_GROUP_ERR();
 
           if (glob[g] == ']') {
             is_matched |= ('-' == str[s]);
@@ -332,7 +332,7 @@ glob_matches(std::string_view glob, std::string_view str,
         }
       }
 
-      if (g >= glob.length() || glob[g] != ']') GLOB_GROUP_ERR();
+      if (g >= glob.size() || glob[g] != ']') GLOB_GROUP_ERR();
       if (should_negate) is_matched = !is_matched;
       if (!is_matched) return false;
 
@@ -345,14 +345,14 @@ glob_matches(std::string_view glob, std::string_view str,
     }
   }
 
-  if (s >= str.length()) {
-    while (g < glob.length() && glob[g] == '*' &&
+  if (s >= str.size()) {
+    while (g < glob.size() && glob[g] == '*' &&
            is_glob_char_active(glob_active, mask_offset + g))
     {
       g++;
     }
 
-    if (g >= glob.length()) return true;
+    if (g >= glob.size()) return true;
   }
 
   return false;

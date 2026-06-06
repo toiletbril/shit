@@ -40,11 +40,11 @@ Getopts::execute(ExecContext &ec, EvalContext &cxt) const
   }
 
   i64 optind = 1;
-  if (Maybe<std::string> value = cxt.get_variable_value("OPTIND");
+  if (Maybe<String> value = cxt.get_variable_value("OPTIND");
       value.has_value())
   {
     try {
-      optind = std::stoll(*value);
+      optind = std::stoll(std::string{value->c_str(), value->size()});
     } catch (...) {
       optind = 1;
     }

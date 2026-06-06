@@ -34,9 +34,9 @@ Readonly::execute(ExecContext &ec, EvalContext &cxt) const
     for (const String &name : cxt.readonly_names()) {
       out += "readonly ";
       out += name;
-      if (Maybe<std::string> value = cxt.get_variable_value(name)) {
+      if (Maybe<String> value = cxt.get_variable_value(name)) {
         out += "='";
-        out += *value;
+        out += value->view();
         out += "'";
       }
       out += "\n";

@@ -422,10 +422,10 @@ main(int argc, char **argv)
     {
       source_file(*home / ".profile", context, ast_arena);
     }
-    if (shit::Maybe<std::string> env = context.get_variable_value("ENV");
+    if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
         env.has_value() && !env->empty())
     {
-      source_file(*env, context, ast_arena);
+      source_file(std::string{env->c_str(), env->size()}, context, ast_arena);
     }
   }
 
@@ -487,12 +487,13 @@ main(int argc, char **argv)
 
         /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
         std::string prompt{};
-        if (shit::Maybe<std::string> ps1 = context.get_variable_value("PS1");
+        if (shit::Maybe<shit::String> ps1 = context.get_variable_value("PS1");
             ps1.has_value() && !ps1->empty())
         {
           /* A user-set PS1 expands its escape sequences, \u \h \w \W \$ and
              the like. */
-          prompt = expand_prompt_escapes(*ps1, u, full_pwd);
+          prompt = expand_prompt_escapes(std::string{ps1->c_str(), ps1->size()},
+                                         u, full_pwd);
         } else {
           prompt += u;
           prompt += ' ';

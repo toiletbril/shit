@@ -86,7 +86,7 @@ struct ControlFlow
 struct LocalBinding
 {
   String name;
-  Maybe<std::string> previous_value;
+  Maybe<String> previous_value;
 };
 
 /* A background job, one entry in the job table. The id is the number jobs and
@@ -149,7 +149,7 @@ struct EvalContext
 
   void set_shell_variable(StringView name, StringView value);
   void unset_shell_variable(StringView name);
-  Maybe<std::string> get_variable_value(StringView name) const;
+  Maybe<String> get_variable_value(StringView name) const;
 
   /* The stored value of a plain shell variable, or nullptr when the name is
      unset or names a special parameter. The pointer reads the value without a
@@ -306,7 +306,7 @@ struct EvalContext
      newlines stripped. The inner command runs in-process with the working
      directory and variables snapshotted, so a cd or an assignment inside does
      not leak to the parent. */
-  std::string capture_command_substitution(const std::string &source);
+  String capture_command_substitution(const std::string &source);
 
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
