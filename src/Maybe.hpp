@@ -122,7 +122,7 @@ private:
 /* Evaluate a Maybe expression, return None from the enclosing function when
    it is empty, otherwise yield the value. The enclosing function must itself
    return a Maybe. */
-#define SHIT_TRY(maybe_expr)                                                   \
+#define SHIT_UNWRAP(maybe_expr)                                                \
   ({                                                                           \
     auto t__result = (maybe_expr);                                             \
     if (!t__result) return ::shit::None;                                       \
