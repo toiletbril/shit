@@ -34,7 +34,7 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     job = cxt.most_recent_job();
 
   if (job == nullptr) throw Error{"fg: there is no such job"};
-  ASSERT(job != NULL);
+  ASSERT(job != nullptr);
 
   /* A job already reaped by a prior poll has its status recorded, so report it
      instead of waiting on a pid that no longer exists. */

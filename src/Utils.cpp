@@ -26,7 +26,7 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &v) throws -> String
 {
   String r{};
   for (const shit::Token *t : v) {
-    ASSERT(t != NULL);
+    ASSERT(t != nullptr);
     r += t->raw_string();
     if (t != v.back()) {
       r += ' ';
@@ -153,8 +153,8 @@ static pure fn find_subview(StringView haystack, StringView needle, usize start)
     return start <= haystack.length ? start : NOT_FOUND_INDEX;
   if (needle.length > haystack.length) return NOT_FOUND_INDEX;
 
-  ASSERT(haystack.data != NULL);
-  ASSERT(needle.data != NULL);
+  ASSERT(haystack.data != nullptr);
+  ASSERT(needle.data != nullptr);
 
   for (usize i = start; i + needle.length <= haystack.length; i++) {
     if (std::memcmp(haystack.data + i, needle.data, needle.length) == 0)

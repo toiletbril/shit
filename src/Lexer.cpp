@@ -148,7 +148,7 @@ hot fn Lexer::next_expression_token() throws -> Token *
   skip_whitespace();
 
   const let t = lex_expression_token();
-  ASSERT(t != NULL);
+  ASSERT(t != nullptr);
 
   advance_past_last_peek();
 
@@ -160,7 +160,7 @@ hot fn Lexer::next_shell_token() throws -> Token *
   skip_whitespace();
 
   const let t = lex_shell_token();
-  ASSERT(t != NULL);
+  ASSERT(t != nullptr);
 
   advance_past_last_peek();
 
@@ -199,7 +199,7 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs)
     throws -> const std::string *
 {
   let body = new std::string{};
-  ASSERT(body != NULL);
+  ASSERT(body != nullptr);
 
   m_heredoc_bodies.push(body);
   m_pending_heredocs.push({String{delimiter}, strip_tabs, body});
@@ -239,7 +239,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
       collected.append(line.data, line.length);
       collected += '\n';
     }
-    ASSERT(pending.body != NULL);
+    ASSERT(pending.body != nullptr);
     *pending.body = std::move(collected);
   }
   m_pending_heredocs.clear();
@@ -281,7 +281,7 @@ hot fn Lexer::lex_shell_token() throws -> Token *
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
 
-  ASSERT(t != NULL);
+  ASSERT(t != nullptr);
 
   m_last_shell_token_was_newline = (t->kind() == Token::Kind::Newline);
 
@@ -335,7 +335,7 @@ hot fn Lexer::lex_number() throws -> Token *
 
   Token *const num = m_arena->create<tokens::Number>(
       here(m_cursor_position, length), digits);
-  ASSERT(num != NULL);
+  ASSERT(num != nullptr);
 
   m_cached_offset = length;
 
@@ -764,7 +764,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
     };
   }
 
-  ASSERT(tok != NULL);
+  ASSERT(tok != nullptr);
 
   m_cached_offset = 1 + extra_length;
 

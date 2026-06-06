@@ -62,7 +62,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         status = 1;
         continue;
       }
-      ASSERT(job != NULL);
+      ASSERT(job != nullptr);
       pid = job->pid;
     } else {
       const ErrorOr<i64> parsed = utils::parse_decimal_integer(target);

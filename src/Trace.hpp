@@ -48,7 +48,7 @@ inline String value_to_log_string(StringView value) { return String{value}; }
 
 inline String value_to_log_string(const char *value)
 {
-  return value != NULL ? String{value} : String{"(null)"};
+  return value != nullptr ? String{value} : String{"(null)"};
 }
 
 inline String value_to_log_string(bool value)

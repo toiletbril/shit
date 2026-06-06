@@ -226,7 +226,7 @@ fn Path::is_executable() const wontthrow -> bool
 fn Path::current_directory() throws -> Path
 {
   char buffer[4096];
-  if (::getcwd(buffer, sizeof(buffer)) != NULL) return Path{StringView{buffer}};
+  if (::getcwd(buffer, sizeof(buffer)) != nullptr) return Path{StringView{buffer}};
   return Path{};
 }
 
@@ -240,13 +240,13 @@ fn Path::set_current_directory(const Path &path) throws -> ErrorOr<ok>
 fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
   DIR *const handle = ::opendir(dir.c_str());
-  if (handle == NULL) return None;
+  if (handle == nullptr) return None;
 
   ArrayList<String> names{};
-  for (struct dirent *entry = ::readdir(handle); entry != NULL;
+  for (struct dirent *entry = ::readdir(handle); entry != nullptr;
        entry = ::readdir(handle))
   {
-    ASSERT(entry != NULL);
+    ASSERT(entry != nullptr);
 
     const StringView name{entry->d_name};
     if (name == StringView{"."} || name == StringView{".."}) continue;
@@ -302,7 +302,7 @@ fn Path::is_executable() const -> bool
 fn Path::current_directory() -> Path
 {
   char buffer[4096];
-  if (_getcwd(buffer, sizeof(buffer)) != NULL) return Path{StringView{buffer}};
+  if (_getcwd(buffer, sizeof(buffer)) != nullptr) return Path{StringView{buffer}};
   return Path{};
 }
 

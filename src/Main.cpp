@@ -133,7 +133,7 @@ static fn report_escaped_control_flow(EvalContext &context,
   }
 
   const String *source =
-      control.source != NULL ? control.source : &fallback_source;
+      control.source != nullptr ? control.source : &fallback_source;
   ErrorWithLocation located{control.location, what};
   show_message(located.to_string(*source));
   if (!control.origin.empty()) {

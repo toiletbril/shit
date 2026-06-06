@@ -46,7 +46,7 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
       const usize aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
 
       if (aligned + size <= block.size) {
-        ASSERT(block.base != NULL);
+        ASSERT(block.base != nullptr);
 
         void *const pointer = block.base + aligned;
         block.used = aligned + size;

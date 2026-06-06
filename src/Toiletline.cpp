@@ -62,7 +62,7 @@ fn tl_arena_malloc(usize length) -> void *
 
 fn tl_arena_free(void *pointer) -> void
 {
-  if (pointer == NULL) return;
+  if (pointer == nullptr) return;
   tl_free_block *block = static_cast<tl_free_block *>(pointer);
   block->next = TOILETLINE_FREE_LIST;
   TOILETLINE_FREE_LIST = block;
@@ -70,7 +70,7 @@ fn tl_arena_free(void *pointer) -> void
 
 fn tl_arena_realloc(void *pointer, usize length) -> void *
 {
-  if (pointer == NULL) return tl_arena_malloc(length);
+  if (pointer == nullptr) return tl_arena_malloc(length);
   usize old_capacity = tl_block_capacity(pointer);
   if (old_capacity >= length) return pointer;
   void *fresh = tl_arena_malloc(length);

@@ -174,7 +174,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
      builtin command. */
   defer { ec.close_fds(); };
 
-  ASSERT(b != NULL);
+  ASSERT(b != nullptr);
   try {
     return b->execute(ec, cxt);
   } catch (const Error &e) {

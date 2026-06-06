@@ -209,7 +209,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     if (next_arg_is_value) {
       next_arg_is_value = false;
 
-      ASSERT(prev_flag != NULL);
+      ASSERT(prev_flag != nullptr);
       if (prev_flag->kind() == Flag::Kind::String)
         static_cast<FlagString *>(prev_flag)->set(argv[i]);
       else
@@ -352,7 +352,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
   /* Previous flag expected a value after space. */
   if (next_arg_is_value) {
-    ASSERT(prev_flag != NULL);
+    ASSERT(prev_flag != nullptr);
     throw Error{"No value provided for '" + flag_name(prev_flag, prev_is_long) +
                 "' flag"};
   }

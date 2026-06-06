@@ -1807,7 +1807,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
       Lexer{String{source.view()}, *AST_ARENA}
   };
   let const ast = parser.construct_ast();
-  ASSERT(ast != NULL);
+  ASSERT(ast != nullptr);
 
   /* A cd or an assignment inside the substitution must not leak. */
   let snapshot = snapshot_state();
@@ -1885,14 +1885,14 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
   /* The source the call site lives in, captured before set_current_source below
      changes it, so a backtrace caret renders the dot or eval against the parent
-     text rather than the source about to run. It is NULL when no call site is
+     text rather than the source about to run. It is nullptr when no call site is
      known, which sends the backtrace to the plain origin message. */
   let const parent_source = call_site ? m_current_source : nullptr;
 
   /* The frame joins the backtrace stack for the length of this call, so an
      error deep in a nested source prints every call site. The pop runs at
      function scope, after the catch below has read the stack. A frame with no
-     call site stores a zero location, unused because parent_source is NULL. */
+     call site stores a zero location, unused because parent_source is nullptr. */
   m_source_frames.push(source_frame{
       String{origin}, call_site ? *call_site : SourceLocation{0, 0},
       parent_source});
@@ -1945,7 +1945,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
        The destructor runs at the next top-level command, freeing the node
        members while the arena storage is reclaimed by the reset. */
     let const ast = parser.construct_ast();
-    ASSERT(ast != NULL);
+    ASSERT(ast != nullptr);
     m_retained_source_asts.push(ast);
 
     /* Keep a copy of the source alive for as long as the AST, so a control-flow

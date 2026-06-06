@@ -79,9 +79,9 @@ fn get_current_user() throws -> Maybe<String>
   /* The name comes from the environment rather than getpwuid, which a static
      build cannot call without pulling in the runtime glibc and which the linker
      warns about. A login shell sets LOGNAME and USER. */
-  if (const char *name = std::getenv("LOGNAME"); name != NULL)
+  if (const char *name = std::getenv("LOGNAME"); name != nullptr)
     return String{StringView{name}};
-  if (const char *name = std::getenv("USER"); name != NULL)
+  if (const char *name = std::getenv("USER"); name != nullptr)
     return String{StringView{name}};
   return shit::None;
 }
@@ -133,7 +133,7 @@ fn get_environment_variable(StringView key) throws -> Maybe<String>
 {
   const String key_string{key};
   const char *e = std::getenv(key_string.c_str());
-  if (e != NULL) return String{StringView{e}};
+  if (e != nullptr) return String{StringView{e}};
   return shit::None;
 }
 
@@ -371,7 +371,7 @@ fn wait_and_monitor_process(process pid) throws -> i32
   if (WIFSIGNALED(status)) {
     const i32 sig = WTERMSIG(status);
     const char *sig_str = strsignal(sig);
-    const String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
+    const String sig_desc = (sig_str != nullptr) ? String{StringView{sig_str}}
                                               : String{StringView{"Unknown"}};
 
     /* Ignore Ctrl-C. */
@@ -387,7 +387,7 @@ fn wait_and_monitor_process(process pid) throws -> i32
   } else if (WIFSTOPPED(status)) {
     const i32 sig = WSTOPSIG(status);
     const char *sig_str = strsignal(sig);
-    const String sig_desc = (sig_str != NULL) ? String{StringView{sig_str}}
+    const String sig_desc = (sig_str != nullptr) ? String{StringView{sig_str}}
                                               : String{StringView{"Unknown"}};
 
     shit::print("[Process " + utils::integer_to_string(pid) + ": " + sig_desc +
@@ -753,7 +753,7 @@ fn make_pipe() -> Maybe<Pipe>
   /* Both ends are non-inheritable, so a child only receives the end execute
      handles explicitly through STARTF_USESTDHANDLES, like close-on-exec. */
   att.bInheritHandle = FALSE;
-  att.lpSecurityDescriptor = NULL; /* NOLINT */
+  att.lpSecurityDescriptor = nullptr; /* NOLINT */
 
   HANDLE in = INVALID_HANDLE_VALUE;
   HANDLE out = INVALID_HANDLE_VALUE;
@@ -785,18 +785,18 @@ fn open_file_descriptor(StringView path, FileOpenMode mode) -> Maybe<descriptor>
   SECURITY_ATTRIBUTES att{};
   att.nLength = sizeof(SECURITY_ATTRIBUTES);
   att.bInheritHandle = FALSE;
-  att.lpSecurityDescriptor = NULL; /* NOLINT */
+  att.lpSecurityDescriptor = nullptr; /* NOLINT */
 
   /* CreateFileA needs a null-terminated path, so the view is copied into a
      String that owns a trailing null. */
   String path_string{path};
   HANDLE handle = CreateFileA(path_string.c_str(), access,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, &att,
-                              disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+                              disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
   /* Append moves the write position to the end of the file. */
-  if (mode == FileOpenMode::Append) SetFilePointer(handle, 0, NULL, FILE_END);
+  if (mode == FileOpenMode::Append) SetFilePointer(handle, 0, nullptr, FILE_END);
 
   return handle;
 }
@@ -810,19 +810,19 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
 
   HANDLE handle = CreateFileA(
-      temp_path, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-      FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+      temp_path, GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+      FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr);
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
   DWORD written = 0;
   if (WriteFile(handle, content.data, static_cast<DWORD>(content.size()),
-                &written, NULL) == 0)
+                &written, nullptr) == 0)
   {
     close_fd(handle);
     return shit::None;
   }
 
-  SetFilePointer(handle, 0, NULL, FILE_BEGIN);
+  SetFilePointer(handle, 0, nullptr, FILE_BEGIN);
   return handle;
 }
 
@@ -926,7 +926,7 @@ fn last_system_error_message() -> String
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
           FORMAT_MESSAGE_IGNORE_INSERTS,
       nullptr, win_errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      reinterpret_cast<LPSTR>(&errno_str), 0, NULL); /* NOLINT */
+      reinterpret_cast<LPSTR>(&errno_str), 0, nullptr); /* NOLINT */
 
   if (ret == 0) {
     return utils::unsigned_integer_to_string(win_errno) +

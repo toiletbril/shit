@@ -95,7 +95,7 @@ cold [[noreturn]] static fn throw_unterminated(SourceLocation opener,
 
 cold pure static fn is_empty_list(const Expression *expression) wontthrow -> bool
 {
-  ASSERT(expression != NULL);
+  ASSERT(expression != nullptr);
   return expression->is_dummy();
 }
 
@@ -103,7 +103,7 @@ cold pure static fn is_empty_list(const Expression *expression) wontthrow -> boo
    command position. It is distinct from a != comparison or a quoted literal. */
 hot pure static fn is_negation_token(const Token *token) wontthrow -> bool
 {
-  ASSERT(token != NULL);
+  ASSERT(token != nullptr);
   if (token->kind() != Token::Kind::Word) return false;
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
   return word.segments.size() == 1 &&
@@ -115,7 +115,7 @@ hot pure static fn is_negation_token(const Token *token) wontthrow -> bool
    keyword almost always means its opener is missing. */
 cold static fn unexpected_command_token_message(const Token *token) throws -> String
 {
-  ASSERT(token != NULL);
+  ASSERT(token != nullptr);
   switch (token->kind()) {
   case Token::Kind::Then:
   case Token::Kind::Else:
@@ -146,7 +146,7 @@ cold static fn unexpected_command_token_message(const Token *token) throws -> St
 static fn require_simple_in_pipeline(Command *command)
     throws -> SimpleCommand *
 {
-  ASSERT(command != NULL);
+  ASSERT(command != nullptr);
   if (!command->is_simple_command()) {
     throw ErrorWithLocation{
         command->source_location(),
@@ -181,7 +181,7 @@ flatten fn Parser::construct_ast() throws -> Expression *
 hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators)
     throws -> Expression *
 {
-  Command *lhs = NULL;
+  Command *lhs = nullptr;
 
   CompoundList *compound_list = m_lexer.arena().create<CompoundList>();
   CompoundListCondition::Kind next_cond = CompoundListCondition::Kind::None;
@@ -193,7 +193,7 @@ hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators
     if (should_parse_command) {
       /* A leading ! negates the pipeline that follows. */
       Token *maybe_negation = m_lexer.peek_shell_token();
-      ASSERT(maybe_negation != NULL);
+      ASSERT(maybe_negation != nullptr);
       if (is_negation_token(maybe_negation)) {
         m_lexer.advance_past_last_peek();
         should_negate_pending = true;
@@ -204,12 +204,12 @@ hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators
     }
 
     Token *token = m_lexer.peek_shell_token();
-    ASSERT(token != NULL);
+    ASSERT(token != nullptr);
 
     /* A terminator keyword ends this list. Append the pending command and leave
        the terminator for the caller to consume. */
     if (kind_in(token->kind(), terminators)) {
-      if (lhs != NULL) {
+      if (lhs != nullptr) {
         if (should_negate_pending) {
           lhs->set_negated();
           should_negate_pending = false;
@@ -251,7 +251,7 @@ hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators
     case Token::Kind::Semicolon: {
       m_lexer.advance_past_last_peek();
 
-      if (lhs != NULL) {
+      if (lhs != nullptr) {
         if (should_negate_pending) {
           lhs->set_negated();
           should_negate_pending = false;
@@ -280,7 +280,7 @@ hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators
     } break;
 
     case Token::Kind::Pipe: {
-      if (lhs == NULL) {
+      if (lhs == nullptr) {
         throw shit::ErrorWithLocation{token->source_location(),
                                       "Expected a command before the pipe"};
       }
@@ -297,10 +297,10 @@ hot fn Parser::parse_command_list(std::initializer_list<Token::Kind> terminators
       for (;;) {
         Command *rhs = parse_simple_command();
 
-        if (rhs != NULL) {
+        if (rhs != nullptr) {
           pipeline->append_command(require_simple_in_pipeline(rhs));
           last_pipe_token = m_lexer.peek_shell_token();
-          ASSERT(last_pipe_token != NULL);
+          ASSERT(last_pipe_token != nullptr);
           if (last_pipe_token->kind() == Token::Kind::Pipe) {
             m_lexer.advance_past_last_peek();
             continue;
@@ -338,7 +338,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
   ArrayList<expressions::redirection> redirections{};
 
   auto build_command = [&]() -> Command * {
-    if (!source_location) return NULL;
+    if (!source_location) return nullptr;
 
     ArrayList<const Token *> args{};
     args.reserve(args_accumulator.size());
@@ -366,7 +366,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 
     if (op_kind != Token::Kind::Less) {
       Token *after = m_lexer.peek_shell_token();
-      ASSERT(after != NULL);
+      ASSERT(after != nullptr);
       if (after->kind() == Token::Kind::Ampersand &&
           after->source_location().position ==
               op_location.position + op_location.length)
@@ -397,7 +397,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     }
 
     Token *target = m_lexer.next_shell_token();
-    ASSERT(target != NULL);
+    ASSERT(target != nullptr);
     if (target->kind() != Token::Kind::Word) {
       throw ErrorWithLocation{target->source_location(),
                               "Expected a filename after the redirection"};
@@ -414,7 +414,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 
   for (;;) {
     Token *token = m_lexer.peek_shell_token();
-    ASSERT(token != NULL);
+    ASSERT(token != nullptr);
 
     /* A reserved word or a group opener in command position introduces a
        compound command. A list terminator means there is no command here. */
@@ -478,7 +478,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
           const let word_location = token->source_location();
           m_lexer.advance_past_last_peek();
           Token *next = m_lexer.peek_shell_token();
-          ASSERT(next != NULL);
+          ASSERT(next != nullptr);
           const let nk = next->kind();
           if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
                nk == Token::Kind::Less) &&
@@ -527,7 +527,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
       /* Peek the next token. A compound list condition, a compound terminator,
        * or the end of input means the assignment stands alone. */
       Token *next = m_lexer.peek_shell_token();
-      ASSERT(next != NULL);
+      ASSERT(next != nullptr);
       if (next->flags() & Token::Flag::CompoundList ||
           next->kind() == Token::Kind::EndOfFile ||
           is_compound_terminator(next->kind()))
@@ -556,7 +556,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
       if (!source_location) source_location = op_location;
 
       Token *delimiter_token = m_lexer.next_shell_token();
-      ASSERT(delimiter_token != NULL);
+      ASSERT(delimiter_token != nullptr);
       if (delimiter_token->kind() != Token::Kind::Word) {
         throw ErrorWithLocation{delimiter_token->source_location(),
                                 "Expected a heredoc delimiter"};
@@ -607,7 +607,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 hot fn Parser::parse_if() throws -> Command *
 {
   Token *if_token = m_lexer.next_shell_token();
-  ASSERT(if_token != NULL);
+  ASSERT(if_token != nullptr);
   ASSERT(if_token->kind() == Token::Kind::If);
   const let location = if_token->source_location();
 
@@ -626,7 +626,7 @@ hot fn Parser::parse_if() throws -> Command *
   for (;;) {
     Expression *condition = parse_command_list({Token::Kind::Then});
     Token *then_token = m_lexer.next_shell_token();
-    ASSERT(then_token != NULL);
+    ASSERT(then_token != nullptr);
     if (then_token->kind() != Token::Kind::Then) {
       const let detail = is_empty_list(condition)
                              ? "expected a command for the condition"
@@ -641,13 +641,13 @@ hot fn Parser::parse_if() throws -> Command *
         condition, body});
 
     Token *after = m_lexer.next_shell_token();
-    ASSERT(after != NULL);
+    ASSERT(after != nullptr);
     if (after->kind() == Token::Kind::Elif) {
       continue;
     } else if (after->kind() == Token::Kind::Else) {
       otherwise = parse_command_list({Token::Kind::Fi});
       Token *fi_token = m_lexer.next_shell_token();
-      ASSERT(fi_token != NULL);
+      ASSERT(fi_token != nullptr);
       if (fi_token->kind() != Token::Kind::Fi) {
         throw_unterminated(location, "Unterminated if", m_lexer.source(), "fi",
                            fi_token->source_location());
@@ -672,12 +672,12 @@ hot fn Parser::parse_if() throws -> Command *
 hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
-  ASSERT(keyword != NULL);
+  ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
   Expression *condition = parse_command_list({Token::Kind::Do});
   Token *do_token = m_lexer.next_shell_token();
-  ASSERT(do_token != NULL);
+  ASSERT(do_token != nullptr);
   if (do_token->kind() != Token::Kind::Do) {
     const let detail = is_empty_list(condition)
                            ? "expected a command for the loop condition"
@@ -688,7 +688,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
 
   Expression *body = parse_command_list({Token::Kind::Done});
   Token *done_token = m_lexer.next_shell_token();
-  ASSERT(done_token != NULL);
+  ASSERT(done_token != nullptr);
   if (done_token->kind() != Token::Kind::Done) {
     throw_unterminated(location, "Unterminated loop", m_lexer.source(), "done",
                        done_token->source_location());
@@ -700,11 +700,11 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
 hot fn Parser::parse_for() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
-  ASSERT(keyword != NULL);
+  ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
   Token *name_token = m_lexer.next_shell_token();
-  ASSERT(name_token != NULL);
+  ASSERT(name_token != nullptr);
   if (name_token->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
@@ -722,13 +722,13 @@ hot fn Parser::parse_for() throws -> Command *
 
   /* An optional 'in WORDS' clause. The word 'in' is not a keyword token. */
   Token *peeked = m_lexer.peek_shell_token();
-  ASSERT(peeked != NULL);
+  ASSERT(peeked != nullptr);
   if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
     m_lexer.advance_past_last_peek();
     has_in_clause = true;
     for (;;) {
       Token *word = m_lexer.peek_shell_token();
-      ASSERT(word != NULL);
+      ASSERT(word != nullptr);
       if (word->kind() != Token::Kind::Word) break;
       m_lexer.advance_past_last_peek();
       words.push(word);
@@ -738,7 +738,7 @@ hot fn Parser::parse_for() throws -> Command *
   /* Skip the separators between the header and 'do'. */
   for (;;) {
     Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != NULL);
+    ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Semicolon ||
         t->kind() == Token::Kind::Newline)
     {
@@ -749,7 +749,7 @@ hot fn Parser::parse_for() throws -> Command *
   }
 
   Token *do_token = m_lexer.next_shell_token();
-  ASSERT(do_token != NULL);
+  ASSERT(do_token != nullptr);
   if (do_token->kind() != Token::Kind::Do) {
     String detail = "expected 'do'";
     if (!has_in_clause) {
@@ -762,7 +762,7 @@ hot fn Parser::parse_for() throws -> Command *
 
   Expression *body = parse_command_list({Token::Kind::Done});
   Token *done_token = m_lexer.next_shell_token();
-  ASSERT(done_token != NULL);
+  ASSERT(done_token != nullptr);
   if (done_token->kind() != Token::Kind::Done) {
     throw_unterminated(location, "Unterminated for loop", m_lexer.source(),
                        "done", done_token->source_location());
@@ -775,18 +775,18 @@ hot fn Parser::parse_for() throws -> Command *
 hot fn Parser::parse_case() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
-  ASSERT(keyword != NULL);
+  ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
   Token *word = m_lexer.next_shell_token();
-  ASSERT(word != NULL);
+  ASSERT(word != nullptr);
   if (word->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{word->source_location(),
                             "Expected a word to match on after 'case'"};
   }
 
   Token *in_token = m_lexer.next_shell_token();
-  ASSERT(in_token != NULL);
+  ASSERT(in_token != nullptr);
   if (!(in_token->kind() == Token::Kind::Word &&
         in_token->raw_string() == "in"))
   {
@@ -808,7 +808,7 @@ hot fn Parser::parse_case() throws -> Command *
 
   for (;;) {
     Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != NULL);
+    ASSERT(t != nullptr);
 
     if (t->kind() == Token::Kind::Newline ||
         t->kind() == Token::Kind::Semicolon)
@@ -833,7 +833,7 @@ hot fn Parser::parse_case() throws -> Command *
 
     for (;;) {
       Token *pattern = m_lexer.next_shell_token();
-      ASSERT(pattern != NULL);
+      ASSERT(pattern != nullptr);
 
       if (pattern->kind() != Token::Kind::Word) {
         throw ErrorWithLocationAndDetails{
@@ -844,7 +844,7 @@ hot fn Parser::parse_case() throws -> Command *
       patterns.push(pattern);
 
       Token *separator = m_lexer.next_shell_token();
-      ASSERT(separator != NULL);
+      ASSERT(separator != nullptr);
 
       if (separator->kind() == Token::Kind::Pipe) continue;
       if (separator->kind() == Token::Kind::RightParen) break;
@@ -858,7 +858,7 @@ hot fn Parser::parse_case() throws -> Command *
     items.push(case_item{std::move(patterns), body});
 
     Token *after = m_lexer.peek_shell_token();
-    ASSERT(after != NULL);
+    ASSERT(after != nullptr);
     if (after->kind() == Token::Kind::DoubleSemicolon) {
       m_lexer.advance_past_last_peek();
     } else if (after->kind() == Token::Kind::Esac) {
@@ -873,13 +873,13 @@ hot fn Parser::parse_case() throws -> Command *
 hot fn Parser::parse_brace_group() throws -> Command *
 {
   Token *open = m_lexer.next_shell_token();
-  ASSERT(open != NULL);
+  ASSERT(open != nullptr);
   ASSERT(open->kind() == Token::Kind::LeftBracket);
 
   Expression *body = parse_command_list({Token::Kind::RightBracket});
 
   Token *close = m_lexer.next_shell_token();
-  ASSERT(close != NULL);
+  ASSERT(close != nullptr);
   if (close->kind() != Token::Kind::RightBracket) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated brace group",
@@ -892,13 +892,13 @@ hot fn Parser::parse_brace_group() throws -> Command *
 hot fn Parser::parse_subshell() throws -> Command *
 {
   Token *open = m_lexer.next_shell_token();
-  ASSERT(open != NULL);
+  ASSERT(open != nullptr);
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
   Expression *body = parse_command_list({Token::Kind::RightParen});
 
   Token *close = m_lexer.next_shell_token();
-  ASSERT(close != NULL);
+  ASSERT(close != nullptr);
   if (close->kind() != Token::Kind::RightParen) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated subshell",
@@ -910,7 +910,7 @@ hot fn Parser::parse_subshell() throws -> Command *
 
 hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
 {
-  ASSERT(name_token != NULL);
+  ASSERT(name_token != nullptr);
   const let location = name_token->source_location();
   const let name = name_token->raw_string();
 
@@ -918,7 +918,7 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
    */
   m_lexer.advance_past_last_peek();
   Token *close = m_lexer.next_shell_token();
-  ASSERT(close != NULL);
+  ASSERT(close != nullptr);
   if (close->kind() != Token::Kind::RightParen) {
     throw ErrorWithLocation{close->source_location(),
                             "Expected ')' in a function definition"};
@@ -927,7 +927,7 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
   /* Skip newlines before the body. */
   for (;;) {
     Token *t = m_lexer.peek_shell_token();
-    ASSERT(t != NULL);
+    ASSERT(t != nullptr);
     if (t->kind() != Token::Kind::Newline) break;
     m_lexer.advance_past_last_peek();
   }
@@ -939,7 +939,7 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
   Command *body = parse_simple_command();
   m_lexer.set_arena(per_command_arena);
 
-  if (body == NULL) {
+  if (body == nullptr) {
     throw ErrorWithLocation{location,
                             "Expected a compound command as the function body"};
   }
@@ -954,7 +954,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
   defer { m_recursion_depth--; };
 
   Token *t = m_lexer.next_expression_token();
-  ASSERT(t != NULL);
+  ASSERT(t != nullptr);
 
   if (m_recursion_depth > MAX_RECURSION_DEPTH) {
     throw ErrorWithLocation{
@@ -963,7 +963,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
             utils::integer_to_string(static_cast<i64>(MAX_RECURSION_DEPTH))};
   }
 
-  Expression *lhs = NULL;
+  Expression *lhs = nullptr;
 
   /* Handle leaf type. We expect either a value, or an unary operator. */
   switch (t->kind()) {
@@ -981,7 +981,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     Expression *condition = parse_expression();
 
     Token *after = m_lexer.next_expression_token();
-    ASSERT(after != NULL);
+    ASSERT(after != nullptr);
     if (after->kind() == Token::Kind::Semicolon) {
       after = m_lexer.next_expression_token();
     }
@@ -994,7 +994,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
 
     Expression *then = parse_expression();
 
-    Expression *otherwise = NULL;
+    Expression *otherwise = nullptr;
     after = m_lexer.next_expression_token();
 
     /* [else [then]] */
@@ -1032,7 +1032,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     m_parentheses_depth--;
 
     Token *rp = m_lexer.next_expression_token();
-    ASSERT(rp != NULL);
+    ASSERT(rp != nullptr);
     if (rp->kind() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated parenthesis",
@@ -1063,7 +1063,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
    * higher precedence. */
   for (;;) {
     Token *maybe_op = m_lexer.peek_expression_token();
-    ASSERT(maybe_op != NULL);
+    ASSERT(maybe_op != nullptr);
 
     /* Check for tokens that terminate the parser. */
     switch (maybe_op->kind()) {

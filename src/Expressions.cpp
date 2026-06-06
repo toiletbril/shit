@@ -223,7 +223,7 @@ IfStatement::IfStatement(SourceLocation location, const Expression *condition,
 {
   ASSERT(condition != nullptr);
   ASSERT(then != nullptr);
-  /* And *otherwise may be NULL. */
+  /* And *otherwise may be nullptr. */
 }
 
 IfStatement::~IfStatement()
