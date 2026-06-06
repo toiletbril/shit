@@ -83,9 +83,8 @@ hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
 
 hot pure fn is_string_quote(char ch) wontthrow -> bool
 {
-  /* A backtick is intentionally not a quote here. It stays a literal character
-     so the prepass can warn and point at $(...), rather than failing the lex.
-   */
+  /* A backtick is not a string quote. It opens a command substitution, which
+     the identifier lexer handles inline. */
   switch (ch) {
   case '"':
   case '\'': return true;
@@ -566,6 +565,45 @@ hot fn Lexer::lex_identifier() throws -> Token *
                                         : WordSegment::Kind::UnquotedText,
                     '$');
       }
+      continue;
+    }
+
+    if (ch == '`') {
+      /* A backtick opens an old-style command substitution. Single quotes take
+         everything literally and are handled above, so reaching here means the
+         backtick is unquoted or inside double quotes, where it stays active.
+         The region runs to the next unescaped backtick, and the POSIX backquote
+         unescaping strips a backslash that precedes a backtick, a dollar sign,
+         or another backslash. The unescaped bytes form the inner command source
+         and reuse the same CommandSubstitution segment as $(...). */
+      const let relative_open_backtick_pos = byte_count;
+      byte_count++;
+      String inner{};
+      for (;;) {
+        const let c = chop_character(byte_count);
+        if (c == lexer::CEOF) {
+          throw ErrorWithLocationAndDetails{
+              here(m_cursor_position + relative_open_backtick_pos, 1),
+              "Unterminated command substitution",
+              here(m_cursor_position + byte_count, 1), "expected ` here"};
+        }
+        if (c == '`') {
+          byte_count++;
+          break;
+        }
+        if (c == '\\') {
+          const let escaped = chop_character(byte_count + 1);
+          if (escaped == '`' || escaped == '$' || escaped == '\\') {
+            inner += escaped;
+            byte_count += 2;
+            continue;
+          }
+        }
+        inner += c;
+        byte_count++;
+      }
+      word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
+                                     steal(inner), is_in_double_quotes});
       continue;
     }
 

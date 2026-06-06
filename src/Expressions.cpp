@@ -115,14 +115,6 @@ fn command_resolves(const String &name) throws -> bool
   return utils::search_program_path(name.view()).count() != 0;
 }
 
-pure fn word_has_backtick(const Word &word) wontthrow -> bool
-{
-  for (const WordSegment &segment : word.segments) {
-    if (segment.text.find_character('`').has_value()) return true;
-  }
-  return false;
-}
-
 /* A flattened view of a word's bytes paired with whether each byte is an active
    glob metacharacter. Only an unquoted '[' or ']' is active, so a quoted "[" or
    an escaped \[ stays literal and never opens a bracket expression. */
@@ -2007,17 +1999,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const equals_position = literal.find_character('=');
       if (equals_position.has_value() && *equals_position > 0)
         actx.known_aliases.add(StringView{literal.data(), *equals_position});
-    }
-  }
-
-  /* A backtick anywhere in the command is an unsupported substitution. */
-  for (const Token *t : m_args) {
-    if (t->kind() != Token::Kind::Word) continue;
-    let const &word = static_cast<const tokens::WordToken *>(t)->word();
-    if (word_has_backtick(word)) {
-      actx.warn(t->source_location(),
-                "Backquote command substitution is not supported, use $(...) "
-                "instead");
     }
   }
 

@@ -1,0 +1,103 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo hi)"]
+  [CompoundListCondition, None]
+    [Assign x=$(echo abc)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo q)"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "matched"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((echo y) 2>/dev/null)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo "a b")"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "`echo no`"]
+  [CompoundListCondition, None]
+    [Assign foo=bar]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo $foo)"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo hi"
+]
+[Word
+  Unquoted "x="
+  CommandSubstitution "echo abc"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo q"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  CommandSubstitution "echo x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "matched"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "(echo y) 2>/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo "a b""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Literal "`echo no`"
+]
+[Word
+  Unquoted "foo=bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo $foo"
+]
+hi
+abc
+q
+matched
+y
+a b
+`echo no`
+bar
+[Code 0]
