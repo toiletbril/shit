@@ -117,7 +117,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word
   for (usize i = 1; i < segments.size(); i++)
     value.segments.push(segments[i]);
 
-  return std::make_pair(std::move(name), std::move(value));
+  return std::make_pair(steal(name), steal(value));
 }
 
 namespace tokens {
@@ -193,7 +193,7 @@ fn Number::flags() const wontthrow -> Token::Flags
 }
 
 Assignment::Assignment(SourceLocation location, StringView key, Word value)
-    : Token(location), m_key(key), m_value(std::move(value))
+    : Token(location), m_key(key), m_value(steal(value))
 {}
 
 fn Assignment::kind() const wontthrow -> Token::Kind
@@ -222,7 +222,7 @@ pure fn Assignment::value_word() const wontthrow -> const Word &
 }
 
 WordToken::WordToken(SourceLocation location, Word word)
-    : Value(location, ""), m_word(std::move(word))
+    : Value(location, ""), m_word(steal(word))
 {
   m_value = m_word.to_literal_string();
 }

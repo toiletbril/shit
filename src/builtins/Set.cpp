@@ -155,7 +155,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
     operands.push(String{heap_allocator(), arg});
   }
 
-  if (should_rebind) cxt.set_positional_params(std::move(operands));
+  if (should_rebind) cxt.set_positional_params(steal(operands));
 
   return 0;
 }

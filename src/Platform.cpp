@@ -721,7 +721,7 @@ fn replace_process(ExecContext &&ec) -> void
   /* Windows cannot replace a process in place, so the program runs to
      completion and the shell exits with its status, which behaves like exec for
      a launched script. */
-  process child = execute_program(std::move(ec));
+  process child = execute_program(steal(ec));
   i32 status = wait_and_monitor_process(child);
   ExitProcess(static_cast<UINT>(status));
   unreachable();
@@ -963,7 +963,7 @@ fn last_system_error_message() -> String
     String capitalized{};
     capitalized.push(static_cast<char>(toupper(err[0])));
     capitalized += err.substring(1);
-    err = std::move(capitalized);
+    err = steal(capitalized);
   }
 
   return err;

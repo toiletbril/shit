@@ -27,8 +27,8 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
                          bool should_error_exit, String shell_name,
                          ArrayList<String> positional_params)
-    : m_shell_name(std::move(shell_name)),
-      m_positional_params(std::move(positional_params)),
+    : m_shell_name(steal(shell_name)),
+      m_positional_params(steal(positional_params)),
       m_enable_path_expansion(!should_disable_path_expansion),
       m_enable_echo(should_echo), m_enable_echo_expanded(should_echo_expanded),
       m_shell_is_interactive(shell_is_interactive),
@@ -176,7 +176,7 @@ pure fn EvalContext::positional_params() const wontthrow
 
 fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow -> void
 {
-  m_positional_params = std::move(params);
+  m_positional_params = steal(params);
 }
 
 fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
@@ -191,7 +191,7 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> int
   new_job.pid = pid;
   new_job.command = command;
   new_job.state = job::State::Running;
-  m_jobs.push(std::move(new_job));
+  m_jobs.push(steal(new_job));
   ASSERT(!m_jobs.empty());
   LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
@@ -240,9 +240,9 @@ fn EvalContext::forget_done_jobs() throws -> void
   let kept = ArrayList<job>{};
   for (job &job : m_jobs) {
     if (job.state == job::State::Done) continue;
-    kept.push(std::move(job));
+    kept.push(steal(job));
   }
-  m_jobs = std::move(kept);
+  m_jobs = steal(kept);
 }
 
 fn EvalContext::set_monitor(bool enabled) wontthrow -> void
@@ -367,8 +367,8 @@ fn EvalContext::leave_function_scope() throws -> void
   }
   let kept = ArrayList<ArrayList<local_binding>>{};
   for (usize i = 0; i + 1 < m_local_scopes.size(); i++)
-    kept.push(std::move(m_local_scopes[i]));
-  m_local_scopes = std::move(kept);
+    kept.push(steal(m_local_scopes[i]));
+  m_local_scopes = steal(kept);
 }
 
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
@@ -411,7 +411,7 @@ fn EvalContext::alias_definitions() const throws -> ArrayList<String>
     definition.append(StringView{"='", 2});
     definition.append(StringView{value.c_str(), value.size()});
     definition.push('\'');
-    out.push(std::move(definition));
+    out.push(steal(definition));
   });
   std::sort(out.begin(), out.end());
   return out;
@@ -496,7 +496,7 @@ fn EvalContext::set_current_source(const String *source, String origin) wontthro
     -> void
 {
   m_current_source = source;
-  m_current_origin = std::move(origin);
+  m_current_origin = steal(origin);
 }
 
 pure fn EvalContext::current_source() const wontthrow -> const String *
@@ -609,7 +609,7 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
     let entry = String{heap_allocator(), name};
     entry.push('=');
     entry.append(StringView{value.c_str(), value.size()});
-    assignments.push(std::move(entry));
+    assignments.push(steal(entry));
   });
   std::sort(assignments.begin(), assignments.end());
   return assignments;
@@ -625,9 +625,9 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
-  m_shell_variables = std::move(snapshot.shell_variables);
-  m_functions = std::move(snapshot.functions);
-  m_positional_params = std::move(snapshot.positional_params);
+  m_shell_variables = steal(snapshot.shell_variables);
+  m_functions = steal(snapshot.functions);
+  m_positional_params = steal(snapshot.positional_params);
   /* set_current_directory reports an error through ErrorOr, ignored here to
      match the prior void call that swallowed a failed chdir. */
   (void) Path::set_current_directory(snapshot.working_directory);
@@ -1035,7 +1035,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
     let copy = glob_field{scratch};
     copy.text.append(field.text.view());
     copy.glob_active = field.glob_active;
-    expanded.push(std::move(copy));
+    expanded.push(steal(copy));
     return expanded;
   }
 
@@ -1071,7 +1071,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
         result_field.text.append(filename);
       else
         result_field.text.append(full_path.text().view());
-      expanded.push(std::move(result_field));
+      expanded.push(steal(result_field));
     }
   }
 
@@ -1121,7 +1121,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
          earlier glob, so keep it only when it actually exists. A path produced
          purely by globbing came from a directory read and always exists, so it
          never reaches here and pays no stat. */
-      if (Path{field.text.view()}.exists()) result.push(std::move(field));
+      if (Path{field.text.view()}.exists()) result.push(steal(field));
       continue;
     }
 
@@ -1143,7 +1143,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     if (!slash_after) {
       let once = expand_path_once(field, true);
       for (glob_field &f : once)
-        result.push(std::move(f));
+        result.push(steal(f));
       continue;
     }
 
@@ -1180,9 +1180,9 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     /* The recurse validates each level through the directory read or, for a
        literal suffix, the existence check above, so no extra stat is needed
        here. */
-    let twice = expand_path_recurse(std::move(once));
+    let twice = expand_path_recurse(steal(once));
     for (glob_field &f : twice)
-      result.push(std::move(f));
+      result.push(steal(f));
   }
 
   return result;
@@ -1209,7 +1209,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   let expanded = String{heap_allocator()};
   expanded.append(home->text().view());
   expanded.append(text.substring(1));
-  text = std::move(expanded);
+  text = steal(expanded);
 }
 
 hot fn EvalContext::expand_path(glob_field field, SourceLocation location) throws -> ArrayList<String>
@@ -1226,7 +1226,7 @@ hot fn EvalContext::expand_path(glob_field field, SourceLocation location) throw
 
   if (!has_glob) {
     let single = ArrayList<String>{scratch};
-    single.push(std::move(field.text));
+    single.push(steal(field.text));
     return single;
   }
 
@@ -1236,12 +1236,12 @@ hot fn EvalContext::expand_path(glob_field field, SourceLocation location) throw
   pattern.append(field.text.view());
 
   let input = ArrayList<glob_field>{scratch};
-  input.push(std::move(field));
-  let fields = expand_path_recurse(std::move(input));
+  input.push(steal(field));
+  let fields = expand_path_recurse(steal(input));
 
   let values = ArrayList<String>{scratch};
   for (glob_field &f : fields)
-    values.push(std::move(f.text));
+    values.push(steal(f.text));
 
   /* Sort the matches in byte order, which is the POSIX collating order in the C
      locale and what dash produces. A plain compare also keeps a large expansion
@@ -1679,7 +1679,7 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field
 
   auto flush = [&]() {
     if (has_current) {
-      fields.push(std::move(current));
+      fields.push(steal(current));
       current = glob_field{scratch};
       has_current = false;
     }
@@ -1868,7 +1868,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
   os::close_fd(pipe->out);
   reader.join();
   os::close_fd(pipe->in);
-  restore_state(std::move(snapshot));
+  restore_state(steal(snapshot));
 
   if (error) std::rethrow_exception(error);
 
@@ -2054,7 +2054,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
         let key_literal = String{StringView{a->key()}};
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
-                                                std::move(key_literal), false});
+                                                steal(key_literal), false});
         let const &value = a->value_word();
         for (const WordSegment &value_segment : value.segments)
           fallback_word.segments.push(value_segment);
@@ -2066,7 +2066,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
       }
 
       for (glob_field &field : expand_word(*word)) {
-        for (String &g : expand_path(std::move(field), l))
+        for (String &g : expand_path(steal(field), l))
           expanded_args.push(String{
               heap_allocator(), StringView{g.c_str(), g.size()}
           });
@@ -2095,7 +2095,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
 
 ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
                          const ArrayList<String> &args)
-    : m_kind(std::move(kind)), m_location(location), m_args(args)
+    : m_kind(steal(kind)), m_location(location), m_args(args)
 {}
 
 pure fn ExecContext::source_location() const wontthrow -> const SourceLocation &
@@ -2172,7 +2172,7 @@ fn ExecContext::make_from(SourceLocation location,
 
     if (!bk) {
       let ps = utils::search_program_path(program.view());
-      if (ps.size() > 0) p = std::move(ps[0]);
+      if (ps.size() > 0) p = steal(ps[0]);
     }
   } else {
     /* TODO: Sanitize extensions here too. */
@@ -2183,7 +2183,7 @@ fn ExecContext::make_from(SourceLocation location,
   ResolvedCommand kind;
   if (!bk) {
     if (p.has_value()) {
-      kind = ResolvedCommand::from_program(std::move(*p));
+      kind = ResolvedCommand::from_program(steal(*p));
     } else {
       throw ErrorWithLocation{location,
                               "Program '" + program + "' wasn't found"};
@@ -2192,7 +2192,7 @@ fn ExecContext::make_from(SourceLocation location,
     kind = ResolvedCommand::from_builtin(*bk);
   }
 
-  return {location, std::move(kind), args};
+  return {location, steal(kind), args};
 }
 
 fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
@@ -2200,7 +2200,7 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
     -> ExecContext
 {
   ASSERT(args.size() > 0);
-  return {location, std::move(kind), args};
+  return {location, steal(kind), args};
 }
 
 

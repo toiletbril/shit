@@ -30,7 +30,7 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
   ArrayList<String> shifted{heap_allocator()};
   for (usize i = static_cast<usize>(count); i < params.size(); i++)
     shifted.push(String{heap_allocator(), params[i]});
-  cxt.set_positional_params(std::move(shifted));
+  cxt.set_positional_params(steal(shifted));
   return 0;
 }
 

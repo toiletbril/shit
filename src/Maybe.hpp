@@ -24,7 +24,7 @@ class [[nodiscard]] Maybe
 public:
   Maybe() noexcept : m_has_value(false) {}
   Maybe(Nothing) noexcept : m_has_value(false) {}
-  Maybe(T value) : m_has_value(true) { new (&m_storage) T(std::move(value)); }
+  Maybe(T value) : m_has_value(true) { new (&m_storage) T(steal(value)); }
 
   Maybe(const Maybe &other) : m_has_value(other.m_has_value)
   {
@@ -32,7 +32,7 @@ public:
   }
   Maybe(Maybe &&other) noexcept : m_has_value(other.m_has_value)
   {
-    if (m_has_value) new (&m_storage) T(std::move(other.reference()));
+    if (m_has_value) new (&m_storage) T(steal(other.reference()));
   }
 
   Maybe &operator=(const Maybe &other)
@@ -49,7 +49,7 @@ public:
     if (this != &other) {
       reset();
       m_has_value = other.m_has_value;
-      if (m_has_value) new (&m_storage) T(std::move(other.reference()));
+      if (m_has_value) new (&m_storage) T(steal(other.reference()));
     }
     return *this;
   }
@@ -78,7 +78,7 @@ public:
   [[nodiscard]] T take()
   {
     ASSERT(m_has_value);
-    T moved = std::move(reference());
+    T moved = steal(reference());
     reset();
     return moved;
   }
@@ -86,7 +86,7 @@ public:
   /* The value when present, otherwise the fallback. */
   [[nodiscard]] T value_or(T fallback) const
   {
-    return m_has_value ? reference() : std::move(fallback);
+    return m_has_value ? reference() : steal(fallback);
   }
 
   /* Equal to a bare value only when present and that value matches, so a

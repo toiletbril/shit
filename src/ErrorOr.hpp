@@ -38,10 +38,10 @@ template <class T>
 class [[nodiscard]] ErrorOr
 {
 public:
-  ErrorOr(T value) : m_is_error(false) { new (&m_storage) T(std::move(value)); }
+  ErrorOr(T value) : m_is_error(false) { new (&m_storage) T(steal(value)); }
   ErrorOr(Error error) : m_is_error(true)
   {
-    new (&m_storage) Error(std::move(error));
+    new (&m_storage) Error(steal(error));
   }
 
   ErrorOr(const ErrorOr &other) : m_is_error(other.m_is_error)
@@ -54,9 +54,9 @@ public:
   ErrorOr(ErrorOr &&other) noexcept : m_is_error(other.m_is_error)
   {
     if (m_is_error)
-      new (&m_storage) Error(std::move(other.error_reference()));
+      new (&m_storage) Error(steal(other.error_reference()));
     else
-      new (&m_storage) T(std::move(other.value_reference()));
+      new (&m_storage) T(steal(other.value_reference()));
   }
 
   ErrorOr &operator=(const ErrorOr &other)
@@ -77,9 +77,9 @@ public:
       destroy();
       m_is_error = other.m_is_error;
       if (m_is_error)
-        new (&m_storage) Error(std::move(other.error_reference()));
+        new (&m_storage) Error(steal(other.error_reference()));
       else
-        new (&m_storage) T(std::move(other.value_reference()));
+        new (&m_storage) T(steal(other.value_reference()));
     }
     return *this;
   }
@@ -114,7 +114,7 @@ public:
   [[nodiscard]] T take()
   {
     ASSERT(!m_is_error);
-    return std::move(value_reference());
+    return steal(value_reference());
   }
 
 private:

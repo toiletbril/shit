@@ -275,7 +275,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
         String collapsed{};
         collapsed += "~";
         collapsed += shown.substring(home->size());
-        shown = std::move(collapsed);
+        shown = steal(collapsed);
       }
       out += shown;
     } break;
@@ -323,7 +323,7 @@ fn main(int argc, char **argv) -> int
     shit::ArrayList<shit::String> rest{};
     for (usize i = 1; i < file_names.size(); i++)
       rest.push(shit::String{shit::heap_allocator(), file_names[i]});
-    file_names = std::move(rest);
+    file_names = steal(rest);
   } else {
     program_path = "<unknown>";
   }
@@ -397,7 +397,7 @@ fn main(int argc, char **argv) -> int
       FLAG_DISABLE_EXPANSION.is_enabled(), FLAG_VERBOSE.is_enabled(),
       FLAG_EXPAND_VERBOSE.is_enabled(),    should_be_interactive,
       FLAG_ERROR_EXIT.is_enabled(),        shit::String{program_path},
-      std::move(positional_params)};
+      steal(positional_params)};
 
   /* Apply the remaining option flags that the constructor does not take. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
@@ -488,7 +488,7 @@ fn main(int argc, char **argv) -> int
             throw shit::Error{"Could not open '" + file_name.view() +
                               "': " + shit::os::last_system_error_message()};
           }
-          script_contents = std::move(*contents);
+          script_contents = steal(*contents);
         }
 
         if ((arg_index += 1) == file_names.size()) {
@@ -519,7 +519,7 @@ fn main(int argc, char **argv) -> int
           shit::String shortened{};
           shortened += "...";
           shortened += pwd.substring(pwd.length() - PWD_LENGTH + 3);
-          pwd = std::move(shortened);
+          pwd = steal(shortened);
         }
 
         shit::String u = shit::os::get_current_user().value_or("???");
@@ -575,7 +575,7 @@ fn main(int argc, char **argv) -> int
 
           /* Execute the command without raw mode. */
           if (code == TL_PRESSED_ENTER && !input.empty()) {
-            script_contents = std::move(input);
+            script_contents = steal(input);
             break;
           }
         }

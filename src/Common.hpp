@@ -129,6 +129,9 @@ public:
 /* The length of statically allocated array. */
 #define countof(arr) (sizeof(arr) / sizeof(*(arr)))
 
+/* Move a value, reading as taking ownership out of the source. */
+#define steal std::move
+
 /* Every function is written `fn name(args) -> ret` and every variable `let x`,
    so the name leads and the type trails, matching the oo style. */
 #define fn  auto

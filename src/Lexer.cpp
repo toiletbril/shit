@@ -121,7 +121,7 @@ hot pure fn is_variable_name(char ch) wontthrow -> bool
 
 Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
              Maybe<StringView> filename)
-    : m_source(std::move(source)), m_arena(&arena), m_filename(filename),
+    : m_source(steal(source)), m_arena(&arena), m_filename(filename),
       m_should_collect_debug_words(should_collect_debug_words)
 {}
 
@@ -240,7 +240,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
       collected += '\n';
     }
     ASSERT(pending.body != nullptr);
-    *pending.body = std::move(collected);
+    *pending.body = steal(collected);
   }
   m_pending_heredocs.clear();
 }
@@ -364,7 +364,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
     } else {
       String single{};
       single.push(ch);
-      word.segments.push(WordSegment{kind, std::move(single), false});
+      word.segments.push(WordSegment{kind, steal(single), false});
     }
   };
 
@@ -481,7 +481,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
             }
           }
           word.segments.push(WordSegment{WordSegment::Kind::ArithmeticExpansion,
-                                         std::move(arithmetic),
+                                         steal(arithmetic),
                                          is_in_double_quotes});
           continue;
         }
@@ -529,7 +529,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
           inner += c;
         }
         word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
-                                       std::move(inner), is_in_double_quotes});
+                                       steal(inner), is_in_double_quotes});
       } else if (next == '{') {
         byte_count++;
         String name{};
@@ -548,7 +548,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
           name += c;
         }
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       std::move(name), is_in_double_quotes});
+                                       steal(name), is_in_double_quotes});
       } else if (lexer::is_variable_name_start(next)) {
         String name{};
         while (lexer::is_variable_name(next = chop_character(byte_count))) {
@@ -556,7 +556,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
           byte_count++;
         }
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       std::move(name), is_in_double_quotes});
+                                       steal(name), is_in_double_quotes});
       } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                  next == '$' || next == '!' || next == '-' ||
                  lexer::is_number(next))
@@ -565,7 +565,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
         String special{};
         special.push(next);
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       std::move(special),
+                                       steal(special),
                                        is_in_double_quotes});
       } else {
         /* A dollar sign that names None stays a literal dollar sign. */
@@ -623,7 +623,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
   {
     t = m_arena->create<tokens::Assignment>(
         here(actual_cursor_position, byte_count), assignment_split->first,
-        std::move(assignment_split->second));
+        steal(assignment_split->second));
   } else if (word.segments.size() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {
@@ -642,7 +642,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
 
   if (t == nullptr) {
     t = m_arena->create<tokens::WordToken>(
-        here(actual_cursor_position, byte_count), std::move(word));
+        here(actual_cursor_position, byte_count), steal(word));
   }
 
   m_cached_offset = byte_count;

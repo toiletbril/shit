@@ -53,7 +53,7 @@ public:
   {
     if (this != &other) {
       ArrayList copy{other};
-      *this = std::move(copy);
+      *this = steal(copy);
     }
     return *this;
   }
@@ -72,7 +72,7 @@ public:
   void push(T value)
   {
     reserve(m_length + 1);
-    new (&m_data[m_length]) T(std::move(value));
+    new (&m_data[m_length]) T(steal(value));
     m_length++;
   }
 
@@ -107,7 +107,7 @@ public:
       new_capacity *= 2;
     T *fresh = m_allocator.alloc_array<T>(new_capacity);
     for (usize i = 0; i < m_length; i++) {
-      new (&fresh[i]) T(std::move(m_data[i]));
+      new (&fresh[i]) T(steal(m_data[i]));
       m_data[i].~T();
     }
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);

@@ -76,7 +76,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws -> i3
   for (usize i = 1; i < args.size(); i++)
     operand_args.push(String{heap_allocator(), args[i]});
   let sub = ExecContext::make_from(ec.source_location(), operand_args);
-  return utils::execute_context(std::move(sub), cxt, false);
+  return utils::execute_context(steal(sub), cxt, false);
 }
 
 } /* namespace shit */

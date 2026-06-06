@@ -64,7 +64,7 @@ public:
   {
     if (this != &other) {
       HashMap copy{other};
-      *this = std::move(copy);
+      *this = steal(copy);
     }
     return *this;
   }
@@ -96,7 +96,7 @@ public:
   }
 
   /* Store a value the table owns by move. */
-  void set(StringView key, Value value) { set_value(key, std::move(value)); }
+  void set(StringView key, Value value) { set_value(key, steal(value)); }
 
   /* The value for a key, inserting the supplied default when the key is absent,
      then returning a mutable reference. The caller passes the default already
@@ -106,7 +106,7 @@ public:
   {
     if (const Value *existing = find(key))
       return *const_cast<Value *>(existing);
-    set_value(key, std::move(default_value));
+    set_value(key, steal(default_value));
     return *const_cast<Value *>(find(key));
   }
 
@@ -184,13 +184,13 @@ private:
       if (slot.state == slot::Occupied && slot.packed == wanted &&
           slot.key == key)
       {
-        slot.value = std::move(value);
+        slot.value = steal(value);
         return;
       }
       if (slot.state == slot::Empty) {
         usize target = first_tombstone != m_capacity ? first_tombstone : i;
         if (first_tombstone != m_capacity) m_tombstones--;
-        place(target, key, std::move(value));
+        place(target, key, steal(value));
         return;
       }
       if (slot.state == slot::Tombstone && first_tombstone == m_capacity)
@@ -202,7 +202,7 @@ private:
        this, but reuse a found tombstone rather than lose the insertion. */
     if (first_tombstone != m_capacity) {
       m_tombstones--;
-      place(first_tombstone, key, std::move(value));
+      place(first_tombstone, key, steal(value));
     }
   }
 
@@ -211,7 +211,7 @@ private:
     slot &slot = m_slots[index];
     slot.key = String{m_allocator, key};
     slot.packed = PackedStringKey::from_view(key);
-    slot.value = std::move(value);
+    slot.value = steal(value);
     slot.state = slot::Occupied;
     m_count++;
   }
@@ -230,7 +230,7 @@ private:
 
     for (usize i = 0; i < old_capacity; i++) {
       if (old_slots[i].state == slot::Occupied)
-        set_value(old_slots[i].key.view(), std::move(old_slots[i].value));
+        set_value(old_slots[i].key.view(), steal(old_slots[i].value));
       old_slots[i].~slot();
     }
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);

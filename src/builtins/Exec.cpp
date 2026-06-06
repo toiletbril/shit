@@ -68,7 +68,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      the shell with 126, the status reserved for a command that is present but
      not executable. A name that resolves to None exited 127 above. */
   try {
-    os::replace_process(std::move(command));
+    os::replace_process(steal(command));
   } catch (const Error &error) {
     show_message(error.to_string());
     utils::quit(126, true);

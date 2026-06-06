@@ -74,7 +74,7 @@ struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
               const String *parent_source)
-      : origin(std::move(origin)), call_site(call_site),
+      : origin(steal(origin)), call_site(call_site),
         parent_source(parent_source)
   {}
 

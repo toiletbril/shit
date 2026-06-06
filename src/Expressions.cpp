@@ -291,7 +291,7 @@ pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 
 fn Command::set_local_vars(HashMap<Word> &&vars) throws -> void
 {
-  m_local_vars = std::move(vars);
+  m_local_vars = steal(vars);
 }
 
 fn Command::is_assignment() const wontthrow -> bool { return false; }
@@ -533,9 +533,9 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
       });
 
     for (usize i = 1; i < args.size(); i++)
-      rebuilt.push(std::move(args[i]));
+      rebuilt.push(steal(args[i]));
 
-    args = std::move(rebuilt);
+    args = steal(rebuilt);
   }
 }
 
@@ -696,8 +696,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           heap_allocator(),
           StringView{program_args[i].c_str(), program_args[i].size()}
       });
-    cxt.set_positional_params(std::move(call_params));
-    defer { cxt.set_positional_params(std::move(saved_params)); };
+    cxt.set_positional_params(steal(call_params));
+    defer { cxt.set_positional_params(steal(saved_params)); };
 
     /* Open a local scope so a local builtin in the body shadows a variable and
        the old value returns when the call ends. */
@@ -756,7 +756,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   ec.dup_out_to_err = dup_out_to_err;
   redirect_fds_handed_off = true;
 
-  const i64 ret = utils::execute_context(std::move(ec), cxt, is_async());
+  const i64 ret = utils::execute_context(steal(ec), cxt, is_async());
 
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -1017,15 +1017,15 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     let ec =
-        ExecContext::make_from(e->source_location(), std::move(stage_args));
+        ExecContext::make_from(e->source_location(), steal(stage_args));
     /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
        its descriptors. The pipe only sets stdin and stdout, so a stderr
        redirection composes with it. */
     e->redirect_exec_context(ec, cxt);
-    ecs.push(std::move(ec));
+    ecs.push(steal(ec));
   }
 
-  return utils::execute_contexts_with_pipes(std::move(ecs), cxt, is_async());
+  return utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
 }
 
 fn Pipeline::append_to(usize d, String &f, bool duplicate) throws -> void
@@ -1335,7 +1335,7 @@ CaseClause::CaseClause(SourceLocation location, const Token *word,
     : CompoundCommand(location), m_word(word)
 {
   for (case_item &item : items)
-    m_items.push(std::move(item));
+    m_items.push(steal(item));
   /* The node now owns the items. Empty the source so the parser's cleanup guard
      does not also free the bodies. */
   items.clear();
@@ -1478,7 +1478,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
     ret = m_body->evaluate(cxt);
   } catch (...) {
     cxt.leave_subshell();
-    cxt.restore_state(std::move(snapshot));
+    cxt.restore_state(steal(snapshot));
     throw;
   }
 
@@ -1493,7 +1493,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   cxt.leave_subshell();
-  cxt.restore_state(std::move(snapshot));
+  cxt.restore_state(steal(snapshot));
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
 }

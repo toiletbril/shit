@@ -40,7 +40,7 @@ public:
   {
     ResolvedCommand resolved{};
     resolved.kind = Kind::Program;
-    resolved.program_path = std::move(path);
+    resolved.program_path = steal(path);
     return resolved;
   }
 

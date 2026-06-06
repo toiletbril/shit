@@ -43,7 +43,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        into the spawn. */
     let const command = is_async ? String{ec.program().view()} : String{};
 
-    let const p = os::execute_program(std::move(ec));
+    let const p = os::execute_program(steal(ec));
     if (is_async) {
       cxt.set_last_background_pid(os::process_id_of(p));
       const i32 id = cxt.register_job(p, command);
@@ -56,7 +56,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     }
     return os::wait_and_monitor_process(p);
   } else {
-    return execute_builtin(std::move(ec), cxt);
+    return execute_builtin(steal(ec), cxt);
   }
 
   unreachable();
@@ -107,13 +107,13 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     }
 
     if (!ec.is_builtin()) {
-      let const child = os::execute_program(std::move(ec));
+      let const child = os::execute_program(steal(ec));
       children.push(child);
       last_child = child;
     } else {
       /* A builtin runs in this process, so its status stands in for the stage.
        */
-      ret = execute_builtin(std::move(ec), cxt);
+      ret = execute_builtin(steal(ec), cxt);
     }
 
     is_first = false;
@@ -187,7 +187,7 @@ fn string_replace(String &s, const StringView to_replace,
   }
 
   result.append(source.substring(previous));
-  s = std::move(result);
+  s = steal(result);
 }
 
 fn lowercase_string(StringView s) throws -> String
@@ -715,7 +715,7 @@ hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
       /* Drop entries that no longer exist, so a later lookup does not stat them
          again. The directory exists check is slow, so this keeps the cache from
          growing with dead paths. */
-      if (kept.size() != cached->size()) *cached = std::move(kept);
+      if (kept.size() != cached->size()) *cached = steal(kept);
       if (result.size() != 0) return result;
     }
   }

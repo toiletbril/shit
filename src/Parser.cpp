@@ -31,7 +31,7 @@ hot pure static fn get_sequence_kind(Token::Kind tk)
   }
 }
 
-Parser::Parser(Lexer &&lexer) : m_lexer(std::move(lexer)) {}
+Parser::Parser(Lexer &&lexer) : m_lexer(steal(lexer)) {}
 
 Parser::~Parser() = default;
 
@@ -346,9 +346,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
       args.push(t);
 
     SimpleCommand *c = m_lexer.arena().create<SimpleCommand>(
-        *source_location, std::move(args));
-    if (local_vars.size() != 0) c->set_local_vars(std::move(local_vars));
-    if (!redirections.empty()) c->set_redirections(std::move(redirections));
+        *source_location, steal(args));
+    if (local_vars.size() != 0) c->set_local_vars(steal(local_vars));
+    if (!redirections.empty()) c->set_redirections(steal(redirections));
     return c;
   };
 
@@ -662,7 +662,7 @@ hot fn Parser::parse_if() throws -> Command *
   }
 
   IfClause *node = m_lexer.arena().create<IfClause>(
-      location, std::move(branches), otherwise);
+      location, steal(branches), otherwise);
   /* Ownership of the else body moved into the node, so the cleanup guard must
      not also free it. The branches vector was moved from and is now empty. */
   otherwise = nullptr;
@@ -769,7 +769,7 @@ hot fn Parser::parse_for() throws -> Command *
   }
 
   return m_lexer.arena().create<ForLoop>(location, variable_name.view(),
-                                         std::move(words), has_in_clause, body);
+                                         steal(words), has_in_clause, body);
 }
 
 hot fn Parser::parse_case() throws -> Command *
@@ -855,7 +855,7 @@ hot fn Parser::parse_case() throws -> Command *
 
     Expression *body =
         parse_command_list({Token::Kind::DoubleSemicolon, Token::Kind::Esac});
-    items.push(case_item{std::move(patterns), body});
+    items.push(case_item{steal(patterns), body});
 
     Token *after = m_lexer.peek_shell_token();
     ASSERT(after != nullptr);
@@ -867,7 +867,7 @@ hot fn Parser::parse_case() throws -> Command *
     }
   }
 
-  return m_lexer.arena().create<CaseClause>(location, word, std::move(items));
+  return m_lexer.arena().create<CaseClause>(location, word, steal(items));
 }
 
 hot fn Parser::parse_brace_group() throws -> Command *
