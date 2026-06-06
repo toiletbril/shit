@@ -590,6 +590,54 @@ search_program_path(const std::string &program_name)
   return result;
 }
 
+Maybe<std::string>
+read_entire_file(const std::string &path)
+{
+  Maybe<os::descriptor> file =
+      os::open_file_descriptor(path, os::FileOpenMode::Read);
+  if (!file) return nothing;
+
+  std::string contents{};
+  char buffer[4096];
+  for (;;) {
+    Maybe<usize> read_count = os::read_fd(*file, buffer, sizeof(buffer));
+    if (!read_count || *read_count == 0) break;
+    contents.append(buffer, *read_count);
+  }
+  os::close_fd(*file);
+  return contents;
+}
+
+std::string
+read_entire_standard_input()
+{
+  std::string contents{};
+  char buffer[4096];
+  for (;;) {
+    Maybe<usize> read_count = os::read_fd(SHIT_STDIN, buffer, sizeof(buffer));
+    if (!read_count || *read_count == 0) break;
+    contents.append(buffer, *read_count);
+  }
+  return contents;
+}
+
+Maybe<std::string>
+read_line_from_standard_input()
+{
+  std::string line{};
+  bool read_any_byte = false;
+  for (;;) {
+    char one_byte = 0;
+    Maybe<usize> read_count = os::read_fd(SHIT_STDIN, &one_byte, 1);
+    if (!read_count || *read_count == 0) break;
+    read_any_byte = true;
+    if (one_byte == '\n') return line;
+    line += one_byte;
+  }
+  if (!read_any_byte) return nothing;
+  return line;
+}
+
 } /* namespace utils */
 
 } /* namespace shit */

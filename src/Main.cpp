@@ -15,9 +15,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <iterator>
 #include <string>
 
 FLAG_LIST_DECL();
@@ -203,12 +200,11 @@ static void
 source_file(const std::filesystem::path &path, shit::EvalContext &context,
             shit::BumpArena &ast_arena)
 {
-  std::fstream f{path, std::fstream::in | std::fstream::binary};
-  if (!f.is_open()) return;
+  shit::Maybe<std::string> contents =
+      shit::utils::read_entire_file(path.string());
+  if (!contents) return;
 
-  std::string contents{std::istreambuf_iterator<char>(f),
-                       std::istreambuf_iterator<char>()};
-  run_script_contents(contents, context, ast_arena);
+  run_script_contents(*contents, context, ast_arena);
 }
 
 /* Expand the common prompt escapes in PS1 and PS2. */
@@ -430,36 +426,20 @@ main(int argc, char **argv)
     /* Figure out what to do and retrieve the code. */
     try {
       if (should_read_files || should_read_stdin) {
-        /* Were we given a list of files or "-s" flag? */
-        std::fstream f{};
-        std::istream *file{};
-
-        /* If "-s" is used, or when file name is "-", use stdin. */
+        /* If "-s" is used, or when the file name is "-", read standard input,
+           otherwise read the named file, both through the descriptor layer so
+           no iostream file stream is pulled in. */
         if (should_read_stdin || file_names[arg_index] == "-") {
-          /* Exit if "-s" is present. */
           should_quit = should_quit || should_read_stdin;
-          file = &std::cin;
+          script_contents = shit::utils::read_entire_standard_input();
         } else {
-          /* Otherwise, process the actual file name. */
-          f = std::fstream{file_names[arg_index],
-                           std::fstream::in | std::fstream::binary};
-
-          if (!f.is_open())
+          shit::Maybe<std::string> contents =
+              shit::utils::read_entire_file(file_names[arg_index]);
+          if (!contents) {
             throw shit::Error{"Could not open '" + file_names[arg_index] +
                               "': " + shit::os::last_system_error_message()};
-
-          file = &f;
-        }
-
-        for (;;) {
-          char ch = file->get();
-          if (file->bad()) {
-            throw shit::Error{"Could not read '" + file_names[arg_index] +
-                              "': " + shit::os::last_system_error_message()};
-          } else if (file->eof()) {
-            break;
           }
-          script_contents += ch;
+          script_contents = *contents;
         }
 
         if ((arg_index += 1) == file_names.size()) {

@@ -1,8 +1,8 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
-#include <iostream>
 #include <string>
 
 /* Reads one line from standard input and splits it on IFS into the named
@@ -36,12 +36,13 @@ Read::execute(ExecContext &ec, EvalContext &cxt) const
 
   if (names.empty()) names.emplace_back("REPLY");
 
-  std::string line{};
-  if (!std::getline(std::cin, line)) {
+  Maybe<std::string> read_line = utils::read_line_from_standard_input();
+  if (!read_line) {
     for (const std::string &name : names)
       cxt.set_shell_variable(name, "");
     return 1;
   }
+  const std::string &line = *read_line;
 
   std::string field_separators =
       cxt.get_variable_value("IFS").value_or(" \t\n");
