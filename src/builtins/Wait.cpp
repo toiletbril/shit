@@ -34,21 +34,21 @@ pure Builtin::Kind Wait::kind() const wontthrow { return Kind::Wait; }
 i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   i32 status = 0;
 
-  if (args.size() == 1) {
+  if (args.count() == 1) {
     for (job &job : cxt.jobs())
       status = wait_for_job(job);
     cxt.forget_done_jobs();
     return status;
   }
 
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &target = args[i];
 
-    if (!target.empty() && target[0] == '%') {
+    if (!target.is_empty() && target[0] == '%') {
       let const parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (!parsed.is_error()) {

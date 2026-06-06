@@ -60,8 +60,8 @@ public:
 
   ~ArrayList() { destroy_all(); }
 
-  [[nodiscard]] usize size() const { return m_length; }
-  [[nodiscard]] bool empty() const { return m_length == 0; }
+  [[nodiscard]] usize count() const { return m_length; }
+  [[nodiscard]] bool is_empty() const { return m_length == 0; }
   [[nodiscard]] T &operator[](usize i) { return m_data[i]; }
   [[nodiscard]] const T &operator[](usize i) const { return m_data[i]; }
   [[nodiscard]] T *begin() { return m_data; }

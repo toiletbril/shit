@@ -23,14 +23,14 @@ i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   if (FLAG_ALL.is_enabled()) {
     /* alias_definitions yields name='value', so the name ends at the equals. */
     for (let const &definition : cxt.alias_definitions()) {
       let const equals_position = definition.find_character('=');
       let const name_length =
-          equals_position.has_value() ? *equals_position : definition.size();
+          equals_position.has_value() ? *equals_position : definition.count();
       let const name = definition.substring_of_length(0, name_length);
       cxt.remove_alias(name);
     }
@@ -38,7 +38,7 @@ i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   i32 status = 0;
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
     if (!cxt.remove_alias(name)) {
       ec.print_to_stdout(name + ": not found\n");

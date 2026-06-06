@@ -3,10 +3,11 @@
 Man, my shell is shit™
 
 Revolutionary command-line interpreter, or an interactive shell based on
-[toiletline](https://github.com/toiletbril/toiletline) written in C++17.
+[toiletline](https://github.com/toiletbril/toiletline) written in BULLSHIT++23.
 
 This software was made as a late april fools joke and literally everything is
-written from scratch.
+written from scratch in a heavily macro-modified C++ dialect I can actually
+stand.
 
 There's no guarantee that this project will come any close to being finished or
 will not instantly break your computer upon the first start, so use it at your
@@ -66,7 +67,7 @@ Is it usable?
 - [x] Numeric expressions.
 
 Is it good?
-- [ ] Background jobs.
+- [x] Background jobs.
 - [x] Scripting capabilities. (flow control keywords)
 - [x] Blocks and functions.
 - [ ] `sh`-compatible.

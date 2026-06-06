@@ -13,13 +13,13 @@ pure fn Cd::kind() const wontthrow -> Builtin::Kind { return Kind::Cd; }
 
 fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  ASSERT(!ec.args().empty());
+  ASSERT(!ec.args().is_empty());
 
   let arg_path = String{};
 
-  if (ec.args().size() > 1) {
+  if (ec.args().count() > 1) {
     arg_path.append(ec.args()[1]);
-    for (usize i = 2; i < ec.args().size(); i++) {
+    for (usize i = 2; i < ec.args().count(); i++) {
       arg_path += ' ';
       arg_path.append(ec.args()[i]);
     }
@@ -40,7 +40,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const old_directory = Path::current_directory();
     let const changed = Path::set_current_directory(target);
     unused(changed);
-    if (!old_directory.empty())
+    if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
     return 0;

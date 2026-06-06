@@ -34,9 +34,9 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws -> i3
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
-  if (args.size() < 2) return 0;
+  if (args.count() < 2) return 0;
 
   let const &name = args[1];
 
@@ -44,14 +44,14 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws -> i3
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const verbose = FLAG_SHOW_VERBOSE.is_enabled();
-    if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
+    if (search_builtin(std::string_view{name.c_str(), name.count()}).has_value())
     {
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n"
                                  : name + "\n");
       return 0;
     }
     if (const ArrayList<Path> paths = utils::search_program_path(name);
-        paths.size() != 0)
+        paths.count() != 0)
     {
       let resolved = String{};
       if (verbose) {
@@ -73,7 +73,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws -> i3
   /* The bare form runs the operand and its arguments as a command, which
      resolves against a builtin or the PATH and never a function. */
   let operand_args = ArrayList<String>{};
-  for (usize i = 1; i < args.size(); i++)
+  for (usize i = 1; i < args.count(); i++)
     operand_args.push(String{heap_allocator(), args[i]});
   let sub = ExecContext::make_from(ec.source_location(), operand_args);
   return utils::execute_context(steal(sub), cxt, false);

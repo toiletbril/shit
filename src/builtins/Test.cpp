@@ -27,10 +27,10 @@ public:
 
   pure const String &current() const wontthrow
   {
-    ASSERT(pos < args.size());
+    ASSERT(pos < args.count());
     return args[pos];
   }
-  pure bool at_end() const wontthrow { return pos >= args.size(); }
+  pure bool at_end() const wontthrow { return pos >= args.count(); }
 
   void fail(StringView message) throws
   {
@@ -40,8 +40,8 @@ public:
 
   bool evaluate_unary(const String &op, const String &operand) throws
   {
-    if (op == "-z") return operand.empty();
-    if (op == "-n") return !operand.empty();
+    if (op == "-z") return operand.is_empty();
+    if (op == "-n") return !operand.is_empty();
     const Path operand_path{operand};
     if (op == "-e") return operand_path.exists();
     if (op == "-f") return operand_path.is_regular_file();
@@ -115,10 +115,10 @@ public:
     }
     /* A binary test needs the operator in the next position, otherwise a single
        argument is true when it is non-empty. */
-    if (pos + 1 < args.size() && is_binary_operator(args[pos + 1])) {
-      if (pos + 2 >= args.size()) {
+    if (pos + 1 < args.count() && is_binary_operator(args[pos + 1])) {
+      if (pos + 2 >= args.count()) {
         fail(StringView{"argument expected after '"} + args[pos + 1] + "'");
-        pos = args.size();
+        pos = args.count();
         return false;
       }
       let const &left = args[pos];
@@ -127,13 +127,13 @@ public:
       pos += 3;
       return evaluate_binary(left, op, right);
     }
-    if (is_unary_operator(current()) && pos + 1 < args.size()) {
+    if (is_unary_operator(current()) && pos + 1 < args.count()) {
       let const &op = args[pos];
       let const &operand = args[pos + 1];
       pos += 2;
       return evaluate_unary(op, operand);
     }
-    let const result = !current().empty();
+    let const result = !current().is_empty();
     pos++;
     return result;
   }
@@ -175,15 +175,15 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      last operand index ends the expression, one before the trailing ] in the
      bracket form. */
   let const &arguments = ec.args();
-  ASSERT(!arguments.empty());
+  ASSERT(!arguments.is_empty());
 
-  usize expression_end = arguments.size();
+  usize expression_end = arguments.count();
   if (ec.program() == "[") {
-    if (arguments.size() < 2 || arguments[arguments.size() - 1] != "]") {
+    if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]") {
       shit::print_error("[: missing closing ']'\n");
       return 2;
     }
-    expression_end = arguments.size() - 1;
+    expression_end = arguments.count() - 1;
   }
 
   ArrayList<String> operands{};
@@ -192,13 +192,13 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* An empty expression is false, as POSIX specifies for test with no
      arguments. */
-  if (operands.empty()) return 1;
+  if (operands.is_empty()) return 1;
 
   TestEvaluator evaluator{operands, 0, false};
   let const result = evaluator.parse_expression();
   if (evaluator.had_error) return 2;
-  if (evaluator.pos != operands.size()) {
-    ASSERT(evaluator.pos < operands.size());
+  if (evaluator.pos != operands.count()) {
+    ASSERT(evaluator.pos < operands.count());
     shit::print_error(StringView{"test: unexpected argument '"} +
                       operands[evaluator.pos] + "'\n");
     return 2;

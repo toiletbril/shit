@@ -22,9 +22,9 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
 

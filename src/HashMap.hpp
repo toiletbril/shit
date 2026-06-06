@@ -71,7 +71,7 @@ public:
 
   ~HashMap() { destroy_all(); }
 
-  [[nodiscard]] usize size() const { return m_count; }
+  [[nodiscard]] usize count() const { return m_count; }
 
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */

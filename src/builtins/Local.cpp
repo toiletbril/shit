@@ -25,12 +25,12 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   if (!cxt.in_function_scope())
     throw Error{"'local' can only be used inside a function"};
 
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
 

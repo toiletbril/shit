@@ -26,7 +26,7 @@ public:
 
   [[nodiscard]] Maybe<Value> find(StringView text) const
   {
-    if (text.size() > 16) return None;
+    if (text.count() > 16) return None;
     PackedStringKey wanted = PackedStringKey::from_view(text);
     /* TODO: slow? */
     for (usize i = 0; i < entry_count; i++)

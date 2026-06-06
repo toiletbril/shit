@@ -106,7 +106,7 @@ hot pure static fn is_negation_token(const Token *token) wontthrow -> bool
   ASSERT(token != nullptr);
   if (token->kind() != Token::Kind::Word) return false;
   const Word &word = static_cast<const tokens::WordToken *>(token)->word();
-  return word.segments.size() == 1 &&
+  return word.segments.count() == 1 &&
          word.segments[0].kind == WordSegment::Kind::UnquotedText &&
          word.segments[0].text == "!";
 }
@@ -341,14 +341,14 @@ hot fn Parser::parse_simple_command() throws -> Command *
     if (!source_location) return nullptr;
 
     ArrayList<const Token *> args{};
-    args.reserve(args_accumulator.size());
+    args.reserve(args_accumulator.count());
     for (Token *t : args_accumulator)
       args.push(t);
 
     SimpleCommand *c = m_lexer.arena().create<SimpleCommand>(
         *source_location, steal(args));
-    if (local_vars.size() != 0) c->set_local_vars(steal(local_vars));
-    if (!redirections.empty()) c->set_redirections(steal(redirections));
+    if (local_vars.count() != 0) c->set_local_vars(steal(local_vars));
+    if (!redirections.is_empty()) c->set_redirections(steal(redirections));
     return c;
   };
 
@@ -380,7 +380,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
                        .to_literal_string();
         }
         i32 from_fd = -1;
-        if (!digits.empty()) {
+        if (!digits.is_empty()) {
           const let parsed = utils::parse_decimal_integer(digits);
           if (parsed.is_error()) throw parsed.error();
           from_fd = static_cast<i32>(parsed.value());
@@ -418,7 +418,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 
     /* A reserved word or a group opener in command position introduces a
        compound command. A list terminator means there is no command here. */
-    if (args_accumulator.empty() && local_vars.size() == 0) {
+    if (args_accumulator.is_empty() && local_vars.count() == 0) {
       switch (token->kind()) {
       case Token::Kind::If: return parse_if();
       case Token::Kind::While: return parse_while_or_until(false);
@@ -467,8 +467,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
         const let literal = static_cast<tokens::WordToken *>(token)
                                 ->word()
                                 .to_literal_string();
-        bool is_all_digits = !literal.empty();
-        for (usize i = 0; i < literal.size(); i++) {
+        bool is_all_digits = !literal.is_empty();
+        for (usize i = 0; i < literal.count(); i++) {
           if (literal[i] < '0' || literal[i] > '9') {
             is_all_digits = false;
             break;
@@ -504,7 +504,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 
     case Token::Kind::LeftParen:
       /* A single word followed by () is a function definition. */
-      if (args_accumulator.size() == 1 && local_vars.size() == 0 &&
+      if (args_accumulator.count() == 1 && local_vars.count() == 0 &&
           args_accumulator[0]->kind() == Token::Kind::Word)
       {
         return parse_function_definition(args_accumulator[0]);
@@ -517,7 +517,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 
       /* Once a command word is present, an assignment-looking token is just an
        * ordinary argument. */
-      if (!args_accumulator.empty()) {
+      if (!args_accumulator.is_empty()) {
         args_accumulator.push(token);
         break;
       }
@@ -568,7 +568,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
       StringView delimiter = delimiter_literal.view();
       bool strip_tabs = false;
       /* <<- strips leading tabs, the dash touching the operator. */
-      if (!delimiter.empty() && delimiter[0] == '-' &&
+      if (!delimiter.is_empty() && delimiter[0] == '-' &&
           delimiter_token->source_location().position ==
               op_location.position + op_location.length)
       {

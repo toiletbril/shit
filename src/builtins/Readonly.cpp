@@ -23,10 +23,10 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   /* readonly with no operand lists the read-only variables and their values. */
-  if (args.size() == 1) {
+  if (args.count() == 1) {
     String out{};
     for (let const &name : cxt.readonly_names()) {
       out += "readonly ";
@@ -42,7 +42,7 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 0;
   }
 
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
 

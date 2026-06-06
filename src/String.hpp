@@ -75,8 +75,8 @@ public:
 
   ~String() { free_storage(); }
 
-  [[nodiscard]] usize size() const { return m_length; }
-  [[nodiscard]] bool empty() const { return m_length == 0; }
+  [[nodiscard]] usize count() const { return m_length; }
+  [[nodiscard]] bool is_empty() const { return m_length == 0; }
   [[nodiscard]] char operator[](usize i) const { return m_data[i]; }
   [[nodiscard]] StringView view() const { return StringView{m_data, m_length}; }
   /* A String reads as a view wherever one is expected, so an owned string

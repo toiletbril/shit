@@ -87,30 +87,30 @@ fn FlagManyStrings::append(StringView v) throws -> void
 
 pure fn FlagManyStrings::is_empty() const wontthrow -> bool
 {
-  return m_values.empty();
+  return m_values.is_empty();
 }
 
-pure fn FlagManyStrings::size() const wontthrow -> usize
+pure fn FlagManyStrings::count() const wontthrow -> usize
 {
-  return m_values.size();
+  return m_values.count();
 }
 
 pure fn FlagManyStrings::get(usize i) const wontthrow -> StringView
 {
-  ASSERT(i < m_values.size());
+  ASSERT(i < m_values.count());
   return m_values[i].view();
 }
 
 fn FlagManyStrings::next() throws -> StringView
 {
-  ASSERT(m_value_position < m_values.size());
+  ASSERT(m_value_position < m_values.count());
   const String &value = m_values[m_value_position++];
   return value.view();
 }
 
 pure fn FlagManyStrings::at_end() const wontthrow -> bool
 {
-  return m_value_position == size();
+  return m_value_position == count();
 }
 
 fn FlagManyStrings::reset() throws -> void
@@ -129,7 +129,7 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
   *value_start = nullptr;
   *result_flag = nullptr;
 
-  for (size_t i = 0; i < flags.size(); ++i) {
+  for (size_t i = 0; i < flags.count(); ++i) {
     if (!is_long) {
       if (flags[i]->short_name() != '\0' &&
           flags[i]->short_name() == *flag_start)
@@ -139,7 +139,7 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
         return true;
       }
     } else {
-      if (!flags[i]->long_name().empty()) {
+      if (!flags[i]->long_name().is_empty()) {
         /* There might be flags that are prefixes of other flags. Go
            through all flags first and pick the longest match. */
         const size_t flag_length = flags[i]->long_name().length;
@@ -164,7 +164,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args) throws -> ArrayList<String>
 {
   std::vector<const char *> os_argv;
-  os_argv.reserve(args.size());
+  os_argv.reserve(args.count());
 
   for (const String &arg : args)
     os_argv.emplace_back(arg.c_str());
@@ -439,7 +439,7 @@ cold fn make_synopsis(std::string_view program_name,
     s += '\n';
   }
 
-  return std::string{s.c_str(), s.size()};
+  return std::string{s.c_str(), s.count()};
 }
 
 cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string
@@ -463,7 +463,7 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string
       has_short = true;
     }
 
-    if (!f->long_name().empty()) {
+    if (!f->long_name().is_empty()) {
       if (has_short) {
         /* '-E, ' */
         s += ", ";
@@ -503,20 +503,20 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> std::string
     s += f->description();
   }
 
-  return std::string{s.c_str(), s.size()};
+  return std::string{s.c_str(), s.count()};
 }
 
 fn print(StringView text) throws -> void
 {
   /* The output is flushed at once so it interleaves with the unbuffered
      write_fd path the builtins use, keeping the order a reader sees correct. */
-  std::fwrite(text.data, 1, text.size(), stdout);
+  std::fwrite(text.data, 1, text.count(), stdout);
   std::fflush(stdout);
 }
 
 fn print_error(StringView text) throws -> void
 {
-  std::fwrite(text.data, 1, text.size(), stderr);
+  std::fwrite(text.data, 1, text.count(), stderr);
   std::fflush(stderr);
 }
 

@@ -10,11 +10,11 @@ pure fn Break::kind() const wontthrow -> Builtin::Kind { return Kind::Break; }
 
 fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  ASSERT(!ec.args().empty());
+  ASSERT(!ec.args().is_empty());
 
   /* The optional argument is how many enclosing loops to break, default one. */
   i64 level = 1;
-  if (ec.args().size() > 1) {
+  if (ec.args().count() > 1) {
     let const parsed = utils::parse_decimal_integer(ec.args()[1]);
     if (parsed.is_error()) throw parsed.error();
     level = parsed.value();

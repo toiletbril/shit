@@ -23,10 +23,10 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const names = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };
 
-  ASSERT(!names.empty());
+  ASSERT(!names.is_empty());
 
   let const unset_function = FLAG_UNSET_FUNCTION.is_enabled();
-  for (usize i = 1; i < names.size(); i++) {
+  for (usize i = 1; i < names.count(); i++) {
     let const &name = names[i];
     if (unset_function)
       cxt.unset_function(name);

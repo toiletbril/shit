@@ -21,7 +21,7 @@ public:
     return m_map.find(key) != nullptr;
   }
 
-  [[nodiscard]] usize size() const { return m_map.size(); }
+  [[nodiscard]] usize count() const { return m_map.count(); }
 
   template <class Fn>
   void for_each(Fn callback) const

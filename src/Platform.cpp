@@ -164,7 +164,7 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 
 hot fn execute_program(ExecContext &&ec) throws -> process
 {
-  ASSERT(ec.args().size() > 0, "a program needs at least argv[0]");
+  ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
   defer { ec.close_fds(); };
 
@@ -205,7 +205,7 @@ hot fn execute_program(ExecContext &&ec) throws -> process
       msg += ": ";
       msg += last_system_error_message();
       msg += '\n';
-      (void) write_fd(STDERR_FILENO, msg.data(), msg.size());
+      (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
       _exit(127);
     }
   }
@@ -217,7 +217,7 @@ hot fn execute_program(ExecContext &&ec) throws -> process
 
 fn replace_process(ExecContext &&ec) throws -> void
 {
-  ASSERT(ec.args().size() > 0, "a program needs at least argv[0]");
+  ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
   let const child_args = make_os_args(ec.args());
 
@@ -315,8 +315,8 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
      mutable buffer with a trailing null rather than the immutable Path text. */
   const String &path_template_text = path_template_path.text();
   ArrayList<char> path_template{};
-  path_template.reserve(path_template_text.size() + 1);
-  for (usize i = 0; i < path_template_text.size(); i++)
+  path_template.reserve(path_template_text.count() + 1);
+  for (usize i = 0; i < path_template_text.count(); i++)
     path_template.push(path_template_text.c_str()[i]);
   path_template.push('\0');
 
@@ -327,9 +327,9 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   unlink(path_template.begin());
 
   usize offset = 0;
-  while (offset < content.size()) {
+  while (offset < content.count()) {
     ssize_t written =
-        ::write(fd, content.data + offset, content.size() - offset);
+        ::write(fd, content.data + offset, content.count() - offset);
     if (written <= 0) {
       close(fd);
       return shit::None;
@@ -444,7 +444,7 @@ fn process_from_pid(i64 pid) wontthrow -> process
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 {
   /* A bare number names the signal directly. */
-  if (!name.empty() &&
+  if (!name.is_empty() &&
       std::all_of(name.data, name.data + name.length,
                   [](unsigned char c) { return std::isdigit(c) != 0; }))
   {
@@ -478,10 +478,10 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
 
 hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
 {
-  ASSERT(args.size() > 0, "argv must carry at least the program name");
+  ASSERT(args.count() > 0, "argv must carry at least the program name");
 
   os_args result{};
-  result.reserve(args.size() + 1);
+  result.reserve(args.count() + 1);
 
   for (const String &arg : args)
     result.push(arg.c_str());
@@ -815,7 +815,7 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   if (handle == INVALID_HANDLE_VALUE) return shit::None;
 
   DWORD written = 0;
-  if (WriteFile(handle, content.data, static_cast<DWORD>(content.size()),
+  if (WriteFile(handle, content.data, static_cast<DWORD>(content.count()),
                 &written, nullptr) == 0)
   {
     close_fd(handle);
@@ -878,7 +878,7 @@ fn process_from_pid(i64 pid) -> process
 
 fn signal_number_from_name(StringView name) -> Maybe<i32>
 {
-  if (!name.empty() &&
+  if (!name.is_empty() &&
       std::all_of(name.data, name.data + name.length,
                   [](unsigned char c) { return std::isdigit(c) != 0; }))
   {
@@ -896,20 +896,20 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
 
 fn make_os_args(const ArrayList<String> &args) -> os_args
 {
-  ASSERT(args.size() > 0);
+  ASSERT(args.count() > 0);
 
   std::string s{};
 
   s += '"';
-  s.append(args[0].c_str(), args[0].size());
+  s.append(args[0].c_str(), args[0].count());
   s += '"';
 
   /* TODO: Remove CVE and escape quotes. */
-  if (args.size() > 1) {
-    for (usize i = 1; i < args.size(); i++) {
+  if (args.count() > 1) {
+    for (usize i = 1; i < args.count(); i++) {
       s += ' ';
       s += '"';
-      s.append(args[i].c_str(), args[i].size());
+      s.append(args[i].c_str(), args[i].count());
       s += '"';
     }
   }

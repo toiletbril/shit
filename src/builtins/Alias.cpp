@@ -24,10 +24,10 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   /* alias with no operand lists every definition. */
-  if (args.size() == 1) {
+  if (args.count() == 1) {
     let out = String{};
     for (let const &definition : cxt.alias_definitions()) {
       out += "alias ";
@@ -39,7 +39,7 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   i32 status = 0;
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
 

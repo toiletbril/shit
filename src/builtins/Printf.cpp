@@ -19,16 +19,16 @@ namespace {
 i64 parse_printf_integer(const String &arg) throws
 {
   usize first_digit = 0;
-  if (first_digit < arg.size() &&
+  if (first_digit < arg.count() &&
       (arg[first_digit] == '+' || arg[first_digit] == '-'))
     first_digit++;
   let const is_hexadecimal =
-      first_digit + 1 < arg.size() && arg[first_digit] == '0' &&
+      first_digit + 1 < arg.count() && arg[first_digit] == '0' &&
       (arg[first_digit + 1] == 'x' || arg[first_digit + 1] == 'X');
   /* A leading zero that is not 0x marks octal, as the C base-zero strtoll the
      old code used did, so printf '%d' 010 yields 8. */
-  let const is_octal = !is_hexadecimal && first_digit < arg.size() &&
-                       arg[first_digit] == '0' && first_digit + 1 < arg.size();
+  let const is_octal = !is_hexadecimal && first_digit < arg.count() &&
+                       arg[first_digit] == '0' && first_digit + 1 < arg.count();
   let const parsed = is_hexadecimal
                                   ? utils::parse_hexadecimal_integer(arg)
                               : is_octal ? utils::parse_octal_integer(arg)
@@ -70,7 +70,7 @@ void append_conversion(String &out, const String &spec, char conv,
     std::snprintf(buffer, sizeof(buffer), with_s.c_str(), arg.c_str());
     out += buffer;
   } else if (conv == 'c') {
-    out += arg.empty() ? '\0' : arg[0];
+    out += arg.is_empty() ? '\0' : arg[0];
   } else if (conv == 'd' || conv == 'i') {
     let const with_ll = spec + "lld";
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
@@ -100,13 +100,13 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
 
-  ASSERT(!ec.args().empty());
+  ASSERT(!ec.args().is_empty());
 
-  if (ec.args().size() < 2) return 0;
+  if (ec.args().count() < 2) return 0;
 
   let const &fmt = ec.args()[1];
   ArrayList<String> operands{};
-  for (usize i = 2; i < ec.args().size(); i++)
+  for (usize i = 2; i < ec.args().count(); i++)
     operands.push(ec.args()[i]);
 
   String out{};
@@ -149,12 +149,12 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
       }
 
       let const arg =
-          operand_index < operands.size() ? operands[operand_index] : String{};
+          operand_index < operands.count() ? operands[operand_index] : String{};
       append_conversion(out, spec, conv, arg);
       operand_index++;
       consumed_a_conversion = true;
     }
-  } while (operand_index < operands.size() && consumed_a_conversion);
+  } while (operand_index < operands.count() && consumed_a_conversion);
 
   ec.print_to_stdout(out);
   return 0;

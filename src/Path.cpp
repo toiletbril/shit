@@ -39,17 +39,17 @@ fn Path::text() const wontthrow -> const String & { return m_text; }
 
 fn Path::c_str() const wontthrow -> const char * { return m_text.c_str(); }
 
-fn Path::size() const wontthrow -> usize { return m_text.size(); }
+fn Path::count() const wontthrow -> usize { return m_text.count(); }
 
-fn Path::empty() const wontthrow -> bool { return m_text.empty(); }
+fn Path::is_empty() const wontthrow -> bool { return m_text.is_empty(); }
 
 fn Path::is_absolute() const wontthrow -> bool
 {
-  if (m_text.empty()) return false;
+  if (m_text.is_empty()) return false;
 #if SHIT_PLATFORM_IS WIN32
   if (is_directory_separator(m_text[0])) return true;
   /* A drive-qualified path such as C:\ is absolute. */
-  return m_text.size() >= 2 && m_text[1] == ':';
+  return m_text.count() >= 2 && m_text[1] == ':';
 #else
   return is_directory_separator(m_text[0]);
 #endif
@@ -61,7 +61,7 @@ fn Path::is_relative() const wontthrow -> bool { return !is_absolute(); }
    when there is no separator. */
 static pure fn filename_offset(const String &text) wontthrow -> usize
 {
-  for (usize i = text.size(); i > 0; i--)
+  for (usize i = text.count(); i > 0; i--)
     if (is_directory_separator(text[i - 1])) return i;
   return 0;
 }
@@ -69,7 +69,7 @@ static pure fn filename_offset(const String &text) wontthrow -> usize
 fn Path::filename() const wontthrow -> StringView
 {
   let const start = filename_offset(m_text);
-  ASSERT(start <= m_text.size());
+  ASSERT(start <= m_text.count());
   return m_text.substring(start);
 }
 
@@ -99,7 +99,7 @@ fn Path::parent() const throws -> Path
 fn Path::push_component(StringView component) throws -> Path &
 {
   if (component.length == 0) return *this;
-  if (!m_text.empty() && !is_directory_separator(m_text.back()) &&
+  if (!m_text.is_empty() && !is_directory_separator(m_text.back()) &&
       !is_directory_separator(component.data[0]))
   {
     m_text.push(DIRECTORY_SEPARATOR);
@@ -112,9 +112,9 @@ fn Path::with_extension(StringView new_extension) const throws -> Path
 {
   let const existing = extension();
 
-  ASSERT(existing.length <= m_text.size(),
+  ASSERT(existing.length <= m_text.count(),
          "extension is a suffix of the path text");
-  let const keep = m_text.size() - existing.length;
+  let const keep = m_text.count() - existing.length;
 
   Path result{m_text.substring_of_length(0, keep)};
   if (new_extension.length > 0 && new_extension.data[0] != '.')
@@ -132,13 +132,13 @@ fn Path::normalized() const throws -> Path
      this function while the result is assembled. */
   ArrayList<StringView> components{};
   usize i = 0;
-  while (i < m_text.size()) {
+  while (i < m_text.count()) {
     if (is_directory_separator(m_text[i])) {
       i++;
       continue;
     }
     const usize start = i;
-    while (i < m_text.size() && !is_directory_separator(m_text[i]))
+    while (i < m_text.count() && !is_directory_separator(m_text[i]))
       i++;
     let const part = m_text.substring_of_length(start, i - start);
     if (part == StringView{"."}) continue;
@@ -146,7 +146,7 @@ fn Path::normalized() const throws -> Path
       /* A .. pops the last real component, unless none remains or the last was
          itself a .. kept because the path is relative and cannot climb past its
          own start. */
-      if (components.size() > 0 && !(components.back() == StringView{".."})) {
+      if (components.count() > 0 && !(components.back() == StringView{".."})) {
         components.pop_back();
       } else if (!absolute) {
         components.push(part);
@@ -158,11 +158,11 @@ fn Path::normalized() const throws -> Path
 
   String built{};
   if (absolute) built.push(DIRECTORY_SEPARATOR);
-  for (usize c = 0; c < components.size(); c++) {
+  for (usize c = 0; c < components.count(); c++) {
     if (c > 0) built.push(DIRECTORY_SEPARATOR);
     built.append(components[c]);
   }
-  if (built.empty()) built.append(absolute ? StringView{"/"} : StringView{"."});
+  if (built.is_empty()) built.append(absolute ? StringView{"/"} : StringView{"."});
   return Path{built};
 }
 
@@ -353,7 +353,7 @@ PathBuilder::PathBuilder(StringView root) : m_text(root) {}
 fn PathBuilder::append(StringView component) throws -> PathBuilder &
 {
   if (component.length == 0) return *this;
-  if (!m_text.empty() && !is_directory_separator(m_text.back()) &&
+  if (!m_text.is_empty() && !is_directory_separator(m_text.back()) &&
       !is_directory_separator(component.data[0]))
   {
     m_text.push(DIRECTORY_SEPARATOR);

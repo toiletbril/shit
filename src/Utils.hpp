@@ -20,9 +20,9 @@ fn merge_tokens_to_string(const ArrayList<const Token *> &v) throws -> String;
 inline fn merge_args_to_string(const ArrayList<String> &v) throws -> String
 {
   String r{};
-  for (usize i = 0; i < v.size(); i++) {
+  for (usize i = 0; i < v.count(); i++) {
     r.append(v[i].view());
-    if (i + 1 < v.size()) {
+    if (i + 1 < v.count()) {
       r.push(' ');
     }
   }

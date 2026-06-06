@@ -56,7 +56,7 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   let const resource = selected_resource();
 
@@ -67,7 +67,7 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* A bare flag reads the soft limit, an operand sets both the soft and the
      hard limit. */
-  if (args.size() < 2) {
+  if (args.count() < 2) {
     String out{};
     if (limit.rlim_cur == RLIM_INFINITY)
       out = String{"unlimited"};
@@ -106,7 +106,7 @@ i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* This platform does not expose resource limits, so report unlimited. */
-  if (args.size() < 2) ec.print_to_stdout("unlimited\n");
+  if (args.count() < 2) ec.print_to_stdout("unlimited\n");
   return 0;
 }
 

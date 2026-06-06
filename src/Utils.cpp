@@ -65,7 +65,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                bool is_async) throws -> i32
 {
-  ASSERT(ecs.size() > 1);
+  ASSERT(ecs.count() > 1);
 
   i32 ret = 0;
 
@@ -168,7 +168,7 @@ fn string_replace(String &s, const StringView to_replace,
                   const StringView replace_with) throws -> void
 {
   String result{};
-  result.reserve(s.size());
+  result.reserve(s.count());
 
   let const source = s.view();
   usize i = 0;
@@ -193,8 +193,8 @@ fn string_replace(String &s, const StringView to_replace,
 fn lowercase_string(StringView s) throws -> String
 {
   String l{};
-  l.reserve(s.size());
-  for (usize i = 0; i < s.size(); i++)
+  l.reserve(s.count());
+  for (usize i = 0; i < s.count(); i++)
     l.push(static_cast<char>(std::tolower(s[i])));
   return l;
 }
@@ -378,7 +378,7 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
 fn find_pos_in_vec(const ArrayList<String> &suffixes, StringView wanted)
     wontthrow -> usize
 {
-  for (usize i = 0; i < suffixes.size(); i++) {
+  for (usize i = 0; i < suffixes.count(); i++) {
     if (suffixes[i] == wanted) return i;
   }
   return NOT_FOUND_INDEX;
@@ -399,9 +399,9 @@ fn canonicalize_path(StringView path) throws -> Maybe<Path>
      is left as typed. */
   const bool ends_with_dot =
       path.length > 0 && path.data[path.length - 1] == '.';
-  if (candidate.extension().empty() && !ends_with_dot) {
+  if (candidate.extension().is_empty() && !ends_with_dot) {
     usize suffix_index = 0;
-    while (!candidate.exists() && suffix_index < os::OMITTED_SUFFIXES.size()) {
+    while (!candidate.exists() && suffix_index < os::OMITTED_SUFFIXES.count()) {
       const String &suffix = os::OMITTED_SUFFIXES[suffix_index++];
       candidate = candidate.with_extension(suffix.view());
     }
@@ -417,7 +417,7 @@ fn canonicalize_path(StringView path) throws -> Maybe<Path>
 static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,
                                    usize index) wontthrow -> bool
 {
-  return index < glob_active.size() && glob_active[index];
+  return index < glob_active.count() && glob_active[index];
 }
 
 fn glob_matches(StringView glob, StringView str,
@@ -427,8 +427,8 @@ fn glob_matches(StringView glob, StringView str,
   usize s = 0;
   usize g = 0;
 
-  while (g < glob.size() && s < str.size()) {
-    ASSERT(g < glob.size() && s < str.size());
+  while (g < glob.count() && s < str.count()) {
+    ASSERT(g < glob.count() && s < str.count());
 
     if (!is_glob_char_active(glob_active, mask_offset + g)) {
       if (glob[g++] != str[s++])
@@ -447,7 +447,7 @@ fn glob_matches(StringView glob, StringView str,
       /* A star at the end of the glob matches the entire rest of the string, so
          there is no need to try every split. This keeps a plain * component,
          the common case, linear in the string instead of quadratic. */
-      if (g + 1 >= glob.size()) return true;
+      if (g + 1 >= glob.count()) return true;
       if (glob_matches(glob.substring(g + 1), str.substring(s), glob_active,
                        mask_offset + g + 1))
       {
@@ -474,10 +474,10 @@ fn glob_matches(StringView glob, StringView str,
          literal character, as POSIX specifies. A ] right after [ or [^ is a
          member, so the scan for the closing ] starts past it. */
       usize close_scan = g + 1;
-      if (close_scan < glob.size() && glob[close_scan] == '^') close_scan++;
-      if (close_scan < glob.size() && glob[close_scan] == ']') close_scan++;
+      if (close_scan < glob.count() && glob[close_scan] == '^') close_scan++;
+      if (close_scan < glob.count() && glob[close_scan] == ']') close_scan++;
       bool has_closing_bracket = false;
-      for (; close_scan < glob.size(); close_scan++) {
+      for (; close_scan < glob.count(); close_scan++) {
         if (glob[close_scan] == ']') {
           has_closing_bracket = true;
           break;
@@ -491,22 +491,22 @@ fn glob_matches(StringView glob, StringView str,
       }
 
       g++; /* skip [ */
-      if (g >= glob.size()) GLOB_GROUP_ERR();
+      if (g >= glob.count()) GLOB_GROUP_ERR();
 
       if (glob[g] == '^') {
         g++;
         should_negate = true;
 
-        if (g >= glob.size()) GLOB_GROUP_ERR();
+        if (g >= glob.count()) GLOB_GROUP_ERR();
       }
 
       u8 prev_glob_ch = glob[g++];
       is_matched |= (prev_glob_ch == str[s]);
 
-      while (g < glob.size() && glob[g] != ']') {
+      while (g < glob.count() && glob[g] != ']') {
         if (glob[g] == '-') {
           g++;
-          if (g >= glob.size()) GLOB_GROUP_ERR();
+          if (g >= glob.count()) GLOB_GROUP_ERR();
 
           if (glob[g] == ']') {
             is_matched |= ('-' == str[s]);
@@ -520,7 +520,7 @@ fn glob_matches(StringView glob, StringView str,
         }
       }
 
-      if (g >= glob.size() || glob[g] != ']') GLOB_GROUP_ERR();
+      if (g >= glob.count() || glob[g] != ']') GLOB_GROUP_ERR();
       if (should_negate) is_matched = !is_matched;
       if (!is_matched) return false;
 
@@ -533,14 +533,14 @@ fn glob_matches(StringView glob, StringView str,
     }
   }
 
-  if (s >= str.size()) {
-    while (g < glob.size() && glob[g] == '*' &&
+  if (s >= str.count()) {
+    while (g < glob.count() && glob[g] == '*' &&
            is_glob_char_active(glob_active, mask_offset + g))
     {
       g++;
     }
 
-    if (g >= glob.size()) return true;
+    if (g >= glob.count()) return true;
   }
 
   return false;
@@ -608,13 +608,13 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   for (usize i = 0; i < path_var.length; i++) {
     const char ch = path_var.data[i];
     if (ch == os::PATH_DELIMITER) {
-      dirs.push(current.empty() ? String{"."} : current);
+      dirs.push(current.is_empty() ? String{"."} : current);
       current.clear();
     } else {
       current.push(ch);
     }
   }
-  dirs.push(current.empty() ? String{"."} : current);
+  dirs.push(current.is_empty() ? String{"."} : current);
 
   return dirs;
 }
@@ -634,7 +634,7 @@ fn initialize_path_map() throws -> void
     /* Cache every file in the directory under its name without an omitted
        extension, pointing at its full path. */
     for (const String &entry_name : *entries) {
-      std::string name{entry_name.c_str(), entry_name.size()};
+      std::string name{entry_name.c_str(), entry_name.count()};
       os::erase_extension_and_get_its_index(name);
 
       let full_path = directory;
@@ -662,14 +662,14 @@ fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
 
     let full_path = directory;
     full_path.push_component(program_name);
-    std::string full_path_str{full_path.c_str(), full_path.size()};
+    std::string full_path_str{full_path.c_str(), full_path.count()};
 
     /* This file already has an extesion specified? */
     if (os::ext_index explicit_ext =
             os::erase_extension_and_get_its_index(full_path_str);
         explicit_ext == 0)
     {
-      for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.size();
+      for (usize ext_index = 0; ext_index < os::OMITTED_SUFFIXES.count();
            ext_index++)
       {
         const String &suffix = os::OMITTED_SUFFIXES[ext_index];
@@ -705,7 +705,7 @@ hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
             PATH_CACHE.find(StringView{sp.data(), sp.size()})))
     {
       ArrayList<Path> kept{};
-      for (usize i = 0; i < cached->size(); i++) {
+      for (usize i = 0; i < cached->count(); i++) {
         const Path &cached_path = (*cached)[i];
         if (cached_path.exists()) {
           result.push(cached_path);
@@ -715,8 +715,8 @@ hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
       /* Drop entries that no longer exist, so a later lookup does not stat them
          again. The directory exists check is slow, so this keeps the cache from
          growing with dead paths. */
-      if (kept.size() != cached->size()) *cached = steal(kept);
-      if (result.size() != 0) return result;
+      if (kept.count() != cached->count()) *cached = steal(kept);
+      if (result.count() != 0) return result;
     }
   }
 

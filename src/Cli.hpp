@@ -93,7 +93,7 @@ public:
                   StringView description);
 
   fn append(StringView v) throws -> void;
-  pure fn size() const wontthrow -> usize;
+  pure fn count() const wontthrow -> usize;
   pure fn is_empty() const wontthrow -> bool;
 
   pure fn get(usize i) const wontthrow -> StringView;

@@ -26,8 +26,8 @@ public:
      gone from the tree. TODO: drop with the last std::string. */
   StringView(const std::string &s) : data(s.data()), length(s.size()) {}
 
-  [[nodiscard]] usize size() const { return length; }
-  [[nodiscard]] bool empty() const { return length == 0; }
+  [[nodiscard]] usize count() const { return length; }
+  [[nodiscard]] bool is_empty() const { return length == 0; }
   [[nodiscard]] char operator[](usize i) const { return data[i]; }
 
   [[nodiscard]] bool operator==(StringView other) const

@@ -19,9 +19,9 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
-  if (args.size() == 1) {
+  if (args.count() == 1) {
     char buffer[8];
     std::snprintf(buffer, sizeof(buffer), "%04o", os::get_file_creation_mask());
     ec.print_to_stdout(String{buffer} + "\n");

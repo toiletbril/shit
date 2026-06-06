@@ -23,16 +23,16 @@ pure fn Getopts::kind() const wontthrow -> Builtin::Kind
 fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
-  if (args.size() < 3)
+  if (args.count() < 3)
     throw Error{"getopts: usage: getopts optstring name [arg ...]"};
 
   let const &optstring = args[1];
   let const &name = args[2];
-  let const is_silent = !optstring.empty() && optstring[0] == ':';
+  let const is_silent = !optstring.is_empty() && optstring[0] == ':';
 
   let operands = ArrayList<String>{};
-  if (args.size() > 3) {
-    for (usize i = 3; i < args.size(); i++)
+  if (args.count() > 3) {
+    for (usize i = 3; i < args.count(); i++)
       operands.push(args[i]);
   } else {
     operands = cxt.positional_params();
@@ -57,12 +57,12 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return code;
   };
 
-  if (optind < 1 || static_cast<usize>(optind) > operands.size()) {
+  if (optind < 1 || static_cast<usize>(optind) > operands.count()) {
     cxt.set_shell_variable(name, "?");
     return finish(1);
   }
 
-  ASSERT(static_cast<usize>(optind) - 1 < operands.size());
+  ASSERT(static_cast<usize>(optind) - 1 < operands.count());
   let const &current = operands[static_cast<usize>(optind) - 1];
   if (current.length() < 2 || current[0] != '-') {
     cxt.set_shell_variable(name, "?");
@@ -109,7 +109,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_shell_variable("OPTARG", optarg);
       optind++;
       char_index = 1;
-    } else if (static_cast<usize>(optind) < operands.size()) {
+    } else if (static_cast<usize>(optind) < operands.count()) {
       let const &optarg = operands[static_cast<usize>(optind)];
       cxt.set_shell_variable("OPTARG", optarg);
       optind += 2;

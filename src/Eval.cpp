@@ -120,24 +120,24 @@ hot fn EvalContext::get_variable_value(StringView name) const throws -> Maybe<St
   if (name == "-") return String{heap_allocator(), option_flags_string()};
   if (name == "#")
     return String{heap_allocator(), utils::unsigned_integer_to_string(
-                                        m_positional_params.size())};
+                                        m_positional_params.count())};
   if (name == "0") return String{heap_allocator(), m_shell_name};
 
   /* A purely numeric name selects a positional parameter, $1 upward. An index
      too large to fit, or beyond the count, has no value. */
-  let is_all_digits = !name.empty();
-  for (usize i = 0; i < name.size(); i++)
+  let is_all_digits = !name.is_empty();
+  for (usize i = 0; i < name.count(); i++)
     if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
       is_all_digits = false;
       break;
     }
   if (is_all_digits) {
-    if (name.size() > 9) return String{};
+    if (name.count() > 9) return String{};
     let const parsed_index = utils::parse_decimal_integer(name);
     if (parsed_index.is_error()) return String{};
     let const index = static_cast<usize>(parsed_index.value());
-    if (index >= 1 && index <= m_positional_params.size()) {
-      ASSERT(index - 1 < m_positional_params.size());
+    if (index >= 1 && index <= m_positional_params.count()) {
+      ASSERT(index - 1 < m_positional_params.count());
       return m_positional_params[index - 1];
     }
     return String{};
@@ -150,11 +150,11 @@ hot fn EvalContext::get_variable_value(StringView name) const throws -> Maybe<St
     let has_separator = true;
     if (name == "*") {
       let const &ifs = m_field_separators;
-      has_separator = !ifs.empty();
+      has_separator = !ifs.is_empty();
       if (has_separator) separator = ifs.first_character();
     }
     let joined = String{};
-    for (usize i = 0; i < m_positional_params.size(); i++) {
+    for (usize i = 0; i < m_positional_params.count(); i++) {
       if (i > 0 && has_separator) joined.push(separator);
       joined.append(m_positional_params[i].view());
     }
@@ -192,7 +192,7 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> int
   new_job.command = command;
   new_job.state = job::State::Running;
   m_jobs.push(steal(new_job));
-  ASSERT(!m_jobs.empty());
+  ASSERT(!m_jobs.is_empty());
   LOG(Verbosity::Debug, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
 }
@@ -228,8 +228,8 @@ fn EvalContext::most_recent_job() wontthrow -> job *
 {
   /* Skip a finished job, so a bare fg or bg acts on a job that is still
      running or stopped rather than a dead pid. */
-  for (usize i = m_jobs.size(); i > 0; i--) {
-    ASSERT(i - 1 < m_jobs.size());
+  for (usize i = m_jobs.count(); i > 0; i--) {
+    ASSERT(i - 1 < m_jobs.count());
     if (m_jobs[i - 1].state != job::State::Done) return &m_jobs[i - 1];
   }
   return nullptr;
@@ -267,7 +267,7 @@ fn EvalContext::find_function(StringView name) const wontthrow
 
 pure fn EvalContext::has_functions() const wontthrow -> bool
 {
-  return m_functions.size() != 0;
+  return m_functions.count() != 0;
 }
 
 fn EvalContext::unset_function(StringView name) throws -> void
@@ -311,7 +311,7 @@ cold fn EvalContext::run_exit_trap() throws -> void
   os::INTERRUPT_REQUESTED = 0;
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
-    if (action->size() > 0) run_source(action->view(), "the EXIT trap");
+    if (action->count() > 0) run_source(action->view(), "the EXIT trap");
 }
 
 fn EvalContext::mark_readonly(StringView name) throws -> void
@@ -322,9 +322,9 @@ fn EvalContext::mark_readonly(StringView name) throws -> void
 
 fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
-  if (m_readonly_names.size() == 0) return false;
+  if (m_readonly_names.count() == 0) return false;
   for (const String &readonly_name : m_readonly_names)
-    if (StringView{readonly_name.c_str(), readonly_name.size()} == name)
+    if (StringView{readonly_name.c_str(), readonly_name.count()} == name)
       return true;
   return false;
 }
@@ -334,7 +334,7 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
   let out = ArrayList<String>{};
   for (const String &name : m_readonly_names)
     out.push(String{
-        heap_allocator(), StringView{name.c_str(), name.size()}
+        heap_allocator(), StringView{name.c_str(), name.count()}
     });
   std::sort(out.begin(), out.end());
   return out;
@@ -347,14 +347,14 @@ fn EvalContext::enter_function_scope() throws -> void
 
 fn EvalContext::leave_function_scope() throws -> void
 {
-  if (m_local_scopes.empty()) return;
+  if (m_local_scopes.is_empty()) return;
 
   /* Restore each shadowed binding in reverse, so a name declared local twice
      ends with the value it held before the function ran. */
-  ASSERT(!m_local_scopes.empty());
+  ASSERT(!m_local_scopes.is_empty());
   let &scope = m_local_scopes.back();
-  for (usize i = scope.size(); i > 0; i--) {
-    ASSERT(i - 1 < scope.size());
+  for (usize i = scope.count(); i > 0; i--) {
+    ASSERT(i - 1 < scope.count());
     let &binding = scope[i - 1];
     /* Restore through assign_variable, not set_shell_variable, since this runs
        inside a noexcept defer and a readonly name would otherwise throw from a
@@ -366,20 +366,20 @@ fn EvalContext::leave_function_scope() throws -> void
       unset_shell_variable(binding.name);
   }
   let kept = ArrayList<ArrayList<local_binding>>{};
-  for (usize i = 0; i + 1 < m_local_scopes.size(); i++)
+  for (usize i = 0; i + 1 < m_local_scopes.count(); i++)
     kept.push(steal(m_local_scopes[i]));
   m_local_scopes = steal(kept);
 }
 
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
 {
-  return !m_local_scopes.empty();
+  return !m_local_scopes.is_empty();
 }
 
 fn EvalContext::declare_local(StringView name) throws -> void
 {
-  if (m_local_scopes.empty()) return;
-  ASSERT(!m_local_scopes.empty());
+  if (m_local_scopes.is_empty()) return;
+  ASSERT(!m_local_scopes.is_empty());
   m_local_scopes.back().push(
       local_binding{String{name}, get_variable_value(name)});
 }
@@ -409,7 +409,7 @@ fn EvalContext::alias_definitions() const throws -> ArrayList<String>
   m_aliases.for_each([&out](StringView key, const String &value) {
     let definition = String{heap_allocator(), key};
     definition.append(StringView{"='", 2});
-    definition.append(StringView{value.c_str(), value.size()});
+    definition.append(StringView{value.c_str(), value.count()});
     definition.push('\'');
     out.push(steal(definition));
   });
@@ -604,11 +604,11 @@ fn EvalContext::set_getopts_last_optind(i64 optind) wontthrow -> void
 fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
 {
   let assignments = ArrayList<String>{};
-  assignments.reserve(m_shell_variables.size());
+  assignments.reserve(m_shell_variables.count());
   m_shell_variables.for_each([&](StringView name, const String &value) {
     let entry = String{heap_allocator(), name};
     entry.push('=');
-    entry.append(StringView{value.c_str(), value.size()});
+    entry.append(StringView{value.c_str(), value.count()});
     assignments.push(steal(entry));
   });
   std::sort(assignments.begin(), assignments.end());
@@ -828,7 +828,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
 
 hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 {
-  if (spec.empty()) return String{heap_allocator()};
+  if (spec.is_empty()) return String{heap_allocator()};
 
   /* ${#name} is the length of the value, distinct from $# which is the count of
      positional parameters. */
@@ -836,7 +836,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     let const name = spec.substring(1);
     if (name == "@" || name == "*")
       return String{heap_allocator(), utils::unsigned_integer_to_string(
-                                          m_positional_params.size())};
+                                          m_positional_params.count())};
     let const value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
@@ -845,7 +845,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   }
 
   /* Split the parameter name from an optional operator and its word. */
-  ASSERT(!spec.empty());
+  ASSERT(!spec.is_empty());
   usize name_end = 0;
   if (lexer::is_variable_name_start(spec[0])) {
     while (name_end < spec.length && lexer::is_variable_name(spec[name_end]))
@@ -860,7 +860,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   let const name = spec.substring_of_length(0, name_end);
   let const rest = spec.substring(name_end);
-  if (rest.empty()) {
+  if (rest.is_empty()) {
     /* Under set -u a plain reference to a variable that is not set is an error,
        while a form with a modifier such as ${x:-w} handles the unset case
        itself. */
@@ -883,7 +883,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   let const current = get_variable_value(name);
   let const is_set = current.has_value();
-  let const is_empty = !is_set || current->empty();
+  let const is_empty = !is_set || current->is_empty();
   let const treat_as_unset = is_colon_form ? is_empty : !is_set;
 
   switch (op) {
@@ -904,7 +904,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     return expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {
-      if (word.empty()) throw Error{name + ": parameter not set or empty"};
+      if (word.is_empty()) throw Error{name + ": parameter not set or empty"};
       throw Error{expand_modifier_word(word)};
     }
     ASSERT(current.has_value());
@@ -1044,7 +1044,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
   /* The no-glob field returned above, so the stem is a non-empty glob here and
      glob[0] reads a real byte. */
   ASSERT(has_glob);
-  ASSERT(!glob.empty());
+  ASSERT(!glob.is_empty());
 
   for (const String &entry_name : *entries) {
     let const filename = entry_name.view();
@@ -1057,7 +1057,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
     if (!should_expand_files && !full_path.is_directory()) continue;
 
     /* TODO: Figure the rules of hidden file expansion. */
-    if (glob[0] != '.' && !filename.empty() && filename[0] == '.') continue;
+    if (glob[0] != '.' && !filename.is_empty() && filename[0] == '.') continue;
 
     if (utils::glob_matches(glob, filename, field.glob_active, stem_start)) {
       add_expansion();
@@ -1088,7 +1088,7 @@ hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask) wont
     -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};
-  for (usize i = 0; i < mask.size(); i++) {
+  for (usize i = 0; i < mask.count(); i++) {
     if (!mask[i]) continue;
     let const ch = text.data[i];
     if (ch == '*' || ch == '?') return i;
@@ -1128,7 +1128,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     /* An active glob index came from the mask, so it points inside the text and
        the field carries a mask parallel to the text. */
     ASSERT(*expand_ch < text.length);
-    ASSERT(field.glob_active.size() == text.length);
+    ASSERT(field.glob_active.count() == text.length);
 
     let slash_after = Maybe<usize>{};
     for (usize k = *expand_ch; k < text.length; k++) {
@@ -1159,7 +1159,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     removed_suffix.text.append(
         StringView{text.data + *slash_after, text.length - *slash_after});
     for (usize k = static_cast<usize>(slash_offset);
-         k < field.glob_active.size(); k++)
+         k < field.glob_active.count(); k++)
       removed_suffix.glob_active.push(field.glob_active[k]);
 
     let once = expand_path_once(operating, false);
@@ -1168,12 +1168,12 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
        match came back all-literal with an empty mask, so restore its false
        entries before the suffix mask to keep the mask aligned with the text. */
     for (glob_field &f : once) {
-      let const matched_length = f.text.size();
+      let const matched_length = f.text.count();
       f.text.append(removed_suffix.text.view());
       f.glob_active.clear();
       for (usize k = 0; k < matched_length; k++)
         f.glob_active.push(false);
-      for (usize k = 0; k < removed_suffix.glob_active.size(); k++)
+      for (usize k = 0; k < removed_suffix.glob_active.count(); k++)
         f.glob_active.push(removed_suffix.glob_active[k]);
     }
 
@@ -1195,7 +1195,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   if (!leading_segment.is_tilde_candidate()) return;
 
   let &text = leading_segment.text;
-  if (text.empty() || text[0] != '~') return;
+  if (text.is_empty() || text[0] != '~') return;
 
   /* TODO: There may be several separators supported. */
   /* Only a bare ~ or a ~/ prefix expands. ~user is left alone for now. */
@@ -1251,7 +1251,7 @@ hot fn EvalContext::expand_path(glob_field field, SourceLocation location) throw
   /* A glob that matches no file is a hard error here, unlike the POSIX fallback
      of expanding to the literal pattern. The caret points at the offending
      word. */
-  if (values.size() == 0)
+  if (values.count() == 0)
     throw ErrorWithLocation{location,
                             "No matches for the glob pattern '" + pattern + "'"};
 
@@ -1361,12 +1361,12 @@ public:
        non-digit and reads a non-numeric value as zero, which matches the old
        strtoll path. */
     if (let const *stored = context.lookup_shell_variable(name)) {
-      if (stored->size() == 0) return 0;
+      if (stored->count() == 0) return 0;
       return parse_arithmetic_operand(stored->view());
     }
 
     let const value = context.get_variable_value(name).value_or(String{});
-    if (value.empty()) return 0;
+    if (value.is_empty()) return 0;
     return parse_arithmetic_operand(value.view());
   }
 
@@ -1664,8 +1664,8 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field
      word has no tilde and reads its segments in place. */
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
-  if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
-      !word.segments.front().text.empty() &&
+  if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
+      !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~')
   {
     tilde_expanded_segments = word.segments;
@@ -1711,7 +1711,7 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field
   };
 
   for (const WordSegment &segment : *segments) {
-    let const segment_text = StringView{segment.text.data(), segment.text.size()};
+    let const segment_text = StringView{segment.text.data(), segment.text.count()};
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
@@ -1724,10 +1724,10 @@ hot fn EvalContext::expand_word(const Word &word) throws -> ArrayList<glob_field
       /* "$@" expands to one field per positional parameter. The first joins any
          preceding text, the last leaves its field open for following text. */
       if (segment.text == "@" && segment.is_in_double_quotes) {
-        for (usize i = 0; i < m_positional_params.size(); i++) {
+        for (usize i = 0; i < m_positional_params.count(); i++) {
           if (i > 0) flush();
           append_run(StringView{m_positional_params[i].data(),
-                                m_positional_params[i].size()},
+                                m_positional_params[i].count()},
                      false);
         }
         break;
@@ -1774,8 +1774,8 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws -> Strin
      common assignment reads its segments in place with no per-command copy. */
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
-  if (!word.segments.empty() && word.segments.front().is_tilde_candidate() &&
-      !word.segments.front().text.empty() &&
+  if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
+      !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~')
   {
     tilde_expanded_segments = word.segments;
@@ -1872,7 +1872,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
 
   if (error) std::rethrow_exception(error);
 
-  while (!captured.empty() && captured.back() == '\n')
+  while (!captured.is_empty() && captured.back() == '\n')
     captured.pop_back();
   return captured;
 }
@@ -1906,7 +1906,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      one running now. A frame whose parent source is known renders a caret at
      its call site, otherwise it falls back to naming the origin. */
   let const print_backtrace = [this]() {
-    for (usize i = m_source_frames.size(); i > 0; i--) {
+    for (usize i = m_source_frames.count(); i > 0; i--) {
       const source_frame &frame = m_source_frames[i - 1];
       if (frame.parent_source != nullptr) {
         /* A frame is context under the primary error, not an error of its own,
@@ -2032,7 +2032,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
   defer { m_scratch_arena.release(scratch_mark); };
 
   let expanded_args = ArrayList<String>{};
-  expanded_args.reserve(args.size());
+  expanded_args.reserve(args.count());
 
   for (const Token *t : args) {
     let const l = t->source_location();
@@ -2068,7 +2068,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
       for (glob_field &field : expand_word(*word)) {
         for (String &g : expand_path(steal(field), l))
           expanded_args.push(String{
-              heap_allocator(), StringView{g.c_str(), g.size()}
+              heap_allocator(), StringView{g.c_str(), g.count()}
           });
       }
     } catch (const Error &e) {
@@ -2105,7 +2105,7 @@ pure fn ExecContext::source_location() const wontthrow -> const SourceLocation &
 
 pure fn ExecContext::program() const wontthrow -> const String &
 {
-  ASSERT(!m_args.empty());
+  ASSERT(!m_args.is_empty());
   return m_args[0];
 }
 
@@ -2160,7 +2160,7 @@ fn ExecContext::make_from(SourceLocation location,
                           const ArrayList<String> &args) throws -> ExecContext
 {
   /* Make sure we always include at least one argument, the program path. */
-  ASSERT(args.size() > 0);
+  ASSERT(args.count() > 0);
 
   let const &program = args[0];
 
@@ -2168,11 +2168,11 @@ fn ExecContext::make_from(SourceLocation location,
   Maybe<Path> p;
 
   if (!program.find_character('/').has_value()) {
-    bk = search_builtin(std::string_view{program.c_str(), program.size()});
+    bk = search_builtin(std::string_view{program.c_str(), program.count()});
 
     if (!bk) {
       let ps = utils::search_program_path(program.view());
-      if (ps.size() > 0) p = steal(ps[0]);
+      if (ps.count() > 0) p = steal(ps[0]);
     }
   } else {
     /* TODO: Sanitize extensions here too. */
@@ -2199,7 +2199,7 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
                               const ArrayList<String> &args) throws
     -> ExecContext
 {
-  ASSERT(args.size() > 0);
+  ASSERT(args.count() > 0);
   return {location, steal(kind), args};
 }
 

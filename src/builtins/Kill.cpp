@@ -22,13 +22,13 @@ pure fn Kill::kind() const wontthrow -> Builtin::Kind { return Kind::Kill; }
 fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
   /* A leading -name or -number names the signal to send. */
-  if (args.size() > 1 && args[1].length() > 1 && args[1][0] == '-') {
+  if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
     let const name = String{args[1].substring(1)};
     let const resolved = os::signal_number_from_name(name);
     if (!resolved) throw Error{"kill: '" + name + "' is not a valid signal"};
@@ -36,16 +36,16 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     first_target = 2;
   }
 
-  if (first_target >= args.size())
+  if (first_target >= args.count())
     throw Error{"kill: a job or a process id is required"};
 
   i32 status = 0;
-  for (usize i = first_target; i < args.size(); i++) {
+  for (usize i = first_target; i < args.count(); i++) {
     const String &target = args[i];
     const String target_text = target;
 
     os::process pid{};
-    if (!target.empty() && target[0] == '%') {
+    if (!target.is_empty() && target[0] == '%') {
       const ErrorOr<i64> parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (parsed.is_error()) {

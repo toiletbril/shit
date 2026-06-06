@@ -13,14 +13,14 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   unused(cxt);
 
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   /* Match dash, where only a leading -n is an option and everything after it,
      including -e, is literal text, and backslash escapes are always
      interpreted. */
   usize start = 1;
   let should_suppress_newline = false;
-  while (start < args.size() && args[start] == "-n") {
+  while (start < args.count() && args[start] == "-n") {
     should_suppress_newline = true;
     start++;
   }
@@ -28,7 +28,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let buf = String{};
   let should_stop = false;
 
-  for (usize i = start; i < args.size() && !should_stop; i++) {
+  for (usize i = start; i < args.count() && !should_stop; i++) {
     if (i > start) buf += ' ';
 
     let const &arg = args[i];

@@ -25,26 +25,26 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   String out{};
   bool all_found = true;
 
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
 
     if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
       out += name;
       out += " is a shell function\n";
-    } else if (search_builtin(std::string_view{name.c_str(), name.size()})
+    } else if (search_builtin(std::string_view{name.c_str(), name.count()})
                    .has_value())
     {
       out += name;
       out += " is a shell builtin\n";
     } else if (let const paths = utils::search_program_path(name);
-               paths.size() != 0)
+               paths.count() != 0)
     {
-      ASSERT(paths.size() > 0);
+      ASSERT(paths.count() > 0);
       out += name;
       out += " is ";
       out += paths[0].text();

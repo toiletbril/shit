@@ -187,7 +187,7 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
 
   /* Consuming the newline that ends a line with a pending heredoc is where the
      body is collected, since the body sits on the following lines. */
-  if (m_last_shell_token_was_newline && !m_pending_heredocs.empty()) {
+  if (m_last_shell_token_was_newline && !m_pending_heredocs.is_empty()) {
     m_last_shell_token_was_newline = false;
     collect_pending_heredocs();
   }
@@ -357,7 +357,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
      changes. A variable reference never merges, since each one carries its own
      name. */
   auto append_char = [&word](WordSegment::Kind kind, char ch) {
-    if (!word.segments.empty() && word.segments.back().kind == kind &&
+    if (!word.segments.is_empty() && word.segments.back().kind == kind &&
         kind != WordSegment::Kind::VariableReference)
     {
       word.segments.back().text += ch;
@@ -624,14 +624,14 @@ hot fn Lexer::lex_identifier() throws -> Token *
     t = m_arena->create<tokens::Assignment>(
         here(actual_cursor_position, byte_count), assignment_split->first,
         steal(assignment_split->second));
-  } else if (word.segments.size() == 1 &&
+  } else if (word.segments.count() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {
     /* A bare word may name a keyword. A quoted or escaped word never does, so
        only a single unquoted segment qualifies. */
     const String &word_text = word.segments[0].text;
     if (const let kw =
-            KEYWORDS.find(StringView{word_text.data(), word_text.size()}))
+            KEYWORDS.find(StringView{word_text.data(), word_text.count()}))
     {
       switch (*kw) {
         KW_SWITCH_CASES();

@@ -80,7 +80,7 @@ static fn print_help_or_version_status(const String &program_path)
     /* make_synopsis remains on the std::string_view Cli boundary, so spell the
        view from the program path String here. */
     h += make_synopsis(
-        std::string_view{program_path.c_str(), program_path.size()},
+        std::string_view{program_path.c_str(), program_path.count()},
         HELP_SYNOPSIS);
     h += '\n';
     h += make_flag_help(FLAG_LIST);
@@ -138,7 +138,7 @@ static fn report_escaped_control_flow(EvalContext &context,
       control.source != nullptr ? control.source : &fallback_source;
   ErrorWithLocation located{control.location, what};
   show_message(located.to_string(*source));
-  if (!control.origin.empty()) {
+  if (!control.origin.is_empty()) {
     show_message(
         Note{"this jump was reached while running " + control.origin}
             .to_string());
@@ -276,7 +276,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       if (home && shown.starts_with(home->text())) {
         String collapsed{};
         collapsed += "~";
-        collapsed += shown.substring(home->size());
+        collapsed += shown.substring(home->count());
         shown = steal(collapsed);
       }
       out += shown;
@@ -318,12 +318,12 @@ fn main(int argc, char **argv) -> int
   /* Program path is the first argument. Pull it out and get rid of it. */
   shit::String program_path{};
 
-  if (file_names.size() > 0) {
+  if (file_names.count() > 0) {
     program_path = file_names[0];
     /* Drop the program path, the first element. The list has no erase, so the
        rest is rebuilt from the second element on. */
     shit::ArrayList<shit::String> rest{};
-    for (usize i = 1; i < file_names.size(); i++)
+    for (usize i = 1; i < file_names.count(); i++)
       rest.push(shit::String{shit::heap_allocator(), file_names[i]});
     file_names = steal(rest);
   } else {
@@ -358,7 +358,7 @@ fn main(int argc, char **argv) -> int
    * Option precedence should behave as follows: "-s", then "-c", then files
    * (arguments), then "-i" (or no arguments). */
   if (FLAG_STDIN.is_enabled()) {
-    if (!FLAG_COMMAND.is_empty() || !file_names.empty() ||
+    if (!FLAG_COMMAND.is_empty() || !file_names.is_empty() ||
         FLAG_INTERACTIVE.is_enabled())
     {
       shit::show_message(
@@ -368,14 +368,14 @@ fn main(int argc, char **argv) -> int
     }
     should_read_stdin = true;
   } else if (!FLAG_COMMAND.is_empty()) {
-    if (!file_names.empty() || FLAG_INTERACTIVE.is_enabled()) {
+    if (!file_names.is_empty() || FLAG_INTERACTIVE.is_enabled()) {
       shit::show_message(
           "Incompatible options or arguments were specified along "
           "with '-c' options. "
           "Falling back to '-c'.");
     }
     should_execute_commands = true;
-  } else if (!file_names.empty()) {
+  } else if (!file_names.is_empty()) {
     if (FLAG_INTERACTIVE.is_enabled()) {
       shit::show_message("Both file argument and '-i' option were given. "
                          "Falling back to reading files.");
@@ -388,11 +388,11 @@ fn main(int argc, char **argv) -> int
   /* Main loop state. The program name is $0 and the remaining arguments are the
      positional parameters $1 upward, held in the list the context owns. */
   shit::ArrayList<shit::String> positional_params{};
-  positional_params.reserve(file_names.size());
+  positional_params.reserve(file_names.count());
   for (const shit::String &file_name : file_names)
     positional_params.push(shit::String{
         shit::heap_allocator(),
-        shit::StringView{file_name.data(), file_name.size()}
+        shit::StringView{file_name.data(), file_name.count()}
     });
 
   shit::EvalContext context{
@@ -460,7 +460,7 @@ fn main(int argc, char **argv) -> int
       source_file(profile, context, ast_arena);
     }
     if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
-        env.has_value() && !env->empty())
+        env.has_value() && !env->is_empty())
     {
       source_file(shit::Path{env->view()}, context, ast_arena);
     }
@@ -493,7 +493,7 @@ fn main(int argc, char **argv) -> int
           script_contents = steal(*contents);
         }
 
-        if ((arg_index += 1) == file_names.size()) {
+        if ((arg_index += 1) == file_names.count()) {
           should_quit = true;
         }
       } else if (should_execute_commands) {
@@ -529,7 +529,7 @@ fn main(int argc, char **argv) -> int
         /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
         shit::String prompt{};
         if (shit::Maybe<shit::String> ps1 = context.get_variable_value("PS1");
-            ps1.has_value() && !ps1->empty())
+            ps1.has_value() && !ps1->is_empty())
         {
           /* A user-set PS1 expands its escape sequences, \u \h \w \W \$ and
              the like. */
@@ -576,7 +576,7 @@ fn main(int argc, char **argv) -> int
           toiletline::emit_newlines(input);
 
           /* Execute the command without raw mode. */
-          if (code == TL_PRESSED_ENTER && !input.empty()) {
+          if (code == TL_PRESSED_ENTER && !input.is_empty()) {
             script_contents = steal(input);
             break;
           }

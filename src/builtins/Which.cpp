@@ -26,14 +26,14 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   String buf{};
 
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &program_name = args[i];
     if (search_builtin(
-            std::string_view{program_name.c_str(), program_name.size()})
+            std::string_view{program_name.c_str(), program_name.count()})
             .has_value())
     {
       buf += program_name;
@@ -42,7 +42,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (os::is_stdout_a_tty()) buf += ": Shell builtin";
       buf += '\n';
     } else if (let const ps = utils::search_program_path(program_name);
-               ps.size() != 0)
+               ps.count() != 0)
     {
       if (FLAG_ALL.is_enabled()) {
         for (let const &p : ps) {
@@ -50,7 +50,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
           buf += '\n';
         }
       } else {
-        ASSERT(ps.size() > 0);
+        ASSERT(ps.count() > 0);
         buf += ps[0].text();
         buf += '\n';
       }
@@ -59,7 +59,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ec.print_to_stdout(buf);
 
-  return (buf.empty()) ? 1 : 0;
+  return (buf.is_empty()) ? 1 : 0;
 }
 
 } /* namespace shit */

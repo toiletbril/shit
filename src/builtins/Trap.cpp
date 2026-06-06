@@ -21,9 +21,9 @@ namespace {
 String normalize_condition(StringView raw) throws
 {
   String name{};
-  for (usize i = 0; i < raw.size(); i++)
+  for (usize i = 0; i < raw.count(); i++)
     name.push(static_cast<char>(toupper(static_cast<unsigned char>(raw[i]))));
-  if (name.starts_with("SIG") && name.size() > 3)
+  if (name.starts_with("SIG") && name.count() > 3)
     name = String{name.substring(3)};
   if (name == "0") name = "EXIT";
   return name;
@@ -34,9 +34,9 @@ String normalize_condition(StringView raw) throws
 i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
-  if (args.size() == 1) {
+  if (args.count() == 1) {
     String out{};
     cxt.traps().for_each([&](StringView condition, const String &action) {
       out += "trap -- '";
@@ -49,12 +49,12 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 0;
   }
 
-  ASSERT(args.size() > 1);
+  ASSERT(args.count() > 1);
   let const &action = args[1];
   /* A lone dash resets the named conditions to their defaults. */
   let const is_reset = action == "-";
 
-  for (usize i = 2; i < args.size(); i++) {
+  for (usize i = 2; i < args.count(); i++) {
     let const condition = normalize_condition(args[i]);
     if (is_reset)
       cxt.remove_trap(condition);

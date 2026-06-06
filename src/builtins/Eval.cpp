@@ -13,12 +13,12 @@ pure fn Eval::kind() const wontthrow -> Builtin::Kind { return Kind::Eval; }
 
 fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  ASSERT(!ec.args().empty());
+  ASSERT(!ec.args().is_empty());
 
   let joined = std::string{};
-  for (usize i = 1; i < ec.args().size(); i++) {
+  for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) joined += ' ';
-    joined.append(ec.args()[i].c_str(), ec.args()[i].size());
+    joined.append(ec.args()[i].c_str(), ec.args()[i].count());
   }
 
   if (joined.empty()) return 0;

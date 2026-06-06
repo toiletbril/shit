@@ -94,7 +94,7 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
   for (const WordSegment &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::VariableReference) return shit::None;
     if (segment.kind == WordSegment::Kind::UnquotedText) {
-      for (usize i = 0; i < segment.text.size(); i++) {
+      for (usize i = 0; i < segment.text.count(); i++) {
         if (lexer::is_expandable_char(segment.text[i])) return shit::None;
       }
     }
@@ -108,12 +108,12 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
    is resolved only once. */
 fn command_resolves(const String &name) throws -> bool
 {
-  if (name.empty()) return false;
-  if (search_builtin(std::string_view{name.c_str(), name.size()}).has_value())
+  if (name.is_empty()) return false;
+  if (search_builtin(std::string_view{name.c_str(), name.count()}).has_value())
     return true;
   if (name.find_character('/').has_value())
     return utils::canonicalize_path(name.view()).has_value();
-  return utils::search_program_path(name.view()).size() != 0;
+  return utils::search_program_path(name.view()).count() != 0;
 }
 
 pure fn word_has_backtick(const Word &word) wontthrow -> bool
@@ -138,7 +138,7 @@ fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<glob_scan_byte>
   ArrayList<glob_scan_byte> bytes{heap_allocator()};
   for (const WordSegment &segment : word.segments) {
     const bool is_active = segment.has_live_glob_chars();
-    for (usize i = 0; i < segment.text.size(); i++) {
+    for (usize i = 0; i < segment.text.count(); i++) {
       bytes.push(glob_scan_byte{segment.text[i], is_active});
     }
   }
@@ -156,7 +156,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
   const ArrayList<glob_scan_byte> bytes = collect_glob_scan_bytes(word);
 
   usize position = 0;
-  while (position < bytes.size()) {
+  while (position < bytes.count()) {
     if (!(bytes[position].is_glob_active && bytes[position].ch == '[')) {
       position++;
       continue;
@@ -165,7 +165,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
     /* A '[' with nothing after it is the last byte of the word, so it cannot
        open a character class and stays literal, like the test command word. */
     usize scan = position + 1;
-    if (scan >= bytes.size()) {
+    if (scan >= bytes.count()) {
       position++;
       continue;
     }
@@ -173,11 +173,11 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
     /* A leading '^' negates the class and a ']' right after '[' or '[^' is a
        member, so the search for the closing ']' starts past both, matching the
        matcher's prescan. */
-    if (scan < bytes.size() && bytes[scan].ch == '^') scan++;
-    if (scan < bytes.size() && bytes[scan].ch == ']') scan++;
+    if (scan < bytes.count() && bytes[scan].ch == '^') scan++;
+    if (scan < bytes.count() && bytes[scan].ch == ']') scan++;
 
     bool has_closing_bracket = false;
-    for (; scan < bytes.size(); scan++) {
+    for (; scan < bytes.count(); scan++) {
       if (bytes[scan].ch == ']') {
         has_closing_bracket = true;
         break;
@@ -340,7 +340,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_last_exit_status(0);
   let const expanded_value =
       cxt.expand_word_for_assignment(m_assignment->value_word());
-  const std::string value{expanded_value.c_str(), expanded_value.size()};
+  const std::string value{expanded_value.c_str(), expanded_value.count()};
 
   /* The assignment goes through set_shell_variable first, so it still rejects a
      readonly name and refreshes the cached IFS. Under allexport it is then
@@ -349,7 +349,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_shell_variable(m_assignment->key(), value);
   if (cxt.export_all()) {
     let const &key = m_assignment->key();
-    os::set_environment_variable(std::string{key.c_str(), key.size()}, value);
+    os::set_environment_variable(std::string{key.c_str(), key.count()}, value);
   }
   return cxt.last_exit_status();
 }
@@ -415,7 +415,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
       let body = std::string{*redir.heredoc_body};
       if (redir.heredoc_expand) {
         let const expanded = cxt.expand_heredoc_body(body);
-        body.assign(expanded.c_str(), expanded.size());
+        body.assign(expanded.c_str(), expanded.count());
       }
 
       let opened = os::write_to_temp_file(body);
@@ -441,7 +441,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redir.target);
     const ArrayList<String> target = cxt.process_args(target_tokens);
-    if (target.size() != 1) {
+    if (target.count() != 1) {
       throw ErrorWithLocation{redir.target->source_location(),
                               "Redirection target is not a single file"};
     }
@@ -453,7 +453,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec, EvalContext &cxt) const
     else if (redir.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    const std::string target_path{target[0].c_str(), target[0].size()};
+    const std::string target_path{target[0].c_str(), target[0].count()};
     let opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redir.target->source_location(),
@@ -494,7 +494,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
 {
   ArrayList<String> already_expanded{};
 
-  while (!args.empty()) {
+  while (!args.is_empty()) {
     let const &word = args[0];
 
     bool seen = false;
@@ -505,7 +505,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     let const body = cxt.get_alias(word);
     if (!body.has_value()) break;
     already_expanded.push(String{
-        heap_allocator(), StringView{word.c_str(), word.size()}
+        heap_allocator(), StringView{word.c_str(), word.count()}
     });
 
     /* The alias body replaces the first word, so the split words go in front of
@@ -514,12 +514,12 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     ArrayList<String> rebuilt{};
     String current{};
     let const &body_value = *body;
-    for (usize i = 0; i < body_value.size(); i++) {
+    for (usize i = 0; i < body_value.count(); i++) {
       const char c = body_value[i];
       if (c == ' ' || c == '\t') {
-        if (!current.empty()) {
+        if (!current.is_empty()) {
           rebuilt.push(String{
-              heap_allocator(), StringView{current.data(), current.size()}
+              heap_allocator(), StringView{current.data(), current.count()}
           });
           current.clear();
         }
@@ -527,12 +527,12 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
         current += c;
       }
     }
-    if (!current.empty())
+    if (!current.is_empty())
       rebuilt.push(String{
-          heap_allocator(), StringView{current.data(), current.size()}
+          heap_allocator(), StringView{current.data(), current.count()}
       });
 
-    for (usize i = 1; i < args.size(); i++)
+    for (usize i = 1; i < args.count(); i++)
       rebuilt.push(steal(args[i]));
 
     args = steal(rebuilt);
@@ -545,7 +545,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* A command may have no words when it is only a redirection, such as > file,
      so the redirections still run below. */
-  ASSERT(m_args.size() > 0 || !m_redirections.empty());
+  ASSERT(m_args.count() > 0 || !m_redirections.is_empty());
 
   if (cxt.should_echo()) {
     shit::print(utils::merge_tokens_to_string(m_args) + "\n");
@@ -583,7 +583,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       let body = std::string{*redir.heredoc_body};
       if (redir.heredoc_expand) {
         let const expanded = cxt.expand_heredoc_body(body);
-        body.assign(expanded.c_str(), expanded.size());
+        body.assign(expanded.c_str(), expanded.count());
       }
 
       let opened = os::write_to_temp_file(body);
@@ -611,7 +611,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     ArrayList<const Token *> target_tokens{heap_allocator()};
     target_tokens.push(redir.target);
     const ArrayList<String> target = cxt.process_args(target_tokens);
-    if (target.size() != 1) {
+    if (target.count() != 1) {
       throw ErrorWithLocation{redir.target->source_location(),
                               "Redirection target is not a single file"};
     }
@@ -623,7 +623,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     else if (redir.kind == Redirection::Kind::AppendOutput)
       mode = os::FileOpenMode::Append;
 
-    const std::string target_path{target[0].c_str(), target[0].size()};
+    const std::string target_path{target[0].c_str(), target[0].count()};
     let opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
       throw ErrorWithLocation{redir.target->source_location(),
@@ -649,7 +649,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* An expansion may drop every word, for example an unset $x used as the whole
      command. There is None to run then, but the redirections above already
      took effect. */
-  if (program_args.empty()) {
+  if (program_args.is_empty()) {
     cxt.set_last_exit_status(0);
     return 0;
   }
@@ -683,7 +683,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A function shadows a builtin and a program. Run its body with the call
      words as the positional parameters, restoring them afterwards. A return
      builtin unwinds here and supplies the function exit status. */
-  ASSERT(!program_args.empty());
+  ASSERT(!program_args.is_empty());
   let const &program_name = program_args[0];
   if (const Expression *function_body =
           cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
@@ -691,10 +691,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   {
     let saved_params = cxt.positional_params();
     ArrayList<String> call_params{};
-    for (usize i = 1; i < program_args.size(); i++)
+    for (usize i = 1; i < program_args.count(); i++)
       call_params.push(String{
           heap_allocator(),
-          StringView{program_args[i].c_str(), program_args[i].size()}
+          StringView{program_args[i].c_str(), program_args[i].count()}
       });
     cxt.set_positional_params(steal(call_params));
     defer { cxt.set_positional_params(steal(saved_params)); };
@@ -768,9 +768,9 @@ cold fn SimpleCommand::to_string() const throws -> String
 
   /* A pipeline stage that is a bare assignment carries the assignment in the
      local variables and has no command word, so the argument list is empty. */
-  if (!m_args.empty()) {
+  if (!m_args.is_empty()) {
     s += " \"" + m_args[0]->raw_string() + "\"";
-    for (usize i = 1; i < m_args.size(); i++) {
+    for (usize i = 1; i < m_args.count(); i++) {
       s += " \"";
       s += m_args[i]->raw_string();
       s += "\"";
@@ -816,7 +816,7 @@ CompoundList::~CompoundList()
 
 pure fn CompoundList::is_empty() const wontthrow -> bool
 {
-  return m_nodes.empty();
+  return m_nodes.is_empty();
 }
 
 fn CompoundList::append_node(const CompoundListCondition *node) throws -> void
@@ -847,13 +847,13 @@ cold fn CompoundList::to_ast_string(usize layer) const throws -> String
 
 hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  ASSERT(m_nodes.size() > 0);
+  ASSERT(m_nodes.count() > 0);
 
   static const i64 NOTHING_WAS_EXECUTED = -256;
 
   i64 ret = NOTHING_WAS_EXECUTED;
 
-  for (usize index = 0; index < m_nodes.size(); index++) {
+  for (usize index = 0; index < m_nodes.count(); index++) {
     const CompoundListCondition *n = m_nodes[index];
     ASSERT(n != nullptr);
 
@@ -877,7 +877,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
        chain fails, unless this list is the condition of an if, a while, or an
        and-or operand. */
     const bool ends_and_or_chain =
-        index + 1 >= m_nodes.size() ||
+        index + 1 >= m_nodes.count() ||
         m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
     if (cxt.error_exit() && !cxt.in_condition() && ends_and_or_chain &&
         ret != 0 && ret != NOTHING_WAS_EXECUTED)
@@ -958,7 +958,7 @@ Pipeline::~Pipeline()
 
 pure fn Pipeline::is_empty() const wontthrow -> bool
 {
-  return m_commands.empty();
+  return m_commands.is_empty();
 }
 
 fn Pipeline::append_command(const SimpleCommand *node) throws -> void
@@ -995,10 +995,10 @@ cold fn Pipeline::to_ast_string(usize layer) const throws -> String
 
 hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  ASSERT(m_commands.size() > 1);
+  ASSERT(m_commands.count() > 1);
 
   let ecs = ArrayList<ExecContext>{heap_allocator()};
-  ecs.reserve(m_commands.size());
+  ecs.reserve(m_commands.count());
 
   for (const SimpleCommand *e : m_commands) {
     ASSERT(e != nullptr);
@@ -1011,7 +1011,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
        unset variable, has no program to run. Report it instead of building an
        exec context from an empty argument list, which would read past the
        arguments. */
-    if (stage_args.empty()) {
+    if (stage_args.is_empty()) {
       throw ErrorWithLocation{e->source_location(),
                               "A pipeline stage expanded to no command to run"};
     }
@@ -1389,7 +1389,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (const Token *pattern_token : item.patterns) {
       let const pattern = expand_no_glob(pattern_token);
       let all_active = ArrayList<bool>{heap_allocator()};
-      for (usize k = 0; k < pattern.size(); k++)
+      for (usize k = 0; k < pattern.count(); k++)
         all_active.push(true);
       if (utils::glob_matches(pattern, subject, all_active, 0)) {
         let const ret = item.body->evaluate(cxt);
@@ -1743,7 +1743,7 @@ BINARY_EXPRESSION_DECLS(NotEqual, !=);
 cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) const
     throws -> void
 {
-  if (m_args.empty()) return;
+  if (m_args.is_empty()) return;
 
   ASSERT(m_args[0] != nullptr);
   let const name = static_command_name(m_args[0]);
@@ -1769,7 +1769,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) con
   /* An alias defined earlier in the same input resolves at runtime, so record
      each name this alias command defines for the later resolution check. */
   if (command_literal == "alias") {
-    for (usize i = 1; i < m_args.size(); i++) {
+    for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const literal = static_cast<const tokens::WordToken *>(m_args[i])
                               ->word()
@@ -1809,7 +1809,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) con
   if (command_literal == "[" || command_literal == "test" ||
       command_literal == "[[")
   {
-    for (usize i = 1; i < m_args.size(); i++) {
+    for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
@@ -1829,15 +1829,15 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) con
 
   /* A prefix assignment does not affect the expansion on the same command, so a
      reference to one of its names reads the old value. */
-  if (m_local_vars.size() > 0) {
-    for (usize i = 1; i < m_args.size(); i++) {
+  if (m_local_vars.count() > 0) {
+    for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
       for (const WordSegment &segment : word.segments) {
         if (segment.kind == WordSegment::Kind::VariableReference &&
             m_local_vars.find(StringView{segment.text.data(),
-                                         segment.text.size()}) != nullptr)
+                                         segment.text.count()}) != nullptr)
         {
           let const message =
               StringView{"The assignment prefix does not affect this "
@@ -1852,8 +1852,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx, bool is_unconditional) con
 
   if (name && !command_resolves(*name) &&
       !actx.defined_functions.contains(
-          StringView{name->data(), name->size()}) &&
-      !actx.known_aliases.contains(StringView{name->data(), name->size()}))
+          StringView{name->data(), name->count()}) &&
+      !actx.known_aliases.contains(StringView{name->data(), name->count()}))
   {
     let const message = StringView{"Command '"} + StringView{*name} +
                         StringView{"' was not found"};

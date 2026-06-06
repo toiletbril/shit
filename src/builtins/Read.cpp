@@ -27,17 +27,17 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const names = parse_flags_vec(FLAG_LIST, ec.args());
   defer { reset_flags(FLAG_LIST); };
 
-  ASSERT(!names.empty());
+  ASSERT(!names.is_empty());
 
   /* With no operand the line goes to REPLY, otherwise to the operands in
      order. The operand names are addressed by an offset into names. */
-  let const has_operands = names.size() > 1;
+  let const has_operands = names.count() > 1;
   const usize first_operand = 1;
-  let const operand_count = has_operands ? names.size() - first_operand : 1;
+  let const operand_count = has_operands ? names.count() - first_operand : 1;
   const String reply_name = "REPLY";
   auto operand_name = [&](usize index) -> String {
     if (!has_operands) return reply_name;
-    ASSERT(first_operand + index < names.size());
+    ASSERT(first_operand + index < names.count());
     return names[first_operand + index];
   };
 
@@ -68,7 +68,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
       /* The last variable receives the rest of the line with trailing
          separators trimmed. */
       String rest = String{line.substring(cursor)};
-      while (!rest.empty() && is_separator(rest.back()))
+      while (!rest.is_empty() && is_separator(rest.back()))
         rest.pop_back();
       cxt.set_shell_variable(operand_name(i), rest);
     } else {

@@ -39,7 +39,7 @@ pure fn WordSegment::is_tilde_candidate() const wontthrow -> bool
   return kind == Kind::UnquotedText;
 }
 
-pure fn Word::is_empty() const wontthrow -> bool { return segments.empty(); }
+pure fn Word::is_empty() const wontthrow -> bool { return segments.is_empty(); }
 
 hot fn Word::to_literal_string() const throws -> String
 {
@@ -90,7 +90,7 @@ cold fn Word::to_pretty_string() const throws -> String
 
 hot fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word>>
 {
-  if (segments.empty()) return shit::None;
+  if (segments.is_empty()) return shit::None;
 
   const WordSegment &first = segments[0];
   if (first.kind != WordSegment::Kind::UnquotedText) return shit::None;
@@ -98,7 +98,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word
   const let equals_position = first.text.find_character('=');
   if (!equals_position.has_value() || *equals_position == 0) return shit::None;
 
-  ASSERT(*equals_position <= first.text.size());
+  ASSERT(*equals_position <= first.text.count());
 
   if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
   for (usize i = 1; i < *equals_position; i++) {
@@ -114,7 +114,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<std::pair<String, Word
   value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
                                   first.text.substring(*equals_position + 1),
                                   false});
-  for (usize i = 1; i < segments.size(); i++)
+  for (usize i = 1; i < segments.count(); i++)
     value.segments.push(segments[i]);
 
   return std::make_pair(steal(name), steal(value));

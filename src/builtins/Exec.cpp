@@ -20,11 +20,11 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   unused(cxt);
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   /* exec with only redirections changes the shell's own descriptors and
      returns, so the rest of the session inherits them. */
-  if (args.size() == 1) {
+  if (args.count() == 1) {
     os::redirect_self(ec);
     return 0;
   }
@@ -43,16 +43,16 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     program_path = resolved.take();
   } else {
     let const found = utils::search_program_path(command_name);
-    if (found.size() == 0) {
+    if (found.count() == 0) {
       show_message("exec: '" + command_name + "': not found");
       utils::quit(127, true);
     }
-    ASSERT(found.size() > 0);
+    ASSERT(found.count() > 0);
     program_path = found[0];
   }
 
   let command_args = ArrayList<String>{};
-  for (usize i = 1; i < args.size(); i++)
+  for (usize i = 1; i < args.count(); i++)
     command_args.push(String{heap_allocator(), args[i]});
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(program_path),

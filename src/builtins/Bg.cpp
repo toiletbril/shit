@@ -21,10 +21,10 @@ pure fn Bg::kind() const wontthrow -> Builtin::Kind { return Kind::Bg; }
 fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   job *job = nullptr;
-  if (args.size() > 1 && !args[1].empty() && args[1][0] == '%') {
+  if (args.count() > 1 && !args[1].is_empty() && args[1][0] == '%') {
     let const parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
     if (parsed.is_error())

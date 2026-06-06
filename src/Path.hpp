@@ -25,8 +25,8 @@ public:
 
   [[nodiscard]] pure fn text() const wontthrow -> const String &;
   [[nodiscard]] pure fn c_str() const wontthrow -> const char *;
-  [[nodiscard]] pure fn size() const wontthrow -> usize;
-  [[nodiscard]] pure fn empty() const wontthrow -> bool;
+  [[nodiscard]] pure fn count() const wontthrow -> usize;
+  [[nodiscard]] pure fn is_empty() const wontthrow -> bool;
 
   /* The text without a trailing separator, the directory holding this path. An
      empty or root path yields itself. */

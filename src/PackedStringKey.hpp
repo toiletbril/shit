@@ -37,7 +37,7 @@ public:
   static PackedStringKey from_view(StringView text)
   {
     PackedStringKey key{};
-    usize count = text.size() < 16 ? text.size() : 16;
+    usize count = text.count() < 16 ? text.count() : 16;
     for (usize i = 0; i < count && i < 8; i++)
       key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
     for (usize i = 8; i < count; i++)

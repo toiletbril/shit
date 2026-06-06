@@ -20,9 +20,9 @@ struct precise_location
 cold static fn calc_precise_position(StringView source, usize byte_position) throws
     -> precise_location
 {
-  ASSERT(byte_position <= source.size(),
+  ASSERT(byte_position <= source.count(),
               "byte position: %zu, source length: %zu", byte_position,
-              source.size());
+              source.count());
 
   usize line_number = 0;
   usize last_newline_location = 0;
@@ -61,13 +61,13 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
 
   usize line_byte_count = 0;
 
-  while (byte_position - start_offset + line_byte_count < source.size() &&
+  while (byte_position - start_offset + line_byte_count < source.count() &&
          source[byte_position - start_offset + line_byte_count] != '\n')
   {
     line_byte_count++;
   }
 
-  ASSERT(byte_position - start_offset + line_byte_count == source.size() ||
+  ASSERT(byte_position - start_offset + line_byte_count == source.count() ||
               source[byte_position - start_offset + line_byte_count] == '\n');
 
   /* Add spacer before line number. */
@@ -172,19 +172,19 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;
 
-  ASSERT(byte_position <= source.size(),
+  ASSERT(byte_position <= source.count(),
               "byte position: %zu, source length: %zu", byte_position,
-              source.size());
+              source.count());
 
   LOG_VARS(Verbosity::Debug, byte_position, byte_count);
   LOG(Verbosity::Debug, "formatting located %s", severity_word().c_str());
 
   /* FIXME: Below are two dirty hacks. */
-  if (byte_position + 2 < source.size() && source[byte_position] == '\\' &&
+  if (byte_position + 2 < source.count() && source[byte_position] == '\\' &&
       source[byte_position + 1] == '\n')
   {
     byte_position += 2;
-  } else if (byte_position + 1 < source.size() && source[byte_position] == '\n')
+  } else if (byte_position + 1 < source.count() && source[byte_position] == '\n')
   {
     byte_position++;
   }
@@ -256,11 +256,11 @@ cold fn ErrorWithLocationAndDetails::details_to_string(StringView source) const 
   usize byte_position = m_details_location.position;
   const usize byte_count = m_details_location.length;
 
-  ASSERT(byte_position <= source.size(),
+  ASSERT(byte_position <= source.count(),
               "byte position: %zu, source length: %zu", byte_position,
-              source.size());
+              source.count());
 
-  if (byte_position > 0 && byte_position == source.size() &&
+  if (byte_position > 0 && byte_position == source.count() &&
       source[byte_position - 1] == '\n')
     byte_position--;
 

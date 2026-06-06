@@ -14,11 +14,11 @@ pure Builtin::Kind Source::kind() const wontthrow { return Kind::Source; }
 
 i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  ASSERT(!ec.args().empty());
+  ASSERT(!ec.args().is_empty());
 
-  if (ec.args().size() < 2) throw Error{"filename argument is required"};
+  if (ec.args().count() < 2) throw Error{"filename argument is required"};
 
-  const std::string path{ec.args()[1].c_str(), ec.args()[1].size()};
+  const std::string path{ec.args()[1].c_str(), ec.args()[1].count()};
   let const contents = utils::read_entire_file(path);
   if (!contents) throw Error{"could not open '" + path + "'"};
 

@@ -83,10 +83,10 @@ pure Builtin::Kind Set::kind() const wontthrow { return Kind::Set; }
 i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   let const &args = ec.args();
-  ASSERT(!args.empty());
+  ASSERT(!args.is_empty());
 
   /* set with no arguments lists the shell variables. */
-  if (args.size() == 1) {
+  if (args.count() == 1) {
     String out{};
     for (let const &assignment : cxt.sorted_variable_assignments()) {
       out += assignment.view();
@@ -100,7 +100,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool collecting_operands = false;
   bool should_rebind = false;
 
-  for (usize i = 1; i < args.size(); i++) {
+  for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
 
     if (collecting_operands) {
@@ -118,11 +118,11 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
        when no name follows. */
     if (arg == "-o" || arg == "+o") {
       let const enable = arg[0] == '-';
-      if (i + 1 >= args.size()) {
+      if (i + 1 >= args.count()) {
         ec.print_to_stdout(list_options(cxt));
         continue;
       }
-      ASSERT(i + 1 < args.size());
+      ASSERT(i + 1 < args.count());
       let const &name = args[++i];
       let const option = find_option_by_name(name);
       if (option == nullptr)
