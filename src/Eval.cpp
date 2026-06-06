@@ -1612,7 +1612,16 @@ EvalContext::evaluate_arithmetic(const std::string &expression)
 {
   /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
      arithmetic becomes its value before the expression is parsed. A bare name
-     is still resolved during evaluation. */
+     is still resolved during evaluation. When the source holds no parameter to
+     expand, which the d=$((d+1)) hot loop hits every iteration, the expansion
+     copy is skipped and the original is parsed directly. */
+  if (expression.find('$') == std::string::npos &&
+      expression.find('`') == std::string::npos)
+  {
+    ArithmeticParser parser{*this, expression, 0};
+    return parser.parse();
+  }
+
   std::string expanded = expand_modifier_word(expression);
   ArithmeticParser parser{*this, expanded, 0};
   return parser.parse();
