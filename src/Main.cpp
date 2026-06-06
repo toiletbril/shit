@@ -66,26 +66,28 @@ FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", "Cosmopolitan: Trace functions.");
 FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 #endif
 
+namespace shit {
+
 /* Report a break, continue, or return that reached the top with no loop,
    function, or sourced script to consume it. The jump carries the source and
    the origin it was made in, so the caret points at the exact builtin and the
    note names where it ran. */
-static fn report_escaped_control_flow(shit::EvalContext &context,
-                                      const shit::String &fallback_source)
+static fn report_escaped_control_flow(EvalContext &context,
+                                      const String &fallback_source)
     -> void
 {
   if (!context.has_pending_control_flow()) return;
 
-  const shit::ControlFlow &control = context.pending_control_flow();
-  shit::String what{};
+  const ControlFlow &control = context.pending_control_flow();
+  String what{};
   switch (control.kind) {
-  case shit::ControlFlow::Kind::Break:
+  case ControlFlow::Kind::Break:
     what = "'break' used outside of a loop";
     break;
-  case shit::ControlFlow::Kind::Continue:
+  case ControlFlow::Kind::Continue:
     what = "'continue' used outside of a loop";
     break;
-  case shit::ControlFlow::Kind::Return: {
+  case ControlFlow::Kind::Return: {
     /* A return that reaches the top of a non-interactive script ends the shell
        with its status, the way dash treats a top-level return. It stays an
        error at an interactive prompt, where there is nothing to return from. */
@@ -93,22 +95,22 @@ static fn report_escaped_control_flow(shit::EvalContext &context,
       i32 return_status = static_cast<i32>(control.value);
       context.clear_control_flow();
       context.run_exit_trap();
-      shit::utils::quit(return_status, true);
+      utils::quit(return_status, true);
     }
     what = "'return' used outside of a function or a sourced script";
     break;
   }
-  case shit::ControlFlow::Kind::Exit:
-  case shit::ControlFlow::Kind::Normal: context.clear_control_flow(); return;
+  case ControlFlow::Kind::Exit:
+  case ControlFlow::Kind::Normal: context.clear_control_flow(); return;
   }
 
-  const shit::String *source =
+  const String *source =
       control.source != NULL ? control.source : &fallback_source;
-  shit::ErrorWithLocation located{control.location, what};
-  shit::show_message(located.to_string(*source));
+  ErrorWithLocation located{control.location, what};
+  show_message(located.to_string(*source));
   if (!control.origin.empty()) {
-    shit::show_message(
-        shit::Note{"this jump was reached while running " + control.origin}
+    show_message(
+        Note{"this jump was reached while running " + control.origin}
             .to_string());
   }
 
@@ -118,10 +120,10 @@ static fn report_escaped_control_flow(shit::EvalContext &context,
 /* Lex, parse, validate, and evaluate one chunk of shell source in the given
    context. The main loop and source_file share this so a sourced file runs the
    same pipeline as an interactive line. Returns the resulting exit code. */
-static fn run_script_contents(const shit::String &script_contents,
-                              shit::EvalContext &context,
-                              shit::BumpArena &ast_arena,
-                              shit::Maybe<shit::StringView> filename = shit::None)
+static fn run_script_contents(const String &script_contents,
+                              EvalContext &context,
+                              BumpArena &ast_arena,
+                              Maybe<StringView> filename = None)
     -> int
 {
   int exit_code = EXIT_FAILURE;
@@ -137,27 +139,27 @@ static fn run_script_contents(const shit::String &script_contents,
     ast_arena.reset();
     context.reset_scratch_arena();
 
-    shit::Parser p{
-        shit::Lexer{shit::String{script_contents.view()}, ast_arena,
+    Parser p{
+        Lexer{String{script_contents.view()}, ast_arena,
                     FLAG_ESCAPE_MAP.is_enabled(), filename}
     };
-    std::unique_ptr<shit::Expression> ast = p.construct_ast();
+    std::unique_ptr<Expression> ast = p.construct_ast();
 
     if (FLAG_AST.is_enabled()) {
-      shit::print(ast->to_ast_string());
-      shit::print("\n");
+      print(ast->to_ast_string());
+      print("\n");
     }
 
     if (FLAG_ESCAPE_MAP.is_enabled()) {
       for (const auto &word : p.debug_words()) {
-        shit::print(word.to_pretty_string());
-        shit::print("\n");
+        print(word.to_pretty_string());
+        print("\n");
       }
     }
 
     /* Validate the whole tree before running anything. An unconditional
        problem stops execution, a conditional one only warns. */
-    if (!shit::analyze_ast(ast.get(), script_contents, context.function_names(),
+    if (!analyze_ast(ast.get(), script_contents, context.function_names(),
                            context.alias_names()))
     {
       exit_code = EXIT_FAILURE;
@@ -175,31 +177,31 @@ static fn run_script_contents(const shit::String &script_contents,
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
     if (FLAG_EXIT_CODE.is_enabled())
-      shit::print("[Code " + shit::utils::integer_to_string(exit_code) + "]\n");
+      print("[Code " + utils::integer_to_string(exit_code) + "]\n");
 
     if (FLAG_STATS.is_enabled()) {
-      shit::print(context.make_stats_string());
-      shit::print("\n");
+      print(context.make_stats_string());
+      print("\n");
     }
-  } catch (const shit::ErrorWithLocationAndDetails &e) {
-    shit::show_message(e.to_string(script_contents));
-    shit::show_message(e.details_to_string(script_contents));
-  } catch (const shit::ErrorWithLocation &e) {
-    shit::show_message(e.to_string(script_contents));
-  } catch (const shit::Error &e) {
-    shit::show_message(e.to_string());
+  } catch (const ErrorWithLocationAndDetails &e) {
+    show_message(e.to_string(script_contents));
+    show_message(e.details_to_string(script_contents));
+  } catch (const ErrorWithLocation &e) {
+    show_message(e.to_string(script_contents));
+  } catch (const Error &e) {
+    show_message(e.to_string());
   } catch (const std::exception &e) {
-    shit::show_message(
+    show_message(
         "Uncaught exception while executing the AST. Aborting the command.");
-    shit::show_message("Last system message: '" +
-                       shit::os::last_system_error_message() + "'.");
-    shit::show_message("Context: '" + shit::String{e.what()} + "'.");
+    show_message("Last system message: '" +
+                       os::last_system_error_message() + "'.");
+    show_message("Context: '" + String{e.what()} + "'.");
   } catch (...) {
-    shit::show_message(
+    show_message(
         "Unexpected system explosion while executing the AST. Exiting.");
-    shit::show_message("Last system message: " +
-                       shit::os::last_system_error_message());
-    shit::utils::quit(EXIT_FAILURE);
+    show_message("Last system message: " +
+                       os::last_system_error_message());
+    utils::quit(EXIT_FAILURE);
   }
 
   return exit_code;
@@ -207,11 +209,11 @@ static fn run_script_contents(const shit::String &script_contents,
 
 /* Read a whole file and run it in the given context. A missing file is not an
    error, since a login shell sources profiles that may not exist. */
-static fn source_file(const shit::Path &path, shit::EvalContext &context,
-                      shit::BumpArena &ast_arena) -> void
+static fn source_file(const Path &path, EvalContext &context,
+                      BumpArena &ast_arena) -> void
 {
-  shit::Maybe<shit::String> contents =
-      shit::utils::read_entire_file(path.text());
+  Maybe<String> contents =
+      utils::read_entire_file(path.text());
   if (!contents) return;
 
   /* The profile path names the source, so a parse error in it and a backtrace
@@ -221,11 +223,11 @@ static fn source_file(const shit::Path &path, shit::EvalContext &context,
 }
 
 /* Expand the common prompt escapes in PS1 and PS2. */
-static fn expand_prompt_escapes(shit::StringView prompt, shit::StringView user,
-                                shit::StringView working_directory)
-    -> shit::String
+static fn expand_prompt_escapes(StringView prompt, StringView user,
+                                StringView working_directory)
+    -> String
 {
-  shit::String out{};
+  String out{};
   for (usize i = 0; i < prompt.length; i++) {
     if (prompt[i] != '\\' || i + 1 >= prompt.length) {
       out += prompt[i];
@@ -236,20 +238,20 @@ static fn expand_prompt_escapes(shit::StringView prompt, shit::StringView user,
     case 'u': out += user; break;
     case 'h':
       out +=
-          shit::os::get_environment_variable("HOSTNAME").value_or("localhost");
+          os::get_environment_variable("HOSTNAME").value_or("localhost");
       break;
     case 'w': {
-      shit::String shown{working_directory};
-      shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+      String shown{working_directory};
+      Maybe<Path> home = os::get_home_directory();
       if (home && shown.starts_with(home->text())) {
-        shit::String collapsed{};
+        String collapsed{};
         collapsed += "~";
         collapsed += shown.substring(home->size());
         shown = std::move(collapsed);
       }
       out += shown;
     } break;
-    case 'W': out += shit::Path{working_directory}.filename(); break;
+    case 'W': out += Path{working_directory}.filename(); break;
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
     case 't': out += '\t'; break;
@@ -262,6 +264,8 @@ static fn expand_prompt_escapes(shit::StringView prompt, shit::StringView user,
   }
   return out;
 }
+
+} /* namespace shit */
 
 fn main(int argc, char **argv) -> int
 {
