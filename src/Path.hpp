@@ -30,7 +30,7 @@ public:
 
   /* The text without a trailing separator, the directory holding this path. An
      empty or root path yields itself. */
-  [[nodiscard]] pure fn parent() const throws -> Path;
+  [[nodiscard]] fn parent() const throws -> Path;
   /* The final component, after the last separator. */
   [[nodiscard]] pure fn filename() const wontthrow -> StringView;
   /* The trailing extension of the filename including the dot, or empty when the
@@ -44,7 +44,7 @@ public:
 
   /* Resolve . and .. components and collapse repeated separators, the
      std::filesystem lexically_normal without touching the disk. */
-  [[nodiscard]] pure fn normalized() const throws -> Path;
+  [[nodiscard]] fn normalized() const throws -> Path;
 
   /* This path joined onto a base when it is relative, the base being the
      current working directory unless one is given. */
@@ -101,7 +101,7 @@ public:
   /* Add raw bytes with no separator, for extending the last component. */
   fn append_raw(StringView bytes) throws -> PathBuilder &;
 
-  [[nodiscard]] pure fn build() const throws -> Path;
+  [[nodiscard]] fn build() const throws -> Path;
 
 private:
   String m_text{};

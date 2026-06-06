@@ -31,13 +31,13 @@ public:
 
   operator bool &() throws;
 
-  pure fn message() const throws -> String;
+  fn message() const throws -> String;
 
   /* The word printed before the message, Error by default. A warning subclass
      overrides i
      t to Warning, so the reporting code reads the severity from the
      object rather than taking it as an argument. */
-  pure virtual fn severity_word() const wontthrow -> String;
+  virtual fn severity_word() const wontthrow -> String;
 
 protected:
   bool m_is_active{false};
@@ -63,7 +63,7 @@ class Warning : public Error
 public:
   Warning(StringView message);
 
-  pure fn severity_word() const wontthrow -> String override;
+  fn severity_word() const wontthrow -> String override;
 };
 
 /* An Error that prints as a note and is shown rather than thrown. It carries no
@@ -73,7 +73,7 @@ class Note : public Error
 public:
   Note(StringView message);
 
-  pure fn severity_word() const wontthrow -> String override;
+  fn severity_word() const wontthrow -> String override;
 };
 
 /**
@@ -102,7 +102,7 @@ class WarningWithLocation : public ErrorWithLocation
 public:
   WarningWithLocation(SourceLocation location, StringView message);
 
-  pure fn severity_word() const wontthrow -> String override;
+  fn severity_word() const wontthrow -> String override;
 };
 
 /* An ErrorWithLocation that prints as a trace and is shown rather than thrown.
@@ -113,7 +113,7 @@ class TraceWithLocation : public ErrorWithLocation
 public:
   TraceWithLocation(SourceLocation location, StringView message);
 
-  pure fn severity_word() const wontthrow -> String override;
+  fn severity_word() const wontthrow -> String override;
 };
 
 class ErrorWithLocationAndDetails : public ErrorWithLocation
