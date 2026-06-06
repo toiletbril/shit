@@ -351,8 +351,7 @@ main(int argc, char **argv)
   }
 
   /* Main loop state. The program name is $0 and the remaining arguments are the
-     positional parameters $1 upward. The argument names come from parse_flags as
-     a std::vector, so they are copied into the ArrayList the context holds. */
+     positional parameters $1 upward, held in the list the context owns. */
   shit::ArrayList<shit::String> positional_params{};
   positional_params.reserve(file_names.size());
   for (const shit::String &file_name : file_names)
