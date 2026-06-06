@@ -187,14 +187,24 @@ public:
     AppendOutput,    /* >>   */
     ReadInput,       /* <    */
     DuplicateOutput, /* >&   */
+    DuplicateInput,  /* <&   */
     Heredoc          /* <<   */
   };
 
+  /* The dup_fd value that marks the close-descriptor form, as in 2>&- and <&-,
+     which closes fd rather than copying another descriptor onto it. */
+  static constexpr i32 DUP_FD_CLOSE = -2;
+
   i32 fd;
   Kind kind;
-  /* The filename word for a file Redirection, or null otherwise. */
+  /* The filename word for a file Redirection. For a duplication it is the word
+     after >& or <& when that word is a variable or an expansion such as $4, so
+     the descriptor is resolved at evaluation. It is null for a duplication whose
+     descriptor was a literal in the source. */
   const Token *target;
-  /* For a duplication, the descriptor to copy from, as in 2>&1. */
+  /* For a duplication, the literal descriptor to copy from, as in 2>&1, or
+     DUP_FD_CLOSE for the close form, or -1 when the descriptor is a dynamic word
+     held in target. */
   i32 dup_fd;
   /* For a heredoc, the lexer-owned body and whether it is expanded. */
   const String *heredoc_body;

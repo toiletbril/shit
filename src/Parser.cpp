@@ -406,7 +406,7 @@ fn Parser::build_file_or_dup_redirection(
   redir.target = nullptr;
   redir.dup_fd = -1;
 
-  if (op_kind != Token::Kind::Less) {
+  {
     Token *after = m_lexer.peek_shell_token();
     ASSERT(after != nullptr);
     if (after->kind() == Token::Kind::Ampersand &&
@@ -415,23 +415,50 @@ fn Parser::build_file_or_dup_redirection(
     {
       m_lexer.advance_past_last_peek();
       Token *from = m_lexer.next_shell_token();
-      String digits{};
-      if (from->kind() == Token::Kind::Word) {
-        digits =
-            static_cast<tokens::WordToken *>(from)->word().to_literal_string();
-      }
-      i32 from_fd = -1;
-      if (!digits.is_empty()) {
-        const let parsed = utils::parse_decimal_integer(digits);
-        if (parsed.is_error()) throw parsed.error();
-        from_fd = static_cast<i32>(parsed.value());
-      }
-      if (from_fd < 0) {
+      if (from->kind() != Token::Kind::Word) {
         throw ErrorWithLocation{from->source_location(),
                                 "Expected a descriptor after '&'"};
       }
-      redir.kind = expressions::Redirection::Kind::DuplicateOutput;
-      redir.dup_fd = from_fd;
+      const Word &from_word = static_cast<tokens::WordToken *>(from)->word();
+
+      redir.kind = (op_kind == Token::Kind::Less)
+                       ? expressions::Redirection::Kind::DuplicateInput
+                       : expressions::Redirection::Kind::DuplicateOutput;
+
+      const String literal = from_word.to_literal_string();
+
+      /* The close form >&- and <&- closes fd outright. The lexer hands the dash
+         back as part of the following word, so it is matched on the literal. */
+      if (literal == "-") {
+        redir.dup_fd = expressions::Redirection::DUP_FD_CLOSE;
+        out.push(redir);
+        return;
+      }
+
+      /* A word that is wholly digits names the descriptor at parse time, the
+         fast path that needs no expansion. Anything else, such as $4 or ${fd},
+         is a dynamic descriptor resolved when the redirection runs. */
+      bool is_all_digits = !literal.is_empty();
+      for (usize i = 0; i < literal.count(); i++) {
+        if (literal[i] < '0' || literal[i] > '9') {
+          is_all_digits = false;
+          break;
+        }
+      }
+
+      if (is_all_digits) {
+        const let parsed = utils::parse_decimal_integer(literal);
+        if (parsed.is_error()) {
+          throw ErrorWithLocation{from->source_location(),
+                                  parsed.error().message()};
+        }
+        redir.dup_fd = static_cast<i32>(parsed.value());
+        out.push(redir);
+        return;
+      }
+
+      redir.target = from;
+      redir.dup_fd = -1;
       out.push(redir);
       return;
     }
@@ -555,7 +582,9 @@ mustuse fn Parser::try_parse_trailing_redirection(
       const let op_location = next->source_location();
       m_lexer.advance_past_last_peek();
       const let parsed = utils::parse_decimal_integer(literal);
-      if (parsed.is_error()) throw parsed.error();
+      if (parsed.is_error()) {
+        throw ErrorWithLocation{word_location, parsed.error().message()};
+      }
       build_file_or_dup_redirection(static_cast<i32>(parsed.value()), nk,
                                     op_location, ignored_first_location, out);
       return true;
@@ -698,7 +727,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
             const let op_location = next->source_location();
             m_lexer.advance_past_last_peek();
             const let parsed = utils::parse_decimal_integer(literal);
-            if (parsed.is_error()) throw parsed.error();
+            if (parsed.is_error()) {
+              throw ErrorWithLocation{word_location, parsed.error().message()};
+            }
             add_redirection(static_cast<i32>(parsed.value()), nk, op_location);
             break;
           }

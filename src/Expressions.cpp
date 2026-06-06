@@ -411,6 +411,42 @@ fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     m_redirections.push(redir);
 }
 
+namespace {
+
+using expressions::Redirection;
+
+/* Resolve the descriptor a duplication copies from. A literal descriptor and the
+   close form were settled at parse time and pass straight through. A dynamic
+   word such as $4 is expanded to one field here, where a dash means close and a
+   numeric field names the descriptor. The result is a non-negative descriptor or
+   Redirection::DUP_FD_CLOSE for the close form. A field that is neither throws a
+   located error at the word. */
+fn resolve_duplication_fd(const Redirection &redir, EvalContext &cxt) throws
+    -> i32
+{
+  if (redir.target == nullptr) return redir.dup_fd;
+
+  ArrayList<const Token *> target_tokens{heap_allocator()};
+  target_tokens.push(redir.target);
+  const ArrayList<String> fields = cxt.process_args(target_tokens);
+  if (fields.count() != 1) {
+    throw ErrorWithLocation{redir.target->source_location(),
+                            "Duplication target is not a single descriptor"};
+  }
+
+  const String &field = fields[0];
+  if (field == "-") return Redirection::DUP_FD_CLOSE;
+
+  const let parsed = utils::parse_decimal_integer(field.view());
+  if (parsed.is_error() || parsed.value() < 0) {
+    throw ErrorWithLocation{redir.target->source_location(),
+                            "'" + field + "' is not a valid descriptor"};
+  }
+  return static_cast<i32>(parsed.value());
+}
+
+} /* namespace */
+
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                                         EvalContext &cxt) const throws -> void
 {
@@ -433,11 +469,21 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       continue;
     }
 
-    if (redir.kind == Redirection::Kind::DuplicateOutput) {
-      if (redir.fd == 2 && redir.dup_fd == 1)
+    if (redir.kind == Redirection::Kind::DuplicateOutput ||
+        redir.kind == Redirection::Kind::DuplicateInput)
+    {
+      const i32 from_fd = resolve_duplication_fd(redir, cxt);
+      /* A self copy changes nothing. The standard cross-routing keeps the flag
+         fast path. An arbitrary descriptor or the close form is not represented
+         by the stage's three descriptor slots and is left to the compound path.
+       */
+      if (from_fd == redir.fd) {
+        /* Self copy is a no-op. */
+      } else if (redir.fd == 2 && from_fd == 1) {
         ec.dup_err_to_out = true;
-      else if (redir.fd == 1 && redir.dup_fd == 2)
+      } else if (redir.fd == 1 && from_fd == 2) {
         ec.dup_out_to_err = true;
+      }
       continue;
     }
 
@@ -571,6 +617,17 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   bool dup_err_to_out = false;
   bool dup_out_to_err = false;
   bool redirect_fds_handed_off = false;
+  /* A duplication onto an arbitrary descriptor, such as >&5 or the close form
+     >&-, points a real shell descriptor at the target around this command. The
+     three descriptor slots above cannot express it, since they only carry the
+     standard input, output, and error. The backups put the descriptors back
+     once the command finishes, restored in reverse on every exit path. */
+  ArrayList<os::saved_descriptor> dup_saved_descriptors{heap_allocator()};
+  defer
+  {
+    for (usize i = dup_saved_descriptors.count(); i > 0; i--)
+      os::restore_descriptor(dup_saved_descriptors[i - 1]);
+  };
   defer
   {
     if (!redirect_fds_handed_off) {
@@ -602,12 +659,44 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     /* A duplication like 2>&1 routes one descriptor to another without a file.
+       The descriptor may come from a dynamic word such as >&$5, resolved here.
      */
-    if (redir.kind == Redirection::Kind::DuplicateOutput) {
-      if (redir.fd == 2 && redir.dup_fd == 1)
+    if (redir.kind == Redirection::Kind::DuplicateOutput ||
+        redir.kind == Redirection::Kind::DuplicateInput)
+    {
+      const i32 from_fd = resolve_duplication_fd(redir, cxt);
+
+      /* A descriptor copied onto itself, as in 1>&1, changes nothing. The
+         standard error and output cross-routing keeps the flag fast path, since
+         the spawn applies it after the files are placed. */
+      if (from_fd == redir.fd) {
+        /* Self copy is a no-op. */
+        continue;
+      }
+      if (redir.fd == 2 && from_fd == 1) {
         dup_err_to_out = true;
-      else if (redir.fd == 1 && redir.dup_fd == 2)
+        continue;
+      }
+      if (redir.fd == 1 && from_fd == 2) {
         dup_out_to_err = true;
+        continue;
+      }
+
+      /* An arbitrary descriptor or the close form points the real shell
+         descriptor at the target around the command, restored afterward. The
+         shell's buffered output is flushed first, so it lands on the original
+         descriptor rather than the duplication target. */
+      shit::flush();
+
+      if (from_fd == Redirection::DUP_FD_CLOSE) {
+        dup_saved_descriptors.push(os::save_and_replace_descriptor(
+            redir.fd, os::descriptor_for_shell_fd(redir.fd)));
+        os::close_fd(os::descriptor_for_shell_fd(redir.fd));
+        continue;
+      }
+
+      dup_saved_descriptors.push(os::save_and_replace_descriptor(
+          redir.fd, os::descriptor_for_shell_fd(from_fd)));
       continue;
     }
 
@@ -1648,9 +1737,22 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     /* A duplication like 2>&1 points one shell descriptor at another, with no
-       file opened. */
-    if (redir.kind == Redirection::Kind::DuplicateOutput) {
-      const os::descriptor source = os::descriptor_for_shell_fd(redir.dup_fd);
+       file opened. The descriptor may come from a dynamic word such as >&$5. */
+    if (redir.kind == Redirection::Kind::DuplicateOutput ||
+        redir.kind == Redirection::Kind::DuplicateInput)
+    {
+      const i32 from_fd = resolve_duplication_fd(redir, cxt);
+
+      /* The close form backs the descriptor up, then closes it. The backup is
+         saved so restore reopens it when the compound command finishes. */
+      if (from_fd == Redirection::DUP_FD_CLOSE) {
+        saved_descriptors.push(os::save_and_replace_descriptor(
+            redir.fd, os::descriptor_for_shell_fd(redir.fd)));
+        os::close_fd(os::descriptor_for_shell_fd(redir.fd));
+        continue;
+      }
+
+      const os::descriptor source = os::descriptor_for_shell_fd(from_fd);
       saved_descriptors.push(os::save_and_replace_descriptor(redir.fd, source));
       continue;
     }

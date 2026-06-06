@@ -1,0 +1,115 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign fd=5]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "dyn-builtin"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "lit-builtin"]
+          [CompoundListCondition, None]
+            [SimpleCommand "/bin/echo" "dyn-extern"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "/tmp/shit_dyn_fd.txt"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "separator"]
+  [CompoundListCondition, None]
+    [Assign errfd=2]
+  [CompoundListCondition, None]
+    [SimpleCommand "/bin/echo" "to-stderr"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "/tmp/shit_dyn_fd2.txt"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-f" "/tmp/shit_dyn_fd.txt" "/tmp/shit_dyn_fd2.txt"]
+[Word
+  Unquoted "fd=5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dyn-builtin"
+]
+[Word
+  Variable "fd"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "lit-builtin"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "/bin/echo"
+]
+[Word
+  Unquoted "dyn-extern"
+]
+[Word
+  Variable "fd"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "/tmp/shit_dyn_fd.txt"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/tmp/shit_dyn_fd.txt"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "separator"
+]
+[Word
+  Unquoted "errfd=2"
+]
+[Word
+  Unquoted "/bin/echo"
+]
+[Word
+  Unquoted "to-stderr"
+]
+[Word
+  Variable "errfd"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "/tmp/shit_dyn_fd2.txt"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/tmp/shit_dyn_fd2.txt"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "/tmp/shit_dyn_fd.txt"
+]
+[Word
+  Unquoted "/tmp/shit_dyn_fd2.txt"
+]
+dyn-builtin
+lit-builtin
+dyn-extern
+separator
+to-stderr
+[Code 0]
