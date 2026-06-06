@@ -24,10 +24,7 @@ Alias::kind() const
 i32
 Alias::execute(ExecContext &ec, EvalContext &cxt) const
 {
-  std::vector<std::string> raw_args{};
-  for (usize i = 0; i < ec.args().size(); i++)
-    raw_args.push_back(std::string{ec.args()[i].c_str(), ec.args()[i].size()});
-  ArrayList<String> args = parse_flags_vec(FLAG_LIST, raw_args);
+  ArrayList<String> args = parse_flags_vec(FLAG_LIST, ec.args());
   SHIT_DEFER { reset_flags(FLAG_LIST); };
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
