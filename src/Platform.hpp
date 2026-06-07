@@ -191,6 +191,10 @@ struct saved_descriptor
   /* False when shell_fd was not open before the redirection, so restore closes
      it instead of duplicating the backup back. */
   bool was_open{false};
+  /* False when the dup2 onto shell_fd failed, as when the target descriptor was
+     closed in a duplication like >&5 with fd 5 closed. The caller throws a
+     located error and the restore puts shell_fd back unchanged. */
+  bool dup2_ok{true};
 };
 
 /* Save shell_fd, then point it at target. The returned backup feeds

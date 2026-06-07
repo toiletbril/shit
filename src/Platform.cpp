@@ -87,7 +87,10 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   result.was_open = backup != -1;
   result.saved = backup;
 
-  dup2(target, shell_fd);
+  /* A dup2 from a closed or invalid target descriptor fails, as in >&5 with fd
+     5 closed. The caller reports the failure so the command fails rather than
+     writing to the original descriptor. */
+  result.dup2_ok = dup2(target, shell_fd) != -1;
   return result;
 }
 
@@ -625,6 +628,11 @@ fn reset_signal_handlers() throws -> void
   struct sigaction sa = {};
   sa.sa_handler = SIG_DFL;
   check_syscall(sigaction(SIGCHLD, &sa, nullptr));
+
+  /* A forked compound-pipeline child inherits the flag value at fork. A stale
+     one would make the evaluator throw Interrupted before the child runs, so it
+     is cleared here alongside the handler reset. */
+  INTERRUPT_REQUESTED = 0;
 }
 
 volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
@@ -720,7 +728,18 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target)
   result.shell_fd = shell_fd;
 
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
-  if (!slot.has_value()) return result;
+  if (!slot.has_value()) {
+    result.dup2_ok = false;
+    return result;
+  }
+
+  /* An invalid target handle, as from a duplication onto a closed descriptor,
+     is reported so the caller fails the command rather than redirecting onto a
+     dead handle. */
+  if (target == INVALID_HANDLE_VALUE) {
+    result.dup2_ok = false;
+    return result;
+  }
 
   result.saved = GetStdHandle(*slot);
   result.was_open = result.saved != INVALID_HANDLE_VALUE;
@@ -1197,6 +1216,11 @@ fn reset_signal_handlers() -> void
   {
     throw Error{"signal() failed: " + last_system_error_message()};
   }
+
+  /* A child started for a compound pipeline stage inherits the flag value at
+     spawn. A stale one would make the evaluator throw Interrupted before the
+     child runs, so it is cleared here alongside the handler reset. */
+  INTERRUPT_REQUESTED = 0;
 }
 
 } /* namespace os */

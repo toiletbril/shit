@@ -48,6 +48,17 @@ static pure fn find_token_start(StringView line, usize cursor) wontthrow
   return start;
 }
 
+/* The byte offset just past the token the cursor sits inside. The scan walks
+   forward from the cursor over non-separator bytes, so the replacement covers
+   the whole word rather than the bytes left of the cursor only. */
+static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
+{
+  usize end = cursor;
+  while (end < line.length && !is_word_separator(line[end]))
+    end++;
+  return end;
+}
+
 /* Whether the token starting at token_start sits in command position, the first
    word of a command. The scan looks back over whitespace to the previous
    non-space byte and reports command position when that byte ends a command or
@@ -62,16 +73,34 @@ static pure fn is_in_command_position(StringView line,
   return is_command_separator(line[i - 1]);
 }
 
-/* Append name to candidates when it carries the typed prefix and is not already
-   present, so the merged command list stays deduped across builtins, functions,
-   aliases, and PATH. */
-static fn add_unique_with_prefix(ArrayList<String> &candidates, StringView name,
-                                 StringView prefix) throws -> void
+/* A command-position token matches a command name either by carrying it as a
+   plain prefix or, when the token holds a glob metacharacter, by matching it as
+   a glob pattern. The shell offers command names rather than cwd entries for a
+   bare glob first word, so a glob like ec* lists the commands it matches. */
+static fn command_name_matches(StringView name, StringView token,
+                               bool token_is_glob) throws -> bool
 {
-  if (!name.starts_with(prefix)) return;
-  for (const String &existing : candidates) {
-    if (existing.view() == name) return;
-  }
+  if (!token_is_glob) return name.starts_with(token);
+
+  ArrayList<bool> glob_active{};
+  glob_active.reserve(token.length);
+  for (usize i = 0; i < token.length; i++)
+    glob_active.push(true);
+  return utils::glob_matches(token, name, glob_active, 0);
+}
+
+/* Append name to candidates when it matches the typed token and the seen set
+   has not recorded it, so the merged command list stays deduped across
+   builtins, functions, aliases, and PATH. The seen set replaces the linear
+   scan, so each insert costs one hash lookup rather than a walk of every
+   candidate already collected. */
+static fn add_unique_command(ArrayList<String> &candidates, HashSet &seen,
+                             StringView name, StringView token,
+                             bool token_is_glob) throws -> void
+{
+  if (!command_name_matches(name, token, token_is_glob)) return;
+  if (seen.contains(name)) return;
+  seen.add(name);
   candidates.push(String{name});
 }
 
@@ -108,36 +137,32 @@ static constexpr const char *BUILTIN_NAMES[] = {
     "unalias", "jobs",     "fg",     "bg",      "wait",   "kill",
 };
 
-/* Collect every command name with the typed prefix. The builtins come from the
-   static name list, the functions and aliases from the context, and the
-   executables from a scan of the PATH directories. */
-static fn complete_command(StringView prefix, EvalContext &context) throws
-    -> ArrayList<String>
+/* Collect every command name that matches the typed token. The builtins come
+   from the static name list, the functions and aliases from the context, and
+   the executables from a scan of the PATH directories. A token holding a glob
+   metacharacter matches by glob, so a bare glob first word lists the command
+   names it matches rather than cwd entries. */
+static fn complete_command(StringView token, bool token_is_glob,
+                           EvalContext &context) throws -> ArrayList<String>
 {
   ArrayList<String> candidates{};
+  HashSet seen{heap_allocator()};
 
-  TRACELN("completing command position for prefix '%.*s'",
-          static_cast<int>(prefix.length), prefix.data);
+  TRACELN("completing command position for token '%.*s'",
+          static_cast<int>(token.length), token.data);
 
   for (const char *builtin_name : BUILTIN_NAMES) {
-    add_unique_with_prefix(candidates, StringView{builtin_name}, prefix);
+    add_unique_command(candidates, seen, StringView{builtin_name}, token,
+                       token_is_glob);
   }
 
   context.function_names().for_each([&](StringView name) {
-    add_unique_with_prefix(candidates, name, prefix);
+    add_unique_command(candidates, seen, name, token, token_is_glob);
   });
 
   context.alias_names().for_each([&](StringView name) {
-    add_unique_with_prefix(candidates, name, prefix);
+    add_unique_command(candidates, seen, name, token, token_is_glob);
   });
-
-  /* A prefix that names a path component, not a bare command word, is a program
-     given by path, so the PATH scan would not find it. The filesystem branch
-     handles it as an argument instead, so the command scan stays a name scan.
-   */
-  if (prefix.find_character('/').has_value()) {
-    return candidates;
-  }
 
   if (Maybe<String> path = os::get_environment_variable("PATH");
       path.has_value())
@@ -156,7 +181,8 @@ static fn complete_command(StringView prefix, EvalContext &context) throws
       if (!entries.has_value()) continue;
 
       for (const String &entry : *entries) {
-        add_unique_with_prefix(candidates, entry.view(), prefix);
+        add_unique_command(candidates, seen, entry.view(), token,
+                           token_is_glob);
       }
     }
   }
@@ -260,6 +286,9 @@ static fn complete_filesystem(StringView token,
     String candidate{parts.directory_part};
     candidate += entry.view();
 
+    /* Path::read_directory hands back names only, so the trailing slash needs a
+       stat per entry. Threading the dirent d_type through read_directory would
+       change its signature and the Windows path, so the stat stays. */
     Path full = listing_directory;
     full.push_component(entry.view());
     if (full.is_directory()) candidate += '/';
@@ -330,10 +359,21 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 {
   if (cursor > line.length) cursor = line.length;
 
-  usize token_start = find_token_start(line, cursor);
-  StringView token =
-      line.substring_of_length(token_start, cursor - token_start);
-  bool is_command = is_in_command_position(line, token_start);
+  /* The replaced span covers the whole word the cursor sits inside, from the
+     token start to the token end, so a cursor in the middle of a word replaces
+     the word cleanly rather than keeping the bytes to its right. */
+  const usize token_start = find_token_start(line, cursor);
+  const usize token_end = find_token_end(line, cursor);
+  const StringView token =
+      line.substring_of_length(token_start, token_end - token_start);
+  const bool is_command = is_in_command_position(line, token_start);
+  const bool token_is_glob = token_has_glob_metacharacter(token);
+
+  /* A command-position token that names a path component is a program given by
+     path rather than a bare command word, so it completes against the
+     filesystem the way dash does instead of the command name sets. */
+  const bool token_has_path_separator =
+      token.find_character('/').has_value();
 
   TRACELN("complete line '%.*s' cursor %zu token '%.*s' command %d",
           static_cast<int>(line.length), line.data, cursor,
@@ -341,10 +381,10 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 
   ArrayList<String> candidates{};
 
-  if (token_has_glob_metacharacter(token)) {
+  if (is_command && !token_has_path_separator) {
+    candidates = complete_command(token, token_is_glob, context);
+  } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
-  } else if (is_command) {
-    candidates = complete_command(token, context);
   } else {
     candidates = complete_filesystem(token, base_directory);
   }
@@ -354,7 +394,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   String longest_common_prefix = compute_longest_common_prefix(candidates);
 
   return completion_result{
-      steal(candidates), steal(longest_common_prefix), token_start, cursor,
+      steal(candidates), steal(longest_common_prefix), token_start, token_end,
       is_command,
   };
 }

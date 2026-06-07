@@ -700,8 +700,19 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         continue;
       }
 
-      dup_saved_descriptors.push(os::save_and_replace_descriptor(
-          redir.fd, os::descriptor_for_shell_fd(from_fd)));
+      const os::saved_descriptor saved = os::save_and_replace_descriptor(
+          redir.fd, os::descriptor_for_shell_fd(from_fd));
+      dup_saved_descriptors.push(saved);
+      /* A duplication onto a closed or invalid descriptor, as in >&5 with fd 5
+         closed, fails the dup2. The command fails with a located error rather
+         than writing to the original descriptor, matching dash. */
+      if (!saved.dup2_ok) {
+        const SourceLocation location = redir.target != nullptr
+                                            ? redir.target->source_location()
+                                            : source_location();
+        throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
+                                              ": Bad file descriptor"};
+      }
       continue;
     }
 
@@ -1881,7 +1892,20 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
 
       const os::descriptor source = os::descriptor_for_shell_fd(from_fd);
-      saved_descriptors.push(os::save_and_replace_descriptor(redir.fd, source));
+      const os::saved_descriptor saved =
+          os::save_and_replace_descriptor(redir.fd, source);
+      saved_descriptors.push(saved);
+      /* A duplication onto a closed or invalid descriptor, as in { echo hi; }
+         >&7 with fd 7 closed, fails the dup2. The compound command fails with a
+         located error rather than writing to the original descriptor, matching
+         dash. */
+      if (!saved.dup2_ok) {
+        const SourceLocation location = redir.target != nullptr
+                                            ? redir.target->source_location()
+                                            : source_location();
+        throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
+                                              ": Bad file descriptor"};
+      }
       continue;
     }
 
