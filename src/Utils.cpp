@@ -45,8 +45,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        command under EV_EXIT. A subshell or a background command keeps the fork,
        since its status does not become the shell's, and replace_process returns
        only when the exec itself fails, where it throws a located error. */
-    /* An EXIT trap set earlier in this same chunk must still run, so the trap is
-       rechecked here at run time rather than only when the chunk began. */
+    /* An EXIT trap set earlier in this same chunk must still run, so the trap
+       is rechecked here at run time rather than only when the chunk began. */
     if (!is_async && cxt.terminal_exec_allowed() && !cxt.in_subshell() &&
         !cxt.has_exit_trap())
     {
@@ -230,8 +230,8 @@ fn lowercase_string(StringView s) throws -> String
 pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
 {
   static const StringView RESERVED_WORDS[] = {
-      "!",    "{",  "}",   "case", "do",   "done",  "elif",  "else",
-      "esac", "fi", "for", "if",   "in",   "then",  "until", "while",
+      "!",    "{",  "}",   "case", "do", "done", "elif",  "else",
+      "esac", "fi", "for", "if",   "in", "then", "until", "while",
   };
   for (const StringView reserved : RESERVED_WORDS)
     if (word == reserved) return true;
@@ -705,7 +705,8 @@ static fn cache_resolved_path(StringView name, const Path &full_path) throws
 
 fn clear_path_map() throws -> void
 {
-  LOG(verbosity::Debug, "clear_path_map dropping %zu cached program resolutions",
+  LOG(verbosity::Debug,
+      "clear_path_map dropping %zu cached program resolutions",
       PATH_CACHE.count());
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
@@ -717,7 +718,8 @@ fn invalidate_path_cache() throws -> void
   /* The cache is not cleared here, since a cd or a PATH change is followed by
      few lookups in a script. The stale flag defers the clear to the next lookup
      so a run that never resolves a command again pays nothing. */
-  LOG(verbosity::Debug, "invalidate_path_cache marking the program cache stale");
+  LOG(verbosity::Debug,
+      "invalidate_path_cache marking the program cache stale");
   PATH_CACHE_IS_STALE = true;
 }
 
@@ -777,11 +779,11 @@ fn initialize_path_map() throws -> void
 }
 
 /* Stat dir/name along PATH until a match, the way dash advances PATH and stats
-   each candidate once. The first hit ends the scan and is cached, so a cold miss
-   costs at most one stat per PATH directory up to the match rather than a full
-   directory read. With find_all the scan does not stop and collects every match
-   for which -a, and it does not write the cache, since a partial single-result
-   entry would later hide the other matches from which -a. */
+   each candidate once. The first hit ends the scan and is cached, so a cold
+   miss costs at most one stat per PATH directory up to the match rather than a
+   full directory read. With find_all the scan does not stop and collects every
+   match for which -a, and it does not write the cache, since a partial
+   single-result entry would later hide the other matches from which -a. */
 static fn resolve_along_path(StringView program_name, bool find_all) throws
     -> ArrayList<Path>
 {
@@ -853,7 +855,8 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
   const os::ext_index typed_extension =
       os::erase_extension_and_get_its_index(sp);
 
-  /* which -a wants every match, so it skips the cache and scans PATH in full. */
+  /* which -a wants every match, so it skips the cache and scans PATH in full.
+   */
   if (find_all) return resolve_along_path(program_name, true);
 
   /* A name typed with an explicit extension is matched exactly by the search,

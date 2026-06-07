@@ -66,7 +66,8 @@ public:
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
 
-  /* True when the segment text holds an unquoted glob metacharacter, one of '*',
+  /* True when the segment text holds an unquoted glob metacharacter, one of
+     '*',
      '?', or '['. The plain-literal fast path in the evaluator consults this to
      decide whether a word may skip pathname expansion. */
   pure fn has_glob_metacharacter() const wontthrow -> bool;

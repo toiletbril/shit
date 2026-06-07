@@ -634,7 +634,8 @@ hot fn Lexer::lex_identifier() throws -> Token *
               if (p == lexer::CEOF) break;
               byte_count++;
               name += p;
-              if (p == '(') paren_depth++;
+              if (p == '(')
+                paren_depth++;
               else if (p == ')') {
                 paren_depth--;
                 if (paren_depth == 0) break;

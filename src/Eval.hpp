@@ -325,10 +325,10 @@ public:
   /* The run loop sets this before the final chunk's evaluation when the shell
      will exit with that chunk's status and no EXIT trap is pending. A terminal
      external command then replaces the shell process instead of fork, exec, and
-     wait, the way dash execs the last command under EV_EXIT. The flag rides only
-     the tail position. A compound list clears it on every node but its last, and
-     every other node clears it, so only a command whose status becomes the
-     shell's status sees it set. */
+     wait, the way dash execs the last command under EV_EXIT. The flag rides
+     only the tail position. A compound list clears it on every node but its
+     last, and every other node clears it, so only a command whose status
+     becomes the shell's status sees it set. */
   fn set_terminal_exec_allowed(bool enabled) wontthrow -> void;
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
@@ -352,8 +352,8 @@ public:
   fn capture_command_substitution(const WordSegment &segment) throws -> String;
 
   /* Run a parsed inner command under the substitution machinery, capturing its
-     stdout and snapshotting state so a cd or an assignment inside does not leak.
-     Both capture overloads share this once they hold an AST. */
+     stdout and snapshotting state so a cd or an assignment inside does not
+     leak. Both capture overloads share this once they hold an AST. */
   fn run_captured_substitution(const Expression *ast) throws -> String;
 
   /* Lex, parse, and evaluate a source string in the current context, without
@@ -572,8 +572,8 @@ protected:
 class ExecContext
 {
 public:
-  static fn make_from(SourceLocation location,
-                      ArrayList<String> &&args) throws -> ExecContext;
+  static fn make_from(SourceLocation location, ArrayList<String> &&args) throws
+      -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and
@@ -588,8 +588,8 @@ public:
   /* 2>&1 routes the standard error to wherever the standard output goes, and
      1>&2 the reverse. Applied after the file descriptors are placed. When both
      are present the source order decides the result, since each dup reads the
-     current target of its source descriptor, so dup_out_to_err_came_last records
-     which one the source wrote last. */
+     current target of its source descriptor, so dup_out_to_err_came_last
+     records which one the source wrote last. */
   bool dup_err_to_out{false};
   bool dup_out_to_err{false};
   bool dup_out_to_err_came_last{false};
@@ -618,11 +618,11 @@ private:
   ArrayList<String> m_args{heap_allocator()};
 };
 
-/* Evaluate an arithmetic expression that holds only literals and operators, with
-   no variable and no substitution, so the result is a compile-time constant. The
-   analyze pass calls this to fold a constant $((...)) once instead of leaving the
-   evaluator to re-parse it on every expansion. Returns None when the expression
-   is not provably constant or fails to evaluate. */
+/* Evaluate an arithmetic expression that holds only literals and operators,
+   with no variable and no substitution, so the result is a compile-time
+   constant. The analyze pass calls this to fold a constant $((...)) once
+   instead of leaving the evaluator to re-parse it on every expansion. Returns
+   None when the expression is not provably constant or fails to evaluate. */
 fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>;
 
 } /* namespace shit */

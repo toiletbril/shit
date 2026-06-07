@@ -36,8 +36,8 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (utils::is_posix_reserved_word(name.view())) {
       out += name;
       out += " is a shell keyword\n";
-    } else if (let const alias = cxt.get_alias(name.view());
-               alias.has_value()) {
+    } else if (let const alias = cxt.get_alias(name.view()); alias.has_value())
+    {
       out += name;
       out += " is an alias for ";
       out += *alias;

@@ -163,7 +163,8 @@ fn String::free_storage() wontthrow -> void
 {
   /* Only a heap or arena buffer is freed. The inline buffer is part of the
      object. The reset leaves the object a valid empty inline string, which is
-     moot in the destructor and required in operator= where the object lives on. */
+     moot in the destructor and required in operator= where the object lives on.
+   */
   if (m_data != nullptr && m_data != m_inline)
     m_allocator.free_array(m_data, m_capacity);
   reset_to_inline();

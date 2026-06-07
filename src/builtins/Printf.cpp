@@ -100,9 +100,8 @@ void append_conversion(String &out, const String &spec, char conv,
     with_ll.push(conv);
     /* The unsigned conversions share the char-code and base parsing with the
        signed ones, so printf '%x' "'A" yields the char code the same way. */
-    std::snprintf(
-        buffer, sizeof(buffer), with_ll.c_str(),
-        static_cast<unsigned long long>(parse_printf_integer(arg)));
+    std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
+                  static_cast<unsigned long long>(parse_printf_integer(arg)));
     out += buffer;
   } else {
     /* An unknown conversion is emitted verbatim. */

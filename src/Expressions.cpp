@@ -94,8 +94,8 @@ fn Expression::is_simple_command() const wontthrow -> bool { return false; }
 
 fn Expression::is_dummy() const wontthrow -> bool { return false; }
 
-fn Expression::try_static_condition_verdict(const AnalysisContext &actx)
-    const wontthrow -> Maybe<bool>
+fn Expression::try_static_condition_verdict(
+    const AnalysisContext &actx) const wontthrow -> Maybe<bool>
 {
   unused(actx);
   return shit::None;
@@ -237,16 +237,15 @@ fn literal_word_value(const Token *token) throws -> Maybe<String>
       break;
     case WordSegment::Kind::UnquotedText:
       /* An unquoted segment may hold a glob or a tilde, which expand. The test
-         operands the fold accepts are plain bytes, so a live glob char makes the
-         word non-constant and the fold declines it. */
+         operands the fold accepts are plain bytes, so a live glob char makes
+         the word non-constant and the fold declines it. */
       for (usize i = 0; i < segment.text.count(); i++) {
         if (lexer::is_expandable_char(segment.text[i])) return shit::None;
       }
       if (segment.has_live_glob_chars()) return shit::None;
       value.append(segment.text.view());
       break;
-    default:
-      return shit::None;
+    default: return shit::None;
     }
   }
   return value;
@@ -290,10 +289,10 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands) throws
   return shit::None;
 }
 
-/* Fold every constant arithmetic expansion in a word to its decimal result once,
-   so the evaluator reads the cached value instead of re-parsing the arithmetic
-   on every expansion. A segment that holds a parameter or a substitution is left
-   alone, since its value is only known at run time. */
+/* Fold every constant arithmetic expansion in a word to its decimal result
+   once, so the evaluator reads the cached value instead of re-parsing the
+   arithmetic on every expansion. A segment that holds a parameter or a
+   substitution is left alone, since its value is only known at run time. */
 fn fold_constant_arithmetic_in_word(const Word &word) wontthrow -> void
 {
   for (const WordSegment &segment : word.segments) {
@@ -318,8 +317,8 @@ fn fold_constant_arithmetic_in_token(const Token *token) wontthrow -> void
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool warn_missing_commands,
-               bool suppress_style_warnings) throws -> bool
+               bool warn_missing_commands, bool suppress_style_warnings) throws
+    -> bool
 {
   ASSERT(root != nullptr);
 
@@ -838,10 +837,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
       const os::descriptor body_fd = opened.take();
       /* The temp file already lands on fd N when mkstemp handed back that very
-         number, since the standard descriptors took the lower slots. The generic
-         save then dup2 would back up the body itself and leave it open on N after
-         the command, so the collision is handled directly. The restore closes fd
-         N, which fd N was free before mkstemp claimed it makes correct. */
+         number, since the standard descriptors took the lower slots. The
+         generic save then dup2 would back up the body itself and leave it open
+         on N after the command, so the collision is handled directly. The
+         restore closes fd N, which fd N was free before mkstemp claimed it
+         makes correct. */
       if (body_fd == redir.fd) {
         dup_saved_descriptors.push(
             os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
@@ -1718,12 +1718,13 @@ cold fn IfClause::to_ast_string(usize layer) const throws -> String
 
 hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  /* A command inside a compound construct forks rather than replacing the shell,
-     so the terminal exec stays confined to a top-level simple command. */
+  /* A command inside a compound construct forks rather than replacing the
+     shell, so the terminal exec stays confined to a top-level simple command.
+   */
   cxt.set_terminal_exec_allowed(false);
 
-  /* The analyze pass proved which branch runs, so the conditions are skipped and
-     the chosen body runs straight away. An index past the last branch means
+  /* The analyze pass proved which branch runs, so the conditions are skipped
+     and the chosen body runs straight away. An index past the last branch means
      every condition failed, so the else body runs or the if yields 0. */
   if (m_folded_branch.has_value()) {
     if (*m_folded_branch < m_branches.count())
@@ -1775,7 +1776,8 @@ cold fn IfClause::analyze(AnalysisContext &actx,
      fails moves to the next branch, and the first undecidable condition stops
      the fold and leaves the run to evaluate the conditions. */
   for (usize i = 0; i < m_branches.count(); i++) {
-    let const verdict = m_branches[i].condition->try_static_condition_verdict(actx);
+    let const verdict =
+        m_branches[i].condition->try_static_condition_verdict(actx);
     if (!verdict.has_value()) return;
     if (*verdict) {
       m_folded_branch = i;
@@ -1927,11 +1929,12 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
 
   /* A statically-decidable condition that never lets the body run folds the
      whole loop away. A while runs the body on success, so a constant failure
-     skips it, and an until runs the body on failure, so a constant success skips
-     it. A while true or an until false is infinite and stays unfolded. */
+     skips it, and an until runs the body on failure, so a constant success
+     skips it. A while true or an until false is infinite and stays unfolded. */
   let const verdict = m_condition->try_static_condition_verdict(actx);
   if (verdict.has_value()) {
-    let const body_would_run = m_is_until ? (*verdict == false) : (*verdict == true);
+    let const body_would_run =
+        m_is_until ? (*verdict == false) : (*verdict == true);
     if (!body_would_run) m_folded_to_skip = true;
   }
 }
@@ -2375,8 +2378,8 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_child != nullptr);
 
-  /* The child runs around saved descriptor backups that restore afterward, so it
-     forks rather than replacing the shell. */
+  /* The child runs around saved descriptor backups that restore afterward, so
+     it forks rather than replacing the shell. */
   cxt.set_terminal_exec_allowed(false);
 
   /* The child runs in the shell process, so each redirection points one of the
@@ -2675,7 +2678,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* A constant $((...)) in any argument or assignment prefix is folded once
      here, so the loop body that re-runs this command does not re-parse it. */
-  for (const Token *t : m_args) fold_constant_arithmetic_in_token(t);
+  for (const Token *t : m_args)
+    fold_constant_arithmetic_in_token(t);
   for (const prefix_assignment &var : m_local_vars)
     fold_constant_arithmetic_in_word(var.value);
 
@@ -2840,7 +2844,8 @@ cold fn SimpleCommand::try_static_condition_verdict(
       if (!closing.has_value() || *closing != "]") return shit::None;
       last -= 1;
     }
-    for (usize i = 1; i < last; i++) operands.push(m_args[i]);
+    for (usize i = 1; i < last; i++)
+      operands.push(m_args[i]);
     try {
       return constant_test_verdict(operands);
     } catch (...) {

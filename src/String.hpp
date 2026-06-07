@@ -139,7 +139,8 @@ public:
 private:
   fn free_storage() wontthrow -> void;
 
-  /* True when the string lives in the inline buffer rather than an allocation. */
+  /* True when the string lives in the inline buffer rather than an allocation.
+   */
   mustuse pure fn is_inline() const wontthrow -> bool
   {
     return m_data == m_inline;

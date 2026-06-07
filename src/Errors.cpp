@@ -279,9 +279,9 @@ cold static fn get_context_pointing_to(
   const usize unicode_start_offset_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position - start_offset);
 
-  /* Does token length go beyond that line? The bounded counter walks at most the
-     given byte count over the interior pointer, so it never runs strlen past the
-     source end at an EOF caret. */
+  /* Does token length go beyond that line? The bounded counter walks at most
+     the given byte count over the interior pointer, so it never runs strlen
+     past the source end at an EOF caret. */
   const usize unicode_length = toiletline::utf8_strnlen(
       source.data + byte_position, (byte_count > line_byte_count - start_offset)
                                        ? line_byte_count - start_offset
@@ -394,10 +394,11 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
      On the first line there is no newline, so the count from the source start
      plus one gives the column. */
   const usize codepoints_before_line =
-      (last_newline_location > 0)
-          ? SOURCE_LINE_INDEX.codepoints_before(source, last_newline_location + 1)
-          : 0;
-  const usize line_byte_position = unicode_position - codepoints_before_line + 1;
+      (last_newline_location > 0) ? SOURCE_LINE_INDEX.codepoints_before(
+                                        source, last_newline_location + 1)
+                                  : 0;
+  const usize line_byte_position =
+      unicode_position - codepoints_before_line + 1;
 
   let const color = diagnostic_colors_for(severity_word());
 

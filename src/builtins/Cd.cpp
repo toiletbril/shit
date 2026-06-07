@@ -39,9 +39,10 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        was. */
     let const old_directory = Path::current_directory();
     /* A path that exists can still refuse the move, a regular file or a
-       directory without execute permission among them. dash reports the failure,
-       exits non-zero, and leaves PWD and OLDPWD untouched, so the chdir result
-       drives an early throw before either variable is rewritten. */
+       directory without execute permission among them. dash reports the
+       failure, exits non-zero, and leaves PWD and OLDPWD untouched, so the
+       chdir result drives an early throw before either variable is rewritten.
+     */
     if (Path::set_current_directory(target).is_error())
       throw Error{StringView{"Could not cd to '"} + arg_path + "'"};
     /* A relative PATH entry, or the current directory as an empty entry, now

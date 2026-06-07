@@ -21,8 +21,7 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
   /* A non-positive count is rejected the way dash rejects an illegal number,
      rather than clamped, so break 0 aborts instead of breaking one loop. */
-  if (level < 1)
-    throw Error{"break: Illegal number: " + ec.args()[1]};
+  if (level < 1) throw Error{"break: Illegal number: " + ec.args()[1]};
 
   cxt.request_break(level, ec.source_location());
   return 0;

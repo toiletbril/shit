@@ -125,16 +125,18 @@ fn clear_path_map() throws -> void;
 fn invalidate_path_cache() throws -> void;
 
 /* Point program resolution at a PATH value, the shell variable store's PATH
-   rather than the process environment, so a plain PATH=... assignment that never
-   exports still drives the search the way dash resolves against the assigned
-   value. None restores the search to the process environment's PATH. The cache
-   is marked stale so the next lookup re-resolves against the new value. */
+   rather than the process environment, so a plain PATH=... assignment that
+   never exports still drives the search the way dash resolves against the
+   assigned value. None restores the search to the process environment's PATH.
+   The cache is marked stale so the next lookup re-resolves against the new
+   value. */
 fn set_path_for_resolution(Maybe<String> path) throws -> void;
 
 /* Searches PATH for program binary. Returns absolute paths to the program. The
    first resolved location is cached under the name and a later hit returns it
    without a stat until the cache is invalidated. With find_all the search skips
-   the cache, scans every PATH directory, and returns every match, for which -a. */
+   the cache, scans every PATH directory, and returns every match, for which -a.
+ */
 fn search_program_path(StringView program_name, bool find_all = false) throws
     -> ArrayList<Path>;
 

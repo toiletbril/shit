@@ -166,9 +166,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     const usize byte_cursor =
         byte_offset_of_codepoint(buffer, byte_length, cursor);
 
-    shit::completion::completion_result result =
-        shit::completion::complete(line, byte_cursor, *COMPLETION_CONTEXT,
-                                   base);
+    shit::completion::completion_result result = shit::completion::complete(
+        line, byte_cursor, *COMPLETION_CONTEXT, base);
 
     if (result.candidates.is_empty()) return 0;
 

@@ -28,9 +28,10 @@ public:
   fn owns(const void *pointer) const wontthrow -> bool;
   fn reset() wontthrow -> void;
 
-  /* Counts how many times the arena has been reset. A cache that holds a pointer
-     into this arena stores the generation it was filled in, so a hit after a
-     reset, which reclaimed that storage, is recognised as stale and refilled. */
+  /* Counts how many times the arena has been reset. A cache that holds a
+     pointer into this arena stores the generation it was filled in, so a hit
+     after a reset, which reclaimed that storage, is recognised as stale and
+     refilled. */
   pure fn reset_generation() const wontthrow -> usize
   {
     return m_reset_generation;

@@ -687,11 +687,11 @@ fn main(int argc, char **argv) -> int
        used to clear the input line does not abort the command about to run. */
     shit::os::INTERRUPT_REQUESTED = 0;
 
-    /* This is the final chunk to run when should_quit is set, so the shell exits
-       with its status next. A terminal external command in it may replace the
-       shell process rather than fork, exec, and wait, the way dash execs the
-       last command under EV_EXIT. An interactive prompt keeps reading, and an
-       EXIT trap must run before the shell ends, so both keep the fork. The
+    /* This is the final chunk to run when should_quit is set, so the shell
+       exits with its status next. A terminal external command in it may replace
+       the shell process rather than fork, exec, and wait, the way dash execs
+       the last command under EV_EXIT. An interactive prompt keeps reading, and
+       an EXIT trap must run before the shell ends, so both keep the fork. The
        exit-code and stats trailers print after the command runs, so the shell
        keeps the fork to regain control and emit them. The flag rides only the
        tail position from here, since the compound nodes clear it on every path

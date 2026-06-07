@@ -73,8 +73,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   if (name == "IFS") set_field_separators(value);
   /* A new PATH names a different search order, so a cached resolution may point
      at a directory PATH no longer lists. The resolver is pointed at the new
-     value, so a plain PATH=... assignment the store holds drives the search even
-     without an export, and the cache is marked stale so the next command
+     value, so a plain PATH=... assignment the store holds drives the search
+     even without an export, and the cache is marked stale so the next command
      re-resolves. */
   if (name == "PATH") utils::set_path_for_resolution(String{value});
   m_shell_variables.set(name, value);
@@ -161,7 +161,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                  ? String{heap_allocator(),
                           utils::int_to_text(*m_last_background_pid)}
                  : String{};
-    if (first_byte == '-') return String{heap_allocator(), option_flags_string()};
+    if (first_byte == '-')
+      return String{heap_allocator(), option_flags_string()};
     if (first_byte == '#')
       return String{heap_allocator(),
                     utils::uint_to_text(m_positional_params.count())};
@@ -186,10 +187,10 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
   }
 
-  /* A purely numeric name selects a positional parameter, $1 upward. Only a name
-     that begins with a digit can be all digits, so the scan runs only then. An
-     index too large to fit, or beyond the count, has no value. The single '0'
-     name is handled above as the shell name. */
+  /* A purely numeric name selects a positional parameter, $1 upward. Only a
+     name that begins with a digit can be all digits, so the scan runs only
+     then. An index too large to fit, or beyond the count, has no value. The
+     single '0' name is handled above as the shell name. */
   if (first_byte >= '0' && first_byte <= '9') {
     let is_all_digits = true;
     for (usize i = 0; i < name.count(); i++)
@@ -994,9 +995,9 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
       usize j = i + 1;
       while (j < word.length && lexer::is_variable_name(word[j]))
         name += word[j++];
-      /* A nested reference inside a default or alternate word, or a heredoc body,
-         obeys set -u the same way a top level reference does, so an unset name
-         here aborts rather than expanding to nothing. */
+      /* A nested reference inside a default or alternate word, or a heredoc
+         body, obeys set -u the same way a top level reference does, so an unset
+         name here aborts rather than expanding to nothing. */
       if (m_error_unset && !get_variable_value(name).has_value())
         throw Error{name + ": parameter not set"};
       out += expand_variable(name);
@@ -1619,7 +1620,8 @@ pure fn arithmetic_modulo(i64 lhs, i64 rhs) wontthrow -> i64
 /* dash masks the shift count to the low 6 bits, so a count of 64 shifts by 0
    and a negative count shifts by its low 6 bits. The shift runs in u64 where a
    shift by a value below the width is defined, and for the right shift the sign
-   is carried by hand so a negative operand keeps its arithmetic-shift result. */
+   is carried by hand so a negative operand keeps its arithmetic-shift result.
+ */
 pure fn arithmetic_shift_left(i64 lhs, i64 rhs) wontthrow -> i64
 {
   let const count = static_cast<u64>(rhs) & 63u;
@@ -1631,8 +1633,7 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
   let const count = static_cast<u64>(rhs) & 63u;
   let const is_negative = lhs < 0;
   let value = static_cast<u64>(lhs) >> count;
-  if (is_negative && count > 0)
-    value |= ~(~static_cast<u64>(0) >> count);
+  if (is_negative && count > 0) value |= ~(~static_cast<u64>(0) >> count);
   return static_cast<i64>(value);
 }
 
@@ -1734,7 +1735,8 @@ public:
     skip_spaces();
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
       /* The name is a contiguous slice of the expression the parser holds for
-         the whole evaluation, so a view into it avoids a per-read allocation. */
+         the whole evaluation, so a view into it avoids a per-read allocation.
+       */
       let const name_start = pos;
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         pos++;
@@ -1961,7 +1963,8 @@ public:
     }
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
       /* The name is a contiguous slice of the expression the parser holds for
-         the whole evaluation, so a view into it avoids a per-read allocation. */
+         the whole evaluation, so a view into it avoids a per-read allocation.
+       */
       let const name_start = pos;
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         pos++;
@@ -2000,7 +2003,8 @@ namespace {
 /* A byte that may appear in a provably-constant arithmetic expression. The set
    is digits, whitespace, parentheses, and the operator characters. It excludes
    every letter and underscore, so no variable name and no hex prefix is folded,
-   which keeps the fold to plain decimal constants the analyze pass can prove. */
+   which keeps the fold to plain decimal constants the analyze pass can prove.
+ */
 pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
 {
   if (lexer::is_number(byte)) return true;
@@ -2025,10 +2029,8 @@ pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
   case '>':
   case '=':
   case '?':
-  case ':':
-    return true;
-  default:
-    return false;
+  case ':': return true;
+  default: return false;
   }
 }
 
@@ -2133,11 +2135,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
         break;
       }
       /* An unquoted $@ or $* keeps each positional parameter as its own field
-         boundary, then field splits each parameter's own text under IFS. Routing
-         it through a single joined string instead would lose the boundary, so a
-         custom or an empty IFS would merge or mis-split the parameters. The
-         quoted "$*" join by the first IFS character stays in the default branch
-         below. */
+         boundary, then field splits each parameter's own text under IFS.
+         Routing it through a single joined string instead would lose the
+         boundary, so a custom or an empty IFS would merge or mis-split the
+         parameters. The quoted "$*" join by the first IFS character stays in
+         the default branch below. */
       if ((segment.text == "@" || segment.text == "*") &&
           !segment.is_in_double_quotes)
       {
@@ -2212,10 +2214,9 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
       result += capture_command_substitution(segment);
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
-      result += utils::int_to_text(
-          segment.folded_arithmetic_result.has_value()
-              ? *segment.folded_arithmetic_result
-              : evaluate_arithmetic(segment_text));
+      result += utils::int_to_text(segment.folded_arithmetic_result.has_value()
+                                       ? *segment.folded_arithmetic_result
+                                       : evaluate_arithmetic(segment_text));
     else
       result += segment_text;
   }
@@ -2404,9 +2405,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
       } else {
         /* The origin line is context under the primary error, so it carries
            the note severity word rather than printing bare. */
-        show_message(
-            Note{"This error was raised while running " + frame.origin}
-                .to_string());
+        show_message(Note{"This error was raised while running " + frame.origin}
+                         .to_string());
       }
     }
   };
@@ -2587,9 +2587,9 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
         for (const WordSegment &segment : word->segments)
           literal.append(segment.text.view());
 
-        /* A single unquoted segment still needs the IFS check, since an IFS byte
-           in its text would split it into more than one field. With no IFS byte
-           it is one field. */
+        /* A single unquoted segment still needs the IFS check, since an IFS
+           byte in its text would split it into more than one field. With no IFS
+           byte it is one field. */
         let needs_split = false;
         if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
           for (usize i = 0; i < literal.count(); i++)
@@ -2737,8 +2737,7 @@ fn ExecContext::make_from(SourceLocation location,
 }
 
 fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
-                              ArrayList<String> &&args) throws
-    -> ExecContext
+                              ArrayList<String> &&args) throws -> ExecContext
 {
   ASSERT(args.count() > 0);
   return {location, steal(kind), steal(args)};

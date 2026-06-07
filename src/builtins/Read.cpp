@@ -77,7 +77,8 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (i + 1 == operand_count) {
       /* The last variable receives the rest of the line with trailing IFS
          whitespace trimmed. A trailing non-whitespace IFS delimiter is kept,
-         since dash leaves the empty field it introduces inside the remainder. */
+         since dash leaves the empty field it introduces inside the remainder.
+       */
       String rest = String{line.substring(cursor)};
       while (!rest.is_empty() && is_ifs_whitespace(rest.back()))
         rest.pop_back();
