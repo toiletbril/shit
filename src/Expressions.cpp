@@ -347,6 +347,10 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_assignment != nullptr);
 
+  /* Record where this assignment sits so a $LINENO in its value reports its
+     line, since a script may read it as x=$LINENO. */
+  cxt.set_current_location(source_location());
+
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
@@ -615,6 +619,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      so the redirections still run below. */
   ASSERT(m_args.count() > 0 || !m_redirections.is_empty());
 
+  /* Record where this command sits so a $LINENO in its words reports its line. */
+  cxt.set_current_location(source_location());
+
   if (cxt.should_echo()) {
     shit::print(utils::merge_tokens_to_string(m_args) + "\n");
     shit::flush();
@@ -827,6 +834,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       });
     cxt.set_positional_params(steal(call_params));
     defer { cxt.set_positional_params(steal(saved_params)); };
+
+    /* Bound the call nesting so a function that recurses without a base case
+       errors with a caret here rather than exhausting the native stack. The
+       defer decrements on every unwind path. */
+    cxt.enter_function_call(source_location());
+    defer { cxt.leave_function_call(); };
 
     /* Open a local scope so a local builtin in the body shadows a variable and
        the old value returns when the call ends. */

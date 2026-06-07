@@ -265,6 +265,12 @@ public:
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
 
+  /* The byte offset in the current source of the command being evaluated, the
+     position $LINENO reports the line of. A SimpleCommand and an assignment set
+     it as evaluation reaches them, which is the statement granularity autoconf
+     reads $LINENO at. */
+  fn set_current_location(SourceLocation location) wontthrow -> void;
+
   /* The set builtin toggles these options at run time. error_exit is set -e,
      echo_expanded is set -x, and error_unset is set -u. */
   fn set_error_exit(bool enabled) wontthrow -> void;
@@ -324,6 +330,15 @@ public:
                 bool consume_return = true,
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None) throws -> i32;
+
+  /* A guard around a nested dot-source or eval run, and one around a function
+     call. Each increments a depth counter and throws a located error past the
+     cap rather than recursing until memory is exhausted. The caller pairs the
+     enter with a defer that calls the matching leave on every unwind path. */
+  fn enter_source(SourceLocation location) throws -> void;
+  fn leave_source() wontthrow -> void;
+  fn enter_function_call(SourceLocation location) throws -> void;
+  fn leave_function_call() wontthrow -> void;
 
   /* getopts keeps the position inside the current argument here, so a grouped
      option such as -abc is parsed one letter per call. last_optind detects when
@@ -392,11 +407,24 @@ protected:
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
 
+  /* The nesting depth of dot-source and eval runs, and of function calls, each
+     bounded so a runaway recursion errors with a located message rather than
+     growing the native stack and the arena until the process is killed. A
+     pathological autoconf self-test that regenerates and re-sources a file
+     forever is the motivating case. */
+  usize m_source_depth{0};
+  usize m_function_call_depth{0};
+
   /* The pending non-local jump, Normal when none is pending. */
   control_flow m_control_flow{};
   /* The source and name of the text being evaluated, for caret formatting. */
   const String *m_current_source{nullptr};
   String m_current_origin{};
+
+  /* The byte offset in m_current_source of the command being evaluated, read by
+     $LINENO to report its line. It starts at zero so an interactive single line,
+     whose source holds no newlines, reports line 1. */
+  usize m_current_location_position{0};
 
   /* The chain of sourced-file and eval frames from the outermost down to the
      one running now, so an error deep in a nested source prints every call site

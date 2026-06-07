@@ -163,6 +163,20 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
+  /* $LINENO reports the line of the command currently evaluating. It yields to a
+     stored value above, so a script that assigns LINENO reads back what it set,
+     matching dash. With no assignment it computes the line from the current
+     source and position, which the command dispatcher keeps current. A run with
+     no real source, such as an interactive single line, reports line 1. */
+  if (name == "LINENO") {
+    const usize line =
+        m_current_source != nullptr
+            ? utils::line_number_at(m_current_source->view(),
+                                    m_current_location_position)
+            : 1;
+    return String{heap_allocator(), utils::uint_to_text(line)};
+  }
+
   if (let const env = os::get_environment_variable(name))
     return String{heap_allocator(), env->view()};
   return shit::None;
@@ -507,6 +521,57 @@ pure fn EvalContext::current_source() const wontthrow -> const String *
 pure fn EvalContext::current_origin() const wontthrow -> const String &
 {
   return m_current_origin;
+}
+
+fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
+{
+  m_current_location_position = location.position;
+}
+
+/* A cap on nested dot-source and eval runs. A configure script nests at most a
+   handful of source levels, so the cap sits far above any legitimate depth yet
+   below the point where the native call stack would overflow first, since each
+   level spends many native frames between run_source calls. A run that crosses
+   it is a runaway that would otherwise exhaust memory. */
+static constexpr usize MAX_SOURCE_DEPTH = 400;
+/* A separate, larger cap on nested function calls, since deep but finite
+   recursion in a real script is more common than deep sourcing. It too stays
+   below the native stack overflow point, which a function call reaches at a
+   greater depth because it spends fewer native frames per level. */
+static constexpr usize MAX_FUNCTION_CALL_DEPTH = 900;
+
+fn EvalContext::enter_source(SourceLocation location) throws -> void
+{
+  if (m_source_depth >= MAX_SOURCE_DEPTH) {
+    LOG(verbosity::Debug, "source depth %zu exceeds cap %zu", m_source_depth,
+        MAX_SOURCE_DEPTH);
+    throw ErrorWithLocation{location,
+                            "Maximum source/recursion depth exceeded"};
+  }
+  m_source_depth++;
+}
+
+fn EvalContext::leave_source() wontthrow -> void
+{
+  ASSERT(m_source_depth > 0);
+  m_source_depth--;
+}
+
+fn EvalContext::enter_function_call(SourceLocation location) throws -> void
+{
+  if (m_function_call_depth >= MAX_FUNCTION_CALL_DEPTH) {
+    LOG(verbosity::Debug, "function call depth %zu exceeds cap %zu",
+        m_function_call_depth, MAX_FUNCTION_CALL_DEPTH);
+    throw ErrorWithLocation{location,
+                            "Maximum source/recursion depth exceeded"};
+  }
+  m_function_call_depth++;
+}
+
+fn EvalContext::leave_function_call() wontthrow -> void
+{
+  ASSERT(m_function_call_depth > 0);
+  m_function_call_depth--;
 }
 
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
@@ -1910,6 +1975,15 @@ fn EvalContext::run_source(StringView source, StringView origin,
      so a return or a break inside the evaluated source reaches the caller. */
   if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
 
+  /* Bound the source and eval nesting so a file that sources itself, or an eval
+     that re-evals forever, errors here rather than growing the arena and the
+     backtrace stack until memory is exhausted. The cap is checked against the
+     call site so the caret points at the dot or eval, falling back to a zero
+     location when no call site is known. The leave runs at function scope on
+     every unwind path. */
+  enter_source(call_site ? *call_site : SourceLocation{0, 0});
+  defer { leave_source(); };
+
   /* The source the call site lives in, captured before set_current_source below
      changes it, so a backtrace caret renders the dot or eval against the parent
      text rather than the source about to run. It is nullptr when no call site
@@ -1987,8 +2061,16 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
     let const previous_source = m_current_source;
     let const previous_origin = m_current_origin;
+    let const previous_location_position = m_current_location_position;
     set_current_source(retained_source, String{origin});
-    defer { set_current_source(previous_source, previous_origin); };
+    /* The sourced text has its own line numbering, so $LINENO inside it counts
+       from its first line. The parent position is restored on return so the
+       caller's $LINENO resumes against the caller's source. */
+    m_current_location_position = 0;
+    defer {
+      set_current_source(previous_source, previous_origin);
+      m_current_location_position = previous_location_position;
+    };
 
     ast->evaluate(*this);
     /* A return at the top of a sourced file or an eval returns from that source
@@ -2037,6 +2119,10 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
      same length, so the cache is dropped here to keep it from serving the stale
      index of the freed source. */
   invalidate_source_line_index();
+
+  /* The $LINENO line lookup caches a newline table keyed the same way on the
+     source address and length, so it is dropped here for the same reason. */
+  utils::invalidate_line_number_cache();
 
   /* The current source frame may point at a retained copy just freed, so reset
      it to None until the next run sets it. */

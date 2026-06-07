@@ -249,6 +249,73 @@ fn int_to_text(i64 value) throws -> String
   return result;
 }
 
+/* A newline offset table cached on one source, so the line lookup is a binary
+   search over the newlines rather than a scan of the prefix. The shell reads
+   $LINENO against a single script source at a time, so one cached entry keyed on
+   the source pointer and length serves every read in that script. */
+class LineNumberCache
+{
+public:
+  LineNumberCache() : m_newline_offsets(heap_allocator()) {}
+
+  /* Build the newline table for this source when it differs from the cached one,
+     so a repeated read against the same script reuses the table. */
+  fn ensure_built_for(StringView source) throws -> void
+  {
+    if (m_source_data == source.data && m_source_length == source.count())
+      return;
+
+    m_source_data = source.data;
+    m_source_length = source.count();
+    m_newline_offsets.clear();
+
+    for (usize i = 0; i < source.count(); i++)
+      if (source[i] == '\n') m_newline_offsets.push(i);
+  }
+
+  fn invalidate() wontthrow -> void
+  {
+    m_source_data = nullptr;
+    m_source_length = 0;
+    m_newline_offsets.clear();
+  }
+
+  /* The count of newlines at a byte offset strictly less than the position. */
+  pure fn newlines_before(usize position) const wontthrow -> usize
+  {
+    usize low = 0;
+    usize high = m_newline_offsets.count();
+    while (low < high) {
+      const usize mid = low + (high - low) / 2;
+      if (m_newline_offsets[mid] < position)
+        low = mid + 1;
+      else
+        high = mid;
+    }
+    return low;
+  }
+
+private:
+  const char *m_source_data{nullptr};
+  usize m_source_length{0};
+  ArrayList<usize> m_newline_offsets;
+};
+
+static LineNumberCache LINE_NUMBER_CACHE{};
+
+fn line_number_at(StringView source, usize position) throws -> usize
+{
+  LINE_NUMBER_CACHE.ensure_built_for(source);
+  /* The first line is line 1, and each newline strictly before the byte starts a
+     new line, so the line number is one more than the newline count. */
+  return LINE_NUMBER_CACHE.newlines_before(position) + 1;
+}
+
+fn invalidate_line_number_cache() wontthrow -> void
+{
+  LINE_NUMBER_CACHE.invalidate();
+}
+
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;

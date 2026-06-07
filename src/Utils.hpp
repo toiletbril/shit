@@ -79,6 +79,19 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
    exceed the i64 range. */
 fn int_to_text(i64 value) throws -> String;
 fn uint_to_text(u64 value) throws -> String;
+
+/* The 1-based line number the byte at position falls on in source, counting the
+   newlines strictly before it. The lookup is a binary search over a newline
+   offset table cached on the source pointer and length, so a script that reads
+   $LINENO on almost every line stays O(log n) per read rather than O(n) over the
+   prefix. The cache holds one source at a time, which fits the access pattern
+   where a long script reads its own LINENO repeatedly. */
+fn line_number_at(StringView source, usize position) throws -> usize;
+
+/* Drop the cached newline table that line_number_at keeps. The host calls this
+   when it frees a retained source, so a later source allocated at the same
+   address with the same length does not read a stale table. */
+fn invalidate_line_number_cache() wontthrow -> void;
 fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>;
 fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 
