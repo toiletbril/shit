@@ -30,12 +30,11 @@ There may be unfinished goals, TODOs and FIXMEs scattered around the sources (in
 [toiletline](https://github.com/toiletbril/toiletline) as well). Feel free to
 help :3
 
-You need a C++17 compatible compiler (but currently only Clang is supported for
-Windows); GNU Make, some coreutils: `rm`, `mkdir` to build the executable;
-`cat`, `diff`, `printf` to run the tests; `clang-format`, `clang-tidy` (better
-18 or newer) to check the code.
+You need Clang 18 and later; GNU Make, some coreutils: `rm`, `mkdir` to build
+the executable; `cat`, `diff`, `printf` to run the tests; `clang-format`,
+`clang-tidy` (better 18 or newer) to check the code.
 
-The `SHIT_MODE` variable controls build type:
+The `MODE` variable controls build type:
 * `rel` is an optimized build;
 * `prof` is an optimized build with debug symbols for profiling;
 * `dbg` includes all symbols and Asan with Ubsan;
@@ -48,7 +47,7 @@ commands.
 
 An example of the excruciatingly complex build process:
 ```bash
-$ export SHIT_MODE=<rel/prof/dbg/cosmo>
+$ export MODE=<rel/prof/dbg/cosmo>
 $ make -j`nproc`
 $ ./shit --help
 ```
@@ -70,7 +69,7 @@ Is it good?
 - [x] Background jobs.
 - [x] Scripting capabilities. (flow control keywords)
 - [x] Blocks and functions.
-- [ ] `sh`-compatible.
+- [x] `sh`-compatible.
 
 Is is exceptional? 
 - [ ] Complex scripting capabilites.

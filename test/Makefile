@@ -57,7 +57,7 @@ dashdiff: $(BIN)
 	rm -f /tmp/shit_dd_s /tmp/shit_dd_d
 
 # Time the builtin-only configure script through each shell, after checking that
-# the output is identical. Use the optimized shit build, SHIT_MODE=rel, for a
+# the output is identical. Use the optimized shit build, MODE=rel, for a
 # fair comparison. SCALE scales the work, the default keeps dash near 0.1s.
 BASH ?= bash
 ZSH ?= zsh

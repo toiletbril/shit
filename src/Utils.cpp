@@ -10,6 +10,7 @@
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 
+#include <cctype>
 #include <csignal>
 #include <cstdarg>
 #include <cstdlib>

@@ -1,5 +1,5 @@
-# make SHIT_MODE=dbg/rel/prof/cosmo/cosmo_dbg
-SHIT_MODE ?= dbg
+# make MODE=dbg/rel/prof/cosmo/cosmo_dbg
+MODE ?= dbg
 
 SOURCES := $(wildcard *.cpp)
 HEADERS := $(wildcard *.hpp)
@@ -10,8 +10,8 @@ SOURCES += $(wildcard */**.cpp)
 HEADERS += $(wildcard */**.hpp)
 
 # Translate a list of <...>.cpp files to a list of paths like
-# o/$SHIT_MODE/<...>.o.
-OBJECTS := $(SOURCES:%.cpp=o/$(SHIT_MODE)/%.o)
+# o/$MODE/<...>.o.
+OBJECTS := $(SOURCES:%.cpp=o/$(MODE)/%.o)
 # One dependency file per object, written by the compiler, so a header edit
 # rebuilds every source that includes it.
 DEPS := $(OBJECTS:.o=.d)
@@ -24,17 +24,17 @@ OUT := ../shit
 DEVNULL := "/dev/null"
 endif
 
-ifeq ($(SHIT_MODE), cosmo)
+ifeq ($(MODE), cosmo)
 CXX := cosmoc++
-else ifeq ($(SHIT_MODE), cosmo_dbg)
+else ifeq ($(MODE), cosmo_dbg)
 CXX := cosmoc++
 else ifeq ($(OS), Windows_NT)
 CXX := clang++
 endif
 
-ifeq ($(SHIT_MODE), cosmo)
+ifeq ($(MODE), cosmo)
 OS_INFO := "unknown-cosmo"
-else ifeq ($(SHIT_MODE), cosmo_dbg)
+else ifeq ($(MODE), cosmo_dbg)
 OS_INFO := "unknown-cosmo-dbg"
 else
 OS_INFO := $(shell uname -rvom || echo "<no uname>")
@@ -50,7 +50,7 @@ DEFINES := \
 	-DSHIT_COMPILER_COMMAND="\"$(CXX)\"" \
 	-DSHIT_OS_INFO="\"$(OS_INFO)\"" \
 	-DSHIT_COMMIT_HASH="\"$(COMMIT_HASH)\"" \
-	-DSHIT_BUILD_MODE="\"$(SHIT_MODE)\"" \
+	-DSHIT_BUILD_MODE="\"$(MODE)\"" \
 	-DSHIT_ENVCXXFLAGS="\"$(ENVCXXFLAGS)\""
 
 CXXFLAGS := \
@@ -88,7 +88,7 @@ else
 USE_LD :=
 endif
 
-ifeq ($(SHIT_MODE), rel)
+ifeq ($(MODE), rel)
 # Link-time optimization merges the duplicated header-only template containers
 # across translation units, which the per-unit compile cannot do on its own.
 CXXFLAGS += \
@@ -107,19 +107,19 @@ CXXFLAGS += \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif
-else ifeq ($(SHIT_MODE), dbg)
+else ifeq ($(MODE), dbg)
 CXXFLAGS += \
 	-fno-omit-frame-pointer \
 	-g3 \
 	-O0
 ifneq ($(OS), Windows_NT)
-ifneq ($(SHIT_MODE), cosmo)
+ifneq ($(MODE), cosmo)
 CXXFLAGS += \
 	-fsanitize=address \
 	-fsanitize=undefined
 endif
 endif
-else ifeq ($(SHIT_MODE), cosmo)
+else ifeq ($(MODE), cosmo)
 CXXFLAGS += \
 	-mcosmo \
 	-mtiny \
@@ -128,18 +128,18 @@ CXXFLAGS += \
 	-DNDEBUG \
 	-O3
 ifneq ($(CXX), cosmoc++)
-$(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo)
+$(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
 endif
-else ifeq ($(SHIT_MODE), cosmo_dbg)
+else ifeq ($(MODE), cosmo_dbg)
 CXXFLAGS += \
 	-mcosmo \
 	-mdbg \
 	-fexceptions \
 	-g3
 ifneq ($(CXX), cosmoc++)
-$(error Your CXX is "$(CXX)" instead of "cosmoc++" for SHIT_MODE=cosmo_dbg)
+$(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo_dbg)
 endif
-else ifeq ($(SHIT_MODE), prof)
+else ifeq ($(MODE), prof)
 # Optimized like rel, but keep frame pointers and symbols so a profiler can
 # unwind, and drop the line editor so the terminal handling does not perturb
 # the measurement.
@@ -157,7 +157,7 @@ CXXFLAGS += \
 LINK_LIBS += -lsupc++
 endif
 else
-$(error Invalid SHIT_MODE=$(SHIT_MODE). Available modes are "dbg", "rel", "prof", "cosmo")
+$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cosmo")
 endif
 
 # The command-substitution drain runs on a pthread, so every POSIX build links
@@ -176,9 +176,9 @@ CXXFLAGS += \
 	-ladvapi32
 endif
 
-# Making objects in o/$SHIT_MODE/<...>.o. -MMD writes the header dependency
+# Making objects in o/$MODE/<...>.o. -MMD writes the header dependency
 # list next to each object, and -MP guards against a removed header.
-o/$(SHIT_MODE)/%.o: %.cpp
+o/$(MODE)/%.o: %.cpp
 	printf "\t%-42s $@\n" $<
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
 
@@ -188,8 +188,8 @@ $(OUT): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(USE_LD) $(OBJECTS) $(LINK_LIBS) -o $@
 
 dirs: $(DIRS)
-	mkdir -p o/$(SHIT_MODE)/
-	mkdir -p o/$(SHIT_MODE)/$<
+	mkdir -p o/$(MODE)/
+	mkdir -p o/$(MODE)/$<
 
 shit: dirs
 	$(MAKE) $(OUT)

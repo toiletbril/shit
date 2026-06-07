@@ -8,6 +8,7 @@
 #include "Utils.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <csignal>
 #include <cstdarg>
 #include <cstring>
