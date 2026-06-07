@@ -1,0 +1,41 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign IFS=:]
+  [CompoundListCondition, None]
+    [Assign x=a::b:c]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$1][$2][$3][$4] n=$#"]
+[Word
+  Unquoted "IFS=:"
+]
+[Word
+  Unquoted "x=a::b:c"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "1"
+  DoubleQuoted "]["
+  Variable "2"
+  DoubleQuoted "]["
+  Variable "3"
+  DoubleQuoted "]["
+  Variable "4"
+  DoubleQuoted "] n="
+  Variable "#"
+]
+[a][][b][c] n=4
+[Code 0]
