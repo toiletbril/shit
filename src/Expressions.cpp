@@ -633,6 +633,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   let program_args = cxt.process_args(m_args);
   expand_command_aliases(cxt, program_args);
 
+  /* A bare exec, the word exec with no further argument, applies its
+     redirections to the shell's own descriptors permanently rather than around
+     a single command. A function named exec shadows the builtin the same way a
+     function shadows any command, so a shadowing function takes the ordinary
+     path. The redirection loop below routes each entry to the permanent path
+     instead of the temporary save and restore path when this is set. */
+  const bool is_bare_exec =
+      program_args.count() == 1 && program_args[0] == "exec" &&
+      !(cxt.has_functions() && cxt.find_function(program_args[0]) != nullptr);
+
   /* Open the redirection targets. A redirection takes effect even when the
      command expands to None, so > file with no command still creates the
      file. The final descriptors pass to the exec context, which closes them,
@@ -679,6 +689,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         throw Error{"Could not stage the heredoc body: " +
                     os::last_system_error_message()};
 
+      /* A bare exec heredoc points the shell's standard input at the staged
+         body for good and drops the temporary descriptor. */
+      if (is_bare_exec) {
+        shit::flush();
+        const os::descriptor body_fd = opened.take();
+        os::replace_descriptor(redir.fd, body_fd);
+        if (body_fd != redir.fd) os::close_fd(body_fd);
+        continue;
+      }
+
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
       redirect_in_fd = opened.take();
       continue;
@@ -691,6 +711,33 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         redir.kind == Redirection::Kind::DuplicateInput)
     {
       const i32 from_fd = resolve_duplication_fd(redir, cxt);
+
+      /* A bare exec applies a duplication to the shell's own descriptor for
+         good, with no backup, so the copy or the close stays in effect for
+         every later command. The flush keeps buffered output on the original
+         descriptor before it moves. */
+      if (is_bare_exec) {
+        shit::flush();
+
+        if (from_fd == Redirection::DUP_FD_CLOSE) {
+          os::close_shell_fd(redir.fd);
+          continue;
+        }
+
+        /* A duplication onto a closed or invalid descriptor, as in exec 6>&9
+           with fd 9 closed, fails the dup2. The exec fails with a located error
+           and the shell keeps the descriptor unchanged, matching dash. */
+        if (!os::replace_descriptor(redir.fd,
+                                    os::descriptor_for_shell_fd(from_fd)))
+        {
+          const SourceLocation location = redir.target != nullptr
+                                              ? redir.target->source_location()
+                                              : source_location();
+          throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
+                                                ": Bad file descriptor"};
+        }
+        continue;
+      }
 
       /* A descriptor copied onto itself, as in 1>&1, changes nothing. The
          standard error and output cross-routing keeps the flag fast path, since
@@ -762,6 +809,23 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                                   "': " + os::last_system_error_message()};
     }
     const os::descriptor file_fd = opened.take();
+
+    /* A bare exec points the shell's own descriptor at the opened file for
+       good, then drops the temporary descriptor the open returned. The dup2
+       onto fd N replaces whatever fd N held before, so a second exec onto the
+       same number closes the earlier file rather than leaking it. The flush
+       keeps buffered output on the original descriptor before it moves. */
+    if (is_bare_exec) {
+      shit::flush();
+      const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
+      if (file_fd != redir.fd) os::close_fd(file_fd);
+      if (!was_replaced) {
+        throw ErrorWithLocation{redir.target->source_location(),
+                                utils::int_to_text(redir.fd) +
+                                    ": Bad file descriptor"};
+      }
+      continue;
+    }
 
     /* The last redirection of a descriptor wins, so a superseded open closes
        at once. */

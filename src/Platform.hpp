@@ -209,6 +209,18 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
    duplication like 2>&1 that points one shell descriptor at another. */
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor;
 
+/* Point shell_fd at target permanently, the way exec with redirections and no
+   command does. Unlike save_and_replace_descriptor it takes no backup, so the
+   descriptor stays pointed at target for every later command until exec changes
+   or closes it again. Returns false when the dup2 fails, as from a duplication
+   onto a closed descriptor. The target descriptor is left for the caller to
+   close, since it was a temporary file or a copy of another descriptor. */
+fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool;
+
+/* Close shell_fd permanently, the way exec N>&- does. Returns false when the
+   descriptor was not open. */
+fn close_shell_fd(i32 shell_fd) wontthrow -> bool;
+
 fn get_environment_variable(StringView key) throws -> Maybe<String>;
 fn set_environment_variable(StringView key, StringView value) throws -> void;
 fn unset_environment_variable(StringView key) throws -> void;

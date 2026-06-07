@@ -111,6 +111,20 @@ fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
   return shell_fd;
 }
 
+fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
+{
+  /* A self copy, as in exec 1>&1, already has the descriptor where it belongs,
+     so the dup2 onto itself is skipped to avoid clearing the close-on-exec the
+     caller may rely on. */
+  if (target == shell_fd) return true;
+  return dup2(target, shell_fd) != -1;
+}
+
+fn close_shell_fd(i32 shell_fd) wontthrow -> bool
+{
+  return close(shell_fd) != -1;
+}
+
 fn get_current_user() throws -> Maybe<String>
 {
   /* The name comes from the environment rather than getpwuid, which a static
@@ -773,6 +787,27 @@ fn descriptor_for_shell_fd(i32 shell_fd) -> os::descriptor
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return SHIT_INVALID_FD;
   return GetStdHandle(*slot);
+}
+
+fn replace_descriptor(i32 shell_fd, os::descriptor target) -> bool
+{
+  /* Windows addresses only the three standard streams, so a higher descriptor
+     number has no slot to point at target. */
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) return false;
+  if (target == INVALID_HANDLE_VALUE) return false;
+  SetStdHandle(*slot, target);
+  return true;
+}
+
+fn close_shell_fd(i32 shell_fd) -> bool
+{
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) return false;
+  const os::descriptor handle = GetStdHandle(*slot);
+  SetStdHandle(*slot, INVALID_HANDLE_VALUE);
+  if (handle == INVALID_HANDLE_VALUE) return false;
+  return CloseHandle(handle);
 }
 
 fn get_current_user() -> Maybe<String>
