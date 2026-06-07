@@ -60,6 +60,7 @@ dashdiff: $(BIN)
 # the output is identical. Use the optimized shit build, SHIT_MODE=rel, for a
 # fair comparison. SCALE scales the work, the default keeps dash near 0.1s.
 BASH ?= bash
+ZSH ?= zsh
 BENCH := bench/configure.shit
 SCALE ?= 40
 
@@ -74,7 +75,7 @@ bench: $(BIN)
 	fi; \
 	echo "wall-clock seconds at SCALE=$(SCALE), lower is better:"; \
 	$(BASH) -c 'export TIMEFORMAT="  %R"; \
-		for sh in "$(DASH)" "$(BASH)" "$(BIN)"; do \
+		for sh in "$(DASH)" "$(BASH)" "$(ZSH)" "$(BIN)"; do \
 			printf "  %-10s" "$$sh"; \
 			( time SCALE=$(SCALE) $$sh $(BENCH) >/dev/null 2>&1 ) 2>&1; \
 		done'; \
