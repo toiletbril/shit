@@ -11,16 +11,27 @@
 
 namespace shit {
 
-/* An owned, growable byte string over an explicit allocator. There is no
-   small-string buffer yet, so every non-empty string is one allocation, which a
-   bump arena makes cheap. The buffer keeps a trailing null so c_str is free. */
+/* An owned, growable byte string over an explicit allocator. A short string
+   lives in the inline buffer with no allocation, since the arithmetic loop
+   churns tiny strings through malloc and free. A longer string lives in a
+   heap or arena buffer. Either way m_data is the access pointer and the buffer
+   keeps a trailing null so c_str is free. */
 class String
 {
 public:
-  /* A default String is heap-backed and empty, so it can serve as a container
-     slot before its real allocator and value are assigned. */
-  String() : m_allocator(heap_allocator()) {}
-  explicit String(Allocator allocator) : m_allocator(allocator) {}
+  /* The inline buffer length. A string shorter than this, counting the trailing
+     null, lives inline. The value keeps sizeof(String) at forty-eight bytes
+     next to the sixteen-byte allocator and the three size words. */
+  static constexpr usize INLINE_CAPACITY = 24;
+
+  /* A default String is inline and empty, so it can serve as a container slot
+     before its real allocator and value are assigned. The default allocator is
+     heap, which only matters once the string grows past the inline buffer. */
+  String() : m_allocator(heap_allocator()) { reset_to_inline(); }
+  explicit String(Allocator allocator) : m_allocator(allocator)
+  {
+    reset_to_inline();
+  }
   String(Allocator allocator, StringView initial) throws;
   /* Heap-backed conversions from a literal or a view. The literal form wins
      over the view form for a const char*, since it is a single conversion. */
@@ -128,10 +139,27 @@ public:
 private:
   fn free_storage() wontthrow -> void;
 
+  /* True when the string lives in the inline buffer rather than an allocation. */
+  mustuse pure fn is_inline() const wontthrow -> bool
+  {
+    return m_data == m_inline;
+  }
+
+  /* Point the string at its empty inline buffer. The caller must have already
+     released any heap storage, since this overwrites the data pointer. */
+  fn reset_to_inline() wontthrow -> void
+  {
+    m_data = m_inline;
+    m_inline[0] = '\0';
+    m_length = 0;
+    m_capacity = INLINE_CAPACITY;
+  }
+
   Allocator m_allocator;
   char *m_data{nullptr};
   usize m_length{0};
   usize m_capacity{0};
+  char m_inline[INLINE_CAPACITY];
 };
 
 /* Concatenate two byte ranges into a fresh heap String. A String and a literal

@@ -5,32 +5,44 @@ namespace shit {
 String::String(Allocator allocator, StringView initial) throws
     : m_allocator(allocator)
 {
+  reset_to_inline();
   append(initial);
 }
 
 String::String(const char *cstr) throws : m_allocator(heap_allocator())
 {
+  reset_to_inline();
   append(StringView{cstr});
 }
 
 String::String(StringView initial) throws : m_allocator(heap_allocator())
 {
+  reset_to_inline();
   append(initial);
 }
 
 String::String(const String &other) throws : m_allocator(other.m_allocator)
 {
+  reset_to_inline();
   append(other.view());
 }
 
-String::String(String &&other) wontthrow : m_allocator(other.m_allocator),
-                                           m_data(other.m_data),
-                                           m_length(other.m_length),
-                                           m_capacity(other.m_capacity)
+/* An inline source cannot have its pointer stolen, since the bytes live in its
+   own object, so they are copied into this inline buffer. A heap source hands
+   over its allocation and is left valid and empty. */
+String::String(String &&other) wontthrow : m_allocator(other.m_allocator)
 {
-  other.m_data = nullptr;
-  other.m_length = 0;
-  other.m_capacity = 0;
+  if (other.is_inline()) {
+    std::memcpy(m_inline, other.m_inline, other.m_length + 1);
+    m_data = m_inline;
+    m_length = other.m_length;
+    m_capacity = INLINE_CAPACITY;
+  } else {
+    m_data = other.m_data;
+    m_length = other.m_length;
+    m_capacity = other.m_capacity;
+    other.reset_to_inline();
+  }
 }
 
 fn String::operator=(const String &other) throws -> String &
@@ -47,12 +59,17 @@ fn String::operator=(String &&other) wontthrow -> String &
   if (this != &other) {
     free_storage();
     m_allocator = other.m_allocator;
-    m_data = other.m_data;
-    m_length = other.m_length;
-    m_capacity = other.m_capacity;
-    other.m_data = nullptr;
-    other.m_length = 0;
-    other.m_capacity = 0;
+    if (other.is_inline()) {
+      std::memcpy(m_inline, other.m_inline, other.m_length + 1);
+      m_data = m_inline;
+      m_length = other.m_length;
+      m_capacity = INLINE_CAPACITY;
+    } else {
+      m_data = other.m_data;
+      m_length = other.m_length;
+      m_capacity = other.m_capacity;
+      other.reset_to_inline();
+    }
   }
   return *this;
 }
@@ -82,14 +99,19 @@ fn String::append(StringView other) throws -> void
 fn String::reserve(usize needed) throws -> void
 {
   if (needed + 1 <= m_capacity) return;
-  usize new_capacity = m_capacity == 0 ? 16 : m_capacity * 2;
+  usize new_capacity = m_capacity * 2;
   while (new_capacity < needed + 1)
     new_capacity *= 2;
   char *fresh = m_allocator.alloc_array<char>(new_capacity);
-  if (m_length > 0) std::memcpy(fresh, m_data, m_length);
-  fresh[m_length] = '\0';
+  usize const preserved_length = m_length;
+  if (preserved_length > 0) std::memcpy(fresh, m_data, preserved_length);
+  fresh[preserved_length] = '\0';
+  /* Release the old allocation before adopting the fresh one. An inline buffer
+     owns no allocation, so free_storage leaves it alone. The reset clears
+     m_length, so it is restored from the preserved value afterwards. */
   free_storage();
   m_data = fresh;
+  m_length = preserved_length;
   m_capacity = new_capacity;
 }
 
@@ -139,9 +161,12 @@ fn String::find_last_character(char wanted) const wontthrow -> Maybe<usize>
 
 fn String::free_storage() wontthrow -> void
 {
-  if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
-  m_data = nullptr;
-  m_capacity = 0;
+  /* Only a heap or arena buffer is freed. The inline buffer is part of the
+     object. The reset leaves the object a valid empty inline string, which is
+     moot in the destructor and required in operator= where the object lives on. */
+  if (m_data != nullptr && m_data != m_inline)
+    m_allocator.free_array(m_data, m_capacity);
+  reset_to_inline();
 }
 
 fn operator+(StringView left, StringView right) throws->String
