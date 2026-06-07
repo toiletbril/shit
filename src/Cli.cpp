@@ -216,7 +216,13 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
     }
 
     if (ignore_rest || argv[i][0] != '-') {
+      /* The program name is the first operand and does not end option parsing.
+         The next operand is the script, after which every argument belongs to
+         the script as a positional parameter, not to the shell, the way
+         `sh script -x` passes -x to the script. */
+      const bool is_program_name = args.is_empty();
       args.push(String{heap_allocator(), StringView{argv[i]}});
+      if (!is_program_name) ignore_rest = true;
       continue;
     }
 
