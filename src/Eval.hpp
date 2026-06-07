@@ -383,11 +383,18 @@ public:
   pure fn last_expansion_count() const wontthrow -> usize;
   pure fn total_expansion_count() const wontthrow -> usize;
 
+  pure fn commands_evaluated() const wontthrow -> usize;
+  pure fn peak_ast_arena_bytes() const wontthrow -> usize;
+
 protected:
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
   usize m_expansions_last{0};
   usize m_expansions_total{0};
+  usize m_commands_evaluated{0};
+  /* The largest live AST arena footprint seen at the end of any command. The
+     stats path samples the arena once per command, off the hot path. */
+  usize m_peak_ast_arena_bytes{0};
 
   BumpArena m_scratch_arena{};
   HashMap<String> m_shell_variables{heap_allocator()};

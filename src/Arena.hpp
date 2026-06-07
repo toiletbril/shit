@@ -28,6 +28,10 @@ public:
   fn owns(const void *pointer) const wontthrow -> bool;
   fn reset() wontthrow -> void;
 
+  /* Sum the live bump bytes across every block. The stats path reads it to
+     report how much the current command's tree occupies. */
+  fn bytes_used() const wontthrow -> usize;
+
   /* A saved bump position, so a scope can reclaim everything it allocated above
      the mark while leaving earlier allocations alone. The marks nest, so a
      command substitution inside an expansion releases only its own region. */

@@ -82,6 +82,14 @@ hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
   return false;
 }
 
+fn BumpArena::bytes_used() const wontthrow -> usize
+{
+  usize total = 0;
+  for (const block &block : m_blocks)
+    total += block.used;
+  return total;
+}
+
 fn BumpArena::mark() const wontthrow -> BumpArena::Mark
 {
   if (m_blocks.is_empty()) return Mark{0, 0, m_destructors.count()};

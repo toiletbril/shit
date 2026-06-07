@@ -49,6 +49,15 @@ fn EvalContext::end_command() wontthrow -> void
 {
   m_expansions_total += m_expansions_last;
   m_expressions_executed_total += m_expressions_executed_last;
+  m_commands_evaluated++;
+
+  /* Sample the arena before the next command resets it, so the peak reflects
+     the largest tree this run has built. The arena is null only outside a
+     parse, which end_command never runs in. */
+  if (AST_ARENA != nullptr) {
+    const usize used = AST_ARENA->bytes_used();
+    if (used > m_peak_ast_arena_bytes) m_peak_ast_arena_bytes = used;
+  }
 
   m_expansions_last = m_expressions_executed_last = 0;
 }
@@ -1004,8 +1013,20 @@ cold fn EvalContext::make_stats_string() const throws -> String
 {
   let s = String{};
 
+  /* Stats print before end_command runs the per-command rollup, so the live
+     arena is sampled here and the current command is counted as one beyond the
+     completed total. */
+  const usize live_ast_arena_bytes =
+      AST_ARENA != nullptr ? AST_ARENA->bytes_used() : 0;
+  const usize peak_ast_arena_bytes =
+      live_ast_arena_bytes > m_peak_ast_arena_bytes ? live_ast_arena_bytes
+                                                     : m_peak_ast_arena_bytes;
+
   s += "[Stats\n";
 
+  s += EXPRESSION_DOUBLE_AST_INDENT;
+  s += "Commands evaluated: " + utils::uint_to_text(m_commands_evaluated + 1);
+  s += '\n';
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Expansions: " + utils::uint_to_text(last_expansion_count());
   s += '\n';
@@ -1018,6 +1039,12 @@ cold fn EvalContext::make_stats_string() const throws -> String
   s += EXPRESSION_DOUBLE_AST_INDENT;
   s += "Total nodes evaluated: " +
        utils::uint_to_text(total_expressions_executed());
+  s += '\n';
+  s += EXPRESSION_DOUBLE_AST_INDENT;
+  s += "AST arena bytes: " + utils::uint_to_text(live_ast_arena_bytes);
+  s += '\n';
+  s += EXPRESSION_DOUBLE_AST_INDENT;
+  s += "Peak AST arena bytes: " + utils::uint_to_text(peak_ast_arena_bytes);
   s += '\n';
 
   s += "]";
@@ -1058,6 +1085,16 @@ pure fn EvalContext::last_expansion_count() const wontthrow -> usize
 pure fn EvalContext::total_expansion_count() const wontthrow -> usize
 {
   return m_expansions_total + m_expansions_last;
+}
+
+pure fn EvalContext::commands_evaluated() const wontthrow -> usize
+{
+  return m_commands_evaluated;
+}
+
+pure fn EvalContext::peak_ast_arena_bytes() const wontthrow -> usize
+{
+  return m_peak_ast_arena_bytes;
 }
 
 /* TODO: Test symlinks. */

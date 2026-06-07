@@ -10,6 +10,7 @@
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
+#include "Trace.hpp"
 #include "Utils.hpp"
 
 #include <cstdlib>
@@ -56,7 +57,12 @@ FLAG(ESCAPE_MAP, Bool, 'M', "escape-bitmap",
 FLAG(EXIT_CODE, Bool, 'E', "exit-code",
      "Print exit code after each executed command.");
 FLAG(STATS, Bool, 'S', "stats",
-     "Print statistics after each executed command.");
+     "Print statistics after each executed command, including commands "
+     "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
+     "peak.");
+FLAG(NO_COMPLETION, Bool, 'T', "no-completion",
+     "Disable interactive tab completion and ghost-text.");
+FLAG(LOG, Bool, 'X', "log", "Enable verbose internal logging to stderr.");
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, 'V', "short-version",
@@ -312,6 +318,11 @@ fn main(int argc, char **argv) -> int
     return EXIT_SUCCESS;
   }
 
+  /* Raise the runtime log level before any helper runs, so the trace covers
+     startup. The default stays Warn, so a run without -X pays one comparison
+     per LOG call and prints nothing. */
+  if (FLAG_LOG.is_enabled()) shit::LOGGER_VERBOSITY = shit::verbosity::All;
+
   /* Program path is the first argument. Pull it out and get rid of it. */
   shit::String program_path{};
 
@@ -527,8 +538,11 @@ fn main(int argc, char **argv) -> int
           shit::utils::initialize_path_map();
           toiletline::initialize();
           /* The line editor only completes at an interactive prompt, so the
-             engine is registered here and never on the script or -c path. */
-          toiletline::enable_completion(context);
+             engine is registered here and never on the script or -c path. The
+             -T flag leaves it unregistered, so the editor runs with no
+             completion callback and no ghost-text. */
+          if (!FLAG_NO_COMPLETION.is_enabled())
+            toiletline::enable_completion(context);
           shit::show_message("Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
