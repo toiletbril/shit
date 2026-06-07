@@ -608,6 +608,32 @@ public:
   pure fn program_path() const wontthrow -> const Path &;
   pure fn builtin_kind() const wontthrow -> const Builtin::Kind &;
 
+  /* Apply the 2>&1 and 1>&2 cross-routing in the order the source wrote them.
+     Each duplication reads the current target of its source descriptor, so when
+     both are present the one that came last in the source must run last. The
+     two callables carry the platform's own way to point one descriptor at the
+     other, a posix_spawn file action, a dup2, or a Windows handle assignment.
+     Apply_err_to_out points the standard error at the standard output for 2>&1,
+     and apply_out_to_err the reverse for 1>&2. */
+  template <typename ApplyErrToOut, typename ApplyOutToErr>
+  fn apply_dup_routing(ApplyErrToOut apply_err_to_out,
+                       ApplyOutToErr apply_out_to_err) const -> void
+  {
+    if (dup_err_to_out && dup_out_to_err) {
+      if (dup_out_to_err_came_last) {
+        apply_err_to_out();
+        apply_out_to_err();
+      } else {
+        apply_out_to_err();
+        apply_err_to_out();
+      }
+    } else if (dup_err_to_out) {
+      apply_err_to_out();
+    } else if (dup_out_to_err) {
+      apply_out_to_err();
+    }
+  }
+
 private:
   ExecContext(SourceLocation location, ResolvedCommand &&kind,
               ArrayList<String> &&args);

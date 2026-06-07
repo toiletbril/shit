@@ -485,6 +485,28 @@ namespace {
 
 using expressions::Redirection;
 
+/* Route an opened descriptor into one of the three standard slots a stage
+   carries. A target fd of 0 is the standard input, 2 the standard error, and
+   any other number the standard output, since a pipeline stage and an exec
+   context only express those three. The last redirection of a descriptor wins,
+   so a descriptor already in the slot closes before the new one takes its
+   place. */
+fn assign_standard_fd(Maybe<os::descriptor> &in_fd, Maybe<os::descriptor> &out_fd,
+                      Maybe<os::descriptor> &err_fd, i32 fd,
+                      os::descriptor file_fd) throws -> void
+{
+  if (fd == 0) {
+    if (in_fd) os::close_fd(*in_fd);
+    in_fd = file_fd;
+  } else if (fd == 2) {
+    if (err_fd) os::close_fd(*err_fd);
+    err_fd = file_fd;
+  } else {
+    if (out_fd) os::close_fd(*out_fd);
+    out_fd = file_fd;
+  }
+}
+
 /* Resolve the descriptor a duplication copies from. A literal descriptor and
    the close form were settled at parse time and pass straight through. A
    dynamic word such as $4 is expanded to one field here, where a dash means
@@ -585,16 +607,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     }
     const os::descriptor file_fd = opened.take();
 
-    if (redir.fd == 0) {
-      if (ec.in_fd) os::close_fd(*ec.in_fd);
-      ec.in_fd = file_fd;
-    } else if (redir.fd == 2) {
-      if (ec.err_fd) os::close_fd(*ec.err_fd);
-      ec.err_fd = file_fd;
-    } else {
-      if (ec.out_fd) os::close_fd(*ec.out_fd);
-      ec.out_fd = file_fd;
-    }
+    assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, redir.fd, file_fd);
   }
 }
 
@@ -616,21 +629,16 @@ namespace {
 fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     -> void
 {
-  ArrayList<String> already_expanded{};
+  HashSet already_expanded{heap_allocator()};
 
   while (!args.is_empty()) {
     let const &word = args[0];
 
-    bool seen = false;
-    for (const String &name : already_expanded)
-      if (name == word) seen = true;
-    if (seen) break;
+    if (already_expanded.contains(word.view())) break;
 
     let const body = cxt.get_alias(word);
     if (!body.has_value()) break;
-    already_expanded.push(String{
-        heap_allocator(), StringView{word.c_str(), word.count()}
-    });
+    already_expanded.add(word.view());
 
     /* The alias body replaces the first word, so the split words go in front of
        the remaining arguments. ArrayList has no in-place erase, so the new list
@@ -906,18 +914,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       continue;
     }
 
-    /* The last redirection of a descriptor wins, so a superseded open closes
-       at once. */
-    if (redir.fd == 0) {
-      if (redirect_in_fd) os::close_fd(*redirect_in_fd);
-      redirect_in_fd = file_fd;
-    } else if (redir.fd == 2) {
-      if (redirect_err_fd) os::close_fd(*redirect_err_fd);
-      redirect_err_fd = file_fd;
-    } else {
-      if (redirect_out_fd) os::close_fd(*redirect_out_fd);
-      redirect_out_fd = file_fd;
-    }
+    assign_standard_fd(redirect_in_fd, redirect_out_fd, redirect_err_fd,
+                       redir.fd, file_fd);
   }
 
   /* An expansion may drop every word, for example an unset $x used as the whole
