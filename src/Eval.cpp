@@ -151,26 +151,27 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   const char first_byte = name.is_empty() ? '\0' : name[0];
 
   if (name.count() == 1) {
-    if (first_byte == '?')
+    switch (first_byte) {
+    case '?':
       return String{heap_allocator(), utils::int_to_text(m_last_exit_status)};
-    if (first_byte == '$')
+    case '$':
       return String{heap_allocator(),
                     utils::int_to_text(os::get_shell_process_id())};
-    if (first_byte == '!')
+    case '!':
       return m_last_background_pid
                  ? String{heap_allocator(),
                           utils::int_to_text(*m_last_background_pid)}
                  : String{};
-    if (first_byte == '-')
-      return String{heap_allocator(), option_flags_string()};
-    if (first_byte == '#')
+    case '-': return String{heap_allocator(), option_flags_string()};
+    case '#':
       return String{heap_allocator(),
                     utils::uint_to_text(m_positional_params.count())};
-    if (first_byte == '0') return String{heap_allocator(), m_shell_name};
+    case '0': return String{heap_allocator(), m_shell_name};
 
     /* $* and $@ outside the special quoted handling join into a single word. $*
        joins with the first IFS character, $@ joins with a space. */
-    if (first_byte == '*' || first_byte == '@') {
+    case '*':
+    case '@': {
       let separator = ' ';
       let has_separator = true;
       if (first_byte == '*') {
@@ -184,6 +185,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         joined.append(m_positional_params[i].view());
       }
       return joined;
+    }
+
+    default: break;
     }
   }
 
@@ -867,49 +871,53 @@ hot fn EvalContext::expand_variable(StringView name) const throws -> String
 
 namespace {
 
-/* Remove the shortest or longest prefix of value that matches pattern as a
-   glob, returning the remainder. */
-fn trim_matching_prefix(StringView value, StringView pattern,
-                        bool longest) throws -> String
-{
-  let active = ArrayList<bool>{heap_allocator()};
-  for (usize k = 0; k < pattern.length; k++)
-    active.push(true);
-  if (longest) {
-    for (usize length = value.length;; length--) {
-      if (utils::glob_matches(pattern, value.substring_of_length(0, length),
-                              active, 0))
-        return String{heap_allocator(), value.substring(length)};
-      if (length == 0) break;
-    }
-  } else {
-    for (usize length = 0; length <= value.length; length++) {
-      if (utils::glob_matches(pattern, value.substring_of_length(0, length),
-                              active, 0))
-        return String{heap_allocator(), value.substring(length)};
-    }
-  }
-  return String{heap_allocator(), value};
-}
+enum class TrimEnd {
+  Prefix,
+  Suffix,
+};
 
-/* Remove the shortest or longest suffix of value that matches pattern as a
-   glob, returning the head. */
-fn trim_matching_suffix(StringView value, StringView pattern,
-                        bool longest) throws -> String
+/* Remove the shortest or longest prefix or suffix of value that matches pattern
+   as a glob, returning the surviving part. The candidate substrings are views
+   over value, so only the returned remainder allocates, and the pattern's
+   all-active glob mask is built once rather than per length tested. */
+fn trim_matching(StringView value, StringView pattern, TrimEnd end,
+                 bool longest) throws -> String
 {
   let active = ArrayList<bool>{heap_allocator()};
   for (usize k = 0; k < pattern.length; k++)
     active.push(true);
-  if (longest) {
-    for (usize start = 0; start <= value.length; start++) {
-      if (utils::glob_matches(pattern, value.substring(start), active, 0))
-        return String{heap_allocator(), value.substring_of_length(0, start)};
+
+  if (end == TrimEnd::Prefix) {
+    /* The longest match scans down from the whole string and the shortest
+       scans up from the empty prefix, so the first hit is the wanted length. */
+    if (longest) {
+      for (usize length = value.length;; length--) {
+        if (utils::glob_matches(pattern, value.substring_of_length(0, length),
+                                active, 0))
+          return String{heap_allocator(), value.substring(length)};
+        if (length == 0) break;
+      }
+    } else {
+      for (usize length = 0; length <= value.length; length++) {
+        if (utils::glob_matches(pattern, value.substring_of_length(0, length),
+                                active, 0))
+          return String{heap_allocator(), value.substring(length)};
+      }
     }
   } else {
-    for (usize start = value.length;; start--) {
-      if (utils::glob_matches(pattern, value.substring(start), active, 0))
-        return String{heap_allocator(), value.substring_of_length(0, start)};
-      if (start == 0) break;
+    /* The longest match scans the suffix start up from byte zero and the
+       shortest scans down from the end, so the first hit is the wanted start. */
+    if (longest) {
+      for (usize start = 0; start <= value.length; start++) {
+        if (utils::glob_matches(pattern, value.substring(start), active, 0))
+          return String{heap_allocator(), value.substring_of_length(0, start)};
+      }
+    } else {
+      for (usize start = value.length;; start--) {
+        if (utils::glob_matches(pattern, value.substring(start), active, 0))
+          return String{heap_allocator(), value.substring_of_length(0, start)};
+        if (start == 0) break;
+      }
     }
   }
   return String{heap_allocator(), value};
@@ -1163,14 +1171,14 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   case '#': {
     let const value = current.value_or(String{});
-    return trim_matching_prefix(value.view(), expand_modifier_word(word),
-                                is_doubled);
+    return trim_matching(value.view(), expand_modifier_word(word),
+                         TrimEnd::Prefix, is_doubled);
   }
 
   case '%': {
     let const value = current.value_or(String{});
-    return trim_matching_suffix(value.view(), expand_modifier_word(word),
-                                is_doubled);
+    return trim_matching(value.view(), expand_modifier_word(word),
+                         TrimEnd::Suffix, is_doubled);
   }
 
   default: return expand_variable(name);
@@ -2070,21 +2078,54 @@ hot fn EvalContext::expand_word(const Word &word) throws
     has_current = true;
   };
 
-  /* A split run breaks into fields on every IFS run. Leading and trailing IFS
-     leave no empty field behind, since flush only emits a started field. */
+  /* A field with no bytes is still pushed, which a non-whitespace IFS delimiter
+     run needs so that an empty field between two delimiters survives. flush
+     alone emits only a started field and so cannot stand in here. */
+  auto emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
+
+  /* IFS whitespace folds and a non-whitespace IFS byte delimits one field each,
+     matching dash. A single forward pass classifies every byte as a field byte,
+     a whitespace separator, or a delimiter separator, and emits one field per
+     run. A whitespace run that holds no delimiter ends the current field. A run
+     that holds k delimiters ends the current field and emits k minus one empty
+     fields, so a:b yields two fields and a::b yields an empty between them. A
+     leading delimiter forces a leading empty field, and a trailing whitespace
+     run or a trailing single delimiter leaves no empty field behind. */
   auto append_split_run = [&](StringView text, bool glob_active) {
     usize i = 0;
     while (i < text.length) {
-      if (is_field_separator(text.data[i])) {
-        flush();
-        while (i < text.length && is_field_separator(text.data[i]))
+      const char byte = text.data[i];
+      if (!is_field_separator(byte)) {
+        usize start = i;
+        while (i < text.length && !is_field_separator(text.data[i]))
           i++;
+        append_run(StringView{text.data + start, i - start}, glob_active);
         continue;
       }
-      usize start = i;
-      while (i < text.length && !is_field_separator(text.data[i]))
+
+      /* Count the delimiters inside the maximal separator run, since each one
+         past the first marks an empty field. A whitespace byte only folds. */
+      const bool was_field_started = has_current;
+      usize delimiter_count = 0;
+      while (i < text.length && is_field_separator(text.data[i])) {
+        const char separator = text.data[i];
+        if (separator != ' ' && separator != '\t' && separator != '\n')
+          delimiter_count++;
         i++;
-      append_run(StringView{text.data + start, i - start}, glob_active);
+      }
+
+      /* The accumulated field ends here whether the run folds or delimits. */
+      flush();
+      if (delimiter_count == 0) continue;
+
+      /* The first delimiter that follows an empty field forces that empty field
+         out, so a leading delimiter and a delimiter after another delimiter
+         both keep their empty. A delimiter that closes a non-empty field adds
+         no extra empty, since flush already emitted that field. Each further
+         delimiter in the run marks one more empty field. */
+      if (!was_field_started) emit_empty_field();
+      for (usize k = 1; k < delimiter_count; k++)
+        emit_empty_field();
     }
   };
 
