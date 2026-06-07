@@ -83,6 +83,17 @@ hot pure fn is_part_of_identifier(char ch) wontthrow -> bool
   return !is_shell_sentinel(ch) && !is_whitespace(ch) && ch != CEOF;
 }
 
+/* A byte that the identifier lexer copies verbatim into the current
+   UnquotedText segment while outside any quote and outside an escape. It is an
+   ordinary identifier byte that does not open a quote, an expansion, a command
+   substitution, or an escape, so a run of these bytes lexes to one literal
+   append with no per-byte state change. */
+hot pure fn is_plain_unquoted_run_byte(char ch) wontthrow -> bool
+{
+  return is_part_of_identifier(ch) && ch != '$' && ch != '`' && ch != '\\' &&
+         ch != '"' && ch != '\'';
+}
+
 hot pure fn is_string_quote(char ch) wontthrow -> bool
 {
   /* A backtick is not a string quote. It opens a command substitution, which
@@ -384,6 +395,23 @@ hot fn Lexer::lex_identifier() throws -> Token *
     }
   };
 
+  /* Append a whole run of plain unquoted bytes to the current UnquotedText
+     segment in one String append, the batched form of calling append_char with
+     UnquotedText for each byte. A run only ever extends or starts an
+     UnquotedText segment, since the bytes carry no quote and no escape. */
+  auto append_unquoted_run = [&word](StringView run) {
+    if (!word.segments.is_empty() &&
+        word.segments.back().kind == WordSegment::Kind::UnquotedText)
+    {
+      word.segments.back().text.append(run);
+    } else {
+      String text{};
+      text.append(run);
+      word.segments.push(
+          WordSegment{WordSegment::Kind::UnquotedText, steal(text), false});
+    }
+  };
+
   for (;;) {
     const let ch = chop_character(byte_count);
 
@@ -393,6 +421,23 @@ hot fn Lexer::lex_identifier() throws -> Token *
         !(is_inside_quote_or_escape && ch != lexer::CEOF))
     {
       break;
+    }
+
+    /* The common case in a large script is a run of plain identifier bytes
+       outside any quote or escape. Scan the whole run and append it in one
+       String append, which removes the per-byte lambda call, the per-byte
+       segment-kind branch, and the per-byte String growth the slow path below
+       would pay. The run ends at the first byte that opens a quote, an
+       expansion, a substitution, or an escape, or that ends the word, and that
+       byte falls through to the unchanged per-byte handling. */
+    if (!is_inside_quote_or_escape && lexer::is_plain_unquoted_run_byte(ch)) {
+      const let run_start = byte_count;
+      do {
+        byte_count++;
+      } while (lexer::is_plain_unquoted_run_byte(chop_character(byte_count)));
+      append_unquoted_run(m_source.view().substring_of_length(
+          m_cursor_position + run_start, byte_count - run_start));
+      continue;
     }
 
     if (should_escape) {
