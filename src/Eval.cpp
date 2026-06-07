@@ -1521,9 +1521,12 @@ public:
     let const save = pos;
     skip_spaces();
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
-      let name = String{};
+      /* The name is a contiguous slice of the expression the parser holds for
+         the whole evaluation, so a view into it avoids a per-read allocation. */
+      let const name_start = pos;
       while (pos < source.length && lexer::is_variable_name(source[pos]))
-        name += source[pos++];
+        pos++;
+      let const name = source.substring_of_length(name_start, pos - name_start);
 
       struct compound_operator
       {
@@ -1739,10 +1742,13 @@ public:
       return value;
     }
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
-      let name = String{};
+      /* The name is a contiguous slice of the expression the parser holds for
+         the whole evaluation, so a view into it avoids a per-read allocation. */
+      let const name_start = pos;
       while (pos < source.length && lexer::is_variable_name(source[pos]))
-        name += source[pos++];
-      return read_variable_value(name);
+        pos++;
+      return read_variable_value(
+          source.substring_of_length(name_start, pos - name_start));
     }
     fail("unexpected character");
   }
@@ -2263,8 +2269,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
 }
 
 ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
-                         const ArrayList<String> &args)
-    : m_kind(steal(kind)), m_location(location), m_args(args)
+                         ArrayList<String> &&args)
+    : m_kind(steal(kind)), m_location(location), m_args(steal(args))
 {}
 
 pure fn ExecContext::source_location() const wontthrow -> const SourceLocation &
@@ -2326,7 +2332,7 @@ fn ExecContext::print_to_stdout(StringView s) const throws -> void
 }
 
 fn ExecContext::make_from(SourceLocation location,
-                          const ArrayList<String> &args) throws -> ExecContext
+                          ArrayList<String> &&args) throws -> ExecContext
 {
   /* Make sure we always include at least one argument, the program path. */
   ASSERT(args.count() > 0);
@@ -2360,15 +2366,15 @@ fn ExecContext::make_from(SourceLocation location,
     kind = ResolvedCommand::from_builtin(*bk);
   }
 
-  return {location, steal(kind), args};
+  return {location, steal(kind), steal(args)};
 }
 
 fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
-                              const ArrayList<String> &args) throws
+                              ArrayList<String> &&args) throws
     -> ExecContext
 {
   ASSERT(args.count() > 0);
-  return {location, steal(kind), args};
+  return {location, steal(kind), steal(args)};
 }
 
 } /* namespace shit */

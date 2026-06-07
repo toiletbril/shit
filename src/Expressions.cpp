@@ -981,10 +981,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      still aborts the command. */
   Maybe<ExecContext> resolved_ec;
   try {
-    resolved_ec = is_cache_valid
-                      ? ExecContext::from_resolved(
-                            source_location(), *m_resolved_kind, program_args)
-                      : ExecContext::make_from(source_location(), program_args);
+    resolved_ec =
+        is_cache_valid
+            ? ExecContext::from_resolved(source_location(), *m_resolved_kind,
+                                         steal(program_args))
+            : ExecContext::make_from(source_location(), steal(program_args));
   } catch (const CommandNotFound &e) {
     report_command_not_found(cxt, e);
     cxt.set_last_exit_status(127);
@@ -997,7 +998,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       m_resolved_kind = ResolvedCommand::from_builtin(ec.builtin_kind());
     else
       m_resolved_kind = ResolvedCommand::from_program(ec.program_path());
-    m_resolved_name = program_name;
+    /* The argument vector moved into the context, so the cached name reads from
+       it there rather than from the now-emptied local. */
+    m_resolved_name = ec.program();
   }
 
   /* The redirections override the inherited descriptors for this command. The

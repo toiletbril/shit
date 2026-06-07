@@ -82,7 +82,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      error unwind and abort the shell. */
   Maybe<ExecContext> sub;
   try {
-    sub = ExecContext::make_from(ec.source_location(), operand_args);
+    sub = ExecContext::make_from(ec.source_location(), steal(operand_args));
   } catch (const CommandNotFound &not_found) {
     const String *source = cxt.current_source();
     show_message(

@@ -525,13 +525,13 @@ class ExecContext
 {
 public:
   static fn make_from(SourceLocation location,
-                      const ArrayList<String> &args) throws -> ExecContext;
+                      ArrayList<String> &&args) throws -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and
      reuses it across the iterations of a loop. */
   static fn from_resolved(SourceLocation location, ResolvedCommand kind,
-                          const ArrayList<String> &args) throws -> ExecContext;
+                          ArrayList<String> &&args) throws -> ExecContext;
 
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
@@ -558,7 +558,7 @@ public:
 
 private:
   ExecContext(SourceLocation location, ResolvedCommand &&kind,
-              const ArrayList<String> &args);
+              ArrayList<String> &&args);
 
   ResolvedCommand m_kind;
 

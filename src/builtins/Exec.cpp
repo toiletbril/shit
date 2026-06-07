@@ -56,7 +56,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     command_args.push(String{heap_allocator(), args[i]});
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(program_path),
-      command_args);
+      steal(command_args));
   if (ec.in_fd) command.in_fd = ec.in_fd.take();
   if (ec.out_fd) command.out_fd = ec.out_fd.take();
   if (ec.err_fd) command.err_fd = ec.err_fd.take();
