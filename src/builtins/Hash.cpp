@@ -1,16 +1,17 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 /* hash remembers command locations in shells that cache the PATH search. This
-   shell resolves the PATH lazily per command, so there is no table to fill, and
-   hash is accepted for script compatibility with None to do. */
+   shell caches a resolved location per command name, and hash -r forgets every
+   one so the next use re-resolves, the way dash clears its command table. */
 
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("hash [-r] [name ...]");
 
-FLAG(RESET, Bool, 'r', "", "Forget remembered locations, a no-op here.");
+FLAG(RESET, Bool, 'r', "", "Forget remembered command locations.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -26,6 +27,8 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  if (FLAG_RESET.is_enabled()) utils::invalidate_path_cache();
 
   return 0;
 }

@@ -113,8 +113,18 @@ fn initialize_path_map() throws -> void;
 
 fn clear_path_map() throws -> void;
 
-/* Searches PATH for program binary. Returns absolute paths to the program. */
-fn search_program_path(StringView program_name) throws -> ArrayList<Path>;
+/* Mark every cached PATH resolution stale so the next lookup re-resolves from
+   the filesystem. A cd, a PATH assignment, and hash -r call this, the way dash
+   sets its rehash flag, so a hit never stats on the common path yet a shadowing
+   directory or a reassigned PATH still wins on the next use. */
+fn invalidate_path_cache() throws -> void;
+
+/* Searches PATH for program binary. Returns absolute paths to the program. The
+   first resolved location is cached under the name and a later hit returns it
+   without a stat until the cache is invalidated. With find_all the search skips
+   the cache, scans every PATH directory, and returns every match, for which -a. */
+fn search_program_path(StringView program_name, bool find_all = false) throws
+    -> ArrayList<Path>;
 
 fn glob_matches(StringView glob, StringView str,
                 const ArrayList<bool> &glob_active, usize mask_offset) throws

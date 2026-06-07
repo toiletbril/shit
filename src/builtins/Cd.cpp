@@ -40,6 +40,11 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const old_directory = Path::current_directory();
     let const changed = Path::set_current_directory(target);
     unused(changed);
+    /* A relative PATH entry, or the current directory as an empty entry, now
+       names a different directory, so a cached resolution may point at the old
+       cwd. The cache is marked stale so the next command re-resolves, the way
+       dash rehashes after a cd. */
+    utils::invalidate_path_cache();
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());

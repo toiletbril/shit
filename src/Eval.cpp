@@ -68,6 +68,10 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
   if (name == "IFS") set_field_separators(value);
+  /* A new PATH names a different search order, so a cached resolution may point
+     at a directory PATH no longer lists. The cache is marked stale so the next
+     command re-resolves against the new PATH. */
+  if (name == "PATH") utils::invalidate_path_cache();
   m_shell_variables.set(name, value);
 }
 
@@ -111,6 +115,9 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
      do. */
   os::unset_environment_variable(name);
   if (name == "IFS") set_field_separators(" \t\n");
+  /* An unset PATH, and an export PATH=... that routes its assignment through
+     here, change the search order, so the cache is marked stale. */
+  if (name == "PATH") utils::invalidate_path_cache();
 }
 
 hot fn EvalContext::get_variable_value(StringView name) const throws

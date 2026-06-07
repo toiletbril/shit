@@ -8,6 +8,7 @@
 #include "Eval.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
+#include "Trace.hpp"
 
 #include <csignal>
 #include <cstdarg>
@@ -642,6 +643,11 @@ fn glob_matches(StringView glob, StringView str,
    compare. */
 static HashMap<ArrayList<Path>> PATH_CACHE{heap_allocator()};
 
+/* A cd, a PATH assignment, and hash -r set this so the next lookup drops the
+   cache and re-resolves, the way dash rehashes lazily. While it is false a hit
+   returns the stored path with no stat. */
+static bool PATH_CACHE_IS_STALE = false;
+
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
 
 /* Append one resolved absolute path under a program name, creating the list on
@@ -654,8 +660,20 @@ static fn cache_resolved_path(StringView name, const Path &full_path) throws
 
 fn clear_path_map() throws -> void
 {
+  LOG(verbosity::Debug, "clear_path_map dropping %zu cached program resolutions",
+      PATH_CACHE.count());
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
+  PATH_CACHE_IS_STALE = false;
+}
+
+fn invalidate_path_cache() throws -> void
+{
+  /* The cache is not cleared here, since a cd or a PATH change is followed by
+     few lookups in a script. The stale flag defers the clear to the next lookup
+     so a run that never resolves a command again pays nothing. */
+  LOG(verbosity::Debug, "invalidate_path_cache marking the program cache stale");
+  PATH_CACHE_IS_STALE = true;
 }
 
 /* Split PATH into its directory components. The last component carries no
@@ -705,21 +723,27 @@ fn initialize_path_map() throws -> void
   }
 }
 
-fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
+/* Stat dir/name along PATH until a match, the way dash advances PATH and stats
+   each candidate once. The first hit ends the scan and is cached, so a cold miss
+   costs at most one stat per PATH directory up to the match rather than a full
+   directory read. With find_all the scan does not stop and collects every match
+   for which -a, and it does not write the cache, since a partial single-result
+   entry would later hide the other matches from which -a. */
+static fn resolve_along_path(StringView program_name, bool find_all) throws
+    -> ArrayList<Path>
 {
   MAYBE_PATH = os::get_environment_variable("PATH");
   if (!MAYBE_PATH) return ArrayList<Path>{};
 
   ArrayList<Path> result{};
 
+  /* The cache key is the program name without an omitted extension, the same
+     key the lookup uses. */
+  String key{program_name};
+  os::erase_extension_and_get_its_index(key);
+
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
     const Path directory{dir_string.view()};
-    if (!directory.is_directory()) continue;
-
-    /* The cache key is the program name without an omitted extension, the same
-       key the lookup uses. */
-    String key{program_name};
-    os::erase_extension_and_get_its_index(key);
 
     let full_path = directory;
     full_path.push_component(program_name);
@@ -737,51 +761,62 @@ fn search_and_cache(StringView program_name) throws -> ArrayList<Path>
         const Path try_path{(full_path.text() + suffix.view()).view()};
 
         if (try_path.exists()) {
-          cache_resolved_path(key.view(), try_path);
           result.push(try_path);
+          if (!find_all) {
+            cache_resolved_path(key.view(), try_path);
+            return result;
+          }
         }
       }
     } else if (full_path.exists()) {
-      cache_resolved_path(key.view(), full_path);
       result.push(full_path);
+      if (!find_all) {
+        cache_resolved_path(key.view(), full_path);
+        return result;
+      }
     }
   }
 
   return result;
 }
 
-hot fn search_program_path(StringView program_name) throws -> ArrayList<Path>
+hot fn search_program_path(StringView program_name, bool find_all) throws
+    -> ArrayList<Path>
 {
+  /* A cd, a PATH change, or hash -r left the cache stale, so it is dropped here
+     before the lookup re-resolves against the current filesystem. */
+  if (PATH_CACHE_IS_STALE) {
+    LOG(verbosity::Debug,
+        "search_program_path clearing stale cache before resolving '%.*s'",
+        (int) program_name.length, program_name.data);
+    PATH_CACHE.clear();
+    PATH_CACHE_IS_STALE = false;
+  }
+
   String sp{program_name};
-  ArrayList<Path> result{};
 
   const os::ext_index typed_extension =
       os::erase_extension_and_get_its_index(sp);
 
+  /* which -a wants every match, so it skips the cache and scans PATH in full. */
+  if (find_all) return resolve_along_path(program_name, true);
+
   /* A name typed with an explicit extension is matched exactly by the search,
      so the extension-stripped cache key would resolve the wrong file. The cache
-     is consulted only when no extension was typed, which on POSIX is always. */
+     is consulted only when no extension was typed, which on POSIX is always. A
+     hit returns the stored absolute path with no stat, the way dash returns a
+     hashed location. */
   if (typed_extension == 0) {
-    if (ArrayList<Path> *const cached =
-            const_cast<ArrayList<Path> *>(PATH_CACHE.find(sp.view())))
+    if (const ArrayList<Path> *const cached = PATH_CACHE.find(sp.view());
+        cached != nullptr && cached->count() != 0)
     {
-      ArrayList<Path> kept{};
-      for (usize i = 0; i < cached->count(); i++) {
-        const Path &cached_path = (*cached)[i];
-        if (cached_path.exists()) {
-          result.push(cached_path);
-          kept.push(cached_path);
-        }
-      }
-      /* Drop entries that no longer exist, so a later lookup does not stat them
-         again. The directory exists check is slow, so this keeps the cache from
-         growing with dead paths. */
-      if (kept.count() != cached->count()) *cached = steal(kept);
-      if (result.count() != 0) return result;
+      ArrayList<Path> result{};
+      result.push((*cached)[0]);
+      return result;
     }
   }
 
-  return search_and_cache(program_name);
+  return resolve_along_path(program_name, false);
 }
 
 fn read_entire_file(StringView path) throws -> Maybe<String>
