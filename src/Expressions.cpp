@@ -210,12 +210,13 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 } /* namespace */
 
 fn analyze_ast(const Expression *root, StringView source,
-               const HashSet &known_functions,
-               const HashSet &known_aliases) throws -> bool
+               const HashSet &known_functions, const HashSet &known_aliases,
+               bool warn_missing_commands) throws -> bool
 {
   ASSERT(root != nullptr);
 
   AnalysisContext actx{source};
+  actx.warn_missing_commands = warn_missing_commands;
 
   /* A function or alias defined by an earlier command resolves, so seed the
      prepass with the names already registered. */
@@ -2366,7 +2367,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (name && !command_resolves(actx, *name) &&
+  if (actx.warn_missing_commands && name && !command_resolves(actx, *name) &&
       !actx.defined_functions.contains(
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))

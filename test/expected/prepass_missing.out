@@ -12,10 +12,7 @@
 [Word
   Unquoted "after"
 ]
-shit: 1:1: warning: Command 'nosuchcmd_xyz' was not found.
-     1 |  nosuchcmd_xyz
-       |  ^~~~~~~~~~~~~ here.
-shit: 1:1: error: Program 'nosuchcmd_xyz' wasn't found.
+shit: input/prepass_missing.shit:1:1: error: Program 'nosuchcmd_xyz' wasn't found.
      1 |  nosuchcmd_xyz
        |  ^~~~~~~~~~~~~ here.
 after

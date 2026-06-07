@@ -20,6 +20,10 @@ class AnalysisContext
 public:
   StringView source;
   bool has_fatal{false};
+  /* Only warn about a missing command under -n, where the command never runs.
+     During a real run the runtime resolution prints the same caret and sets
+     127, so warning here too would duplicate the diagnostic. */
+  bool warn_missing_commands{false};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
      see, so a later unresolved command is a warning rather than a failure. */
   bool saw_runtime_definer{false};
@@ -43,8 +47,8 @@ public:
 /* Walk the tree and report. Returns true when execution may proceed, false when
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
-               const HashSet &known_functions,
-               const HashSet &known_aliases) throws -> bool;
+               const HashSet &known_functions, const HashSet &known_aliases,
+               bool warn_missing_commands) throws -> bool;
 
 class Expression
 {

@@ -131,10 +131,6 @@ static fn report_escaped_control_flow(EvalContext &context,
       control.source != nullptr ? control.source : &fallback_source;
   ErrorWithLocation located{control.location, what};
   show_message(located.to_string(*source));
-  if (!control.origin.is_empty()) {
-    show_message(Note{"This jump was reached while running " + control.origin}
-                     .to_string());
-  }
 
   context.clear_control_flow();
 }
@@ -192,7 +188,7 @@ static fn run_script_contents(const String &script_contents,
     /* Validate the whole tree before running anything. An unconditional
        problem stops execution, a conditional one only warns. */
     if (!analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names()))
+                     context.alias_names(), context.no_exec()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
@@ -489,6 +485,11 @@ fn main(int argc, char **argv) -> int
     ASSERT(!shit::os::is_child_process());
 
     shit::String script_contents{};
+    /* The named script file flows into the diagnostics so an error reads
+       path:line:col. A command string, standard input, or an interactive line
+       from the editor carries no path, so a prompt error stays a bare
+       line:col. */
+    shit::Maybe<shit::StringView> source_filename = shit::None;
 
     /* Figure out what to do and retrieve the code. */
     try {
@@ -509,6 +510,7 @@ fn main(int argc, char **argv) -> int
                               "': " + shit::os::last_system_error_message()};
           }
           script_contents = steal(*contents);
+          source_filename = file_name.view();
         }
 
         should_quit = true;
@@ -627,7 +629,8 @@ fn main(int argc, char **argv) -> int
     shit::os::INTERRUPT_REQUESTED = 0;
 
     /* Execute the contents through the shared pipeline. */
-    exit_code = run_script_contents(script_contents, context, ast_arena);
+    exit_code =
+        run_script_contents(script_contents, context, ast_arena, source_filename);
 
     /* TODO: Make ExecutionErrorWithLocation to distinguish execution
      * errors? Or statically check commands before they are executed? */
