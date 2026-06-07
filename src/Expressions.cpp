@@ -84,8 +84,8 @@ cold fn Expression::analyze(AnalysisContext &actx,
   unused(is_unconditional);
 }
 
-cold fn Expression::register_defined_functions(AnalysisContext &actx) const
-    throws -> void
+cold fn Expression::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
 {
   unused(actx);
 }
@@ -122,8 +122,9 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 
 /* A command resolves when it is a builtin, a program on PATH, or an existing
    path. The result is memoized per name in the analysis context, so a command
-   run many times across the file scans PATH at most once. A name holding a slash
-   is a path, so it is not cached, since the filesystem may differ per run. */
+   run many times across the file scans PATH at most once. A name holding a
+   slash is a path, so it is not cached, since the filesystem may differ per
+   run. */
 fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
 {
   if (name.is_empty()) return false;
@@ -134,7 +135,8 @@ fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
   if (const bool *cached = actx.command_resolution_cache.find(name.view()))
     return *cached;
 
-  const bool was_resolved = utils::search_program_path(name.view()).count() != 0;
+  const bool was_resolved =
+      utils::search_program_path(name.view()).count() != 0;
   actx.command_resolution_cache.set(name.view(), was_resolved);
   return was_resolved;
 }
@@ -436,12 +438,12 @@ namespace {
 
 using expressions::Redirection;
 
-/* Resolve the descriptor a duplication copies from. A literal descriptor and the
-   close form were settled at parse time and pass straight through. A dynamic
-   word such as $4 is expanded to one field here, where a dash means close and a
-   numeric field names the descriptor. The result is a non-negative descriptor or
-   Redirection::DUP_FD_CLOSE for the close form. A field that is neither throws a
-   located error at the word. */
+/* Resolve the descriptor a duplication copies from. A literal descriptor and
+   the close form were settled at parse time and pass straight through. A
+   dynamic word such as $4 is expanded to one field here, where a dash means
+   close and a numeric field names the descriptor. The result is a non-negative
+   descriptor or Redirection::DUP_FD_CLOSE for the close form. A field that is
+   neither throws a located error at the word. */
 fn resolve_duplication_fd(const Redirection &redir, EvalContext &cxt) throws
     -> i32
 {
@@ -622,7 +624,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_args.count() > 0 || !m_redirections.is_empty() ||
          m_local_vars.count() > 0);
 
-  /* Record where this command sits so a $LINENO in its words reports its line. */
+  /* Record where this command sits so a $LINENO in its words reports its line.
+   */
   cxt.set_current_location(source_location());
 
   if (cxt.should_echo()) {
@@ -848,9 +851,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      location was set at the top of this function, so a $LINENO in any value on
      the line reports the same line, the way dash reports it. */
   if (program_args.is_empty()) {
-    /* The assignments commit left to right, each before the next is expanded, so
-       a later value reads an earlier same-line one and a repeated name or a +=
-       accumulates against what the store already holds. */
+    /* The assignments commit left to right, each before the next is expanded,
+       so a later value reads an earlier same-line one and a repeated name or a
+       += accumulates against what the store already holds. */
     for (const prefix_assignment &var : m_local_vars) {
       const StringView name = var.name.view();
       String value = cxt.expand_word_for_assignment(var.value);
@@ -876,10 +879,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<String> previous_value;
   };
   ArrayList<saved_env_var> saved_env{heap_allocator()};
-  /* The assignments apply left to right, each committed to the environment before
-     the next is expanded, so a later value reads an earlier same-line one and a
-     repeated name or a += accumulates. The previous environment values are saved
-     for the restore on exit, which keeps the prefix temporary for this command. */
+  /* The assignments apply left to right, each committed to the environment
+     before the next is expanded, so a later value reads an earlier same-line
+     one and a repeated name or a += accumulates. The previous environment
+     values are saved for the restore on exit, which keeps the prefix temporary
+     for this command. */
   for (const prefix_assignment &var : m_local_vars) {
     const StringView name = var.name.view();
     Maybe<String> previous = os::get_environment_variable(name);
@@ -977,11 +981,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      still aborts the command. */
   Maybe<ExecContext> resolved_ec;
   try {
-    resolved_ec =
-        is_cache_valid
-            ? ExecContext::from_resolved(source_location(), *m_resolved_kind,
-                                         program_args)
-            : ExecContext::make_from(source_location(), program_args);
+    resolved_ec = is_cache_valid
+                      ? ExecContext::from_resolved(
+                            source_location(), *m_resolved_kind, program_args)
+                      : ExecContext::make_from(source_location(), program_args);
   } catch (const CommandNotFound &e) {
     report_command_not_found(cxt, e);
     cxt.set_last_exit_status(127);
@@ -1286,8 +1289,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           os::fork_compound_stage(stage_in, stage_out, {});
 
       if (child == 0) {
-        /* The child evaluates the stage in a subshell, so a variable change such
-           as a while-read does not escape, then exits with its status. A
+        /* The child evaluates the stage in a subshell, so a variable change
+           such as a while-read does not escape, then exits with its status. A
            diagnostic or an exit request inside still yields a child status
            rather than unwinding back into the parent's evaluator. */
         i32 stage_status = 0;
@@ -1331,8 +1334,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
          error, so it is swallowed here. */
       try {
         os::wait_and_monitor_process(child);
-      } catch (...) {
-      }
+      } catch (...) {}
     }
     throw;
   }
@@ -1342,11 +1344,10 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       cxt.set_last_background_pid(os::process_id_of(last_child));
       const i32 id = cxt.register_job(last_child, "pipeline");
       if (cxt.shell_is_interactive())
-        shit::print_error(
-            "[" + utils::int_to_text(id) + "] " +
-            utils::uint_to_text(
-                static_cast<u64>(os::process_id_of(last_child))) +
-            "\n");
+        shit::print_error("[" + utils::int_to_text(id) + "] " +
+                          utils::uint_to_text(
+                              static_cast<u64>(os::process_id_of(last_child))) +
+                          "\n");
     }
     return 0;
   }
@@ -1406,7 +1407,8 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
        retried. */
     Maybe<ExecContext> stage_ec;
     try {
-      stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args));
+      stage_ec =
+          ExecContext::make_from(e->source_location(), steal(stage_args));
     } catch (const CommandNotFound &not_found) {
       report_command_not_found(cxt, not_found);
       cxt.set_last_exit_status(127);
@@ -1547,9 +1549,9 @@ cold fn IfClause::analyze(AnalysisContext &actx,
 cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
     -> void
 {
-  /* Every branch body and the conditions run in the current shell, so a function
-     defined in any of them is callable from a sibling and must be registered
-     before the ordered walk warns about a forward reference. */
+  /* Every branch body and the conditions run in the current shell, so a
+     function defined in any of them is callable from a sibling and must be
+     registered before the ordered walk warns about a forward reference. */
   for (const auto &[condition, body] : m_branches) {
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
@@ -1666,8 +1668,8 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
   m_body->analyze(actx, false);
 }
 
-cold fn WhileLoop::register_defined_functions(AnalysisContext &actx) const throws
-    -> void
+cold fn WhileLoop::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -1824,8 +1826,8 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
   }
 }
 
-cold fn CaseClause::register_defined_functions(AnalysisContext &actx) const throws
-    -> void
+cold fn CaseClause::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
 {
   /* Each arm body runs in the current shell when its pattern matches, so a
      function defined in any arm is registered before the ordered walk. */
@@ -1867,8 +1869,8 @@ cold fn BraceGroup::analyze(AnalysisContext &actx,
   m_body->analyze(actx, is_unconditional);
 }
 
-cold fn BraceGroup::register_defined_functions(AnalysisContext &actx) const
-    throws -> void
+cold fn BraceGroup::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
 {
   ASSERT(m_body != nullptr);
 
@@ -2532,8 +2534,8 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
   }
 }
 
-cold fn CompoundList::register_defined_functions(AnalysisContext &actx) const
-    throws -> void
+cold fn CompoundList::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
 {
   for (const CompoundListCondition *node : m_nodes) {
     ASSERT(node != nullptr);
@@ -2553,8 +2555,8 @@ cold fn IfStatement::analyze(AnalysisContext &actx,
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
 }
 
-cold fn IfStatement::register_defined_functions(AnalysisContext &actx) const
-    throws -> void
+cold fn IfStatement::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);

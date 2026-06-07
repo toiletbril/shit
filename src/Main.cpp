@@ -647,8 +647,8 @@ fn main(int argc, char **argv) -> int
     shit::os::INTERRUPT_REQUESTED = 0;
 
     /* Execute the contents through the shared pipeline. */
-    exit_code =
-        run_script_contents(script_contents, context, ast_arena, source_filename);
+    exit_code = run_script_contents(script_contents, context, ast_arena,
+                                    source_filename);
 
     /* TODO: Make ExecutionErrorWithLocation to distinguish execution
      * errors? Or statically check commands before they are executed? */

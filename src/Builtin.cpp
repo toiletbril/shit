@@ -190,7 +190,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
     if (ec.err_fd)
       saved_descriptors.push(os::save_and_replace_descriptor(2, *ec.err_fd));
   }
-  defer {
+  defer
+  {
     for (usize i = saved_descriptors.count(); i > 0; i--)
       os::restore_descriptor(saved_descriptors[i - 1]);
   };

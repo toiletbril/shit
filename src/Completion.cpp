@@ -372,8 +372,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   /* A command-position token that names a path component is a program given by
      path rather than a bare command word, so it completes against the
      filesystem the way dash does instead of the command name sets. */
-  const bool token_has_path_separator =
-      token.find_character('/').has_value();
+  const bool token_has_path_separator = token.find_character('/').has_value();
 
   TRACELN("complete line '%.*s' cursor %zu token '%.*s' command %d",
           static_cast<int>(line.length), line.data, cursor,

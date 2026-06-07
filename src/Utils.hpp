@@ -83,9 +83,9 @@ fn uint_to_text(u64 value) throws -> String;
 /* The 1-based line number the byte at position falls on in source, counting the
    newlines strictly before it. The lookup is a binary search over a newline
    offset table cached on the source pointer and length, so a script that reads
-   $LINENO on almost every line stays O(log n) per read rather than O(n) over the
-   prefix. The cache holds one source at a time, which fits the access pattern
-   where a long script reads its own LINENO repeatedly. */
+   $LINENO on almost every line stays O(log n) per read rather than O(n) over
+   the prefix. The cache holds one source at a time, which fits the access
+   pattern where a long script reads its own LINENO repeatedly. */
 fn line_number_at(StringView source, usize position) throws -> usize;
 
 /* Drop the cached newline table that line_number_at keeps. The host calls this

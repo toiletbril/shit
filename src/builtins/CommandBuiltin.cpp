@@ -85,8 +85,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     sub = ExecContext::make_from(ec.source_location(), operand_args);
   } catch (const CommandNotFound &not_found) {
     const String *source = cxt.current_source();
-    show_message(not_found.to_string(source != nullptr ? source->view()
-                                                       : StringView{}));
+    show_message(
+        not_found.to_string(source != nullptr ? source->view() : StringView{}));
     return 127;
   }
   return utils::execute_context(steal(*sub), cxt, false);

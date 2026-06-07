@@ -143,11 +143,11 @@ fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
    The engine completes the token under the cursor and the result is stored in
    the static buffers above, which toiletline reads right after this returns.
 
-   Toiletline edits in codepoints, so the cursor arrives as a codepoint index and
-   the token bounds must go back as codepoint indices, while the completion engine
-   works in bytes. The cursor is converted to a byte offset before the engine
-   runs, and the byte token bounds it returns are converted back to codepoint
-   indices here. Returns 1 when at least one candidate was produced, 0
+   Toiletline edits in codepoints, so the cursor arrives as a codepoint index
+   and the token bounds must go back as codepoint indices, while the completion
+   engine works in bytes. The cursor is converted to a byte offset before the
+   engine runs, and the byte token bounds it returns are converted back to
+   codepoint indices here. Returns 1 when at least one candidate was produced, 0
    otherwise. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out) -> int

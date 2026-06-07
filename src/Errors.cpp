@@ -12,8 +12,8 @@
 
 namespace shit {
 
-/* ANSI SGR sequences matching clang's diagnostic palette. The reset clears every
-   attribute a colored span set, and the rest open a bold colored span. */
+/* ANSI SGR sequences matching clang's diagnostic palette. The reset clears
+   every attribute a colored span set, and the rest open a bold colored span. */
 namespace ansi {
 static const StringView RESET = "\x1b[0m";
 static const StringView BOLD = "\x1b[1m";
@@ -81,10 +81,11 @@ struct precise_location
 };
 
 /* A per-source index that turns the line and column lookup from a scan over the
-   whole prefix into a binary search. Without it a warning deep in the file costs
-   time proportional to its byte offset, so N warnings cost N squared. The shell
-   reuses one source for a whole analysis pass, so a single cached entry keyed on
-   the source pointer and length serves every located message in that pass. */
+   whole prefix into a binary search. Without it a warning deep in the file
+   costs time proportional to its byte offset, so N warnings cost N squared. The
+   shell reuses one source for a whole analysis pass, so a single cached entry
+   keyed on the source pointer and length serves every located message in that
+   pass. */
 class SourceLineIndex
 {
 public:
@@ -214,13 +215,10 @@ cold static fn number_string_length(T n) throws -> usize
   return len;
 }
 
-cold static fn get_context_pointing_to(StringView source, usize byte_position,
-                                       usize byte_count, usize line_number,
-                                       usize last_newline_location,
-                                       usize unicode_position,
-                                       Maybe<StringView> message,
-                                       const diagnostic_color &color) throws
-    -> String
+cold static fn get_context_pointing_to(
+    StringView source, usize byte_position, usize byte_count, usize line_number,
+    usize last_newline_location, usize unicode_position,
+    Maybe<StringView> message, const diagnostic_color &color) throws -> String
 {
   usize start_offset = byte_position - last_newline_location;
 
@@ -340,8 +338,8 @@ Error::Error(StringView message) : ErrorBase(message) {}
 cold fn Error::to_string() const throws -> String
 {
   let const color = diagnostic_colors_for(severity_word());
-  return color.severity + severity_word() + color.reset + ": " +
-         color.message + message() + "." + color.reset;
+  return color.severity + severity_word() + color.reset + ": " + color.message +
+         message() + "." + color.reset;
 }
 
 Error::operator String() const throws { return to_string(); }
@@ -425,9 +423,9 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   }
   result += '\n';
 
-  result += get_context_pointing_to(source, byte_position, byte_count,
-                                    line_number, last_newline_location,
-                                    unicode_position, StringView{"here"}, color);
+  result += get_context_pointing_to(
+      source, byte_position, byte_count, line_number, last_newline_location,
+      unicode_position, StringView{"here"}, color);
   return result;
 }
 

@@ -435,8 +435,8 @@ protected:
   String m_current_origin{};
 
   /* The byte offset in m_current_source of the command being evaluated, read by
-     $LINENO to report its line. It starts at zero so an interactive single line,
-     whose source holds no newlines, reports line 1. */
+     $LINENO to report its line. It starts at zero so an interactive single
+     line, whose source holds no newlines, reports line 1. */
   usize m_current_location_position{0};
 
   /* The chain of sourced-file and eval frames from the outermost down to the

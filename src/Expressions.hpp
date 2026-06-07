@@ -143,7 +143,8 @@ protected:
 /* One prefix assignment on a simple command, the name, the right hand side, and
    whether the source spelled it as the appending NAME+=VALUE form. The prefix
    assignments are kept as an ordered list rather than a map, so they preserve
-   left-to-right order and a repeated name accumulates rather than overwrites. */
+   left-to-right order and a repeated name accumulates rather than overwrites.
+ */
 struct prefix_assignment
 {
   String name;
@@ -220,12 +221,12 @@ public:
   Kind kind;
   /* The filename word for a file Redirection. For a duplication it is the word
      after >& or <& when that word is a variable or an expansion such as $4, so
-     the descriptor is resolved at evaluation. It is null for a duplication whose
-     descriptor was a literal in the source. */
+     the descriptor is resolved at evaluation. It is null for a duplication
+     whose descriptor was a literal in the source. */
   const Token *target;
   /* For a duplication, the literal descriptor to copy from, as in 2>&1, or
-     DUP_FD_CLOSE for the close form, or -1 when the descriptor is a dynamic word
-     held in target. */
+     DUP_FD_CLOSE for the close form, or -1 when the descriptor is a dynamic
+     word held in target. */
   i32 dup_fd;
   /* For a heredoc, the lexer-owned body and whether it is expanded. */
   const String *heredoc_body;

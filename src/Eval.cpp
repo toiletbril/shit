@@ -172,17 +172,17 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
-  /* $LINENO reports the line of the command currently evaluating. It yields to a
-     stored value above, so a script that assigns LINENO reads back what it set,
-     matching dash. With no assignment it computes the line from the current
-     source and position, which the command dispatcher keeps current. A run with
-     no real source, such as an interactive single line, reports line 1. */
+  /* $LINENO reports the line of the command currently evaluating. It yields to
+     a stored value above, so a script that assigns LINENO reads back what it
+     set, matching dash. With no assignment it computes the line from the
+     current source and position, which the command dispatcher keeps current. A
+     run with no real source, such as an interactive single line, reports
+     line 1. */
   if (name == "LINENO") {
-    const usize line =
-        m_current_source != nullptr
-            ? utils::line_number_at(m_current_source->view(),
-                                    m_current_location_position)
-            : 1;
+    const usize line = m_current_source != nullptr
+                           ? utils::line_number_at(m_current_source->view(),
+                                                   m_current_location_position)
+                           : 1;
     return String{heap_allocator(), utils::uint_to_text(line)};
   }
 
@@ -1020,7 +1020,7 @@ cold fn EvalContext::make_stats_string() const throws -> String
       AST_ARENA != nullptr ? AST_ARENA->bytes_used() : 0;
   const usize peak_ast_arena_bytes =
       live_ast_arena_bytes > m_peak_ast_arena_bytes ? live_ast_arena_bytes
-                                                     : m_peak_ast_arena_bytes;
+                                                    : m_peak_ast_arena_bytes;
 
   s += "[Stats\n";
 
@@ -2115,7 +2115,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
        from its first line. The parent position is restored on return so the
        caller's $LINENO resumes against the caller's source. */
     m_current_location_position = 0;
-    defer {
+    defer
+    {
       set_current_source(previous_source, previous_origin);
       m_current_location_position = previous_location_position;
     };
@@ -2163,9 +2164,9 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   m_retained_sources.clear();
 
   /* The located-error formatter caches a line index keyed on the source address
-     and length. A just-freed buffer can be reissued at the same address with the
-     same length, so the cache is dropped here to keep it from serving the stale
-     index of the freed source. */
+     and length. A just-freed buffer can be reissued at the same address with
+     the same length, so the cache is dropped here to keep it from serving the
+     stale index of the freed source. */
   invalidate_source_line_index();
 
   /* The $LINENO line lookup caches a newline table keyed the same way on the
@@ -2353,8 +2354,7 @@ fn ExecContext::make_from(SourceLocation location,
     if (p.has_value()) {
       kind = ResolvedCommand::from_program(steal(*p));
     } else {
-      throw CommandNotFound{location,
-                            "Program '" + program + "' wasn't found"};
+      throw CommandNotFound{location, "Program '" + program + "' wasn't found"};
     }
   } else {
     kind = ResolvedCommand::from_builtin(*bk);

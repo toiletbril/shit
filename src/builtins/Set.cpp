@@ -29,21 +29,21 @@ public:
 };
 
 const SetOption SET_OPTIONS[] = {
-    {'e', "errexit",   &EvalContext::set_error_exit,    &EvalContext::error_exit },
-    {'x', "xtrace",    &EvalContext::set_echo_expanded,
-     &EvalContext::should_echo_expanded                                          },
-    {'u', "nounset",   &EvalContext::set_error_unset,   &EvalContext::error_unset},
-    {'a', "allexport", &EvalContext::set_export_all,    &EvalContext::export_all },
-    {'C', "noclobber", &EvalContext::set_no_clobber,    &EvalContext::no_clobber },
-    {'f', "noglob",    &EvalContext::set_no_glob,       &EvalContext::no_glob    },
-    {'n', "noexec",    &EvalContext::set_no_exec,       &EvalContext::no_exec    },
-    {'m', "monitor",   &EvalContext::set_monitor,       &EvalContext::monitor    },
+    {'e',  "errexit",   &EvalContext::set_error_exit,    &EvalContext::error_exit },
+    {'x',  "xtrace",    &EvalContext::set_echo_expanded,
+     &EvalContext::should_echo_expanded                                           },
+    {'u',  "nounset",   &EvalContext::set_error_unset,   &EvalContext::error_unset},
+    {'a',  "allexport", &EvalContext::set_export_all,    &EvalContext::export_all },
+    {'C',  "noclobber", &EvalContext::set_no_clobber,    &EvalContext::no_clobber },
+    {'f',  "noglob",    &EvalContext::set_no_glob,       &EvalContext::no_glob    },
+    {'n',  "noexec",    &EvalContext::set_no_exec,       &EvalContext::no_exec    },
+    {'m',  "monitor",   &EvalContext::set_monitor,       &EvalContext::monitor    },
     /* failglob has no short letter, so '\0' keeps find_option_by_letter from
        ever matching a parsed option character. */
-    {'\0', "failglob", &EvalContext::set_failglob,      &EvalContext::failglob   },
-    {'b', "notify",    nullptr,                         nullptr                  },
-    {'h', "hashall",   nullptr,                         nullptr                  },
-    {'v', "verbose",   nullptr,                         nullptr                  },
+    {'\0', "failglob",  &EvalContext::set_failglob,      &EvalContext::failglob   },
+    {'b',  "notify",    nullptr,                         nullptr                  },
+    {'h',  "hashall",   nullptr,                         nullptr                  },
+    {'v',  "verbose",   nullptr,                         nullptr                  },
 };
 
 const SetOption *find_option_by_letter(char letter) throws

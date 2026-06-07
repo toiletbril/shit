@@ -50,10 +50,10 @@ hot pure static fn kind_in(Token::Kind kind,
   return false;
 }
 
-/* A brace is a reserved word only when a token is exactly '{' or '}' as a single
-   unquoted segment. The lexer keeps a brace inside a larger word literal, so
-   'a{b}c' is one word and never matches here. A quoted or escaped brace carries
-   a non-unquoted segment and is also rejected. */
+/* A brace is a reserved word only when a token is exactly '{' or '}' as a
+   single unquoted segment. The lexer keeps a brace inside a larger word
+   literal, so 'a{b}c' is one word and never matches here. A quoted or escaped
+   brace carries a non-unquoted segment and is also rejected. */
 hot pure static fn is_brace_word(const Token *token, char brace) wontthrow
     -> bool
 {
@@ -69,8 +69,9 @@ hot pure static fn is_brace_word(const Token *token, char brace) wontthrow
 /* Whether the peeked token terminates a command list. The closing brace of a
    brace group is a '}' word rather than a token kind, so RightBracket in the
    terminator set stands for a standalone '}' word here. */
-hot pure static fn is_list_terminator(
-    const Token *token, std::initializer_list<Token::Kind> terminators) wontthrow
+hot pure static fn
+is_list_terminator(const Token *token,
+                   std::initializer_list<Token::Kind> terminators) wontthrow
     -> bool
 {
   ASSERT(token != nullptr);
@@ -682,8 +683,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
     if (args_accumulator.is_empty() && local_vars.count() == 0) {
       /* A standalone '{' in command position opens a brace group, and a
          standalone '}' closes the enclosing one. Both arrive as words, so they
-         are matched on the text before the kind switch. A '}' with no open group
-         is left for the caller, which reports it as unexpected. */
+         are matched on the text before the kind switch. A '}' with no open
+         group is left for the caller, which reports it as unexpected. */
       if (is_brace_word(token, '{')) {
         return attach_trailing_redirections(parse_brace_group());
       }
@@ -817,13 +818,14 @@ hot fn Parser::parse_simple_command() throws -> Command *
            AssignCommand fast path. */
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       } else {
-        /* The assignment joins the prefix sequence in source order, either ahead
-           of a command word or as one of several assignments on a command-less
-           line. The ordered list lets a later assignment see an earlier one and
-           a repeated name accumulate, which a map would lose. The command-less
-           line persists the whole sequence in SimpleCommand. */
-        local_vars.push(prefix_assignment{String{a->key()},
-                                          Word{a->value_word()}, a->is_append()});
+        /* The assignment joins the prefix sequence in source order, either
+           ahead of a command word or as one of several assignments on a
+           command-less line. The ordered list lets a later assignment see an
+           earlier one and a repeated name accumulate, which a map would lose.
+           The command-less line persists the whole sequence in SimpleCommand.
+         */
+        local_vars.push(prefix_assignment{
+            String{a->key()}, Word{a->value_word()}, a->is_append()});
       }
     } break;
 
