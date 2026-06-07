@@ -827,6 +827,13 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   else
     set_field_separators(" \t\n");
 
+  /* The resolver reads a process-global PATH rather than the restored map, so a
+     PATH change inside the subshell or the command substitution would leak its
+     search order to the parent. The search is re-pointed at the restored PATH,
+     read as None when the snapshot held no PATH so the resolver falls back the
+     way an unset PATH does. */
+  utils::set_path_for_resolution(get_variable_value("PATH"));
+
   /* The exit status is intentionally not restored. A subshell and a command
      substitution propagate the status of their last command to the parent. */
 }

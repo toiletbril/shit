@@ -72,6 +72,12 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return finish(1);
   }
 
+  /* The per-argument index is persisted across calls, so a stale index can run
+     past a current operand that the caller rebound to a shorter word while
+     OPTIND stayed put. An index at or past the operand length is treated as a
+     fresh operand, returning to the first letter rather than reading past the
+     end. */
+  if (char_index >= current.length()) char_index = 1;
   ASSERT(char_index < current.length());
   let const option = current[char_index];
   let option_as_string = String{};

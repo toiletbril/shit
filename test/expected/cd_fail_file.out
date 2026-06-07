@@ -1,0 +1,61 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/tmp"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "exit" "1"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "zz_cd_target_xyz"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after rc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "pwd"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-f" "/tmp/zz_cd_target_xyz"]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "zz_cd_target_xyz"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "zz_cd_target_xyz"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after rc="
+  Variable "?"
+]
+[Word
+  Unquoted "pwd"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "/tmp/zz_cd_target_xyz"
+]
+shit: 3:1: error: Builtin 'cd': Could not cd to 'zz_cd_target_xyz'.
+     3 |  cd zz_cd_target_xyz
+       |  ^~~~~~~~~~~~~~~~~~~ here.

@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <new>
 
 namespace shit {
 
@@ -50,6 +51,12 @@ public:
   template <class T>
   T *alloc_array(usize count) const
   {
+    /* The product overflows usize for a large enough count, wrapping to a small
+       request that the caller then writes past. The division guards the
+       multiply, since count times sizeof(T) cannot exceed the max when count is
+       at most the max divided by sizeof(T). */
+    if (sizeof(T) != 0 && count > (static_cast<usize>(-1) / sizeof(T)))
+      throw std::bad_alloc{};
     return static_cast<T *>(raw_alloc(count * sizeof(T), alignof(T)));
   }
   template <class T>
@@ -97,7 +104,15 @@ inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
 inline void *heap_alloc(void *context, usize length, usize alignment)
 {
   unused(context);
-  unused(alignment);
+  /* malloc already meets every alignment up to alignof(max_align_t), so the
+     common request stays on the plain path with no extra work. An over-aligned
+     type takes aligned_alloc, whose result std::free accepts the same as a
+     malloc result, so the free path needs no change. aligned_alloc wants a size
+     that is a multiple of the alignment, so the length is rounded up. */
+  if (alignment > alignof(max_align_t)) {
+    let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
+    return std::aligned_alloc(alignment, rounded_length);
+  }
   return std::malloc(length);
 }
 inline bool heap_resize(void *context, void *pointer, usize old_length,
