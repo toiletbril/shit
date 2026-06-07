@@ -31,8 +31,15 @@ public:
 private:
   static constexpr usize MAX_RECURSION_DEPTH = 64;
 
+  /* The compound-command nesting limit guards the native stack against a
+     pathologically nested source such as thousands of open parentheses. It is
+     looser than the arithmetic limit because a legitimate script nests far
+     fewer compound commands than an arithmetic expression nests operators. */
+  static constexpr usize MAX_COMMAND_DEPTH = 512;
+
   Lexer m_lexer;
 
+  usize m_command_depth{0};
   usize m_recursion_depth{0};
   usize m_if_condition_depth{0};
   usize m_parentheses_depth{0};

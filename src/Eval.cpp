@@ -1485,6 +1485,60 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
   return is_negative ? -parsed.value() : parsed.value();
 }
 
+/* Signed arithmetic in $((...)) wraps two's-complement the way dash does, so
+   the add, subtract, and multiply run in u64 where overflow is defined and the
+   result casts back to i64. A direct i64 overflow would be undefined and trips
+   UBSan in the dbg build. */
+pure fn arithmetic_add(i64 lhs, i64 rhs) wontthrow -> i64
+{
+  return static_cast<i64>(static_cast<u64>(lhs) + static_cast<u64>(rhs));
+}
+
+pure fn arithmetic_subtract(i64 lhs, i64 rhs) wontthrow -> i64
+{
+  return static_cast<i64>(static_cast<u64>(lhs) - static_cast<u64>(rhs));
+}
+
+pure fn arithmetic_multiply(i64 lhs, i64 rhs) wontthrow -> i64
+{
+  return static_cast<i64>(static_cast<u64>(lhs) * static_cast<u64>(rhs));
+}
+
+/* INT64_MIN / -1 and INT64_MIN % -1 overflow the signed result and trap on
+   x86, so the wrapped values are returned directly. Division yields INT64_MIN
+   and modulo yields 0, which is the two's-complement wrap. */
+pure fn arithmetic_divide(i64 lhs, i64 rhs) wontthrow -> i64
+{
+  if (lhs == INT64_MIN && rhs == -1) return INT64_MIN;
+  return lhs / rhs;
+}
+
+pure fn arithmetic_modulo(i64 lhs, i64 rhs) wontthrow -> i64
+{
+  if (lhs == INT64_MIN && rhs == -1) return 0;
+  return lhs % rhs;
+}
+
+/* dash masks the shift count to the low 6 bits, so a count of 64 shifts by 0
+   and a negative count shifts by its low 6 bits. The shift runs in u64 where a
+   shift by a value below the width is defined, and for the right shift the sign
+   is carried by hand so a negative operand keeps its arithmetic-shift result. */
+pure fn arithmetic_shift_left(i64 lhs, i64 rhs) wontthrow -> i64
+{
+  let const count = static_cast<u64>(rhs) & 63u;
+  return static_cast<i64>(static_cast<u64>(lhs) << count);
+}
+
+pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
+{
+  let const count = static_cast<u64>(rhs) & 63u;
+  let const is_negative = lhs < 0;
+  let value = static_cast<u64>(lhs) >> count;
+  if (is_negative && count > 0)
+    value |= ~(~static_cast<u64>(0) >> count);
+  return static_cast<i64>(value);
+}
+
 /* A recursive-descent evaluator for $((...)), following C operator precedence,
    that resolves and assigns shell variables through the context. */
 class ArithmeticParser
@@ -1496,6 +1550,12 @@ public:
   EvalContext *context;
   StringView source;
   usize pos;
+
+  /* A parenthesized subexpression descends through parse_primary, so a source
+     such as thousands of open parentheses would overflow the native stack. The
+     depth is counted at each primary and capped before the recursion. */
+  usize depth{0};
+  static constexpr usize MAX_DEPTH = 512;
 
   [[noreturn]] cold fn fail(StringView message) throws -> void
   {
@@ -1551,20 +1611,20 @@ public:
   fn apply_compound(i64 lhs, i64 rhs, char kind) throws -> i64
   {
     switch (kind) {
-    case '+': return lhs + rhs;
-    case '-': return lhs - rhs;
-    case '*': return lhs * rhs;
+    case '+': return arithmetic_add(lhs, rhs);
+    case '-': return arithmetic_subtract(lhs, rhs);
+    case '*': return arithmetic_multiply(lhs, rhs);
     case '/':
       if (rhs == 0) fail("division by zero");
-      return lhs / rhs;
+      return arithmetic_divide(lhs, rhs);
     case '%':
       if (rhs == 0) fail("division by zero");
-      return lhs % rhs;
+      return arithmetic_modulo(lhs, rhs);
     case '&': return lhs & rhs;
     case '|': return lhs | rhs;
     case '^': return lhs ^ rhs;
-    case 'L': return lhs << rhs;
-    case 'R': return lhs >> rhs;
+    case 'L': return arithmetic_shift_left(lhs, rhs);
+    case 'R': return arithmetic_shift_right(lhs, rhs);
     default: return rhs;
     }
   }
@@ -1717,9 +1777,9 @@ public:
     let lhs = parse_additive();
     for (;;) {
       if (consume("<<"))
-        lhs <<= parse_additive();
+        lhs = arithmetic_shift_left(lhs, parse_additive());
       else if (consume(">>"))
-        lhs >>= parse_additive();
+        lhs = arithmetic_shift_right(lhs, parse_additive());
       else
         break;
     }
@@ -1731,9 +1791,9 @@ public:
     let lhs = parse_multiplicative();
     for (;;) {
       if (consume("+"))
-        lhs += parse_multiplicative();
+        lhs = arithmetic_add(lhs, parse_multiplicative());
       else if (consume("-"))
-        lhs -= parse_multiplicative();
+        lhs = arithmetic_subtract(lhs, parse_multiplicative());
       else
         break;
     }
@@ -1745,15 +1805,15 @@ public:
     let lhs = parse_unary();
     for (;;) {
       if (consume("*"))
-        lhs *= parse_unary();
+        lhs = arithmetic_multiply(lhs, parse_unary());
       else if (consume("/")) {
         let const divisor = parse_unary();
         if (divisor == 0) fail("division by zero");
-        lhs /= divisor;
+        lhs = arithmetic_divide(lhs, divisor);
       } else if (consume("%")) {
         let const divisor = parse_unary();
         if (divisor == 0) fail("division by zero");
-        lhs %= divisor;
+        lhs = arithmetic_modulo(lhs, divisor);
       } else
         break;
     }
@@ -1764,13 +1824,17 @@ public:
   {
     if (consume("!")) return parse_unary() == 0 ? 1 : 0;
     if (consume("~")) return ~parse_unary();
-    if (consume("-")) return -parse_unary();
+    if (consume("-")) return arithmetic_subtract(0, parse_unary());
     if (consume("+")) return parse_unary();
     return parse_primary();
   }
 
   fn parse_primary() throws -> i64
   {
+    depth++;
+    defer { depth--; };
+    if (depth > MAX_DEPTH) fail("expression nested too deeply");
+
     skip_spaces();
     if (consume("(")) {
       let const value = parse_assignment();

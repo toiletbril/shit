@@ -105,10 +105,26 @@ public:
     m_length = 0;
   }
 
-  mustuse T &back() { return m_data[m_length - 1]; }
-  mustuse const T &back() const { return m_data[m_length - 1]; }
-  mustuse T &front() { return m_data[0]; }
-  mustuse const T &front() const { return m_data[0]; }
+  mustuse T &back()
+  {
+    ASSERT(m_length > 0, "back() on an empty list");
+    return m_data[m_length - 1];
+  }
+  mustuse const T &back() const
+  {
+    ASSERT(m_length > 0, "back() on an empty list");
+    return m_data[m_length - 1];
+  }
+  mustuse T &front()
+  {
+    ASSERT(m_length > 0, "front() on an empty list");
+    return m_data[0];
+  }
+  mustuse const T &front() const
+  {
+    ASSERT(m_length > 0, "front() on an empty list");
+    return m_data[0];
+  }
 
   void reserve(usize needed)
   {

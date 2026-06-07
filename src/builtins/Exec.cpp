@@ -62,6 +62,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.err_fd) command.err_fd = ec.err_fd.take();
   command.dup_err_to_out = ec.dup_err_to_out;
   command.dup_out_to_err = ec.dup_out_to_err;
+  command.dup_out_to_err_came_last = ec.dup_out_to_err_came_last;
 
   /* An external command replaces the shell. replace_process returns only by
      throwing, when the program was found but could not be executed, which ends

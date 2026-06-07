@@ -569,9 +569,13 @@ public:
   Maybe<os::descriptor> err_fd{};
 
   /* 2>&1 routes the standard error to wherever the standard output goes, and
-     1>&2 the reverse. Applied after the file descriptors are placed. */
+     1>&2 the reverse. Applied after the file descriptors are placed. When both
+     are present the source order decides the result, since each dup reads the
+     current target of its source descriptor, so dup_out_to_err_came_last records
+     which one the source wrote last. */
   bool dup_err_to_out{false};
   bool dup_out_to_err{false};
+  bool dup_out_to_err_came_last{false};
 
   pure fn is_builtin() const wontthrow -> bool;
 

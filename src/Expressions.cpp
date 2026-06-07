@@ -622,8 +622,10 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
         /* Self copy is a no-op. */
       } else if (redir.fd == 2 && from_fd == 1) {
         ec.dup_err_to_out = true;
+        ec.dup_out_to_err_came_last = false;
       } else if (redir.fd == 1 && from_fd == 2) {
         ec.dup_out_to_err = true;
+        ec.dup_out_to_err_came_last = true;
       }
       continue;
     }
@@ -773,6 +775,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   Maybe<os::descriptor> redirect_err_fd;
   bool dup_err_to_out = false;
   bool dup_out_to_err = false;
+  bool dup_out_to_err_came_last = false;
   bool redirect_fds_handed_off = false;
   /* A duplication onto an arbitrary descriptor, such as >&5 or the close form
      >&-, points a real shell descriptor at the target around this command. The
@@ -869,10 +872,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
       if (redir.fd == 2 && from_fd == 1) {
         dup_err_to_out = true;
+        dup_out_to_err_came_last = false;
         continue;
       }
       if (redir.fd == 1 && from_fd == 2) {
         dup_out_to_err = true;
+        dup_out_to_err_came_last = true;
         continue;
       }
 
@@ -1135,6 +1140,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (redirect_err_fd) ec.err_fd = redirect_err_fd;
   ec.dup_err_to_out = dup_err_to_out;
   ec.dup_out_to_err = dup_out_to_err;
+  ec.dup_out_to_err_came_last = dup_out_to_err_came_last;
   redirect_fds_handed_off = true;
 
   const i64 ret = utils::execute_context(steal(ec), cxt, is_async());

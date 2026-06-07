@@ -276,13 +276,31 @@ hot fn execute_program(ExecContext &&ec) throws -> process
     posix_spawn_file_actions_addclose(&file_actions, *ec.err_fd);
   }
   /* The descriptor duplications come after the files are placed, so 2>&1 sees
-     the final standard output. */
-  if (ec.dup_err_to_out)
+     the final standard output. Each dup reads the current target of its source
+     descriptor, so when both are present the source order decides the result.
+     The earlier dup is applied first and the later one reads its effect, which
+     reproduces the way dash routes a mixed 2>&1 1>&2 against 1>&2 2>&1. */
+  let const apply_err_to_out = [&]() {
     posix_spawn_file_actions_adddup2(&file_actions, STDOUT_FILENO,
                                      STDERR_FILENO);
-  if (ec.dup_out_to_err)
+  };
+  let const apply_out_to_err = [&]() {
     posix_spawn_file_actions_adddup2(&file_actions, STDERR_FILENO,
                                      STDOUT_FILENO);
+  };
+  if (ec.dup_err_to_out && ec.dup_out_to_err) {
+    if (ec.dup_out_to_err_came_last) {
+      apply_err_to_out();
+      apply_out_to_err();
+    } else {
+      apply_out_to_err();
+      apply_err_to_out();
+    }
+  } else if (ec.dup_err_to_out) {
+    apply_err_to_out();
+  } else if (ec.dup_out_to_err) {
+    apply_out_to_err();
+  }
 
   posix_spawnattr_t attr;
   posix_spawnattr_init(&attr);
@@ -389,8 +407,22 @@ fn replace_process(ExecContext &&ec) throws -> void
     check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
     if (*ec.err_fd != STDERR_FILENO) check_syscall(close(*ec.err_fd));
   }
-  if (ec.dup_err_to_out) check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
-  if (ec.dup_out_to_err) check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
+  /* Each dup reads the current target of its source descriptor, so when both
+     are present the source order decides the result. The earlier dup runs
+     first and the later one reads its effect, matching dash. */
+  if (ec.dup_err_to_out && ec.dup_out_to_err) {
+    if (ec.dup_out_to_err_came_last) {
+      check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
+      check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
+    } else {
+      check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
+      check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
+    }
+  } else if (ec.dup_err_to_out) {
+    check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
+  } else if (ec.dup_out_to_err) {
+    check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
+  }
 
   reset_signal_handlers();
 
@@ -515,7 +547,12 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   while (offset < content.count()) {
     ssize_t written =
         ::write(fd, content.data + offset, content.count() - offset);
-    if (written <= 0) {
+    /* A signal interrupted the write before any byte landed. Retry instead of
+       dropping the heredoc, matching the EINTR loops in read_fd and write_fd.
+       The handlers carry no SA_RESTART, so a SIGCHLD or a SIGINT mid-write can
+       surface here. */
+    if (written < 0 && errno == EINTR) continue;
+    if (written < 0) {
       close(fd);
       return shit::None;
     }
@@ -953,10 +990,22 @@ fn execute_program(ExecContext &&ec) -> process
   startup_info.hStdOutput = ec.out_fd.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
   startup_info.hStdError = ec.err_fd.value_or(GetStdHandle(STD_ERROR_HANDLE));
 
-  /* Apply the descriptor duplications in the same order as the POSIX path, so
-     2>&1 routes stderr to the current stdout and 1>&2 the reverse. */
-  if (ec.dup_err_to_out) startup_info.hStdError = startup_info.hStdOutput;
-  if (ec.dup_out_to_err) startup_info.hStdOutput = startup_info.hStdError;
+  /* Each duplication reads the current target of its source handle, so when
+     both are present the source order decides the result, the same way the
+     POSIX path applies the earlier dup first. */
+  if (ec.dup_err_to_out && ec.dup_out_to_err) {
+    if (ec.dup_out_to_err_came_last) {
+      startup_info.hStdError = startup_info.hStdOutput;
+      startup_info.hStdOutput = startup_info.hStdError;
+    } else {
+      startup_info.hStdOutput = startup_info.hStdError;
+      startup_info.hStdError = startup_info.hStdOutput;
+    }
+  } else if (ec.dup_err_to_out) {
+    startup_info.hStdError = startup_info.hStdOutput;
+  } else if (ec.dup_out_to_err) {
+    startup_info.hStdOutput = startup_info.hStdError;
+  }
 
   defer
   {

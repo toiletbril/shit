@@ -275,6 +275,21 @@ cold fn Parser::construct_ast(ArrayList<ErrorWithLocation> &errors) throws
 hot fn Parser::parse_command_list(
     std::initializer_list<Token::Kind> terminators) throws -> Expression *
 {
+  /* Every nested compound command recurses through this list, so the depth
+     guard here covers a subshell, a brace group, an if, a while, a for, and a
+     case alike. A source nested past the limit throws here instead of
+     overflowing the native stack. */
+  m_command_depth++;
+  defer { m_command_depth--; };
+  if (m_command_depth > MAX_COMMAND_DEPTH) {
+    Token *token = m_lexer.peek_shell_token();
+    ASSERT(token != nullptr);
+    throw shit::ErrorWithLocation{
+        token->source_location(),
+        "Compound command nested deeper than " +
+            utils::int_to_text(static_cast<i64>(MAX_COMMAND_DEPTH))};
+  }
+
   Command *lhs = nullptr;
 
   CompoundList *compound_list = m_lexer.arena().create<CompoundList>();
