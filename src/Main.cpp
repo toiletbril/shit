@@ -83,6 +83,19 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 
 namespace shit {
 
+/* Set when the shell is invoked through a name whose basename is sh, the way a
+   system ln -s shit sh does. bash and zsh switch to their POSIX modes when run
+   as sh, so the shell does the same and a /bin/sh script runs POSIX-clean. */
+static bool INVOKED_AS_SH = false;
+
+/* True when POSIX behavior is in effect, either from --posix or from the sh
+   invocation name. The failglob default and the style-warning suppression both
+   read it. */
+pure static fn should_run_in_posix_mode() wontthrow -> bool
+{
+  return FLAG_POSIX_ME_HARDER.is_enabled() || INVOKED_AS_SH;
+}
+
 /* Print the help or version text and return the exit code when one of those
    flags is set, otherwise None so the shell proceeds to normal startup. */
 static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
@@ -210,7 +223,7 @@ static fn run_script_contents(const String &script_contents,
     if (!should_suppress_diagnostics &&
         !analyze_ast(ast, script_contents, context.function_names(),
                      context.alias_names(), context.no_exec(),
-                     FLAG_POSIX_ME_HARDER.is_enabled()))
+                     should_run_in_posix_mode()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
@@ -360,6 +373,12 @@ fn main(int argc, char **argv) -> int
     program_path = "<unknown>";
   }
 
+  /* A basename of sh selects POSIX mode, so a /bin/sh symlink behaves like one. */
+  let const last_slash = program_path.find_last_character('/');
+  shit::INVOKED_AS_SH =
+      (last_slash.has_value() ? program_path.substring(*last_slash + 1)
+                              : program_path.view()) == "sh";
+
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
 
@@ -458,7 +477,7 @@ fn main(int argc, char **argv) -> int
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
   context.set_failglob(!FLAG_NO_FAIL_GLOB.is_enabled() &&
-                       !FLAG_POSIX_ME_HARDER.is_enabled());
+                       !shit::should_run_in_posix_mode());
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);
