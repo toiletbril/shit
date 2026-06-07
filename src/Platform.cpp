@@ -142,6 +142,8 @@ fn is_stdin_a_tty() wontthrow -> bool { return isatty(SHIT_STDIN); }
 
 fn is_stdout_a_tty() wontthrow -> bool { return isatty(SHIT_STDOUT); }
 
+fn is_stderr_a_tty() wontthrow -> bool { return isatty(SHIT_STDERR); }
+
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
 #if SHIT_PLATFORM_ISNT COSMO
@@ -778,6 +780,8 @@ fn process_id_of(process p) -> i64 { return static_cast<i64>(GetProcessId(p)); }
 fn is_stdin_a_tty() -> bool { return _isatty(_fileno(stdin)); }
 
 fn is_stdout_a_tty() -> bool { return _isatty(_fileno(stdout)); }
+
+fn is_stderr_a_tty() -> bool { return _isatty(_fileno(stderr)); }
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
 

@@ -3,6 +3,7 @@
 #include "Debug.hpp"
 #include "ErrorOr.hpp"
 #include "Eval.hpp"
+#include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -10,6 +11,67 @@
 /* TODO: Print proper offset and context for UTF-8. */
 
 namespace shit {
+
+/* ANSI SGR sequences matching clang's diagnostic palette. The reset clears every
+   attribute a colored span set, and the rest open a bold colored span. */
+namespace ansi {
+static const StringView RESET = "\x1b[0m";
+static const StringView BOLD = "\x1b[1m";
+static const StringView BOLD_RED = "\x1b[1;31m";
+static const StringView BOLD_MAGENTA = "\x1b[1;35m";
+static const StringView BOLD_CYAN = "\x1b[1;36m";
+static const StringView BOLD_GREEN = "\x1b[1;32m";
+} /* namespace ansi */
+
+/* The SGR codes wrapping one diagnostic. Each field is empty when color is off,
+   so the same render code appends them unconditionally and emits nothing on the
+   plain path. The severity code follows clang, where an error is red, a warning
+   is magenta, and a note or trace is cyan. */
+struct diagnostic_color
+{
+  StringView severity{};
+  StringView location{};
+  StringView message{};
+  StringView caret{};
+  StringView reset{};
+};
+
+/* Whether diagnostics may carry color, decided fresh at render time so a
+   redirected stderr never gains escapes. Color is on only when stderr is a
+   terminal, NO_COLOR is unset or empty, and TERM is not dumb. */
+cold static fn should_color_diagnostics() throws -> bool
+{
+  if (!os::is_stderr_a_tty()) return false;
+
+  if (let const no_color = os::get_environment_variable("NO_COLOR");
+      no_color.has_value() && !no_color->is_empty())
+    return false;
+
+  if (let const term = os::get_environment_variable("TERM");
+      term.has_value() && term->view() == StringView{"dumb"})
+    return false;
+
+  return true;
+}
+
+/* The color codes for a diagnostic of this severity, or all empty StringViews
+   when color is off. The severity word selects the severity hue, since the
+   reporting code reads the word from the object rather than its concrete type.
+ */
+cold static fn diagnostic_colors_for(StringView severity_word) throws
+    -> diagnostic_color
+{
+  if (!should_color_diagnostics()) return diagnostic_color{};
+
+  StringView severity = ansi::BOLD_CYAN;
+  if (severity_word == StringView{"Error"})
+    severity = ansi::BOLD_RED;
+  else if (severity_word == StringView{"Warning"})
+    severity = ansi::BOLD_MAGENTA;
+
+  return diagnostic_color{severity, ansi::BOLD, ansi::BOLD, ansi::BOLD_GREEN,
+                          ansi::RESET};
+}
 
 /* The line a byte falls on and the offset of the newline that starts it. */
 struct precise_location
@@ -139,7 +201,8 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
                                        usize byte_count, usize line_number,
                                        usize last_newline_location,
                                        usize unicode_position,
-                                       Maybe<StringView> message) throws
+                                       Maybe<StringView> message,
+                                       const diagnostic_color &color) throws
     -> String
 {
   usize start_offset = byte_position - last_newline_location;
@@ -222,7 +285,10 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
   for (usize i = 0; i < underline_padding_length; i++)
     msg += ' ';
 
-  /* The underline itself of this token's length. */
+  /* The underline itself of this token's length. The caret and its trailing
+     message share clang's caret hue, so the span opens here and closes after
+     the message. */
+  msg += color.caret;
   msg += "^~";
   if (unicode_length > 2) {
     for (usize i = 0; i < unicode_length - 2; i++)
@@ -234,6 +300,7 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
     msg += *message;
     msg += '.';
   }
+  msg += color.reset;
 
   return msg;
 }
@@ -255,7 +322,9 @@ Error::Error(StringView message) : ErrorBase(message) {}
 
 cold fn Error::to_string() const throws -> String
 {
-  return severity_word() + ": " + message() + ".";
+  let const color = diagnostic_colors_for(severity_word());
+  return color.severity + severity_word() + color.reset + ": " +
+         color.message + message() + "." + color.reset;
 }
 
 Error::operator String() const throws { return to_string(); }
@@ -309,9 +378,12 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
       (last_newline_location > 0) ? unicode_position - last_newline_location
                                   : unicode_position + 1;
 
+  let const color = diagnostic_colors_for(severity_word());
+
   String result{};
   /* A named source prefixes its path before the line and column, so a sourced
      error reads path:line:col rather than a bare line:col. */
+  result += color.location;
   if (let const name = m_location.filename; name.has_value()) {
     result += *name;
     result += ':';
@@ -319,20 +391,26 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   result += utils::uint_to_text(line_number + 1);
   result += ':';
   result += utils::uint_to_text(line_byte_position);
-  result += ": ";
+  result += ':';
+  result += color.reset;
+  result += ' ';
+  result += color.severity;
   result += severity_word();
+  result += color.reset;
   /* A located note with no message, such as a backtrace trace frame, ends at
      the severity word, so nothing follows the colon. */
   if (!m_message.is_empty()) {
     result += ": ";
+    result += color.message;
     result += m_message;
     result += '.';
+    result += color.reset;
   }
   result += '\n';
 
   result += get_context_pointing_to(source, byte_position, byte_count,
                                     line_number, last_newline_location,
-                                    unicode_position, StringView{"here"});
+                                    unicode_position, StringView{"here"}, color);
   return result;
 }
 
@@ -387,16 +465,25 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
           ? unicode_details_position - details_last_newline_location
           : unicode_details_position + 1;
 
+  let const color = diagnostic_colors_for(StringView{"Note"});
+
   String result{};
+  result += color.location;
   result += utils::uint_to_text(details_line_number + 1);
   result += ':';
   result += utils::uint_to_text(details_line_byte_position);
-  result += ": Note:\n";
+  result += ':';
+  result += color.reset;
+  result += ' ';
+  result += color.severity;
+  result += "Note";
+  result += color.reset;
+  result += ":\n";
 
   result += get_context_pointing_to(
       source, byte_position, byte_count, details_line_number,
       details_last_newline_location, unicode_details_position,
-      m_details_message.view());
+      m_details_message.view(), color);
   return result;
 }
 

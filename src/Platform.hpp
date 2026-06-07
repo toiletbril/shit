@@ -59,6 +59,7 @@ using os_args = String;
 
 #define SHIT_STDIN  GetStdHandle(STD_INPUT_HANDLE)
 #define SHIT_STDOUT GetStdHandle(STD_OUTPUT_HANDLE)
+#define SHIT_STDERR GetStdHandle(STD_ERROR_HANDLE)
 
 #elif SHIT_PLATFORM_IS POSIX
 constexpr char PATH_DELIMITER = ':';
@@ -72,6 +73,7 @@ using os_args = ArrayList<const char *>;
 
 #define SHIT_STDIN  STDIN_FILENO
 #define SHIT_STDOUT STDOUT_FILENO
+#define SHIT_STDERR STDERR_FILENO
 #endif
 
 using ext_index = usize;
@@ -217,6 +219,7 @@ fn process_id_of(process p) wontthrow -> i64;
 
 fn is_stdin_a_tty() wontthrow -> bool;
 fn is_stdout_a_tty() wontthrow -> bool;
+fn is_stderr_a_tty() wontthrow -> bool;
 
 fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
 
