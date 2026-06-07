@@ -170,6 +170,31 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
      builtin command. */
   defer { ec.close_fds(); };
 
+  /* A builtin stage of a pipeline carries the pipe ends in its context. A
+     builtin that runs a sub-command, such as eval, command, or the dot source,
+     evaluates a fresh command that builds its own context from the shell's real
+     descriptors and never sees these pipe ends. The pipe descriptors are placed
+     on the real shell fd 0, 1, and 2 for the duration of the builtin so any
+     sub-command it spawns inherits them, and the originals are restored after.
+     A single builtin that is not a pipeline stage carries no pipe fds, so it
+     pays for none of this. */
+  const bool has_pipe_descriptors =
+      ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value();
+
+  ArrayList<os::saved_descriptor> saved_descriptors{};
+  if (has_pipe_descriptors) {
+    if (ec.in_fd)
+      saved_descriptors.push(os::save_and_replace_descriptor(0, *ec.in_fd));
+    if (ec.out_fd)
+      saved_descriptors.push(os::save_and_replace_descriptor(1, *ec.out_fd));
+    if (ec.err_fd)
+      saved_descriptors.push(os::save_and_replace_descriptor(2, *ec.err_fd));
+  }
+  defer {
+    for (usize i = saved_descriptors.count(); i > 0; i--)
+      os::restore_descriptor(saved_descriptors[i - 1]);
+  };
+
   ASSERT(b != nullptr);
   try {
     return b->execute(ec, cxt);
