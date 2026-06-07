@@ -116,58 +116,72 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
 hot fn EvalContext::get_variable_value(StringView name) const throws
     -> Maybe<String>
 {
-  if (name == "?")
-    return String{heap_allocator(), utils::int_to_text(m_last_exit_status)};
-  if (name == "$")
-    return String{heap_allocator(),
-                  utils::int_to_text(os::get_shell_process_id())};
-  if (name == "!")
-    return m_last_background_pid
-               ? String{heap_allocator(),
-                        utils::int_to_text(*m_last_background_pid)}
-               : String{};
-  if (name == "-") return String{heap_allocator(), option_flags_string()};
-  if (name == "#")
-    return String{heap_allocator(),
-                  utils::uint_to_text(m_positional_params.count())};
-  if (name == "0") return String{heap_allocator(), m_shell_name};
+  /* The ordinary name dominates every read, so its dispatch is reached first.
+     Every special single-character name is one byte, so a name longer than one
+     byte that does not begin with a digit or 'L' is an ordinary name that goes
+     straight to the store. The single-character specials, the positional digit
+     run, and $LINENO are split out below so the common read pays only the first
+     byte test. */
+  const char first_byte = name.is_empty() ? '\0' : name[0];
 
-  /* A purely numeric name selects a positional parameter, $1 upward. An index
-     too large to fit, or beyond the count, has no value. */
-  let is_all_digits = !name.is_empty();
-  for (usize i = 0; i < name.count(); i++)
-    if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
-      is_all_digits = false;
-      break;
+  if (name.count() == 1) {
+    if (first_byte == '?')
+      return String{heap_allocator(), utils::int_to_text(m_last_exit_status)};
+    if (first_byte == '$')
+      return String{heap_allocator(),
+                    utils::int_to_text(os::get_shell_process_id())};
+    if (first_byte == '!')
+      return m_last_background_pid
+                 ? String{heap_allocator(),
+                          utils::int_to_text(*m_last_background_pid)}
+                 : String{};
+    if (first_byte == '-') return String{heap_allocator(), option_flags_string()};
+    if (first_byte == '#')
+      return String{heap_allocator(),
+                    utils::uint_to_text(m_positional_params.count())};
+    if (first_byte == '0') return String{heap_allocator(), m_shell_name};
+
+    /* $* and $@ outside the special quoted handling join into a single word. $*
+       joins with the first IFS character, $@ joins with a space. */
+    if (first_byte == '*' || first_byte == '@') {
+      let separator = ' ';
+      let has_separator = true;
+      if (first_byte == '*') {
+        let const &ifs = m_field_separators;
+        has_separator = !ifs.is_empty();
+        if (has_separator) separator = ifs.first_character();
+      }
+      let joined = String{};
+      for (usize i = 0; i < m_positional_params.count(); i++) {
+        if (i > 0 && has_separator) joined.push(separator);
+        joined.append(m_positional_params[i].view());
+      }
+      return joined;
     }
-  if (is_all_digits) {
-    if (name.count() > 9) return String{};
-    let const parsed_index = utils::parse_decimal_integer(name);
-    if (parsed_index.is_error()) return String{};
-    let const index = static_cast<usize>(parsed_index.value());
-    if (index >= 1 && index <= m_positional_params.count()) {
-      ASSERT(index - 1 < m_positional_params.count());
-      return m_positional_params[index - 1];
-    }
-    return String{};
   }
 
-  /* $* and $@ outside the special quoted handling join into a single word. $*
-     joins with the first IFS character, $@ joins with a space. */
-  if (name == "*" || name == "@") {
-    let separator = ' ';
-    let has_separator = true;
-    if (name == "*") {
-      let const &ifs = m_field_separators;
-      has_separator = !ifs.is_empty();
-      if (has_separator) separator = ifs.first_character();
+  /* A purely numeric name selects a positional parameter, $1 upward. Only a name
+     that begins with a digit can be all digits, so the scan runs only then. An
+     index too large to fit, or beyond the count, has no value. The single '0'
+     name is handled above as the shell name. */
+  if (first_byte >= '0' && first_byte <= '9') {
+    let is_all_digits = true;
+    for (usize i = 0; i < name.count(); i++)
+      if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
+        is_all_digits = false;
+        break;
+      }
+    if (is_all_digits) {
+      if (name.count() > 9) return String{};
+      let const parsed_index = utils::parse_decimal_integer(name);
+      if (parsed_index.is_error()) return String{};
+      let const index = static_cast<usize>(parsed_index.value());
+      if (index >= 1 && index <= m_positional_params.count()) {
+        ASSERT(index - 1 < m_positional_params.count());
+        return m_positional_params[index - 1];
+      }
+      return String{};
     }
-    let joined = String{};
-    for (usize i = 0; i < m_positional_params.count(); i++) {
-      if (i > 0 && has_separator) joined.push(separator);
-      joined.append(m_positional_params[i].view());
-    }
-    return joined;
   }
 
   if (let const *stored = m_shell_variables.find(name)) return *stored;
@@ -177,8 +191,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      set, matching dash. With no assignment it computes the line from the
      current source and position, which the command dispatcher keeps current. A
      run with no real source, such as an interactive single line, reports
-     line 1. */
-  if (name == "LINENO") {
+     line 1. The first byte gates the compare so an ordinary name skips it. */
+  if (first_byte == 'L' && name == "LINENO") {
     const usize line = m_current_source != nullptr
                            ? utils::line_number_at(m_current_source->view(),
                                                    m_current_location_position)
@@ -2240,11 +2254,42 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
         word = &fallback_word;
       }
 
-      for (glob_field &field : expand_word(*word)) {
-        for (String &g : expand_path(steal(field), l))
-          expanded_args.push(String{
-              heap_allocator(), StringView{g.c_str(), g.count()}
-          });
+      /* The plain-literal fast path pushes a word that needs no expansion,
+         splitting, or globbing straight to the heap argument vector. The common
+         literal argument such as '-lt', '200000', 'echo', or a plain filename
+         takes this path and never enters expand_word or expand_path. */
+      let const plain_kind = word->plain_literal_kind();
+      let took_fast_path = false;
+      if (plain_kind != Word::PlainLiteral::NotPlain) {
+        let literal = String{heap_allocator()};
+        for (const WordSegment &segment : word->segments)
+          literal.append(segment.text.view());
+
+        /* A single unquoted segment still needs the IFS check, since an IFS byte
+           in its text would split it into more than one field. With no IFS byte
+           it is one field. */
+        let needs_split = false;
+        if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
+          for (usize i = 0; i < literal.count(); i++)
+            if (is_field_separator(literal[i])) {
+              needs_split = true;
+              break;
+            }
+        }
+
+        if (!needs_split) {
+          expanded_args.push(steal(literal));
+          took_fast_path = true;
+        }
+      }
+
+      if (!took_fast_path) {
+        for (glob_field &field : expand_word(*word)) {
+          for (String &g : expand_path(steal(field), l))
+            expanded_args.push(String{
+                heap_allocator(), StringView{g.c_str(), g.count()}
+            });
+        }
       }
     } catch (const Error &e) {
       throw ErrorWithLocation{l, e.message()};

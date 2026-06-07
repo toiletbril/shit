@@ -47,6 +47,11 @@ public:
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
+
+  /* True when the segment text holds an unquoted glob metacharacter, one of '*',
+     '?', or '['. The plain-literal fast path in the evaluator consults this to
+     decide whether a word may skip pathname expansion. */
+  pure fn has_glob_metacharacter() const wontthrow -> bool;
 };
 
 /* A lexed word carries its quoting structure as ordered segments. The evaluator
@@ -70,6 +75,21 @@ public:
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. */
   fn get_assignment_split() const throws -> Maybe<word_assignment_split>;
+
+  /* How a word may take the evaluator's plain-literal fast path. NotPlain words
+     run the full expansion machine. PlainNoSplit words concatenate their
+     segments into one field with no expansion, splitting, or globbing.
+     PlainUnquotedOneSegment is a single unquoted segment free of glob
+     metacharacters whose only remaining question is whether it holds an IFS
+     byte, which the evaluator answers against the live separators. */
+  enum class PlainLiteral : u8
+  {
+    NotPlain,
+    PlainNoSplit,
+    PlainUnquotedOneSegment,
+  };
+
+  pure fn plain_literal_kind() const wontthrow -> PlainLiteral;
 };
 
 struct word_assignment_split

@@ -39,6 +39,15 @@ pure fn WordSegment::is_tilde_candidate() const wontthrow -> bool
   return kind == Kind::UnquotedText;
 }
 
+pure fn WordSegment::has_glob_metacharacter() const wontthrow -> bool
+{
+  for (usize i = 0; i < text.count(); i++) {
+    const char c = text[i];
+    if (c == '*' || c == '?' || c == '[') return true;
+  }
+  return false;
+}
+
 pure fn Word::is_empty() const wontthrow -> bool { return segments.is_empty(); }
 
 hot fn Word::to_literal_string() const throws -> String
@@ -61,6 +70,33 @@ hot fn Word::to_literal_string() const throws -> String
     result += segment.text;
   }
   return result;
+}
+
+pure fn Word::plain_literal_kind() const wontthrow -> PlainLiteral
+{
+  if (segments.is_empty()) return PlainLiteral::NotPlain;
+
+  /* A single unquoted segment splits and globs, so it qualifies only without a
+     glob metacharacter and without a leading tilde that tilde expansion would
+     rewrite. The IFS question is left to the evaluator. */
+  if (segments.count() == 1 &&
+      segments[0].kind == WordSegment::Kind::UnquotedText)
+  {
+    const WordSegment &only = segments[0];
+    if (only.has_glob_metacharacter()) return PlainLiteral::NotPlain;
+    if (!only.text.is_empty() && only.text[0] == '~')
+      return PlainLiteral::NotPlain;
+    return PlainLiteral::PlainUnquotedOneSegment;
+  }
+
+  /* Literal and double-quoted text never splits, globs, or expands, so a word
+     built only from those is one field of its concatenated text. */
+  for (const WordSegment &segment : segments) {
+    if (segment.kind != WordSegment::Kind::LiteralText &&
+        segment.kind != WordSegment::Kind::DoubleQuotedText)
+      return PlainLiteral::NotPlain;
+  }
+  return PlainLiteral::PlainNoSplit;
 }
 
 pure fn Word::is_all_ascii_digits() const wontthrow -> bool
