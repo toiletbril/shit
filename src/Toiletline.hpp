@@ -8,12 +8,23 @@ namespace {
 
 } /* namespace */
 
+namespace shit {
+class EvalContext;
+} /* namespace shit */
+
 namespace toiletline {
 
 using shit::String;
 using shit::StringView;
 
 void set_title(const String &title);
+
+/* Register the shell completion engine as the line editor's TAB and ghost-text
+   source, reading names and the filesystem through the given context. Called
+   only on the interactive path, so a non-interactive run never enables it.
+   disable_completion clears the callback. */
+void enable_completion(shit::EvalContext &context);
+void disable_completion();
 
 usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));
 

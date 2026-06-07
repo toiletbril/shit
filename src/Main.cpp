@@ -1,6 +1,7 @@
 #include "Arena.hpp"
 #include "Cli.hpp"
 #include "Common.hpp"
+#include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -54,6 +55,10 @@ FLAG(EXIT_CODE, Bool, 'E', "exit-code",
      "Print exit code after each executed command.");
 FLAG(STATS, Bool, 'S', "stats",
      "Print statistics after each executed command.");
+
+FLAG(COMPLETE, Bool, '\0', "complete",
+     "Debug: print tab completions for a line. Args are the line, the cursor "
+     "byte offset, and an optional base directory for filesystem completion.");
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, 'V', "short-version",
@@ -293,6 +298,56 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
   return out;
 }
 
+/* Run the completion engine against a line and print the result, so a test
+   exercises completion without a terminal. The args are the line, the cursor
+   byte offset, and an optional base directory that roots filesystem completion
+   at a fixed place. The output is deterministic, the longest common prefix
+   followed by each candidate on its own line. */
+static fn run_complete_debug(const ArrayList<String> &args) -> int
+{
+  if (args.is_empty()) {
+    print_error("--complete needs a line argument\n");
+    return EXIT_FAILURE;
+  }
+
+  StringView line = args[0].view();
+
+  usize cursor = line.length;
+  if (args.count() > 1) {
+    if (ErrorOr<i64> parsed = utils::parse_decimal_integer(args[1].view());
+        !parsed.is_error() && parsed.value() >= 0)
+    {
+      cursor = static_cast<usize>(parsed.value());
+    }
+  }
+
+  Path base_directory =
+      args.count() > 2 ? Path{args[2].view()} : Path::current_directory();
+
+  /* A throwaway context with no functions or aliases, enough for the engine to
+     read its empty name sets and complete builtins, PATH, and the filesystem. */
+  EvalContext context{false, false, false, false};
+
+  completion::completion_result result =
+      completion::complete(line, cursor, context, base_directory);
+
+  String out{};
+  out += "position: ";
+  out += result.is_command_position ? "command" : "argument";
+  out += "\nlcp: ";
+  out += result.longest_common_prefix.view();
+  out += "\n";
+  for (const String &candidate : result.candidates) {
+    out += "candidate: ";
+    out += candidate.view();
+    out += "\n";
+  }
+  print(out);
+  flush();
+
+  return EXIT_SUCCESS;
+}
+
 } /* namespace shit */
 
 fn main(int argc, char **argv) -> int
@@ -330,6 +385,11 @@ fn main(int argc, char **argv) -> int
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
+
+  /* The completion debug path runs the engine and exits, so a test exercises it
+     without a terminal. It must stay off the normal startup, so it is gated on
+     its own flag and returns before any interactive or script work. */
+  if (FLAG_COMPLETE.is_enabled()) return shit::run_complete_debug(file_names);
 
   if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
 
@@ -504,6 +564,9 @@ fn main(int argc, char **argv) -> int
         if (!toiletline::is_active()) {
           shit::utils::initialize_path_map();
           toiletline::initialize();
+          /* The line editor only completes at an interactive prompt, so the
+             engine is registered here and never on the script or -c path. */
+          toiletline::enable_completion(context);
           shit::show_message("Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
@@ -548,11 +611,12 @@ fn main(int argc, char **argv) -> int
 
           switch (code) {
           case TL_PRESSED_TAB:
-            /* TODO. */
-            shit::print("^I");
-            shit::flush();
+            /* The completion engine handles TAB inside the editor and returns
+               TL_PRESSED_ENTER or TL_SUCCESS, so this fires only when there was
+               nothing to complete. Re-feed the line and keep prompting on the
+               same row rather than inserting a literal tab. */
             toiletline::set_input(input);
-            break;
+            continue;
           case TL_PRESSED_EOF:
             /* Exit on CTRL-D. */
             shit::print("^D");

@@ -3,8 +3,11 @@
 
 #include "Arena.hpp"
 #include "Cli.hpp"
+#include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
+#include "Path.hpp"
 #include "Platform.hpp"
 #include "Utils.hpp"
 
@@ -101,6 +104,50 @@ fn tl_arena_realloc(void *pointer, usize length) -> void *
 #pragma GCC diagnostic pop
 #endif
 
+/* The context the completion engine reads, set by the host before each line is
+   read and cleared when completion is disabled. A null context means no
+   completion, the non-interactive default. */
+shit::EvalContext *COMPLETION_CONTEXT = nullptr;
+
+/* The storage the completion callback hands back to toiletline. The C-string
+   pointers must outlive the callback return, so the engine's owned strings are
+   kept here until the next call replaces them. */
+shit::ArrayList<shit::String> COMPLETION_CANDIDATES{};
+shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{};
+shit::String COMPLETION_LCP{};
+
+/* Bridge toiletline's TAB and ghost queries onto the shell completion engine.
+   The engine completes the token under the cursor and the result is stored in
+   the static buffers above, which toiletline reads right after this returns.
+   Returns 1 when at least one candidate was produced, 0 otherwise. */
+fn shit_completion_callback(const char *buffer, size_t cursor,
+                            tl_completion *out) -> int
+{
+  if (COMPLETION_CONTEXT == nullptr) return 0;
+
+  shit::StringView line{buffer, std::strlen(buffer)};
+  shit::Path base = shit::Path::current_directory();
+
+  shit::completion::completion_result result =
+      shit::completion::complete(line, cursor, *COMPLETION_CONTEXT, base);
+
+  if (result.candidates.is_empty()) return 0;
+
+  COMPLETION_CANDIDATES = steal(result.candidates);
+  COMPLETION_LCP = steal(result.longest_common_prefix);
+
+  COMPLETION_CANDIDATE_POINTERS.clear();
+  for (const shit::String &candidate : COMPLETION_CANDIDATES)
+    COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
+
+  out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
+  out->count = COMPLETION_CANDIDATE_POINTERS.count();
+  out->longest_common_prefix = COMPLETION_LCP.c_str();
+  out->token_start = result.token_start;
+
+  return 1;
+}
+
 } /* namespace */
 
 namespace toiletline {
@@ -122,6 +169,18 @@ fn set_title(const String &title) -> void
 {
   if (::tl_set_title(title.c_str()) != TL_SUCCESS)
     throw shit::Error{"Toiletline: Could not set the title for the terminal"};
+}
+
+fn enable_completion(shit::EvalContext &context) -> void
+{
+  COMPLETION_CONTEXT = &context;
+  ::tl_set_complete_callback(shit_completion_callback);
+}
+
+fn disable_completion() -> void
+{
+  COMPLETION_CONTEXT = nullptr;
+  ::tl_set_complete_callback(nullptr);
 }
 
 fn utf8_strlen(const String &s, usize count) -> usize
@@ -240,6 +299,10 @@ struct input_result
 };
 
 fn set_title(const String &title) -> void { unused(title); }
+
+fn enable_completion(shit::EvalContext &context) -> void { unused(context); }
+
+fn disable_completion() -> void {}
 
 fn utf8_strlen(const String &s, usize count) -> usize
 {

@@ -1,0 +1,31 @@
+# command position completes builtin prefix ech
+position: command
+lcp: echo
+candidate: echo
+# command position completes several builtins for tr
+position: command
+lcp: tr
+candidate: trap
+candidate: true
+# argument position completes a directory prefix with a trailing slash
+position: argument
+lcp: data/abcd
+candidate: data/abcd/
+candidate: data/abcdefg/
+# argument position lists the entries of a directory
+position: argument
+lcp: data/abcd/
+candidate: data/abcd/first
+candidate: data/abcd/second
+# a glob star token resolves to its match
+position: argument
+lcp: data/abcdefg/
+candidate: data/abcdefg/
+# a glob question mark token resolves to its match
+position: argument
+lcp: data/abcd/
+candidate: data/abcd/
+# a glob bracket token resolves to its match
+position: argument
+lcp: data/abcdefg/
+candidate: data/abcdefg/
