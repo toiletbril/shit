@@ -28,12 +28,12 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
     if (parsed.is_error())
-      throw Error{"bg: '" + args[1] + "' is not a valid job"};
+      throw Error{"Bg: '" + args[1] + "' is not a valid job"};
     job = cxt.find_job(static_cast<int>(parsed.value()));
   } else
     job = cxt.most_recent_job();
 
-  if (job == nullptr) throw Error{"bg: there is no such job"};
+  if (job == nullptr) throw Error{"Bg: there is no such job"};
   ASSERT(job != nullptr);
 
   if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))

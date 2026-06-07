@@ -8,6 +8,6 @@
   Unquoted "[d]*"
   Literal "*"
 ]
-shit: 1:6: Error: No matches for the glob pattern '[d]**'.
+shit: 1:6: error: No matches for the glob pattern '[d]**'.
      1 |  echo [d]*\*
        |       ^~~~~~ here.

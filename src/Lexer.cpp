@@ -470,7 +470,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
               throw ErrorWithLocationAndDetails{
                   here(m_cursor_position, byte_count),
                   "Unterminated arithmetic expansion",
-                  here(m_cursor_position + byte_count, 1), "expected )) here"};
+                  here(m_cursor_position + byte_count, 1), "Expected )) here"};
             }
             if (c == '(') {
               group_depth++;
@@ -503,7 +503,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position, byte_count),
                 "Unterminated command substitution",
-                here(m_cursor_position + byte_count, 1), "expected ) here"};
+                here(m_cursor_position + byte_count, 1), "Expected ) here"};
           }
           byte_count++;
 
@@ -545,7 +545,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position + byte_count, 1),
                 "Unterminated variable expansion",
-                here(m_cursor_position + byte_count, 1), "expected } here"};
+                here(m_cursor_position + byte_count, 1), "Expected } here"};
           }
           byte_count++;
           if (c == '}') break;
@@ -596,7 +596,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
           throw ErrorWithLocationAndDetails{
               here(m_cursor_position + relative_open_backtick_pos, 1),
               "Unterminated command substitution",
-              here(m_cursor_position + byte_count, 1), "expected ` here"};
+              here(m_cursor_position + byte_count, 1), "Expected ` here"};
         }
         if (c == '`') {
           byte_count++;
@@ -626,7 +626,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
 
   if (quote_char) {
     String expected_quote{};
-    expected_quote += "expected ";
+    expected_quote += "Expected ";
     expected_quote += *quote_char;
     expected_quote += " here";
     throw ErrorWithLocationAndDetails{
@@ -639,7 +639,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
   if (should_escape) {
     throw ErrorWithLocationAndDetails{
         here(m_cursor_position + byte_count - 1, 1), "Nothing to escape",
-        here(m_cursor_position + byte_count, 1), "expected a character here"};
+        here(m_cursor_position + byte_count, 1), "Expected a character here"};
   }
 
   const let actual_cursor_position = m_cursor_position + escaped_newline_count;

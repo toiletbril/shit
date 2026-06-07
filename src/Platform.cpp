@@ -1220,7 +1220,7 @@ fn set_default_signal_handlers() -> void
   if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||
       signal(SIGINT, handle_interrupt) == SIG_ERR)
   {
-    throw Error{"signal() failed: " + last_system_error_message()};
+    throw Error{"Signal() failed: " + last_system_error_message()};
   }
 }
 
@@ -1228,7 +1228,7 @@ fn reset_signal_handlers() -> void
 {
   if (signal(SIGTERM, SIG_DFL) == SIG_ERR || signal(SIGINT, SIG_DFL) == SIG_ERR)
   {
-    throw Error{"signal() failed: " + last_system_error_message()};
+    throw Error{"Signal() failed: " + last_system_error_message()};
   }
 
   /* A child started for a compound pipeline stage inherits the flag value at

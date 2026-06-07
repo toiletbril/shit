@@ -119,11 +119,11 @@ throw_unterminated(SourceLocation opener, StringView what, StringView source,
   {
     throw ErrorWithLocationAndDetails{
         opener, what, *found,
-        "this '" + keyword +
+        "This '" + keyword +
             "' was read as an argument, put a ';' or a newline before it"};
   }
   throw ErrorWithLocationAndDetails{opener, what, fallback,
-                                    "expected '" + keyword + "'"};
+                                    "Expected '" + keyword + "'"};
 }
 
 cold pure static fn is_empty_list(const Expression *expression) wontthrow
@@ -970,9 +970,9 @@ hot fn Parser::parse_for() throws -> Command *
   Token *do_token = m_lexer.next_shell_token();
   ASSERT(do_token != nullptr);
   if (do_token->kind() != Token::Kind::Do) {
-    String detail = "expected 'do'";
+    String detail = "Expected 'do'";
     if (!has_in_clause) {
-      detail = "expected 'do', or 'in WORDS' before it; without 'in' the loop "
+      detail = "Expected 'do', or 'in WORDS' before it; without 'in' the loop "
                "walks the positional parameters";
     }
     throw ErrorWithLocationAndDetails{location, "Unterminated for loop",
@@ -1042,7 +1042,7 @@ hot fn Parser::parse_case() throws -> Command *
       if (pattern->kind() != Token::Kind::Word) {
         throw ErrorWithLocationAndDetails{
             location, "Unterminated case", pattern->source_location(),
-            "expected a pattern to start an arm, or 'esac' to end the case"};
+            "Expected a pattern to start an arm, or 'esac' to end the case"};
       }
 
       patterns.push(pattern);
@@ -1089,7 +1089,7 @@ hot fn Parser::parse_brace_group() throws -> Command *
   if (!is_brace_word(close, '}')) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated brace group",
-                                      close->source_location(), "expected '}'"};
+                                      close->source_location(), "Expected '}'"};
   }
 
   return m_lexer.arena().create<BraceGroup>(open->source_location(), body);
@@ -1108,7 +1108,7 @@ hot fn Parser::parse_subshell() throws -> Command *
   if (close->kind() != Token::Kind::RightParen) {
     throw ErrorWithLocationAndDetails{open->source_location(),
                                       "Unterminated subshell",
-                                      close->source_location(), "expected ')'"};
+                                      close->source_location(), "Expected ')'"};
   }
 
   return m_lexer.arena().create<Subshell>(open->source_location(), body);
@@ -1243,7 +1243,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     if (after->kind() != Token::Kind::Fi) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated If condition",
-          after->source_location(), "expected 'Fi' here"};
+          after->source_location(), "Expected 'Fi' here"};
     }
 
     m_if_condition_depth--;
@@ -1269,7 +1269,7 @@ hot fn Parser::parse_expression(u8 min_precedence) throws -> Expression *
     if (rp->kind() != Token::Kind::RightParen) {
       throw ErrorWithLocationAndDetails{
           t->source_location(), "Unterminated parenthesis",
-          rp->source_location(), "expected a closing parenthesis here"};
+          rp->source_location(), "Expected a closing parenthesis here"};
     }
   } break;
 

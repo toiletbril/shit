@@ -13,6 +13,6 @@
   Unquoted "does_not_exist*"
 ]
 юникод
-shit: 1:14: Error: No matches for the glob pattern 'does_not_exist*'.
+shit: 1:14: error: No matches for the glob pattern 'does_not_exist*'.
      1 |  echo юникод; does_not_exist*
        |               ^~~~~~~~~~~~~~~ here.

@@ -132,7 +132,7 @@ static fn report_escaped_control_flow(EvalContext &context,
   ErrorWithLocation located{control.location, what};
   show_message(located.to_string(*source));
   if (!control.origin.is_empty()) {
-    show_message(Note{"this jump was reached while running " + control.origin}
+    show_message(Note{"This jump was reached while running " + control.origin}
                      .to_string());
   }
 

@@ -64,9 +64,9 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
   if (!should_color_diagnostics()) return diagnostic_color{};
 
   StringView severity = ansi::BOLD_CYAN;
-  if (severity_word == StringView{"Error"})
+  if (severity_word == StringView{"error"})
     severity = ansi::BOLD_RED;
-  else if (severity_word == StringView{"Warning"})
+  else if (severity_word == StringView{"warning"})
     severity = ansi::BOLD_MAGENTA;
 
   return diagnostic_color{severity, ansi::BOLD, ansi::BOLD, ansi::BOLD_GREEN,
@@ -333,7 +333,7 @@ ErrorBase::operator bool &() throws { return m_is_active; }
 
 cold fn ErrorBase::message() const throws -> String { return m_message; }
 
-cold fn ErrorBase::severity_word() const wontthrow -> String { return "Error"; }
+cold fn ErrorBase::severity_word() const wontthrow -> String { return "error"; }
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
@@ -348,11 +348,11 @@ Error::operator String() const throws { return to_string(); }
 
 Warning::Warning(StringView message) : Error(message) {}
 
-cold fn Warning::severity_word() const wontthrow -> String { return "Warning"; }
+cold fn Warning::severity_word() const wontthrow -> String { return "warning"; }
 
 Note::Note(StringView message) : Error(message) {}
 
-cold fn Note::severity_word() const wontthrow -> String { return "Note"; }
+cold fn Note::severity_word() const wontthrow -> String { return "note"; }
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
@@ -442,7 +442,7 @@ WarningWithLocation::WarningWithLocation(SourceLocation location,
 
 cold fn WarningWithLocation::severity_word() const wontthrow -> String
 {
-  return "Warning";
+  return "warning";
 }
 
 TraceWithLocation::TraceWithLocation(SourceLocation location)
@@ -451,7 +451,7 @@ TraceWithLocation::TraceWithLocation(SourceLocation location)
 
 cold fn TraceWithLocation::severity_word() const wontthrow -> String
 {
-  return "Trace";
+  return "trace";
 }
 
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
@@ -486,7 +486,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
           ? unicode_details_position - details_last_newline_location
           : unicode_details_position + 1;
 
-  let const color = diagnostic_colors_for(StringView{"Note"});
+  let const color = diagnostic_colors_for(StringView{"note"});
 
   String result{};
   result += color.location;
@@ -497,7 +497,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   result += color.reset;
   result += ' ';
   result += color.severity;
-  result += "Note";
+  result += "note";
   result += color.reset;
   result += ":\n";
 

@@ -17,7 +17,7 @@
 [Word
   Unquoted "done"
 ]
-shit: 1:10: Warning: Command 'nosuchcmd_xyz' was not found.
+shit: 1:10: warning: Command 'nosuchcmd_xyz' was not found.
      1 |  false && nosuchcmd_xyz
        |           ^~~~~~~~~~~~~ here.
 done

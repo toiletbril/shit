@@ -22,7 +22,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   if (args.count() < 3)
-    throw Error{"getopts: usage: getopts optstring name [arg ...]"};
+    throw Error{"Getopts: usage: getopts optstring name [arg ...]"};
 
   let const &optstring = args[1];
   let const &name = args[2];

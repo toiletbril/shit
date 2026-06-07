@@ -7,6 +7,6 @@
 [Word
   Unquoted "a*.zzznomatch"
 ]
-shit: 1:6: Error: No matches for the glob pattern 'a*.zzznomatch'.
+shit: 1:6: error: No matches for the glob pattern 'a*.zzznomatch'.
      1 |  echo a*.zzznomatch
        |       ^~~~~~~~~~~~~ here.

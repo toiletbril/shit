@@ -16,11 +16,11 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   ASSERT(!ec.args().is_empty());
 
-  if (ec.args().count() < 2) throw Error{"filename argument is required"};
+  if (ec.args().count() < 2) throw Error{"Filename argument is required"};
 
   const String path{ec.args()[1]};
   let const contents = utils::read_entire_file(path);
-  if (!contents) throw Error{"could not open '" + path + "'"};
+  if (!contents) throw Error{"Could not open '" + path + "'"};
 
   return cxt.run_source(*contents, "the file '" + path + "'", true,
                         ec.source_location(), StringView{path});

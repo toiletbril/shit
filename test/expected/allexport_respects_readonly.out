@@ -38,4 +38,4 @@
   DoubleQuoted "unreached_if_rejected"
 ]
 R=1
-shit: Error: 'R' is read only and cannot be assigned.
+shit: error: 'R' is read only and cannot be assigned.

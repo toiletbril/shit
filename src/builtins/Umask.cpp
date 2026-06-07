@@ -31,7 +31,7 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &requested = args[1];
   let const parsed = utils::parse_octal_integer(requested);
   if (parsed.is_error()) {
-    throw Error{"umask: '" + requested + "' is not a valid octal mask"};
+    throw Error{"Umask: '" + requested + "' is not a valid octal mask"};
   }
   os::set_file_creation_mask(static_cast<u32>(parsed.value()));
 

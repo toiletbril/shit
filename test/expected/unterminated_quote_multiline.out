@@ -1,6 +1,6 @@
-shit: 1:7: Error: Unterminated string literal.
+shit: 1:7: error: Unterminated string literal.
      1 |  привет"world
        |        ^~~~~~ here.
-shit: 2:5: Note:
+shit: 2:5: note:
      2 |  или sailor
-       |            ^~ expected " here.
+       |            ^~ Expected " here.

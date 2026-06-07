@@ -7,6 +7,6 @@
 [Word
   Unquoted "data/*/doesnotexist"
 ]
-shit: 1:6: Error: No matches for the glob pattern 'data/*/doesnotexist'.
+shit: 1:6: error: No matches for the glob pattern 'data/*/doesnotexist'.
      1 |  echo data/*/doesnotexist
        |       ^~~~~~~~~~~~~~~~~~~ here.

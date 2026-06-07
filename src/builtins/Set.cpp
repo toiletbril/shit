@@ -126,7 +126,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const &name = args[++i];
       let const option = find_option_by_name(name);
       if (option == nullptr)
-        throw Error{"set: '" + name + "' is not a valid option name"};
+        throw Error{"Set: '" + name + "' is not a valid option name"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
       continue;
     }
@@ -141,7 +141,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
           String invalid_option{};
           invalid_option += arg[0];
           invalid_option += letter;
-          throw Error{"set: '" + invalid_option + "' is not a valid option"};
+          throw Error{"Set: '" + invalid_option + "' is not a valid option"};
         }
         if (option->set != nullptr) (cxt.*(option->set))(enable);
       }

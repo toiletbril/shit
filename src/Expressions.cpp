@@ -477,7 +477,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
 
       let opened = os::write_to_temp_file(body);
       if (!opened)
-        throw Error{"could not stage the heredoc body: " +
+        throw Error{"Could not stage the heredoc body: " +
                     os::last_system_error_message()};
 
       if (ec.in_fd) os::close_fd(*ec.in_fd);
@@ -666,7 +666,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
       let opened = os::write_to_temp_file(body);
       if (!opened)
-        throw Error{"could not stage the heredoc body: " +
+        throw Error{"Could not stage the heredoc body: " +
                     os::last_system_error_message()};
 
       if (redirect_in_fd) os::close_fd(*redirect_in_fd);
@@ -1993,7 +1993,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
       let opened = os::write_to_temp_file(body);
       if (!opened)
-        throw Error{"could not stage the heredoc body: " +
+        throw Error{"Could not stage the heredoc body: " +
                     os::last_system_error_message()};
 
       const os::descriptor temp_fd = opened.take();

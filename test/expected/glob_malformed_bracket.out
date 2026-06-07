@@ -7,7 +7,7 @@
 [Word
   Unquoted "[abc"
 ]
-shit: 1:6: Error: Malformed glob pattern, unterminated '['.
+shit: 1:6: error: Malformed glob pattern, unterminated '['.
      1 |  echo [abc
        |       ^~~~ here.
 [Code 1]

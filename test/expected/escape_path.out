@@ -82,7 +82,7 @@
 [Word
   Unquoted "dir"
 ]
-shit: 5:17: Warning: Command 'no' was not found.
+shit: 5:17: warning: Command 'no' was not found.
      5 |  test -e ~/\* && no such file;
        |                  ^~ here.
 **

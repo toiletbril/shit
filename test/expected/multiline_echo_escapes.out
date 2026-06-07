@@ -14,6 +14,6 @@
 [Word
   Unquoted "does_not_exist*"
 ]
-shit: 5:1: Error: No matches for the glob pattern 'does_not_exist*'.
+shit: 5:1: error: No matches for the glob pattern 'does_not_exist*'.
      5 |  does_not_exist*
        |  ^~~~~~~~~~~~~~~ here.
