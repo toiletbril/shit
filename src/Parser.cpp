@@ -808,13 +808,18 @@ hot fn Parser::parse_simple_command() throws -> Command *
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       }
 
-      if (next->flags() & Token::Flag::CompoundList ||
-          next->kind() == Token::Kind::EndOfFile ||
-          is_compound_terminator(next->kind()))
+      if (local_vars.count() == 0 &&
+          (next->flags() & Token::Flag::CompoundList ||
+           next->kind() == Token::Kind::EndOfFile ||
+           is_compound_terminator(next->kind())))
       {
+        /* A lone assignment with no other on the line takes the dedicated
+           AssignCommand fast path. */
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       } else {
-        /* Single-command variable. */
+        /* The assignment joins the prefix set, either ahead of a command word
+           or as one of several assignments on a command-less line. The
+           command-less line persists the whole set in SimpleCommand. */
         local_vars.set(
             a->key(), prefix_assignment{Word{a->value_word()}, a->is_append()});
       }

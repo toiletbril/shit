@@ -617,8 +617,10 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
 hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* A command may have no words when it is only a redirection, such as > file,
-     so the redirections still run below. */
-  ASSERT(m_args.count() > 0 || !m_redirections.is_empty());
+     or only assignments, such as a=1 b=2, so the redirections and the
+     assignments still run below. */
+  ASSERT(m_args.count() > 0 || !m_redirections.is_empty() ||
+         m_local_vars.count() > 0);
 
   /* Record where this command sits so a $LINENO in its words reports its line. */
   cxt.set_current_location(source_location());
@@ -777,8 +779,21 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* An expansion may drop every word, for example an unset $x used as the whole
      command. There is None to run then, but the redirections above already
-     took effect. */
+     took effect. A command-less line still carries its assignments, which
+     persist in the current shell rather than apply only to a child. The
+     location was set at the top of this function, so a $LINENO in any value on
+     the line reports the same line, the way dash reports it. */
   if (program_args.is_empty()) {
+    m_local_vars.for_each([&](StringView name, const prefix_assignment &var) {
+      String value = cxt.expand_word_for_assignment(var.value);
+      if (var.is_append) {
+        String appended{cxt.get_variable_value(name).value_or("")};
+        appended += value;
+        value = steal(appended);
+      }
+      cxt.set_shell_variable(name, value);
+      if (cxt.export_all()) os::set_environment_variable(name, value.view());
+    });
     cxt.set_last_exit_status(0);
     return 0;
   }
