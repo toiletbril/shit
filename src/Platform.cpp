@@ -14,7 +14,13 @@
 
 #if SHIT_PLATFORM_IS POSIX
 #include <fcntl.h>
+#include <spawn.h>
 #include <sys/stat.h>
+
+/* posix_spawn takes the child environment as an envp argument. The shell passes
+   its own process environment, which prefix assignments mutate before the spawn
+   and restore after, so the declaration of environ is needed here. */
+extern char **environ;
 #endif
 
 #if SHIT_PLATFORM_IS POSIX
@@ -211,55 +217,109 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 
 #define check_syscall(call) check_syscall_impl(call, #call)
 
+/* posix_spawn reports an exec failure to the parent through its return value
+   rather than through a child that runs the parent's cleanup, so there is no
+   spawned process to wait on. The fork path this replaces let the child print
+   the path and message and exit 127, so the caller always received a waitable
+   pid that yielded 127. This reproduces that on the cold failure path. The
+   error came from posix_spawn rather than errno, so it is passed in. A trivial
+   child is forked that only reports and exits 127, which gives the caller the
+   same waitable pid and status the fork path produced. */
+cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
+    -> process
+{
+  const pid_t child_pid = check_syscall(fork());
+
+  if (child_pid == 0) {
+    String msg{};
+    msg += program_path.text();
+    msg += ": ";
+    msg += String{StringView{strerror(spawn_error)}};
+    msg += '\n';
+    (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
+    _exit(127);
+  }
+
+  return child_pid;
+}
+
 hot fn execute_program(ExecContext &&ec) throws -> process
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
   defer { ec.close_fds(); };
 
-  const pid_t child_pid = check_syscall(fork());
+  let const child_args = make_os_args(ec.args());
 
-  if (child_pid == 0) {
-    let const child_args = make_os_args(ec.args());
+  /* glibc backs posix_spawn with clone(CLONE_VM | CLONE_VFORK), so the child
+     shares the parent address space until exec and pays no page-table copy, the
+     way dash's vfork does. The redirections become file actions and the signal
+     reset becomes spawn attributes, so the parent never enters a duplicated
+     evaluator the way the fork path did. */
+  posix_spawn_file_actions_t file_actions;
+  posix_spawn_file_actions_init(&file_actions);
+  defer { posix_spawn_file_actions_destroy(&file_actions); };
 
-    if (ec.in_fd) {
-      check_syscall(dup2(*ec.in_fd, STDIN_FILENO));
-      check_syscall(close(*ec.in_fd));
-    }
-    if (ec.out_fd) {
-      check_syscall(dup2(*ec.out_fd, STDOUT_FILENO));
-      check_syscall(close(*ec.out_fd));
-    }
-    if (ec.err_fd) {
-      check_syscall(dup2(*ec.err_fd, STDERR_FILENO));
-      check_syscall(close(*ec.err_fd));
-    }
-    /* The descriptor duplications come after the files are placed, so 2>&1 sees
-       the final standard output. */
-    if (ec.dup_err_to_out) check_syscall(dup2(STDOUT_FILENO, STDERR_FILENO));
-    if (ec.dup_out_to_err) check_syscall(dup2(STDERR_FILENO, STDOUT_FILENO));
-
-    reset_signal_handlers();
-
-    /* TODO: If execv() failed, try to execute the path as a shell script.
-     */
-    if (execv(ec.program_path().c_str(),
-              const_cast<char *const *>(child_args.begin())) == -1)
-    {
-      /* We are the forked child. Report the failure and terminate the child
-       * directly. Throwing here would unwind back into the parent's evaluator
-       * inside the duplicated process. */
-      String msg{};
-      msg += ec.program_path().text();
-      msg += ": ";
-      msg += last_system_error_message();
-      msg += '\n';
-      (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
-      _exit(127);
-    }
+  /* Each redirect is placed onto its standard descriptor and the original is
+     closed, in this order, so the child sees the same descriptor layout the
+     fork child built. */
+  if (ec.in_fd) {
+    posix_spawn_file_actions_adddup2(&file_actions, *ec.in_fd, STDIN_FILENO);
+    posix_spawn_file_actions_addclose(&file_actions, *ec.in_fd);
   }
+  if (ec.out_fd) {
+    posix_spawn_file_actions_adddup2(&file_actions, *ec.out_fd, STDOUT_FILENO);
+    posix_spawn_file_actions_addclose(&file_actions, *ec.out_fd);
+  }
+  if (ec.err_fd) {
+    posix_spawn_file_actions_adddup2(&file_actions, *ec.err_fd, STDERR_FILENO);
+    posix_spawn_file_actions_addclose(&file_actions, *ec.err_fd);
+  }
+  /* The descriptor duplications come after the files are placed, so 2>&1 sees
+     the final standard output. */
+  if (ec.dup_err_to_out)
+    posix_spawn_file_actions_adddup2(&file_actions, STDOUT_FILENO,
+                                     STDERR_FILENO);
+  if (ec.dup_out_to_err)
+    posix_spawn_file_actions_adddup2(&file_actions, STDERR_FILENO,
+                                     STDOUT_FILENO);
+
+  posix_spawnattr_t attr;
+  posix_spawnattr_init(&attr);
+  defer { posix_spawnattr_destroy(&attr); };
+
+  /* The parent blocks the terminal-generated signals and handles SIGINT and
+     SIGCHLD itself, so without a reset the exec'd program would inherit the
+     blocked set and the parent's dispositions. An empty signal mask unblocks
+     everything the parent blocked, and the default set restores SIG_DFL for the
+     signals the parent installed handlers on. This matches the fork child's
+     reset_signal_handlers, so a foreground command still dies on Ctrl-C and a
+     producer in a pipe still dies on SIGPIPE. */
+  sigset_t empty_mask;
+  sigemptyset(&empty_mask);
+  posix_spawnattr_setsigmask(&attr, &empty_mask);
+
+  sigset_t default_signals;
+  sigemptyset(&default_signals);
+  sigaddset(&default_signals, SIGINT);
+  sigaddset(&default_signals, SIGCHLD);
+  posix_spawnattr_setsigdefault(&attr, &default_signals);
+
+  posix_spawnattr_setflags(&attr,
+                           POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+
+  pid_t child_pid = 0;
+  /* The shell environment is passed as envp, so a prefix assignment the parent
+     committed before this call reaches the child. */
+  const int spawn_error =
+      posix_spawn(&child_pid, ec.program_path().c_str(), &file_actions, &attr,
+                  const_cast<char *const *>(child_args.begin()), environ);
 
   ec.close_fds();
+
+  if (spawn_error != 0) {
+    return spawn_failure_child(ec.program_path(), spawn_error);
+  }
 
   return child_pid;
 }
