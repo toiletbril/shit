@@ -921,6 +921,11 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
       usize j = i + 1;
       while (j < word.length && lexer::is_variable_name(word[j]))
         name += word[j++];
+      /* A nested reference inside a default or alternate word, or a heredoc body,
+         obeys set -u the same way a top level reference does, so an unset name
+         here aborts rather than expanding to nothing. */
+      if (m_error_unset && !get_variable_value(name).has_value())
+        throw Error{name + ": parameter not set"};
       out += expand_variable(name);
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
@@ -962,7 +967,10 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
                next == '$' || next == '!' || next == '-' ||
                lexer::is_number(next))
     {
-      out += expand_variable(StringView{&next, 1});
+      let const special_name = StringView{&next, 1};
+      if (m_error_unset && !get_variable_value(special_name).has_value())
+        throw Error{special_name + ": parameter not set"};
+      out += expand_variable(special_name);
       i++;
     } else {
       out += '$';
@@ -2042,6 +2050,23 @@ hot fn EvalContext::expand_word(const Word &word) throws
           append_run(StringView{m_positional_params[i].data(),
                                 m_positional_params[i].count()},
                      false);
+        }
+        break;
+      }
+      /* An unquoted $@ or $* keeps each positional parameter as its own field
+         boundary, then field splits each parameter's own text under IFS. Routing
+         it through a single joined string instead would lose the boundary, so a
+         custom or an empty IFS would merge or mis-split the parameters. The
+         quoted "$*" join by the first IFS character stays in the default branch
+         below. */
+      if ((segment.text == "@" || segment.text == "*") &&
+          !segment.is_in_double_quotes)
+      {
+        for (usize i = 0; i < m_positional_params.count(); i++) {
+          if (i > 0) flush();
+          append_split_run(StringView{m_positional_params[i].data(),
+                                      m_positional_params[i].count()},
+                           true);
         }
         break;
       }

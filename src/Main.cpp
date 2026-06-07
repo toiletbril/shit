@@ -315,7 +315,9 @@ fn main(int argc, char **argv) -> int
     file_names = shit::parse_flags(FLAG_LIST, argc, argv);
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
-    return EXIT_SUCCESS;
+    /* A flag error is a usage error, so the shell exits with the POSIX usage
+       status rather than success, matching dash. */
+    return 2;
   }
 
   /* Raise the runtime log level before any helper runs, so the trace covers

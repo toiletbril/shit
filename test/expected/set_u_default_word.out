@@ -1,0 +1,31 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-u"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s" "$x-$y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "unreachable"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s"
+]
+[Word
+  Variable "x-$y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unreachable"
+]
+shit: 2:13: error: y: parameter not set.
+     2 |  printf '%s' "${x-$y}"
+       |              ^~~~~~~~~ here.

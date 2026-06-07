@@ -1,0 +1,3 @@
+set -u
+printf '%s' "${x-$y}"
+echo unreachable

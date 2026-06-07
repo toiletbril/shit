@@ -1,0 +1,14 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign a=€]
+  [CompoundListCondition, None]
+    [SimpleCommand "doesnotexist_xyz*"]
+[Word
+  Unquoted "a=€"
+]
+[Word
+  Unquoted "doesnotexist_xyz*"
+]
+shit: 2:1: error: No matches for the glob pattern 'doesnotexist_xyz*'.
+     2 |  doesnotexist_xyz*
+       |  ^~~~~~~~~~~~~~~~~ here.

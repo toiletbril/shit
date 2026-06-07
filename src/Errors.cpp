@@ -279,8 +279,10 @@ cold static fn get_context_pointing_to(
   const usize unicode_start_offset_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position - start_offset);
 
-  /* Does token length go beyond that line? */
-  const usize unicode_length = toiletline::utf8_strlen(
+  /* Does token length go beyond that line? The bounded counter walks at most the
+     given byte count over the interior pointer, so it never runs strlen past the
+     source end at an EOF caret. */
+  const usize unicode_length = toiletline::utf8_strnlen(
       source.data + byte_position, (byte_count > line_byte_count - start_offset)
                                        ? line_byte_count - start_offset
                                        : byte_count);
@@ -386,12 +388,16 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   const usize unicode_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
-  /* Our count starts from 0. If there's only a single line, we need to use the
-   * raw location for the correct offset. Otherwise, newline counts as an extra
-   * character. */
-  const usize line_byte_position =
-      (last_newline_location > 0) ? unicode_position - last_newline_location
-                                  : unicode_position + 1;
+  /* The column counts code points from the line start to the caret. Both terms
+     must be code point counts, since subtracting the newline's byte offset from
+     a code point count underflows once a preceding line holds a multibyte byte.
+     On the first line there is no newline, so the count from the source start
+     plus one gives the column. */
+  const usize codepoints_before_line =
+      (last_newline_location > 0)
+          ? SOURCE_LINE_INDEX.codepoints_before(source, last_newline_location + 1)
+          : 0;
+  const usize line_byte_position = unicode_position - codepoints_before_line + 1;
 
   let const color = diagnostic_colors_for(severity_word());
 
@@ -479,10 +485,16 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   const usize unicode_details_position =
       SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
-  const usize details_line_byte_position =
+  /* The column counts code points from the line start to the caret, so both
+     terms stay in code points. See ErrorWithLocation::to_string for why a byte
+     offset here would underflow on a multibyte preceding line. */
+  const usize codepoints_before_details_line =
       (details_last_newline_location > 0)
-          ? unicode_details_position - details_last_newline_location
-          : unicode_details_position + 1;
+          ? SOURCE_LINE_INDEX.codepoints_before(
+                source, details_last_newline_location + 1)
+          : 0;
+  const usize details_line_byte_position =
+      unicode_details_position - codepoints_before_details_line + 1;
 
   let const color = diagnostic_colors_for(StringView{"note"});
 

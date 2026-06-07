@@ -1,0 +1,128 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "a b" "c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$@"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [Assign IFS=:]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$@"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [Assign IFS=]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$@"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Literal "a b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]"
+]
+[Word
+  Variable "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]"
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "IFS=:"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]"
+]
+[Word
+  Variable "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]"
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "IFS="
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]"
+]
+[Word
+  Variable "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]"
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "echo"
+]
+[a][b][c]
+[a][b][c]
+[a b][c]
+[a b][c]
+[a b][c]
+[a b][c]
+[Code 0]

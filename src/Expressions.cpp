@@ -1574,8 +1574,18 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     let ec = stage_ec.take();
     /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
        its descriptors. The pipe only sets stdin and stdout, so a stderr
-       redirection composes with it. */
+       redirection composes with it. A later redirection in the same stage may
+       throw after an earlier one already opened a descriptor into the stage's
+       slots, so the descriptors opened so far are closed on that throw rather
+       than leaked, the way the simple command path guards its own descriptors.
+       The guard is disarmed once the stage is handed into the pipeline. */
+    bool stage_redirect_handed_off = false;
+    defer
+    {
+      if (!stage_redirect_handed_off) ec.close_fds();
+    };
     e->redirect_exec_context(ec, cxt);
+    stage_redirect_handed_off = true;
     ecs.push(steal(ec));
   }
 
