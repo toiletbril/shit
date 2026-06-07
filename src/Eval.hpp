@@ -618,11 +618,12 @@ private:
   ArrayList<String> m_args{heap_allocator()};
 };
 
-/* Evaluate an arithmetic expression that holds only literals and operators,
-   with no variable and no substitution, so the result is a compile-time
-   constant. The analyze pass calls this to fold a constant $((...)) once
-   instead of leaving the evaluator to re-parse it on every expansion. Returns
-   None when the expression is not provably constant or fails to evaluate. */
-fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>;
+/* Parse and evaluate a constant arithmetic expression with no evaluation
+   context. The optimizer's constant fold calls this once the byte scan proves
+   the source holds no variable and no substitution, so the parser never
+   dereferences a context. A malformed constant, such as a division by zero,
+   throws. This is the Eval-side primitive the optimizer reaches, since the
+   arithmetic parser lives in this translation unit. */
+fn evaluate_constant_arithmetic(StringView expression) throws -> i64;
 
 } /* namespace shit */

@@ -1998,62 +1998,13 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
   return parser.parse();
 }
 
-namespace {
-
-/* A byte that may appear in a provably-constant arithmetic expression. The set
-   is digits, whitespace, parentheses, and the operator characters. It excludes
-   every letter and underscore, so no variable name and no hex prefix is folded,
-   which keeps the fold to plain decimal constants the analyze pass can prove.
- */
-pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
+fn evaluate_constant_arithmetic(StringView expression) throws -> i64
 {
-  if (lexer::is_number(byte)) return true;
-  switch (byte) {
-  case ' ':
-  case '\t':
-  case '\n':
-  case '\r':
-  case '(':
-  case ')':
-  case '+':
-  case '-':
-  case '*':
-  case '/':
-  case '%':
-  case '&':
-  case '|':
-  case '^':
-  case '~':
-  case '!':
-  case '<':
-  case '>':
-  case '=':
-  case '?':
-  case ':': return true;
-  default: return false;
-  }
-}
-
-} /* namespace */
-
-fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>
-{
-  if (expression.length == 0) return None;
-
-  for (usize i = 0; i < expression.length; i++) {
-    if (!is_constant_arithmetic_byte(expression[i])) return None;
-  }
-
-  /* The expression holds no variable and no assignment, so the parser never
-     dereferences its context and a null one is safe. A malformed constant, such
-     as a division by zero, throws and leaves the segment unfolded for the
-     runtime path to report at the caret. */
-  try {
-    let parser = ArithmeticParser{nullptr, expression, 0};
-    return parser.parse();
-  } catch (...) {
-    return None;
-  }
+  /* The optimizer has already proven the expression holds no variable and no
+     assignment, so the parser never dereferences its context and a null one is
+     safe. */
+  let parser = ArithmeticParser{nullptr, expression, 0};
+  return parser.parse();
 }
 
 hot fn EvalContext::expand_word(const Word &word) throws

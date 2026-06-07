@@ -7,6 +7,7 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Lexer.hpp"
+#include "Optimizer.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
@@ -216,79 +217,6 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
   return false;
 }
 
-/* The fully literal value of a word, the concatenation of its text when every
-   segment is literal or quoted text with no expansion. None when any segment is
-   a variable, a command substitution, or an arithmetic expansion, since the
-   value is then only known at run time. Unlike static_command_name this keeps a
-   glob metacharacter, since a test operand compares bytes and does not glob. */
-fn literal_word_value(const Token *token) throws -> Maybe<String>
-{
-  if (token == nullptr) return shit::None;
-  if (token->kind() != Token::Kind::Word) return shit::None;
-
-  let const &word = static_cast<const tokens::WordToken *>(token)->word();
-
-  String value{};
-  for (const WordSegment &segment : word.segments) {
-    switch (segment.kind) {
-    case WordSegment::Kind::LiteralText:
-    case WordSegment::Kind::DoubleQuotedText:
-      value.append(segment.text.view());
-      break;
-    case WordSegment::Kind::UnquotedText:
-      /* An unquoted segment may hold a glob or a tilde, which expand. The test
-         operands the fold accepts are plain bytes, so a live glob char makes
-         the word non-constant and the fold declines it. */
-      for (usize i = 0; i < segment.text.count(); i++) {
-        if (lexer::is_expandable_char(segment.text[i])) return shit::None;
-      }
-      if (segment.has_live_glob_chars()) return shit::None;
-      value.append(segment.text.view());
-      break;
-    default: return shit::None;
-    }
-  }
-  return value;
-}
-
-/* The constant verdict of a literal test command, the arguments after the test
-   or [ word with the trailing ] of the bracket form already removed. Some(true)
-   or Some(false) for the simplest forms the fold can prove, None otherwise. */
-fn constant_test_verdict(const ArrayList<const Token *> &operands) throws
-    -> Maybe<bool>
-{
-  /* test with no operand is false, test X is true when X is non-empty. */
-  if (operands.is_empty()) return Maybe<bool>{false};
-
-  if (operands.count() == 1) {
-    let const value = literal_word_value(operands[0]);
-    if (!value.has_value()) return shit::None;
-    return Maybe<bool>{!value->is_empty()};
-  }
-
-  if (operands.count() == 2) {
-    let const op = literal_word_value(operands[0]);
-    let const arg = literal_word_value(operands[1]);
-    if (!op.has_value() || !arg.has_value()) return shit::None;
-    if (*op == "-n") return Maybe<bool>{!arg->is_empty()};
-    if (*op == "-z") return Maybe<bool>{arg->is_empty()};
-    return shit::None;
-  }
-
-  if (operands.count() == 3) {
-    let const lhs = literal_word_value(operands[0]);
-    let const op = literal_word_value(operands[1]);
-    let const rhs = literal_word_value(operands[2]);
-    if (!lhs.has_value() || !op.has_value() || !rhs.has_value())
-      return shit::None;
-    if (*op == "=") return Maybe<bool>{*lhs == *rhs};
-    if (*op == "!=") return Maybe<bool>{!(*lhs == *rhs)};
-    return shit::None;
-  }
-
-  return shit::None;
-}
-
 /* Fold every constant arithmetic expansion in a word to its decimal result
    once, so the evaluator reads the cached value instead of re-parsing the
    arithmetic on every expansion. A segment that holds a parameter or a
@@ -299,7 +227,7 @@ fn fold_constant_arithmetic_in_word(const Word &word) wontthrow -> void
     if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
     if (segment.folded_arithmetic_result.has_value()) continue;
     segment.folded_arithmetic_result =
-        try_fold_constant_arithmetic(segment.text.view());
+        optimizer::try_fold_constant_arithmetic(segment.text.view());
   }
 }
 
@@ -2809,51 +2737,14 @@ cold fn SimpleCommand::try_static_condition_verdict(
 {
   /* A redirection has an effect even when the command succeeds, an async or a
      negated command changes the status, and a prefix assignment writes a
-     variable. None of those is constant, so the fold declines them. */
+     variable. None of those is constant, so the fold declines them. The guards
+     read this node's private members, so they stay here and the decision over
+     the command words runs in the optimizer. */
   if (!m_redirections.is_empty()) return shit::None;
   if (is_async() || is_negated()) return shit::None;
   if (m_local_vars.count() > 0) return shit::None;
-  if (m_args.is_empty()) return shit::None;
 
-  let const name = literal_word_value(m_args[0]);
-  if (!name.has_value()) return shit::None;
-
-  /* A function or an alias of the same name shadows the builtin, so the program
-     word no longer names the constant builtin and the fold declines it. */
-  if (actx.defined_functions.contains(name->view())) return shit::None;
-  if (actx.known_aliases.contains(name->view())) return shit::None;
-
-  /* true and : always succeed, false always fails, each with no side effect. */
-  if (*name == "true" || *name == ":") {
-    if (m_args.count() != 1) return shit::None;
-    return Maybe<bool>{true};
-  }
-  if (*name == "false") {
-    if (m_args.count() != 1) return shit::None;
-    return Maybe<bool>{false};
-  }
-
-  /* A literal test or [ with only plain operands decides at analyze time. The
-     bracket form must close with a literal ], which is dropped before the
-     operands are judged. */
-  if (*name == "test" || *name == "[") {
-    ArrayList<const Token *> operands{heap_allocator()};
-    usize last = m_args.count();
-    if (*name == "[") {
-      let const closing = literal_word_value(m_args[m_args.count() - 1]);
-      if (!closing.has_value() || *closing != "]") return shit::None;
-      last -= 1;
-    }
-    for (usize i = 1; i < last; i++)
-      operands.push(m_args[i]);
-    try {
-      return constant_test_verdict(operands);
-    } catch (...) {
-      return shit::None;
-    }
-  }
-
-  return shit::None;
+  return optimizer::simple_command_static_verdict(m_args, actx);
 }
 
 cold fn Pipeline::analyze(AnalysisContext &actx,
