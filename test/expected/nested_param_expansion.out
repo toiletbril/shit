@@ -1,0 +1,49 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=]
+  [CompoundListCondition, None]
+    [Assign y=]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x:-${y:-N}"]
+  [CompoundListCondition, None]
+    [Assign HOME=/h]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$HOME:+${HOME}/bin"]
+  [CompoundListCondition, None]
+    [Assign a=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$z:-${a}${a}"]
+[Word
+  Unquoted "x="
+]
+[Word
+  Unquoted "y="
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x:-${y:-N}"
+]
+[Word
+  Unquoted "HOME=/h"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "HOME:+${HOME}/bin"
+]
+[Word
+  Unquoted "a=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "z:-${a}${a}"
+]
+N
+/h/bin
+11
+[Code 0]

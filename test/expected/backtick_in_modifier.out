@@ -1,0 +1,39 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x-`echo bt`"]
+  [CompoundListCondition, None]
+    [Assign x=set]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x-`echo bt`"]
+  [CompoundListCondition, None]
+    [Assign y=foo]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$z:-`echo $y`"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x-`echo bt`"
+]
+[Word
+  Unquoted "x=set"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x-`echo bt`"
+]
+[Word
+  Unquoted "y=foo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "z:-`echo $y`"
+]
+bt
+set
+foo
+[Code 0]

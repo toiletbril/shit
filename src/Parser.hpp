@@ -63,9 +63,10 @@ private:
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> void;
 
-  /* Build one heredoc redirection. The << operator is already consumed and
-     op_location is its position. */
-  fn build_heredoc_redirection(SourceLocation op_location,
+  /* Build one heredoc redirection on descriptor fd. The << operator is already
+     consumed and op_location is its position. A digit prefix such as the 3 in
+     3<<EOF supplies a non-zero fd. */
+  fn build_heredoc_redirection(i32 fd, SourceLocation op_location,
                                Maybe<SourceLocation> &first_location,
                                ArrayList<expressions::Redirection> &out) throws
       -> void;

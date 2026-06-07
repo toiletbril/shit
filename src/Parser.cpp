@@ -528,7 +528,7 @@ fn Parser::build_file_or_dup_redirection(
 }
 
 fn Parser::build_heredoc_redirection(
-    SourceLocation op_location, Maybe<SourceLocation> &first_location,
+    i32 fd, SourceLocation op_location, Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out) throws -> void
 {
   if (!first_location) first_location = op_location;
@@ -545,8 +545,17 @@ fn Parser::build_heredoc_redirection(
   const let delimiter_literal = delimiter_word.to_literal_string();
   StringView delimiter = delimiter_literal.view();
   bool strip_tabs = false;
-  /* <<- strips leading tabs, the dash touching the operator. */
-  if (!delimiter.is_empty() && delimiter[0] == '-' &&
+  /* <<- strips leading tabs, the dash touching the operator. The dash counts
+     only when it is unquoted, so <<'-EOF' keeps the dash as part of the
+     delimiter and is a plain heredoc terminated by -EOF rather than a tab
+     stripping one terminated by EOF. */
+  const let has_unquoted_leading_dash =
+      !delimiter_word.segments.is_empty() &&
+      delimiter_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+      !delimiter_word.segments[0].text.is_empty() &&
+      delimiter_word.segments[0].text.view()[0] == '-';
+  if (has_unquoted_leading_dash && !delimiter.is_empty() &&
+      delimiter[0] == '-' &&
       delimiter_token->source_location().position ==
           op_location.position + op_location.length)
   {
@@ -564,7 +573,7 @@ fn Parser::build_heredoc_redirection(
   }
 
   expressions::Redirection redir{};
-  redir.fd = 0;
+  redir.fd = fd;
   redir.kind = expressions::Redirection::Kind::Heredoc;
   redir.target = nullptr;
   redir.dup_fd = -1;
@@ -600,7 +609,7 @@ mustuse fn Parser::try_parse_trailing_redirection(
   case Token::Kind::DoubleLess: {
     const let op_location = token->source_location();
     m_lexer.advance_past_last_peek();
-    build_heredoc_redirection(op_location, ignored_first_location, out);
+    build_heredoc_redirection(0, op_location, ignored_first_location, out);
     return true;
   }
 
@@ -615,7 +624,7 @@ mustuse fn Parser::try_parse_trailing_redirection(
     ASSERT(next != nullptr);
     const let nk = next->kind();
     if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
-         nk == Token::Kind::Less) &&
+         nk == Token::Kind::Less || nk == Token::Kind::DoubleLess) &&
         next->source_location().position ==
             word_location.position + word_location.length)
     {
@@ -626,8 +635,13 @@ mustuse fn Parser::try_parse_trailing_redirection(
       if (parsed.is_error()) {
         throw ErrorWithLocation{word_location, parsed.error().message()};
       }
-      build_file_or_dup_redirection(static_cast<i32>(parsed.value()), nk,
-                                    op_location, ignored_first_location, out);
+      const let fd = static_cast<i32>(parsed.value());
+      if (nk == Token::Kind::DoubleLess) {
+        build_heredoc_redirection(fd, op_location, ignored_first_location, out);
+      } else {
+        build_file_or_dup_redirection(fd, nk, op_location,
+                                      ignored_first_location, out);
+      }
       return true;
     }
 
@@ -760,7 +774,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
           ASSERT(next != nullptr);
           const let nk = next->kind();
           if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
-               nk == Token::Kind::Less) &&
+               nk == Token::Kind::Less || nk == Token::Kind::DoubleLess) &&
               next->source_location().position ==
                   word_location.position + word_location.length)
           {
@@ -771,7 +785,13 @@ hot fn Parser::parse_simple_command() throws -> Command *
             if (parsed.is_error()) {
               throw ErrorWithLocation{word_location, parsed.error().message()};
             }
-            add_redirection(static_cast<i32>(parsed.value()), nk, op_location);
+            const let fd = static_cast<i32>(parsed.value());
+            if (nk == Token::Kind::DoubleLess) {
+              build_heredoc_redirection(fd, op_location, source_location,
+                                        redirections);
+            } else {
+              add_redirection(fd, nk, op_location);
+            }
             break;
           }
           if (!source_location) source_location = word_location;
@@ -857,7 +877,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     case Token::Kind::DoubleLess: {
       const let op_location = token->source_location();
       m_lexer.advance_past_last_peek();
-      build_heredoc_redirection(op_location, source_location, redirections);
+      build_heredoc_redirection(0, op_location, source_location, redirections);
     } break;
 
     /* A separator, an operator, or a list terminator ends the command. */

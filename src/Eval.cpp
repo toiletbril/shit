@@ -926,6 +926,30 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
       continue;
     }
 
+    if (word[i] == '`') {
+      /* Old-style backtick command substitution in a default, alternate,
+         assign, or error word, and in a heredoc body. It runs to the next
+         unescaped backtick. The POSIX backquote unescaping strips a backslash
+         that precedes a backtick, a dollar sign, or another backslash, and the
+         unescaped bytes are captured the same way $(...) is. */
+      String inner{heap_allocator()};
+      usize j = i + 1;
+      for (; j < word.length; j++) {
+        if (word[j] == '\\' && j + 1 < word.length &&
+            (word[j + 1] == '`' || word[j + 1] == '$' || word[j + 1] == '\\'))
+        {
+          inner += word[j + 1];
+          j++;
+          continue;
+        }
+        if (word[j] == '`') break;
+        inner += word[j];
+      }
+      out += capture_command_substitution(inner);
+      i = j;
+      continue;
+    }
+
     if (word[i] != '$') {
       out += word[i];
       continue;

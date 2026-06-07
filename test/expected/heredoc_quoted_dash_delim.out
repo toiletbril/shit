@@ -1,0 +1,21 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Literal "-EOF"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "-"
+  Literal "-EOF"
+]
+body
+indented
+[Code 0]

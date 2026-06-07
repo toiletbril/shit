@@ -1,0 +1,14 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "B"
+]
+hi
+[Code 0]

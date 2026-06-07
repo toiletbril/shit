@@ -560,6 +560,16 @@ hot fn Lexer::lex_identifier() throws -> Token *
       } else if (next == '{') {
         byte_count++;
         String name{};
+        /* The matching close brace lives at brace depth one, so a nested
+           ${...} in a default or alternate word does not end the outer
+           expansion early. A bare { does not raise the depth, matching dash,
+           which closes ${x:-a{b} at the first brace. A nested $(...),
+           $((...)), or backtick is copied as a balanced unit so a } inside it
+           is never counted. A single quote run, a double quote run, and a
+           backslash escape keep their bytes literal so a } they contain is
+           never counted either. */
+        usize brace_depth = 1;
+        char quote = 0;
         for (;;) {
           const let c = chop_character(byte_count);
           if (c == lexer::CEOF) {
@@ -569,7 +579,82 @@ hot fn Lexer::lex_identifier() throws -> Token *
                 here(m_cursor_position + byte_count, 1), "Expected } here"};
           }
           byte_count++;
-          if (c == '}') break;
+
+          if (quote == '\'') {
+            if (c == '\'') quote = 0;
+            name += c;
+            continue;
+          }
+          if (c == '\\') {
+            name += c;
+            const let escaped = chop_character(byte_count);
+            if (escaped != lexer::CEOF) {
+              byte_count++;
+              name += escaped;
+            }
+            continue;
+          }
+          if (quote == '"') {
+            if (c == '"') quote = 0;
+            name += c;
+            continue;
+          }
+          if (c == '\'' || c == '"') {
+            quote = c;
+            name += c;
+            continue;
+          }
+          if (c == '`') {
+            name += c;
+            for (;;) {
+              const let b = chop_character(byte_count);
+              if (b == lexer::CEOF) break;
+              byte_count++;
+              name += b;
+              if (b == '\\') {
+                const let escaped = chop_character(byte_count);
+                if (escaped != lexer::CEOF) {
+                  byte_count++;
+                  name += escaped;
+                }
+                continue;
+              }
+              if (b == '`') break;
+            }
+            continue;
+          }
+          if (c == '$' && chop_character(byte_count) == '(') {
+            /* Copy a nested $(...) or $((...)) by paren balance. */
+            name += c;
+            name += chop_character(byte_count);
+            byte_count++;
+            usize paren_depth = 1;
+            for (;;) {
+              const let p = chop_character(byte_count);
+              if (p == lexer::CEOF) break;
+              byte_count++;
+              name += p;
+              if (p == '(') paren_depth++;
+              else if (p == ')') {
+                paren_depth--;
+                if (paren_depth == 0) break;
+              }
+            }
+            continue;
+          }
+          if (c == '$' && chop_character(byte_count) == '{') {
+            brace_depth++;
+            name += c;
+            name += chop_character(byte_count);
+            byte_count++;
+            continue;
+          }
+          if (c == '}') {
+            brace_depth--;
+            if (brace_depth == 0) break;
+            name += c;
+            continue;
+          }
           name += c;
         }
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
