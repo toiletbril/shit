@@ -54,12 +54,13 @@ public:
   /* The parsed inner command of a CommandSubstitution segment, lexed and parsed
      once and reused on every later expansion. The outer AST of a loop body is
      re-evaluated without re-parsing, so a $(...) in the body would otherwise
-     re-run the lexer and parser each iteration. The tree lives in AST_ARENA
-     alongside the outer command and is reclaimed when that arena resets, so the
-     cache never outlives the segment it hangs on. The parsed flag separates a
-     cached null from an unparsed segment. */
+     re-run the lexer and parser each iteration. The tree lives in AST_ARENA,
+     which resets between top-level commands, yet a function-body segment lives
+     in FUNCTION_ARENA and outlives that reset, so the cache records the arena
+     generation it was filled in and a hit from an earlier generation is treated
+     as stale and reparsed. A null pointer marks a never-parsed segment. */
   mutable const Expression *cached_substitution_ast{nullptr};
-  mutable bool is_substitution_parsed{false};
+  mutable usize cached_substitution_generation{0};
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;

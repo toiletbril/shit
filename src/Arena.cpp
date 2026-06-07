@@ -119,6 +119,10 @@ fn BumpArena::reset() wontthrow -> void
 {
   run_destructors_down_to(0);
 
+  /* Every reset reclaims the storage a cached pointer may hold, so bump the
+     generation to invalidate any cache that recorded an earlier one. */
+  m_reset_generation++;
+
   /* Keep the first block and drop the rest, so a typical command reuses one
      block without asking the system for memory again. */
   for (usize i = 1; i < m_blocks.count(); i++)

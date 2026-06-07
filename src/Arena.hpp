@@ -28,6 +28,14 @@ public:
   fn owns(const void *pointer) const wontthrow -> bool;
   fn reset() wontthrow -> void;
 
+  /* Counts how many times the arena has been reset. A cache that holds a pointer
+     into this arena stores the generation it was filled in, so a hit after a
+     reset, which reclaimed that storage, is recognised as stale and refilled. */
+  pure fn reset_generation() const wontthrow -> usize
+  {
+    return m_reset_generation;
+  }
+
   /* Sum the live bump bytes across every block. The stats path reads it to
      report how much the current command's tree occupies. */
   fn bytes_used() const wontthrow -> usize;
@@ -77,6 +85,7 @@ private:
 
   ArrayList<block> m_blocks{heap_allocator()};
   ArrayList<pending_destructor> m_destructors{heap_allocator()};
+  usize m_reset_generation{0};
 
   fn add_block(usize minimum_size) throws -> void;
   /* Run and drop every registered destructor from the index down to first, in

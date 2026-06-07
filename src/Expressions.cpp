@@ -1062,6 +1062,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.enter_function_scope();
     defer { cxt.leave_function_scope(); };
 
+    /* A command at the tail of the body must not exec the shell in place even
+       when the call itself is the terminal command, since the call's cleanup,
+       the positional restore and the scope pop, has to run after the body. */
+    let const saved_terminal_exec = cxt.terminal_exec_allowed();
+    cxt.set_terminal_exec_allowed(false);
+    defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
+
     let function_ret = function_body->evaluate(cxt);
 
     /* A return inside the body unwinds to here and supplies the status. A break

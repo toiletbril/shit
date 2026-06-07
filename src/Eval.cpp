@@ -2091,14 +2091,18 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
     throw Error{"Command substitution outside of a parse"};
 
   /* The segment text and its escape state never change between iterations, so
-     the inner command is lexed and parsed once and the tree is reused. The
-     parsed flag distinguishes a cached null from a never-parsed segment. */
-  if (!segment.is_substitution_parsed) {
+     the inner command is lexed and parsed once and the tree is reused while the
+     arena that holds it is unreset. A cached tree from an earlier generation
+     points into reclaimed storage, so it is reparsed. */
+  const usize generation = AST_ARENA->reset_generation();
+  if (segment.cached_substitution_ast == nullptr ||
+      segment.cached_substitution_generation != generation)
+  {
     let parser = Parser{
         Lexer{String{segment.text.view()}, *AST_ARENA}
     };
     segment.cached_substitution_ast = parser.construct_ast();
-    segment.is_substitution_parsed = true;
+    segment.cached_substitution_generation = generation;
   }
   ASSERT(segment.cached_substitution_ast != nullptr);
 
