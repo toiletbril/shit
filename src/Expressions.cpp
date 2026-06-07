@@ -66,6 +66,17 @@ cold fn AnalysisContext::fail(SourceLocation location,
   has_fatal = true;
 }
 
+/* A command-not-found at runtime is non-fatal. It prints a located diagnostic
+   to stderr against the source the evaluator is running, so a redirection such
+   as 2>/dev/null still suppresses it, and leaves the caller to report status
+   127. */
+cold static fn report_command_not_found(EvalContext &cxt,
+                                        const CommandNotFound &e) throws -> void
+{
+  const String *source = cxt.current_source();
+  show_message(e.to_string(source != nullptr ? source->view() : StringView{}));
+}
+
 cold fn Expression::analyze(AnalysisContext &actx,
                             bool is_unconditional) const throws -> void
 {
@@ -852,10 +863,24 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   const bool is_cache_valid =
       m_resolved_kind.has_value() && program_args[0] == m_resolved_name;
 
-  let ec = is_cache_valid
-               ? ExecContext::from_resolved(source_location(), *m_resolved_kind,
-                                            program_args)
-               : ExecContext::make_from(source_location(), program_args);
+  /* A command word that resolves to nothing is non-fatal. Report it to stderr,
+     set status 127, and continue so the surrounding list, and-or chain, and
+     command substitution proceed on the 127 the way a normal failing command
+     drives them. The catch is narrow, so a real located error from elsewhere
+     still aborts the command. */
+  Maybe<ExecContext> resolved_ec;
+  try {
+    resolved_ec =
+        is_cache_valid
+            ? ExecContext::from_resolved(source_location(), *m_resolved_kind,
+                                         program_args)
+            : ExecContext::make_from(source_location(), program_args);
+  } catch (const CommandNotFound &e) {
+    report_command_not_found(cxt, e);
+    cxt.set_last_exit_status(127);
+    return 127;
+  }
+  let ec = resolved_ec.take();
 
   if (!is_cache_valid) {
     if (ec.is_builtin())
@@ -1268,7 +1293,19 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
                               "A pipeline stage expanded to no command to run"};
     }
 
-    let ec = ExecContext::make_from(e->source_location(), steal(stage_args));
+    /* A stage whose command does not resolve is non-fatal. Report it to stderr
+       and yield 127 for the pipeline rather than aborting the shell. The
+       expansions of the earlier stages already ran, so the build is not
+       retried. */
+    Maybe<ExecContext> stage_ec;
+    try {
+      stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args));
+    } catch (const CommandNotFound &not_found) {
+      report_command_not_found(cxt, not_found);
+      cxt.set_last_exit_status(127);
+      return 127;
+    }
+    let ec = stage_ec.take();
     /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
        its descriptors. The pipe only sets stdin and stdout, so a stderr
        redirection composes with it. */
@@ -2216,6 +2253,10 @@ BINARY_EXPRESSION_DECLS(NotEqual, !=);
 cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
+  /* A missing command is only warned about, so the conditional context no
+     longer changes the prepass outcome for this node. */
+  unused(is_unconditional);
+
   if (m_args.is_empty()) return;
 
   ASSERT(m_args[0] != nullptr);
@@ -2320,13 +2361,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     let const message = StringView{"Command '"} + StringView{*name} +
                         StringView{"' was not found"};
     /* Point at the command word, not at the whole command. With an assignment
-       prefix the command location is the assignment, not the program name. A
-       command after a dot, source, or eval may be defined at runtime, so it is
-       only a warning. */
-    if (is_unconditional && !actx.saw_runtime_definer)
-      actx.fail(m_args[0]->source_location(), message);
-    else
-      actx.warn(m_args[0]->source_location(), message);
+       prefix the command location is the assignment, not the program name. The
+       prepass only warns, never aborts, since a missing command at runtime is
+       non-fatal under POSIX and yields exit status 127 while evaluation
+       continues. The runtime resolution in SimpleCommand prints the same caret
+       to stderr and sets 127 when the command actually runs. */
+    actx.warn(m_args[0]->source_location(), message);
   }
 }
 

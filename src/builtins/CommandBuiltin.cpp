@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
+#include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Utils.hpp"
@@ -75,8 +76,20 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   let operand_args = ArrayList<String>{};
   for (usize i = 1; i < args.count(); i++)
     operand_args.push(String{heap_allocator(), args[i]});
-  let sub = ExecContext::make_from(ec.source_location(), operand_args);
-  return utils::execute_context(steal(sub), cxt, false);
+
+  /* An operand that does not resolve is non-fatal, the same as a bare command
+     word. Report it to stderr and return 127 rather than letting the not-found
+     error unwind and abort the shell. */
+  Maybe<ExecContext> sub;
+  try {
+    sub = ExecContext::make_from(ec.source_location(), operand_args);
+  } catch (const CommandNotFound &not_found) {
+    const String *source = cxt.current_source();
+    show_message(not_found.to_string(source != nullptr ? source->view()
+                                                       : StringView{}));
+    return 127;
+  }
+  return utils::execute_context(steal(*sub), cxt, false);
 }
 
 } /* namespace shit */

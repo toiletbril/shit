@@ -2219,8 +2219,8 @@ fn ExecContext::make_from(SourceLocation location,
     if (p.has_value()) {
       kind = ResolvedCommand::from_program(steal(*p));
     } else {
-      throw ErrorWithLocation{location,
-                              "Program '" + program + "' wasn't found"};
+      throw CommandNotFound{location,
+                            "Program '" + program + "' wasn't found"};
     }
   } else {
     kind = ResolvedCommand::from_builtin(*bk);

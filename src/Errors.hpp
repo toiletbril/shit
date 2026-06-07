@@ -100,6 +100,17 @@ protected:
   SourceLocation m_location;
 };
 
+/* An ErrorWithLocation raised when a command word resolves to neither a
+   builtin, a program on PATH, nor an existing path at runtime. The simple
+   command boundary catches it, prints it to stderr, and yields exit status 127
+   so evaluation continues the way a normal failing command does, rather than
+   aborting the shell. */
+class CommandNotFound : public ErrorWithLocation
+{
+public:
+  CommandNotFound(SourceLocation location, StringView message);
+};
+
 /* An ErrorWithLocation that prints as a warning and is shown rather than
    thrown. The prepass builds it to point a caret at a non-fatal issue. */
 class WarningWithLocation : public ErrorWithLocation

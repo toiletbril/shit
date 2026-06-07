@@ -431,6 +431,10 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   return result;
 }
 
+CommandNotFound::CommandNotFound(SourceLocation location, StringView message)
+    : ErrorWithLocation(location, message)
+{}
+
 WarningWithLocation::WarningWithLocation(SourceLocation location,
                                          StringView message)
     : ErrorWithLocation(location, message)
