@@ -430,6 +430,7 @@ fn main(int argc, char **argv) -> int
                             steal(positional_params)};
 
   /* Apply the remaining option flags that the constructor does not take. */
+  context.set_stats_enabled(FLAG_STATS.is_enabled());
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());

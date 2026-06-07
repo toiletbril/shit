@@ -40,6 +40,9 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
 {
+  /* The count feeds only the -S report, so skip the increment unless -S asked
+     for it and keep the per-node hot path free of the bookkeeping. */
+  if (!m_stats_enabled) return;
   m_expressions_executed_last++;
 }
 
@@ -647,6 +650,16 @@ fn EvalContext::set_export_all(bool enabled) wontthrow -> void
 pure fn EvalContext::export_all() const wontthrow -> bool
 {
   return m_export_all;
+}
+
+fn EvalContext::set_stats_enabled(bool enabled) wontthrow -> void
+{
+  m_stats_enabled = enabled;
+}
+
+pure fn EvalContext::stats_enabled() const wontthrow -> bool
+{
+  return m_stats_enabled;
 }
 
 fn EvalContext::set_no_glob(bool enabled) wontthrow -> void
@@ -1953,7 +1966,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
     case WordSegment::Kind::CommandSubstitution: {
       let const output =
-          String{heap_allocator(), capture_command_substitution(segment.text)};
+          String{heap_allocator(), capture_command_substitution(segment)};
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
@@ -2002,7 +2015,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     if (segment.kind == WordSegment::Kind::VariableReference)
       result += apply_parameter_expansion(segment_text);
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
-      result += capture_command_substitution(segment.text);
+      result += capture_command_substitution(segment);
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
       result += utils::int_to_text(
           segment.folded_arithmetic_result.has_value()
@@ -2049,6 +2062,35 @@ fn EvalContext::capture_command_substitution(const String &source) throws
       Lexer{String{source.view()}, *AST_ARENA}
   };
   let const ast = parser.construct_ast();
+  ASSERT(ast != nullptr);
+
+  return run_captured_substitution(ast);
+}
+
+fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
+    -> String
+{
+  if (AST_ARENA == nullptr)
+    throw Error{"Command substitution outside of a parse"};
+
+  /* The segment text and its escape state never change between iterations, so
+     the inner command is lexed and parsed once and the tree is reused. The
+     parsed flag distinguishes a cached null from a never-parsed segment. */
+  if (!segment.is_substitution_parsed) {
+    let parser = Parser{
+        Lexer{String{segment.text.view()}, *AST_ARENA}
+    };
+    segment.cached_substitution_ast = parser.construct_ast();
+    segment.is_substitution_parsed = true;
+  }
+  ASSERT(segment.cached_substitution_ast != nullptr);
+
+  return run_captured_substitution(segment.cached_substitution_ast);
+}
+
+fn EvalContext::run_captured_substitution(const Expression *ast) throws
+    -> String
+{
   ASSERT(ast != nullptr);
 
   /* A cd or an assignment inside the substitution must not leak. */

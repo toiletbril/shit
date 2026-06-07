@@ -320,6 +320,17 @@ public:
      not leak to the parent. */
   fn capture_command_substitution(const String &source) throws -> String;
 
+  /* Same capture, but the segment caches its parsed inner command so a $(...)
+     in a loop body is lexed and parsed once and re-evaluated thereafter. The
+     evaluation still runs every call, so output and side effects are
+     unchanged. */
+  fn capture_command_substitution(const WordSegment &segment) throws -> String;
+
+  /* Run a parsed inner command under the substitution machinery, capturing its
+     stdout and snapshotting state so a cd or an assignment inside does not leak.
+     Both capture overloads share this once they hold an AST. */
+  fn run_captured_substitution(const Expression *ast) throws -> String;
+
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
      so a break, a return, or an assignment inside acts on the caller. */
@@ -377,6 +388,11 @@ public:
 
   fn make_stats_string() const throws -> String;
 
+  /* Stats counting is off unless -S asked for the report. The evaluate path
+     tests this so the per-node bookkeeping never runs when nobody reads it. */
+  fn set_stats_enabled(bool enabled) wontthrow -> void;
+  pure fn stats_enabled() const wontthrow -> bool;
+
   pure fn last_expressions_executed() const wontthrow -> usize;
   pure fn total_expressions_executed() const wontthrow -> usize;
 
@@ -387,6 +403,7 @@ public:
   pure fn peak_ast_arena_bytes() const wontthrow -> usize;
 
 protected:
+  bool m_stats_enabled{false};
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
   usize m_expansions_last{0};

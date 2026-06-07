@@ -51,6 +51,16 @@ public:
      segment. */
   mutable Maybe<i64> folded_arithmetic_result{};
 
+  /* The parsed inner command of a CommandSubstitution segment, lexed and parsed
+     once and reused on every later expansion. The outer AST of a loop body is
+     re-evaluated without re-parsing, so a $(...) in the body would otherwise
+     re-run the lexer and parser each iteration. The tree lives in AST_ARENA
+     alongside the outer command and is reclaimed when that arena resets, so the
+     cache never outlives the segment it hangs on. The parsed flag separates a
+     cached null from an unparsed segment. */
+  mutable const Expression *cached_substitution_ast{nullptr};
+  mutable bool is_substitution_parsed{false};
+
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;
