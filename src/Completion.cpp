@@ -37,24 +37,33 @@ static pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
   return false;
 }
 
+/* True for a byte that ends the token under the cursor, either a word separator
+   or a command separator. A token bounded this way stops at an unspaced
+   separator, so `ls|gre` ends the token at `|` and leaves `gre` under the
+   cursor rather than the whole `ls|gre` run. */
+static pure fn is_token_boundary(char c) wontthrow -> bool
+{
+  return is_word_separator(c) || is_command_separator(c);
+}
+
 /* The byte offset where the token under the cursor begins. The scan walks back
-   from the cursor over non-separator bytes. */
+   from the cursor over non-boundary bytes. */
 static pure fn find_token_start(StringView line, usize cursor) wontthrow
     -> usize
 {
   usize start = cursor;
-  while (start > 0 && !is_word_separator(line[start - 1]))
+  while (start > 0 && !is_token_boundary(line[start - 1]))
     start--;
   return start;
 }
 
 /* The byte offset just past the token the cursor sits inside. The scan walks
-   forward from the cursor over non-separator bytes, so the replacement covers
+   forward from the cursor over non-boundary bytes, so the replacement covers
    the whole word rather than the bytes left of the cursor only. */
 static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
 {
   usize end = cursor;
-  while (end < line.length && !is_word_separator(line[end]))
+  while (end < line.length && !is_token_boundary(line[end]))
     end++;
   return end;
 }
@@ -119,6 +128,16 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
            prefix.view()[shared] == candidate.view()[shared])
     {
       shared++;
+    }
+    /* The byte-wise match can stop in the middle of a multibyte codepoint when
+       two candidates agree on a lead byte but differ on a continuation byte, so
+       retract the cut back to the start of that codepoint to avoid corrupting a
+       glyph in the ghost text. A cut at the prefix end sits on a boundary
+       already. */
+    while (shared > 0 && shared < prefix.length() &&
+           (static_cast<unsigned char>(prefix.view()[shared]) & 0xC0) == 0x80)
+    {
+      shared--;
     }
     prefix = String{prefix.view().substring_of_length(0, shared)};
   }

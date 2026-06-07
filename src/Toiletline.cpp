@@ -154,34 +154,43 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
 
-  const usize byte_length = std::strlen(buffer);
-  shit::StringView line{buffer, byte_length};
-  shit::Path base = shit::Path::current_directory();
+  /* Toiletline calls this through a C function pointer, so a C++ exception that
+     unwound past this frame would tear through C stack frames, which is
+     undefined behavior. The whole body is guarded and any throw is swallowed
+     into a no-completion result that leaves the line unchanged. */
+  try {
+    const usize byte_length = std::strlen(buffer);
+    shit::StringView line{buffer, byte_length};
+    shit::Path base = shit::Path::current_directory();
 
-  const usize byte_cursor =
-      byte_offset_of_codepoint(buffer, byte_length, cursor);
+    const usize byte_cursor =
+        byte_offset_of_codepoint(buffer, byte_length, cursor);
 
-  shit::completion::completion_result result =
-      shit::completion::complete(line, byte_cursor, *COMPLETION_CONTEXT, base);
+    shit::completion::completion_result result =
+        shit::completion::complete(line, byte_cursor, *COMPLETION_CONTEXT,
+                                   base);
 
-  if (result.candidates.is_empty()) return 0;
+    if (result.candidates.is_empty()) return 0;
 
-  COMPLETION_CANDIDATES = steal(result.candidates);
-  COMPLETION_LCP = steal(result.longest_common_prefix);
+    COMPLETION_CANDIDATES = steal(result.candidates);
+    COMPLETION_LCP = steal(result.longest_common_prefix);
 
-  COMPLETION_CANDIDATE_POINTERS.clear();
-  for (const shit::String &candidate : COMPLETION_CANDIDATES)
-    COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
+    COMPLETION_CANDIDATE_POINTERS.clear();
+    for (const shit::String &candidate : COMPLETION_CANDIDATES)
+      COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
 
-  out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
-  out->count = COMPLETION_CANDIDATE_POINTERS.count();
-  out->longest_common_prefix = COMPLETION_LCP.c_str();
-  /* The engine reports the token span in bytes, so convert each boundary to a
-     codepoint index for toiletline, which replaces the span in codepoints. */
-  out->token_start = ::tl_utf8_strnlen(buffer, result.token_start);
-  out->token_end = ::tl_utf8_strnlen(buffer, result.token_end);
+    out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
+    out->count = COMPLETION_CANDIDATE_POINTERS.count();
+    out->longest_common_prefix = COMPLETION_LCP.c_str();
+    /* The engine reports the token span in bytes, so convert each boundary to a
+       codepoint index for toiletline, which replaces the span in codepoints. */
+    out->token_start = ::tl_utf8_strnlen(buffer, result.token_start);
+    out->token_end = ::tl_utf8_strnlen(buffer, result.token_end);
 
-  return 1;
+    return 1;
+  } catch (...) {
+    return 0;
+  }
 }
 
 } /* namespace */

@@ -289,7 +289,14 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case 'w': {
       String shown{working_directory};
       Maybe<Path> home = os::get_home_directory();
-      if (home && shown.starts_with(home->text())) {
+      /* The home prefix collapses to ~ only when it ends on a path boundary, so
+         HOME=/home/sd and cwd=/home/sderp keeps the full path rather than
+         rendering ~erp. The byte after the prefix must be a separator or the
+         end of the string. */
+      if (home && shown.starts_with(home->text()) &&
+          (shown.length() == home->count() ||
+           shown.view()[home->count()] == '/'))
+      {
         String collapsed{};
         collapsed += "~";
         collapsed += shown.substring(home->count());
@@ -574,9 +581,19 @@ fn main(int argc, char **argv) -> int
 
         shit::String pwd{full_pwd};
         if (pwd.length() > PWD_LENGTH) {
+          /* The byte slice can land in the middle of a multibyte codepoint, so
+             advance the start forward to the next codepoint boundary, the first
+             byte that is not a UTF-8 continuation byte. */
+          usize tail_start = pwd.length() - PWD_LENGTH + 3;
+          while (tail_start < pwd.length() &&
+                 (static_cast<unsigned char>(pwd.view()[tail_start]) & 0xC0) ==
+                     0x80)
+          {
+            tail_start++;
+          }
           shit::String shortened{};
           shortened += "...";
-          shortened += pwd.substring(pwd.length() - PWD_LENGTH + 3);
+          shortened += pwd.substring(tail_start);
           pwd = steal(shortened);
         }
 
@@ -611,11 +628,18 @@ fn main(int argc, char **argv) -> int
             toiletline::set_input(input);
             continue;
           case TL_PRESSED_EOF:
-            /* Exit on CTRL-D. */
-            shit::print("^D");
-            shit::flush();
-            toiletline::emit_newlines(input);
-            shit::utils::quit(exit_code, true);
+            /* EOF logs out only on an empty line, the way dash and bash treat
+               CTRL-D. On a non-empty line the EOF is ignored and the editor
+               keeps the typed text, so the user can finish the command. */
+            if (input.is_empty()) {
+              shit::print("^D");
+              shit::flush();
+              toiletline::emit_newlines(input);
+              shit::utils::quit(exit_code, true);
+            } else {
+              toiletline::set_input(input);
+              continue;
+            }
             break;
           case TL_PRESSED_INTERRUPT:
             /* Ignore Ctrl-C. */
