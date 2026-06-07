@@ -18,7 +18,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]", "[-OPTIONS] [-]",
+HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]", "[-OPTIONS] -",
                    "[-OPTIONS]");
 
 FLAG(INTERACTIVE, Bool, 'i', "interactive",
@@ -42,13 +42,13 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
 FLAG(NO_EXEC, Bool, 'n', "no-exec",
      "Read and parse commands but do not run them.");
 FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
-FLAG(NO_FAIL_GLOB, Bool, 'G', "no-fail-glob",
-     "Expand a glob that matches nothing to its literal pattern, like POSIX, "
-     "instead of failing.");
-FLAG(POSIX_ME_HARDER, Bool, '\0', "posix",
-     "Behave like POSIX sh. A glob that matches nothing stays its literal "
-     "pattern and the style warnings, such as an unquoted variable in a test, "
-     "are suppressed.");
+FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible",
+     "Make the shell Bash and POSIX compatible. A glob that matches nothing "
+     "stays its literal pattern and the style warnings, such as an unquoted "
+     "variable in a test, are suppressed.");
+FLAG(WARNINGS, Bool, 'W', "warnings",
+     "Re-enable the style warnings that --bash-compatible suppresses. The "
+     "behavior stays the same, only the diagnostics return.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
      "Skip the analysis stage, so no warnings or pre-run diagnostics are "
      "reported and evaluation begins sooner.");
@@ -58,18 +58,19 @@ FLAG(LOGIN, Bool, 'l', "login",
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
 
-FLAG(AST, Bool, 'A', "ast", "Print AST before executing each command.");
-FLAG(ESCAPE_MAP, Bool, 'M', "escape-bitmap",
+FLAG(AST, Bool, 'A', "show-ast", "Print AST before executing each command.");
+FLAG(ESCAPE_MAP, Bool, 'M', "show-lexed-words",
      "Print escape bitmap after each parsed command.");
-FLAG(EXIT_CODE, Bool, 'E', "exit-code",
+FLAG(EXIT_CODE, Bool, 'E', "show-exit-code",
      "Print exit code after each executed command.");
-FLAG(STATS, Bool, 'S', "stats",
+FLAG(STATS, Bool, 'S', "show-stats",
      "Print statistics after each executed command, including commands "
      "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
      "peak.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion",
      "Disable interactive tab completion and ghost-text.");
-FLAG(LOG, Bool, 'X', "log", "Enable verbose internal logging to stderr.");
+FLAG(LOG, Bool, 'X', "enable-debug-logging",
+     "Enable verbose internal logging to stderr.");
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, 'V', "short-version",
@@ -83,17 +84,18 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 
 namespace shit {
 
-/* Set when the shell is invoked through a name whose basename is sh, the way a
-   system ln -s shit sh does. bash and zsh switch to their POSIX modes when run
-   as sh, so the shell does the same and a /bin/sh script runs POSIX-clean. */
-static bool INVOKED_AS_SH = false;
+/* Set when the shell is invoked through a name whose basename is sh, bash, or
+   dash, the way a system ln -s shit sh does. bash and zsh switch to their POSIX
+   modes when run as sh, so the shell does the same and a script that names it
+   after a system shell runs compatibility-clean. */
+static bool INVOKED_AS_COMPAT_SHELL = false;
 
-/* True when POSIX behavior is in effect, either from --posix or from the sh
-   invocation name. The failglob default and the style-warning suppression both
-   read it. */
+/* True when POSIX behavior is in effect, either from --bash-compatible or from
+   the sh invocation name. The failglob default and the style-warning
+   suppression both read it. */
 pure static fn should_run_in_posix_mode() wontthrow -> bool
 {
-  return FLAG_POSIX_ME_HARDER.is_enabled() || INVOKED_AS_SH;
+  return FLAG_BASH_COMPATIBLE.is_enabled() || INVOKED_AS_COMPAT_SHELL;
 }
 
 /* Print the help or version text and return the exit code when one of those
@@ -102,8 +104,9 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
     String h{};
-    h += "shit, a pedantic, super-fast and awesome posix-compatible command "
-         "line interpreter\nor a friendly interactive shell for gigachads.\n\n";
+    h += "\n  shit, a pedantic, super-fast and awesome posix-compatible "
+         "command line interpreter\n  or a friendly interactive shell for "
+         "gigachads.\n\n";
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
     h += make_flag_help(FLAG_LIST);
@@ -220,10 +223,14 @@ static fn run_script_contents(const String &script_contents,
        constant folding and the prompt reaches evaluation sooner. */
     let const should_suppress_diagnostics =
         FLAG_SUPPRESS_DIAGNOSTICS.is_enabled();
+    /* Compatibility mode suppresses the style warnings, but -W brings them
+       back without changing any behavior. */
+    let const should_suppress_style_warnings =
+        should_run_in_posix_mode() && !FLAG_WARNINGS.is_enabled();
     if (!should_suppress_diagnostics &&
         !analyze_ast(ast, script_contents, context.function_names(),
                      context.alias_names(), context.no_exec(),
-                     should_run_in_posix_mode()))
+                     should_suppress_style_warnings))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
@@ -373,12 +380,15 @@ fn main(int argc, char **argv) -> int
     program_path = "<unknown>";
   }
 
-  /* A basename of sh selects POSIX mode, so a /bin/sh symlink behaves like one.
-   */
+  /* A basename of sh, bash, or dash selects compatibility mode, so a symlink
+     that names the shell after a system shell behaves like one. */
   let const last_slash = program_path.find_last_character('/');
-  shit::INVOKED_AS_SH =
-      (last_slash.has_value() ? program_path.substring(*last_slash + 1)
-                              : program_path.view()) == "sh";
+  let const program_basename = last_slash.has_value()
+                                   ? program_path.substring(*last_slash + 1)
+                                   : program_path.view();
+  shit::INVOKED_AS_COMPAT_SHELL = program_basename == "sh" ||
+                                  program_basename == "bash" ||
+                                  program_basename == "dash";
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
@@ -477,8 +487,7 @@ fn main(int argc, char **argv) -> int
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
-  context.set_failglob(!FLAG_NO_FAIL_GLOB.is_enabled() &&
-                       !shit::should_run_in_posix_mode());
+  context.set_failglob(!shit::should_run_in_posix_mode());
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);
@@ -587,7 +596,9 @@ fn main(int argc, char **argv) -> int
              completion callback and no ghost-text. */
           if (!FLAG_NO_COMPLETION.is_enabled())
             toiletline::enable_completion(context);
-          shit::show_message("Welcome :3");
+          shit::show_message(shit::should_run_in_posix_mode()
+                                 ? "POSIX me harder!"
+                                 : "Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
            * previosly! */

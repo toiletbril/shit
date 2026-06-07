@@ -421,6 +421,12 @@ cold fn show_short_version() throws -> void
   s += utils::int_to_text(SHIT_VER_PATCH);
   s += '-';
   s += SHIT_VER_EXTRA;
+  /* The build mode and the short commit hash trail the version so a reported
+     binary names exactly which build and revision it is. */
+  s += '-';
+  s += SHIT_BUILD_MODE;
+  s += '-';
+  s += StringView{SHIT_COMMIT_HASH}.substring_of_length(0, 7);
   s += '\n';
 
   print(s);

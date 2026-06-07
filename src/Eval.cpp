@@ -1302,10 +1302,11 @@ fn EvalContext::expand_path_once(const glob_field &field,
   let glob = StringView{};
   if (has_glob) glob = path.substring(stem_start);
 
+  /* A missing or unreadable parent directory yields no match the way dash
+     treats it, so the caller applies the failglob policy and the pattern stays
+     literal under failglob-off rather than raising an error here. */
   let const entries = Path::read_directory(parent_dir);
-  if (!entries.has_value())
-    throw Error{"Could not descend into '" + parent_dir.text() +
-                "': " + os::last_system_error_message()};
+  if (!entries.has_value()) return expanded;
 
   if (!has_glob) {
     let copy = glob_field{scratch};
