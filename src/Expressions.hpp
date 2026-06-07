@@ -24,6 +24,9 @@ public:
      During a real run the runtime resolution prints the same caret and sets
      127, so warning here too would duplicate the diagnostic. */
   bool warn_missing_commands{false};
+  /* Under --posix the style warnings, such as an unquoted variable in a test,
+     are suppressed, so a POSIX script that relies on splitting runs quietly. */
+  bool suppress_style_warnings{false};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
      see, so a later unresolved command is a warning rather than a failure. */
   bool saw_runtime_definer{false};
@@ -48,7 +51,8 @@ public:
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool warn_missing_commands) throws -> bool;
+               bool warn_missing_commands,
+               bool suppress_style_warnings) throws -> bool;
 
 class Expression
 {

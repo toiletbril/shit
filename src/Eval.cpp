@@ -2359,8 +2359,11 @@ fn EvalContext::run_source(StringView source, StringView origin,
         let const sourced_here = TraceWithLocation{frame.call_site};
         show_message(sourced_here.to_string(*frame.parent_source));
       } else {
-        show_message("This error was raised while running " + frame.origin +
-                     ".");
+        /* The origin line is context under the primary error, so it carries
+           the note severity word rather than printing bare. */
+        show_message(
+            Note{"This error was raised while running " + frame.origin}
+                .to_string());
       }
     }
   };

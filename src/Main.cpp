@@ -45,6 +45,13 @@ FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
 FLAG(NO_FAIL_GLOB, Bool, 'G', "no-fail-glob",
      "Expand a glob that matches nothing to its literal pattern, like POSIX, "
      "instead of failing.");
+FLAG(POSIX_ME_HARDER, Bool, '\0', "posix",
+     "Behave like POSIX sh. A glob that matches nothing stays its literal "
+     "pattern and the style warnings, such as an unquoted variable in a test, "
+     "are suppressed.");
+FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
+     "Skip the analysis stage, so no warnings or pre-run diagnostics are "
+     "reported and evaluation begins sooner.");
 FLAG(LOGIN, Bool, 'l', "login",
      "Act as a login shell and source the profiles.");
 
@@ -195,9 +202,15 @@ static fn run_script_contents(const String &script_contents,
     }
 
     /* Validate the whole tree before running anything. An unconditional
-       problem stops execution, a conditional one only warns. */
-    if (!analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), context.no_exec()))
+       problem stops execution, a conditional one only warns. Suppressing
+       diagnostics skips the whole stage, so the tree runs without validation or
+       constant folding and the prompt reaches evaluation sooner. */
+    let const should_suppress_diagnostics =
+        FLAG_SUPPRESS_DIAGNOSTICS.is_enabled();
+    if (!should_suppress_diagnostics &&
+        !analyze_ast(ast, script_contents, context.function_names(),
+                     context.alias_names(), context.no_exec(),
+                     FLAG_POSIX_ME_HARDER.is_enabled()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
@@ -437,7 +450,8 @@ fn main(int argc, char **argv) -> int
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
-  context.set_failglob(!FLAG_NO_FAIL_GLOB.is_enabled());
+  context.set_failglob(!FLAG_NO_FAIL_GLOB.is_enabled() &&
+                       !FLAG_POSIX_ME_HARDER.is_enabled());
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);

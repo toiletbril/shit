@@ -1,0 +1,26 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "rm -f nonexistent_zzz_glob_*.tmp" "EXIT"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "hello"]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Literal "rm -f nonexistent_zzz_glob_*.tmp"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hello"
+]
+hello
+[Code 0]
+shit: 1:7: error: No matches for the glob pattern 'nonexistent_zzz_glob_*.tmp'.
+     1 |  rm -f nonexistent_zzz_glob_*.tmp
+       |        ^~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+shit: note: This error was raised while running the EXIT trap.

@@ -318,12 +318,14 @@ fn fold_constant_arithmetic_in_token(const Token *token) wontthrow -> void
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool warn_missing_commands) throws -> bool
+               bool warn_missing_commands,
+               bool suppress_style_warnings) throws -> bool
 {
   ASSERT(root != nullptr);
 
   AnalysisContext actx{source};
   actx.warn_missing_commands = warn_missing_commands;
+  actx.suppress_style_warnings = suppress_style_warnings;
 
   /* A function or alias defined by an earlier command resolves, so seed the
      prepass with the names already registered. */
@@ -2692,9 +2694,11 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 
   /* An unquoted variable inside a test silently breaks when it is empty or
-     splits into several words. */
-  if (command_literal == "[" || command_literal == "test" ||
-      command_literal == "[[")
+     splits into several words. Under --posix the split is intended, so the
+     warning is suppressed. */
+  if (!actx.suppress_style_warnings &&
+      (command_literal == "[" || command_literal == "test" ||
+       command_literal == "[["))
   {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
