@@ -1,0 +1,74 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%d\n" "'A"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%x\n" "'A"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%o\n" "'A"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%u\n" "'A"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%d\n" ""A"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%d\n" "'AB"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%d\n"
+]
+[Word
+  DoubleQuoted "'A"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%x\n"
+]
+[Word
+  DoubleQuoted "'A"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%o\n"
+]
+[Word
+  DoubleQuoted "'A"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%u\n"
+]
+[Word
+  DoubleQuoted "'A"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%d\n"
+]
+[Word
+  Literal ""A"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%d\n"
+]
+[Word
+  DoubleQuoted "'AB"
+]
+65
+41
+101
+65
+65
+65
+[Code 0]

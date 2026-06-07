@@ -1,0 +1,20 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "wait" "99999"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit=$?"]
+[Word
+  Unquoted "wait"
+]
+[Word
+  Unquoted "99999"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "exit="
+  Variable "?"
+]
+exit=127
+[Code 0]

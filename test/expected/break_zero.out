@@ -1,0 +1,52 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ForLoop "i"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "break" "0"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "unreached"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unreached"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 1:18: error: Builtin 'break': break: Illegal number: 0.
+     1 |  for i in 1 2; do break 0; echo unreached; done
+       |                   ^~~~~~~ here.

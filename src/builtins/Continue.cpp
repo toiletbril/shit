@@ -22,7 +22,10 @@ fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (parsed.is_error()) throw parsed.error();
     level = parsed.value();
   }
-  if (level < 1) level = 1;
+  /* A non-positive count is rejected the way dash rejects an illegal number,
+     rather than clamped, so continue 0 aborts instead of skipping one loop. */
+  if (level < 1)
+    throw Error{"continue: Illegal number: " + ec.args()[1]};
 
   cxt.request_continue(level, ec.source_location());
   return 0;

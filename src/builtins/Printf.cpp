@@ -14,10 +14,15 @@ namespace shit {
 namespace {
 
 /* Parse one signed integer argument the way printf does, in base zero. A
-   leading 0x marks hexadecimal, otherwise the digits are decimal. A malformed
+   leading 0x marks hexadecimal, otherwise the digits are decimal. An argument
+   that opens with a single or a double quote yields the char code of the byte
+   that follows, or zero when nothing follows, as POSIX specifies. A malformed
    argument yields zero. */
 i64 parse_printf_integer(const String &arg) throws
 {
+  if (!arg.is_empty() && (arg[0] == '\'' || arg[0] == '"'))
+    return arg.count() > 1 ? static_cast<unsigned char>(arg[1]) : 0;
+
   usize first_digit = 0;
   if (first_digit < arg.count() &&
       (arg[first_digit] == '+' || arg[first_digit] == '-'))
@@ -93,9 +98,11 @@ void append_conversion(String &out, const String &spec, char conv,
   } else if (conv == 'x' || conv == 'X' || conv == 'o' || conv == 'u') {
     String with_ll = spec + "ll";
     with_ll.push(conv);
-    std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
-                  static_cast<unsigned long long>(
-                      std::strtoull(arg.c_str(), nullptr, 0)));
+    /* The unsigned conversions share the char-code and base parsing with the
+       signed ones, so printf '%x' "'A" yields the char code the same way. */
+    std::snprintf(
+        buffer, sizeof(buffer), with_ll.c_str(),
+        static_cast<unsigned long long>(parse_printf_integer(arg)));
     out += buffer;
   } else {
     /* An unknown conversion is emitted verbatim. */

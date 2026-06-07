@@ -58,8 +58,18 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
     } else {
       let const parsed = utils::parse_decimal_integer(target);
       if (!parsed.is_error()) {
-        let const pid = os::process_from_pid(parsed.value());
-        status = os::wait_and_monitor_process(pid);
+        /* wait only waits for this shell's own children. A pid that names no
+           tracked job is not a child, so the status is 127 and waitpid is never
+           called, matching dash. Waiting the raw pid would throw on ECHILD and
+           abort the command. */
+        job *matched = nullptr;
+        for (job &job : cxt.jobs()) {
+          if (job.pid == static_cast<os::process>(parsed.value())) {
+            matched = &job;
+            break;
+          }
+        }
+        status = matched != nullptr ? wait_for_job(*matched) : 127;
       }
     }
     /* A non-numeric operand is ignored rather than waiting on waitpid(0), which

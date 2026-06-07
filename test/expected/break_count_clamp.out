@@ -1,0 +1,132 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ForLoop "i"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ForLoop "j"]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "break" "5"]
+              [CompoundListCondition, None]
+                [SimpleCommand "echo" "unreached"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "inner-done"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "end-break"]
+  [CompoundListCondition, None]
+    [ForLoop "i"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "continue" "5"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "body"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "end-continue"]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "j"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unreached"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "inner-done"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "end-break"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "continue"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "body"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "end-continue"
+]
+end-break
+end-continue
+[Code 0]

@@ -66,6 +66,11 @@ fn string_replace(String &s, StringView to_replace,
 
 fn lowercase_string(StringView s) throws -> String;
 
+/* Whether the word is one of the POSIX shell reserved words, the set the type
+   and command builtins report as a shell keyword. It matches dash's set rather
+   than the lexer's, so a shell-specific token such as time is excluded. */
+pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
+
 /* Parse a whole view as a signed integer, the StringView-native replacement for
    std::stoll. Each base has its own function so the digit loop carries no base
    branch and the compiler keeps the divisor a constant. Leading and trailing

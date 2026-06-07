@@ -227,6 +227,17 @@ fn lowercase_string(StringView s) throws -> String
   return l;
 }
 
+pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
+{
+  static const StringView RESERVED_WORDS[] = {
+      "!",    "{",  "}",   "case", "do",   "done",  "elif",  "else",
+      "esac", "fi", "for", "if",   "in",   "then",  "until", "while",
+  };
+  for (const StringView reserved : RESERVED_WORDS)
+    if (word == reserved) return true;
+  return false;
+}
+
 static pure fn is_ascii_whitespace(char c) wontthrow -> bool
 {
   return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' ||

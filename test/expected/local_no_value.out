@@ -1,0 +1,108 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=outer]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "x"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[$x]"]
+          [CompoundListCondition, None]
+            [Assign x=inner]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[$x]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$x]"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "g"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local" "y"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[$y-UNSET]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "g"]
+[Word
+  Unquoted "x=outer"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "x=inner"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "g"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "y-UNSET"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "g"
+]
+[outer]
+[inner]
+[outer]
+[UNSET]
+[Code 0]

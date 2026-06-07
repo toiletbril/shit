@@ -33,7 +33,16 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
 
-    if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
+    if (utils::is_posix_reserved_word(name.view())) {
+      out += name;
+      out += " is a shell keyword\n";
+    } else if (let const alias = cxt.get_alias(name.view());
+               alias.has_value()) {
+      out += name;
+      out += " is an alias for ";
+      out += *alias;
+      out += "\n";
+    } else if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
       out += name;
       out += " is a shell function\n";
     } else if (search_builtin(name.view()).has_value()) {

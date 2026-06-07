@@ -1,0 +1,4 @@
+for i in 1 2; do for j in a b; do break 5; echo unreached; done; echo inner-done; done
+echo end-break
+for i in 1 2; do continue 5; echo body; done
+echo end-continue

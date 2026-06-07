@@ -1,0 +1,30 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-break"]
+  [CompoundListCondition, None]
+    [SimpleCommand "continue"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-continue"]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-break"
+]
+[Word
+  Unquoted "continue"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-continue"
+]
+after-break
+after-continue
+[Code 0]

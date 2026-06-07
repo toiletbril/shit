@@ -1,0 +1,77 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias" "ll=ls -l"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "if"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "ll"]
+  [CompoundListCondition, None]
+    [SimpleCommand "command" "-v" "if"]
+  [CompoundListCondition, None]
+    [SimpleCommand "command" "-v" "ll"]
+  [CompoundListCondition, None]
+    [SimpleCommand "command" "-V" "if"]
+  [CompoundListCondition, None]
+    [SimpleCommand "command" "-V" "ll"]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "ll="
+  Literal "ls -l"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "ll"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "ll"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-V"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "-V"
+]
+[Word
+  Unquoted "ll"
+]
+if is a shell keyword
+ll is an alias for ls -l
+if
+alias ll='ls -l'
+if is a shell keyword
+ll is an alias for ls -l
+[Code 0]

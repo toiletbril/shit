@@ -35,7 +35,9 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const equals_position = arg.find_character('=');
 
     /* Record the shadowed binding before overwriting it, so leaving the
-       function restores it. A bare name shadows with an empty value. */
+       function restores it. A bare name declares the local without touching the
+       value, so the currently-visible binding from the caller stays readable
+       until the body assigns the name, matching dash. */
     let const name = equals_position.has_value()
                          ? arg.substring_of_length(0, *equals_position)
                          : arg.view();
@@ -43,8 +45,6 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
 
     if (equals_position.has_value())
       cxt.set_shell_variable(name, arg.substring(*equals_position + 1));
-    else
-      cxt.set_shell_variable(name, "");
   }
 
   return 0;

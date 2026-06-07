@@ -51,10 +51,31 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case '\\': buf += '\\'; break;
       /* \c stops all output and drops the trailing newline. */
       case 'c': should_stop = true; break;
-      /* \0NNN is up to three octal digits. */
+      /* \0NNN reads up to three octal digits after the leading zero. */
       case '0': {
         i32 value = 0;
         usize digit_count = 0;
+        while (digit_count < 3 && j + 1 < arg.length() && arg[j + 1] >= '0' &&
+               arg[j + 1] <= '7')
+        {
+          value = value * 8 + (arg[j + 1] - '0');
+          j++;
+          digit_count++;
+        }
+        buf += static_cast<char>(value);
+      } break;
+      /* The bare \NNN form is one to three octal digits with no leading zero,
+         so \101 is the byte A the way dash's XSI echo reads it. The first digit
+         is already in hand, so up to two more follow. */
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7': {
+        i32 value = escaped - '0';
+        usize digit_count = 1;
         while (digit_count < 3 && j + 1 < arg.length() && arg[j + 1] >= '0' &&
                arg[j + 1] <= '7')
         {

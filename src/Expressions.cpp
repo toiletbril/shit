@@ -1062,6 +1062,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.enter_function_call(source_location());
     defer { cxt.leave_function_call(); };
 
+    /* A loop in the caller is not the body's to break, so the body starts with
+       a fresh loop count and the caller's count returns when the call ends. */
+    let const saved_loop_depth = cxt.loop_depth();
+    cxt.set_loop_depth(0);
+    defer { cxt.set_loop_depth(saved_loop_depth); };
+
     /* Open a local scope so a local builtin in the body shadows a variable and
        the old value returns when the call ends. */
     cxt.enter_function_scope();
@@ -1843,6 +1849,11 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     return 0;
   }
 
+  /* The body runs inside one more loop level, so a break or a continue clamps
+     its level against the nesting that is actually live. */
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
+
   i64 ret = 0;
   for (;;) {
     i64 condition_status;
@@ -1942,6 +1953,11 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* Without an in clause the loop walks the positional parameters. */
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
+
+  /* The body runs inside one more loop level, so a break or a continue clamps
+     its level against the nesting that is actually live. */
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
 
   i64 ret = 0;
   for (const String &value : values) {
@@ -2143,6 +2159,12 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* This shell has no process-level subshell, so isolate by snapshot. A cd or
      an assignment inside does not leak, but the exit status propagates. An exit
      inside ends only the subshell. */
+  /* A loop in the parent is not the subshell's to break, so the body runs with
+     a fresh loop count and the parent's count returns afterward. */
+  let const saved_loop_depth = cxt.loop_depth();
+  cxt.set_loop_depth(0);
+  defer { cxt.set_loop_depth(saved_loop_depth); };
+
   let snapshot = cxt.snapshot_state();
   cxt.enter_subshell();
   i64 ret = 0;
@@ -2158,13 +2180,19 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* An exit inside the subshell ends only the subshell and supplies its status.
-     A break, a continue, or a return stays pending and propagates after the
-     state is restored, the same as the old re-throw did. */
-  if (cxt.has_pending_control_flow() &&
-      cxt.pending_control_flow().kind == control_flow::Kind::Exit)
-  {
-    ret = cxt.pending_control_flow().value;
-    cxt.clear_control_flow();
+     A break or a continue is scoped to a loop inside the subshell, so it does
+     not escape into the parent's loop and is consumed here. A return stays
+     pending and propagates after the state is restored. */
+  if (cxt.has_pending_control_flow()) {
+    const control_flow::Kind kind = cxt.pending_control_flow().kind;
+    if (kind == control_flow::Kind::Exit) {
+      ret = cxt.pending_control_flow().value;
+      cxt.clear_control_flow();
+    } else if (kind == control_flow::Kind::Break ||
+               kind == control_flow::Kind::Continue)
+    {
+      cxt.clear_control_flow();
+    }
   }
 
   cxt.leave_subshell();

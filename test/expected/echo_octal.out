@@ -1,0 +1,47 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "\101"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "\0101"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "\1011"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "\77"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "\8"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "\101"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "\0101"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "\1011"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "\77"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "\8"
+]
+A
+A
+A1
+?
+\8
+[Code 0]

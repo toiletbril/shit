@@ -507,7 +507,16 @@ pure fn EvalContext::in_subshell() const wontthrow -> bool
 
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 {
-  LOG(verbosity::Debug, "break requested, level %lld", (long long) level);
+  /* A break with no enclosing loop is a no-op, and a level past the nesting
+     clamps to the outermost loop, so no leftover level escapes as an error. */
+  if (m_loop_depth == 0) {
+    LOG(verbosity::Debug, "break requested outside a loop, ignored");
+    return;
+  }
+  if (static_cast<usize>(level) > m_loop_depth)
+    level = static_cast<i64>(m_loop_depth);
+  LOG(verbosity::Debug, "break requested, level %lld of depth %zu",
+      (long long) level, m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Break, level, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -515,7 +524,16 @@ fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
 fn EvalContext::request_continue(i64 level, SourceLocation location) throws
     -> void
 {
-  LOG(verbosity::Debug, "continue requested, level %lld", (long long) level);
+  /* A continue with no enclosing loop is a no-op, and a level past the nesting
+     clamps to the outermost loop, so no leftover level escapes as an error. */
+  if (m_loop_depth == 0) {
+    LOG(verbosity::Debug, "continue requested outside a loop, ignored");
+    return;
+  }
+  if (static_cast<usize>(level) > m_loop_depth)
+    level = static_cast<i64>(m_loop_depth);
+  LOG(verbosity::Debug, "continue requested, level %lld of depth %zu",
+      (long long) level, m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -714,6 +732,24 @@ fn EvalContext::leave_condition() wontthrow -> void
 pure fn EvalContext::in_condition() const wontthrow -> bool
 {
   return m_condition_depth > 0;
+}
+
+fn EvalContext::enter_loop() wontthrow -> void { m_loop_depth++; }
+
+fn EvalContext::leave_loop() wontthrow -> void
+{
+  ASSERT(m_loop_depth > 0);
+  m_loop_depth--;
+}
+
+pure fn EvalContext::loop_depth() const wontthrow -> usize
+{
+  return m_loop_depth;
+}
+
+fn EvalContext::set_loop_depth(usize depth) wontthrow -> void
+{
+  m_loop_depth = depth;
 }
 
 fn EvalContext::set_terminal_exec_allowed(bool enabled) wontthrow -> void

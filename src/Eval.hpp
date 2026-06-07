@@ -310,6 +310,18 @@ public:
   fn leave_condition() wontthrow -> void;
   pure fn in_condition() const wontthrow -> bool;
 
+  /* The count of loops currently running in the active execution context. A
+     loop body increments it around the iterations and decrements after. The
+     break and continue builtins clamp their requested level to this count, so a
+     level past the nesting breaks every enclosing loop rather than escaping as
+     an error, and a request with no enclosing loop is dropped. A function call
+     and a subshell save and zero this around their body, so a jump inside them
+     sees only their own loops, matching dash. */
+  fn enter_loop() wontthrow -> void;
+  fn leave_loop() wontthrow -> void;
+  pure fn loop_depth() const wontthrow -> usize;
+  fn set_loop_depth(usize depth) wontthrow -> void;
+
   /* The run loop sets this before the final chunk's evaluation when the shell
      will exit with that chunk's status and no EXIT trap is pending. A terminal
      external command then replaces the shell process instead of fork, exec, and
@@ -449,6 +461,7 @@ protected:
   HashMap<const Expression *> m_functions{heap_allocator()};
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
+  usize m_loop_depth{0};
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each
      bounded so a runaway recursion errors with a located message rather than

@@ -46,6 +46,21 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const verbose = FLAG_SHOW_VERBOSE.is_enabled();
+    /* A reserved word resolves first, terse to the bare word and verbose to a
+       keyword note, matching dash. */
+    if (utils::is_posix_reserved_word(name.view())) {
+      ec.print_to_stdout(verbose ? name + " is a shell keyword\n"
+                                 : name + "\n");
+      return 0;
+    }
+    /* An alias resolves next, terse to its definition and verbose to a note. */
+    if (let const alias = cxt.get_alias(name.view()); alias.has_value()) {
+      if (verbose)
+        ec.print_to_stdout(name + " is an alias for " + *alias + "\n");
+      else
+        ec.print_to_stdout("alias " + name + "='" + *alias + "'\n");
+      return 0;
+    }
     if (search_builtin(name.view()).has_value()) {
       ec.print_to_stdout(verbose ? name + " is a shell builtin\n"
                                  : name + "\n");
