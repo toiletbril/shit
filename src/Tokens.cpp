@@ -63,6 +63,28 @@ hot fn Word::to_literal_string() const throws -> String
   return result;
 }
 
+pure fn Word::is_all_ascii_digits() const wontthrow -> bool
+{
+  if (segments.is_empty()) return false;
+  bool saw_digit = false;
+  for (const WordSegment &segment : segments) {
+    /* An expansion segment contributes a $ or a $(...) wrapper to the literal
+       text, so a word holding one is never all digits. */
+    if (segment.kind == WordSegment::Kind::VariableReference ||
+        segment.kind == WordSegment::Kind::CommandSubstitution ||
+        segment.kind == WordSegment::Kind::ArithmeticExpansion)
+    {
+      return false;
+    }
+    for (usize i = 0; i < segment.text.count(); i++) {
+      const char c = segment.text[i];
+      if (c < '0' || c > '9') return false;
+      saw_digit = true;
+    }
+  }
+  return saw_digit;
+}
+
 cold fn Word::to_pretty_string() const throws -> String
 {
   String result{"[Word"};

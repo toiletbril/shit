@@ -589,16 +589,9 @@ mustuse fn Parser::try_parse_trailing_redirection(
   }
 
   case Token::Kind::Word: {
-    const let literal =
-        static_cast<tokens::WordToken *>(token)->word().to_literal_string();
-    bool is_all_digits = !literal.is_empty();
-    for (usize i = 0; i < literal.count(); i++) {
-      if (literal[i] < '0' || literal[i] > '9') {
-        is_all_digits = false;
-        break;
-      }
-    }
-    if (!is_all_digits) return false;
+    const tokens::WordToken *word_token =
+        static_cast<tokens::WordToken *>(token);
+    if (!word_token->word().is_all_ascii_digits()) return false;
 
     const let word_location = token->source_location();
     m_lexer.advance_past_last_peek();
@@ -612,6 +605,7 @@ mustuse fn Parser::try_parse_trailing_redirection(
     {
       const let op_location = next->source_location();
       m_lexer.advance_past_last_peek();
+      const let literal = word_token->word().to_literal_string();
       const let parsed = utils::parse_decimal_integer(literal);
       if (parsed.is_error()) {
         throw ErrorWithLocation{word_location, parsed.error().message()};
@@ -741,16 +735,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
       /* A run of digits touching a redir operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
-        const let literal =
-            static_cast<tokens::WordToken *>(token)->word().to_literal_string();
-        bool is_all_digits = !literal.is_empty();
-        for (usize i = 0; i < literal.count(); i++) {
-          if (literal[i] < '0' || literal[i] > '9') {
-            is_all_digits = false;
-            break;
-          }
-        }
-        if (is_all_digits) {
+        const tokens::WordToken *word_token =
+            static_cast<tokens::WordToken *>(token);
+        if (word_token->word().is_all_ascii_digits()) {
           const let word_location = token->source_location();
           m_lexer.advance_past_last_peek();
           Token *next = m_lexer.peek_shell_token();
@@ -763,6 +750,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
           {
             const let op_location = next->source_location();
             m_lexer.advance_past_last_peek();
+            const let literal = word_token->word().to_literal_string();
             const let parsed = utils::parse_decimal_integer(literal);
             if (parsed.is_error()) {
               throw ErrorWithLocation{word_location, parsed.error().message()};

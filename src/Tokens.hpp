@@ -61,6 +61,12 @@ public:
   fn to_literal_string() const throws -> String;
   fn to_pretty_string() const throws -> String;
 
+  /* True when the literal text of the word is a non-empty run of ASCII digits,
+     the shape a descriptor prefix such as the 2 in 2>file takes. The parser
+     checks this in command position for every word, so it answers from the
+     segments directly and allocates no literal String. */
+  pure fn is_all_ascii_digits() const wontthrow -> bool;
+
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. */
   fn get_assignment_split() const throws -> Maybe<word_assignment_split>;
