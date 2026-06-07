@@ -825,8 +825,31 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         continue;
       }
 
-      if (redirect_in_fd) os::close_fd(*redirect_in_fd);
-      redirect_in_fd = opened.take();
+      /* A heredoc on the standard input takes the in_fd slot. A numbered
+         heredoc such as 3<<EOF targets descriptor N instead, which the three
+         standard slots cannot express, so the body descriptor is staged onto
+         the real shell fd N around the command and restored afterward, the same
+         way a duplication onto an arbitrary descriptor is. */
+      if (redir.fd == 0) {
+        if (redirect_in_fd) os::close_fd(*redirect_in_fd);
+        redirect_in_fd = opened.take();
+        continue;
+      }
+
+      const os::descriptor body_fd = opened.take();
+      /* The temp file already lands on fd N when mkstemp handed back that very
+         number, since the standard descriptors took the lower slots. The generic
+         save then dup2 would back up the body itself and leave it open on N after
+         the command, so the collision is handled directly. The restore closes fd
+         N, which fd N was free before mkstemp claimed it makes correct. */
+      if (body_fd == redir.fd) {
+        dup_saved_descriptors.push(
+            os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
+        continue;
+      }
+      dup_saved_descriptors.push(
+          os::save_and_replace_descriptor(redir.fd, body_fd));
+      os::close_fd(body_fd);
       continue;
     }
 
@@ -1023,20 +1046,33 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     saved_env.push(saved_env_var{String{name}, steal(previous)});
     os::set_environment_variable(name, expanded_value.view());
+    /* A prefix PATH=... applies only to this command, so the resolver follows
+       the temporary value while the command runs and reverts on exit. The
+       resolver reads its own MAYBE_PATH rather than the environment, so a write
+       to the environment alone would not change the search order. */
+    if (name == "PATH")
+      utils::set_path_for_resolution(String{expanded_value.view()});
   }
   defer
   {
     /* The restore runs newest first, so a name spelled more than once on the
        line restores to the value it held before the first of its assignments
        rather than to an intermediate one. */
+    bool path_was_assigned = false;
     for (usize i = saved_env.count(); i > 0; i--) {
       const saved_env_var &restore = saved_env[i - 1];
+      if (restore.name == "PATH") path_was_assigned = true;
       if (restore.previous_value)
         os::set_environment_variable(restore.name.view(),
                                      restore.previous_value->view());
       else
         os::unset_environment_variable(restore.name.view());
     }
+    /* The prefix PATH reverts to the shell's effective PATH, the store value
+       when set and the restored environment otherwise, so the next command
+       resolves the way it would have without the prefix. */
+    if (path_was_assigned)
+      utils::set_path_for_resolution(cxt.get_variable_value("PATH"));
   };
 
   /* A function shadows a builtin and a program. Run its body with the call

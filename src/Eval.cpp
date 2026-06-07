@@ -72,9 +72,11 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
      cached here to keep that path off the map and the environment. */
   if (name == "IFS") set_field_separators(value);
   /* A new PATH names a different search order, so a cached resolution may point
-     at a directory PATH no longer lists. The cache is marked stale so the next
-     command re-resolves against the new PATH. */
-  if (name == "PATH") utils::invalidate_path_cache();
+     at a directory PATH no longer lists. The resolver is pointed at the new
+     value, so a plain PATH=... assignment the store holds drives the search even
+     without an export, and the cache is marked stale so the next command
+     re-resolves. */
+  if (name == "PATH") utils::set_path_for_resolution(String{value});
   m_shell_variables.set(name, value);
 }
 
@@ -128,9 +130,13 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
      do. */
   os::unset_environment_variable(name);
   if (name == "IFS") set_field_separators(" \t\n");
-  /* An unset PATH, and an export PATH=... that routes its assignment through
-     here, change the search order, so the cache is marked stale. */
-  if (name == "PATH") utils::invalidate_path_cache();
+  /* An unset PATH drops the search order, so the resolver falls back to the
+     process environment's PATH, which this just removed and so reads None. An
+     export PATH=... routes through here to drop the bare copy, then sets the
+     environment and refreshes the resolver itself, so the None set here is
+     transient on that path. */
+  if (name == "PATH")
+    utils::set_path_for_resolution(os::get_environment_variable("PATH"));
 }
 
 hot fn EvalContext::get_variable_value(StringView name) const throws
@@ -1276,7 +1282,14 @@ fn EvalContext::expand_path_once(const glob_field &field,
     return expanded;
   }
 
-  let const parent_is_dot = parent_dir.text() == StringView{"."};
+  /* The typed prefix is everything up to and through the last slash, such as
+     dot-slash or a directory name with a slash. It is preserved on each match
+     the way dash keeps the directory the user wrote, so a dot-slash glob yields
+     a dot-slash result rather than a bare filename. A bare glob with no slash
+     has an empty prefix and a synthetic dot parent, so the match carries the
+     filename alone. */
+  let const typed_prefix =
+      has_slashes ? path.substring_of_length(0, stem_start) : StringView{};
 
   /* The no-glob field returned above, so the stem is a non-empty glob here and
      glob[0] reads a real byte. */
@@ -1301,13 +1314,12 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
       /* A real filename is literal, so the resulting field never globs again.
          The empty mask is the all-literal convention, so it carries no
-         per-result allocation. A parent of "." is dropped to keep the result
-         relative. */
+         per-result allocation. The typed prefix joins the filename directly
+         rather than through the Path join, so the user's exact "./" or "dir/"
+         survives instead of a normalized form. */
       let result_field = glob_field{scratch};
-      if (parent_is_dot)
-        result_field.text.append(filename);
-      else
-        result_field.text.append(full_path.text().view());
+      result_field.text.append(typed_prefix);
+      result_field.text.append(filename);
       expanded.push(steal(result_field));
     }
   }

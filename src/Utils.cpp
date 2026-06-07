@@ -721,6 +721,14 @@ fn invalidate_path_cache() throws -> void
   PATH_CACHE_IS_STALE = true;
 }
 
+fn set_path_for_resolution(Maybe<String> path) throws -> void
+{
+  LOG(verbosity::Debug,
+      "set_path_for_resolution pointing the search at the shell's PATH value");
+  MAYBE_PATH = steal(path);
+  PATH_CACHE_IS_STALE = true;
+}
+
 /* Split PATH into its directory components. The last component carries no
    trailing delimiter, so a plain delimiter scan drops it and the directory is
    never searched. POSIX treats an empty component as the current directory. */
@@ -777,7 +785,9 @@ fn initialize_path_map() throws -> void
 static fn resolve_along_path(StringView program_name, bool find_all) throws
     -> ArrayList<Path>
 {
-  MAYBE_PATH = os::get_environment_variable("PATH");
+  /* The search reads MAYBE_PATH, which the shell keeps in step with its PATH
+     variable, so a plain PATH=... assignment that the store holds but the
+     environment does not still drives the order. */
   if (!MAYBE_PATH) return ArrayList<Path>{};
 
   ArrayList<Path> result{};

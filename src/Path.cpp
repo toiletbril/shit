@@ -2,6 +2,7 @@
 
 #include "Platform.hpp"
 
+#include <cerrno>
 #include <cstdlib>
 
 #if SHIT_PLATFORM_IS POSIX
@@ -226,10 +227,21 @@ fn Path::is_executable() const wontthrow -> bool
 
 fn Path::current_directory() throws -> Path
 {
-  char buffer[4096];
-  if (::getcwd(buffer, sizeof(buffer)) != nullptr)
-    return Path{StringView{buffer}};
-  return Path{};
+  /* getcwd fails with ERANGE when the working directory does not fit the
+     buffer, so the buffer doubles until the path fits rather than silently
+     returning an empty path for a deep directory. A real failure such as a
+     removed working directory carries a different errno and ends the loop with
+     an empty path. */
+  ArrayList<char> buffer{};
+  usize buffer_size = 4096;
+  for (;;) {
+    buffer.reserve(buffer_size);
+    errno = 0;
+    if (::getcwd(buffer.begin(), buffer_size) != nullptr)
+      return Path{StringView{buffer.begin()}};
+    if (errno != ERANGE) return Path{};
+    buffer_size *= 2;
+  }
 }
 
 fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
@@ -245,10 +257,20 @@ fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   if (handle == nullptr) return None;
 
   ArrayList<String> names{};
-  for (struct dirent *entry = ::readdir(handle); entry != nullptr;
-       entry = ::readdir(handle))
-  {
-    ASSERT(entry != nullptr);
+  /* readdir returns NULL on both a clean end of the directory and a read error,
+     so errno is cleared before each call. A NULL with a changed errno is a real
+     error, which returns None rather than a truncated list the caller would
+     mistake for the whole directory. */
+  for (;;) {
+    errno = 0;
+    struct dirent *const entry = ::readdir(handle);
+    if (entry == nullptr) {
+      if (errno != 0) {
+        ::closedir(handle);
+        return None;
+      }
+      break;
+    }
 
     const StringView name{entry->d_name};
     if (name == StringView{"."} || name == StringView{".."}) continue;

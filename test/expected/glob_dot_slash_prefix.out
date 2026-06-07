@@ -1,0 +1,90 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/tmp"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "rm" "-rf" "shit_glob_dot_t"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "mkdir" "shit_glob_dot_t"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "cd" "shit_glob_dot_t"]
+  [CompoundListCondition, &&]
+    [SimpleCommand ":"]
+  [CompoundListCondition, &&]
+    [SimpleCommand ":"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "./*.sh"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "*.sh"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "cd" "/tmp"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "rm" "-rf" "shit_glob_dot_t"]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Unquoted "shit_glob_dot_t"
+]
+[Word
+  Unquoted "mkdir"
+]
+[Word
+  Unquoted "shit_glob_dot_t"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "shit_glob_dot_t"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "a.sh"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "b.sh"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "./*.sh"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "*.sh"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-rf"
+]
+[Word
+  Unquoted "shit_glob_dot_t"
+]
+./a.sh ./b.sh
+a.sh b.sh
+[Code 0]

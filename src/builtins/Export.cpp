@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -56,6 +57,10 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        removed and child processes inherit it. */
     cxt.unset_shell_variable(name);
     os::set_environment_variable(name, value);
+    /* The unset above pointed the resolver at the now-removed environment PATH,
+       so an export PATH=... refreshes it to the value just placed in the
+       environment. */
+    if (name == "PATH") utils::set_path_for_resolution(String{value.view()});
   }
 
   return had_error ? 2 : 0;
