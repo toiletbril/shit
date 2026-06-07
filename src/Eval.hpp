@@ -566,4 +566,11 @@ private:
   ArrayList<String> m_args{heap_allocator()};
 };
 
+/* Evaluate an arithmetic expression that holds only literals and operators, with
+   no variable and no substitution, so the result is a compile-time constant. The
+   analyze pass calls this to fold a constant $((...)) once instead of leaving the
+   evaluator to re-parse it on every expansion. Returns None when the expression
+   is not provably constant or fails to evaluate. */
+fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>;
+
 } /* namespace shit */

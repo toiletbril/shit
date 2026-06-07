@@ -94,6 +94,13 @@ fn Expression::is_simple_command() const wontthrow -> bool { return false; }
 
 fn Expression::is_dummy() const wontthrow -> bool { return false; }
 
+fn Expression::try_static_condition_verdict(const AnalysisContext &actx)
+    const wontthrow -> Maybe<bool>
+{
+  unused(actx);
+  return shit::None;
+}
+
 namespace {
 
 /* The literal name of a command when it is statically known. A word that holds
@@ -207,6 +214,104 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
   }
 
   return false;
+}
+
+/* The fully literal value of a word, the concatenation of its text when every
+   segment is literal or quoted text with no expansion. None when any segment is
+   a variable, a command substitution, or an arithmetic expansion, since the
+   value is then only known at run time. Unlike static_command_name this keeps a
+   glob metacharacter, since a test operand compares bytes and does not glob. */
+fn literal_word_value(const Token *token) throws -> Maybe<String>
+{
+  if (token == nullptr) return shit::None;
+  if (token->kind() != Token::Kind::Word) return shit::None;
+
+  let const &word = static_cast<const tokens::WordToken *>(token)->word();
+
+  String value{};
+  for (const WordSegment &segment : word.segments) {
+    switch (segment.kind) {
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::DoubleQuotedText:
+      value.append(segment.text.view());
+      break;
+    case WordSegment::Kind::UnquotedText:
+      /* An unquoted segment may hold a glob or a tilde, which expand. The test
+         operands the fold accepts are plain bytes, so a live glob char makes the
+         word non-constant and the fold declines it. */
+      for (usize i = 0; i < segment.text.count(); i++) {
+        if (lexer::is_expandable_char(segment.text[i])) return shit::None;
+      }
+      if (segment.has_live_glob_chars()) return shit::None;
+      value.append(segment.text.view());
+      break;
+    default:
+      return shit::None;
+    }
+  }
+  return value;
+}
+
+/* The constant verdict of a literal test command, the arguments after the test
+   or [ word with the trailing ] of the bracket form already removed. Some(true)
+   or Some(false) for the simplest forms the fold can prove, None otherwise. */
+fn constant_test_verdict(const ArrayList<const Token *> &operands) throws
+    -> Maybe<bool>
+{
+  /* test with no operand is false, test X is true when X is non-empty. */
+  if (operands.is_empty()) return Maybe<bool>{false};
+
+  if (operands.count() == 1) {
+    let const value = literal_word_value(operands[0]);
+    if (!value.has_value()) return shit::None;
+    return Maybe<bool>{!value->is_empty()};
+  }
+
+  if (operands.count() == 2) {
+    let const op = literal_word_value(operands[0]);
+    let const arg = literal_word_value(operands[1]);
+    if (!op.has_value() || !arg.has_value()) return shit::None;
+    if (*op == "-n") return Maybe<bool>{!arg->is_empty()};
+    if (*op == "-z") return Maybe<bool>{arg->is_empty()};
+    return shit::None;
+  }
+
+  if (operands.count() == 3) {
+    let const lhs = literal_word_value(operands[0]);
+    let const op = literal_word_value(operands[1]);
+    let const rhs = literal_word_value(operands[2]);
+    if (!lhs.has_value() || !op.has_value() || !rhs.has_value())
+      return shit::None;
+    if (*op == "=") return Maybe<bool>{*lhs == *rhs};
+    if (*op == "!=") return Maybe<bool>{!(*lhs == *rhs)};
+    return shit::None;
+  }
+
+  return shit::None;
+}
+
+/* Fold every constant arithmetic expansion in a word to its decimal result once,
+   so the evaluator reads the cached value instead of re-parsing the arithmetic
+   on every expansion. A segment that holds a parameter or a substitution is left
+   alone, since its value is only known at run time. */
+fn fold_constant_arithmetic_in_word(const Word &word) wontthrow -> void
+{
+  for (const WordSegment &segment : word.segments) {
+    if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
+    if (segment.folded_arithmetic_result.has_value()) continue;
+    segment.folded_arithmetic_result =
+        try_fold_constant_arithmetic(segment.text.view());
+  }
+}
+
+/* Fold the constant arithmetic in a command word when it is a plain word token,
+   the only token kind whose segments the analyze pass can reach. */
+fn fold_constant_arithmetic_in_token(const Token *token) wontthrow -> void
+{
+  if (token == nullptr) return;
+  if (token->kind() != Token::Kind::Word) return;
+  fold_constant_arithmetic_in_word(
+      static_cast<const tokens::WordToken *>(token)->word());
 }
 
 } /* namespace */
@@ -345,6 +450,19 @@ pure fn AssignCommand::assignment() const wontthrow -> const Assignment *
 }
 
 fn AssignCommand::is_assignment() const wontthrow -> bool { return true; }
+
+cold fn AssignCommand::analyze(AnalysisContext &actx,
+                               bool is_unconditional) const throws -> void
+{
+  unused(actx);
+  unused(is_unconditional);
+
+  ASSERT(m_assignment != nullptr);
+
+  /* A constant $((...)) on the right of x=$((2+2)) is folded once, so the loop
+     body that re-runs this assignment reads the cached result. */
+  fold_constant_arithmetic_in_word(m_assignment->value_word());
+}
 
 hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
@@ -1510,6 +1628,16 @@ cold fn IfClause::to_ast_string(usize layer) const throws -> String
 
 hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  /* The analyze pass proved which branch runs, so the conditions are skipped and
+     the chosen body runs straight away. An index past the last branch means
+     every condition failed, so the else body runs or the if yields 0. */
+  if (m_folded_branch.has_value()) {
+    if (*m_folded_branch < m_branches.count())
+      return m_branches[*m_folded_branch].body->evaluate(cxt);
+    if (m_otherwise != nullptr) return m_otherwise->evaluate(cxt);
+    return 0;
+  }
+
   for (const auto &[condition, body] : m_branches) {
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
@@ -1547,6 +1675,22 @@ cold fn IfClause::analyze(AnalysisContext &actx,
   }
 
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
+
+  /* Decide the branch when every condition up to the chosen one is statically
+     known. A condition that always succeeds selects its body, one that always
+     fails moves to the next branch, and the first undecidable condition stops
+     the fold and leaves the run to evaluate the conditions. */
+  for (usize i = 0; i < m_branches.count(); i++) {
+    let const verdict = m_branches[i].condition->try_static_condition_verdict(actx);
+    if (!verdict.has_value()) return;
+    if (*verdict) {
+      m_folded_branch = i;
+      return;
+    }
+  }
+  /* Every condition failed, so the else body runs, or nothing when there is
+     none. An index past the last branch names that outcome. */
+  m_folded_branch = m_branches.count();
 }
 
 cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
@@ -1637,6 +1781,14 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
+
+  /* The analyze pass proved the body never runs, so the loop yields 0 without
+     evaluating the condition. A while false and an until true fold here. */
+  if (m_folded_to_skip) {
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
   i64 ret = 0;
   for (;;) {
     i64 condition_status;
@@ -1669,6 +1821,16 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
   /* The condition runs at least once, the body may run zero times. */
   m_condition->analyze(actx, is_unconditional);
   m_body->analyze(actx, false);
+
+  /* A statically-decidable condition that never lets the body run folds the
+     whole loop away. A while runs the body on success, so a constant failure
+     skips it, and an until runs the body on failure, so a constant success skips
+     it. A while true or an until false is infinite and stays unfolded. */
+  let const verdict = m_condition->try_static_condition_verdict(actx);
+  if (verdict.has_value()) {
+    let const body_would_run = m_is_until ? (*verdict == false) : (*verdict == true);
+    if (!body_would_run) m_folded_to_skip = true;
+  }
 }
 
 cold fn WhileLoop::register_defined_functions(
@@ -2369,6 +2531,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      longer changes the prepass outcome for this node. */
   unused(is_unconditional);
 
+  /* A constant $((...)) in any argument or assignment prefix is folded once
+     here, so the loop body that re-runs this command does not re-parse it. */
+  for (const Token *t : m_args) fold_constant_arithmetic_in_token(t);
+  for (const prefix_assignment &var : m_local_vars)
+    fold_constant_arithmetic_in_word(var.value);
+
   if (m_args.is_empty()) return;
 
   ASSERT(m_args[0] != nullptr);
@@ -2488,6 +2656,57 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 }
 
+cold fn SimpleCommand::try_static_condition_verdict(
+    const AnalysisContext &actx) const wontthrow -> Maybe<bool>
+{
+  /* A redirection has an effect even when the command succeeds, an async or a
+     negated command changes the status, and a prefix assignment writes a
+     variable. None of those is constant, so the fold declines them. */
+  if (!m_redirections.is_empty()) return shit::None;
+  if (is_async() || is_negated()) return shit::None;
+  if (m_local_vars.count() > 0) return shit::None;
+  if (m_args.is_empty()) return shit::None;
+
+  let const name = literal_word_value(m_args[0]);
+  if (!name.has_value()) return shit::None;
+
+  /* A function or an alias of the same name shadows the builtin, so the program
+     word no longer names the constant builtin and the fold declines it. */
+  if (actx.defined_functions.contains(name->view())) return shit::None;
+  if (actx.known_aliases.contains(name->view())) return shit::None;
+
+  /* true and : always succeed, false always fails, each with no side effect. */
+  if (*name == "true" || *name == ":") {
+    if (m_args.count() != 1) return shit::None;
+    return Maybe<bool>{true};
+  }
+  if (*name == "false") {
+    if (m_args.count() != 1) return shit::None;
+    return Maybe<bool>{false};
+  }
+
+  /* A literal test or [ with only plain operands decides at analyze time. The
+     bracket form must close with a literal ], which is dropped before the
+     operands are judged. */
+  if (*name == "test" || *name == "[") {
+    ArrayList<const Token *> operands{heap_allocator()};
+    usize last = m_args.count();
+    if (*name == "[") {
+      let const closing = literal_word_value(m_args[m_args.count() - 1]);
+      if (!closing.has_value() || *closing != "]") return shit::None;
+      last -= 1;
+    }
+    for (usize i = 1; i < last; i++) operands.push(m_args[i]);
+    try {
+      return constant_test_verdict(operands);
+    } catch (...) {
+      return shit::None;
+    }
+  }
+
+  return shit::None;
+}
+
 cold fn Pipeline::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
@@ -2512,6 +2731,17 @@ cold fn CompoundListCondition::register_defined_functions(
   ASSERT(m_cmd != nullptr);
 
   m_cmd->register_defined_functions(actx);
+}
+
+cold fn CompoundListCondition::try_static_condition_verdict(
+    const AnalysisContext &actx) const wontthrow -> Maybe<bool>
+{
+  ASSERT(m_cmd != nullptr);
+
+  /* An && or || node depends on the command before it, so only a plain
+     sequence node carries the verdict of its own command. */
+  if (m_kind != Kind::None) return shit::None;
+  return m_cmd->try_static_condition_verdict(actx);
 }
 
 cold fn CompoundList::analyze(AnalysisContext &actx,
@@ -2544,6 +2774,16 @@ cold fn CompoundList::register_defined_functions(
     ASSERT(node != nullptr);
     node->register_defined_functions(actx);
   }
+}
+
+cold fn CompoundList::try_static_condition_verdict(
+    const AnalysisContext &actx) const wontthrow -> Maybe<bool>
+{
+  /* A condition list of more than one command runs each in turn, so only a list
+     of exactly one command has a verdict the whole condition takes. */
+  if (m_nodes.count() != 1) return shit::None;
+  ASSERT(m_nodes[0] != nullptr);
+  return m_nodes[0]->try_static_condition_verdict(actx);
 }
 
 cold fn IfStatement::analyze(AnalysisContext &actx,

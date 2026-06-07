@@ -94,6 +94,15 @@ public:
   virtual fn register_defined_functions(AnalysisContext &actx) const throws
       -> void;
 
+  /* The statically-decidable success of this node used as a loop or if
+     condition. Some(true) means the condition always succeeds with status 0 and
+     no side effect, Some(false) means it always fails, and None means the result
+     is only known at run time. The base returns None, the list wrappers forward
+     through a single unconditional command, and a simple command decides from a
+     constant builtin such as true, false, or a literal test. */
+  virtual fn try_static_condition_verdict(const AnalysisContext &actx)
+      const wontthrow -> Maybe<bool>;
+
 protected:
   virtual fn evaluate_impl(EvalContext &cxt) const throws -> i64 = 0;
 
@@ -189,6 +198,9 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 
@@ -256,6 +268,9 @@ public:
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
 
+  fn try_static_condition_verdict(const AnalysisContext &actx)
+      const wontthrow -> Maybe<bool> override;
+
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 
@@ -296,6 +311,8 @@ public:
       -> void override;
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
+  fn try_static_condition_verdict(const AnalysisContext &actx)
+      const wontthrow -> Maybe<bool> override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -321,6 +338,8 @@ public:
       -> void override;
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
+  fn try_static_condition_verdict(const AnalysisContext &actx)
+      const wontthrow -> Maybe<bool> override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -402,6 +421,12 @@ protected:
 
   ArrayList<if_branch> m_branches{heap_allocator()};
   const Expression *m_otherwise;
+
+  /* The branch the analyze pass proved this if takes, when every condition up to
+     it has a statically-decidable verdict. Some(i) selects branch i's body, a
+     value past the last branch selects the else body or nothing. None means the
+     branch is only known at run time and evaluate_impl runs the conditions. */
+  mutable Maybe<usize> m_folded_branch{};
 };
 
 class WhileLoop : public CompoundCommand
@@ -425,6 +450,11 @@ protected:
   const Expression *m_body;
   /* An until loop runs the body while the condition is non-zero. */
   bool m_is_until;
+
+  /* Set when the analyze pass proved the condition never lets the body run, so
+     the whole loop is skipped. A while false or an until true folds to this. A
+     while true stays unfolded, since the loop is infinite and still runs. */
+  mutable bool m_folded_to_skip{false};
 };
 
 class ForLoop : public CompoundCommand

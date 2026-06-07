@@ -44,6 +44,13 @@ public:
   String text;
   bool is_in_double_quotes{false};
 
+  /* The constant decimal result of an ArithmeticExpansion segment whose source
+     holds no parameter and no command substitution, computed once at analyze
+     time. The evaluator reads it instead of re-parsing the arithmetic on every
+     expansion, which matters inside a loop body. None on any non-constant
+     segment. */
+  mutable Maybe<i64> folded_arithmetic_result{};
+
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
   pure fn is_tilde_candidate() const wontthrow -> bool;

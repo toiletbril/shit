@@ -1460,7 +1460,10 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
 class ArithmeticParser
 {
 public:
-  EvalContext &context;
+  /* Null only on the analyze-time constant fold, where the expression holds no
+     variable and no assignment, so neither read_variable_value nor the
+     assignment path that dereferences the context is ever reached. */
+  EvalContext *context;
   StringView source;
   usize pos;
 
@@ -1496,12 +1499,13 @@ public:
        from the stored value with no copy. The operand parser stops at the first
        non-digit and reads a non-numeric value as zero, which matches the old
        strtoll path. */
-    if (let const *stored = context.lookup_shell_variable(name)) {
+    ASSERT(context != nullptr);
+    if (let const *stored = context->lookup_shell_variable(name)) {
       if (stored->count() == 0) return 0;
       return parse_arithmetic_operand(stored->view());
     }
 
-    let const value = context.get_variable_value(name).value_or(String{});
+    let const value = context->get_variable_value(name).value_or(String{});
     if (value.is_empty()) return 0;
     return parse_arithmetic_operand(value.view());
   }
@@ -1571,14 +1575,16 @@ public:
           let const rhs = parse_assignment();
           let const result =
               apply_compound(read_variable_value(name), rhs, kind);
-          context.set_shell_variable(name, utils::int_to_text(result));
+          ASSERT(context != nullptr);
+          context->set_shell_variable(name, utils::int_to_text(result));
           return result;
         }
       }
       if (starts_with("=") && !starts_with("==")) {
         consume("=");
         let const rhs = parse_assignment();
-        context.set_shell_variable(name, utils::int_to_text(rhs));
+        ASSERT(context != nullptr);
+        context->set_shell_variable(name, utils::int_to_text(rhs));
         return rhs;
       }
       pos = save;
@@ -1787,15 +1793,74 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
   if (!expression.find_character('$').has_value() &&
       !expression.find_character('`').has_value())
   {
-    let parser = ArithmeticParser{*this, expression, 0};
+    let parser = ArithmeticParser{this, expression, 0};
     return parser.parse();
   }
 
   /* The expanded word owns the bytes the parser views, so it outlives the
      parser below. */
   let const expanded_word = expand_modifier_word(expression);
-  let parser = ArithmeticParser{*this, expanded_word.view(), 0};
+  let parser = ArithmeticParser{this, expanded_word.view(), 0};
   return parser.parse();
+}
+
+namespace {
+
+/* A byte that may appear in a provably-constant arithmetic expression. The set
+   is digits, whitespace, parentheses, and the operator characters. It excludes
+   every letter and underscore, so no variable name and no hex prefix is folded,
+   which keeps the fold to plain decimal constants the analyze pass can prove. */
+pure fn is_constant_arithmetic_byte(char byte) wontthrow -> bool
+{
+  if (lexer::is_number(byte)) return true;
+  switch (byte) {
+  case ' ':
+  case '\t':
+  case '\n':
+  case '\r':
+  case '(':
+  case ')':
+  case '+':
+  case '-':
+  case '*':
+  case '/':
+  case '%':
+  case '&':
+  case '|':
+  case '^':
+  case '~':
+  case '!':
+  case '<':
+  case '>':
+  case '=':
+  case '?':
+  case ':':
+    return true;
+  default:
+    return false;
+  }
+}
+
+} /* namespace */
+
+fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>
+{
+  if (expression.length == 0) return None;
+
+  for (usize i = 0; i < expression.length; i++) {
+    if (!is_constant_arithmetic_byte(expression[i])) return None;
+  }
+
+  /* The expression holds no variable and no assignment, so the parser never
+     dereferences its context and a null one is safe. A malformed constant, such
+     as a division by zero, throws and leaves the segment unfolded for the
+     runtime path to report at the caret. */
+  try {
+    let parser = ArithmeticParser{nullptr, expression, 0};
+    return parser.parse();
+  } catch (...) {
+    return None;
+  }
 }
 
 hot fn EvalContext::expand_word(const Word &word) throws
@@ -1896,9 +1961,12 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::ArithmeticExpansion: {
-      let const value =
-          String{heap_allocator(),
-                 utils::int_to_text(evaluate_arithmetic(segment.text.view()))};
+      /* A constant arithmetic segment was folded at analyze time, so the result
+         is read straight from the cache rather than re-parsed here. */
+      let const result = segment.folded_arithmetic_result.has_value()
+                             ? *segment.folded_arithmetic_result
+                             : evaluate_arithmetic(segment.text.view());
+      let const value = String{heap_allocator(), utils::int_to_text(result)};
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -1936,7 +2004,10 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     else if (segment.kind == WordSegment::Kind::CommandSubstitution)
       result += capture_command_substitution(segment.text);
     else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
-      result += utils::int_to_text(evaluate_arithmetic(segment_text));
+      result += utils::int_to_text(
+          segment.folded_arithmetic_result.has_value()
+              ? *segment.folded_arithmetic_result
+              : evaluate_arithmetic(segment_text));
     else
       result += segment_text;
   }
