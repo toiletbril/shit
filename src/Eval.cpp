@@ -940,6 +940,31 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
       continue;
     }
 
+    /* A backslash escapes the next byte from expansion. Before a dollar,
+       backtick, or backslash, and before a double quote in a quote-stripping
+       word, the escaped byte is emitted literally and not treated as an
+       expansion or a quote. Before a newline it is a line continuation. Any
+       other backslash is kept literally, matching the shell in a heredoc body
+       and a parameter word. */
+    if (word[i] == '\\') {
+      if (i + 1 < word.length) {
+        const char next = word[i + 1];
+        if (next == '$' || next == '`' || next == '\\' ||
+            (remove_quotes && next == '"'))
+        {
+          out += next;
+          i++;
+          continue;
+        }
+        if (next == '\n') {
+          i++;
+          continue;
+        }
+      }
+      out += '\\';
+      continue;
+    }
+
     if (word[i] == '`') {
       /* Old-style backtick command substitution in a default, alternate,
          assign, or error word, and in a heredoc body. It runs to the next

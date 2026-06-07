@@ -1,0 +1,16 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=VAL]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+[Word
+  Unquoted "x=VAL"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "EOF"
+]
+$x stays, \ is one, $ok stays, VAL expands
+[Code 0]

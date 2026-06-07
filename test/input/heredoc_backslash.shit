@@ -1,0 +1,4 @@
+x=VAL
+cat <<EOF
+\$x stays, \\ is one, \$ok stays, $x expands
+EOF
