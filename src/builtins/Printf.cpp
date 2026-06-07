@@ -66,8 +66,23 @@ void append_conversion(String &out, const String &spec, char conv,
   if (conv == 's') {
     String with_s = spec;
     with_s.push('s');
-    std::snprintf(buffer, sizeof(buffer), with_s.c_str(), arg.c_str());
-    out += buffer;
+    /* A %s argument can be arbitrarily long, so a fixed buffer would truncate
+       it. The first write into the stack buffer serves the common short string,
+       and snprintf reports the length it needed, so a longer one writes into a
+       heap buffer sized to fit. */
+    const int needed =
+        std::snprintf(buffer, sizeof(buffer), with_s.c_str(), arg.c_str());
+    if (needed >= 0 && static_cast<usize>(needed) < sizeof(buffer)) {
+      out += buffer;
+    } else if (needed > 0) {
+      const usize size = static_cast<usize>(needed) + 1;
+      char *const big = static_cast<char *>(std::malloc(size));
+      if (big != nullptr) {
+        std::snprintf(big, size, with_s.c_str(), arg.c_str());
+        out += StringView{big, static_cast<usize>(needed)};
+        std::free(big);
+      }
+    }
   } else if (conv == 'c') {
     out += arg.is_empty() ? '\0' : arg[0];
   } else if (conv == 'd' || conv == 'i') {
