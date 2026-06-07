@@ -206,6 +206,9 @@ public:
   fn remove_trap(StringView condition) throws -> void;
   pure fn traps() const wontthrow -> const HashMap<String> &;
   fn run_exit_trap() throws -> void;
+  /* True when an EXIT trap action is set, so the run loop keeps the fork for a
+     terminal command and lets the trap run before the shell exits. */
+  fn has_exit_trap() const wontthrow -> bool;
 
   /* readonly marks a variable so a later assignment to it fails. The set is
      usually empty, so set_shell_variable only scans it when it is not. */
@@ -306,6 +309,16 @@ public:
   fn enter_condition() wontthrow -> void;
   fn leave_condition() wontthrow -> void;
   pure fn in_condition() const wontthrow -> bool;
+
+  /* The run loop sets this before the final chunk's evaluation when the shell
+     will exit with that chunk's status and no EXIT trap is pending. A terminal
+     external command then replaces the shell process instead of fork, exec, and
+     wait, the way dash execs the last command under EV_EXIT. The flag rides only
+     the tail position. A compound list clears it on every node but its last, and
+     every other node clears it, so only a command whose status becomes the
+     shell's status sees it set. */
+  fn set_terminal_exec_allowed(bool enabled) wontthrow -> void;
+  pure fn terminal_exec_allowed() const wontthrow -> bool;
 
   /* The name=value lines that set with no argument prints, sorted. */
   fn sorted_variable_assignments() const throws -> ArrayList<String>;
@@ -484,6 +497,7 @@ protected:
   i64 m_getopts_last_optind{0};
   HashMap<String> m_traps{heap_allocator()};
   bool m_exit_trap_ran{false};
+  bool m_terminal_exec_allowed{false};
 
   /* The names marked read-only, scanned by set_shell_variable only when the
      list is not empty. */

@@ -1226,9 +1226,20 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   i64 ret = NOTHING_WAS_EXECUTED;
 
+  /* Only the last node of the list yields the list's status, so a terminal exec
+     rides into that node alone. Every earlier node runs with the flag cleared
+     and so forks normally, and the saved value is restored after the list so a
+     containing tail position is not disturbed. */
+  const bool was_terminal_exec_allowed = cxt.terminal_exec_allowed();
+  cxt.set_terminal_exec_allowed(false);
+  defer { cxt.set_terminal_exec_allowed(was_terminal_exec_allowed); };
+
   for (usize index = 0; index < m_nodes.count(); index++) {
     const CompoundListCondition *n = m_nodes[index];
     ASSERT(n != nullptr);
+
+    const bool is_last_node = index + 1 >= m_nodes.count();
+    cxt.set_terminal_exec_allowed(was_terminal_exec_allowed && is_last_node);
 
     switch (n->kind()) {
     case CompoundListCondition::Kind::None: ret = n->evaluate(cxt); break;
@@ -1310,6 +1321,13 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
     -> i64
 {
   ASSERT(m_cmd != nullptr);
+
+  /* A negated command reports the inverse of its status, so the shell's exit
+     status differs from what the exec'd program returns. Clear the terminal
+     exec permission here, since an exec in place would let the program's own
+     status escape uninverted. */
+  if (m_cmd->is_negated()) cxt.set_terminal_exec_allowed(false);
+
   let status = m_cmd->evaluate(cxt);
 
   /* A pipeline prefixed with ! reports the inverse of its status, and that
@@ -1487,6 +1505,11 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_commands.count() > 1);
 
+  /* A pipeline wires pipes and forks each stage, so its last stage cannot
+     replace the shell. Clear the terminal exec permission so no stage execs in
+     place. */
+  cxt.set_terminal_exec_allowed(false);
+
   /* A pipeline of only simple commands keeps the fast path, which wires the
      pipes once and forks each external directly with no extra subshell. A
      compound stage cannot run that way, so a pipeline that holds one takes the
@@ -1628,6 +1651,10 @@ cold fn IfClause::to_ast_string(usize layer) const throws -> String
 
 hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  /* A command inside a compound construct forks rather than replacing the shell,
+     so the terminal exec stays confined to a top-level simple command. */
+  cxt.set_terminal_exec_allowed(false);
+
   /* The analyze pass proved which branch runs, so the conditions are skipped and
      the chosen body runs straight away. An index past the last branch means
      every condition failed, so the else body runs or the if yields 0. */
@@ -1782,6 +1809,10 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
 
+  /* A loop body runs repeatedly in the shell process, so no command in it may
+     replace the shell. */
+  cxt.set_terminal_exec_allowed(false);
+
   /* The analyze pass proved the body never runs, so the loop yields 0 without
      evaluating the condition. A while false and an until true fold here. */
   if (m_folded_to_skip) {
@@ -1881,6 +1912,10 @@ cold fn ForLoop::to_ast_string(usize layer) const throws -> String
 hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
+
+  /* A loop body runs repeatedly in the shell process, so no command in it may
+     replace the shell. */
+  cxt.set_terminal_exec_allowed(false);
   /* Without an in clause the loop walks the positional parameters. */
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
@@ -1946,6 +1981,10 @@ cold fn CaseClause::to_ast_string(usize layer) const throws -> String
 fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_word != nullptr);
+
+  /* A command inside a case branch forks rather than replacing the shell, so
+     the terminal exec stays confined to a top-level simple command. */
+  cxt.set_terminal_exec_allowed(false);
 
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no pathname globbing, so a pattern keeps its metacharacters
@@ -2023,6 +2062,11 @@ cold fn BraceGroup::to_ast_string(usize layer) const throws -> String
 fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
+
+  /* A command inside a brace group forks rather than replacing the shell, so
+     the terminal exec stays confined to a top-level simple command. */
+  cxt.set_terminal_exec_allowed(false);
+
   return m_body->evaluate(cxt);
 }
 
@@ -2067,6 +2111,11 @@ cold fn Subshell::to_ast_string(usize layer) const throws -> String
 fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
+
+  /* A subshell isolates its commands, so none of them may replace the shell
+     process. The in_subshell guard already blocks the terminal exec, and the
+     flag is cleared here as well so the intent reads at the boundary. */
+  cxt.set_terminal_exec_allowed(false);
 
   /* This shell has no process-level subshell, so isolate by snapshot. A cd or
      an assignment inside does not leak, but the exit status propagates. An exit
@@ -2236,6 +2285,10 @@ fn RedirectedCommand::redirect_to(usize d, String &f, bool duplicate) throws
 fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_child != nullptr);
+
+  /* The child runs around saved descriptor backups that restore afterward, so it
+     forks rather than replacing the shell. */
+  cxt.set_terminal_exec_allowed(false);
 
   /* The child runs in the shell process, so each redirection points one of the
      shell's own descriptors at the target and the saved backups put them back.

@@ -39,6 +39,36 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32
 {
   if (!ec.is_builtin()) {
+    /* The shell is about to exit with this command's status and it is the
+       terminal external command of the run, so replace the shell process in
+       place rather than fork, exec, and wait, the way dash execs the last
+       command under EV_EXIT. A subshell or a background command keeps the fork,
+       since its status does not become the shell's, and replace_process returns
+       only when the exec itself fails, where it throws a located error. */
+    /* An EXIT trap set earlier in this same chunk must still run, so the trap is
+       rechecked here at run time rather than only when the chunk began. */
+    if (!is_async && cxt.terminal_exec_allowed() && !cxt.in_subshell() &&
+        !cxt.has_exit_trap())
+    {
+      LOG(verbosity::Debug,
+          "execute_context replacing the shell with the terminal command '%s'",
+          ec.program().c_str());
+      /* The shell's buffered output lands before the descriptors move and the
+         process is replaced. replace_process returns only by throwing, when the
+         program resolved but could not be executed. The forked spawn this path
+         replaces reports that case as a bare path and message on stderr and
+         exits 127, so the in-place failure matches it rather than printing a
+         located error or a goodbye. */
+      flush();
+      try {
+        os::replace_process(steal(ec));
+      } catch (const Error &error) {
+        print_error(error.message() + "\n");
+        quit(127, false);
+      }
+      unreachable();
+    }
+
     /* The command word is kept for the job table before the context is moved
        into the spawn. */
     let const command = is_async ? String{ec.program().view()} : String{};

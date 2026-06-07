@@ -362,6 +362,13 @@ cold fn EvalContext::run_exit_trap() throws -> void
     if (action->count() > 0) run_source(action->view(), "the EXIT trap");
 }
 
+fn EvalContext::has_exit_trap() const wontthrow -> bool
+{
+  if (let const *action = m_traps.find(StringView{"EXIT", 4}))
+    return action->count() > 0;
+  return false;
+}
+
 fn EvalContext::mark_readonly(StringView name) throws -> void
 {
   if (is_readonly(name)) return;
@@ -697,6 +704,16 @@ fn EvalContext::leave_condition() wontthrow -> void
 pure fn EvalContext::in_condition() const wontthrow -> bool
 {
   return m_condition_depth > 0;
+}
+
+fn EvalContext::set_terminal_exec_allowed(bool enabled) wontthrow -> void
+{
+  m_terminal_exec_allowed = enabled;
+}
+
+pure fn EvalContext::terminal_exec_allowed() const wontthrow -> bool
+{
+  return m_terminal_exec_allowed;
 }
 
 pure fn EvalContext::getopts_char_index() const wontthrow -> usize
