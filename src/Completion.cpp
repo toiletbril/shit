@@ -373,6 +373,57 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
   return candidates;
 }
 
+/* Whether the token names a variable expansion, a leading '$' the user is
+   typing a name after. The completion offers variable names for it rather than
+   files or commands. */
+static pure fn token_is_variable(StringView token) wontthrow -> bool
+{
+  return token.length >= 1 && token[0] == '$';
+}
+
+/* Complete a variable token. The name after the '$' (or '${') becomes a prefix
+   matched against the shell variable names and the environment names, and each
+   match is formatted back into the form the user typed, '$NAME' or '${NAME}'.
+   The brace form is only offered when the typed token has no name characters
+   after a metacharacter the completion does not parse, so a plain '$' or '${'
+   prefix completes cleanly. */
+static fn complete_variable(StringView token, EvalContext &context) throws
+    -> ArrayList<String>
+{
+  ArrayList<String> candidates{};
+
+  /* Strip the leading '$' and an optional '{', so the rest is the partial name.
+     The brace form is reproduced on every candidate. */
+  bool has_brace = token.length >= 2 && token[1] == '{';
+  usize name_start = has_brace ? 2 : 1;
+  StringView prefix = token.substring(name_start);
+
+  TRACELN("completing variable token '%.*s', prefix '%.*s', brace %d",
+          static_cast<int>(token.length), token.data,
+          static_cast<int>(prefix.length), prefix.data, has_brace ? 1 : 0);
+
+  HashSet seen{heap_allocator()};
+
+  let add_name = [&](StringView name) throws -> void {
+    if (!name.starts_with(prefix)) return;
+    if (seen.contains(name)) return;
+    seen.add(name);
+
+    String candidate{};
+    candidate += has_brace ? "${" : "$";
+    candidate.append(name);
+    if (has_brace) candidate.push('}');
+    candidates.push(steal(candidate));
+  };
+
+  context.variable_names().for_each([&](StringView name) { add_name(name); });
+
+  for (const String &name : os::environment_names())
+    add_name(name.view());
+
+  return candidates;
+}
+
 fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory) throws -> completion_result
 {
@@ -399,7 +450,9 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 
   ArrayList<String> candidates{};
 
-  if (is_command && !token_has_path_separator) {
+  if (token_is_variable(token)) {
+    candidates = complete_variable(token, context);
+  } else if (is_command && !token_has_path_separator) {
     candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);

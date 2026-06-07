@@ -181,6 +181,13 @@ public:
   fn most_recent_job() wontthrow -> job *;
   fn forget_done_jobs() throws -> void;
 
+  /* Poll the jobs, print a bash-style done line for every one that just
+     finished, then forget those entries. The prompt loop calls this before each
+     interactive prompt so a background job reports its completion the way bash
+     reports it, and the caller gates the call on an interactive shell so a
+     script stays silent. */
+  fn notify_done_jobs() throws -> void;
+
   /* monitor mode is set -m. It is on by default in an interactive shell, and it
      gates the terminal handoff so a non-interactive run never touches the
      controlling terminal. */
@@ -199,6 +206,11 @@ public:
   /* The names of every defined function, so the prepass of a later command
      knows a function defined earlier resolves. */
   fn function_names() const throws -> HashSet;
+
+  /* The names of every shell variable, so variable completion can offer them
+     after a '$'. The environment names are added by the caller, since they live
+     in the process rather than the store. */
+  fn variable_names() const throws -> HashSet;
 
   /* trap stores an action to run for a condition, keyed by the condition name
      such as EXIT or INT. The EXIT action runs once when the shell ends. */

@@ -225,6 +225,11 @@ fn get_environment_variable(StringView key) throws -> Maybe<String>;
 fn set_environment_variable(StringView key, StringView value) throws -> void;
 fn unset_environment_variable(StringView key) throws -> void;
 
+/* The names of every variable in the process environment, the keys left of the
+   first '=' in each entry. Variable completion offers these alongside the shell
+   variable names. */
+fn environment_names() throws -> ArrayList<String>;
+
 fn is_child_process() wontthrow -> bool;
 
 /* The process id of the shell itself, for $$. */

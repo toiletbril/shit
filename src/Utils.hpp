@@ -144,6 +144,11 @@ fn glob_matches(StringView glob, StringView str,
                 const ArrayList<bool> &glob_active, usize mask_offset) throws
     -> bool;
 
+/* Record whether the shell runs at a real interactive prompt, set once from
+   Main when the invocation mode is known. quit reads it so the goodbye message
+   appears only at a prompt and never for a script, a -c, or a subshell. */
+fn set_shell_is_interactive(bool is_interactive) wontthrow -> void;
+
 /* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] fn quit(i32 code, bool should_goodbye = false) throws -> void;
 

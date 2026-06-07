@@ -314,6 +314,34 @@ fn EvalContext::forget_done_jobs() throws -> void
   m_jobs = steal(kept);
 }
 
+fn EvalContext::notify_done_jobs() throws -> void
+{
+  update_jobs();
+
+  for (usize i = 0; i < m_jobs.count(); i++) {
+    const job &job = m_jobs[i];
+    if (job.state != job::State::Done) continue;
+
+    /* The bash current-job marker, '+' for the last entry and '-' for the one
+       before it, otherwise a space. */
+    char marker = ' ';
+    if (i == m_jobs.count() - 1)
+      marker = '+';
+    else if (m_jobs.count() >= 2 && i == m_jobs.count() - 2)
+      marker = '-';
+
+    String line{};
+    line += "[" + utils::int_to_text(job.id) + "]";
+    line.push(marker);
+    line += " Done  ";
+    line += job.command.c_str();
+    line.push('\n');
+    print_error(line);
+  }
+
+  forget_done_jobs();
+}
+
 fn EvalContext::set_monitor(bool enabled) wontthrow -> void
 {
   m_monitor = enabled;
@@ -349,6 +377,16 @@ fn EvalContext::function_names() const throws -> HashSet
   let names = HashSet{heap_allocator()};
   m_functions.for_each([&](StringView name, const Expression *body) {
     unused(body);
+    names.add(name);
+  });
+  return names;
+}
+
+fn EvalContext::variable_names() const throws -> HashSet
+{
+  let names = HashSet{heap_allocator()};
+  m_shell_variables.for_each([&](StringView name, const String &value) {
+    unused(value);
     names.add(name);
   });
   return names;

@@ -654,6 +654,15 @@ fn glob_matches(StringView glob, StringView str,
   return false;
 }
 
+/* The shell is at a real interactive prompt. quit gates the goodbye on this so a
+   script, a -c, or a subshell exits silently the way dash does. */
+static bool SHELL_IS_INTERACTIVE = false;
+
+fn set_shell_is_interactive(bool is_interactive) wontthrow -> void
+{
+  SHELL_IS_INTERACTIVE = is_interactive;
+}
+
 [[noreturn]] fn quit(i32 code, bool should_goodbye) throws -> void
 {
   const u8 actual_code = static_cast<u8>(code);
@@ -668,7 +677,7 @@ fn glob_matches(StringView glob, StringView str,
       }
     }
 
-    if (should_goodbye) {
+    if (should_goodbye && SHELL_IS_INTERACTIVE) {
       String code_str{};
       if (code != 0) {
         code_str += " (Code ";

@@ -95,6 +95,28 @@ fn Expression::is_simple_command() const wontthrow -> bool { return false; }
 
 fn Expression::is_dummy() const wontthrow -> bool { return false; }
 
+fn Expression::as_if_clause() const wontthrow -> const expressions::IfClause *
+{
+  return nullptr;
+}
+
+fn Expression::as_while_loop() const wontthrow -> const expressions::WhileLoop *
+{
+  return nullptr;
+}
+
+fn Expression::as_assign_command() const wontthrow
+    -> const expressions::AssignCommand *
+{
+  return nullptr;
+}
+
+fn Expression::as_simple_command() const wontthrow
+    -> const expressions::SimpleCommand *
+{
+  return nullptr;
+}
+
 fn Expression::try_static_condition_verdict(
     const AnalysisContext &actx) const wontthrow -> Maybe<bool>
 {
@@ -220,26 +242,9 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 /* Fold every constant arithmetic expansion in a word to its decimal result
    once, so the evaluator reads the cached value instead of re-parsing the
    arithmetic on every expansion. A segment that holds a parameter or a
-   substitution is left alone, since its value is only known at run time. */
-fn fold_constant_arithmetic_in_word(const Word &word) wontthrow -> void
-{
-  for (const WordSegment &segment : word.segments) {
-    if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
-    if (segment.folded_arithmetic_result.has_value()) continue;
-    segment.folded_arithmetic_result =
-        optimizer::try_fold_constant_arithmetic(segment.text.view());
-  }
-}
-
-/* Fold the constant arithmetic in a command word when it is a plain word token,
-   the only token kind whose segments the analyze pass can reach. */
-fn fold_constant_arithmetic_in_token(const Token *token) wontthrow -> void
-{
-  if (token == nullptr) return;
-  if (token->kind() != Token::Kind::Word) return;
-  fold_constant_arithmetic_in_word(
-      static_cast<const tokens::WordToken *>(token)->word());
-}
+   substitution is left alone, since its value is only known at run time. The
+   fold now runs as the constant-arithmetic rule in the optimizer, reached
+   through optimize_node from each command's analyze. */
 
 } /* namespace */
 
@@ -342,6 +347,12 @@ fn Command::set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void
   m_local_vars = steal(vars);
 }
 
+pure fn Command::local_vars() const wontthrow
+    -> const ArrayList<prefix_assignment> &
+{
+  return m_local_vars;
+}
+
 fn Command::is_assignment() const wontthrow -> bool { return false; }
 
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
@@ -380,17 +391,48 @@ pure fn AssignCommand::assignment() const wontthrow -> const Assignment *
 
 fn AssignCommand::is_assignment() const wontthrow -> bool { return true; }
 
+fn AssignCommand::as_assign_command() const wontthrow -> const AssignCommand *
+{
+  return this;
+}
+
 cold fn AssignCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
-  unused(actx);
-  unused(is_unconditional);
-
   ASSERT(m_assignment != nullptr);
 
-  /* A constant $((...)) on the right of x=$((2+2)) is folded once, so the loop
-     body that re-runs this assignment reads the cached result. */
-  fold_constant_arithmetic_in_word(m_assignment->value_word());
+  /* A constant $((...)) on the right of x=$((2+2)) is folded once by the
+     constant-arithmetic rule, so the loop body that re-runs this assignment
+     reads the cached result. The rule reads the constant table, so the fold
+     runs before the table records this assignment. */
+  optimizer::optimize_node(this, actx);
+
+  /* The constant-propagation rule records a name assigned a plain literal value
+     in a straight-line block, so a later $name reference in a static condition
+     or constant arithmetic reads the recorded value. The record is conservative
+     in every uncertain case, where the table simply forgets the name. */
+  let const &name = m_assignment->key();
+
+  /* A conditional or nested assignment may not run, and a runtime definer such
+     as eval or dot may already have changed the name out of view, so neither
+     proves the value. The append form NAME+=VALUE depends on the prior value,
+     which the prepass does not track. Each of these forgets the name rather
+     than record it. */
+  if (!is_unconditional || actx.saw_runtime_definer ||
+      m_assignment->is_append())
+  {
+    actx.constant_variables.erase(name.view());
+    return;
+  }
+
+  let const literal =
+      optimizer::literal_word_value(m_assignment->value_word());
+  if (literal.has_value())
+    actx.constant_variables.set(name.view(), literal->view());
+  else
+    /* The value is only known at run time, so a constant recorded for this name
+       under an earlier assignment no longer holds and is forgotten. */
+    actx.constant_variables.erase(name.view());
 }
 
 hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
@@ -617,6 +659,11 @@ pure fn SimpleCommand::args() const wontthrow
     -> const ArrayList<const Token *> &
 {
   return m_args;
+}
+
+fn SimpleCommand::as_simple_command() const wontthrow -> const SimpleCommand *
+{
+  return this;
 }
 
 namespace {
@@ -1683,6 +1730,13 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 cold fn IfClause::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
+  /* The dead-branch rule reads the constant table while it still holds the
+     values recorded before this if. The verdict of a condition is decided by
+     the command words alone and does not need the condition's own analyze to
+     have run, so the fold runs first, before any child analyze mutates the
+     table. */
+  optimizer::optimize_node(this, actx);
+
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional, since a branch may not be reached. */
   let is_first_branch = true;
@@ -1697,22 +1751,11 @@ cold fn IfClause::analyze(AnalysisContext &actx,
 
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
 
-  /* Decide the branch when every condition up to the chosen one is statically
-     known. A condition that always succeeds selects its body, one that always
-     fails moves to the next branch, and the first undecidable condition stops
-     the fold and leaves the run to evaluate the conditions. */
-  for (usize i = 0; i < m_branches.count(); i++) {
-    let const verdict =
-        m_branches[i].condition->try_static_condition_verdict(actx);
-    if (!verdict.has_value()) return;
-    if (*verdict) {
-      m_folded_branch = i;
-      return;
-    }
-  }
-  /* Every condition failed, so the else body runs, or nothing when there is
-     none. An index past the last branch names that outcome. */
-  m_folded_branch = m_branches.count();
+  /* A branch ran conditionally and may have reassigned a name, so a value
+     recorded before this if is no longer proven to hold in the straight-line
+     block after it. Clearing the constant table at the if boundary keeps the
+     propagation to a single straight-line run. */
+  actx.constant_variables.clear();
 }
 
 cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
@@ -1730,6 +1773,28 @@ cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
 
   if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
 }
+
+pure fn IfClause::branches() const wontthrow -> const ArrayList<if_branch> &
+{
+  return m_branches;
+}
+
+pure fn IfClause::otherwise() const wontthrow -> const Expression *
+{
+  return m_otherwise;
+}
+
+fn IfClause::set_folded_branch(usize index) const wontthrow -> void
+{
+  m_folded_branch = index;
+}
+
+pure fn IfClause::has_folded_branch() const wontthrow -> bool
+{
+  return m_folded_branch.has_value();
+}
+
+fn IfClause::as_if_clause() const wontthrow -> const IfClause * { return this; }
 
 WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
                      const Expression *body, bool is_until)
@@ -1849,20 +1914,18 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
 
-  /* The condition runs at least once, the body may run zero times. */
+  /* The loop re-evaluates its condition every iteration and the body may
+     reassign any name, so a value recorded before the loop does not hold across
+     iterations. The constant table is cleared before the condition, so a
+     pre-loop constant is never inlined into it, which would freeze a loop whose
+     counter was folded to its initial value. A literal condition such as while
+     false still folds, since the verdict reads the literal words alone. */
+  actx.constant_variables.clear();
+
+  optimizer::optimize_node(this, actx);
+
   m_condition->analyze(actx, is_unconditional);
   m_body->analyze(actx, false);
-
-  /* A statically-decidable condition that never lets the body run folds the
-     whole loop away. A while runs the body on success, so a constant failure
-     skips it, and an until runs the body on failure, so a constant success
-     skips it. A while true or an until false is infinite and stays unfolded. */
-  let const verdict = m_condition->try_static_condition_verdict(actx);
-  if (verdict.has_value()) {
-    let const body_would_run =
-        m_is_until ? (*verdict == false) : (*verdict == true);
-    if (!body_would_run) m_folded_to_skip = true;
-  }
 }
 
 cold fn WhileLoop::register_defined_functions(
@@ -1875,6 +1938,28 @@ cold fn WhileLoop::register_defined_functions(
      defined in either is registered before the ordered walk. */
   m_condition->register_defined_functions(actx);
   m_body->register_defined_functions(actx);
+}
+
+pure fn WhileLoop::condition() const wontthrow -> const Expression *
+{
+  return m_condition;
+}
+
+pure fn WhileLoop::is_until() const wontthrow -> bool { return m_is_until; }
+
+fn WhileLoop::set_folded_to_skip() const wontthrow -> void
+{
+  m_folded_to_skip = true;
+}
+
+pure fn WhileLoop::is_folded_to_skip() const wontthrow -> bool
+{
+  return m_folded_to_skip;
+}
+
+fn WhileLoop::as_while_loop() const wontthrow -> const WhileLoop *
+{
+  return this;
 }
 
 ForLoop::ForLoop(SourceLocation location, StringView variable_name,
@@ -1942,6 +2027,12 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
 
   unused(is_unconditional);
+
+  /* The body runs repeatedly over the loop list and may reassign a name, so a
+     value recorded before the loop does not hold inside it. Clearing the
+     constant table before the body keeps a pre-loop constant from being inlined
+     into a counter the body increments. */
+  actx.constant_variables.clear();
   m_body->analyze(actx, false);
 }
 
@@ -2034,6 +2125,10 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
     ASSERT(item.body != nullptr);
     item.body->analyze(actx, false);
   }
+
+  /* An arm body runs only when its pattern matches and may reassign a name, so
+     a value recorded before the case is no longer proven after it. */
+  actx.constant_variables.clear();
 }
 
 cold fn CaseClause::register_defined_functions(
@@ -2173,7 +2268,14 @@ cold fn Subshell::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
 
+  /* A subshell runs in a forked child, so an assignment in its body never
+     changes a parent variable. The outer constants are saved and restored
+     around the body, and the body itself starts from an empty table so it does
+     not carry a propagation across the subshell boundary. */
+  HashMap<String> saved_constants = actx.constant_variables;
+  actx.constant_variables.clear();
   m_body->analyze(actx, is_unconditional);
+  actx.constant_variables = steal(saved_constants);
 }
 
 FunctionDefinition::FunctionDefinition(SourceLocation location, StringView name,
@@ -2228,7 +2330,16 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
 
   unused(is_unconditional);
   actx.defined_functions.add(m_name);
+
+  /* The body runs later when the function is called, not where it is defined,
+     so a constant recorded before the definition does not prove a value inside
+     the body, and an assignment in the body does not reach the straight-line
+     block around the definition. The outer constants are saved and restored
+     around the body, and the body starts from an empty table. */
+  HashMap<String> saved_constants = actx.constant_variables;
+  actx.constant_variables.clear();
   m_body->analyze(actx, false);
+  actx.constant_variables = steal(saved_constants);
 }
 
 cold fn FunctionDefinition::register_defined_functions(
@@ -2602,12 +2713,11 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      longer changes the prepass outcome for this node. */
   unused(is_unconditional);
 
-  /* A constant $((...)) in any argument or assignment prefix is folded once
-     here, so the loop body that re-runs this command does not re-parse it. */
-  for (const Token *t : m_args)
-    fold_constant_arithmetic_in_token(t);
-  for (const prefix_assignment &var : m_local_vars)
-    fold_constant_arithmetic_in_word(var.value);
+  /* A constant $((...)) in any argument or assignment prefix is folded once by
+     the constant-arithmetic rule, so the loop body that re-runs this command
+     does not re-parse it. The rule reads the constant table, so the fold runs
+     while the recorded values still hold for this command. */
+  optimizer::optimize_node(this, actx);
 
   if (m_args.is_empty()) return;
 
@@ -2728,6 +2838,44 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
        to stderr and sets 127 when the command actually runs. */
     actx.warn(m_args[0]->source_location(), message);
   }
+
+  /* A command may change a variable out of the prepass's static view, so a
+     constant recorded for a later straight-line reference is no longer proven.
+     A small set of builtins never writes a shell variable and never runs code
+     the prepass cannot see, so a constant survives across them. Every other
+     command, including a function call, an unset, an export, or a command
+     substitution argument, forgets the whole table. */
+  let const is_variable_neutral_builtin =
+      command_literal == "echo" || command_literal == "printf" ||
+      command_literal == "true" || command_literal == "false" ||
+      command_literal == ":" || command_literal == "test" ||
+      command_literal == "[" || command_literal == "pwd";
+
+  bool clears_constants = !is_variable_neutral_builtin;
+  if (!clears_constants) {
+    /* A command substitution runs arbitrary code, so even a neutral builtin
+       carrying one forgets the table to stay conservative. */
+    for (const Token *t : m_args) {
+      if (t->kind() != Token::Kind::Word) continue;
+      let const &word = static_cast<const tokens::WordToken *>(t)->word();
+      for (const WordSegment &segment : word.segments) {
+        if (segment.kind == WordSegment::Kind::CommandSubstitution) {
+          clears_constants = true;
+          break;
+        }
+      }
+      if (clears_constants) break;
+    }
+  }
+
+  /* A neutral builtin run under a name shadowed by a function or an alias is
+     really a call into user code, so it forgets the table too. */
+  if (!clears_constants &&
+      (actx.defined_functions.contains(command_literal.view()) ||
+       actx.known_aliases.contains(command_literal.view())))
+    clears_constants = true;
+
+  if (clears_constants) actx.constant_variables.clear();
 }
 
 cold fn SimpleCommand::try_static_condition_verdict(
@@ -2748,10 +2896,20 @@ cold fn SimpleCommand::try_static_condition_verdict(
 cold fn Pipeline::analyze(AnalysisContext &actx,
                           bool is_unconditional) const throws -> void
 {
+  /* A multi-stage pipeline runs each stage in a forked child, so an assignment
+     in a stage never changes a parent variable and must not be recorded as a
+     straight-line constant. A single command is not a real pipeline and keeps
+     the caller's unconditional context. */
+  let const stage_is_unconditional =
+      is_unconditional && m_commands.count() == 1;
   for (const Command *command : m_commands) {
     ASSERT(command != nullptr);
-    command->analyze(actx, is_unconditional);
+    command->analyze(actx, stage_is_unconditional);
   }
+
+  /* A multi-stage pipeline reads variables in its children and the table cannot
+     prove a value across the fork, so it forgets any recorded constant. */
+  if (m_commands.count() > 1) actx.constant_variables.clear();
 }
 
 cold fn CompoundListCondition::analyze(AnalysisContext &actx,

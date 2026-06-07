@@ -206,6 +206,22 @@ fn unset_environment_variable(StringView key) throws -> void
   unsetenv(key_string.c_str());
 }
 
+fn environment_names() throws -> ArrayList<String>
+{
+  ArrayList<String> names{};
+  if (environ == nullptr) return names;
+  for (char **entry = environ; *entry != nullptr; entry++) {
+    StringView pair{*entry};
+    let const equals = pair.find_character('=');
+    /* An entry with no '=' is kept whole, since the name is the entry. */
+    let const name = equals.has_value()
+                         ? pair.substring_of_length(0, *equals)
+                         : pair;
+    names.push(String{name});
+  }
+  return names;
+}
+
 fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 {
   if (status == -1) {
@@ -946,6 +962,26 @@ fn unset_environment_variable(StringView key) -> void
 {
   String key_string{key};
   SetEnvironmentVariableA(key_string.c_str(), nullptr);
+}
+
+fn environment_names() -> ArrayList<String>
+{
+  ArrayList<String> names{};
+  char *block = GetEnvironmentStringsA();
+  if (block == nullptr) return names;
+  for (char *entry = block; *entry != '\0';) {
+    StringView pair{entry};
+    let const equals = pair.find_character('=');
+    /* The drive entries such as =C: begin with '=', so a leading '=' is kept as
+       part of the name rather than splitting on it. */
+    let const split = (equals.has_value() && *equals > 0)
+                          ? pair.substring_of_length(0, *equals)
+                          : pair;
+    names.push(String{split});
+    entry += pair.length + 1;
+  }
+  FreeEnvironmentStringsA(block);
+  return names;
 }
 
 fn execute_program(ExecContext &&ec) -> process

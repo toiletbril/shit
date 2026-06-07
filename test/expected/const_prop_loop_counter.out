@@ -1,0 +1,104 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign count=0]
+  [CompoundListCondition, None]
+    [ForLoop "item"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign count=$((count + 1))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "count=$count"]
+  [CompoundListCondition, None]
+    [Assign i=0]
+  [CompoundListCondition, None]
+    [UntilLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$i" "-ge" "3" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign i=$((i + 1))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "i=$i"]
+[Word
+  Unquoted "count=0"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "item"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "count="
+  ArithmeticExpansion "count + 1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "count="
+  Variable "count"
+]
+[Word
+  Unquoted "i=0"
+]
+[Word
+  Unquoted "until"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "i"
+]
+[Word
+  Unquoted "-ge"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "i="
+  ArithmeticExpansion "i + 1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "i="
+  Variable "i"
+]
+count=4
+i=3
+[Code 0]

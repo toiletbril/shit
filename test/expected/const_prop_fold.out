@@ -1,0 +1,72 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=5]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$x" "=" "5" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "folded_A"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "B"]
+  [CompoundListCondition, None]
+    [Assign x=2]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x+x))"]
+[Word
+  Unquoted "x=5"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "folded_A"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "B"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "x=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x+x"
+]
+folded_A
+4
+[Code 0]

@@ -12,6 +12,13 @@ using namespace tokens;
 
 class Token;
 
+namespace expressions {
+class IfClause;
+class WhileLoop;
+class AssignCommand;
+class SimpleCommand;
+} /* namespace expressions */
+
 /* The prepass walks the whole tree once before any command runs. It carries the
    source for the caret, and a fatal flag that stops execution. A warning is a
    located message that does not stop execution, a failure does. */
@@ -40,6 +47,14 @@ public:
      this pass. A name run many times across the file then hits the filesystem
      at most once. */
   HashMap<bool> command_resolution_cache{heap_allocator()};
+  /* Names assigned a plain literal value in the current straight-line block,
+     mapped to that value. The constant-propagation rule records a name here on
+     an unconditional literal assignment and reads it to fold a $name reference
+     in a later static condition or constant arithmetic. The table is cleared at
+     a conditional branch, a loop body, a function body, a subshell, and on any
+     runtime definer, since a value recorded before such a boundary is no longer
+     proven to hold past it. */
+  HashMap<String> constant_variables{heap_allocator()};
 
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
@@ -78,6 +93,17 @@ public:
 
   virtual fn is_simple_command() const wontthrow -> bool;
   virtual fn is_dummy() const wontthrow -> bool;
+
+  /* The typed-node downcasts the optimizer rules use to match a node without
+     RTTI, since the build links with -fno-rtti. The base returns nullptr and a
+     node of the matching kind overrides its own hook to return this, so a rule
+     reads a typed pointer or skips the node. */
+  virtual fn as_if_clause() const wontthrow -> const expressions::IfClause *;
+  virtual fn as_while_loop() const wontthrow -> const expressions::WhileLoop *;
+  virtual fn as_assign_command() const wontthrow
+      -> const expressions::AssignCommand *;
+  virtual fn as_simple_command() const wontthrow
+      -> const expressions::SimpleCommand *;
 
   /* A node lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap node otherwise. The
@@ -175,6 +201,10 @@ public:
   pure fn is_async() const wontthrow -> bool;
   fn set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void;
 
+  /* The prefix assignments on this command, read by the constant-arithmetic
+     rule to fold a constant $((...)) in a prefix value. */
+  pure fn local_vars() const wontthrow -> const ArrayList<prefix_assignment> &;
+
   /* The ! reserved word in front of a pipeline inverts its exit status. */
   fn set_negated() wontthrow -> void;
   pure fn is_negated() const wontthrow -> bool;
@@ -205,6 +235,8 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+
+  fn as_assign_command() const wontthrow -> const AssignCommand * override;
 
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
@@ -275,6 +307,8 @@ public:
 
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
+
+  fn as_simple_command() const wontthrow -> const SimpleCommand * override;
 
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
@@ -421,6 +455,20 @@ public:
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
+  /* The branch list and the else body, read by the dead-branch-elimination rule
+     to walk the conditions and judge each statically. */
+  pure fn branches() const wontthrow -> const ArrayList<if_branch> &;
+  pure fn otherwise() const wontthrow -> const Expression *;
+
+  /* Record the branch the dead-branch-elimination rule proved this if takes, so
+     the evaluator runs that body without testing any condition. The rule passes
+     the branch index, or the branch count to select the else body or nothing.
+   */
+  fn set_folded_branch(usize index) const wontthrow -> void;
+  pure fn has_folded_branch() const wontthrow -> bool;
+
+  fn as_if_clause() const wontthrow -> const IfClause * override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
@@ -448,6 +496,18 @@ public:
       -> void override;
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
+
+  /* The condition and the until flag, read by the loop-elimination rule to
+     judge whether the body ever runs. */
+  pure fn condition() const wontthrow -> const Expression *;
+  pure fn is_until() const wontthrow -> bool;
+
+  /* Record that the loop-elimination rule proved the body never runs, so the
+     evaluator yields 0 without testing the condition. */
+  fn set_folded_to_skip() const wontthrow -> void;
+  pure fn is_folded_to_skip() const wontthrow -> bool;
+
+  fn as_while_loop() const wontthrow -> const WhileLoop * override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;

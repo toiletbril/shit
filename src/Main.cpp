@@ -481,6 +481,10 @@ fn main(int argc, char **argv) -> int
                             shit::String{shell_name},
                             steal(positional_params)};
 
+  /* quit lives outside the context, so the goodbye gate is told the same
+     interactive state the context was built with. */
+  shit::utils::set_shell_is_interactive(should_be_interactive);
+
   /* Apply the remaining option flags that the constructor does not take. */
   context.set_stats_enabled(FLAG_STATS.is_enabled());
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
@@ -604,6 +608,11 @@ fn main(int argc, char **argv) -> int
            * previosly! */
           toiletline::enter_raw_mode();
         }
+
+        /* Report any background job that finished while the previous command
+           ran, the way bash prints a Done line before the next prompt. This is
+           the interactive branch, so a script never reaches it. */
+        context.notify_done_jobs();
 
         static constexpr usize PWD_LENGTH = 24;
 
