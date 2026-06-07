@@ -1,0 +1,38 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 << 64 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 << 65 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 >> 64 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 << -1 ))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 << 64 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 << 65 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 >> 64 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 << -1 "
+]
+1
+2
+1
+-9223372036854775808
+[Code 0]

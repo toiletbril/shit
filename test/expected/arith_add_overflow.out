@@ -1,0 +1,20 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 9223372036854775807 + 1 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 9223372036854775807 * 2 ))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 9223372036854775807 + 1 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 9223372036854775807 * 2 "
+]
+-9223372036854775808
+-2
+[Code 0]

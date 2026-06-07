@@ -1,0 +1,4 @@
+f(){ /bin/echo x; }
+set -- a b c
+f
+echo "$1"
