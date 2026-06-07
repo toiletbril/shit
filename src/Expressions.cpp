@@ -301,7 +301,7 @@ fn Command::set_negated() wontthrow -> void { m_is_negated = true; }
 
 pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 
-fn Command::set_local_vars(HashMap<prefix_assignment> &&vars) throws -> void
+fn Command::set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void
 {
   m_local_vars = steal(vars);
 }
@@ -848,7 +848,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      location was set at the top of this function, so a $LINENO in any value on
      the line reports the same line, the way dash reports it. */
   if (program_args.is_empty()) {
-    m_local_vars.for_each([&](StringView name, const prefix_assignment &var) {
+    /* The assignments commit left to right, each before the next is expanded, so
+       a later value reads an earlier same-line one and a repeated name or a +=
+       accumulates against what the store already holds. */
+    for (const prefix_assignment &var : m_local_vars) {
+      const StringView name = var.name.view();
       String value = cxt.expand_word_for_assignment(var.value);
       if (var.is_append) {
         String appended{cxt.get_variable_value(name).value_or("")};
@@ -857,7 +861,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
       cxt.set_shell_variable(name, value);
       if (cxt.export_all()) os::set_environment_variable(name, value.view());
-    });
+    }
     cxt.set_last_exit_status(0);
     return 0;
   }
@@ -872,7 +876,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<String> previous_value;
   };
   ArrayList<saved_env_var> saved_env{heap_allocator()};
-  m_local_vars.for_each([&](StringView name, const prefix_assignment &var) {
+  /* The assignments apply left to right, each committed to the environment before
+     the next is expanded, so a later value reads an earlier same-line one and a
+     repeated name or a += accumulates. The previous environment values are saved
+     for the restore on exit, which keeps the prefix temporary for this command. */
+  for (const prefix_assignment &var : m_local_vars) {
+    const StringView name = var.name.view();
     Maybe<String> previous = os::get_environment_variable(name);
     String expanded_value = cxt.expand_word_for_assignment(var.value);
     /* The append form prepends the current value of NAME, which a prefix reads
@@ -885,14 +894,19 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     saved_env.push(saved_env_var{String{name}, steal(previous)});
     os::set_environment_variable(name, expanded_value.view());
-  });
+  }
   defer
   {
-    for (const auto &[name, old_value] : saved_env) {
-      if (old_value)
-        os::set_environment_variable(name.view(), old_value->view());
+    /* The restore runs newest first, so a name spelled more than once on the
+       line restores to the value it held before the first of its assignments
+       rather than to an intermediate one. */
+    for (usize i = saved_env.count(); i > 0; i--) {
+      const saved_env_var &restore = saved_env[i - 1];
+      if (restore.previous_value)
+        os::set_environment_variable(restore.name.view(),
+                                     restore.previous_value->view());
       else
-        os::unset_environment_variable(name.view());
+        os::unset_environment_variable(restore.name.view());
     }
   };
 
@@ -2431,10 +2445,16 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
       for (const WordSegment &segment : word.segments) {
-        if (segment.kind == WordSegment::Kind::VariableReference &&
-            m_local_vars.find(StringView{segment.text.data(),
-                                         segment.text.count()}) != nullptr)
-        {
+        if (segment.kind != WordSegment::Kind::VariableReference) continue;
+        const StringView referenced{segment.text.data(), segment.text.count()};
+        bool names_a_prefix = false;
+        for (const prefix_assignment &var : m_local_vars) {
+          if (var.name.view() == referenced) {
+            names_a_prefix = true;
+            break;
+          }
+        }
+        if (names_a_prefix) {
           let const message =
               StringView{"The assignment prefix does not affect this "
                          "command, '"} +

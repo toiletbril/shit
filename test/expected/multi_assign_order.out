@@ -1,0 +1,68 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$a][$b][$c]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$x]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$y]"]
+[Word
+  Unquoted "a=1"
+]
+[Word
+  Unquoted "b="
+  Variable "a"
+]
+[Word
+  Unquoted "c="
+  Variable "b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "a"
+  DoubleQuoted "]["
+  Variable "b"
+  DoubleQuoted "]["
+  Variable "c"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "x=foo"
+]
+[Word
+  Unquoted "x+=bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "y=1"
+]
+[Word
+  Unquoted "y=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "y"
+  DoubleQuoted "]"
+]
+[1][1][1]
+[foobar]
+[2]
+[Code 0]

@@ -649,7 +649,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
 {
   Maybe<SourceLocation> source_location;
   ArrayList<Token *> args_accumulator{};
-  HashMap<prefix_assignment> local_vars{heap_allocator()};
+  ArrayList<prefix_assignment> local_vars{heap_allocator()};
   ArrayList<expressions::Redirection> redirections{};
 
   auto build_command = [&]() -> Command * {
@@ -817,11 +817,13 @@ hot fn Parser::parse_simple_command() throws -> Command *
            AssignCommand fast path. */
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       } else {
-        /* The assignment joins the prefix set, either ahead of a command word
-           or as one of several assignments on a command-less line. The
-           command-less line persists the whole set in SimpleCommand. */
-        local_vars.set(
-            a->key(), prefix_assignment{Word{a->value_word()}, a->is_append()});
+        /* The assignment joins the prefix sequence in source order, either ahead
+           of a command word or as one of several assignments on a command-less
+           line. The ordered list lets a later assignment see an earlier one and
+           a repeated name accumulate, which a map would lose. The command-less
+           line persists the whole sequence in SimpleCommand. */
+        local_vars.push(prefix_assignment{String{a->key()},
+                                          Word{a->value_word()}, a->is_append()});
       }
     } break;
 
