@@ -57,25 +57,49 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   auto is_separator = [&field_separators](char c) {
     return field_separators.find_character(c).has_value();
   };
+  /* POSIX folds an IFS whitespace run into a single delimiter, while each IFS
+     non-whitespace character delimits one field on its own, so an empty field
+     can sit between two non-whitespace delimiters. */
+  auto is_ifs_whitespace = [&is_separator](char c) {
+    return (c == ' ' || c == '\t' || c == '\n') && is_separator(c);
+  };
+  auto is_ifs_nonwhitespace = [&](char c) {
+    return is_separator(c) && !is_ifs_whitespace(c);
+  };
 
   usize cursor = 0;
-  for (usize i = 0; i < operand_count; i++) {
-    while (cursor < line.length() && is_separator(line[cursor]))
-      cursor++;
+  /* Leading IFS whitespace before the first field is skipped and produces no
+     empty field. */
+  while (cursor < line.length() && is_ifs_whitespace(line[cursor]))
+    cursor++;
 
+  for (usize i = 0; i < operand_count; i++) {
     if (i + 1 == operand_count) {
-      /* The last variable receives the rest of the line with trailing
-         separators trimmed. */
+      /* The last variable receives the rest of the line with trailing IFS
+         whitespace trimmed. A trailing non-whitespace IFS delimiter is kept,
+         since dash leaves the empty field it introduces inside the remainder. */
       String rest = String{line.substring(cursor)};
-      while (!rest.is_empty() && is_separator(rest.back()))
+      while (!rest.is_empty() && is_ifs_whitespace(rest.back()))
         rest.pop_back();
       cxt.set_shell_variable(operand_name(i), rest);
-    } else {
-      let const start = cursor;
-      while (cursor < line.length() && !is_separator(line[cursor]))
+      break;
+    }
+
+    let const start = cursor;
+    while (cursor < line.length() && !is_separator(line[cursor]))
+      cursor++;
+    cxt.set_shell_variable(operand_name(i),
+                           line.substring_of_length(start, cursor - start));
+
+    /* Consume one delimiter. A run of IFS whitespace folds to one, then an
+       optional single non-whitespace IFS character, then trailing whitespace,
+       so 'x : y' and 'x:y' both split into the same fields. */
+    while (cursor < line.length() && is_ifs_whitespace(line[cursor]))
+      cursor++;
+    if (cursor < line.length() && is_ifs_nonwhitespace(line[cursor])) {
+      cursor++;
+      while (cursor < line.length() && is_ifs_whitespace(line[cursor]))
         cursor++;
-      cxt.set_shell_variable(operand_name(i),
-                             line.substring_of_length(start, cursor - start));
     }
   }
 

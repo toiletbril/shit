@@ -566,7 +566,9 @@ fn glob_matches(StringView glob, StringView str,
          literal character, as POSIX specifies. A ] right after [ or [^ is a
          member, so the scan for the closing ] starts past it. */
       usize close_scan = g + 1;
-      if (close_scan < glob.count() && glob[close_scan] == '^') close_scan++;
+      if (close_scan < glob.count() &&
+          (glob[close_scan] == '!' || glob[close_scan] == '^'))
+        close_scan++;
       if (close_scan < glob.count() && glob[close_scan] == ']') close_scan++;
       bool has_closing_bracket = false;
       for (; close_scan < glob.count(); close_scan++) {
@@ -585,7 +587,9 @@ fn glob_matches(StringView glob, StringView str,
       g++; /* skip [ */
       if (g >= glob.count()) GLOB_GROUP_ERR();
 
-      if (glob[g] == '^') {
+      /* POSIX sh negates a class with a leading '!'. The '^' form is kept as a
+         common extension. */
+      if (glob[g] == '!' || glob[g] == '^') {
         g++;
         should_negate = true;
 

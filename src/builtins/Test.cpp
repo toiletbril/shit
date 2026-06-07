@@ -101,6 +101,12 @@ public:
       return false;
     }
     if (current() == "!") {
+      /* A lone ! with nothing after it is the one-argument test of a non-empty
+         string, which is true, not a negation missing its operand. */
+      if (pos + 1 >= args.count()) {
+        pos++;
+        return true;
+      }
       pos++;
       return !parse_factor();
     }

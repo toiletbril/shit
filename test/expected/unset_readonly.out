@@ -1,0 +1,29 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "readonly" "x=1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x=$x"]
+[Word
+  Unquoted "readonly"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "x="
+  Variable "x"
+]
+unset: x: is read only
+x=1
+[Code 0]

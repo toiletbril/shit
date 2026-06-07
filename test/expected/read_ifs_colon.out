@@ -1,0 +1,53 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "x::y\n"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign IFS=:]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "a" "b" "c"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[$a][$b][$c]"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "x::y\n"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "IFS=:"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "a"
+  DoubleQuoted "]["
+  Variable "b"
+  DoubleQuoted "]["
+  Variable "c"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[x][][y]
+[Code 0]

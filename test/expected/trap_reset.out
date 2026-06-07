@@ -1,0 +1,35 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo hi" "INT"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "INT"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "trap"
+]
+[Word
+  DoubleQuoted "echo hi"
+]
+[Word
+  Unquoted "INT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "INT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+done
+[Code 0]

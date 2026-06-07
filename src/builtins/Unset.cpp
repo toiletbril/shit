@@ -26,15 +26,25 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
   ASSERT(!names.is_empty());
 
   let const unset_function = FLAG_UNSET_FUNCTION.is_enabled();
+  let had_error = false;
   for (usize i = 1; i < names.count(); i++) {
     let const &name = names[i];
-    if (unset_function)
+    if (unset_function) {
       cxt.unset_function(name);
-    else
-      cxt.unset_shell_variable(name);
+    } else {
+      /* A read-only variable makes unset_shell_variable throw. The remaining
+         names are still unset and the builtin reports a non-zero status, the
+         way dash continues past a read-only name. */
+      try {
+        cxt.unset_shell_variable(name);
+      } catch (const Error &e) {
+        shit::print_error(StringView{"unset: "} + name + ": is read only\n");
+        had_error = true;
+      }
+    }
   }
 
-  return 0;
+  return had_error ? 2 : 0;
 }
 
 } /* namespace shit */

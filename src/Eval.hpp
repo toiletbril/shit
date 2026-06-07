@@ -528,6 +528,10 @@ protected:
      terminate the shell. */
   fn assign_variable(StringView name, StringView value) throws -> void;
 
+  /* Remove a variable without the read-only check, for the same local restore
+     path as assign_variable where a throw would terminate the shell. */
+  fn force_unset_shell_variable(StringView name) throws -> void;
+
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
   fn apply_parameter_expansion(StringView spec) throws -> String;

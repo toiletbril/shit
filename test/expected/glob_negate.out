@@ -1,0 +1,80 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "y"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "n"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "y"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "n"]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!a]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!a]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "esac"
+]
+y
+n
+[Code 0]

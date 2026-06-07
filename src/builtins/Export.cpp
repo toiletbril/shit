@@ -24,13 +24,15 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
+  let had_error = false;
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
 
     let name = String{};
     let value = String{};
-    if (!equals_position.has_value()) {
+    let const has_new_value = equals_position.has_value();
+    if (!has_new_value) {
       /* Export an existing variable by its current value. */
       name = arg;
       value = cxt.get_variable_value(arg).value_or(String{});
@@ -39,13 +41,24 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       value = String{arg.substring(*equals_position + 1)};
     }
 
+    /* A read-only variable rejects a new value the way an ordinary assignment
+       does, and a bare re-export of a read-only variable leaves its value
+       untouched. */
+    if (cxt.is_readonly(name)) {
+      if (has_new_value) {
+        shit::print_error(StringView{"export: "} + name + ": is read only\n");
+        had_error = true;
+      }
+      continue;
+    }
+
     /* The variable moves into the environment, so the bare shell copy is
        removed and child processes inherit it. */
     cxt.unset_shell_variable(name);
     os::set_environment_variable(name, value);
   }
 
-  return 0;
+  return had_error ? 2 : 0;
 }
 
 } /* namespace shit */

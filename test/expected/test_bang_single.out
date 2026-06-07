@@ -1,0 +1,22 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+0
+[Code 0]

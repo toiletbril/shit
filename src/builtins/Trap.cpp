@@ -50,8 +50,19 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   ASSERT(args.count() > 1);
+
+  /* With a single operand there is no action, so the operand names a condition
+     to reset to its default, as POSIX specifies for 'trap SIG' and 'trap NUM'.
+     With two or more operands the first is the action and the rest are the
+     conditions it applies to. */
+  if (args.count() == 2) {
+    let const condition = normalize_condition(args[1]);
+    cxt.remove_trap(condition);
+    return 0;
+  }
+
   let const &action = args[1];
-  /* A lone dash resets the named conditions to their defaults. */
+  /* A lone dash as the action resets the named conditions to their defaults. */
   let const is_reset = action == "-";
 
   for (usize i = 2; i < args.count(); i++) {

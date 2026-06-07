@@ -111,6 +111,16 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
 
 fn EvalContext::unset_shell_variable(StringView name) throws -> void
 {
+  /* A read-only variable rejects removal the same way it rejects assignment,
+     so unset cannot defeat readonly. */
+  if (is_readonly(name))
+    throw Error{"'" + name + "' is read only and cannot be unset"};
+
+  force_unset_shell_variable(name);
+}
+
+fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
+{
   m_shell_variables.erase(name);
   /* An exported variable also lives in the process environment, so it is
      removed there too. Otherwise a later lookup falls back to the stale
@@ -418,7 +428,7 @@ fn EvalContext::leave_function_scope() throws -> void
     if (binding.previous_value.has_value())
       assign_variable(binding.name, *binding.previous_value);
     else
-      unset_shell_variable(binding.name);
+      force_unset_shell_variable(binding.name);
   }
   let kept = ArrayList<ArrayList<local_binding>>{};
   for (usize i = 0; i + 1 < m_local_scopes.count(); i++)
