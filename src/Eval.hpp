@@ -294,6 +294,12 @@ public:
   /* noexec parses without running, set by -n and set -o noexec. */
   fn set_no_exec(bool enabled) wontthrow -> void;
   pure fn no_exec() const wontthrow -> bool;
+  /* failglob makes a glob that matches no path a hard error, the shell default
+     that catches a typo. With it off the unmatched glob expands to its literal
+     pattern the way POSIX and dash do, set by --no-fail-glob and set -o
+     failglob. */
+  fn set_failglob(bool enabled) wontthrow -> void;
+  pure fn failglob() const wontthrow -> bool;
 
   /* A condition, such as an if test or an && operand, suppresses set -e while
      it runs, since its failure is expected. */
@@ -449,6 +455,7 @@ protected:
   bool m_no_clobber{false};
   bool m_export_all{false};
   bool m_no_exec{false};
+  bool m_failglob{true};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
   HashMap<String> m_traps{heap_allocator()};

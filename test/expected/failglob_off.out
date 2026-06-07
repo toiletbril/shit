@@ -1,0 +1,51 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "failglob"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "nomatch_*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a*.zzznomatch" "literal"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "set" "-o"]
+      [SimpleCommand "grep" "failglob"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "failglob"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "nomatch_*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a*.zzznomatch"
+]
+[Word
+  Unquoted "literal"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "failglob"
+]
+nomatch_*
+a*.zzznomatch literal
+set +o failglob
+[Code 0]

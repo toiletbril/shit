@@ -38,6 +38,9 @@ const SetOption SET_OPTIONS[] = {
     {'f', "noglob",    &EvalContext::set_no_glob,       &EvalContext::no_glob    },
     {'n', "noexec",    &EvalContext::set_no_exec,       &EvalContext::no_exec    },
     {'m', "monitor",   &EvalContext::set_monitor,       &EvalContext::monitor    },
+    /* failglob has no short letter, so '\0' keeps find_option_by_letter from
+       ever matching a parsed option character. */
+    {'\0', "failglob", &EvalContext::set_failglob,      &EvalContext::failglob   },
     {'b', "notify",    nullptr,                         nullptr                  },
     {'h', "hashall",   nullptr,                         nullptr                  },
     {'v', "verbose",   nullptr,                         nullptr                  },

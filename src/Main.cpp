@@ -41,6 +41,9 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
 FLAG(NO_EXEC, Bool, 'n', "no-exec",
      "Read and parse commands but do not run them.");
 FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
+FLAG(NO_FAIL_GLOB, Bool, 'G', "no-fail-glob",
+     "Expand a glob that matches nothing to its literal pattern, like POSIX, "
+     "instead of failing.");
 FLAG(LOGIN, Bool, 'l', "login",
      "Act as a login shell and source the profiles.");
 
@@ -420,6 +423,7 @@ fn main(int argc, char **argv) -> int
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
+  context.set_failglob(!FLAG_NO_FAIL_GLOB.is_enabled());
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);

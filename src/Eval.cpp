@@ -636,6 +636,13 @@ fn EvalContext::set_no_exec(bool enabled) wontthrow -> void
 
 pure fn EvalContext::no_exec() const wontthrow -> bool { return m_no_exec; }
 
+fn EvalContext::set_failglob(bool enabled) wontthrow -> void
+{
+  m_failglob = enabled;
+}
+
+pure fn EvalContext::failglob() const wontthrow -> bool { return m_failglob; }
+
 fn EvalContext::enter_condition() wontthrow -> void { m_condition_depth++; }
 
 fn EvalContext::leave_condition() wontthrow -> void
@@ -1315,12 +1322,16 @@ hot fn EvalContext::expand_path(glob_field field,
      from spending most of its time in the sort comparator. */
   utils::sort_ascending(values);
 
-  /* A glob that matches no file is a hard error here, unlike the POSIX fallback
-     of expanding to the literal pattern. The caret points at the offending
-     word. */
-  if (values.count() == 0)
-    throw ErrorWithLocation{location, "No matches for the glob pattern '" +
-                                          pattern + "'"};
+  /* A glob that matches no file is a hard error by default, the typo-catching
+     behavior. With failglob off the shell takes the POSIX fallback and expands
+     the glob to its literal pattern as a single field, the way dash does. The
+     caret points at the offending word. */
+  if (values.count() == 0) {
+    if (m_failglob)
+      throw ErrorWithLocation{location, "No matches for the glob pattern '" +
+                                            pattern + "'"};
+    values.push(steal(pattern));
+  }
 
   return values;
 }
