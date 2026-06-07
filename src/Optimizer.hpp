@@ -42,8 +42,8 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
 /* True when the segment text holds an unquoted glob metacharacter, one of '*',
    '?', or '['. The plain-literal fast path in the evaluator consults this to
    decide whether a word may skip pathname expansion. */
-pure fn word_segment_has_glob_metacharacter(const WordSegment &segment)
-    wontthrow -> bool;
+pure fn word_segment_has_glob_metacharacter(
+    const WordSegment &segment) wontthrow -> bool;
 
 /* How a word may take the evaluator's plain-literal fast path. The fast path in
    process_args reads this to push a word that needs no expansion, splitting, or

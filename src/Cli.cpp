@@ -450,9 +450,9 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
   String s{};
 
   /* The description starts at a fixed column so every flag lines up, and a
-     description longer than the line wraps with its continuation indented to the
-     same column. A flag whose names reach the column gets its description on the
-     next line. */
+     description longer than the line wraps with its continuation indented to
+     the same column. A flag whose names reach the column gets its description
+     on the next line. */
   static constexpr usize DESCRIPTION_COLUMN = 26;
   static constexpr usize WRAP_WIDTH = 80;
   static constexpr usize TEXT_WIDTH = WRAP_WIDTH - DESCRIPTION_COLUMN;
@@ -491,14 +491,16 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
        column. */
     if (left.length() + 2 > DESCRIPTION_COLUMN) {
       s += '\n';
-      for (usize i = 0; i < DESCRIPTION_COLUMN; i++) s += ' ';
+      for (usize i = 0; i < DESCRIPTION_COLUMN; i++)
+        s += ' ';
     } else {
-      for (usize i = left.length(); i < DESCRIPTION_COLUMN; i++) s += ' ';
+      for (usize i = left.length(); i < DESCRIPTION_COLUMN; i++)
+        s += ' ';
     }
 
     /* Word-wrap the description so no line exceeds the wrap width, each
-       continuation indented back to the description column. A single word longer
-       than the text width is emitted whole rather than split. */
+       continuation indented back to the description column. A single word
+       longer than the text width is emitted whole rather than split. */
     let const description = f->description();
     usize line_used = 0;
     usize word_start = 0;
@@ -510,7 +512,8 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
       if (word_length > 0) {
         if (line_used > 0 && line_used + 1 + word_length > TEXT_WIDTH) {
           s += '\n';
-          for (usize j = 0; j < DESCRIPTION_COLUMN; j++) s += ' ';
+          for (usize j = 0; j < DESCRIPTION_COLUMN; j++)
+            s += ' ';
           line_used = 0;
         }
         if (line_used > 0) {

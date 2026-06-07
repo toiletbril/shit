@@ -110,8 +110,7 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands) throws
     let const lhs = literal_word_value(operands[0]);
     let const op = literal_word_value(operands[1]);
     let const rhs = literal_word_value(operands[2]);
-    if (!lhs.has_value() || !op.has_value() || !rhs.has_value())
-      return None;
+    if (!lhs.has_value() || !op.has_value() || !rhs.has_value()) return None;
     if (*op == "=") return Maybe<bool>{*lhs == *rhs};
     if (*op == "!=") return Maybe<bool>{!(*lhs == *rhs)};
     return None;
@@ -188,8 +187,8 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
   return None;
 }
 
-pure fn word_segment_has_glob_metacharacter(const WordSegment &segment)
-    wontthrow -> bool
+pure fn word_segment_has_glob_metacharacter(
+    const WordSegment &segment) wontthrow -> bool
 {
   for (usize i = 0; i < segment.text.count(); i++) {
     const char c = segment.text[i];

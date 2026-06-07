@@ -373,7 +373,8 @@ fn main(int argc, char **argv) -> int
     program_path = "<unknown>";
   }
 
-  /* A basename of sh selects POSIX mode, so a /bin/sh symlink behaves like one. */
+  /* A basename of sh selects POSIX mode, so a /bin/sh symlink behaves like one.
+   */
   let const last_slash = program_path.find_last_character('/');
   shit::INVOKED_AS_SH =
       (last_slash.has_value() ? program_path.substring(*last_slash + 1)
