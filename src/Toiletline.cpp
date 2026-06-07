@@ -130,6 +130,11 @@ fn utf8_strlen(const String &s, usize count) -> usize
                                            : ::tl_utf8_strlen(s.c_str());
 }
 
+fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
+{
+  return ::tl_utf8_strnlen(bytes, byte_count);
+}
+
 fn is_active() -> bool { return ::itl_g_is_active; }
 
 fn initialize() -> void
@@ -240,6 +245,12 @@ fn utf8_strlen(const String &s, usize count) -> usize
 {
   return (count != static_cast<usize>(-1) && count < s.length()) ? count
                                                                  : s.length();
+}
+
+fn utf8_strnlen(const char *bytes, usize byte_count) -> usize
+{
+  unused(bytes);
+  return byte_count;
 }
 
 fn is_active() -> bool { return false; }

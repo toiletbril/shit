@@ -18,6 +18,100 @@ struct precise_location
   usize last_newline_location;
 };
 
+/* A per-source index that turns the line and column lookup from a scan over the
+   whole prefix into a binary search. Without it a warning deep in the file costs
+   time proportional to its byte offset, so N warnings cost N squared. The shell
+   reuses one source for a whole analysis pass, so a single cached entry keyed on
+   the source pointer and length serves every located message in that pass. */
+class SourceLineIndex
+{
+public:
+  SourceLineIndex()
+      : m_newline_offsets(heap_allocator()),
+        m_codepoints_before_newline(heap_allocator())
+  {}
+
+  /* Build the index for this source when it differs from the cached one. The
+     entry holds, for each newline, its byte offset and the code point count of
+     the bytes before it. */
+  fn ensure_built_for(StringView source) throws -> void
+  {
+    if (m_source_data == source.data && m_source_length == source.count())
+      return;
+
+    m_source_data = source.data;
+    m_source_length = source.count();
+    m_newline_offsets.clear();
+    m_codepoints_before_newline.clear();
+
+    usize codepoints = 0;
+    for (usize i = 0; i < source.count(); i++) {
+      /* A byte that is not a UTF-8 continuation byte starts a code point. */
+      if ((static_cast<u8>(source[i]) & 0xC0) != 0x80) codepoints++;
+      if (source[i] == '\n') {
+        m_newline_offsets.push(i);
+        m_codepoints_before_newline.push(codepoints - 1);
+      }
+    }
+  }
+
+  /* The line number and the offset of the newline that starts it, matching the
+     prefix scan it replaces. The line number counts newlines strictly before
+     the byte, and the newline offset is the last such newline, or zero when the
+     byte is on the first line. */
+  pure fn locate(usize byte_position) const wontthrow -> precise_location
+  {
+    const usize newlines_before = count_newlines_before(byte_position);
+    const usize last_newline_location =
+        newlines_before == 0 ? 0 : m_newline_offsets[newlines_before - 1];
+    return precise_location{newlines_before, last_newline_location};
+  }
+
+  /* The code point count of the bytes in the half open range before the byte,
+     the value the prefix utf8 scan produced. It sums the code points up to the
+     line start and the code points within the line up to the byte. */
+  pure fn codepoints_before(StringView source,
+                            usize byte_position) const wontthrow -> usize
+  {
+    const usize newlines_before = count_newlines_before(byte_position);
+    if (newlines_before == 0)
+      return toiletline::utf8_strnlen(source.data, byte_position);
+
+    const usize newline_offset = m_newline_offsets[newlines_before - 1];
+    const usize codepoints_through_newline =
+        m_codepoints_before_newline[newlines_before - 1] + 1;
+    return codepoints_through_newline +
+           toiletline::utf8_strnlen(source.data + newline_offset + 1,
+                                    byte_position - (newline_offset + 1));
+  }
+
+private:
+  /* The count of newlines at a byte offset strictly less than the position,
+     found by binary search over the sorted newline offsets. */
+  pure fn count_newlines_before(usize byte_position) const wontthrow -> usize
+  {
+    usize low = 0;
+    usize high = m_newline_offsets.count();
+    while (low < high) {
+      const usize mid = low + (high - low) / 2;
+      if (m_newline_offsets[mid] < byte_position)
+        low = mid + 1;
+      else
+        high = mid;
+    }
+    return low;
+  }
+
+  const char *m_source_data{nullptr};
+  usize m_source_length{0};
+  ArrayList<usize> m_newline_offsets;
+  ArrayList<usize> m_codepoints_before_newline;
+};
+
+/* One index reused across every located message in a pass, since the pass works
+   over a single source at a time. */
+static SourceLineIndex SOURCE_LINE_INDEX{};
+
 cold static fn calc_precise_position(StringView source,
                                      usize byte_position) throws
     -> precise_location
@@ -26,16 +120,8 @@ cold static fn calc_precise_position(StringView source,
          "byte position: %zu, source length: %zu", byte_position,
          source.count());
 
-  usize line_number = 0;
-  usize last_newline_location = 0;
-
-  for (usize i = 0; i < byte_position; i++) {
-    if (source[i] != '\n') continue;
-    last_newline_location = i;
-    line_number++;
-  }
-
-  return precise_location{line_number, last_newline_location};
+  SOURCE_LINE_INDEX.ensure_built_for(source);
+  return SOURCE_LINE_INDEX.locate(byte_position);
 }
 
 template <class T>
@@ -113,7 +199,7 @@ cold static fn get_context_pointing_to(StringView source, usize byte_position,
 
   /* Calculate proper unicode offsets and lengths for underline. */
   const usize unicode_start_offset_position =
-      toiletline::utf8_strlen(source.data, byte_position - start_offset);
+      SOURCE_LINE_INDEX.codepoints_before(source, byte_position - start_offset);
 
   /* Does token length go beyond that line? */
   const usize unicode_length = toiletline::utf8_strlen(
@@ -214,7 +300,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
       calc_precise_position(source, byte_position);
 
   const usize unicode_position =
-      toiletline::utf8_strlen(source.data, byte_position);
+      SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
   /* Our count starts from 0. If there's only a single line, we need to use the
    * raw location for the correct offset. Otherwise, newline counts as an extra
@@ -294,7 +380,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
       calc_precise_position(source, byte_position);
 
   const usize unicode_details_position =
-      toiletline::utf8_strlen(source.data, byte_position);
+      SOURCE_LINE_INDEX.codepoints_before(source, byte_position);
 
   const usize details_line_byte_position =
       (details_last_newline_location > 0)

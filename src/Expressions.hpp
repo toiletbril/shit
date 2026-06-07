@@ -29,6 +29,10 @@ public:
   /* Names already defined as aliases. A call to one resolves at runtime through
      the alias expansion, so it is not a missing command. */
   HashSet known_aliases{heap_allocator()};
+  /* Caches whether a command name resolved against the builtins and PATH during
+     this pass. A name run many times across the file then hits the filesystem
+     at most once. */
+  HashMap<bool> command_resolution_cache{heap_allocator()};
 
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
@@ -76,6 +80,14 @@ public:
      control flow nodes override it. is_unconditional says whether this node is
      reached on every run, which decides a failure from a warning. */
   virtual fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void;
+
+  /* Register the function names this node defines at the top level, before the
+     ordered analyze walk. A call to a sibling function defined later in the
+     file then resolves without a PATH scan or a missing-command warning. The
+     base does None, the list nodes forward to their children, and a function
+     definition adds its own name. */
+  virtual fn register_defined_functions(AnalysisContext &actx) const throws
       -> void;
 
 protected:
@@ -272,6 +284,8 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
+  fn register_defined_functions(AnalysisContext &actx) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -294,6 +308,8 @@ public:
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+  fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
 protected:
@@ -519,6 +535,8 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+  fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
 protected:

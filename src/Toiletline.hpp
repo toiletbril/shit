@@ -17,6 +17,11 @@ void set_title(const String &title);
 
 usize utf8_strlen(const String &s, usize byte_count = static_cast<usize>(-1));
 
+/* The code point count of the first byte_count bytes of a raw buffer. This
+   counts in place over the caller's bytes, so a located error formats its
+   column without copying the whole source per call. */
+usize utf8_strnlen(const char *bytes, usize byte_count);
+
 bool is_active();
 
 void initialize();

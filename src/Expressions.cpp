@@ -73,6 +73,12 @@ cold fn Expression::analyze(AnalysisContext &actx,
   unused(is_unconditional);
 }
 
+cold fn Expression::register_defined_functions(AnalysisContext &actx) const
+    throws -> void
+{
+  unused(actx);
+}
+
 fn Expression::is_simple_command() const wontthrow -> bool { return false; }
 
 fn Expression::is_dummy() const wontthrow -> bool { return false; }
@@ -104,15 +110,22 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 }
 
 /* A command resolves when it is a builtin, a program on PATH, or an existing
-   path. This shares the PATH cache with execution, so an unconditional command
-   is resolved only once. */
-fn command_resolves(const String &name) throws -> bool
+   path. The result is memoized per name in the analysis context, so a command
+   run many times across the file scans PATH at most once. A name holding a slash
+   is a path, so it is not cached, since the filesystem may differ per run. */
+fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
 {
   if (name.is_empty()) return false;
   if (search_builtin(name.view()).has_value()) return true;
   if (name.find_character('/').has_value())
     return utils::canonicalize_path(name.view()).has_value();
-  return utils::search_program_path(name.view()).count() != 0;
+
+  if (const bool *cached = actx.command_resolution_cache.find(name.view()))
+    return *cached;
+
+  const bool was_resolved = utils::search_program_path(name.view()).count() != 0;
+  actx.command_resolution_cache.set(name.view(), was_resolved);
+  return was_resolved;
 }
 
 /* A flattened view of a word's bytes paired with whether each byte is an active
@@ -1748,6 +1761,12 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
   m_body->analyze(actx, false);
 }
 
+cold fn FunctionDefinition::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  actx.defined_functions.add(m_name);
+}
+
 RedirectedCommand::RedirectedCommand(SourceLocation location,
                                      const Command *child,
                                      ArrayList<Redirection> &&redirections)
@@ -2178,7 +2197,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (name && !command_resolves(*name) &&
+  if (name && !command_resolves(actx, *name) &&
       !actx.defined_functions.contains(
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))
@@ -2214,9 +2233,26 @@ cold fn CompoundListCondition::analyze(AnalysisContext &actx,
   m_cmd->analyze(actx, is_unconditional);
 }
 
+cold fn CompoundListCondition::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  ASSERT(m_cmd != nullptr);
+
+  m_cmd->register_defined_functions(actx);
+}
+
 cold fn CompoundList::analyze(AnalysisContext &actx,
                               bool is_unconditional) const throws -> void
 {
+  /* A function defined by a later sibling resolves a call earlier in the same
+     list, the way the runtime would once the whole file is read. Register every
+     top-level function name before the ordered walk so a forward or
+     cross-branch call does not scan PATH or warn. */
+  for (const CompoundListCondition *node : m_nodes) {
+    ASSERT(node != nullptr);
+    node->register_defined_functions(actx);
+  }
+
   for (const CompoundListCondition *node : m_nodes) {
     ASSERT(node != nullptr);
 
@@ -2225,6 +2261,15 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
     let const node_unconditional =
         is_unconditional && node->kind() == CompoundListCondition::Kind::None;
     node->analyze(actx, node_unconditional);
+  }
+}
+
+cold fn CompoundList::register_defined_functions(AnalysisContext &actx) const
+    throws -> void
+{
+  for (const CompoundListCondition *node : m_nodes) {
+    ASSERT(node != nullptr);
+    node->register_defined_functions(actx);
   }
 }
 
