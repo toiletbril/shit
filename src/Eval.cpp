@@ -2032,6 +2032,12 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
     delete source;
   m_retained_sources.clear();
 
+  /* The located-error formatter caches a line index keyed on the source address
+     and length. A just-freed buffer can be reissued at the same address with the
+     same length, so the cache is dropped here to keep it from serving the stale
+     index of the freed source. */
+  invalidate_source_line_index();
+
   /* The current source frame may point at a retained copy just freed, so reset
      it to None until the next run sets it. */
   m_current_source = nullptr;

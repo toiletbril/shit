@@ -256,20 +256,34 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   const pid_t child_pid = check_syscall(fork());
 
   if (child_pid == 0) {
-    if (in_fd) {
-      check_syscall(dup2(*in_fd, STDIN_FILENO));
-      check_syscall(close(*in_fd));
-    }
-    if (out_fd) {
-      check_syscall(dup2(*out_fd, STDOUT_FILENO));
-      check_syscall(close(*out_fd));
-    }
-    if (err_fd) {
-      check_syscall(dup2(*err_fd, STDERR_FILENO));
-      check_syscall(close(*err_fd));
-    }
+    /* A dup2 or close failure here throws through check_syscall. In the forked
+       child that would unwind back into the parent's evaluator inside the
+       duplicated process, running the parent's cleanup and never reaching
+       _exit. The child must always terminate directly, so a failure in the
+       descriptor setup is caught and reported, then the child exits. */
+    try {
+      if (in_fd) {
+        check_syscall(dup2(*in_fd, STDIN_FILENO));
+        check_syscall(close(*in_fd));
+      }
+      if (out_fd) {
+        check_syscall(dup2(*out_fd, STDOUT_FILENO));
+        check_syscall(close(*out_fd));
+      }
+      if (err_fd) {
+        check_syscall(dup2(*err_fd, STDERR_FILENO));
+        check_syscall(close(*err_fd));
+      }
 
-    reset_signal_handlers();
+      reset_signal_handlers();
+    } catch (const shit::Error &e) {
+      String msg = e.message();
+      msg += '\n';
+      (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
+      exit_process_immediately(1);
+    } catch (...) {
+      exit_process_immediately(1);
+    }
   }
 
   return child_pid;

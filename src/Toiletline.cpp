@@ -116,20 +116,53 @@ shit::ArrayList<shit::String> COMPLETION_CANDIDATES{};
 shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{};
 shit::String COMPLETION_LCP{};
 
+/* The byte offset of the codepoint at the given codepoint index in a UTF-8
+   buffer, walking from the start and counting the lead bytes. An index at or
+   past the codepoint count returns the byte length, so a clamped cursor maps to
+   the end of the buffer. */
+fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
+                            usize codepoint_index) -> usize
+{
+  usize byte_offset = 0;
+  usize seen_codepoints = 0;
+  while (byte_offset < byte_length && seen_codepoints < codepoint_index) {
+    /* A byte that is not a UTF-8 continuation byte starts a codepoint. */
+    if ((static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) != 0x80)
+      seen_codepoints += 1;
+    byte_offset += 1;
+  }
+  /* A continuation byte that trails the last counted codepoint is not the start
+     of the next one, so step over the rest of that codepoint. */
+  while (byte_offset < byte_length &&
+         (static_cast<unsigned char>(bytes[byte_offset]) & 0xC0) == 0x80)
+    byte_offset += 1;
+  return byte_offset;
+}
+
 /* Bridge toiletline's TAB and ghost queries onto the shell completion engine.
    The engine completes the token under the cursor and the result is stored in
    the static buffers above, which toiletline reads right after this returns.
-   Returns 1 when at least one candidate was produced, 0 otherwise. */
+
+   Toiletline edits in codepoints, so the cursor arrives as a codepoint index and
+   the token bounds must go back as codepoint indices, while the completion engine
+   works in bytes. The cursor is converted to a byte offset before the engine
+   runs, and the byte token bounds it returns are converted back to codepoint
+   indices here. Returns 1 when at least one candidate was produced, 0
+   otherwise. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
                             tl_completion *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
 
-  shit::StringView line{buffer, std::strlen(buffer)};
+  const usize byte_length = std::strlen(buffer);
+  shit::StringView line{buffer, byte_length};
   shit::Path base = shit::Path::current_directory();
 
+  const usize byte_cursor =
+      byte_offset_of_codepoint(buffer, byte_length, cursor);
+
   shit::completion::completion_result result =
-      shit::completion::complete(line, cursor, *COMPLETION_CONTEXT, base);
+      shit::completion::complete(line, byte_cursor, *COMPLETION_CONTEXT, base);
 
   if (result.candidates.is_empty()) return 0;
 
@@ -143,7 +176,10 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
   out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
   out->count = COMPLETION_CANDIDATE_POINTERS.count();
   out->longest_common_prefix = COMPLETION_LCP.c_str();
-  out->token_start = result.token_start;
+  /* The engine reports the token span in bytes, so convert each boundary to a
+     codepoint index for toiletline, which replaces the span in codepoints. */
+  out->token_start = ::tl_utf8_strnlen(buffer, result.token_start);
+  out->token_end = ::tl_utf8_strnlen(buffer, result.token_end);
 
   return 1;
 }

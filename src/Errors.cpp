@@ -117,6 +117,18 @@ public:
     }
   }
 
+  /* Forget the cached source, so the next ensure_built_for rebuilds rather than
+     trusting the pointer and length. A retained source freed by the host can be
+     replaced by a fresh allocation at the same address with the same length,
+     which the pointer-and-length key alone cannot tell apart. */
+  fn invalidate() wontthrow -> void
+  {
+    m_source_data = nullptr;
+    m_source_length = 0;
+    m_newline_offsets.clear();
+    m_codepoints_before_newline.clear();
+  }
+
   /* The line number and the offset of the newline that starts it, matching the
      prefix scan it replaces. The line number counts newlines strictly before
      the byte, and the newline offset is the last such newline, or zero when the
@@ -173,6 +185,11 @@ private:
 /* One index reused across every located message in a pass, since the pass works
    over a single source at a time. */
 static SourceLineIndex SOURCE_LINE_INDEX{};
+
+fn invalidate_source_line_index() wontthrow -> void
+{
+  SOURCE_LINE_INDEX.invalidate();
+}
 
 cold static fn calc_precise_position(StringView source,
                                      usize byte_position) throws

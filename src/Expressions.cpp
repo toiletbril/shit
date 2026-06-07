@@ -1120,69 +1120,89 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
-  for (usize stage_index = 0; stage_index < m_commands.count(); stage_index++) {
-    const Command *stage = m_commands[stage_index];
-    ASSERT(stage != nullptr);
+  /* A make_pipe or fork failure mid-loop leaves the previous stage's pipe read
+     end open and the already-forked children unreaped. On the error path the
+     open read end is closed and every spawned child is waited, then the error
+     is rethrown so the caller still reports it. The success path falls through
+     untouched. */
+  try {
+    for (usize stage_index = 0; stage_index < m_commands.count(); stage_index++)
+    {
+      const Command *stage = m_commands[stage_index];
+      ASSERT(stage != nullptr);
 
-    cxt.add_evaluated_expression();
+      cxt.add_evaluated_expression();
 
-    let const is_first = (stage_index == 0);
-    let const is_last = (stage_index + 1 == m_commands.count());
+      let const is_first = (stage_index == 0);
+      let const is_last = (stage_index + 1 == m_commands.count());
 
-    Maybe<os::descriptor> stage_in{};
-    Maybe<os::descriptor> stage_out{};
-    Maybe<os::Pipe> pipe{};
+      Maybe<os::descriptor> stage_in{};
+      Maybe<os::descriptor> stage_out{};
+      Maybe<os::Pipe> pipe{};
 
-    if (!is_last) {
-      pipe = os::make_pipe();
-      if (!pipe) {
-        throw ErrorWithLocation{stage->source_location(),
-                                "Could not open a pipe"};
-      }
-      stage_out = pipe->out;
-    }
-    if (!is_first) stage_in = last_stdin;
-
-    const os::process child =
-        os::fork_compound_stage(stage_in, stage_out, {});
-
-    if (child == 0) {
-      /* The child evaluates the stage in a subshell, so a variable change such
-         as a while-read does not escape, then exits with its status. A
-         diagnostic or an exit request inside still yields a child status rather
-         than unwinding back into the parent's evaluator. */
-      i32 stage_status = 0;
-      try {
-        cxt.enter_subshell();
-        stage_status = static_cast<i32>(stage->evaluate(cxt));
-        if (cxt.has_pending_control_flow() &&
-            cxt.pending_control_flow().kind == control_flow::Kind::Exit)
-        {
-          stage_status = static_cast<i32>(cxt.pending_control_flow().value);
+      if (!is_last) {
+        pipe = os::make_pipe();
+        if (!pipe) {
+          throw ErrorWithLocation{stage->source_location(),
+                                  "Could not open a pipe"};
         }
-      } catch (const ErrorWithLocation &e) {
-        const String *source = cxt.current_source();
-        shit::show_message(
-            e.to_string(source != nullptr ? source->view() : StringView{}));
-        stage_status = 1;
-      } catch (const Error &e) {
-        shit::show_message(e.to_string());
-        stage_status = 1;
-      } catch (...) {
-        stage_status = 1;
+        stage_out = pipe->out;
       }
-      shit::flush();
-      os::exit_process_immediately(stage_status);
+      if (!is_first) stage_in = last_stdin;
+
+      const os::process child =
+          os::fork_compound_stage(stage_in, stage_out, {});
+
+      if (child == 0) {
+        /* The child evaluates the stage in a subshell, so a variable change such
+           as a while-read does not escape, then exits with its status. A
+           diagnostic or an exit request inside still yields a child status
+           rather than unwinding back into the parent's evaluator. */
+        i32 stage_status = 0;
+        try {
+          cxt.enter_subshell();
+          stage_status = static_cast<i32>(stage->evaluate(cxt));
+          if (cxt.has_pending_control_flow() &&
+              cxt.pending_control_flow().kind == control_flow::Kind::Exit)
+          {
+            stage_status = static_cast<i32>(cxt.pending_control_flow().value);
+          }
+        } catch (const ErrorWithLocation &e) {
+          const String *source = cxt.current_source();
+          shit::show_message(
+              e.to_string(source != nullptr ? source->view() : StringView{}));
+          stage_status = 1;
+        } catch (const Error &e) {
+          shit::show_message(e.to_string());
+          stage_status = 1;
+        } catch (...) {
+          stage_status = 1;
+        }
+        shit::flush();
+        os::exit_process_immediately(stage_status);
+      }
+
+      /* The parent keeps neither pipe end open past the stage that owns it,
+         otherwise a reader never sees the writer close. */
+      if (stage_out) os::close_fd(*stage_out);
+      if (stage_in) os::close_fd(*stage_in);
+      if (!is_last) last_stdin = pipe->in;
+
+      children.push(child);
+      last_child = child;
     }
-
-    /* The parent keeps neither pipe end open past the stage that owns it,
-       otherwise a reader never sees the writer close. */
-    if (stage_out) os::close_fd(*stage_out);
-    if (stage_in) os::close_fd(*stage_in);
-    if (!is_last) last_stdin = pipe->in;
-
-    children.push(child);
-    last_child = child;
+  } catch (...) {
+    if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+    for (const os::process child : children) {
+      /* The wait reaps the child, so a spawned stage never lingers as a zombie
+         when the pipeline aborts. A failure to wait must not mask the original
+         error, so it is swallowed here. */
+      try {
+        os::wait_and_monitor_process(child);
+      } catch (...) {
+      }
+    }
+    throw;
   }
 
   if (is_async()) {
@@ -1380,6 +1400,22 @@ cold fn IfClause::analyze(AnalysisContext &actx,
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
 }
 
+cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
+    -> void
+{
+  /* Every branch body and the conditions run in the current shell, so a function
+     defined in any of them is callable from a sibling and must be registered
+     before the ordered walk warns about a forward reference. */
+  for (const auto &[condition, body] : m_branches) {
+    ASSERT(condition != nullptr);
+    ASSERT(body != nullptr);
+    condition->register_defined_functions(actx);
+    body->register_defined_functions(actx);
+  }
+
+  if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
+}
+
 WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
                      const Expression *body, bool is_until)
     : CompoundCommand(location), m_condition(condition), m_body(body),
@@ -1486,6 +1522,18 @@ cold fn WhileLoop::analyze(AnalysisContext &actx,
   m_body->analyze(actx, false);
 }
 
+cold fn WhileLoop::register_defined_functions(AnalysisContext &actx) const throws
+    -> void
+{
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_body != nullptr);
+
+  /* The condition and the body both run in the current shell, so a function
+     defined in either is registered before the ordered walk. */
+  m_condition->register_defined_functions(actx);
+  m_body->register_defined_functions(actx);
+}
+
 ForLoop::ForLoop(SourceLocation location, StringView variable_name,
                  ArrayList<const Token *> &&words, bool has_in_clause,
                  const Expression *body)
@@ -1543,6 +1591,16 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
 
   unused(is_unconditional);
   m_body->analyze(actx, false);
+}
+
+cold fn ForLoop::register_defined_functions(AnalysisContext &actx) const throws
+    -> void
+{
+  ASSERT(m_body != nullptr);
+
+  /* The loop body runs in the current shell, so a function it defines is
+     registered before the ordered walk. */
+  m_body->register_defined_functions(actx);
 }
 
 CaseClause::CaseClause(SourceLocation location, const Token *word,
@@ -1622,6 +1680,17 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
   }
 }
 
+cold fn CaseClause::register_defined_functions(AnalysisContext &actx) const throws
+    -> void
+{
+  /* Each arm body runs in the current shell when its pattern matches, so a
+     function defined in any arm is registered before the ordered walk. */
+  for (const case_item &item : m_items) {
+    ASSERT(item.body != nullptr);
+    item.body->register_defined_functions(actx);
+  }
+}
+
 BraceGroup::BraceGroup(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}
@@ -1652,6 +1721,18 @@ cold fn BraceGroup::analyze(AnalysisContext &actx,
   ASSERT(m_body != nullptr);
 
   m_body->analyze(actx, is_unconditional);
+}
+
+cold fn BraceGroup::register_defined_functions(AnalysisContext &actx) const
+    throws -> void
+{
+  ASSERT(m_body != nullptr);
+
+  /* A brace group runs in the current shell, so a function defined in its body
+     leaks to the enclosing scope and is registered before the ordered walk.
+     Subshell does not forward here, since a function defined in a subshell does
+     not escape it. */
+  m_body->register_defined_functions(actx);
 }
 
 Subshell::Subshell(SourceLocation location, const Expression *body)
@@ -1811,6 +1892,16 @@ cold fn RedirectedCommand::analyze(AnalysisContext &actx,
   ASSERT(m_child != nullptr);
 
   m_child->analyze(actx, is_unconditional);
+}
+
+cold fn RedirectedCommand::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  ASSERT(m_child != nullptr);
+
+  /* The redirected command runs in the current shell, so a function defined in
+     it is registered before the ordered walk. */
+  m_child->register_defined_functions(actx);
 }
 
 fn RedirectedCommand::append_to(usize d, String &f, bool duplicate) throws
@@ -2307,6 +2398,19 @@ cold fn IfStatement::analyze(AnalysisContext &actx,
   m_condition->analyze(actx, is_unconditional);
   m_then->analyze(actx, false);
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
+}
+
+cold fn IfStatement::register_defined_functions(AnalysisContext &actx) const
+    throws -> void
+{
+  ASSERT(m_condition != nullptr);
+  ASSERT(m_then != nullptr);
+
+  /* The condition and both branches run in the current shell, so a function
+     defined in any of them is registered before the ordered walk. */
+  m_condition->register_defined_functions(actx);
+  m_then->register_defined_functions(actx);
+  if (m_otherwise != nullptr) m_otherwise->register_defined_functions(actx);
 }
 
 } /* namespace expressions */

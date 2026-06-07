@@ -22,6 +22,11 @@ struct SourceLocation
   Maybe<StringView> filename{};
 };
 
+/* Drop the cached source-line index that the located-error formatter keeps. The
+   host calls this when it frees a retained source, so a later source allocated
+   at the same address with the same length does not read a stale index. */
+fn invalidate_source_line_index() wontthrow -> void;
+
 class ErrorBase
 {
 public:
