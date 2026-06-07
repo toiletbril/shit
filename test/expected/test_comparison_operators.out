@@ -90,6 +90,7 @@
   Unquoted "-z"
 ]
 [Word
+  DoubleQuoted ""
 ]
 [Word
   Unquoted "]"

@@ -1,0 +1,352 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ForLoop "x"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "iter[$x]"]
+  [CompoundListCondition, None]
+    [ForLoop "x"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "[$x]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "" "a" ""]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "$unset"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "count=$#"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "" "a" ""]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [Assign u=]
+  [CompoundListCondition, None]
+    [ForLoop "x"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "<$x>"]
+  [CompoundListCondition, None]
+    [ForLoop "x"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "def<$x>"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "$(false)" "a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "subst=$#"]
+  [CompoundListCondition, None]
+    [ForLoop "x"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "NO"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "unquoted-done"]
+  [CompoundListCondition, None]
+    [ForLoop "e"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "ext[$e]"]
+  [CompoundListCondition, None]
+    [Assign x=]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "len=$#x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ab" "pq" "c"]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "iter["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Literal ""
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ""
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "x"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Variable "unset"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "count="
+  Variable "#"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "u="
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "u"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "<"
+  Variable "x"
+  DoubleQuoted ">"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "z:-"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "def<"
+  Variable "x"
+  DoubleQuoted ">"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "subst="
+  Variable "#"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "unset"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "NO"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unquoted-done"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "e"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Literal ""
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ext["
+  Variable "e"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "x="
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "len="
+  Variable "#x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ab"
+]
+[Word
+  DoubleQuoted "p"
+  Unquoted "q"
+]
+[Word
+  Unquoted "c"
+  DoubleQuoted ""
+]
+iter[]
+[]
+[a]
+[]
+3
+count=0
+[][a][]
+<>
+<b>
+def<>
+def<b>
+subst=2
+unquoted-done
+ext[]
+ext[x]
+len=0
+ab pq c
+[Code 0]

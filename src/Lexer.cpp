@@ -363,6 +363,12 @@ hot fn Lexer::lex_identifier() throws -> Token *
 
   Maybe<char> quote_char;
 
+  /* Set when the open quote enclosed at least one character. When the matching
+     close quote arrives with it still clear, the quote enclosed nothing and an
+     empty segment is synthesized so the word keeps one empty field, the way ""
+     and '' each expand to one empty argument rather than to none. */
+  bool did_quote_enclose_content = false;
+
   /* Append a character to the open segment, starting a new one when the kind
      changes. A variable reference never merges, since each one carries its own
      name. */
@@ -403,10 +409,15 @@ hot fn Lexer::lex_identifier() throws -> Token *
 
     if (quote_char == '\'') {
       /* Single quotes take everything literally up to the closing quote. */
-      if (ch == '\'')
+      if (ch == '\'') {
+        if (!did_quote_enclose_content)
+          word.segments.push(
+              WordSegment{WordSegment::Kind::LiteralText, String{}, false});
         quote_char.reset();
-      else
+      } else {
         append_char(WordSegment::Kind::LiteralText, ch);
+        did_quote_enclose_content = true;
+      }
       byte_count++;
       continue;
     }
@@ -417,6 +428,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
          "\n" is a backslash and an n, not an escape. Outside double quotes a
          backslash escapes the next character. */
       if (quote_char == '"') {
+        did_quote_enclose_content = true;
         const let escaped_next = chop_character(byte_count + 1);
         if (escaped_next == '$' || escaped_next == '`' || escaped_next == '"' ||
             escaped_next == '\\' || escaped_next == '\n')
@@ -436,13 +448,22 @@ hot fn Lexer::lex_identifier() throws -> Token *
     const let is_in_double_quotes = quote_char == '"';
 
     if (is_in_double_quotes && ch == '"') {
+      if (!did_quote_enclose_content)
+        word.segments.push(
+            WordSegment{WordSegment::Kind::DoubleQuotedText, String{}, false});
       quote_char.reset();
       byte_count++;
       continue;
     }
 
+    /* Past the close quote, any character reached while still inside the double
+       quote is enclosed content, whether it is a literal, an expansion, or a
+       substitution. */
+    if (is_in_double_quotes) did_quote_enclose_content = true;
+
     if (!quote_char && lexer::is_string_quote(ch)) {
       relative_last_quote_char_pos = byte_count;
+      did_quote_enclose_content = false;
       quote_char = ch;
       byte_count++;
       continue;
