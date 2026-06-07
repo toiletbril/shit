@@ -35,7 +35,7 @@ run_tests: $(TEST_NAMES)
 refill:
 	for f in $(TEST_NAMES); do \
 		printf "	%-42s $$f.out\n" $$f.shit; \
-		$(BIN) $(BIN_FLAGS) input/$$f.shit > expected/$$f.out 2>&1; \
+		cat input/$$f.shit | $(BIN) $(BIN_FLAGS) > expected/$$f.out 2>&1; \
 	done || true
 
 # Run each sh-compat script through the shell and through dash, then compare
