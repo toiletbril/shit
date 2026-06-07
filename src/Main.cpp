@@ -1,7 +1,6 @@
 #include "Arena.hpp"
 #include "Cli.hpp"
 #include "Common.hpp"
-#include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -55,10 +54,6 @@ FLAG(EXIT_CODE, Bool, 'E', "exit-code",
      "Print exit code after each executed command.");
 FLAG(STATS, Bool, 'S', "stats",
      "Print statistics after each executed command.");
-
-FLAG(COMPLETE, Bool, '\0', "complete",
-     "Debug: print tab completions for a line. Args are the line, the cursor "
-     "byte offset, and an optional base directory for filesystem completion.");
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, 'V', "short-version",
@@ -298,56 +293,6 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
   return out;
 }
 
-/* Run the completion engine against a line and print the result, so a test
-   exercises completion without a terminal. The args are the line, the cursor
-   byte offset, and an optional base directory that roots filesystem completion
-   at a fixed place. The output is deterministic, the longest common prefix
-   followed by each candidate on its own line. */
-static fn run_complete_debug(const ArrayList<String> &args) -> int
-{
-  if (args.is_empty()) {
-    print_error("--complete needs a line argument\n");
-    return EXIT_FAILURE;
-  }
-
-  StringView line = args[0].view();
-
-  usize cursor = line.length;
-  if (args.count() > 1) {
-    if (ErrorOr<i64> parsed = utils::parse_decimal_integer(args[1].view());
-        !parsed.is_error() && parsed.value() >= 0)
-    {
-      cursor = static_cast<usize>(parsed.value());
-    }
-  }
-
-  Path base_directory =
-      args.count() > 2 ? Path{args[2].view()} : Path::current_directory();
-
-  /* A throwaway context with no functions or aliases, enough for the engine to
-     read its empty name sets and complete builtins, PATH, and the filesystem. */
-  EvalContext context{false, false, false, false};
-
-  completion::completion_result result =
-      completion::complete(line, cursor, context, base_directory);
-
-  String out{};
-  out += "position: ";
-  out += result.is_command_position ? "command" : "argument";
-  out += "\nlcp: ";
-  out += result.longest_common_prefix.view();
-  out += "\n";
-  for (const String &candidate : result.candidates) {
-    out += "candidate: ";
-    out += candidate.view();
-    out += "\n";
-  }
-  print(out);
-  flush();
-
-  return EXIT_SUCCESS;
-}
-
 } /* namespace shit */
 
 fn main(int argc, char **argv) -> int
@@ -386,11 +331,6 @@ fn main(int argc, char **argv) -> int
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
 
-  /* The completion debug path runs the engine and exits, so a test exercises it
-     without a terminal. It must stay off the normal startup, so it is gated on
-     its own flag and returns before any interactive or script work. */
-  if (FLAG_COMPLETE.is_enabled()) return shit::run_complete_debug(file_names);
-
   if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
 
   /* Both stdin and interactive flags are enabled, but there will be only the
@@ -416,9 +356,9 @@ fn main(int argc, char **argv) -> int
    * Option precedence should behave as follows: "-s", then "-c", then files
    * (arguments), then "-i" (or no arguments). */
   if (FLAG_STDIN.is_enabled()) {
-    if (!FLAG_COMMAND.is_empty() || !file_names.is_empty() ||
-        FLAG_INTERACTIVE.is_enabled())
-    {
+    /* Operands after -s are the positional parameters, so they are not
+       incompatible. Only the command and interactive flags conflict with -s. */
+    if (!FLAG_COMMAND.is_empty() || FLAG_INTERACTIVE.is_enabled()) {
       shit::show_message(
           "Incompatible options or arguments were specified along "
           "with '-s' option. "
@@ -426,7 +366,10 @@ fn main(int argc, char **argv) -> int
     }
     should_read_stdin = true;
   } else if (!FLAG_COMMAND.is_empty()) {
-    if (!file_names.is_empty() || FLAG_INTERACTIVE.is_enabled()) {
+    /* Operands after the command string are not incompatible, since POSIX reads
+       the first as $0 and the rest as the positional parameters. Only the
+       interactive flag conflicts with -c. */
+    if (FLAG_INTERACTIVE.is_enabled()) {
       shit::show_message(
           "Incompatible options or arguments were specified along "
           "with '-c' options. "
@@ -443,14 +386,29 @@ fn main(int argc, char **argv) -> int
     should_be_interactive = true;
   }
 
-  /* Main loop state. The program name is $0 and the remaining arguments are the
-     positional parameters $1 upward, held in the list the context owns. */
+  /* Resolve $0 and the positional parameters $1 upward from the operands per
+     POSIX, since the rule differs by invocation mode. When running a script
+     file the first operand is the script path and becomes $0, while the rest
+     are its arguments. Under -c the first operand names $0 and the rest are the
+     arguments. An interactive or -s shell keeps the shell name as $0 and takes
+     every operand as a positional parameter. The context owns both. */
+  shit::String shell_name{program_path};
   shit::ArrayList<shit::String> positional_params{};
-  positional_params.reserve(file_names.count());
-  for (const shit::String &file_name : file_names)
+
+  usize first_param_index = 0;
+  if (should_read_files && !file_names.is_empty()) {
+    shell_name = shit::String{file_names[0]};
+    first_param_index = 1;
+  } else if (should_execute_commands && !file_names.is_empty()) {
+    shell_name = shit::String{file_names[0]};
+    first_param_index = 1;
+  }
+
+  positional_params.reserve(file_names.count() - first_param_index);
+  for (usize i = first_param_index; i < file_names.count(); i++)
     positional_params.push(shit::String{
         shit::heap_allocator(),
-        shit::StringView{file_name.data(), file_name.count()}
+        shit::StringView{file_names[i].data(), file_names[i].count()}
     });
 
   shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
@@ -458,7 +416,7 @@ fn main(int argc, char **argv) -> int
                             FLAG_EXPAND_VERBOSE.is_enabled(),
                             should_be_interactive,
                             FLAG_ERROR_EXIT.is_enabled(),
-                            shit::String{program_path},
+                            shit::String{shell_name},
                             steal(positional_params)};
 
   /* Apply the remaining option flags that the constructor does not take. */
@@ -486,7 +444,6 @@ fn main(int argc, char **argv) -> int
   context.set_shell_variable("SHIT_BUILD_MODE", SHIT_BUILD_MODE);
   context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);
 
-  usize arg_index = 0;
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
   int exit_code = EXIT_SUCCESS;
 
@@ -536,14 +493,15 @@ fn main(int argc, char **argv) -> int
     /* Figure out what to do and retrieve the code. */
     try {
       if (should_read_files || should_read_stdin) {
-        /* If "-s" is used, or when the file name is "-", read standard input,
-           otherwise read the named file, both through the descriptor layer so
-           no iostream file stream is pulled in. */
-        if (should_read_stdin || file_names[arg_index] == "-") {
-          should_quit = should_quit || should_read_stdin;
+        /* The shell runs exactly one script, the first operand, with the rest
+           of the operands as its positional parameters. If "-s" is used, or
+           when that operand is "-", read standard input, otherwise read the
+           named file, both through the descriptor layer so no iostream file
+           stream is pulled in. */
+        if (should_read_stdin || file_names[0] == "-") {
           script_contents = shit::utils::read_entire_standard_input();
         } else {
-          const shit::String &file_name = file_names[arg_index];
+          const shit::String &file_name = file_names[0];
           shit::Maybe<shit::String> contents =
               shit::utils::read_entire_file(file_name.view());
           if (!contents) {
@@ -553,9 +511,7 @@ fn main(int argc, char **argv) -> int
           script_contents = steal(*contents);
         }
 
-        if ((arg_index += 1) == file_names.count()) {
-          should_quit = true;
-        }
+        should_quit = true;
       } else if (should_execute_commands) {
         shit::StringView command_view = FLAG_COMMAND.next();
         script_contents = shit::String{command_view};

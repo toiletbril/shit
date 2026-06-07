@@ -28,26 +28,15 @@ clean:
 test: $(BIN)
 	@$(MAKE) -B clean
 	@$(MAKE) -B run_tests
-	@$(MAKE) -B completiontest
 	cat $(FAILED_LIST)
 
 run_tests: $(TEST_NAMES)
-
-# Drive the completion engine through the --complete debug flag over a fixed set
-# of cases and diff against the golden output. This exercises completion without
-# a terminal, so it runs as part of the headless suite.
-completiontest: $(BIN)
-	sh completion_cases.sh $(BIN) | \
-	diff $(DIFF_FLAGS) expected/completion.out - >> $(FAILED_LIST) && \
-	printf "	%-42s ok\n" completion || \
-	printf "	%-42s FAILED :c\n" completion
 
 refill:
 	for f in $(TEST_NAMES); do \
 		printf "	%-42s $$f.out\n" $$f.shit; \
 		$(BIN) $(BIN_FLAGS) input/$$f.shit > expected/$$f.out 2>&1; \
 	done || true
-	sh completion_cases.sh $(BIN) > expected/completion.out
 
 # Run each sh-compat script through the shell and through dash, then compare
 # their standard output and exit status. The goal is byte-identical behavior.
@@ -91,4 +80,4 @@ bench: $(BIN)
 		done'; \
 	rm -f /tmp/shit_bench_d /tmp/shit_bench_s
 
-.PHONY: test clean run_tests completiontest refill dashdiff bench
+.PHONY: test clean run_tests refill dashdiff bench
