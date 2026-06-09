@@ -848,10 +848,10 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
 hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* A command may have no words when it is only a redirection, such as > file,
-     or only assignments, such as a=1 b=2, so the redirections and the
-     assignments still run below. */
+     or only assignments, such as a=1 b=2 or a bare array assignment a=(1 2), so
+     the redirections and the assignments still run below. */
   ASSERT(m_args.count() > 0 || !m_redirections.is_empty() ||
-         m_local_vars.count() > 0);
+         m_local_vars.count() > 0 || !m_array_args.is_empty());
 
   /* Record where this command sits so a $LINENO in its words reports its line.
    */
