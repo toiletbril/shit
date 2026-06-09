@@ -551,6 +551,10 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     if (!for_listing) return None;
     const completion_spec *def = context.default_completion_spec();
     if (def == nullptr || def->function_name.is_empty()) return None;
+    /* The default's fallback flag is read before the function runs, since the
+       function may itself register a new default and move the spec the pointer
+       names, so the flag is captured rather than read back through def. */
+    let const default_falls_back = def->use_default;
     usize default_cword = 0;
     let const default_words = split_completion_words(line, cursor, default_cword);
     i32 status = 0;
@@ -561,7 +565,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
       let loaded = ArrayList<String>{};
       for (const String &entry : reply)
         loaded.push_managed(entry.view());
-      if (loaded.is_empty() && def->use_default) return None;
+      if (loaded.is_empty() && default_falls_back) return None;
       return loaded;
     }
     spec = context.lookup_completion_spec(command);
