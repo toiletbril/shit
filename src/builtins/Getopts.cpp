@@ -9,6 +9,12 @@
    OPTIND and the per-argument index the EvalContext keeps. A leading colon in
    optstring selects the silent error mode. */
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("optstring name [arg ...]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Getopts::Getopts() = default;
@@ -21,8 +27,11 @@ pure fn Getopts::kind() const wontthrow -> Builtin::Kind
 fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
+
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   if (args.count() < 3)
-    throw Error{"Getopts: usage: getopts optstring name [arg ...]"};
+    throw Error{"usage: getopts optstring name [arg ...]"};
 
   let const &optstring = args[1];
   let const &name = args[2];

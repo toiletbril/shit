@@ -1,29 +1,18 @@
 #include "../Builtin.hpp"
-#include "../Cli.hpp"
+#include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Utils.hpp"
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("expression, or [ expression ]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 namespace {
-
-/* Build a located diagnostic at the command word and render it with a caret the
-   way a runtime command-not-found does. When the source is null, as in an eval
-   with no retained buffer, fall back to the bare prefixed line. The caret points
-   at the command word, since the post-expansion operands carry no per-argument
-   source offsets. */
-cold fn print_located(ExecContext &ec, EvalContext &cxt,
-                      StringView message) throws -> void
-{
-  const String *source = cxt.current_source();
-  if (source != nullptr) {
-    const ErrorWithLocation located{ec.source_location(), message};
-    show_message(located.to_string(source->view()));
-  } else {
-    shit::print_error(StringView{"test: "} + message + "\n");
-  }
-}
 
 bool parse_integer(StringView text, i64 &out) throws
 {
@@ -40,8 +29,6 @@ class TestEvaluator
 public:
   const ArrayList<String> &args;
   usize pos;
-  bool had_error;
-  String error_message;
 
   pure const String &current() const wontthrow
   {
@@ -50,13 +37,9 @@ public:
   }
   pure bool at_end() const wontthrow { return pos >= args.count(); }
 
-  /* The evaluator holds no ec or cxt, so it records the first failure here and
-     execute renders it with a caret after the parse returns. */
-  void fail(StringView message) throws
-  {
-    if (!had_error) error_message = String{message};
-    had_error = true;
-  }
+  /* A malformed expression throws, so the builtin dispatch wraps the message
+     with the test name and a caret at the command word. */
+  void fail(StringView message) throws { throw Error{String{message}}; }
 
   bool evaluate_unary(const String &op, const String &operand) throws
   {
@@ -195,18 +178,21 @@ pure Builtin::Kind Test::kind() const wontthrow { return Kind::Test; }
 
 i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
+  unused(cxt);
+
   /* Strip the program name, and for the [ form the required trailing ]. The
      last operand index ends the expression, one before the trailing ] in the
      bracket form. */
   let const &arguments = ec.args();
   ASSERT(!arguments.is_empty());
 
+  if (arguments.count() > 1 && arguments[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   usize expression_end = arguments.count();
   if (ec.program() == "[") {
-    if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]") {
-      print_located(ec, cxt, "missing closing ']'");
-      return 2;
-    }
+    if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]")
+      throw Error{"missing closing ']'"};
     expression_end = arguments.count() - 1;
   }
 
@@ -218,17 +204,12 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      arguments. */
   if (operands.is_empty()) return 1;
 
-  TestEvaluator evaluator{operands, 0, false, String{}};
+  TestEvaluator evaluator{operands, 0};
   let const result = evaluator.parse_expression();
-  if (evaluator.had_error) {
-    print_located(ec, cxt, evaluator.error_message.view());
-    return 2;
-  }
   if (evaluator.pos != operands.count()) {
     ASSERT(evaluator.pos < operands.count());
-    print_located(ec, cxt, StringView{"unexpected argument '"} +
-                               operands[evaluator.pos] + "'");
-    return 2;
+    throw Error{StringView{"unexpected argument '"} + operands[evaluator.pos] +
+                "'"};
   }
   return result ? 0 : 1;
 }

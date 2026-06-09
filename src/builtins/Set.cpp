@@ -10,8 +10,10 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("set [-abCefhmnuvx] [+abCefhmnuvx] [-o name] [+o name] "
+HELP_SYNOPSIS_DECL("[-abCefhmnuvx] [+abCefhmnuvx] [-o name] [+o name] "
                    "[--] [arg ...]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -88,6 +90,8 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   /* set with no arguments lists the shell variables. */
   if (args.count() == 1) {
     String out{};
@@ -129,7 +133,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const &name = args[++i];
       let const option = find_option_by_name(name);
       if (option == nullptr)
-        throw Error{"Set: '" + name + "' is not a valid option name"};
+        throw Error{"'" + name + "' is not a valid option name"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
       continue;
     }
@@ -144,7 +148,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
           String invalid_option{};
           invalid_option += arg[0];
           invalid_option += letter;
-          throw Error{"Set: '" + invalid_option + "' is not a valid option"};
+          throw Error{"'" + invalid_option + "' is not a valid option"};
         }
         if (option->set != nullptr) (cxt.*(option->set))(enable);
       }

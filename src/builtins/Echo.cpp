@@ -2,6 +2,12 @@
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-n] [-e] [-E] [arg ...]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Echo::Echo() = default;
@@ -14,6 +20,8 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const &args = ec.args();
   ASSERT(!args.is_empty());
+
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* Match dash, where only a leading -n is an option and everything after it,
      including -e, is literal text, and backslash escapes are always

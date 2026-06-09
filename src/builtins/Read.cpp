@@ -9,9 +9,10 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("read [-r] [name ...]");
+HELP_SYNOPSIS_DECL("[-r] [name ...]");
 
 FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -28,6 +29,8 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   defer { reset_flags(FLAG_LIST); };
 
   ASSERT(!names.is_empty());
+
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* With no operand the line goes to REPLY, otherwise to the operands in
      order. The operand names are addressed by an offset into names. */

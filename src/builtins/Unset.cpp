@@ -7,10 +7,11 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("unset [-f] [-v] name ...");
+HELP_SYNOPSIS_DECL("[-f] [-v] name ...");
 
 FLAG(UNSET_FUNCTION, Bool, 'f', "", "Remove functions instead of variables.");
 FLAG(UNSET_VARIABLE, Bool, 'v', "", "Remove variables, which is the default.");
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -24,6 +25,8 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
   defer { reset_flags(FLAG_LIST); };
 
   ASSERT(!names.is_empty());
+
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   let const unset_function = FLAG_UNSET_FUNCTION.is_enabled();
   let had_error = false;
