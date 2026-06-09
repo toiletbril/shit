@@ -37,13 +37,22 @@ struct frecency_entry
   i64 last_access;
 };
 
-/* The store lives at ~/.shit_dirs. None when the home directory is unknown. */
+/* The store lives at ~/.shit_directory_history by default. A test or a one-off
+   session redirects it through the SHIT_DIRECTORY_HISTORY environment variable
+   so it does not clobber the real store. None when there is no home and no
+   override. */
 static fn frecency_store_path() throws -> Maybe<Path>
 {
+  if (let const override_path =
+          os::get_environment_variable("SHIT_DIRECTORY_HISTORY");
+      override_path.has_value() && !override_path->is_empty())
+  {
+    return Path{override_path->view()};
+  }
   let home = os::get_home_directory();
   if (!home) return None;
   let path = *home;
-  path.push_component(".shit_dirs");
+  path.push_component(".shit_directory_history");
   return path;
 }
 

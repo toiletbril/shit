@@ -248,6 +248,27 @@ static char TL_BUFFER[ITL_STRING_MAX_LEN];
 
 static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
 
+/* The command history file, ~/.shit_history by default. A test or a one-off
+   session redirects it through the SHIT_HISTORY environment variable so it does
+   not clobber the real history. None when there is no home and no override. */
+static fn history_file_path() -> shit::Maybe<shit::Path>
+{
+  if (shit::Maybe<shit::String> override_path =
+          shit::os::get_environment_variable("SHIT_HISTORY");
+      override_path.has_value() && !override_path->is_empty())
+  {
+    return shit::Path{override_path->view()};
+  }
+  if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+      home.has_value())
+  {
+    shit::Path path = *home;
+    path.push_component(SHIT_HISTORY_FILE);
+    return path;
+  }
+  return shit::None;
+}
+
 fn set_title(const String &title) -> void
 {
   if (::tl_set_title(title.c_str()) != TL_SUCCESS)
@@ -288,11 +309,12 @@ fn is_active() -> bool { return ::itl_g_is_active; }
 fn initialize() -> void
 {
   /* Load history. */
-  if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
+  if (shit::Maybe<shit::Path> shit_history = history_file_path();
+      shit_history.has_value())
   {
-    shit::Path shit_history = *h;
-    shit_history.push_component(SHIT_HISTORY_FILE);
-    if (int ret = ::tl_history_load(shit_history.c_str()); ret != TL_SUCCESS) {
+    if (int ret = ::tl_history_load(shit_history->c_str());
+        ret != TL_SUCCESS)
+    {
       /* Don't count non-existent history file as an error. */
       if (ret != -ENOENT) {
         shit::String err_message = "Toiletline: Could not load history: ";
@@ -316,11 +338,10 @@ fn initialize() -> void
 fn exit() -> void
 {
   /* Dump history. */
-  if (shit::Maybe<shit::Path> h = shit::os::get_home_directory(); h.has_value())
+  if (shit::Maybe<shit::Path> shit_history = history_file_path();
+      shit_history.has_value())
   {
-    shit::Path shit_history = *h;
-    shit_history.push_component(SHIT_HISTORY_FILE);
-    if (int ret = ::tl_history_dump(shit_history.c_str());
+    if (int ret = ::tl_history_dump(shit_history->c_str());
         ret != TL_SUCCESS && ret != -EINVAL)
     {
       shit::Error e{"Toiletline: Could not dump history: " +
