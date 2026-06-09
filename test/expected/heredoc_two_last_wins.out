@@ -1,0 +1,21 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "-n"]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "EOF"
+]
+[Word
+  Unquoted "EOF2"
+]
+[Word
+  Unquoted "2"
+]
+     1	second-a
+     2	second-b
+[Code 0]

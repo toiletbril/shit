@@ -1,0 +1,7 @@
+cat -n <<EOF <<EOF2 >&2
+first-a
+first-b
+EOF
+second-a
+second-b
+EOF2
