@@ -116,9 +116,17 @@ public:
   }
 
   /* Store a String value built from a view, the form the variable store and the
-     traps use. Only instantiated when Value is String. */
+     traps use. Only instantiated when Value is String. An existing slot reuses
+     its String buffer rather than allocating a fresh String and freeing the old
+     one, so a tight reassignment loop such as a counter pays no per-turn
+     allocation once the buffer is large enough. */
   void set(StringView key, StringView value)
   {
+    if (Value *existing = find(key)) {
+      existing->clear();
+      existing->append(value);
+      return;
+    }
     set_value(key, String{m_allocator, value});
   }
 
