@@ -118,6 +118,12 @@ struct local_binding
   String name;
   Maybe<String> previous_value;
   Maybe<ArrayList<String>> previous_indexed_array;
+  /* The associative array the name held, as parallel key and value lists, with
+     the flag set when the name was an associative array. A local -A restores the
+     caller's map on return and clears it when the caller had none. */
+  bool previous_was_associative{false};
+  ArrayList<String> previous_associative_keys{heap_allocator()};
+  ArrayList<String> previous_associative_values{heap_allocator()};
 };
 
 /* A background job, one entry in the job table. The id is the number jobs and
@@ -259,6 +265,10 @@ public:
       -> Maybe<String>;
   fn associative_keys(StringView name) const throws -> ArrayList<String>;
   fn associative_values(StringView name) const throws -> ArrayList<String>;
+  /* Forget every element of an associative array and the name's membership, so a
+     local -A leaving its scope drops its entries before the caller's are put
+     back. */
+  fn clear_associative_array(StringView name) throws -> void;
 
   /* Every element of an array name as a list, the indexed elements in order,
      the associative values in store order, or a one-element list for a plain

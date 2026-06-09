@@ -330,6 +330,23 @@ fn EvalContext::associative_values(StringView name) const throws
   return values;
 }
 
+fn EvalContext::clear_associative_array(StringView name) throws -> void
+{
+  if (!is_associative_array(name)) return;
+  /* The composite keys are collected before erasing, since removing entries
+     while iterating the value map would be unsafe. */
+  const String prefix = associative_composite_key(name, "");
+  let to_erase = ArrayList<String>{heap_allocator()};
+  m_associative_values.for_each([&](StringView composite, const String &) {
+    if (composite.length >= prefix.count() &&
+        composite.substring_of_length(0, prefix.count()) == prefix.view())
+      to_erase.push(String{heap_allocator(), composite});
+  });
+  for (const String &composite : to_erase)
+    m_associative_values.erase(composite.view());
+  m_associative_names.remove(name);
+}
+
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
   m_shell_variables.erase(name);
@@ -870,6 +887,16 @@ fn EvalContext::leave_function_scope() throws -> void
                            steal(*binding.previous_indexed_array));
     else
       m_indexed_arrays.erase(binding.name.view());
+    /* Restore the associative array the name held, dropping the local one first,
+       then re-adding the saved pairs, or leaving it cleared when the caller had
+       none. set_associative_element does no readonly check, so it cannot throw a
+       located error from this noexcept defer. */
+    clear_associative_array(binding.name.view());
+    if (binding.previous_was_associative)
+      for (usize k = 0; k < binding.previous_associative_keys.count(); k++)
+        set_associative_element(binding.name.view(),
+                                binding.previous_associative_keys[k].view(),
+                                binding.previous_associative_values[k].view());
   }
   /* The innermost scope is the one just restored, so it is dropped in place
      rather than rebuilding the whole stack into a fresh list on every return.
@@ -895,15 +922,26 @@ fn EvalContext::declare_local(StringView name) throws -> void
   let previous_array = Maybe<ArrayList<String>>{};
   if (m_indexed_arrays.count() != 0)
     if (let const *array = lookup_indexed_array(name); array != nullptr) {
-    let copy = ArrayList<String>{heap_allocator()};
-    copy.reserve(array->count());
-    for (const String &element : *array)
-      copy.push(String{heap_allocator(), element.view()});
-    previous_array = steal(copy);
+      let copy = ArrayList<String>{heap_allocator()};
+      copy.reserve(array->count());
+      for (const String &element : *array)
+        copy.push(String{heap_allocator(), element.view()});
+      previous_array = steal(copy);
+    }
+
+  /* The associative array the name held is saved the same way, as parallel key
+     and value lists, so a local -A restores the caller's map on return. */
+  let const previous_was_associative = is_associative_array(name);
+  let previous_keys = ArrayList<String>{heap_allocator()};
+  let previous_values = ArrayList<String>{heap_allocator()};
+  if (previous_was_associative) {
+    previous_keys = associative_keys(name);
+    previous_values = associative_values(name);
   }
 
   m_local_scopes.back().push(local_binding{
-      String{name}, get_variable_value(name), steal(previous_array)});
+      String{name}, get_variable_value(name), steal(previous_array),
+      previous_was_associative, steal(previous_keys), steal(previous_values)});
 }
 
 fn EvalContext::set_alias(StringView name, StringView value) throws -> void
