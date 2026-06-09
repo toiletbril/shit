@@ -968,8 +968,29 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       continue;
     }
 
-    assign_standard_fd(redirect_in_fd, redirect_out_fd, redirect_err_fd,
-                       redir.fd, file_fd);
+    /* A redirect to the standard input, output, or error fills the matching
+       descriptor slot the spawn places. A redirect to a higher descriptor, such
+       as 3>file, has no slot among the three, so the opened file is staged onto
+       the real shell fd N around the command and restored afterward, the same
+       way a numbered heredoc and the compound redirect path stage fd N. Routing
+       it through a slot instead sent fd 3 to the standard output and left the
+       child without fd 3. */
+    if (redir.fd == 0 || redir.fd == 1 || redir.fd == 2) {
+      assign_standard_fd(redirect_in_fd, redirect_out_fd, redirect_err_fd,
+                         redir.fd, file_fd);
+    } else if (file_fd == redir.fd) {
+      /* open returned fd N itself, since fd N was the lowest free descriptor, so
+         the file already sits on its target. The generic save then dup2 would
+         back up the file and the close would shut fd N, leaving the child
+         without it, so the collision is recorded for restore without a close,
+         the same way the numbered heredoc handles it. */
+      dup_saved_descriptors.push(
+          os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
+    } else {
+      dup_saved_descriptors.push(
+          os::save_and_replace_descriptor(redir.fd, file_fd));
+      os::close_fd(file_fd);
+    }
   }
 
   /* An expansion may drop every word, for example an unset $x used as the whole
