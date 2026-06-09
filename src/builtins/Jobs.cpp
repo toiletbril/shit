@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
+#include "../Colors.hpp"
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
@@ -43,9 +44,9 @@ fn state_color(job::State state, bool may_color) throws -> StringView
 {
   if (!may_color) return StringView{};
   switch (state) {
-  case job::State::Running: return StringView{"\x1b[1;32m"};
-  case job::State::Stopped: return StringView{"\x1b[1;33m"};
-  case job::State::Done: return StringView{"\x1b[2m"};
+  case job::State::Running: return colors::ansi::BOLD_GREEN;
+  case job::State::Stopped: return colors::ansi::BOLD_YELLOW;
+  case job::State::Done: return colors::ansi::DIM;
   }
   return StringView{};
 }
@@ -56,18 +57,7 @@ fn state_color(job::State state, bool may_color) throws -> StringView
    sh-compatible. */
 fn may_color_jobs(EvalContext &cxt) throws -> bool
 {
-  if (!cxt.shell_is_interactive()) return false;
-  if (!os::is_stdout_a_tty()) return false;
-
-  if (let const no_color = os::get_environment_variable("NO_COLOR");
-      no_color.has_value() && !no_color->is_empty())
-    return false;
-
-  if (let const term = os::get_environment_variable("TERM");
-      term.has_value() && term->view() == StringView{"dumb"})
-    return false;
-
-  return true;
+  return cxt.shell_is_interactive() && colors::stdout_wants_color();
 }
 
 } /* namespace */
@@ -100,7 +90,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     out.append(state);
     for (usize pad = state.length; pad < 7; pad++)
       out.push(' ');
-    if (may_color) out += "\x1b[0m";
+    if (may_color) out += colors::ansi::RESET;
 
     out += "  ";
     out += job.command.c_str();

@@ -1,5 +1,6 @@
 #include "Errors.hpp"
 
+#include "Colors.hpp"
 #include "Debug.hpp"
 #include "ErrorOr.hpp"
 #include "Eval.hpp"
@@ -11,17 +12,6 @@
 /* TODO: Print proper offset and context for UTF-8. */
 
 namespace shit {
-
-/* ANSI SGR sequences matching clang's diagnostic palette. The reset clears
-   every attribute a colored span set, and the rest open a bold colored span. */
-namespace ansi {
-static const StringView RESET = "\x1b[0m";
-static const StringView BOLD = "\x1b[1m";
-static const StringView BOLD_RED = "\x1b[1;31m";
-static const StringView BOLD_MAGENTA = "\x1b[1;35m";
-static const StringView BOLD_CYAN = "\x1b[1;36m";
-static const StringView BOLD_GREEN = "\x1b[1;32m";
-} /* namespace ansi */
 
 /* The SGR codes wrapping one diagnostic. Each field is empty when color is off,
    so the same render code appends them unconditionally and emits nothing on the
@@ -36,24 +26,6 @@ struct diagnostic_color
   StringView reset{};
 };
 
-/* Whether diagnostics may carry color, decided fresh at render time so a
-   redirected stderr never gains escapes. Color is on only when stderr is a
-   terminal, NO_COLOR is unset or empty, and TERM is not dumb. */
-cold static fn should_color_diagnostics() throws -> bool
-{
-  if (!os::is_stderr_a_tty()) return false;
-
-  if (let const no_color = os::get_environment_variable("NO_COLOR");
-      no_color.has_value() && !no_color->is_empty())
-    return false;
-
-  if (let const term = os::get_environment_variable("TERM");
-      term.has_value() && term->view() == StringView{"dumb"})
-    return false;
-
-  return true;
-}
-
 /* The color codes for a diagnostic of this severity, or all empty StringViews
    when color is off. The severity word selects the severity hue, since the
    reporting code reads the word from the object rather than its concrete type.
@@ -61,16 +33,16 @@ cold static fn should_color_diagnostics() throws -> bool
 cold static fn diagnostic_colors_for(StringView severity_word) throws
     -> diagnostic_color
 {
-  if (!should_color_diagnostics()) return diagnostic_color{};
+  if (!colors::stderr_wants_color()) return diagnostic_color{};
 
-  StringView severity = ansi::BOLD_CYAN;
+  StringView severity = colors::ansi::BOLD_CYAN;
   if (severity_word == StringView{"error"})
-    severity = ansi::BOLD_RED;
+    severity = colors::ansi::BOLD_RED;
   else if (severity_word == StringView{"warning"})
-    severity = ansi::BOLD_MAGENTA;
+    severity = colors::ansi::BOLD_MAGENTA;
 
-  return diagnostic_color{severity, ansi::BOLD, ansi::BOLD, ansi::BOLD_GREEN,
-                          ansi::RESET};
+  return diagnostic_color{severity, colors::ansi::BOLD, colors::ansi::BOLD,
+                          colors::ansi::BOLD_GREEN, colors::ansi::RESET};
 }
 
 /* The line a byte falls on and the offset of the newline that starts it. */
