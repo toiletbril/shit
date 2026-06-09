@@ -26,16 +26,50 @@ pure Builtin::Kind Local::kind() const wontthrow { return Kind::Local; }
 
 i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  let const args = PARSE_BUILTIN_ARGS(ec);
-
-  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
-
+  /* The attribute flags are read straight off the arguments rather than through
+     the shared flag parser, since that parser rejects an unknown letter and the
+     bash attribute letters are not declared as flags here. */
+  let const &args = ec.args();
   ASSERT(!args.is_empty());
+
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (!cxt.in_function_scope())
     throw Error{"'local' can only be used inside a function"};
 
-  for (usize i = 1; i < args.count(); i++) {
+  /* Leading flags carry the bash attributes. -a declares an indexed array and
+     -A an associative one, the rest are accepted without backing behavior so a
+     script that sets them keeps running. */
+  bool make_indexed = false;
+  bool make_associative = false;
+  usize first_name = 1;
+  for (; first_name < args.count(); first_name++) {
+    const StringView arg = args[first_name].view();
+    if (arg.length < 1 || arg[0] != '-') break;
+    if (arg == "--") {
+      first_name++;
+      break;
+    }
+    for (usize c = 1; c < arg.length; c++) {
+      switch (arg[c]) {
+      case 'a': make_indexed = true; break;
+      case 'A': make_associative = true; break;
+      case 'i':
+      case 'r':
+      case 'x':
+      case 'l':
+      case 'u':
+      case 'n': break;
+      default: {
+        String invalid{};
+        invalid += arg[c];
+        throw Error{"local: -" + invalid + ": invalid option"};
+      }
+      }
+    }
+  }
+
+  for (usize i = first_name; i < args.count(); i++) {
     let const &arg = args[i];
     let const equals_position = arg.find_character('=');
 
@@ -48,8 +82,14 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
                          : arg.view();
     cxt.declare_local(name);
 
-    if (equals_position.has_value())
+    if (make_associative) {
+      cxt.declare_associative_array(name);
+    } else if (make_indexed) {
+      if (cxt.lookup_indexed_array(name) == nullptr)
+        cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
+    } else if (equals_position.has_value()) {
       cxt.set_shell_variable(name, arg.substring(*equals_position + 1));
+    }
   }
 
   return 0;
