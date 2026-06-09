@@ -19,6 +19,13 @@
 #include <cstdlib>
 #include <exception>
 
+/* POSIX regcomp and regexec back the [[ =~ operator. The release build drops
+   libstdc++, so std::regex is unavailable and the libc regex is used instead.
+ */
+#if SHIT_PLATFORM_IS POSIX
+#include <regex.h>
+#endif
+
 namespace shit {
 
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
@@ -1963,9 +1970,38 @@ struct ConditionalEvaluator
 
   static pure bool is_binary_word_op(StringView s) wontthrow
   {
-    return s == "=" || s == "==" || s == "!=" || s == "-eq" || s == "-ne" ||
-           s == "-lt" || s == "-le" || s == "-gt" || s == "-ge" || s == "-ef" ||
-           s == "-nt" || s == "-ot";
+    return s == "=" || s == "==" || s == "!=" || s == "=~" || s == "-eq" ||
+           s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" || s == "-ge" ||
+           s == "-ef" || s == "-nt" || s == "-ot";
+  }
+
+  /* The =~ operator matches the value against an extended regular expression. A
+     std::regex with the POSIX extended grammar mirrors the ERE bash uses, and a
+     search rather than a full match finds the pattern anywhere in the value,
+     the way [[ =~ does. BASH_REMATCH waits for the array work, so only the
+     boolean result is reported here. */
+  bool regex_match(StringView value, StringView pattern) throws
+  {
+#if SHIT_PLATFORM_IS POSIX
+    /* regcomp and regexec read C strings, so the operands are copied into
+       null-terminated buffers first. */
+    const String pattern_text{heap_allocator(), pattern};
+    const String value_text{heap_allocator(), value};
+    regex_t compiled;
+    if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
+      /* bash returns status 2 for a malformed regex, which the conditional
+         turns into an evaluation error. */
+      throw Error{"[[: invalid regular expression"};
+    }
+    const int match_result =
+        regexec(&compiled, value_text.c_str(), 0, nullptr, 0);
+    regfree(&compiled);
+    return match_result == 0;
+#else
+    unused(value);
+    unused(pattern);
+    throw Error{"[[: =~ is not supported on this platform"};
+#endif
   }
 
   /* Glob match the value against the pattern, marking the unescaped *, ?, and [
@@ -2003,6 +2039,7 @@ struct ConditionalEvaluator
   {
     if (op == "==" || op == "=") return glob_equal(left, right);
     if (op == "!=") return !glob_equal(left, right);
+    if (op == "=~") return regex_match(left, right);
     if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
     if (op == "-ot") return Path{left}.is_older_than(Path{right});
