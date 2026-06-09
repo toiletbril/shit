@@ -15,7 +15,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install clang, lld, and compiler-rt
+      - name: Setup
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -26,15 +26,20 @@ jobs:
           clang++-18 --version
           ld.lld-18 --version
 
-      - name: Build and test
-        run: make
+      - name: Build ASAN binary
+        run: make shit
 
-      - name: Build the release binary
+      - name: Run golden tests
+        run: make -C test test
+
+      - name: Build release binary
         run: make MODE=rel shit
 
-      - name: Benchmark and assert shit beats dash
+      - name: Run benchmark
+        run: SCALE=200 make -C test bench
+
+      - name: Assert that Shit is faster than Dash
         run: |
-          SCALE=200 make -C test bench
           cd test
           run_min() {
             min=""
