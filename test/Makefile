@@ -57,7 +57,7 @@ POSIX_COMPAT := $(wildcard posix/*.shit)
 # The diff targets compare two live shells through process substitution, so they
 # run in bash rather than the system /bin/sh. The scope is these two targets so
 # the other recipes keep their /bin/sh semantics.
-dashdiff bashdiff: SHELL := bash
+dashdiff bashdiff mimicrydiff: SHELL := bash
 
 dashdiff: $(BIN)
 	@for f in $(POSIX_COMPAT); do \
@@ -82,6 +82,25 @@ bashdiff: $(BIN)
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
 		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (bash)" \
 			<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST) \
+			&& printf "	%-64s ok\n" "$$f" \
+			|| printf "	%-64s FAILED :c\n" "$$f"; \
+	done
+
+# Run each shebang script through shit mimicry and through the interpreter the
+# shebang names, then diff their output the way dashdiff and bashdiff do. The
+# script is run as a command with -I -c so the shebang chooses the mood, since
+# mimicry intercepts a command, not the main file. A bash shebang compares
+# against bash, any other shebang against dash, since the POSIX mood targets
+# dash semantics.
+MIMIC_SCRIPTS := $(wildcard mimicry/*.sh)
+
+mimicrydiff: $(BIN)
+	@for f in $(MIMIC_SCRIPTS); do \
+		case "$$(head -1 $$f)" in *bash*) ref="$(BASH)";; *) ref="$(DASH)";; esac; \
+		s="$$($(BIN) -I -c "$$PWD/$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		r="$$($$ref "$$f" 2>/dev/null; printf X)"; r="$${r%X}"; \
+		diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f ($$ref)" \
+			<(printf '%s' "$$s") <(printf '%s' "$$r") >> $(FAILED_LIST) \
 			&& printf "	%-64s ok\n" "$$f" \
 			|| printf "	%-64s FAILED :c\n" "$$f"; \
 	done
