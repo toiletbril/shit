@@ -521,8 +521,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
          globs, the way single quotes produce a literal but with escapes. */
       if (next == '\'' && m_bash_compatible) {
         byte_count++;
+        bool did_emit_any = false;
         auto emit_literal = [&](char byte) {
           append_char(WordSegment::Kind::LiteralText, byte);
+          did_emit_any = true;
         };
         auto hex_value = [](char h) -> int {
           if (h >= '0' && h <= '9') return h - '0';
@@ -637,6 +639,11 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             break;
           }
         }
+        /* An empty $'' still produces one empty field, the way '' and "" each
+           keep an empty argument rather than dropping it. */
+        if (!did_emit_any)
+          word.segments.push(
+              WordSegment{WordSegment::Kind::LiteralText, String{}, false});
         continue;
       }
 

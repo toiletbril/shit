@@ -2021,6 +2021,11 @@ fn EvalContext::apply_pattern_replacement(StringView name,
           ? expand_modifier_word(remainder.substring(separator + 1))
           : String{heap_allocator()};
 
+  /* An empty unanchored pattern matches nothing in bash, so the value is
+     returned unchanged rather than splicing the replacement between every
+     character. The anchored forms still splice at the start or the end. */
+  if (pattern.is_empty() && !anchor_start && !anchor_end) return value;
+
   let out = String{heap_allocator()};
 
   /* The start anchor only matches a prefix, so a single longest match at the
@@ -2264,6 +2269,11 @@ struct ConditionalEvaluator
   EvalContext &cxt;
   const ArrayList<conditional_element> &elements;
   usize pos = 0;
+  /* When a && or || branch is already decided, the other side is parsed to
+     advance past its tokens but not evaluated, so a glob, a regex, a bad
+     integer, or a command substitution on the dead branch runs no side effect
+     and raises no evaluation error, the way bash short-circuits [[ ]]. */
+  bool is_skipping = false;
 
   using Kind = conditional_element::Kind;
 
@@ -2404,8 +2414,9 @@ struct ConditionalEvaluator
     if (is_unary_op(first_literal.view()) && pos + 1 < elements.count() &&
         kind_at(pos + 1) == Kind::Operand)
     {
-      const String operand = operand_value(elements[pos + 1]);
       pos += 2;
+      if (is_skipping) return false;
+      const String operand = operand_value(elements[pos - 1]);
       return eval_unary(first_literal.view(), operand.view());
     }
 
@@ -2416,9 +2427,10 @@ struct ConditionalEvaluator
       if (next == Kind::Less || next == Kind::Greater) {
         if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
           throw Error{"[[: expected operand after a comparison"};
-        const String left = operand_value(first);
-        const String right = operand_value(elements[pos + 2]);
         pos += 3;
+        if (is_skipping) return false;
+        const String left = operand_value(elements[pos - 3]);
+        const String right = operand_value(elements[pos - 1]);
         return next == Kind::Less ? left < right : right < left;
       }
       if (next == Kind::Operand) {
@@ -2426,17 +2438,19 @@ struct ConditionalEvaluator
         if (is_binary_word_op(op.view())) {
           if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
             throw Error{"[[: expected operand after '" + op + "'"};
-          const String left = operand_value(first);
-          const String right = operand_value(elements[pos + 2]);
           pos += 3;
+          if (is_skipping) return false;
+          const String left = operand_value(elements[pos - 3]);
+          const String right = operand_value(elements[pos - 1]);
           return eval_binary(left.view(), op.view(), right.view());
         }
       }
     }
 
     /* A lone operand is true when it is non-empty. */
-    const String value = operand_value(first);
     pos++;
+    if (is_skipping) return false;
+    const String value = operand_value(elements[pos - 1]);
     return !value.is_empty();
   }
 
@@ -2462,7 +2476,12 @@ struct ConditionalEvaluator
     bool result = eval_term();
     while (!at_end() && kind_at(pos) == Kind::And) {
       pos++;
+      /* A false left already decides the and, so the right is parsed without
+         evaluation. The skip nests, so an outer skip stays set. */
+      const bool was_skipping = is_skipping;
+      is_skipping = is_skipping || !result;
       const bool rhs = eval_term();
+      is_skipping = was_skipping;
       result = result && rhs;
     }
     return result;
@@ -2473,7 +2492,12 @@ struct ConditionalEvaluator
     bool result = eval_and();
     while (!at_end() && kind_at(pos) == Kind::Or) {
       pos++;
+      /* A true left already decides the or, so the right is parsed without
+         evaluation. */
+      const bool was_skipping = is_skipping;
+      is_skipping = is_skipping || result;
       const bool rhs = eval_and();
+      is_skipping = was_skipping;
       result = result || rhs;
     }
     return result;
@@ -4091,8 +4115,13 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
   if (i == digit_start) return None;
 
   i64 magnitude = 0;
-  for (usize j = digit_start; j < text.length; j++)
-    magnitude = magnitude * 10 + (text[j] - '0');
+  for (usize j = digit_start; j < text.length; j++) {
+    const i64 digit = text[j] - '0';
+    /* A bound past the signed range is not a usable sequence, so the brace is
+       left literal rather than overflowing during the parse. */
+    if (magnitude > (9223372036854775807LL - digit) / 10) return None;
+    magnitude = magnitude * 10 + digit;
+  }
   const i64 value = text[0] == '-' ? -magnitude : magnitude;
   const usize width = text.length - digit_start;
   const bool leading_zero = width > 1 && text[digit_start] == '0';
@@ -4311,13 +4340,20 @@ fn expand_braces(const Word &word) throws -> ArrayList<Word>
     let run = String{heap_allocator()};
     for (usize i = 0; i < produced.count(); i++) {
       const char c = produced[i];
-      if (c == BRACE_OPAQUE_MARKER) {
+      /* The marker is followed by an in-range segment index only when this
+         scanner inserted it. A literal 0x01 byte that reached the text from
+         $'\x01' is not a marker, so the index bound is checked at run time and
+         a failed check copies the byte verbatim rather than reading past the
+         segment list. */
+      const bool is_opaque_marker =
+          c == BRACE_OPAQUE_MARKER && i + 1 < produced.count() &&
+          static_cast<u8>(produced[i + 1]) < opaque_segments.count();
+      if (is_opaque_marker) {
         if (!run.is_empty()) {
           out.segments.push(
               WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
           run = String{heap_allocator()};
         }
-        ASSERT(i + 1 < produced.count());
         const u8 index = static_cast<u8>(produced[++i]);
         out.segments.push(*opaque_segments[index]);
       } else {

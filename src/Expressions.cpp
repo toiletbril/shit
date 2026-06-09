@@ -2588,16 +2588,6 @@ cold fn ArithmeticCommand::to_ast_string(usize layer) const throws -> String
          m_expression.view() + "\"]";
 }
 
-fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  /* A non-zero arithmetic value is success, a zero value is failure, the
-     opposite of the value-to-status convention of the rest of the shell. */
-  const i64 value = cxt.evaluate_arithmetic(m_expression.view());
-  const i64 status = value != 0 ? 0 : 1;
-  cxt.set_last_exit_status(static_cast<i32>(status));
-  return status;
-}
-
 /* A clause that holds only spaces or tabs is treated as omitted, the way bash
    reads for (( ; ; )) as an empty header rather than three blank expressions.
  */
@@ -2606,6 +2596,23 @@ static pure fn is_blank_clause(StringView text) wontthrow -> bool
   for (usize i = 0; i < text.length; i++)
     if (text[i] != ' ' && text[i] != '\t' && text[i] != '\n') return false;
   return true;
+}
+
+fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  /* An empty (( )) is a failure with no evaluation, the way bash reads it as a
+     null expression that yields status 1 rather than a parse error. */
+  if (is_blank_clause(m_expression.view())) {
+    cxt.set_last_exit_status(1);
+    return 1;
+  }
+
+  /* A non-zero arithmetic value is success, a zero value is failure, the
+     opposite of the value-to-status convention of the rest of the shell. */
+  const i64 value = cxt.evaluate_arithmetic(m_expression.view());
+  const i64 status = value != 0 ? 0 : 1;
+  cxt.set_last_exit_status(static_cast<i32>(status));
+  return status;
 }
 
 CStyleForLoop::CStyleForLoop(SourceLocation location, String init,
