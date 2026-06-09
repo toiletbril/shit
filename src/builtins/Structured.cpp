@@ -415,6 +415,7 @@ static fn render_aligned(const ArrayList<String> &columns,
     -> String
 {
   ArrayList<usize> widths{};
+  widths.reserve(columns.count());
   for (const String &column : columns) widths.push(column.view().length);
   for (const ArrayList<String> &row : rows)
     for (usize i = 0; i < row.count() && i < widths.count(); i++)
@@ -467,6 +468,7 @@ static fn render_table(const json_value &value) throws -> String
       ArrayList<ArrayList<String>> rows{};
       for (const json_value &row : value.items) {
         ArrayList<String> cells{};
+        cells.reserve(columns.count());
         for (const String &column : columns) {
           const json_value *cell = nullptr;
           for (usize k = 0; k < row.keys.count(); k++)
