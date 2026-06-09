@@ -17,6 +17,8 @@ HELP_DESCRIPTION_DECL(
     "rather than a newline yields a non-zero status.");
 
 FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
+FLAG(READ_ARRAY, String, 'a', "",
+     "Split the line into the named indexed array.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -76,6 +78,30 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   auto is_ifs_nonwhitespace = [&](char c) {
     return is_separator(c) && !is_ifs_whitespace(c);
   };
+
+  /* read -a NAME splits the line into every field and stores them in the named
+     indexed array rather than into separate scalar variables. */
+  if (FLAG_READ_ARRAY.is_set()) {
+    ArrayList<String> words{heap_allocator()};
+    usize c = 0;
+    while (c < line.length() && is_ifs_whitespace(line[c]))
+      c++;
+    while (c < line.length()) {
+      const usize start = c;
+      while (c < line.length() && !is_separator(line[c]))
+        c++;
+      words.push(String{line.substring_of_length(start, c - start)});
+      while (c < line.length() && is_ifs_whitespace(line[c]))
+        c++;
+      if (c < line.length() && is_ifs_nonwhitespace(line[c])) {
+        c++;
+        while (c < line.length() && is_ifs_whitespace(line[c]))
+          c++;
+      }
+    }
+    cxt.set_indexed_array(FLAG_READ_ARRAY.value(), steal(words));
+    return was_newline_terminated ? 0 : 1;
+  }
 
   usize cursor = 0;
   /* Leading IFS whitespace before the first field is skipped and produces no
