@@ -155,6 +155,17 @@ fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
 {
   if (bash_identity) {
     set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+    /* BASH_VERSINFO is the version broken into its components, the array a
+       config such as ble.sh reads to gate on a major version rather than
+       parsing the string. */
+    let versinfo = ArrayList<String>{};
+    versinfo.push(String{"5"});
+    versinfo.push(String{"2"});
+    versinfo.push(String{"0"});
+    versinfo.push(String{"1"});
+    versinfo.push(String{"release"});
+    versinfo.push(String{SHIT_OS_INFO});
+    set_indexed_array("BASH_VERSINFO", steal(versinfo));
     /* $BASH is the path the shell records as the executable that started it,
        which is the SHELL value the shell already holds. */
     set_shell_variable("BASH", get_variable_value("SHELL").value_or(String{}));

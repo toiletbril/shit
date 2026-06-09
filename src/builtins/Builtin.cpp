@@ -43,9 +43,10 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &name = ec.args()[1];
   if (name == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* -l prints every registered builtin, sorted and laid out in columns that fit
-     a usual terminal width, so a reader can see at a glance what shit carries. */
-  if (name == "-l") {
+  /* -l, or its long form --list, prints every registered builtin, sorted and
+     laid out in columns that fit a usual terminal width, so a reader can see at
+     a glance what shit carries. */
+  if (name == "-l" || name == "--list") {
     let sorted = ArrayList<String>{};
     for (const String &builtin_name : builtin_names())
       sorted.push(String{heap_allocator(), builtin_name});
