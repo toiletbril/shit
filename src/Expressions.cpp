@@ -2839,6 +2839,17 @@ cold fn negated_test_operator(StringView op) wontthrow -> Maybe<StringView>
   return shit::None;
 }
 
+/* The binary operators of test, used to tell a == sitting in the operator slot
+   from a literal == that is the operand of another operator, so the SC3014 lint
+   does not flag [ x = == ]. */
+cold fn is_test_binary_operator_word(StringView op) wontthrow -> bool
+{
+  return op == "=" || op == "==" || op == "!=" || op == "<" || op == ">" ||
+         op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
+         op == "-gt" || op == "-ge" || op == "-ef" || op == "-nt" ||
+         op == "-ot";
+}
+
 cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
@@ -3052,21 +3063,28 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                               ->word()
                               .to_literal_string();
       let const view = literal.view();
+      /* The literal of the word before this one, used to tell == in the
+         operator slot from a literal == operand, and a negated unary -a file
+         test from the binary AND operator. Empty for a non-word predecessor. */
+      let const previous_literal =
+          m_args[i - 1]->kind() == Token::Kind::Word
+              ? static_cast<const tokens::WordToken *>(m_args[i - 1])
+                    ->word()
+                    .to_literal_string()
+              : String{};
       /* == is a bashism in test, POSIX test compares strings with =. This is
-         shellcheck SC3014, and the test builtin rejects == at run time with the
-         same suggestion. */
-      if (view == "==") {
+         shellcheck SC3014, warned only when == sits in the operator slot, after
+         a plain operand rather than as the first operand or the right side of
+         another operator, so [ x = == ] comparing the literal == is left alone.
+         The test builtin rejects an operator == at run time with the same
+         suggestion. */
+      if (view == "==" && i >= 2 &&
+          !is_test_binary_operator_word(previous_literal.view()))
+      {
         actx.warn(m_args[i]->source_location(),
                   "== is undefined in POSIX test, use = for string equality");
       }
-      /* The word right before -a or -o, used to tell a negated unary -a file
-         test from the binary AND operator. */
-      let const previous_is_bang =
-          m_args[i - 1]->kind() == Token::Kind::Word &&
-          static_cast<const tokens::WordToken *>(m_args[i - 1])
-                  ->word()
-                  .to_literal_string()
-                  .view() == "!";
+      let const previous_is_bang = previous_literal.view() == "!";
       if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
         actx.warn(
             m_args[i]->source_location(),
@@ -3126,7 +3144,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   .view() == (command_literal == "[" ? "]" : "]]");
       if (bracket_form_is_closed) operand_end = m_args.count() - 1;
     }
-    if (bracket_form_is_closed && operand_end - 1 == 1 &&
+    if (bracket_form_is_closed && operand_end == 2 &&
         m_args[1]->kind() == Token::Kind::Word)
     {
       let const operand = static_cast<const tokens::WordToken *>(m_args[1])

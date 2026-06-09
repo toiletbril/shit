@@ -7,6 +7,11 @@ on:
 jobs:
   build-test-bench:
     runs-on: ubuntu-24.04
+    # The Makefile only forces clang++ on Windows, so on Linux it would fall
+    # back to make's built-in g++. Pin the compiler to the clang installed below
+    # so the build uses the toolchain CI just set up.
+    env:
+      CXX: clang++-18
     steps:
       # src/toiletline is a submodule the build needs, so fetch it too.
       - name: Checkout
@@ -16,17 +21,20 @@ jobs:
 
       # The official script installs clang, lld, and compiler-rt for the pinned
       # version. The sanitizer build needs the compiler-rt runtime. The symlinks
-      # point the unversioned names the Makefile defaults expect at the 18
-      # binaries. dash backs the benchmark comparison and zsh fills the table.
+      # give the Makefile's which-lld check and clang's -fuse-ld=lld the
+      # unversioned names. The version probes fail the step early if the install
+      # named the binaries differently. dash backs the benchmark comparison and
+      # zsh fills the table.
       - name: Install clang, lld, and compiler-rt
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 18 all
-          sudo ln -sf /usr/bin/clang++-18 /usr/local/bin/clang++
-          sudo ln -sf /usr/bin/clang-18   /usr/local/bin/clang
-          sudo ln -sf /usr/bin/lld-18     /usr/local/bin/lld
+          sudo ln -sf /usr/bin/lld-18    /usr/local/bin/lld
+          sudo ln -sf /usr/bin/ld.lld-18 /usr/local/bin/ld.lld
           sudo apt-get install -y zsh dash
+          clang++-18 --version
+          ld.lld-18 --version
 
       # The default goal is all, shit then test, so this compiles the dbg
       # sanitizer binary and runs the golden suite.
@@ -38,8 +46,11 @@ jobs:
         run: make MODE=rel shit
 
       # The make target prints the output-matches-dash line and the timing table
-      # for the log, then the comparison times dash and the release shit over the
-      # benchmark and fails the job when shit is not strictly faster than dash.
+      # for the log. The comparison then times dash and the release shit and
+      # fails the job when shit is not strictly faster. run_min returns non-zero
+      # when a timed run fails, and the numeric guards reject an empty or
+      # non-numeric time, so a broken shit that produces no measurement cannot
+      # coerce to zero and pass the awk gate as falsely faster.
       - name: Benchmark and assert shit beats dash
         run: |
           SCALE=200 make -C test bench
@@ -49,14 +60,21 @@ jobs:
             for i in 1 2 3; do
               t=$( { TIMEFORMAT=%R; time SCALE=200 "$1" bench/configure.shit \
                      >/dev/null 2>&1; } 2>&1 )
+              rc=$?
+              if [ "$rc" -ne 0 ] || [ -z "$t" ]; then
+                echo "timing failed for '$1'" >&2
+                return 1
+              fi
               min=$(awk -v a="$t" -v b="$min" \
                     'BEGIN { if (b == "" || a < b) print a; else print b }')
             done
             echo "$min"
           }
-          dash_seconds=$(run_min dash)
-          shit_seconds=$(run_min ../shit)
+          dash_seconds=$(run_min dash) || exit 1
+          shit_seconds=$(run_min ../shit) || exit 1
           echo "dash=$dash_seconds shit=$shit_seconds"
+          case "$dash_seconds" in ''|*[!0-9.]*) echo "bad dash timing"; exit 1;; esac
+          case "$shit_seconds" in ''|*[!0-9.]*) echo "bad shit timing"; exit 1;; esac
           awk -v s="$shit_seconds" -v d="$dash_seconds" \
-              'BEGIN { exit !(s < d) }' \
+              'BEGIN { exit !(s + 0 > 0 && s + 0 < d + 0) }' \
             || { echo "shit is not faster than dash"; exit 1; }
