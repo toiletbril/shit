@@ -1035,11 +1035,19 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           word_spans.push(
               highlight_span{literal_start, i, colors::ansi::YELLOW});
       } else if (d == '`') {
-        /* A backtick substitution recurses the same way $(...) does. */
+        /* A backtick substitution recurses the same way $(...) does. The close
+           is the first unescaped backtick, where a backslash escapes only a
+           backtick, a dollar, or another backslash the way the lexer reads a
+           backquote, so an escaped backtick does not end the substitution. */
         let const inner_begin = i + 1;
         i++;
-        while (i < end && line[i] != '`')
-          i++;
+        while (i < end && line[i] != '`') {
+          if (line[i] == '\\' && i + 1 < end &&
+              (line[i + 1] == '`' || line[i + 1] == '$' || line[i + 1] == '\\'))
+            i += 2;
+          else
+            i++;
+        }
         let const inner_end = i;
         if (i < end) i++;
         scan_highlight_range(line, inner_begin, inner_end, context, word_spans,
