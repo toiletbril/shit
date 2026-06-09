@@ -585,23 +585,43 @@ fn glob_matches(StringView glob, StringView str,
   };
       /* clang-format on */
 
+      /* A bracket member, a class terminator ], a negating ! or ^, and a range
+         '-' carry their special meaning only when the byte is an active glob
+         character. A quoted or escaped ] inside the class is a literal member,
+         not the terminator, and a quoted member byte never opens a range, so the
+         scan consults the same per-byte mask the rest of the matcher reads. */
+      let const is_active = [&](usize index) wontthrow -> bool {
+        return is_glob_char_active(glob_active, mask_offset + index);
+      };
+      let const is_close_at = [&](usize index) wontthrow -> bool {
+        return glob[index] == ']' && is_active(index);
+      };
+
+      /* The unsigned value of a byte, so a high byte at or above 0x80 compares
+         as itself rather than as a negative char in the range and equality
+         tests. */
+      let const byte_at = [](StringView view, usize index) wontthrow -> u8 {
+        return static_cast<u8>(view[index]);
+      };
+
       /* A bracket with no closing ] is not a character class, so the [ is a
          literal character, as POSIX specifies. A ] right after [ or [^ is a
          member, so the scan for the closing ] starts past it. */
       usize close_scan = g + 1;
       if (close_scan < glob.count() &&
-          (glob[close_scan] == '!' || glob[close_scan] == '^'))
+          (glob[close_scan] == '!' || glob[close_scan] == '^') &&
+          is_active(close_scan))
         close_scan++;
-      if (close_scan < glob.count() && glob[close_scan] == ']') close_scan++;
+      if (close_scan < glob.count() && is_close_at(close_scan)) close_scan++;
       bool has_closing_bracket = false;
       for (; close_scan < glob.count(); close_scan++) {
-        if (glob[close_scan] == ']') {
+        if (is_close_at(close_scan)) {
           has_closing_bracket = true;
           break;
         }
       }
       if (!has_closing_bracket) {
-        if (glob[g] != str[s]) return false;
+        if (byte_at(glob, g) != byte_at(str, s)) return false;
         g++;
         s++;
         break;
@@ -611,35 +631,40 @@ fn glob_matches(StringView glob, StringView str,
       if (g >= glob.count()) GLOB_GROUP_ERR();
 
       /* POSIX sh negates a class with a leading '!'. The '^' form is kept as a
-         common extension. */
-      if (glob[g] == '!' || glob[g] == '^') {
+         common extension. The negation applies only to an active byte, so a
+         quoted ! or ^ at the front is a literal member. */
+      if ((glob[g] == '!' || glob[g] == '^') && is_active(g)) {
         g++;
         should_negate = true;
 
         if (g >= glob.count()) GLOB_GROUP_ERR();
       }
 
-      u8 prev_glob_ch = glob[g++];
-      is_matched |= (prev_glob_ch == str[s]);
+      u8 prev_glob_ch = byte_at(glob, g);
+      is_matched |= (prev_glob_ch == byte_at(str, s));
+      g++;
 
-      while (g < glob.count() && glob[g] != ']') {
-        if (glob[g] == '-') {
+      while (g < glob.count() && !is_close_at(g)) {
+        if (glob[g] == '-' && is_active(g)) {
           g++;
           if (g >= glob.count()) GLOB_GROUP_ERR();
 
-          if (glob[g] == ']') {
-            is_matched |= ('-' == str[s]);
+          if (is_close_at(g)) {
+            is_matched |= ('-' == byte_at(str, s));
           } else {
-            is_matched |= (prev_glob_ch <= str[s] && str[s] <= glob[g]);
-            prev_glob_ch = glob[g++];
+            is_matched |=
+                (prev_glob_ch <= byte_at(str, s) && byte_at(str, s) <= byte_at(glob, g));
+            prev_glob_ch = byte_at(glob, g);
+            g++;
           }
         } else {
-          prev_glob_ch = glob[g++];
-          is_matched |= (prev_glob_ch == str[s]);
+          prev_glob_ch = byte_at(glob, g);
+          is_matched |= (prev_glob_ch == byte_at(str, s));
+          g++;
         }
       }
 
-      if (g >= glob.count() || glob[g] != ']') GLOB_GROUP_ERR();
+      if (g >= glob.count() || !is_close_at(g)) GLOB_GROUP_ERR();
       if (should_negate) is_matched = !is_matched;
       if (!is_matched) return false;
 

@@ -2336,6 +2336,68 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
   return result;
 }
 
+fn EvalContext::expand_case_pattern_masked(const Word &word,
+                                           ArrayList<bool> &active_out) throws
+    -> String
+{
+  /* Only copy the segments when a leading tilde must be rewritten, mirroring the
+     assignment expansion the case word otherwise shares. */
+  let const *segments = &word.segments;
+  let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
+  if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
+      !word.segments.front().text.is_empty() &&
+      word.segments.front().text.first_character() == '~')
+  {
+    tilde_expanded_segments = word.segments;
+    expand_tilde(tilde_expanded_segments.front());
+    segments = &tilde_expanded_segments;
+  }
+
+  let result = String{heap_allocator()};
+
+  /* Append a run of bytes that share one glob-active state, so the mask stays
+     parallel to the result the way expand_word builds it. */
+  auto emit_run = [&](StringView bytes, bool is_active) {
+    result.append(bytes);
+    for (usize k = 0; k < bytes.length; k++)
+      active_out.push(is_active);
+  };
+
+  for (const WordSegment &segment : *segments) {
+    let const segment_text = segment.text.view();
+    switch (segment.kind) {
+    case WordSegment::Kind::LiteralText:
+    case WordSegment::Kind::DoubleQuotedText:
+      /* A quoted or double-quoted region is a literal member, so its
+         metacharacters never act as wildcards. */
+      emit_run(segment_text, false);
+      break;
+    case WordSegment::Kind::UnquotedText:
+      emit_run(segment_text, true);
+      break;
+    case WordSegment::Kind::VariableReference: {
+      let const value =
+          String{heap_allocator(), apply_parameter_expansion(segment_text)};
+      emit_run(value.view(), !segment.is_in_double_quotes);
+    } break;
+    case WordSegment::Kind::CommandSubstitution: {
+      let const output =
+          String{heap_allocator(), capture_command_substitution(segment)};
+      emit_run(output.view(), !segment.is_in_double_quotes);
+    } break;
+    case WordSegment::Kind::ArithmeticExpansion: {
+      /* An arithmetic result is decimal digits and a sign, so it carries no glob
+         metacharacter and stays inactive. */
+      let const number = segment.folded_arithmetic_result.has_value()
+                             ? *segment.folded_arithmetic_result
+                             : evaluate_arithmetic(segment_text);
+      emit_run(utils::int_to_text(number).view(), false);
+    } break;
+    }
+  }
+  return result;
+}
+
 /* The drain thread reads the pipe into captured while the inner command writes
    the other end, so output larger than the pipe buffer cannot deadlock. */
 struct command_substitution_drain_context

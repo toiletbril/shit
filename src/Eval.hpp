@@ -352,6 +352,16 @@ public:
      substitution but no field splitting and no globbing. */
   fn expand_word_for_assignment(const Word &word) throws -> String;
 
+  /* Expand a case pattern word the same way assignment context expands, with no
+     field splitting and no pathname globbing, plus a parallel mask that marks
+     which output bytes may act as glob metacharacters. A byte from a quoted or
+     double-quoted region is inactive, an unquoted literal byte is active, and a
+     byte from an unquoted expansion is active so a * or ? in the value matches as
+     a wildcard. The case matcher reads the mask so a quoted metacharacter in the
+     pattern matches literally. */
+  fn expand_case_pattern_masked(const Word &word, ArrayList<bool> &active_out)
+      throws -> String;
+
   /* Run the source of a $(...) and return its standard output with trailing
      newlines stripped. The inner command runs in-process with the working
      directory and variables snapshotted, so a cd or an assignment inside does

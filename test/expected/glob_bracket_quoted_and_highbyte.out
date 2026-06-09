@@ -1,0 +1,531 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bracket_close_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bracket_close_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bracket_b_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bracket_b_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bracket_x_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bracket_x_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "dash_dash_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "dash_dash_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "dash_m_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "dash_m_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "dash_a_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "dash_a_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bang_member_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bang_member_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bang_c_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bang_c_miss"]
+  [CompoundListCondition, None]
+    [Assign star=*]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "quoted_star_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "quoted_star_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "unquoted_star_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "unquoted_star_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "highrange_b_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "highrange_b_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "highrange_A_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "highrange_A_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_highrange_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_highrange_miss"]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "]"
+  Unquoted "b]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket_close_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket_close_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "]"
+  Unquoted "b]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket_b_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket_b_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "]"
+  Unquoted "b]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket_x_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket_x_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "-"
+  Unquoted "z]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dash_dash_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dash_dash_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "m"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "-"
+  Unquoted "z]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dash_m_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dash_m_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "-"
+  Unquoted "z]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dash_a_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "dash_a_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  DoubleQuoted "!"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "!"
+  Unquoted "b]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bang_member_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bang_member_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a"
+  DoubleQuoted "!"
+  Unquoted "b]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bang_c_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bang_c_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "star="
+  DoubleQuoted "*"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "foo"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "star"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "quoted_star_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "quoted_star_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "foo"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "star"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unquoted_star_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unquoted_star_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a-ÿ]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "highrange_b_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "highrange_b_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "A"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[a-ÿ]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "highrange_A_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "highrange_A_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!a-ÿ]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_highrange_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_highrange_miss"
+]
+[Word
+  Unquoted "esac"
+]
+bracket_close_hit
+bracket_b_hit
+bracket_x_miss
+dash_dash_hit
+dash_m_miss
+dash_a_hit
+bang_member_hit
+bang_c_miss
+quoted_star_miss
+unquoted_star_hit
+highrange_b_hit
+highrange_A_miss
+neg_highrange_hit
+[Code 0]

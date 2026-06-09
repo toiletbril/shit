@@ -2082,11 +2082,23 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     ASSERT(item.body != nullptr);
 
     for (const Token *pattern_token : item.patterns) {
-      let const pattern = expand_no_glob(pattern_token);
-      let all_active = ArrayList<bool>{heap_allocator()};
-      for (usize k = 0; k < pattern.count(); k++)
-        all_active.push(true);
-      if (utils::glob_matches(pattern, subject, all_active, 0)) {
+      /* A pattern keeps its glob metacharacters for matching, yet a quoted or
+         escaped metacharacter in the pattern is a literal, so the expansion
+         carries a parallel mask the matcher reads. A pattern token that is not a
+         plain word, such as a reserved word arm, has no quoting structure and
+         stays fully active. */
+      let pattern_active = ArrayList<bool>{heap_allocator()};
+      String pattern{};
+      if (pattern_token->kind() == Token::Kind::Word) {
+        pattern = cxt.expand_case_pattern_masked(
+            static_cast<const tokens::WordToken *>(pattern_token)->word(),
+            pattern_active);
+      } else {
+        pattern = pattern_token->raw_string();
+        for (usize k = 0; k < pattern.count(); k++)
+          pattern_active.push(true);
+      }
+      if (utils::glob_matches(pattern, subject, pattern_active, 0)) {
         let const ret = item.body->evaluate(cxt);
         cxt.set_last_exit_status(static_cast<i32>(ret));
         return ret;
