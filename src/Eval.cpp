@@ -3501,21 +3501,85 @@ public:
         name, utils::int_to_text_into(value, buffer, sizeof(buffer)));
   }
 
+  /* An assignment or step target, a name and an optional [subscript] for an
+     array element. The subscript is the raw bytes between the brackets, which
+     the evaluator expands when the element is read or written. */
+  struct lvalue
+  {
+    StringView name;
+    Maybe<StringView> subscript;
+  };
+
+  /* A [subscript] right after a name, with the bracket content returned as a
+     view, or None when no bracket sits there. Nested brackets are balanced so
+     a[b[0]] reads the whole inner expression. */
+  fn read_optional_subscript() throws -> Maybe<StringView>
+  {
+    if (pos >= source.length || source[pos] != '[') return None;
+    pos++;
+    let const inner_start = pos;
+    usize depth = 1;
+    while (pos < source.length && depth > 0) {
+      if (source[pos] == '[')
+        depth++;
+      else if (source[pos] == ']' && --depth == 0)
+        break;
+      pos++;
+    }
+    if (depth != 0) fail("expected ']' after an array subscript");
+    let const subscript =
+        source.substring_of_length(inner_start, pos - inner_start);
+    pos++;
+    return subscript;
+  }
+
+  /* A name at the cursor with its optional array subscript. */
+  fn read_lvalue() throws -> lvalue
+  {
+    let const name = read_lvalue_name();
+    if (name.is_empty()) return lvalue{name, None};
+    return lvalue{name, read_optional_subscript()};
+  }
+
+  fn read_lvalue_value(const lvalue &target) throws -> i64
+  {
+    if (target.subscript.has_value()) {
+      ASSERT(context != nullptr);
+      return context->read_array_element_integer(target.name,
+                                                 *target.subscript);
+    }
+    return read_variable_value(target.name);
+  }
+
+  fn write_lvalue(const lvalue &target, i64 value) throws -> void
+  {
+    if (m_is_skipping) return;
+    if (target.subscript.has_value()) {
+      ASSERT(context != nullptr);
+      char buffer[24];
+      context->assign_array_element(
+          target.name, *target.subscript,
+          utils::int_to_text_into(value, buffer, sizeof(buffer)), false);
+      return;
+    }
+    write_variable(target.name, value);
+  }
+
   /* A prefix ++ or -- changes the variable and yields the new value. */
   fn prefix_step(i64 delta) throws -> i64
   {
-    const StringView name = read_lvalue_name();
-    if (name.is_empty()) fail("expected a variable after '++' or '--'");
-    const i64 updated = arithmetic_add(read_variable_value(name), delta);
-    write_variable(name, updated);
+    const lvalue target = read_lvalue();
+    if (target.name.is_empty()) fail("expected a variable after '++' or '--'");
+    const i64 updated = arithmetic_add(read_lvalue_value(target), delta);
+    write_lvalue(target, updated);
     return updated;
   }
 
   /* A postfix ++ or -- yields the old value and then changes the variable. */
-  fn postfix_step(StringView name, i64 delta) throws -> i64
+  fn postfix_step(const lvalue &target, i64 delta) throws -> i64
   {
-    const i64 original = read_variable_value(name);
-    write_variable(name, arithmetic_add(original, delta));
+    const i64 original = read_lvalue_value(target);
+    write_lvalue(target, arithmetic_add(original, delta));
     return original;
   }
 
@@ -3573,6 +3637,7 @@ public:
       while (pos < source.length && lexer::is_variable_name(source[pos]))
         pos++;
       let const name = source.substring_of_length(name_start, pos - name_start);
+      const lvalue target{name, read_optional_subscript()};
 
       struct compound_operator
       {
@@ -3595,25 +3660,15 @@ public:
         if (consume(op)) {
           let const rhs = parse_assignment();
           let const result =
-              apply_compound(read_variable_value(name), rhs, kind);
-          if (!m_is_skipping) {
-            ASSERT(context != nullptr);
-            char buffer[24];
-            context->set_shell_variable(
-                name, utils::int_to_text_into(result, buffer, sizeof(buffer)));
-          }
+              apply_compound(read_lvalue_value(target), rhs, kind);
+          write_lvalue(target, result);
           return result;
         }
       }
       if (starts_with("=") && !starts_with("==")) {
         consume("=");
         let const rhs = parse_assignment();
-        if (!m_is_skipping) {
-          ASSERT(context != nullptr);
-          char buffer[24];
-          context->set_shell_variable(
-              name, utils::int_to_text_into(rhs, buffer, sizeof(buffer)));
-        }
+        write_lvalue(target, rhs);
         return rhs;
       }
       pos = save;
@@ -3844,16 +3899,22 @@ public:
       /* The name is a contiguous slice of the expression the parser holds for
          the whole evaluation, so a view into it avoids a per-read allocation. A
          trailing ++ or -- right after the name is a postfix step on it. */
-      const StringView name = read_lvalue_name();
-      if (consume("++")) return postfix_step(name, 1);
-      if (consume("--")) return postfix_step(name, -1);
-      return read_variable_value(name);
+      const lvalue target = read_lvalue();
+      if (consume("++")) return postfix_step(target, 1);
+      if (consume("--")) return postfix_step(target, -1);
+      return read_lvalue_value(target);
     }
     fail("unexpected character");
   }
 };
 
 } /* namespace */
+
+fn EvalContext::read_array_element_integer(StringView name,
+                                           StringView subscript) throws -> i64
+{
+  return parse_arithmetic_operand(apply_array_subscript(name, subscript).view());
+}
 
 fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 {

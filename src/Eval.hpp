@@ -271,6 +271,12 @@ public:
      parser path so the subscript expansion stays inside the evaluator. */
   fn assign_array_element(StringView name, StringView subscript,
                           StringView value, bool is_append) throws -> void;
+  /* Read one array element as an arithmetic integer from a raw subscript, the
+     read counterpart of assign_array_element for the a[i] arithmetic path. The
+     subscript is expanded inside the evaluator, then the element parses as an
+     operand. */
+  fn read_array_element_integer(StringView name, StringView subscript) throws
+      -> i64;
   pure fn lookup_indexed_array(StringView name) const wontthrow
       -> const ArrayList<String> *
   {
