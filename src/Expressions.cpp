@@ -588,6 +588,10 @@ fn resolve_duplication_fd(const Redirection &redir, EvalContext &cxt) throws
 
 } /* namespace */
 
+/* The pipeline-stage redirect path fills the stage's descriptor slots and the
+   cross-route flags the spawn applies after the files, so a `cmd 2>&1 >file`
+   stage still snapshots the final file target. The standalone simple-command
+   path in evaluate_impl is source-ordered, this one is not yet. */
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                                         EvalContext &cxt) const throws -> void
 {
@@ -759,20 +763,20 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* Open the redirection targets. A redirection takes effect even when the
      command expands to None, so > file with no command still creates the
-     file. The final descriptors pass to the exec context, which closes them,
-     and the guard closes them on any path that does not hand them off. */
+     file. A heredoc on the standard input passes its staged descriptor to the
+     exec context through this slot, which closes it, and the guard closes it on
+     any path that does not hand it off. A file or a cross-route on the standard
+     output and error is staged in source order onto the real shell fd below
+     rather than into a slot. */
   Maybe<os::descriptor> redirect_in_fd;
-  Maybe<os::descriptor> redirect_out_fd;
-  Maybe<os::descriptor> redirect_err_fd;
-  bool dup_err_to_out = false;
-  bool dup_out_to_err = false;
-  bool dup_out_to_err_came_last = false;
-  bool redirect_fds_handed_off = false;
-  /* A duplication onto an arbitrary descriptor, such as >&5 or the close form
-     >&-, points a real shell descriptor at the target around this command. The
-     three descriptor slots above cannot express it, since they only carry the
-     standard input, output, and error. The backups put the descriptors back
-     once the command finishes, restored in reverse on every exit path. */
+  bool redirect_in_fd_handed_off = false;
+  /* A redirect that points a real shell descriptor at its target around this
+     command, a file on fd 1 or fd 2, a cross-route like 2>&1, a duplication onto
+     an arbitrary descriptor like >&5, the close form >&-, and a numbered heredoc
+     among them. The backups put the descriptors back once the command finishes,
+     restored in reverse on every exit path. The standard fds are routed here so
+     a later 2>&1 copies the descriptor its source points at now, in source
+     order, rather than the one a deferred slot would place last. */
   ArrayList<os::saved_descriptor> dup_saved_descriptors{heap_allocator()};
   defer
   {
@@ -781,11 +785,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   };
   defer
   {
-    if (!redirect_fds_handed_off) {
-      if (redirect_in_fd) os::close_fd(*redirect_in_fd);
-      if (redirect_out_fd) os::close_fd(*redirect_out_fd);
-      if (redirect_err_fd) os::close_fd(*redirect_err_fd);
-    }
+    if (!redirect_in_fd_handed_off && redirect_in_fd)
+      os::close_fd(*redirect_in_fd);
   };
 
   for (const Redirection &redir : m_redirections) {
@@ -878,28 +879,18 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         continue;
       }
 
-      /* A descriptor copied onto itself, as in 1>&1, changes nothing. The
-         standard error and output cross-routing keeps the flag fast path, since
-         the spawn applies it after the files are placed. */
+      /* A descriptor copied onto itself, as in 1>&1, changes nothing. */
       if (from_fd == redir.fd) {
         /* Self copy is a no-op. */
         continue;
       }
-      if (redir.fd == 2 && from_fd == 1) {
-        dup_err_to_out = true;
-        dup_out_to_err_came_last = false;
-        continue;
-      }
-      if (redir.fd == 1 && from_fd == 2) {
-        dup_out_to_err = true;
-        dup_out_to_err_came_last = true;
-        continue;
-      }
 
-      /* An arbitrary descriptor or the close form points the real shell
-         descriptor at the target around the command, restored afterward. The
-         shell's buffered output is flushed first, so it lands on the original
-         descriptor rather than the duplication target. */
+      /* A cross-route between the standard output and error, as in 2>&1, points
+         the real shell descriptor at the target in source order so a later file
+         redirect on the source does not change what the copy already captured.
+         The shell's buffered output is flushed first, so it lands on the
+         original descriptor rather than the duplication target. The arbitrary
+         descriptor and the close form take the same in-order path. */
       shit::flush();
 
       if (from_fd == Redirection::DUP_FD_CLOSE) {
@@ -968,17 +959,18 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       continue;
     }
 
-    /* A redirect to the standard input, output, or error fills the matching
-       descriptor slot the spawn places. A redirect to a higher descriptor, such
-       as 3>file, has no slot among the three, so the opened file is staged onto
-       the real shell fd N around the command and restored afterward, the same
-       way a numbered heredoc and the compound redirect path stage fd N. Routing
-       it through a slot instead sent fd 3 to the standard output and left the
-       child without fd 3. */
-    if (redir.fd == 0 || redir.fd == 1 || redir.fd == 2) {
-      assign_standard_fd(redirect_in_fd, redirect_out_fd, redirect_err_fd,
-                         redir.fd, file_fd);
-    } else if (file_fd == redir.fd) {
+    /* Every file redirect, the standard input, output, and error included, is
+       staged onto the real shell fd N in source order so a later 2>&1 copies
+       the descriptor fd N points at now rather than the one the spawn would
+       place last. A redirect onto fd 1 or fd 2 mutates the shell's own standard
+       output or error in place, so the buffered output is flushed first to land
+       on the original descriptor. open returns the lowest free fd, which is at
+       least three while fds 0, 1, and 2 hold the shell's stdio, so the file
+       never lands on a standard fd itself. The higher fd, such as 3>file, takes
+       the same in-order path the numbered heredoc and the compound redirect
+       path use. */
+    if (redir.fd == 1 || redir.fd == 2) shit::flush();
+    if (file_fd == redir.fd) {
       /* open returned fd N itself, since fd N was the lowest free descriptor, so
          the file already sits on its target. The generic save then dup2 would
          back up the file and the close would shut fd N, leaving the child
@@ -1178,15 +1170,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     m_resolved_name = ec.program();
   }
 
-  /* The redirections override the inherited descriptors for this command. The
-     exec context now owns the opened files and closes them. */
+  /* A heredoc on the standard input passes its staged descriptor through the
+     in_fd slot, which the exec context now owns and closes. The standard output
+     and error redirects already took effect in source order on the real shell
+     fds above and are restored by the defer, so they need no slot here. */
   if (redirect_in_fd) ec.in_fd = redirect_in_fd;
-  if (redirect_out_fd) ec.out_fd = redirect_out_fd;
-  if (redirect_err_fd) ec.err_fd = redirect_err_fd;
-  ec.dup_err_to_out = dup_err_to_out;
-  ec.dup_out_to_err = dup_out_to_err;
-  ec.dup_out_to_err_came_last = dup_out_to_err_came_last;
-  redirect_fds_handed_off = true;
+  redirect_in_fd_handed_off = true;
 
   const i64 ret = utils::execute_context(steal(ec), cxt, is_async());
 

@@ -1,0 +1,52 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "sh" "-c" "echo this-is-stdout; echo this-is-stderr 1>&2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "file-has-only-stdout:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "zz_dup_before_file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-f" "zz_dup_before_file"]
+[Word
+  Unquoted "sh"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "echo this-is-stdout; echo this-is-stderr 1>&2"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "zz_dup_before_file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "file-has-only-stdout:"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "zz_dup_before_file"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "zz_dup_before_file"
+]
+this-is-stderr
+file-has-only-stdout:
+this-is-stdout
+[Code 0]
