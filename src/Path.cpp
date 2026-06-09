@@ -203,6 +203,13 @@ fn Path::is_regular_file() const wontthrow -> bool
   return S_ISREG(info.st_mode);
 }
 
+fn Path::is_symbolic_link() const wontthrow -> bool
+{
+  struct stat info{};
+  if (::lstat(m_text.c_str(), &info) != 0) return false;
+  return S_ISLNK(info.st_mode);
+}
+
 fn Path::file_size() const wontthrow -> Maybe<u64>
 {
   struct stat info{};
@@ -332,6 +339,13 @@ fn Path::is_regular_file() const -> bool
   DWORD attributes = GetFileAttributesA(m_text.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+fn Path::is_symbolic_link() const -> bool
+{
+  DWORD attributes = GetFileAttributesA(m_text.c_str());
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
 fn Path::file_size() const -> Maybe<u64>

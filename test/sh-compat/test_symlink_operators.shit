@@ -1,0 +1,12 @@
+# -L and -h test the symlink-ness of a path without following it.
+target=/tmp/shit_symlink_target_fixed
+link=/tmp/shit_symlink_link_fixed
+rm -f "$link"
+: > "$target"
+ln -s "$target" "$link"
+[ -L "$link" ] && echo link_is_symlink
+[ -h "$link" ] && echo link_h_symlink
+[ ! -L "$target" ] && echo target_not_symlink
+[ -L "$target" ] || echo target_confirmed_plain
+[ ! -L "$link" ] || echo negation_of_symlink_false
+rm -f "$link" "$target"

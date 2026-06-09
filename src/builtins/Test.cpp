@@ -53,8 +53,9 @@ public:
     if (op == "-r") return operand_path.is_readable();
     if (op == "-w") return operand_path.is_writable();
     if (op == "-x") return operand_path.is_executable();
+    if (op == "-L" || op == "-h") return operand_path.is_symbolic_link();
     fail(StringView{"unknown unary operator '"} + op +
-         "', expected one of -z -n -e -f -d -s -r -w -x");
+         "', expected one of -z -n -e -f -d -s -r -w -x -L -h");
     return false;
   }
 
@@ -109,7 +110,8 @@ public:
   pure bool is_unary_operator(const String &s) const wontthrow
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
-           s == "-s" || s == "-r" || s == "-w" || s == "-x";
+           s == "-s" || s == "-r" || s == "-w" || s == "-x" || s == "-L" ||
+           s == "-h";
   }
 
   pure bool is_binary_operator(const String &s) const wontthrow

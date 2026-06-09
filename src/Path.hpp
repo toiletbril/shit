@@ -62,6 +62,9 @@ public:
   mustuse fn exists() const wontthrow -> bool;
   mustuse fn is_directory() const wontthrow -> bool;
   mustuse fn is_regular_file() const wontthrow -> bool;
+  /* True when the path itself is a symbolic link, tested without following it,
+     for the test builtin's -L and -h primaries. */
+  mustuse fn is_symbolic_link() const wontthrow -> bool;
   mustuse fn file_size() const wontthrow -> Maybe<u64>;
 
   /* The access checks the test builtin asks for, each one access() call. */
