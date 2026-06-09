@@ -66,8 +66,8 @@ public:
   template <class T, class... Args>
   flatten fn create(Args &&...args) throws -> T *
   {
-    void *const storage = allocate(sizeof(T), alignof(T));
-    T *const object = new (storage) T(std::forward<Args>(args)...);
+    let const storage = allocate(sizeof(T), alignof(T));
+    let const object = new (storage) T(std::forward<Args>(args)...);
     /* A trivially destructible object needs no teardown, so the registration is
        skipped and only the genuinely-owning ones cost a slot. */
     if constexpr (!std::is_trivially_destructible_v<T>)

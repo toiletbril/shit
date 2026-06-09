@@ -41,7 +41,7 @@ public:
     other.m_count = 0;
     other.m_tombstones = 0;
   }
-  HashMap &operator=(HashMap &&other) noexcept
+  fn operator=(HashMap &&other) wontthrow->HashMap &
   {
     if (this != &other) {
       destroy_all();
@@ -57,7 +57,7 @@ public:
     }
     return *this;
   }
-  HashMap &operator=(const HashMap &other)
+  fn operator=(const HashMap &other) throws->HashMap &
   {
     if (this != &other) {
       HashMap copy{other};
@@ -68,18 +68,18 @@ public:
 
   ~HashMap() { destroy_all(); }
 
-  mustuse usize count() const { return m_count; }
+  mustuse pure fn count() const wontthrow -> usize { return m_count; }
 
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */
-  mustuse const Value *find(StringView key) const
+  mustuse pure fn find(StringView key) const wontthrow -> const Value *
   {
     if (m_capacity == 0) return nullptr;
-    PackedStringKey wanted = PackedStringKey::from_view(key);
-    usize mask = m_capacity - 1;
-    usize i = hash_bytes(key) & mask;
+    let const wanted = PackedStringKey::from_view(key);
+    let const mask = m_capacity - 1;
+    let i = hash_bytes(key) & mask;
     for (usize probe = 0; probe < m_capacity; probe++) {
-      const slot &slot = m_slots[i];
+      let const &slot = m_slots[i];
       if (slot.state == slot::Empty) return nullptr;
       /* The packed compare rejects a mismatch in two words before the byte
          compare runs, and the byte compare confirms a key past sixteen bytes.
@@ -95,19 +95,19 @@ public:
   /* The mutable value for the key, or nullptr when absent, so a caller can edit
      a stored value in place without a copy-out then set. The pointer is stable
      until the next set that grows the table. */
-  mustuse Value *find(StringView key)
+  mustuse fn find(StringView key) wontthrow -> Value *
   {
     return const_cast<Value *>(static_cast<const HashMap *>(this)->find(key));
   }
 
   /* Store a value the table owns by move. */
-  void set(StringView key, Value value) { set_value(key, steal(value)); }
+  fn set(StringView key, Value value) throws -> void { set_value(key, steal(value)); }
 
   /* The value for a key, inserting the supplied default when the key is absent,
      then returning a mutable reference. The caller passes the default already
      built with the right allocator. The reference is valid until the next set
      that grows the table. */
-  Value &get_or_create(StringView key, Value default_value)
+  fn get_or_create(StringView key, Value default_value) throws -> Value &
   {
     if (const Value *existing = find(key))
       return *const_cast<Value *>(existing);
@@ -125,7 +125,7 @@ public:
      append would read bytes the clear already truncated. Every caller builds
      the value in a fresh String or a stack buffer first, so a self-assignment
      such as x=$x still passes an independent view. */
-  void set(StringView key, StringView value)
+  fn set(StringView key, StringView value) throws -> void
   {
     if (Value *existing = find(key)) {
       /* A buffer that once held a large value and now takes a far smaller one
@@ -133,7 +133,7 @@ public:
          big value does not pin that memory for the session. A small or
          similar-sized value reuses the buffer, which keeps a counter loop
          allocation free. */
-      const bool buffer_is_wasteful =
+      let const buffer_is_wasteful =
           existing->count() > 256 && value.length < existing->count() / 2;
       if (!buffer_is_wasteful) {
         existing->clear();
@@ -144,13 +144,13 @@ public:
     set_value(key, String{m_allocator, value});
   }
 
-  void erase(StringView key)
+  fn erase(StringView key) throws -> void
   {
     if (m_capacity == 0) return;
-    usize mask = m_capacity - 1;
-    usize i = hash_bytes(key) & mask;
+    let const mask = m_capacity - 1;
+    let i = hash_bytes(key) & mask;
     for (usize probe = 0; probe < m_capacity; probe++) {
-      slot &slot = m_slots[i];
+      let &slot = m_slots[i];
       if (slot.state == slot::Empty) return;
       if (slot.state == slot::Occupied && slot.key == key) {
         /* Free the stored key and value but keep the slot objects alive, so a
@@ -169,7 +169,7 @@ public:
 
   /* Visit each key and value in unspecified order. */
   template <class Fn>
-  void for_each(Fn callback) const
+  fn for_each(Fn callback) const throws -> void
   {
     for (usize i = 0; i < m_capacity; i++) {
       if (m_slots[i].state == slot::Occupied)
@@ -177,7 +177,7 @@ public:
     }
   }
 
-  void clear() { destroy_all(); }
+  fn clear() wontthrow -> void { destroy_all(); }
 
 private:
   struct slot
@@ -194,7 +194,7 @@ private:
     Value value{};
   };
 
-  void set_value(StringView key, Value value)
+  fn set_value(StringView key, Value value) throws -> void
   {
     /* Tombstones count toward the load, so the table rehashes before a probe
        chain fills with deleted slots. That keeps an Empty slot reachable on
@@ -202,12 +202,12 @@ private:
     if (m_count + m_tombstones + 1 > (m_capacity >> 1) + (m_capacity >> 2))
       rehash(m_capacity == 0 ? 16 : m_capacity * 2);
 
-    PackedStringKey wanted = PackedStringKey::from_view(key);
-    usize mask = m_capacity - 1;
-    usize i = hash_bytes(key) & mask;
-    usize first_tombstone = m_capacity;
+    let const wanted = PackedStringKey::from_view(key);
+    let const mask = m_capacity - 1;
+    let i = hash_bytes(key) & mask;
+    let first_tombstone = m_capacity;
     for (usize probe = 0; probe < m_capacity; probe++) {
-      slot &slot = m_slots[i];
+      let &slot = m_slots[i];
       if (slot.state == slot::Occupied && slot.packed == wanted &&
           slot.key == key)
       {
@@ -215,7 +215,7 @@ private:
         return;
       }
       if (slot.state == slot::Empty) {
-        usize target = first_tombstone != m_capacity ? first_tombstone : i;
+        let const target = first_tombstone != m_capacity ? first_tombstone : i;
         if (first_tombstone != m_capacity) m_tombstones--;
         place(target, key, wanted, steal(value));
         return;
@@ -235,10 +235,10 @@ private:
 
   /* The caller already computed the packed key for its probe, so it is passed
      in rather than recomputed from the key bytes here. */
-  void place(usize index, StringView key, const PackedStringKey &packed,
-             Value value)
+  fn place(usize index, StringView key, const PackedStringKey &packed,
+           Value value) throws -> void
   {
-    slot &slot = m_slots[index];
+    let &slot = m_slots[index];
     slot.key = String{m_allocator, key};
     slot.packed = packed;
     slot.value = steal(value);
@@ -246,10 +246,10 @@ private:
     m_count++;
   }
 
-  void rehash(usize new_capacity)
+  fn rehash(usize new_capacity) throws -> void
   {
-    slot *old_slots = m_slots;
-    usize old_capacity = m_capacity;
+    let old_slots = m_slots;
+    let const old_capacity = m_capacity;
 
     m_slots = m_allocator.alloc_array<slot>(new_capacity);
     for (usize i = 0; i < new_capacity; i++)
@@ -266,7 +266,7 @@ private:
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);
   }
 
-  void destroy_all()
+  fn destroy_all() wontthrow -> void
   {
     for (usize i = 0; i < m_capacity; i++)
       m_slots[i].~slot();

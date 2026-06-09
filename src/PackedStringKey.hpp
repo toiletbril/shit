@@ -22,7 +22,8 @@ public:
 
   /* Pack a NUL-terminated literal at compile time, so a static table entry
      becomes a constant with no runtime initialization. */
-  static constexpr PackedStringKey from_literal(const char *text)
+  static constexpr fn from_literal(const char *text) wontthrow
+      -> PackedStringKey
   {
     PackedStringKey key{};
     usize i = 0;
@@ -35,10 +36,10 @@ public:
   }
 
   /* Pack the first sixteen bytes of a view at lookup time. */
-  static PackedStringKey from_view(StringView text)
+  static fn from_view(StringView text) wontthrow -> PackedStringKey
   {
     PackedStringKey key{};
-    usize count = text.count() < 16 ? text.count() : 16;
+    let const count = text.count() < 16 ? text.count() : 16;
     for (usize i = 0; i < count && i < 8; i++)
       key.low_word |= static_cast<u64>(static_cast<u8>(text[i])) << (8 * i);
     for (usize i = 8; i < count; i++)
@@ -47,7 +48,8 @@ public:
     return key;
   }
 
-  mustuse bool operator==(const PackedStringKey &other) const
+  mustuse pure fn operator==(const PackedStringKey &other) const wontthrow
+      -> bool
   {
     return low_word == other.low_word && high_word == other.high_word;
   }
@@ -56,12 +58,12 @@ public:
      sixteen-byte limit. A key built from a name with no embedded NUL and no
      more than sixteen bytes round-trips exactly, which holds for every builtin
      name. */
-  mustuse String to_string() const
+  mustuse fn to_string() const throws -> String
   {
     char buffer[16];
     usize length = 0;
     for (; length < 8; length++) {
-      const char byte = static_cast<char>((low_word >> (8 * length)) & 0xFF);
+      let const byte = static_cast<char>((low_word >> (8 * length)) & 0xFF);
       if (byte == '\0')
         return String{
             StringView{buffer, length}
@@ -69,7 +71,7 @@ public:
       buffer[length] = byte;
     }
     for (; length < 16; length++) {
-      const char byte =
+      let const byte =
           static_cast<char>((high_word >> (8 * (length - 8))) & 0xFF);
       if (byte == '\0')
         return String{

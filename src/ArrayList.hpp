@@ -44,7 +44,7 @@ public:
     other.m_capacity = 0;
   }
 
-  ArrayList &operator=(ArrayList &&other) noexcept
+  fn operator=(ArrayList &&other) wontthrow->ArrayList &
   {
     if (this != &other) {
       destroy_all();
@@ -58,7 +58,7 @@ public:
     }
     return *this;
   }
-  ArrayList &operator=(const ArrayList &other)
+  fn operator=(const ArrayList &other) throws->ArrayList &
   {
     if (this != &other) {
       ArrayList copy{other};
@@ -69,16 +69,22 @@ public:
 
   ~ArrayList() { destroy_all(); }
 
-  mustuse usize count() const { return m_length; }
-  mustuse bool is_empty() const { return m_length == 0; }
-  mustuse T &operator[](usize i) { return m_data[i]; }
-  mustuse const T &operator[](usize i) const { return m_data[i]; }
-  mustuse T *begin() { return m_data; }
-  mustuse T *end() { return m_data + m_length; }
-  mustuse const T *begin() const { return m_data; }
-  mustuse const T *end() const { return m_data + m_length; }
+  mustuse pure fn count() const wontthrow -> usize { return m_length; }
+  mustuse pure fn is_empty() const wontthrow -> bool { return m_length == 0; }
+  mustuse pure fn operator[](usize i) wontthrow->T & { return m_data[i]; }
+  mustuse pure fn operator[](usize i) const wontthrow->const T &
+  {
+    return m_data[i];
+  }
+  mustuse pure fn begin() wontthrow -> T * { return m_data; }
+  mustuse pure fn end() wontthrow -> T * { return m_data + m_length; }
+  mustuse pure fn begin() const wontthrow -> const T * { return m_data; }
+  mustuse pure fn end() const wontthrow -> const T *
+  {
+    return m_data + m_length;
+  }
 
-  void push(T value)
+  fn push(T value) throws -> void
   {
     reserve(m_length + 1);
     new (&m_data[m_length]) T(steal(value));
@@ -87,7 +93,7 @@ public:
 
   /* Destroy and drop the last element. The caller guarantees the list is not
      empty. */
-  void pop_back()
+  fn pop_back() wontthrow -> void
   {
     ASSERT(m_length > 0, "pop_back on an empty list");
     m_length--;
@@ -96,35 +102,35 @@ public:
 
   /* Destroy the elements but keep the storage, so a reused list does not
      reallocate. */
-  void clear()
+  fn clear() wontthrow -> void
   {
     for (usize i = 0; i < m_length; i++)
       m_data[i].~T();
     m_length = 0;
   }
 
-  mustuse T &back()
+  mustuse pure fn back() wontthrow -> T &
   {
     ASSERT(m_length > 0, "back() on an empty list");
     return m_data[m_length - 1];
   }
-  mustuse const T &back() const
+  mustuse pure fn back() const wontthrow -> const T &
   {
     ASSERT(m_length > 0, "back() on an empty list");
     return m_data[m_length - 1];
   }
-  mustuse T &front()
+  mustuse pure fn front() wontthrow -> T &
   {
     ASSERT(m_length > 0, "front() on an empty list");
     return m_data[0];
   }
-  mustuse const T &front() const
+  mustuse pure fn front() const wontthrow -> const T &
   {
     ASSERT(m_length > 0, "front() on an empty list");
     return m_data[0];
   }
 
-  void reserve(usize needed)
+  fn reserve(usize needed) throws -> void
   {
     if (needed <= m_capacity) return;
     /* A small list quadruples so a list grown one push at a time reaches a
@@ -135,7 +141,7 @@ public:
                                            : m_capacity * 2;
     while (new_capacity < needed)
       new_capacity *= 2;
-    T *fresh = m_allocator.alloc_array<T>(new_capacity);
+    let const fresh = m_allocator.alloc_array<T>(new_capacity);
     for (usize i = 0; i < m_length; i++) {
       new (&fresh[i]) T(steal(m_data[i]));
       m_data[i].~T();
@@ -149,7 +155,7 @@ public:
      then left alone keeps the growth overshoot for its whole lifetime, which a
      long-lived arena never reclaims, so a one-time builder calls this to hand
      the slack back. */
-  void shrink_to_fit()
+  fn shrink_to_fit() throws -> void
   {
     if (m_length == m_capacity) return;
     if (m_length == 0) {
@@ -158,7 +164,7 @@ public:
       m_capacity = 0;
       return;
     }
-    T *fresh = m_allocator.alloc_array<T>(m_length);
+    let const fresh = m_allocator.alloc_array<T>(m_length);
     for (usize i = 0; i < m_length; i++) {
       new (&fresh[i]) T(steal(m_data[i]));
       m_data[i].~T();
@@ -169,7 +175,7 @@ public:
   }
 
 private:
-  void destroy_all()
+  fn destroy_all() wontthrow -> void
   {
     for (usize i = 0; i < m_length; i++)
       m_data[i].~T();

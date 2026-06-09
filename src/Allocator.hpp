@@ -12,7 +12,8 @@ namespace shit {
    which would close the ArrayList -> Allocator -> Arena include cycle. The bump
    adapter reaches the arena through a free function defined in Arena.cpp. */
 class BumpArena;
-void *bump_arena_allocate(BumpArena *arena, usize length, usize alignment);
+fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
+    -> void *;
 
 /* An allocator value, in the manner of Zig's std.mem.Allocator. It carries a
    context and a table of operations, so a data structure is handed the
@@ -34,22 +35,23 @@ public:
   void *context;
   const VTable *vtable;
 
-  void *raw_alloc(usize length, usize alignment) const
+  fn raw_alloc(usize length, usize alignment) const throws -> void *
   {
     return vtable->alloc(context, length, alignment);
   }
-  bool raw_resize(void *pointer, usize old_length, usize new_length,
-                  usize alignment) const
+  fn raw_resize(void *pointer, usize old_length, usize new_length,
+                usize alignment) const wontthrow -> bool
   {
     return vtable->resize(context, pointer, old_length, new_length, alignment);
   }
-  void raw_free(void *pointer, usize length, usize alignment) const
+  fn raw_free(void *pointer, usize length, usize alignment) const wontthrow
+      -> void
   {
     vtable->free(context, pointer, length, alignment);
   }
 
   template <class T>
-  T *alloc_array(usize count) const
+  fn alloc_array(usize count) const throws -> T *
   {
     /* The product overflows usize for a large enough count, wrapping to a small
        request that the caller then writes past. The division guards the
@@ -60,7 +62,7 @@ public:
     return static_cast<T *>(raw_alloc(count * sizeof(T), alignof(T)));
   }
   template <class T>
-  void free_array(T *pointer, usize count) const
+  fn free_array(T *pointer, usize count) const wontthrow -> void
   {
     raw_free(pointer, count * sizeof(T), alignof(T));
   }
@@ -71,13 +73,14 @@ namespace allocators {
 /* The bump adapter over a BumpArena. A free is a no-op and a resize never grows
    in place, since the arena reclaims everything at once on reset. The whole
    lifetime of its allocations is the lifetime of the arena. */
-inline void *bump_alloc(void *context, usize length, usize alignment)
+inline fn bump_alloc(void *context, usize length, usize alignment) throws
+    -> void *
 {
   return bump_arena_allocate(static_cast<BumpArena *>(context), length,
                              alignment);
 }
-inline bool bump_resize(void *context, void *pointer, usize old_length,
-                        usize new_length, usize alignment)
+inline fn bump_resize(void *context, void *pointer, usize old_length,
+                      usize new_length, usize alignment) wontthrow -> bool
 {
   unused(context);
   unused(pointer);
@@ -86,8 +89,8 @@ inline bool bump_resize(void *context, void *pointer, usize old_length,
   unused(alignment);
   return false;
 }
-inline void bump_free(void *context, void *pointer, usize length,
-                      usize alignment)
+inline fn bump_free(void *context, void *pointer, usize length,
+                    usize alignment) wontthrow -> void
 {
   unused(context);
   unused(pointer);
@@ -101,7 +104,8 @@ inline constexpr Allocator::VTable BUMP_VTABLE{bump_alloc, bump_resize,
 /* The heap adapter over the C allocator. It frees on demand, so it backs the
    long-lived mutable data the bump model would leak, the variable store above
    all. */
-inline void *heap_alloc(void *context, usize length, usize alignment)
+inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
+    -> void *
 {
   unused(context);
   /* malloc already meets every alignment up to alignof(max_align_t), so the
@@ -115,8 +119,8 @@ inline void *heap_alloc(void *context, usize length, usize alignment)
   }
   return std::malloc(length);
 }
-inline bool heap_resize(void *context, void *pointer, usize old_length,
-                        usize new_length, usize alignment)
+inline fn heap_resize(void *context, void *pointer, usize old_length,
+                      usize new_length, usize alignment) wontthrow -> bool
 {
   unused(context);
   unused(pointer);
@@ -125,8 +129,8 @@ inline bool heap_resize(void *context, void *pointer, usize old_length,
   unused(alignment);
   return false;
 }
-inline void heap_free(void *context, void *pointer, usize length,
-                      usize alignment)
+inline fn heap_free(void *context, void *pointer, usize length,
+                    usize alignment) wontthrow -> void
 {
   unused(context);
   unused(length);
@@ -140,13 +144,13 @@ inline constexpr Allocator::VTable HEAP_VTABLE{heap_alloc, heap_resize,
 } /* namespace allocators */
 
 /* Make a bump allocator bound to an arena. */
-inline Allocator bump_allocator(BumpArena &arena)
+inline fn bump_allocator(BumpArena &arena) wontthrow -> Allocator
 {
   return Allocator{&arena, &allocators::BUMP_VTABLE};
 }
 
 /* Make a heap allocator over the C allocator. */
-inline Allocator heap_allocator()
+inline fn heap_allocator() wontthrow -> Allocator
 {
   return Allocator{nullptr, &allocators::HEAP_VTABLE};
 }

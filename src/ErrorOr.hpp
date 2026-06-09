@@ -17,7 +17,8 @@ namespace utils {
 /* Declared here rather than included from Utils.hpp, since Utils.hpp includes
    ErrorOr.hpp and the include would close a cycle. The definition lives in
    Utils.cpp. */
-String int_to_text(i64 value, Allocator allocator = heap_allocator());
+fn int_to_text(i64 value, Allocator allocator = heap_allocator()) throws
+    -> String;
 } /* namespace utils */
 
 /* The success payload of a fallible function that returns no value. A caller
@@ -57,7 +58,7 @@ public:
       new (&m_storage) T(steal(other.value_reference()));
   }
 
-  ErrorOr &operator=(const ErrorOr &other)
+  fn operator=(const ErrorOr &other) throws -> ErrorOr &
   {
     if (this != &other) {
       destroy();
@@ -69,7 +70,7 @@ public:
     }
     return *this;
   }
-  ErrorOr &operator=(ErrorOr &&other) noexcept
+  fn operator=(ErrorOr &&other) noexcept -> ErrorOr &
   {
     if (this != &other) {
       destroy();
@@ -84,39 +85,39 @@ public:
 
   ~ErrorOr() { destroy(); }
 
-  mustuse bool is_error() const { return m_is_error; }
+  mustuse pure fn is_error() const wontthrow -> bool { return m_is_error; }
 
-  mustuse T &value()
+  mustuse pure fn value() wontthrow -> T &
   {
     ASSERT(!m_is_error);
     return value_reference();
   }
-  mustuse const T &value() const
+  mustuse pure fn value() const wontthrow -> const T &
   {
     ASSERT(!m_is_error);
     return value_reference();
   }
 
-  mustuse Error &error()
+  mustuse pure fn error() wontthrow -> Error &
   {
     ASSERT(m_is_error);
     return error_reference();
   }
-  mustuse const Error &error() const
+  mustuse pure fn error() const wontthrow -> const Error &
   {
     ASSERT(m_is_error);
     return error_reference();
   }
 
   /* Move the value out, called once the caller has checked is_error. */
-  mustuse T take()
+  mustuse fn take() throws -> T
   {
     ASSERT(!m_is_error);
     return steal(value_reference());
   }
 
 private:
-  void destroy() noexcept
+  fn destroy() wontthrow -> void
   {
     if (m_is_error)
       error_reference().~Error();
@@ -124,16 +125,19 @@ private:
       value_reference().~T();
   }
 
-  T &value_reference() noexcept { return *reinterpret_cast<T *>(&m_storage); }
-  const T &value_reference() const noexcept
+  fn value_reference() wontthrow -> T &
+  {
+    return *reinterpret_cast<T *>(&m_storage);
+  }
+  fn value_reference() const wontthrow -> const T &
   {
     return *reinterpret_cast<const T *>(&m_storage);
   }
-  Error &error_reference() noexcept
+  fn error_reference() wontthrow -> Error &
   {
     return *reinterpret_cast<Error *>(&m_storage);
   }
-  const Error &error_reference() const noexcept
+  fn error_reference() const wontthrow -> const Error &
   {
     return *reinterpret_cast<const Error *>(&m_storage);
   }

@@ -14,19 +14,19 @@ class HashSet
 public:
   explicit HashSet(Allocator allocator) : m_map(allocator) {}
 
-  void add(StringView key) { m_map.set(key, Nothing{}); }
+  fn add(StringView key) throws -> void { m_map.set(key, Nothing{}); }
 
-  void remove(StringView key) { m_map.erase(key); }
+  fn remove(StringView key) throws -> void { m_map.erase(key); }
 
-  mustuse bool contains(StringView key) const
+  mustuse pure fn contains(StringView key) const wontthrow -> bool
   {
     return m_map.find(key) != nullptr;
   }
 
-  mustuse usize count() const { return m_map.count(); }
+  mustuse pure fn count() const wontthrow -> usize { return m_map.count(); }
 
   template <class Fn>
-  void for_each(Fn callback) const
+  fn for_each(Fn callback) const throws -> void
   {
     m_map.for_each(
         [&callback](StringView key, const Nothing &) { callback(key); });

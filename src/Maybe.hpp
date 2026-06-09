@@ -34,7 +34,7 @@ public:
     if (m_has_value) new (&m_storage) T(steal(other.reference()));
   }
 
-  Maybe &operator=(const Maybe &other)
+  fn operator=(const Maybe &other) throws -> Maybe &
   {
     if (this != &other) {
       reset();
@@ -43,7 +43,7 @@ public:
     }
     return *this;
   }
-  Maybe &operator=(Maybe &&other) noexcept
+  fn operator=(Maybe &&other) noexcept -> Maybe &
   {
     if (this != &other) {
       reset();
@@ -55,49 +55,55 @@ public:
 
   ~Maybe() { reset(); }
 
-  mustuse bool has_value() const noexcept { return m_has_value; }
-  mustuse explicit operator bool() const noexcept { return m_has_value; }
+  mustuse pure fn has_value() const wontthrow -> bool { return m_has_value; }
+  mustuse pure explicit operator bool() const wontthrow { return m_has_value; }
 
-  mustuse T &value()
+  mustuse pure fn value() wontthrow -> T &
   {
     ASSERT(m_has_value);
     return reference();
   }
-  mustuse const T &value() const
+  mustuse pure fn value() const wontthrow -> const T &
   {
     ASSERT(m_has_value);
     return reference();
   }
-  mustuse T &operator*() { return value(); }
-  mustuse const T &operator*() const { return value(); }
-  mustuse T *operator->() { return &reference(); }
-  mustuse const T *operator->() const { return &reference(); }
+  mustuse pure fn operator*() wontthrow -> T & { return value(); }
+  mustuse pure fn operator*() const wontthrow -> const T & { return value(); }
+  mustuse pure fn operator->() wontthrow -> T * { return &reference(); }
+  mustuse pure fn operator->() const wontthrow -> const T *
+  {
+    return &reference();
+  }
 
   /* Move the value out, leaving the Maybe empty. */
-  mustuse T take()
+  mustuse fn take() throws -> T
   {
     ASSERT(m_has_value);
-    T moved = steal(reference());
+    let moved = steal(reference());
     reset();
     return moved;
   }
 
   /* The value when present, otherwise the fallback. */
-  mustuse T value_or(T fallback) const
+  mustuse fn value_or(T fallback) const throws -> T
   {
     return m_has_value ? reference() : steal(fallback);
   }
 
   /* Equal to a bare value only when present and that value matches, so a
      comparison reads like the one against a std::optional. */
-  mustuse bool operator==(const T &other) const
+  mustuse fn operator==(const T &other) const throws -> bool
   {
     return m_has_value && reference() == other;
   }
-  mustuse bool operator!=(const T &other) const { return !(*this == other); }
+  mustuse fn operator!=(const T &other) const throws -> bool
+  {
+    return !(*this == other);
+  }
 
   /* Drop the value, leaving the Maybe empty. */
-  void reset() noexcept
+  fn reset() wontthrow -> void
   {
     if (m_has_value) {
       reference().~T();
@@ -106,8 +112,8 @@ public:
   }
 
 private:
-  T &reference() noexcept { return *reinterpret_cast<T *>(&m_storage); }
-  const T &reference() const noexcept
+  fn reference() wontthrow -> T & { return *reinterpret_cast<T *>(&m_storage); }
+  fn reference() const wontthrow -> const T &
   {
     return *reinterpret_cast<const T *>(&m_storage);
   }

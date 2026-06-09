@@ -102,11 +102,11 @@ fn String::reserve(usize needed) throws -> void
   /* A small buffer quadruples so a string built one append at a time leaves the
      inline size in one realloc rather than several, while a large buffer
      doubles to keep the overshoot bounded. */
-  usize new_capacity = m_capacity < 64 ? m_capacity * 4 : m_capacity * 2;
+  let new_capacity = m_capacity < 64 ? m_capacity * 4 : m_capacity * 2;
   while (new_capacity < needed + 1)
     new_capacity *= 2;
-  char *fresh = m_allocator.alloc_array<char>(new_capacity);
-  usize const preserved_length = m_length;
+  let fresh = m_allocator.alloc_array<char>(new_capacity);
+  let const preserved_length = m_length;
   if (preserved_length > 0) std::memcpy(fresh, m_data, preserved_length);
   fresh[preserved_length] = '\0';
   /* Release the old allocation before adopting the fresh one. An inline buffer

@@ -138,7 +138,7 @@ fn Path::normalized() const throws -> Path
       i++;
       continue;
     }
-    const usize start = i;
+    let const start = i;
     while (i < m_text.count() && !is_directory_separator(m_text[i]))
       i++;
     let const part = m_text.substring_of_length(start, i - start);
@@ -319,7 +319,7 @@ fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 
 fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
-  DIR *const handle = ::opendir(dir.c_str());
+  let const handle = ::opendir(dir.c_str());
   if (handle == nullptr) return None;
 
   ArrayList<String> names{};
@@ -329,7 +329,7 @@ fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
      mistake for the whole directory. */
   for (;;) {
     errno = 0;
-    struct dirent *const entry = ::readdir(handle);
+    let const entry = ::readdir(handle);
     if (entry == nullptr) {
       if (errno != 0) {
         ::closedir(handle);
@@ -338,7 +338,7 @@ fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
       break;
     }
 
-    const StringView name{entry->d_name};
+    let const name = StringView{entry->d_name};
     if (name == StringView{"."} || name == StringView{".."}) continue;
     names.push(String{name});
   }
@@ -350,28 +350,28 @@ fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 
 #elif SHIT_PLATFORM_IS WIN32
 
-fn Path::exists() const -> bool
+fn Path::exists() const wontthrow -> bool
 {
   return GetFileAttributesA(m_text.c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
-fn Path::is_directory() const -> bool
+fn Path::is_directory() const wontthrow -> bool
 {
-  DWORD attributes = GetFileAttributesA(m_text.c_str());
+  let const attributes = GetFileAttributesA(m_text.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
-fn Path::is_regular_file() const -> bool
+fn Path::is_regular_file() const wontthrow -> bool
 {
-  DWORD attributes = GetFileAttributesA(m_text.c_str());
+  let const attributes = GetFileAttributesA(m_text.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
-fn Path::is_symbolic_link() const -> bool
+fn Path::is_symbolic_link() const wontthrow -> bool
 {
-  DWORD attributes = GetFileAttributesA(m_text.c_str());
+  let const attributes = GetFileAttributesA(m_text.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
@@ -383,7 +383,7 @@ fn Path::is_character_device() const wontthrow -> bool { return false; }
 fn Path::is_fifo() const wontthrow -> bool { return false; }
 fn Path::is_socket() const wontthrow -> bool { return false; }
 
-fn Path::file_size() const -> Maybe<u64>
+fn Path::file_size() const wontthrow -> Maybe<u64>
 {
   WIN32_FILE_ATTRIBUTE_DATA data{};
   if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &data) == 0)
@@ -392,17 +392,17 @@ fn Path::file_size() const -> Maybe<u64>
   return (static_cast<u64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
 }
 
-fn Path::is_same_file_as(const Path &other) const -> bool
+fn Path::is_same_file_as(const Path &other) const wontthrow -> bool
 {
   /* The volume serial and the file index together name one file the way a
      device and an inode do on POSIX, read from an opened handle. The backup
      semantics flag lets a directory open too, so a directory compares like any
      other path. */
-  HANDLE first = CreateFileA(
+  let const first = CreateFileA(
       m_text.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
       nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
   if (first == INVALID_HANDLE_VALUE) return false;
-  HANDLE second =
+  let const second =
       CreateFileA(other.m_text.c_str(), 0,
                   FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                   nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
@@ -411,8 +411,8 @@ fn Path::is_same_file_as(const Path &other) const -> bool
     return false;
   }
   BY_HANDLE_FILE_INFORMATION first_info{}, second_info{};
-  const bool both_read = GetFileInformationByHandle(first, &first_info) != 0 &&
-                         GetFileInformationByHandle(second, &second_info) != 0;
+  let const both_read = GetFileInformationByHandle(first, &first_info) != 0 &&
+                        GetFileInformationByHandle(second, &second_info) != 0;
   CloseHandle(first);
   CloseHandle(second);
   if (!both_read) return false;
@@ -421,7 +421,7 @@ fn Path::is_same_file_as(const Path &other) const -> bool
          first_info.nFileIndexLow == second_info.nFileIndexLow;
 }
 
-fn Path::is_newer_than(const Path &other) const -> bool
+fn Path::is_newer_than(const Path &other) const wontthrow -> bool
 {
   WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
   if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &a) == 0)
@@ -432,7 +432,7 @@ fn Path::is_newer_than(const Path &other) const -> bool
   return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0;
 }
 
-fn Path::is_older_than(const Path &other) const -> bool
+fn Path::is_older_than(const Path &other) const wontthrow -> bool
 {
   WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
   if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &a) == 0)
@@ -443,18 +443,24 @@ fn Path::is_older_than(const Path &other) const -> bool
   return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) < 0;
 }
 
-fn Path::is_readable() const -> bool { return _access(m_text.c_str(), 4) == 0; }
+fn Path::is_readable() const wontthrow -> bool
+{
+  return _access(m_text.c_str(), 4) == 0;
+}
 
-fn Path::is_writable() const -> bool { return _access(m_text.c_str(), 2) == 0; }
+fn Path::is_writable() const wontthrow -> bool
+{
+  return _access(m_text.c_str(), 2) == 0;
+}
 
-fn Path::is_executable() const -> bool
+fn Path::is_executable() const wontthrow -> bool
 {
   /* Windows has no execute permission bit, so an existing file is treated as
      runnable, matching how the shell resolves a program there. */
   return exists();
 }
 
-fn Path::current_directory() -> Path
+fn Path::current_directory() throws -> Path
 {
   char buffer[4096];
   if (_getcwd(buffer, sizeof(buffer)) != nullptr)
@@ -462,26 +468,26 @@ fn Path::current_directory() -> Path
   return Path{};
 }
 
-fn Path::set_current_directory(const Path &path) -> ErrorOr<Ok>
+fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
   if (_chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
   return Success;
 }
 
-fn Path::read_directory(const Path &dir) -> Maybe<ArrayList<String>>
+fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
   String pattern{dir.text()};
   pattern.push(DIRECTORY_SEPARATOR);
   pattern.push('*');
 
   WIN32_FIND_DATAA data{};
-  HANDLE handle = FindFirstFileA(pattern.c_str(), &data);
+  let const handle = FindFirstFileA(pattern.c_str(), &data);
   if (handle == INVALID_HANDLE_VALUE) return None;
 
   ArrayList<String> names{};
   do {
-    StringView name{data.cFileName};
+    let const name = StringView{data.cFileName};
     if (name == StringView{"."} || name == StringView{".."}) continue;
     names.push(String{name});
   } while (FindNextFileA(handle, &data) != 0);
