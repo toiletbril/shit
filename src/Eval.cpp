@@ -889,9 +889,12 @@ fn EvalContext::declare_local(StringView name) throws -> void
 
   /* The indexed array the name held is saved alongside the scalar value, so a
      local array restores the caller's array on return. A copy is taken since the
-     body may overwrite the stored array in place. */
+     body may overwrite the stored array in place. The lookup is skipped when no
+     array exists at all, so a scalar local in an array-free script pays nothing
+     on the function-call path. */
   let previous_array = Maybe<ArrayList<String>>{};
-  if (let const *array = lookup_indexed_array(name); array != nullptr) {
+  if (m_indexed_arrays.count() != 0)
+    if (let const *array = lookup_indexed_array(name); array != nullptr) {
     let copy = ArrayList<String>{heap_allocator()};
     copy.reserve(array->count());
     for (const String &element : *array)
