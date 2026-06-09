@@ -470,7 +470,7 @@ fn main(int argc, char **argv) -> int
   /* init-as-bash initializes from the bash config files in bash mode, then snaps
      to the default at the interactive prompt. The SHIT_INIT_AS_BASH environment
      variable enables it when set and not empty, the same as passing -L. */
-  bool init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
+  let init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
   if (!init_as_bash) {
     if (shit::Maybe<shit::String> env =
             shit::os::get_environment_variable("SHIT_INIT_AS_BASH");
@@ -478,11 +478,21 @@ fn main(int argc, char **argv) -> int
       init_as_bash = true;
   }
 
+  /* init-as-bash and POSIX mode contradict each other, one initializes as bash
+     and the other forces the dash semantics. POSIX takes precedence, the way the
+     shell resolves the other incompatible option pairs, and a warning names the
+     fallback. */
+  if (init_as_bash && shit::should_run_in_posix_mode()) {
+    shit::show_message("Both '--init-as-bash' and POSIX mode were specified. "
+                       "Falling back to POSIX mode.");
+    init_as_bash = false;
+  }
+
   /* A privileged shell skips every startup config file, so a profile or rc that
      a less-privileged user controls cannot run with the raised privileges. The
      -p flag forces it, and a setuid or setgid invocation turns it on by
      default. */
-  const bool is_privileged =
+  let const is_privileged =
       FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
 
   /* Both stdin and interactive flags are enabled, but there will be only the
@@ -750,10 +760,11 @@ fn main(int argc, char **argv) -> int
       }
     }
 
-    /* A compatibility mode also reads the interactive rc its host shell would,
-       so a user's existing bashrc or sh ENV file is honored. The shit rc above
-       runs first in every mode. The login path already read ENV, so a non-login
-       sh reads it here instead. A missing file is silently skipped. */
+    /* A compatibility mode reads the interactive rc its host shell would. Bash
+       mode reads ~/.bashrc, and POSIX mode reads the file named by ENV whether
+       or not the shell is a login one, since the POSIX login path above leaves
+       ENV to here. The shit rc above runs first in the default mode. A missing
+       file is silently skipped. */
     if (should_be_interactive && shit::should_run_in_bash_mode()) {
       if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
           home.has_value())
