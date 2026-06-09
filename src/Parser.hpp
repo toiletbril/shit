@@ -71,6 +71,17 @@ private:
                                ArrayList<expressions::Redirection> &out) throws
       -> void;
 
+  /* The digit word is already peeked and word_location is its position. Consume
+     it, and when the next token is a redirect operator touching the digit run,
+     parse the descriptor and append the redirection to out, then return true.
+     Return false with the digit consumed when no adjacent operator follows, so
+     the caller decides what the bare number means. Shared by the simple command
+     parser and the trailing redirect parser. */
+  mustuse fn try_parse_descriptor_prefixed_redirection(
+      const tokens::WordToken *word_token, SourceLocation word_location,
+      Maybe<SourceLocation> &first_location,
+      ArrayList<expressions::Redirection> &out) throws -> bool;
+
   /* Peek the next token and, when it begins a redirection, consume the whole
      redirection and append it to out. Returns true when one was parsed, false
      when the next token does not begin a redirection. Used to attach trailing

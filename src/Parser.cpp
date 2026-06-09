@@ -582,6 +582,38 @@ fn Parser::build_heredoc_redirection(
   out.push(redir);
 }
 
+mustuse fn Parser::try_parse_descriptor_prefixed_redirection(
+    const tokens::WordToken *word_token, SourceLocation word_location,
+    Maybe<SourceLocation> &first_location,
+    ArrayList<expressions::Redirection> &out) throws -> bool
+{
+  m_lexer.advance_past_last_peek();
+  Token *next = m_lexer.peek_shell_token();
+  ASSERT(next != nullptr);
+  const let nk = next->kind();
+  if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
+       nk == Token::Kind::Less || nk == Token::Kind::DoubleLess) &&
+      next->source_location().position ==
+          word_location.position + word_location.length)
+  {
+    const let op_location = next->source_location();
+    m_lexer.advance_past_last_peek();
+    const let literal = word_token->word().to_literal_string();
+    const let parsed = utils::parse_decimal_integer(literal);
+    if (parsed.is_error()) {
+      throw ErrorWithLocation{word_location, parsed.error().message()};
+    }
+    const let fd = static_cast<i32>(parsed.value());
+    if (nk == Token::Kind::DoubleLess) {
+      build_heredoc_redirection(fd, op_location, first_location, out);
+    } else {
+      build_file_or_dup_redirection(fd, nk, op_location, first_location, out);
+    }
+    return true;
+  }
+  return false;
+}
+
 /* Peek the next token and, when it begins a redirection, parse it. A digit word
    touching a redirect operator is a descriptor prefix, such as the 2 in 2>file.
    A bare redirect operator targets descriptor 0 for input or 1 for output. */
@@ -619,35 +651,15 @@ mustuse fn Parser::try_parse_trailing_redirection(
     if (!word_token->word().is_all_ascii_digits()) return false;
 
     const let word_location = token->source_location();
-    m_lexer.advance_past_last_peek();
-    Token *next = m_lexer.peek_shell_token();
-    ASSERT(next != nullptr);
-    const let nk = next->kind();
-    if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
-         nk == Token::Kind::Less || nk == Token::Kind::DoubleLess) &&
-        next->source_location().position ==
-            word_location.position + word_location.length)
+    if (try_parse_descriptor_prefixed_redirection(
+            word_token, word_location, ignored_first_location, out))
     {
-      const let op_location = next->source_location();
-      m_lexer.advance_past_last_peek();
-      const let literal = word_token->word().to_literal_string();
-      const let parsed = utils::parse_decimal_integer(literal);
-      if (parsed.is_error()) {
-        throw ErrorWithLocation{word_location, parsed.error().message()};
-      }
-      const let fd = static_cast<i32>(parsed.value());
-      if (nk == Token::Kind::DoubleLess) {
-        build_heredoc_redirection(fd, op_location, ignored_first_location, out);
-      } else {
-        build_file_or_dup_redirection(fd, nk, op_location,
-                                      ignored_first_location, out);
-      }
       return true;
     }
 
     /* A bare number that does not prefix a redirect operator is not a trailing
-       redirection. The caller already consumed it from the peek, so report it
-       as an unexpected token rather than silently dropping it. */
+       redirection. The helper already consumed it, so report it as an
+       unexpected token rather than silently dropping it. */
     throw ErrorWithLocation{word_location,
                             "Unexpected word after a compound command"};
   }
@@ -769,31 +781,13 @@ hot fn Parser::parse_simple_command() throws -> Command *
             static_cast<tokens::WordToken *>(token);
         if (word_token->word().is_all_ascii_digits()) {
           const let word_location = token->source_location();
-          m_lexer.advance_past_last_peek();
-          Token *next = m_lexer.peek_shell_token();
-          ASSERT(next != nullptr);
-          const let nk = next->kind();
-          if ((nk == Token::Kind::Greater || nk == Token::Kind::DoubleGreater ||
-               nk == Token::Kind::Less || nk == Token::Kind::DoubleLess) &&
-              next->source_location().position ==
-                  word_location.position + word_location.length)
+          if (try_parse_descriptor_prefixed_redirection(
+                  word_token, word_location, source_location, redirections))
           {
-            const let op_location = next->source_location();
-            m_lexer.advance_past_last_peek();
-            const let literal = word_token->word().to_literal_string();
-            const let parsed = utils::parse_decimal_integer(literal);
-            if (parsed.is_error()) {
-              throw ErrorWithLocation{word_location, parsed.error().message()};
-            }
-            const let fd = static_cast<i32>(parsed.value());
-            if (nk == Token::Kind::DoubleLess) {
-              build_heredoc_redirection(fd, op_location, source_location,
-                                        redirections);
-            } else {
-              add_redirection(fd, nk, op_location);
-            }
             break;
           }
+          /* A digit run with no adjacent redirect operator is an ordinary
+             argument, and the helper already consumed it. */
           if (!source_location) source_location = word_location;
           args_accumulator.push(token);
           break;
