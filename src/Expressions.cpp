@@ -170,12 +170,35 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
    run many times across the file scans PATH at most once. A name holding a
    slash is a path, so it is not cached, since the filesystem may differ per
    run. */
+/* Expand a leading tilde in a command path the way the runtime does before it
+   resolves the command, so the analysis checks ~/bin/foo at the home directory
+   rather than as a literal ~ path. None when the path has no leading tilde or
+   names a user with no home. */
+static fn expand_leading_tilde(StringView name) throws -> Maybe<String>
+{
+  if (name.is_empty() || name[0] != '~') return None;
+  let const slash = name.find_character('/');
+  let const user = slash.has_value() ? name.substring_of_length(1, *slash - 1)
+                                     : name.substring(1);
+  Maybe<Path> home =
+      user.is_empty() ? os::get_home_directory() : os::get_home_for_user(user);
+  if (!home.has_value()) return None;
+  let expanded = *home;
+  if (slash.has_value()) expanded.push_component(name.substring(*slash + 1));
+  return String{expanded.text().view()};
+}
+
 fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
 {
   if (name.is_empty()) return false;
   if (search_builtin(name.view()).has_value()) return true;
-  if (name.find_character('/').has_value())
+  if (name.find_character('/').has_value()) {
+    /* A leading tilde is expanded first, since the runtime expands it before
+       resolving the command. */
+    if (let const expanded = expand_leading_tilde(name.view()))
+      return utils::canonicalize_path(expanded->view()).has_value();
     return utils::canonicalize_path(name.view()).has_value();
+  }
 
   if (const bool *cached = actx.command_resolution_cache.find(name.view()))
     return *cached;
