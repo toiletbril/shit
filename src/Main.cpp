@@ -592,6 +592,20 @@ fn main(int argc, char **argv) -> int
     }
   }
 
+  /* An interactive shell reads ~/.shitrc, the home for interactive config such
+     as aliases, options, and the prompt. A login shell reads it too, after the
+     profiles, so a setting lands in every interactive session. A missing file is
+     silently skipped. */
+  if (should_be_interactive) {
+    if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+        home.has_value())
+    {
+      shit::Path shitrc = *home;
+      shitrc.push_component(".shitrc");
+      source_file(shitrc, context, ast_arena);
+    }
+  }
+
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
   for (;;) {
