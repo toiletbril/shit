@@ -1,0 +1,47 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( $(printf ")" | wc -c) ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( $(printf "((" | wc -c) ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 2 + $((3 * 4)) ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( $(echo 5)$(echo 0) ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( (1 + 2) * 3 ))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " $(printf ")" | wc -c) "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " $(printf "((" | wc -c) "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 2 + $((3 * 4)) "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " $(echo 5)$(echo 0) "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " (1 + 2) * 3 "
+]
+1
+2
+14
+50
+9
+[Code 0]

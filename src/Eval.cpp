@@ -1135,39 +1135,79 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       emit_run(expand_variable(name), !in_double_quote);
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
-      /* Arithmetic $((...)), scanned to the matching )). */
+      /* Arithmetic $((...)), scanned to the matching )). A quote run and a
+         backslash escape keep their bytes literal so a ) inside a string is text
+         and does not count toward the grouping depth or terminate the
+         expansion. */
       String inner{heap_allocator()};
       usize j = i + 3;
       usize depth = 0;
+      char quote = 0;
       for (; j < word.length; j++) {
-        if (word[j] == '(') {
+        const char ch = word[j];
+        if (quote != 0) {
+          inner += ch;
+          if (quote == '"' && ch == '\\' && j + 1 < word.length) {
+            inner += word[++j];
+            continue;
+          }
+          if (ch == quote) quote = 0;
+          continue;
+        }
+        if (ch == '\\' && j + 1 < word.length) {
+          inner += ch;
+          inner += word[++j];
+          continue;
+        }
+        if (ch == '\'' || ch == '"') {
+          quote = ch;
+        } else if (ch == '(') {
           depth++;
-        } else if (word[j] == ')' && depth > 0) {
+        } else if (ch == ')' && depth > 0) {
           depth--;
-        } else if (word[j] == ')' && j + 1 < word.length && word[j + 1] == ')')
-        {
+        } else if (ch == ')' && j + 1 < word.length && word[j + 1] == ')') {
           j += 2;
           break;
         }
-        inner += word[j];
+        inner += ch;
       }
       /* An arithmetic result is decimal digits and an optional minus, none of
          which can glob, so the bytes are emitted inactive. */
       emit_run(utils::int_to_text(evaluate_arithmetic(inner)), false);
       i = j - 1;
     } else if (next == '(') {
-      /* Command substitution $(...), scanned to the matching ). */
+      /* Command substitution $(...), scanned to the matching ). A quote run and
+         a backslash escape keep their bytes literal so a ) inside a string does
+         not decrement the depth and close the substitution early. */
       String inner{heap_allocator()};
       usize j = i + 2;
       usize depth = 1;
+      char quote = 0;
       for (; j < word.length; j++) {
-        if (word[j] == '(') {
+        const char ch = word[j];
+        if (quote != 0) {
+          inner += ch;
+          if (quote == '"' && ch == '\\' && j + 1 < word.length) {
+            inner += word[++j];
+            continue;
+          }
+          if (ch == quote) quote = 0;
+          continue;
+        }
+        if (ch == '\\' && j + 1 < word.length) {
+          inner += ch;
+          inner += word[++j];
+          continue;
+        }
+        if (ch == '\'' || ch == '"') {
+          quote = ch;
+        } else if (ch == '(') {
           depth++;
-        } else if (word[j] == ')') {
+        } else if (ch == ')') {
           depth--;
           if (depth == 0) break;
         }
-        inner += word[j];
+        inner += ch;
       }
       emit_run(capture_command_substitution(inner), !in_double_quote);
       i = j;

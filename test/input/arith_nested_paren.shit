@@ -1,0 +1,5 @@
+echo $(( $(printf ")" | wc -c) ))
+echo $(( $(printf "((" | wc -c) ))
+echo $(( 2 + $((3 * 4)) ))
+echo $(( $(echo 5)$(echo 0) ))
+echo $(( (1 + 2) * 3 ))
