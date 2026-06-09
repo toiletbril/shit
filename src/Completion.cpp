@@ -952,6 +952,14 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     let const c = line[i];
 
     if (c == ' ' || c == '\t' || c == '\n') {
+      /* A newline ends a command the way a ';' does, so the next word in a
+         multiline edit returns to command position and a keyword such as then,
+         do, or else after the newline is recognized rather than colored as an
+         argument. */
+      if (c == '\n') {
+        command_position = true;
+        expecting_in = false;
+      }
       i++;
       continue;
     }
