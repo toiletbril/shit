@@ -2496,6 +2496,13 @@ struct ConditionalEvaluator
   pure bool at_end() const wontthrow { return pos >= elements.count(); }
   pure Kind kind_at(usize i) const wontthrow { return elements[i].kind; }
 
+  /* The literal text of the token the evaluator stopped before, so an error
+     names what was unexpected rather than leaving the reader to guess. */
+  String unexpected_token() throws
+  {
+    return at_end() ? String{} : operand_literal(elements[pos]);
+  }
+
   /* The literal source text of an operand, used to recognize a word operator
      such as == or -f without expanding it. */
   String operand_literal(const conditional_element &e) throws
@@ -2531,7 +2538,7 @@ struct ConditionalEvaluator
            s == "-r" || s == "-w" || s == "-x" || s == "-s" || s == "-h" ||
            s == "-L" || s == "-b" || s == "-c" || s == "-p" || s == "-S" ||
            s == "-g" || s == "-u" || s == "-k" || s == "-O" || s == "-G" ||
-           s == "-v";
+           s == "-v" || s == "-t";
   }
 
   static pure bool is_binary_word_op(StringView s) wontthrow
@@ -2598,6 +2605,19 @@ struct ConditionalEvaluator
     if (op == "-s") {
       let const size = path.file_size();
       return size.has_value() && size.value() > 0;
+    }
+    /* -t tests whether a file descriptor is an open terminal, the way a script
+       gates an interactive feature on a real tty. The operand names the
+       descriptor, 0, 1, or 2. */
+    if (op == "-t") {
+      if (ErrorOr<i64> descriptor = utils::parse_decimal_integer(operand);
+          !descriptor.is_error())
+      {
+        if (descriptor.value() == 0) return os::is_stdin_a_tty();
+        if (descriptor.value() == 1) return os::is_stdout_a_tty();
+        if (descriptor.value() == 2) return os::is_stderr_a_tty();
+      }
+      return false;
     }
     /* The remaining file-type tests fall back to existence, which covers the
        common scripts without a full stat-mode surface. */
@@ -2751,7 +2771,11 @@ fn EvalContext::evaluate_conditional(
   let evaluator = ConditionalEvaluator{*this, elements};
   const bool result = evaluator.eval_or();
   if (!evaluator.at_end())
-    throw Error{"[[: unexpected token after conditional expression"};
+    throw Error{
+        "Unable to evaluate the [[ ]] because the token '" +
+        evaluator.unexpected_token() +
+        "' came after a complete conditional, so it may be an operator shit "
+        "does not support or a missing && or || between two tests"};
   return result;
 }
 
