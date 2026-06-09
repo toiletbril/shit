@@ -104,6 +104,16 @@ protected:
   usize m_cursor_position{0};
   usize m_cached_offset{0};
 
+  /* The parser peeks the next token many times before it consumes one, and each
+     peek would otherwise re-lex from the same position, the hottest cost in a
+     parse-heavy run. The last peeked token is cached and reused while the cursor
+     has not moved and the lexing mode, shell versus expression, is the same. A
+     consumed token advances the cursor, so the stored position no longer matches
+     and the next peek lexes afresh. */
+  Token *m_peek_cache{nullptr};
+  usize m_peek_cache_position{0};
+  bool m_peek_cache_is_shell{false};
+
   /* The lexer keeps a copy of every word it produces only when the segment
      dump is requested, so the common path stays allocation free. A word is
      recorded by its start position, so peeking the same token twice, which the

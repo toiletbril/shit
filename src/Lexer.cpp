@@ -150,20 +150,37 @@ Lexer::~Lexer() = default;
 flatten fn Lexer::peek_expression_token() throws -> Token *
 {
   skip_whitespace();
-  return lex_expression_token();
+  if (m_peek_cache != nullptr && !m_peek_cache_is_shell &&
+      m_peek_cache_position == m_cursor_position)
+    return m_peek_cache;
+  Token *const t = lex_expression_token();
+  m_peek_cache = t;
+  m_peek_cache_is_shell = false;
+  m_peek_cache_position = m_cursor_position;
+  return t;
 }
 
 flatten fn Lexer::peek_shell_token() throws -> Token *
 {
   skip_whitespace();
-  return lex_shell_token();
+  if (m_peek_cache != nullptr && m_peek_cache_is_shell &&
+      m_peek_cache_position == m_cursor_position)
+    return m_peek_cache;
+  Token *const t = lex_shell_token();
+  m_peek_cache = t;
+  m_peek_cache_is_shell = true;
+  m_peek_cache_position = m_cursor_position;
+  return t;
 }
 
 hot fn Lexer::next_expression_token() throws -> Token *
 {
   skip_whitespace();
 
-  const let t = lex_expression_token();
+  Token *const t = (m_peek_cache != nullptr && !m_peek_cache_is_shell &&
+                    m_peek_cache_position == m_cursor_position)
+                       ? m_peek_cache
+                       : lex_expression_token();
   ASSERT(t != nullptr);
 
   advance_past_last_peek();
@@ -175,7 +192,10 @@ hot fn Lexer::next_shell_token() throws -> Token *
 {
   skip_whitespace();
 
-  const let t = lex_shell_token();
+  Token *const t = (m_peek_cache != nullptr && m_peek_cache_is_shell &&
+                    m_peek_cache_position == m_cursor_position)
+                       ? m_peek_cache
+                       : lex_shell_token();
   ASSERT(t != nullptr);
 
   advance_past_last_peek();
@@ -195,7 +215,12 @@ pure fn Lexer::debug_words() const wontthrow -> const ArrayList<Word> &
 
 pure fn Lexer::arena() const wontthrow -> BumpArena & { return *m_arena; }
 
-fn Lexer::set_arena(BumpArena &arena) wontthrow -> void { m_arena = &arena; }
+fn Lexer::set_arena(BumpArena &arena) wontthrow -> void
+{
+  m_arena = &arena;
+  /* The cached token lives in the old arena, so it must not survive the swap. */
+  m_peek_cache = nullptr;
+}
 
 hot fn Lexer::advance_past_last_peek() throws -> usize
 {

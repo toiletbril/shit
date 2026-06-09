@@ -148,9 +148,12 @@ CXXFLAGS += \
 	-fno-omit-frame-pointer \
 	-O3 \
 	-flto
-# The same libstdc++ drop as rel, so a profile measures the shipped binary.
+# The same static link and libstdc++ drop as rel, so a profile measures the
+# shipped binary and the static link lets the profiled binary run in a container
+# whose glibc is older than the host's.
 ifneq ($(OS), Windows_NT)
 CXXFLAGS += \
+	-static-pie \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif
