@@ -295,6 +295,12 @@ fn int_to_text(i64 value) throws -> String
 
 fn format_minutes_seconds(double seconds) throws -> String
 {
+  /* A time report subtracts two child rusage samples, so a sample that goes
+     backwards yields a small negative duration. bash never prints a negative
+     time, so a negative input clamps to zero rather than printing a doubled sign
+     like -0m-0.001s, which the separate minutes and remainder would otherwise
+     produce. */
+  if (seconds < 0.0) seconds = 0.0;
   const i64 minutes = static_cast<i64>(seconds) / 60;
   const double remainder = seconds - static_cast<double>(minutes * 60);
   char buffer[64];
