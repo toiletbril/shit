@@ -4818,6 +4818,19 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
   m_bash_compatible = mode == MimicMode::Bash;
   m_posix_mode = mode == MimicMode::Posix;
 
+  /* The strict interactive defaults shit turns on at its own prompt, nounset and
+     pipefail and failglob, do not belong to a real bash or sh running a file, so
+     a mimicked script clears them for its run and the isolated case puts them
+     back. This is why a mimicked declare -A array literal does not abort on the
+     unmatched [k]=v glob, and an unset parameter expands empty rather than
+     tripping nounset, the way the named shell runs the script. */
+  let const previous_error_unset = error_unset();
+  let const previous_pipefail = pipefail();
+  let const previous_failglob = failglob();
+  set_error_unset(false);
+  set_pipefail(false);
+  set_failglob(false);
+
   let parser = Parser{Lexer{String{contents->view()}, *AST_ARENA, false, None,
                             is_bash_compatible()}};
   const Expression *ast = parser.construct_ast();
@@ -4928,6 +4941,9 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
   m_current_location_position = previous_location_position;
   m_bash_compatible = previous_bash;
   m_posix_mode = previous_posix;
+  set_error_unset(previous_error_unset);
+  set_pipefail(previous_pipefail);
+  set_failglob(previous_failglob);
   m_shell_name = steal(previous_shell_name);
 
   if (error) {
