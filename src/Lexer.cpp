@@ -418,6 +418,39 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     }
   };
 
+  /* The word so far is a bare array name, the left side of a NAME[subscript]
+     reference, when it is one unquoted run that reads as a variable name. */
+  auto word_is_plain_array_name = [&word]() -> bool {
+    if (word.segments.count() != 1) return false;
+    const WordSegment &segment = word.segments[0];
+    if (segment.kind != WordSegment::Kind::UnquotedText ||
+        segment.text.is_empty())
+      return false;
+    if (!lexer::is_variable_name_start(segment.text.view()[0])) return false;
+    for (usize i = 1; i < segment.text.count(); i++)
+      if (!lexer::is_variable_name(segment.text.view()[i])) return false;
+    return true;
+  };
+
+  /* A balanced [ ... ] starting at the offset closes on a ] that is followed by
+     = or +=, the shape of an array element assignment. The lookahead consumes
+     nothing, it only decides whether the bracket run is a protected subscript. */
+  auto subscript_closes_with_assignment = [this](usize start) -> bool {
+    usize offset = start + 1;
+    usize depth = 1;
+    while (depth > 0) {
+      const char c = chop_character(offset);
+      if (c == lexer::CEOF) return false;
+      offset++;
+      if (c == '[')
+        depth++;
+      else if (c == ']')
+        depth--;
+    }
+    const char after = chop_character(offset);
+    return after == '=' || (after == '+' && chop_character(offset + 1) == '=');
+  };
+
   for (;;) {
     const let ch = chop_character(byte_count);
 
@@ -427,6 +460,32 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         !(is_inside_quote_or_escape && ch != lexer::CEOF))
     {
       break;
+    }
+
+    /* A NAME[subscript]= assignment protects the subscript's operators, so the
+       |, &, ;, and parentheses a bitmask subscript such as key[a|b]=1 carries
+       stay in the word rather than ending it. The capture runs only when the
+       word so far is a bare array name and a balanced ] followed by = or += marks
+       this an assignment, so a glob like x[1|2] in argument position is left to
+       split the way bash does. */
+    if (!is_inside_quote_or_escape && ch == '[' && word_is_plain_array_name() &&
+        subscript_closes_with_assignment(byte_count))
+    {
+      const let subscript_start = byte_count;
+      byte_count++; /* the [ */
+      usize depth = 1;
+      while (depth > 0) {
+        const char c = chop_character(byte_count);
+        if (c == lexer::CEOF) break;
+        byte_count++;
+        if (c == '[')
+          depth++;
+        else if (c == ']')
+          depth--;
+      }
+      append_unquoted_run(m_source.view().substring_of_length(
+          m_cursor_position + subscript_start, byte_count - subscript_start));
+      continue;
     }
 
     /* An extended-glob group such as @(a|b) is captured whole so its (, the
@@ -474,8 +533,11 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       };
       while (!opens_extglob_at(byte_count)) {
         byte_count++;
-        if (!lexer::is_plain_unquoted_run_byte(chop_character(byte_count)))
-          break;
+        const char next = chop_character(byte_count);
+        /* The run stops before a '[' so the assignment-subscript capture above
+           can decide whether to protect the bracket group, the way it stops
+           before an extglob opener. */
+        if (next == '[' || !lexer::is_plain_unquoted_run_byte(next)) break;
       }
       append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + run_start, byte_count - run_start));
