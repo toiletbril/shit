@@ -636,7 +636,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           append_char(WordSegment::Kind::LiteralText, byte);
           did_emit_any = true;
         };
-        auto hex_value = [](char h) -> int {
+        auto hex_value = [](char h) -> i32 {
           if (h >= '0' && h <= '9') return h - '0';
           if (h >= 'a' && h <= 'f') return h - 'a' + 10;
           if (h >= 'A' && h <= 'F') return h - 'A' + 10;
@@ -711,9 +711,9 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           } break;
           case 'u':
           case 'U': {
-            const int max_digits = e == 'u' ? 4 : 8;
+            const i32 max_digits = e == 'u' ? 4 : 8;
             u32 codepoint = 0;
-            int digits = 0;
+            i32 digits = 0;
             while (digits < max_digits &&
                    hex_value(chop_character(byte_count)) >= 0)
             {
@@ -732,8 +732,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           } break;
           default:
             if (e >= '0' && e <= '7') {
-              int value = e - '0';
-              int digits = 1;
+              i32 value = e - '0';
+              i32 digits = 1;
               while (digits < 3) {
                 const char o = chop_character(byte_count);
                 if (o < '0' || o > '7') break;

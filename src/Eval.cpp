@@ -623,7 +623,7 @@ fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
   m_last_background_pid = pid;
 }
 
-fn EvalContext::register_job(os::process pid, StringView command) throws -> int
+fn EvalContext::register_job(os::process pid, StringView command) throws -> i32
 {
   let new_job = job{};
   new_job.id = m_next_job_id++;
@@ -656,7 +656,7 @@ fn EvalContext::update_jobs() throws -> void
 
 fn EvalContext::jobs() wontthrow -> ArrayList<job> & { return m_jobs; }
 
-fn EvalContext::find_job(int id) wontthrow -> job *
+fn EvalContext::find_job(i32 id) wontthrow -> job *
 {
   for (job &job : m_jobs)
     if (job.id == id) return &job;
