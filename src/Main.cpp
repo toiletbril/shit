@@ -374,6 +374,27 @@ static fn source_file(const Path &path, EvalContext &context,
   return true;
 }
 
+/* Source a file named under the home directory, such as .bashrc or .shitrc. A
+   shell with no home directory or no such file sources nothing. */
+static fn source_home_file(StringView name, EvalContext &context,
+                           BumpArena &ast_arena) throws -> void
+{
+  if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
+    Path path = *home;
+    path.push_component(name);
+    source_file(path, context, ast_arena);
+  }
+}
+
+/* Source the dash login files in POSIX login order, /etc/profile then ~/.profile.
+   The file named by ENV is an interactive feature read separately. */
+static fn source_posix_login_files(EvalContext &context,
+                                   BumpArena &ast_arena) throws -> void
+{
+  source_file(Path{"/etc/profile"}, context, ast_arena);
+  source_home_file(".profile", context, ast_arena);
+}
+
 /* Source the bash login files in bash login order, /etc/profile then the first
    existing of ~/.bash_profile, ~/.bash_login, ~/.profile. A login shell in bash
    mode and an init-as-bash login shell both read this set. */
@@ -702,63 +723,33 @@ fn main(int argc, char **argv) -> int
        interactive shell reads ~/.bashrc. The shit rc and the POSIX ENV are
        skipped, since the intent is to initialize from the bash files. */
     if (is_login_shell) source_bash_login_files(context, ast_arena);
-    if (should_be_interactive) {
-      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-          home.has_value())
-      {
-        shit::Path bashrc = *home;
-        bashrc.push_component(".bashrc");
-        source_file(bashrc, context, ast_arena);
-      }
-    }
+    if (should_be_interactive)
+      source_home_file(".bashrc", context, ast_arena);
   } else {
     /* A login shell reads the login files of the shell it emulates. Bash mode
        reads the bash login order, so --bash-compatible -l or a bash invocation
        gets the bash profiles. POSIX mode reads the strict dash login order,
        /etc/profile then ~/.profile, while the file named by ENV is an
        interactive feature read below rather than part of the login set. The
-       default shit mode keeps /etc/profile, ~/.profile, and ENV. A missing file
+       default shit mode reads the same dash order and then ENV. A missing file
        is silently skipped. */
     if (is_login_shell && shit::should_run_in_bash_mode()) {
       source_bash_login_files(context, ast_arena);
     } else if (is_login_shell && shit::should_run_in_posix_mode()) {
-      source_file(shit::Path{"/etc/profile"}, context, ast_arena);
-      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-          home.has_value())
-      {
-        shit::Path profile = *home;
-        profile.push_component(".profile");
-        source_file(profile, context, ast_arena);
-      }
+      source_posix_login_files(context, ast_arena);
     } else if (is_login_shell) {
-      source_file(shit::Path{"/etc/profile"}, context, ast_arena);
-      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-          home.has_value())
-      {
-        shit::Path profile = *home;
-        profile.push_component(".profile");
-        source_file(profile, context, ast_arena);
-      }
+      source_posix_login_files(context, ast_arena);
       if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
           env.has_value() && !env->is_empty())
-      {
         source_file(shit::Path{env->view()}, context, ast_arena);
-      }
     }
 
     /* An interactive shell reads ~/.shitrc, the home for interactive config such
        as aliases, options, and the prompt. A login shell reads it too, after the
        profiles, so a setting lands in every interactive session. A missing file
        is silently skipped. */
-    if (should_be_interactive) {
-      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-          home.has_value())
-      {
-        shit::Path shitrc = *home;
-        shitrc.push_component(".shitrc");
-        source_file(shitrc, context, ast_arena);
-      }
-    }
+    if (should_be_interactive)
+      source_home_file(".shitrc", context, ast_arena);
 
     /* A compatibility mode reads the interactive rc its host shell would. Bash
        mode reads ~/.bashrc, and POSIX mode reads the file named by ENV whether
@@ -766,16 +757,8 @@ fn main(int argc, char **argv) -> int
        ENV to here. The shit rc above runs first in the default mode. A missing
        file is silently skipped. */
     if (should_be_interactive && shit::should_run_in_bash_mode()) {
-      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-          home.has_value())
-      {
-        shit::Path bashrc = *home;
-        bashrc.push_component(".bashrc");
-        source_file(bashrc, context, ast_arena);
-      }
+      source_home_file(".bashrc", context, ast_arena);
     } else if (should_be_interactive && shit::should_run_in_posix_mode()) {
-      /* An interactive dash reads the file named by ENV, whether or not it is a
-         login shell, so the POSIX login path above leaves ENV to here. */
       if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
           env.has_value() && !env->is_empty())
         source_file(shit::Path{env->view()}, context, ast_arena);

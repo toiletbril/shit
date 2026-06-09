@@ -1,7 +1,3 @@
-# The diff targets compare two live shells through process substitution, so the
-# recipes run in bash rather than the system /bin/sh.
-SHELL := bash
-
 DIFF_FLAGS := -u
 
 ifeq ($(OS), Windows_NT)
@@ -58,10 +54,15 @@ refill:
 DASH ?= dash
 POSIX_COMPAT := $(wildcard posix/*.shit)
 
+# The diff targets compare two live shells through process substitution, so they
+# run in bash rather than the system /bin/sh. The scope is these two targets so
+# the other recipes keep their /bin/sh semantics.
+dashdiff bashdiff: SHELL := bash
+
 dashdiff: $(BIN)
 	@for f in $(POSIX_COMPAT); do \
-		s="$$($(BIN) "$$f" 2>/dev/null)"; \
-		d="$$($(DASH) "$$f" 2>/dev/null)"; \
+		s="$$($(BIN) "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (dash)" \
 			<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST) \
 			&& printf "	%-64s ok\n" "$$f" \
@@ -77,8 +78,8 @@ BASH_COMPAT := $(wildcard bash/*.shit)
 
 bashdiff: $(BIN)
 	@for f in $(BASH_COMPAT); do \
-		s="$$($(BIN) --bash-compatible "$$f" 2>/dev/null)"; \
-		b="$$($(BASH) "$$f" 2>/dev/null)"; \
+		s="$$($(BIN) --bash-compatible "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
 		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (bash)" \
 			<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST) \
 			&& printf "	%-64s ok\n" "$$f" \
