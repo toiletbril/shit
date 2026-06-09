@@ -909,7 +909,8 @@ hot fn EvalContext::expand_variable(StringView name) const throws -> String
 
 namespace {
 
-enum class TrimEnd {
+enum class TrimEnd
+{
   Prefix,
   Suffix,
 };
@@ -944,7 +945,8 @@ fn trim_matching(StringView value, StringView pattern, TrimEnd end,
     }
   } else {
     /* The longest match scans the suffix start up from byte zero and the
-       shortest scans down from the end, so the first hit is the wanted start. */
+       shortest scans down from the end, so the first hit is the wanted start.
+     */
     if (longest) {
       for (usize start = 0; start <= value.length; start++) {
         if (utils::glob_matches(pattern, value.substring(start), active, 0))

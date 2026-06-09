@@ -146,10 +146,10 @@ fn literal_word_value(const Word &word) throws -> Maybe<String>
       value.append(segment.text.view());
       break;
     case WordSegment::Kind::UnquotedText:
-      /* An unquoted segment expands a glob metacharacter and a leading tilde, so
-         its bytes are only a plain constant when it holds neither. A glob char
-         is one of '*', '?', or '[', which is_expandable_char reports, and a
-         leading '~' opens tilde expansion. The fold accepts the remaining
+      /* An unquoted segment expands a glob metacharacter and a leading tilde,
+         so its bytes are only a plain constant when it holds neither. A glob
+         char is one of '*', '?', or '[', which is_expandable_char reports, and
+         a leading '~' opens tilde expansion. The fold accepts the remaining
          literal bytes, which a test operand compares directly. */
       for (usize i = 0; i < segment.text.count(); i++) {
         if (lexer::is_expandable_char(segment.text[i])) return None;
@@ -273,8 +273,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
       }
 
       usize start = i;
-      while (i < expression.length &&
-             is_identifier_continuation(expression[i]))
+      while (i < expression.length && is_identifier_continuation(expression[i]))
         i++;
       let const name = StringView{&expression.data[start], i - start};
 
@@ -428,8 +427,8 @@ fn rule_fold_constant_arithmetic(const Expression *node,
                                  AnalysisContext &actx) throws -> bool
 {
   if (const expressions::AssignCommand *assign = node->as_assign_command()) {
-    return fold_constant_arithmetic_in_word(
-        assign->assignment()->value_word(), actx);
+    return fold_constant_arithmetic_in_word(assign->assignment()->value_word(),
+                                            actx);
   }
 
   if (const expressions::SimpleCommand *cmd = node->as_simple_command()) {

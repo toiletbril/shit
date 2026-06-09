@@ -654,8 +654,8 @@ fn glob_matches(StringView glob, StringView str,
   return false;
 }
 
-/* The shell is at a real interactive prompt. quit gates the goodbye on this so a
-   script, a -c, or a subshell exits silently the way dash does. */
+/* The shell is at a real interactive prompt. quit gates the goodbye on this so
+   a script, a -c, or a subshell exits silently the way dash does. */
 static bool SHELL_IS_INTERACTIVE = false;
 
 fn set_shell_is_interactive(bool is_interactive) wontthrow -> void

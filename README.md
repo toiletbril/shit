@@ -72,7 +72,7 @@ Is it good?
 - [x] `sh`-compatible.
 
 Is is exceptional? 
-- [ ] Complex scripting capabilites.
+- [ ] `bash`-compatible.
 - [ ] Arbitrary precision numeric expressions.
 - [ ] Cross-platform replacement for most common Unix programs which Windows
       does not have.

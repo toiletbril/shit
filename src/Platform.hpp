@@ -264,7 +264,8 @@ fn monotonic_nanos() wontthrow -> u64;
 
 /* The Linux hardware performance counters a measured run collects. The counts
    are valid only when measured_result::has_perf is true, which happens on Linux
-   when perf_event_open succeeded. Every other platform leaves has_perf false. */
+   when perf_event_open succeeded. Every other platform leaves has_perf false.
+ */
 struct perf_counts
 {
   u64 cpu_cycles{0};

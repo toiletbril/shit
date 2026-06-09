@@ -223,9 +223,8 @@ fn environment_names() throws -> ArrayList<String>
     StringView pair{*entry};
     let const equals = pair.find_character('=');
     /* An entry with no '=' is kept whole, since the name is the entry. */
-    let const name = equals.has_value()
-                         ? pair.substring_of_length(0, *equals)
-                         : pair;
+    let const name =
+        equals.has_value() ? pair.substring_of_length(0, *equals) : pair;
     names.push(String{name});
   }
   return names;
@@ -820,8 +819,8 @@ struct perf_event_request
 fn open_perf_event(const struct perf_event_attr &attr, int group_fd) wontthrow
     -> int
 {
-  return static_cast<int>(
-      syscall(SYS_perf_event_open, &attr, 0, -1, group_fd, PERF_FLAG_FD_CLOEXEC));
+  return static_cast<int>(syscall(SYS_perf_event_open, &attr, 0, -1, group_fd,
+                                  PERF_FLAG_FD_CLOEXEC));
 }
 
 /* Open the counter group, run runner while the group counts, and write the
@@ -833,16 +832,18 @@ template <typename Runner>
 fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
 {
   perf_event_request requests[] = {
-      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, &out.cpu_cycles},
-      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS, &out.instructions},
-      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES, &out.cache_references},
-      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES, &out.cache_misses},
-      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES, &out.branch_misses},
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,       &out.cpu_cycles   },
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,     &out.instructions },
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,
+       &out.cache_references                                                 },
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,     &out.cache_misses },
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,    &out.branch_misses},
   };
   constexpr usize PERF_COUNT = sizeof(requests) / sizeof(requests[0]);
 
   int perf_fds[PERF_COUNT];
-  for (usize i = 0; i < PERF_COUNT; i++) perf_fds[i] = -1;
+  for (usize i = 0; i < PERF_COUNT; i++)
+    perf_fds[i] = -1;
 
   defer
   {
@@ -875,7 +876,8 @@ fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
 
   for (usize i = 0; i < PERF_COUNT; i++) {
     u64 value = 0;
-    if (read(perf_fds[i], &value, sizeof(value)) == static_cast<ssize_t>(sizeof(value)))
+    if (read(perf_fds[i], &value, sizeof(value)) ==
+        static_cast<ssize_t>(sizeof(value)))
       *requests[i].destination = value;
   }
 
@@ -894,7 +896,8 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
                    i64 &status_out, u64 &peak_rss_out) wontthrow -> bool
 {
   os::os_args raw_argv{};
-  for (usize i = 0; i < argv.count(); i++) raw_argv.push(argv[i].c_str());
+  for (usize i = 0; i < argv.count(); i++)
+    raw_argv.push(argv[i].c_str());
   raw_argv.push(nullptr);
 
   const pid_t child_pid = fork();
@@ -906,7 +909,8 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
       if (null_fd != -1) {
         dup2(null_fd, STDOUT_FILENO);
         dup2(null_fd, STDERR_FILENO);
-        if (null_fd != STDOUT_FILENO && null_fd != STDERR_FILENO) close(null_fd);
+        if (null_fd != STDOUT_FILENO && null_fd != STDERR_FILENO)
+          close(null_fd);
       }
     }
     execvp(raw_argv[0], const_cast<char *const *>(raw_argv.begin()));
@@ -1607,8 +1611,8 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
     SECURITY_ATTRIBUTES inherit_sa{};
     inherit_sa.nLength = sizeof(inherit_sa);
     inherit_sa.bInheritHandle = TRUE;
-    null_handle = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE, &inherit_sa,
-                              OPEN_EXISTING, 0, nullptr);
+    null_handle = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE,
+                              &inherit_sa, OPEN_EXISTING, 0, nullptr);
     if (null_handle != INVALID_HANDLE_VALUE) {
       startup.dwFlags |= STARTF_USESTDHANDLES;
       startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
@@ -1626,8 +1630,8 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 
   const u64 start_nanos = monotonic_nanos();
 
-  if (CreateProcessA(nullptr, mutable_command_line.data(), nullptr, nullptr, TRUE,
-                     0, nullptr, nullptr, &startup, &process_info) == 0)
+  if (CreateProcessA(nullptr, mutable_command_line.data(), nullptr, nullptr,
+                     TRUE, 0, nullptr, nullptr, &startup, &process_info) == 0)
     return None;
 
   WaitForSingleObject(process_info.hProcess, INFINITE);

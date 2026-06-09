@@ -425,8 +425,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
     return;
   }
 
-  let const literal =
-      optimizer::literal_word_value(m_assignment->value_word());
+  let const literal = optimizer::literal_word_value(m_assignment->value_word());
   if (literal.has_value())
     actx.constant_variables.set(name.view(), literal->view());
   else
@@ -533,7 +532,8 @@ using expressions::Redirection;
    context only express those three. The last redirection of a descriptor wins,
    so a descriptor already in the slot closes before the new one takes its
    place. */
-fn assign_standard_fd(Maybe<os::descriptor> &in_fd, Maybe<os::descriptor> &out_fd,
+fn assign_standard_fd(Maybe<os::descriptor> &in_fd,
+                      Maybe<os::descriptor> &out_fd,
                       Maybe<os::descriptor> &err_fd, i32 fd,
                       os::descriptor file_fd) throws -> void
 {
