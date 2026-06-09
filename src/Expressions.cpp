@@ -3273,8 +3273,20 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))
   {
-    let const message = StringView{"Command '"} + StringView{*name} +
-                        StringView{"' was not found"};
+    String message = StringView{"Command '"} + StringView{*name} +
+                     StringView{"' was not found"};
+    /* A close function, alias, builtin, or PATH program is offered as a
+       did-you-mean hint, so a typo points at the command it resembles. */
+    ArrayList<String> local_names{};
+    actx.defined_functions.for_each(
+        [&](StringView n) throws { local_names.push(String{n}); });
+    actx.known_aliases.for_each(
+        [&](StringView n) throws { local_names.push(String{n}); });
+    if (Maybe<String> suggestion =
+            utils::suggest_command(StringView{*name}, local_names))
+    {
+      message += ", did you mean '" + *suggestion + "'?";
+    }
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. A
        missing command is a fatal analysis error, so the file does not run with

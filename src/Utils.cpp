@@ -946,6 +946,107 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
   return resolve_along_path(program_name, false);
 }
 
+/* The optimal-string-alignment distance, the edit distance that also counts an
+   adjacent transposition as one edit, so a typo such as gti for git scores one
+   rather than two. Bounded by max_distance, returning max_distance + 1 once the
+   best possible result on the current row already exceeds it, so a far-off
+   candidate costs little. */
+static pure fn bounded_osa_distance(StringView a, StringView b,
+                                    usize max_distance) wontthrow -> usize
+{
+  const usize la = a.length;
+  const usize lb = b.length;
+  if (la > lb ? la - lb > max_distance : lb - la > max_distance)
+    return max_distance + 1;
+  if (la == 0) return lb;
+  if (lb == 0) return la;
+
+  usize previous_previous[256];
+  usize previous[256];
+  usize current[256];
+  if (lb + 1 > 256) return max_distance + 1;
+
+  for (usize j = 0; j <= lb; j++) previous[j] = j;
+  for (usize i = 1; i <= la; i++) {
+    current[0] = i;
+    usize row_best = current[0];
+    for (usize j = 1; j <= lb; j++) {
+      const usize cost = a[i - 1] == b[j - 1] ? 0 : 1;
+      usize value = previous[j] + 1;
+      if (current[j - 1] + 1 < value) value = current[j - 1] + 1;
+      if (previous[j - 1] + cost < value) value = previous[j - 1] + cost;
+      if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] &&
+          previous_previous[j - 2] + 1 < value)
+      {
+        value = previous_previous[j - 2] + 1;
+      }
+      current[j] = value;
+      if (value < row_best) row_best = value;
+    }
+    if (row_best > max_distance) return max_distance + 1;
+    for (usize j = 0; j <= lb; j++) {
+      previous_previous[j] = previous[j];
+      previous[j] = current[j];
+    }
+  }
+  return previous[lb];
+}
+
+fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
+    -> Maybe<String>
+{
+  if (name.is_empty()) return None;
+
+  /* A typo is usually one or two edits, so the search stays within two and a
+     shorter name allows only one, which keeps a wild miss silent. */
+  const usize max_distance = name.length <= 3 ? 1 : 2;
+  usize best_distance = max_distance + 1;
+  bool best_is_anagram = false;
+  String best{};
+
+  /* Same length and same character multiset, so the candidate is a pure
+     transposition of the typed name, the most likely typo. Used to break a tie
+     in favor of git over gtf for the input gti. */
+  let const is_anagram = [](StringView a, StringView b) wontthrow -> bool {
+    if (a.length != b.length) return false;
+    i32 counts[256] = {0};
+    for (usize i = 0; i < a.length; i++) {
+      counts[static_cast<unsigned char>(a[i])]++;
+      counts[static_cast<unsigned char>(b[i])]--;
+    }
+    for (i32 count : counts)
+      if (count != 0) return false;
+    return true;
+  };
+
+  let const consider = [&](StringView candidate) throws -> void {
+    if (candidate.is_empty() || candidate == name) return;
+    const usize distance = bounded_osa_distance(name, candidate, max_distance);
+    if (distance > best_distance) return;
+    const bool anagram = is_anagram(name, candidate);
+    if (distance < best_distance || (anagram && !best_is_anagram)) {
+      best_distance = distance;
+      best_is_anagram = anagram;
+      best = String{candidate};
+    }
+  };
+
+  for (const String &local : local_names) consider(local.view());
+  for (const String &builtin : builtin_names()) consider(builtin.view());
+  if (MAYBE_PATH) {
+    for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
+      if (Maybe<ArrayList<String>> entries =
+              Path::read_directory(Path{dir_string.view()}))
+      {
+        for (const String &entry : *entries) consider(entry.view());
+      }
+    }
+  }
+
+  if (best_distance > max_distance) return None;
+  return best;
+}
+
 fn read_entire_file(StringView path) throws -> Maybe<String>
 {
   let const file = os::open_file_descriptor(path, os::file_open_mode::Read);

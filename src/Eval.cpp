@@ -3296,7 +3296,15 @@ fn ExecContext::make_from(SourceLocation location,
     if (p.has_value()) {
       kind = ResolvedCommand::from_program(steal(*p));
     } else {
-      throw CommandNotFound{location, "Program '" + program + "' wasn't found"};
+      /* A close builtin or PATH program is offered as a did-you-mean hint, so a
+         typo such as gti points at git. */
+      String message = "Program '" + program + "' wasn't found";
+      if (Maybe<String> suggestion =
+              utils::suggest_command(program.view(), ArrayList<String>{}))
+      {
+        message += ", did you mean '" + *suggestion + "'?";
+      }
+      throw CommandNotFound{location, steal(message)};
     }
   } else {
     kind = ResolvedCommand::from_builtin(*bk);

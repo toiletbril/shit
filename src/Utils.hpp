@@ -107,6 +107,13 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 
 fn canonicalize_path(StringView path) throws -> Maybe<Path>;
 
+/* The command name closest to name among the local names passed in, the
+   builtins, and the PATH programs, within a couple of edits counting an adjacent
+   transposition as one, for a did-you-mean hint on a command that was not found.
+   None when nothing is close enough. */
+fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
+    -> Maybe<String>;
+
 /* Read a whole file into a string through the os descriptor layer, so no
    iostream file stream is pulled in. Returns None when the open fails. */
 fn read_entire_file(StringView path) throws -> Maybe<String>;
