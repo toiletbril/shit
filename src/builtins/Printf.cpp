@@ -179,15 +179,26 @@ pure Builtin::Kind Printf::kind() const wontthrow { return Kind::Printf; }
 
 i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  unused(cxt);
-
   ASSERT(!ec.args().is_empty());
 
   if (ec.args().count() < 2) return 0;
 
-  let const &fmt = ec.args()[1];
+  /* bash printf -v NAME stores the result in the named variable instead of
+     printing it, so the format and operands shift two places past -v NAME. */
+  usize format_index = 1;
+  Maybe<String> store_variable;
+  if (cxt.is_bash_compatible() && ec.args()[1] == "-v" &&
+      ec.args().count() >= 3)
+  {
+    store_variable = ec.args()[2];
+    format_index = 3;
+  }
+
+  if (format_index >= ec.args().count()) return 0;
+
+  let const &fmt = ec.args()[format_index];
   ArrayList<String> operands{};
-  for (usize i = 2; i < ec.args().count(); i++)
+  for (usize i = format_index + 1; i < ec.args().count(); i++)
     operands.push(ec.args()[i]);
 
   String out{};
@@ -268,6 +279,11 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
   } while (!should_stop && operand_index < operands.count() &&
            consumed_a_conversion);
+
+  if (store_variable.has_value()) {
+    cxt.set_shell_variable(store_variable->view(), out.view());
+    return 0;
+  }
 
   ec.print_to_stdout(out);
   return 0;

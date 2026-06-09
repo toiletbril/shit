@@ -10,19 +10,42 @@ pure fn Echo::kind() const wontthrow -> Builtin::Kind { return Kind::Echo; }
 
 fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(cxt);
-
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  /* Match dash, where only a leading -n is an option and everything after it,
-     including -e, is literal text, and backslash escapes are always
-     interpreted. */
   usize start = 1;
   let should_suppress_newline = false;
-  while (start < args.count() && args[start] == "-n") {
-    should_suppress_newline = true;
-    start++;
+  /* dash always interprets the backslash escapes and treats only a leading -n
+     as an option. bash leaves the escapes literal unless -e is given, and reads
+     -e, -E, and -n as leading options, alone or combined such as -ne. */
+  let interpret_escapes = !cxt.is_bash_compatible();
+
+  if (cxt.is_bash_compatible()) {
+    while (start < args.count()) {
+      const StringView arg = args[start].view();
+      if (arg.length < 2 || arg[0] != '-') break;
+      bool all_option_letters = true;
+      for (usize k = 1; k < arg.length; k++)
+        if (arg[k] != 'n' && arg[k] != 'e' && arg[k] != 'E') {
+          all_option_letters = false;
+          break;
+        }
+      if (!all_option_letters) break;
+      for (usize k = 1; k < arg.length; k++) {
+        if (arg[k] == 'n')
+          should_suppress_newline = true;
+        else if (arg[k] == 'e')
+          interpret_escapes = true;
+        else if (arg[k] == 'E')
+          interpret_escapes = false;
+      }
+      start++;
+    }
+  } else {
+    while (start < args.count() && args[start] == "-n") {
+      should_suppress_newline = true;
+      start++;
+    }
   }
 
   let buf = String{};
@@ -33,7 +56,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     let const &arg = args[i];
     for (usize j = 0; j < arg.length(); j++) {
-      if (arg[j] != '\\' || j + 1 >= arg.length()) {
+      if (!interpret_escapes || arg[j] != '\\' || j + 1 >= arg.length()) {
         buf += arg[j];
         continue;
       }
