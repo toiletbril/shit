@@ -670,6 +670,14 @@ protected:
   fn apply_substring_expansion(StringView name, StringView body) throws
       -> String;
 
+  /* Expand the bash pattern-replacement forms ${name/pat/rep},
+     ${name//pat/rep}, ${name/#pat/rep}, and ${name/%pat/rep}. The spec begins
+     at the slash. The pattern is a glob, the replacement is a literal word, and
+     a leading second slash replaces every match while # and % anchor the
+     pattern to the start or the end. */
+  fn apply_pattern_replacement(StringView name, StringView spec) throws
+      -> String;
+
   /* Compute the integer value of a $((...)) expression, resolving shell
      variables and applying any assignments inside it. */
   fn evaluate_arithmetic(StringView expression) throws -> i64;

@@ -1,0 +1,22 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign v=hello]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v//l/L|$v/#he/HE|$v/0/X|$v//[lo]/_"]
+[Word
+  Unquoted "v=hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v//l/L"
+  DoubleQuoted "|"
+  Variable "v/#he/HE"
+  DoubleQuoted "|"
+  Variable "v/0/X"
+  DoubleQuoted "|"
+  Variable "v//[lo]/_"
+]
+heLLo|HEllo|hello|he___
+[Code 0]

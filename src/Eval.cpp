@@ -1544,6 +1544,12 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       return apply_substring_expansion(name, rest.substring(1));
   }
 
+  /* ${name/pat/rep} and its // # % variants are bash pattern replacement. They
+     are the non-colon form whose operator is a slash. A name of @ or * applies
+     per element, left to the array work. */
+  if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*")
+    return apply_pattern_replacement(name, rest);
+
   let const op = rest[op_index];
   let const is_doubled = (op_index + 1 < rest.length &&
                           rest[op_index + 1] == op && (op == '#' || op == '%'));
@@ -1671,6 +1677,139 @@ fn EvalContext::apply_substring_expansion(StringView name,
   return String{heap_allocator(), value.view().substring_of_length(
                                       static_cast<usize>(start),
                                       static_cast<usize>(end - start))};
+}
+
+/* The index of the unescaped slash that separates the pattern from the
+   replacement, or the body length when there is none. A backslash escapes the
+   following byte so a literal slash inside the pattern is not the separator. */
+static fn find_replacement_separator(StringView body) wontthrow -> usize
+{
+  for (usize i = 0; i < body.length; i++) {
+    if (body[i] == '\\') {
+      i++;
+      continue;
+    }
+    if (body[i] == '/') return i;
+  }
+  return body.length;
+}
+
+/* The length of the longest match the pattern makes starting at the given
+   position in the value, or None when it matches nothing there. The end shrinks
+   from the value end so a greedy star takes the most it can, the way bash picks
+   the leftmost-longest match. */
+static fn longest_pattern_match_at(StringView pattern,
+                                   const ArrayList<bool> &pattern_active,
+                                   StringView value, usize start) throws
+    -> Maybe<usize>
+{
+  for (usize end = value.length; end >= start; end--) {
+    if (utils::glob_matches(pattern,
+                            value.substring_of_length(start, end - start),
+                            pattern_active, 0))
+      return end - start;
+    if (end == start) break;
+  }
+  return None;
+}
+
+fn EvalContext::apply_pattern_replacement(StringView name,
+                                          StringView spec) throws -> String
+{
+  let const current = get_variable_value(name);
+  if (m_error_unset && !current.has_value())
+    throw Error{name + ": parameter not set"};
+  let const value = current.value_or(String{});
+
+  /* The spec opens with the slash operator. A doubled slash replaces every
+     match, and a # or % after the first slash anchors the pattern to the start
+     or the end of the value. */
+  StringView remainder = spec.substring(1);
+  bool replace_all = false;
+  bool anchor_start = false;
+  bool anchor_end = false;
+  if (!remainder.is_empty() && remainder[0] == '/') {
+    replace_all = true;
+    remainder = remainder.substring(1);
+  } else if (!remainder.is_empty() && remainder[0] == '#') {
+    anchor_start = true;
+    remainder = remainder.substring(1);
+  } else if (!remainder.is_empty() && remainder[0] == '%') {
+    anchor_end = true;
+    remainder = remainder.substring(1);
+  }
+
+  const usize separator = find_replacement_separator(remainder);
+  let pattern_active = ArrayList<bool>{heap_allocator()};
+  let const pattern = expand_modifier_word_masked(
+      remainder.substring_of_length(0, separator), pattern_active);
+  /* No separator means the replacement is empty, so the matches are deleted. */
+  let const replacement =
+      separator < remainder.length
+          ? expand_modifier_word(remainder.substring(separator + 1))
+          : String{heap_allocator()};
+
+  let out = String{heap_allocator()};
+
+  /* The start anchor only matches a prefix, so a single longest match at the
+     front is replaced and the rest is kept. */
+  if (anchor_start) {
+    if (let const matched = longest_pattern_match_at(
+            pattern.view(), pattern_active, value.view(), 0))
+    {
+      out += replacement;
+      out.append(value.view().substring(*matched));
+    } else {
+      out.append(value.view());
+    }
+    return out;
+  }
+
+  /* The end anchor matches a suffix, so the leftmost start whose remainder
+     fully matches the pattern names the longest matching suffix to replace. */
+  if (anchor_end) {
+    for (usize start = 0; start <= value.length(); start++) {
+      if (utils::glob_matches(pattern.view(), value.view().substring(start),
+                              pattern_active, 0))
+      {
+        out.append(value.view().substring_of_length(0, start));
+        out += replacement;
+        return out;
+      }
+    }
+    out.append(value.view());
+    return out;
+  }
+
+  /* The unanchored form scans left to right, replacing the first match for the
+     single-slash form and every non-overlapping match for the doubled-slash
+     form. A zero-length match advances one byte so the scan cannot loop. */
+  bool has_replaced = false;
+  usize i = 0;
+  while (i < value.length()) {
+    Maybe<usize> matched;
+    if (!has_replaced || replace_all)
+      matched = longest_pattern_match_at(pattern.view(), pattern_active,
+                                         value.view(), i);
+    if (matched.has_value()) {
+      out += replacement;
+      has_replaced = true;
+      if (*matched == 0) {
+        out.push(value.view()[i]);
+        i++;
+      } else {
+        i += *matched;
+      }
+      if (!replace_all) {
+        out.append(value.view().substring(i));
+        return out;
+      }
+    } else {
+      out.push(value.view()[i]);
+      i++;
+    }
+  }
+  return out;
 }
 
 cold fn EvalContext::make_stats_string() const throws -> String
