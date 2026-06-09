@@ -752,6 +752,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   bool command_position = true;
   bool expecting_in = false;
   bool for_variable_pending = false;
+  bool for_do_expected = false;
 
   usize i = begin;
   while (i < end) {
@@ -869,6 +870,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       expecting_in = false;
       for_variable_pending = false;
       command_position = false;
+      /* A for loop names its word list after in and then requires do, with no
+         command list between, so do is expected once the words end. A case
+         takes patterns after in, so this only arms for a for. */
+      if (!stack.is_empty() && stack.back() == highlight_construct::For)
+        for_do_expected = true;
       continue;
     }
 
@@ -882,6 +888,20 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (!plain || !is_plain_identifier(word))
         push(word_start, word_end, colors::ansi::BOLD_RED);
       continue;
+    }
+
+    /* A for loop requires do once its word list ends, so the first command in
+       that position other than do is misplaced and shown in red. The words of
+       the list are not in command position, so they keep the flag set until the
+       do position is reached, where do itself falls through to the keyword
+       handling below and is colored green. */
+    if (for_do_expected && command_position) {
+      for_do_expected = false;
+      if (word != "do") {
+        push(word_start, word_end, colors::ansi::BOLD_RED);
+        command_position = false;
+        continue;
+      }
     }
 
     if (command_position && plain && !is_assignment) {
