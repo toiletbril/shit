@@ -709,14 +709,7 @@ fn main(int argc, char **argv) -> int
      version and runtime values come from the build. */
   context.set_shell_variable("SHELL", program_path);
   context.set_shell_variable("PWD", shit::Path::current_directory().text());
-  let version_string = shit::String{};
-  version_string += shit::utils::int_to_text(SHIT_VER_MAJOR);
-  version_string += ".";
-  version_string += shit::utils::int_to_text(SHIT_VER_MINOR);
-  version_string += ".";
-  version_string += shit::utils::int_to_text(SHIT_VER_PATCH);
-  version_string += "-" SHIT_VER_EXTRA;
-  context.set_shell_variable("SHIT_VERSION", version_string);
+  context.set_shell_variable("SHIT_VERSION", SHIT_VERSION_STRING);
   context.set_shell_variable("SHIT_COMMIT", SHIT_COMMIT_HASH);
   context.set_shell_variable("SHIT_BUILD_MODE", SHIT_BUILD_MODE);
   context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);

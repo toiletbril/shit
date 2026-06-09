@@ -43,6 +43,15 @@
 #define SHIT_VER_PATCH 6
 #define SHIT_VER_EXTRA "alpha"
 
+/* The version as a compile-time string, so the startup does not rebuild it from
+   the numeric parts with a String allocation on every invocation. */
+#define SHIT_STRINGIFY_INNER(x) #x
+#define SHIT_STRINGIFY(x)       SHIT_STRINGIFY_INNER(x)
+#define SHIT_VERSION_STRING                                                    \
+  SHIT_STRINGIFY(SHIT_VER_MAJOR)                                               \
+  "." SHIT_STRINGIFY(SHIT_VER_MINOR) "." SHIT_STRINGIFY(SHIT_VER_PATCH)        \
+  "-" SHIT_VER_EXTRA
+
 #define SHIT_SHORT_LICENSE                                                     \
   "Licensed under the 3-Clause BSD License.\n"                                 \
   "There is NO WARRANTY, to the extent permitted by law."
