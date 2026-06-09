@@ -1078,9 +1078,13 @@ hot fn Parser::parse_simple_command() throws -> Command *
       if (is_array_assignment) {
         ArrayList<const Token *> elements = consume_bash_array_assignment();
         if (m_lexer.is_bash_compatible()) {
-          return m_lexer.arena().create<ArrayAssignCommand>(
-              *source_location, a->key().view(), steal(elements),
-              a->is_append());
+          /* A bare array assignment joins the prefix sequence the way a scalar
+             one does, so a command-less line of several assignments, some of
+             them arrays such as flags= pvars=() specs=(), applies them all in
+             order rather than the first array assignment standing alone. */
+          array_args.push(array_builtin_assignment{
+              a->key().clone(), steal(elements), a->is_append()});
+          break;
         }
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       }

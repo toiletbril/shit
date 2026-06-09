@@ -1178,6 +1178,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         cxt.mark_exported(name);
       }
     }
+    /* A command-less line may also carry bare array assignments, such as the
+       pvars=() of flags= pvars=() specs=(), applied after the scalars in source
+       order. */
+    for (const array_builtin_assignment &assignment : m_array_args) {
+      ArrayList<String> values = cxt.process_args(assignment.elements);
+      if (assignment.is_append)
+        cxt.append_indexed_array(assignment.name, steal(values));
+      else
+        cxt.set_indexed_array(assignment.name, steal(values));
+    }
     cxt.set_last_exit_status(0);
     return 0;
   }
