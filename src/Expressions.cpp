@@ -18,6 +18,14 @@
 
 namespace shit {
 
+static fn indent_for_layer(usize layer) throws -> String
+{
+  let pad = String{};
+  for (usize i = 0; i < layer; i++)
+    pad += EXPRESSION_AST_INDENT;
+  return pad;
+}
+
 Expression::Expression(SourceLocation location) : m_location(location) {}
 
 pure fn Expression::source_location() const wontthrow -> SourceLocation
@@ -27,10 +35,7 @@ pure fn Expression::source_location() const wontthrow -> SourceLocation
 
 cold fn Expression::to_ast_string(usize layer) const throws -> String
 {
-  String pad{};
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
-  return pad + "[" + to_string() + "]";
+  return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
 hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
@@ -317,10 +322,7 @@ cold fn IfStatement::to_ast_string(usize layer) const throws -> String
   ASSERT(m_then != nullptr);
 
   String s{};
-  String pad{};
-
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
+  let const pad = indent_for_layer(layer);
 
   s += pad + "[If]\n";
   s += pad + EXPRESSION_AST_INDENT + m_condition->to_ast_string(layer + 1) +
@@ -374,11 +376,7 @@ cold fn DummyExpression::to_string() const throws -> String { return "Dummy"; }
 
 cold fn DummyExpression::to_ast_string(usize layer) const throws -> String
 {
-  String pad{};
-  for (usize i = 0; i < layer; i++) {
-    pad += EXPRESSION_AST_INDENT;
-  }
-  return pad + "[" + to_string() + "]";
+  return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
 AssignCommand::AssignCommand(SourceLocation location, const Assignment *a)
@@ -478,10 +476,7 @@ cold fn AssignCommand::to_string() const throws -> String
 
 cold fn AssignCommand::to_ast_string(usize layer) const throws -> String
 {
-  String pad{};
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
-  return pad + "[" + to_string() + "]";
+  return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
 fn AssignCommand::redirect_to(usize d, String &f, bool duplicate) throws -> void
@@ -1191,10 +1186,7 @@ cold fn SimpleCommand::to_string() const throws -> String
 
 cold fn SimpleCommand::to_ast_string(usize layer) const throws -> String
 {
-  String pad{};
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
-  return pad + "[" + to_string() + "]";
+  return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
 fn SimpleCommand::append_to(usize d, String &f, bool duplicate) throws -> void
@@ -1239,10 +1231,8 @@ cold fn CompoundList::to_string() const throws -> String
 cold fn CompoundList::to_ast_string(usize layer) const throws -> String
 {
   String s{};
-  String pad{};
+  let const pad = indent_for_layer(layer);
 
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
   s += pad + "[" + to_string() + "]";
   for (const CompoundListCondition *n : m_nodes) {
     s += '\n';
@@ -1341,9 +1331,7 @@ cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
   ASSERT(m_cmd != nullptr);
 
   String s{};
-  String pad{};
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
+  let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_cmd->to_ast_string(layer + 1);
@@ -1402,10 +1390,7 @@ cold fn Pipeline::to_string() const throws -> String
 cold fn Pipeline::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
-  let pad = String{};
-  for (usize i = 0; i < layer; i++) {
-    pad += EXPRESSION_AST_INDENT;
-  }
+  let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]";
   for (const Command *e : m_commands) {
@@ -1648,14 +1633,6 @@ fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
   unused(duplicate);
   throw ErrorWithLocation{source_location(),
                           "Redirection on a compound command is not supported"};
-}
-
-static fn indent_for_layer(usize layer) throws -> String
-{
-  let pad = String{};
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
-  return pad;
 }
 
 IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
@@ -2545,10 +2522,8 @@ cold fn UnaryExpression::to_ast_string(usize layer) const throws -> String
   ASSERT(m_rhs != nullptr);
 
   let s = String{};
-  let pad = String{};
-  for (usize i = 0; i < layer; i++) {
-    pad += EXPRESSION_AST_INDENT;
-  }
+  let const pad = indent_for_layer(layer);
+
   s += pad + "[Unary " + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_rhs->to_ast_string(layer + 1);
   return s;
@@ -2568,10 +2543,8 @@ cold fn BinaryExpression::to_ast_string(usize layer) const throws -> String
   ASSERT(m_rhs != nullptr);
 
   let s = String{};
-  let pad = String{};
+  let const pad = indent_for_layer(layer);
 
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
   s += pad + "[Binary " + to_string() + "]\n";
   s += pad + EXPRESSION_AST_INDENT + m_lhs->to_ast_string(layer + 1) + "\n";
   s += pad + EXPRESSION_AST_INDENT + m_rhs->to_ast_string(layer + 1);
@@ -2594,9 +2567,8 @@ fn ConstantNumber::evaluate_impl(EvalContext &cxt) const throws -> i64
 cold fn ConstantNumber::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
-  let pad = String{};
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
+  let const pad = indent_for_layer(layer);
+
   s += pad + "[Number " + to_string() + "]";
   return s;
 }
@@ -2621,9 +2593,8 @@ fn ConstantString::evaluate_impl(EvalContext &cxt) const throws -> i64
 cold fn ConstantString::to_ast_string(usize layer) const throws -> String
 {
   let s = String{};
-  let pad = String{};
-  for (usize i = 0; i < layer; i++)
-    pad += EXPRESSION_AST_INDENT;
+  let const pad = indent_for_layer(layer);
+
   s += pad + "[String \"" + to_string() + "\"]";
   return s;
 }
