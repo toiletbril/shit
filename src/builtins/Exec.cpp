@@ -10,6 +10,12 @@
    command it applies its redirections to the shell itself and returns. exec
    names an executable file, not a builtin, since it replaces the process. */
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[command [argument ...]]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Exec::Exec() = default;
@@ -21,6 +27,8 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   unused(cxt);
   let const &args = ec.args();
   ASSERT(!args.is_empty());
+
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* exec with only redirections changes the shell's own descriptors and
      returns, so the rest of the session inherits them. */

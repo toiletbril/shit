@@ -5,6 +5,12 @@
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[dir]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Cd::Cd() = default;
@@ -14,6 +20,9 @@ pure fn Cd::kind() const wontthrow -> Builtin::Kind { return Kind::Cd; }
 fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   let arg_path = String{};
 

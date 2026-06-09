@@ -6,6 +6,12 @@
 /* The dot and source builtins read a file and run it in the current shell, so
    its assignments and function definitions persist in the caller. */
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("file");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Source::Source() = default;
@@ -15,6 +21,9 @@ pure Builtin::Kind Source::kind() const wontthrow { return Kind::Source; }
 i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   ASSERT(!ec.args().is_empty());
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (ec.args().count() < 2) throw Error{"Filename argument is required"};
 

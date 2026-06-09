@@ -5,6 +5,12 @@
 /* The eval builtin joins its arguments with spaces and runs the result in the
    current shell. */
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[arg ...]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Eval::Eval() = default;
@@ -14,6 +20,9 @@ pure fn Eval::kind() const wontthrow -> Builtin::Kind { return Kind::Eval; }
 fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   let joined = String{};
   for (usize i = 1; i < ec.args().count(); i++) {
