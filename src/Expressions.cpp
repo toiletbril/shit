@@ -2740,9 +2740,18 @@ cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
 
 fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  /* A true conditional exits zero, the way the [[ ]] command reports success.
-   */
-  const i64 status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
+  /* The [[ ]] evaluator reports a malformed expression as a plain error, so it
+     is relocated to this command's position to carry a caret at the [[ in a
+     script, the same as the shell's other located diagnostics. A diagnostic
+     that is already located passes through untouched. */
+  i64 status;
+  try {
+    /* A true conditional exits zero, the way the [[ ]] command reports success.
+     */
+    status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
+  } catch (const Error &e) {
+    throw ErrorWithLocation{source_location(), e.message()};
+  }
   cxt.set_last_exit_status(static_cast<i32>(status));
   return status;
 }
