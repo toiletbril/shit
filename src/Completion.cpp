@@ -540,6 +540,23 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
    a reserved keyword the shell runs as syntax, a builtin, a function, an alias,
    a PATH executable, or, when it holds a slash, an existing regular file the
    process may execute. */
+/* Expand a leading tilde in a command path the way the evaluator does before it
+   resolves the command, so ~/bin/foo is checked at the home directory rather
+   than as a literal ~ path. None when the path names a user with no home. */
+static fn expand_command_tilde(StringView word) throws -> Maybe<String>
+{
+  if (word.is_empty() || word[0] != '~') return None;
+  let const slash = word.find_character('/');
+  let const user = slash.has_value() ? word.substring_of_length(1, *slash - 1)
+                                     : word.substring(1);
+  Maybe<Path> home =
+      user.is_empty() ? os::get_home_directory() : os::get_home_for_user(user);
+  if (!home.has_value()) return None;
+  let expanded = *home;
+  if (slash.has_value()) expanded.push_component(word.substring(*slash + 1));
+  return String{expanded.text().view()};
+}
+
 static fn first_word_resolves(StringView word, EvalContext &context) throws
     -> bool
 {
@@ -548,9 +565,17 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (KEYWORDS.find(word).has_value()) return true;
 
   /* A path word resolves against the filesystem the way the evaluator does for
-     a program given by path, rather than the command name sets. */
+     a program given by path, rather than the command name sets. A leading tilde
+     is expanded first, so ~/bin/foo is checked at the home directory. */
   if (word.find_character('/').has_value()) {
-    if (Maybe<Path> canonical = utils::canonicalize_path(word);
+    String expanded{word};
+    if (!word.is_empty() && word[0] == '~') {
+      if (Maybe<String> home_expanded = expand_command_tilde(word))
+        expanded = steal(*home_expanded);
+      else
+        return false;
+    }
+    if (Maybe<Path> canonical = utils::canonicalize_path(expanded.view());
         canonical.has_value())
     {
       return canonical->is_regular_file() && canonical->is_executable();
