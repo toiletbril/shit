@@ -4963,6 +4963,19 @@ fn EvalContext::register_completion_spec(StringView command,
   m_completion_specs.set(command, steal(spec));
 }
 
+fn EvalContext::register_default_completion_spec(completion_spec spec) throws
+    -> void
+{
+  m_default_completion_spec = steal(spec);
+}
+
+pure fn EvalContext::default_completion_spec() const wontthrow
+    -> const completion_spec *
+{
+  return m_default_completion_spec.has_value() ? &*m_default_completion_spec
+                                               : nullptr;
+}
+
 pure fn EvalContext::lookup_completion_spec(StringView command) const wontthrow
     -> const completion_spec *
 {
@@ -4972,7 +4985,9 @@ pure fn EvalContext::lookup_completion_spec(StringView command) const wontthrow
 fn EvalContext::run_completion_function(StringView function_name,
                                         const ArrayList<String> &words,
                                         usize cword, StringView line,
-                                        usize point) throws -> ArrayList<String>
+                                        usize point,
+                                        i32 *out_exit_status) throws
+    -> ArrayList<String>
 {
   const Expression *body =
       has_functions() ? find_function(function_name) : nullptr;
@@ -5035,6 +5050,10 @@ fn EvalContext::run_completion_function(StringView function_name,
     body->evaluate(*this);
   } catch (const ErrorBase &) {
   }
+  /* The function's return status is read before the control flow is cleared, so
+     a dynamic loader that returns 124 to request a retry is seen by the caller.
+   */
+  if (out_exit_status != nullptr) *out_exit_status = last_exit_status();
   if (has_pending_control_flow()) clear_control_flow();
 
   let result = ArrayList<String>{};

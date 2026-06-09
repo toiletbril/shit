@@ -540,7 +540,33 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
   const StringView command = command_word_of(line);
   if (command.is_empty()) return None;
   const completion_spec *spec = context.lookup_completion_spec(command);
-  if (spec == nullptr) return None;
+
+  /* No command-specific spec. On an explicit tab, consult the default completion
+     the way bash-completion's complete -D dynamic loader does. The loader sources
+     the per-command file and returns 124 to ask for a retry, so the now
+     registered command spec is looked up and run. A non-124 return means the
+     default itself produced the candidates. The ghost path never runs this since
+     sourcing a file on every keystroke would be wrong. */
+  if (spec == nullptr) {
+    if (!for_listing) return None;
+    const completion_spec *def = context.default_completion_spec();
+    if (def == nullptr || def->function_name.is_empty()) return None;
+    usize default_cword = 0;
+    let const default_words = split_completion_words(line, cursor, default_cword);
+    i32 status = 0;
+    let const reply =
+        context.run_completion_function(def->function_name.view(), default_words,
+                                        default_cword, line, cursor, &status);
+    if (status != 124) {
+      let loaded = ArrayList<String>{};
+      for (const String &entry : reply)
+        loaded.push(String{heap_allocator(), entry.view()});
+      if (loaded.is_empty() && def->use_default) return None;
+      return loaded;
+    }
+    spec = context.lookup_completion_spec(command);
+    if (spec == nullptr) return None;
+  }
 
   let candidates = ArrayList<String>{};
 

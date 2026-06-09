@@ -45,10 +45,18 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let function_name = String{};
   let word_list = String{};
   bool use_default = false;
+  bool is_default_completion = false;
   let commands = ArrayList<String>{};
 
   for (usize i = 1; i < args.count();) {
     let const arg = args[i].view();
+    /* -D registers the default completion, used for a command with no spec of
+       its own, the way bash-completion attaches its dynamic loader. */
+    if (arg == "-D") {
+      is_default_completion = true;
+      i++;
+      continue;
+    }
     if (arg == "-F") {
       if (++i < args.count()) function_name = String{heap_allocator(), args[i]};
       i++;
@@ -83,6 +91,15 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     commands.push(String{heap_allocator(), arg});
     i++;
+  }
+
+  if (is_default_completion) {
+    let spec = completion_spec{};
+    spec.function_name = String{heap_allocator(), function_name};
+    spec.word_list = String{heap_allocator(), word_list};
+    spec.use_default = use_default;
+    cxt.register_default_completion_spec(steal(spec));
+    return 0;
   }
 
   for (const String &command : commands) {

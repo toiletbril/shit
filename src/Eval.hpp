@@ -414,9 +414,19 @@ public:
       -> void;
   pure fn lookup_completion_spec(StringView command) const wontthrow
       -> const completion_spec *;
+  /* The default completion that complete -D registers, used when no command
+     specific spec exists. bash-completion registers its dynamic loader this way,
+     so the engine runs it on an unknown command, the loader sources the per
+     command file and returns 124 to ask for a retry against the now registered
+     spec. */
+  fn register_default_completion_spec(completion_spec spec) throws -> void;
+  pure fn default_completion_spec() const wontthrow -> const completion_spec *;
+  /* out_exit_status, when given, receives the function's return status, so the
+     engine can see the 124 a dynamic loader returns to request a retry. */
   fn run_completion_function(StringView function_name,
                              const ArrayList<String> &words, usize cword,
-                             StringView line, usize point) throws
+                             StringView line, usize point,
+                             i32 *out_exit_status = nullptr) throws
       -> ArrayList<String>;
 
   /* The names of every shell variable, so variable completion can offer them
@@ -841,6 +851,8 @@ protected:
   HashMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   /* The completion specs the complete builtin registered, keyed by command. */
   HashMap<completion_spec> m_completion_specs{heap_allocator()};
+  /* The default completion that complete -D registered, if any. */
+  Maybe<completion_spec> m_default_completion_spec{};
   HashSet m_associative_names{heap_allocator()};
   HashMap<String> m_associative_values{heap_allocator()};
   /* An indexed array element whose subscript is past the dense limit, held by
