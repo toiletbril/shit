@@ -47,7 +47,9 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* The command's input descriptor honors a redirection or a heredoc on the
      read, falling back to the shell's standard input when none is present. The
      line is copied into a heap String for the splitting below. */
-  let const read_line = utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN));
+  let was_newline_terminated = false;
+  let const read_line = utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN),
+                                                 was_newline_terminated);
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)
       cxt.set_shell_variable(operand_name(i), "");
@@ -107,7 +109,10 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
   }
 
-  return 0;
+  /* A final line that end of input ended rather than a newline yields a non-zero
+     status, while the variables above are still assigned, the way dash reports a
+     short read. */
+  return was_newline_terminated ? 0 : 1;
 }
 
 } /* namespace shit */
