@@ -119,13 +119,26 @@ public:
      traps use. Only instantiated when Value is String. An existing slot reuses
      its String buffer rather than allocating a fresh String and freeing the old
      one, so a tight reassignment loop such as a counter pays no per-turn
-     allocation once the buffer is large enough. */
+     allocation once the buffer is large enough.
+
+     The value must not view the existing slot's own buffer, since clear then
+     append would read bytes the clear already truncated. Every caller builds the
+     value in a fresh String or a stack buffer first, so a self-assignment such
+     as x=$x still passes an independent view. */
   void set(StringView key, StringView value)
   {
     if (Value *existing = find(key)) {
-      existing->clear();
-      existing->append(value);
-      return;
+      /* A buffer that once held a large value and now takes a far smaller one is
+         rebuilt at the right size rather than reused, so a name that held a big
+         value does not pin that memory for the session. A small or similar-sized
+         value reuses the buffer, which keeps a counter loop allocation free. */
+      const bool buffer_is_wasteful =
+          existing->count() > 256 && value.length < existing->count() / 2;
+      if (!buffer_is_wasteful) {
+        existing->clear();
+        existing->append(value);
+        return;
+      }
     }
     set_value(key, String{m_allocator, value});
   }
