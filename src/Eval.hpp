@@ -208,6 +208,11 @@ public:
   fn set_last_exit_status(i32 status) wontthrow -> void;
   pure fn last_exit_status() const wontthrow -> i32;
 
+  /* The wall-clock nanoseconds the last top-level command took, for the \D
+     prompt segment. */
+  fn set_last_command_duration_ns(u64 nanos) wontthrow -> void;
+  pure fn last_command_duration_ns() const wontthrow -> u64;
+
   /* The process id of the most recent background command, for $!. */
   fn set_last_background_pid(i64 pid) wontthrow -> void;
 
@@ -548,6 +553,8 @@ protected:
   bool m_field_separator_table[256]{};
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
+
+  u64 m_last_command_duration_ns{0};
 
   String m_shell_name{};
   ArrayList<String> m_positional_params{heap_allocator()};

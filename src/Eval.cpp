@@ -1099,6 +1099,16 @@ fn EvalContext::set_last_exit_status(i32 status) wontthrow -> void
   m_last_exit_status = status;
 }
 
+fn EvalContext::set_last_command_duration_ns(u64 nanos) wontthrow -> void
+{
+  m_last_command_duration_ns = nanos;
+}
+
+pure fn EvalContext::last_command_duration_ns() const wontthrow -> u64
+{
+  return m_last_command_duration_ns;
+}
+
 pure fn EvalContext::last_exit_status() const wontthrow -> i32
 {
   return m_last_exit_status;

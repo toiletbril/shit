@@ -259,8 +259,12 @@ static fn run_script_contents(const String &script_contents,
       exit_code = EXIT_SUCCESS;
     } else {
       context.set_current_source(&script_contents, "the script");
-      /* Run! */
+      /* Run, timing the wall clock so the \D prompt segment can show how long
+         the last command took. */
+      const auto command_start_ns = shit::os::monotonic_nanos();
       exit_code = static_cast<int>(ast->evaluate(context));
+      context.set_last_command_duration_ns(shit::os::monotonic_nanos() -
+                                           command_start_ns);
       /* A trapped signal delivered during the last command of the chunk has no
          following node to trigger its action, so the pending traps drain here
          before the chunk ends, the way dash runs a pending trap before it reads
@@ -317,9 +321,62 @@ static fn source_file(const Path &path, EvalContext &context,
   run_script_contents(*contents, context, ast_arena, path.text().view());
 }
 
+/* The current git branch read from .git/HEAD without forking git, walking up
+   from the working directory to the filesystem root. Empty outside a repository.
+   A detached HEAD shows the short commit hash. */
+static fn git_branch() throws -> String
+{
+  Path dir = Path::current_directory();
+  for (;;) {
+    Path head = dir;
+    head.push_component(".git");
+    head.push_component("HEAD");
+    if (Maybe<String> content = utils::read_entire_file(head.text().view())) {
+      StringView text = content->view();
+      while (!text.is_empty() &&
+             (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
+      {
+        text = text.substring_of_length(0, text.length - 1);
+      }
+      const StringView ref_prefix = "ref: refs/heads/";
+      if (text.starts_with(ref_prefix))
+        return String{text.substring(ref_prefix.length)};
+      return String{
+          text.substring_of_length(0, text.length < 7 ? text.length : 7)};
+    }
+    Path parent = dir;
+    parent.push_component("..");
+    Path normalized = parent.to_absolute().normalized();
+    if (normalized.text() == dir.text()) break;
+    dir = steal(normalized);
+  }
+  return String{};
+}
+
+/* A human duration for the \D prompt segment, quiet under a few milliseconds,
+   then milliseconds, then seconds with one decimal. */
+static fn format_prompt_duration(u64 nanos) throws -> String
+{
+  const u64 milliseconds = nanos / 1000000ULL;
+  if (milliseconds < 5) return String{};
+  String out{};
+  if (milliseconds < 1000) {
+    out.append(utils::int_to_text(static_cast<i64>(milliseconds)));
+    out += "ms";
+    return out;
+  }
+  const u64 tenths = nanos / 100000000ULL;
+  out.append(utils::int_to_text(static_cast<i64>(tenths / 10)));
+  out += '.';
+  out.append(utils::int_to_text(static_cast<i64>(tenths % 10)));
+  out += 's';
+  return out;
+}
+
 /* Expand the common prompt escapes in PS1 and PS2. */
 static fn expand_prompt_escapes(StringView prompt, StringView user,
-                                StringView working_directory) -> String
+                                StringView working_directory,
+                                EvalContext &context) -> String
 {
   String out{};
   for (usize i = 0; i < prompt.length; i++) {
@@ -356,6 +413,22 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
     case 't': out += '\t'; break;
+    /* The last exit status, colored green on success and red on failure when the
+       terminal takes color. */
+    case '?': {
+      const i32 status = context.last_exit_status();
+      const bool wants_color = colors::stdout_wants_color();
+      if (wants_color)
+        out += status == 0 ? colors::ansi::GREEN : colors::ansi::RED;
+      out += utils::int_to_text(status);
+      if (wants_color) out += colors::ansi::RESET;
+    } break;
+    /* The number of background jobs. */
+    case 'j': out += utils::int_to_text(static_cast<i64>(context.jobs().count())); break;
+    /* The time the last command took, empty for an instant command. */
+    case 'D': out += format_prompt_duration(context.last_command_duration_ns()); break;
+    /* The current git branch, empty outside a repository. */
+    case 'g': out += git_branch(); break;
     case '\\': out += '\\'; break;
     default:
       out += '\\';
@@ -699,10 +772,10 @@ fn main(int argc, char **argv) -> int
         if (shit::Maybe<shit::String> ps1 = context.get_variable_value("PS1");
             ps1.has_value() && !ps1->is_empty())
         {
-          /* A user-set PS1 expands its escape sequences, \u \h \w \W \$ and
-             the like. */
-          prompt =
-              expand_prompt_escapes(ps1->view(), u.view(), full_pwd.view());
+          /* A user-set PS1 expands its escape sequences, \u \h \w \W \$ \? \j
+             \D \g and the like. */
+          prompt = expand_prompt_escapes(ps1->view(), u.view(),
+                                         full_pwd.view(), context);
         } else {
           shit::String host = shit::os::get_hostname().value_or(
               shit::os::get_environment_variable("HOSTNAME")
