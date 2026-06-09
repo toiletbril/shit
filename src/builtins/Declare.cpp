@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Utils.hpp"
 
 /* declare and its alias typeset set variable attributes. The bash-specific use
    here is -A to make a name an associative array and -a to make it indexed, so
@@ -32,6 +33,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool make_associative = false;
   bool make_indexed = false;
   bool do_export = false;
+  bool do_print = false;
 
   usize i = 1;
   for (; i < args.count(); i++) {
@@ -46,6 +48,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       case 'A': make_associative = true; break;
       case 'a': make_indexed = true; break;
       case 'x': do_export = true; break;
+      case 'p': do_print = true; break;
       /* The remaining attribute letters carry no backing behavior yet and are
          accepted so a script that sets them keeps running. */
       case 'i':
@@ -55,8 +58,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       case 'u':
       case 'n':
       case 'f':
-      case 't':
-      case 'p': break;
+      case 't': break;
       default: {
         String invalid{};
         invalid += arg[0];
@@ -65,6 +67,61 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       }
       }
     }
+  }
+
+  /* declare -p NAME prints the current declaration of each name in the bash
+     syntax, the attribute flag then the name and a quoted value or an array
+     literal, so a script can reload the state. An unknown name is an error. */
+  if (do_print) {
+    i32 status = 0;
+    for (; i < args.count(); i++) {
+      const StringView name = args[i].view();
+      if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name)) {
+        String line{"declare -a "};
+        line.append(name);
+        line += "=(";
+        for (usize e = 0; e < elements->count(); e++) {
+          if (e > 0) line += ' ';
+          line += '[';
+          line += utils::int_to_text(static_cast<i64>(e));
+          line += "]=\"";
+          line.append((*elements)[e].view());
+          line += '"';
+        }
+        line += ")\n";
+        ec.print_to_stdout(line.view());
+      } else if (cxt.is_associative_array(name)) {
+        const ArrayList<String> keys = cxt.associative_keys(name);
+        const ArrayList<String> values = cxt.associative_values(name);
+        String line{"declare -A "};
+        line.append(name);
+        line += "=(";
+        for (usize e = 0; e < keys.count(); e++) {
+          line += '[';
+          line.append(keys[e].view());
+          line += "]=\"";
+          if (e < values.count()) line.append(values[e].view());
+          line += "\" ";
+        }
+        line += ")\n";
+        ec.print_to_stdout(line.view());
+      } else if (const Maybe<String> value = cxt.get_variable_value(name)) {
+        const StringView attribute =
+            os::get_environment_variable(name).has_value() ? "-x" : "--";
+        String line{"declare "};
+        line.append(attribute);
+        line += ' ';
+        line.append(name);
+        line += "=\"";
+        line.append(value->view());
+        line += "\"\n";
+        ec.print_to_stdout(line.view());
+      } else {
+        shit::print_error(StringView{"declare: "} + name + ": not found\n");
+        status = 1;
+      }
+    }
+    return status;
   }
 
   for (; i < args.count(); i++) {
