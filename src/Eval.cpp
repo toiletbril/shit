@@ -1489,6 +1489,13 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 {
   if (spec.is_empty()) return String{heap_allocator()};
 
+  /* ${!name} reads the value of the variable that name names, or lists the
+     variable names that start with a prefix when it ends with * or @. The
+     length form ${#name} below begins with the same kind of sigil, so this is
+     checked first. */
+  if (spec.length > 1 && spec[0] == '!')
+    return apply_indirect_or_name_listing(spec.substring(1));
+
   /* ${#name} is the length of the value, distinct from $# which is the count of
      positional parameters. */
   if (spec.length > 1 && spec[0] == '#') {
@@ -1858,6 +1865,52 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
     out.push(c);
   }
   return out;
+}
+
+fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
+{
+  if (body.is_empty()) return String{heap_allocator()};
+
+  const char last = body[body.length - 1];
+  if (last == '*' || last == '@') {
+    /* List the variable names that start with the prefix, gathered from the
+       shell store and the process environment, deduplicated, sorted, and joined
+       with a space the way bash renders ${!prefix*}. */
+    const StringView prefix = body.substring_of_length(0, body.length - 1);
+    let names = ArrayList<String>{heap_allocator()};
+    let seen = HashSet{heap_allocator()};
+    auto consider = [&](StringView candidate) throws {
+      if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
+        seen.add(candidate);
+        names.push(String{heap_allocator(), candidate});
+      }
+    };
+    m_shell_variables.for_each([&](StringView variable_name, const String &v) {
+      unused(v);
+      consider(variable_name);
+    });
+    for (const String &environment_name : os::environment_names())
+      consider(environment_name.view());
+
+    utils::sort_ascending(names);
+    let out = String{heap_allocator()};
+    for (usize i = 0; i < names.count(); i++) {
+      if (i > 0) out.push(' ');
+      out.append(names[i].view());
+    }
+    return out;
+  }
+
+  /* The indirect form reads body, takes its value as a variable name, and
+     expands that variable. */
+  const Maybe<String> target = get_variable_value(body);
+  if (!target.has_value()) {
+    if (m_error_unset) throw Error{body + ": parameter not set"};
+    return String{heap_allocator()};
+  }
+  if (m_error_unset && !get_variable_value(target->view()).has_value())
+    throw Error{*target + ": parameter not set"};
+  return expand_variable(target->view());
 }
 
 cold fn EvalContext::make_stats_string() const throws -> String

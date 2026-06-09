@@ -1,0 +1,40 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign a=b]
+  [CompoundListCondition, None]
+    [Assign b=hi]
+  [CompoundListCondition, None]
+    [Assign foo1=1]
+  [CompoundListCondition, None]
+    [Assign foo2=2]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$!a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$!foo*"]
+[Word
+  Unquoted "a=b"
+]
+[Word
+  Unquoted "b=hi"
+]
+[Word
+  Unquoted "foo1=1"
+]
+[Word
+  Unquoted "foo2=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!foo*"
+]
+hi
+foo1 foo2
+[Code 0]
