@@ -627,8 +627,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           case '"': emit_literal('"'); break;
           case '?': emit_literal('?'); break;
           case 'x': {
-            int value = 0;
-            int digits = 0;
+            i32 value = 0;
+            i32 digits = 0;
             while (digits < 2 && hex_value(chop_character(byte_count)) >= 0) {
               value = value * 16 + hex_value(chop_character(byte_count));
               byte_count++;

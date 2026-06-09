@@ -629,7 +629,7 @@ fn resolve_duplication_fd(const Redirection &redir, EvalContext &cxt) throws
   const String &field = fields[0];
   if (field == "-") return Redirection::DUP_FD_CLOSE;
 
-  const let parsed = utils::parse_decimal_integer(field.view());
+  let const parsed = utils::parse_decimal_integer(field.view());
   if (parsed.is_error() || parsed.value() < 0) {
     throw ErrorWithLocation{redir.target->source_location(),
                             "'" + field + "' is not a valid descriptor"};

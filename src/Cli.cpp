@@ -125,12 +125,12 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
                     bool is_long, Flag **result_flag,
                     const char **value_start) throws -> bool
 {
-  size_t longest_length = 0;
+  usize longest_length = 0;
 
   *value_start = nullptr;
   *result_flag = nullptr;
 
-  for (size_t i = 0; i < flags.count(); ++i) {
+  for (usize i = 0; i < flags.count(); ++i) {
     if (!is_long) {
       if (flags[i]->short_name() != '\0' &&
           flags[i]->short_name() == *flag_start)
@@ -143,7 +143,7 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
       if (!flags[i]->long_name().is_empty()) {
         /* There might be flags that are prefixes of other flags. Go
            through all flags first and pick the longest match. */
-        const size_t flag_length = flags[i]->long_name().length;
+        let const flag_length = flags[i]->long_name().length;
 
         if (flag_length > longest_length &&
             /* Yay let's add starts_with in C++20. */

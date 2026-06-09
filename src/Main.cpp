@@ -224,7 +224,7 @@ static fn run_script_contents(const String &script_contents,
                               EvalContext &context, BumpArena &ast_arena,
                               Maybe<StringView> filename = None) -> int
 {
-  int exit_code = EXIT_FAILURE;
+  i32 exit_code = EXIT_FAILURE;
 
   try {
     defer { context.end_command(); };
@@ -779,7 +779,7 @@ fn main(int argc, char **argv) -> int
     context.set_shell_variable("PS1", shit::default_prompt_template());
 
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
-  int exit_code = EXIT_SUCCESS;
+  i32 exit_code = EXIT_SUCCESS;
 
   /* Clear and set up cache. Don't prematurely initialize the whole path map,
    * since it's only really noticeable in interactive mode. This way,
@@ -935,7 +935,7 @@ fn main(int argc, char **argv) -> int
 
         /* Ask for input until we get one. */
         for (;;) {
-          auto [code, input] = toiletline::get_input(prompt);
+          let [code, input] = toiletline::get_input(prompt);
 
           switch (code) {
           case TL_PRESSED_TAB:
