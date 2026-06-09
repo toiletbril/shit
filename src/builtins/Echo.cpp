@@ -16,11 +16,14 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize start = 1;
   let should_suppress_newline = false;
   /* dash always interprets the backslash escapes and treats only a leading -n
-     as an option. bash leaves the escapes literal unless -e is given, and reads
-     -e, -E, and -n as leading options, alone or combined such as -ne. */
+     as an option, the POSIX behavior. bash leaves the escapes literal unless -e
+     is given. The shit-native default interprets the escapes the way dash does,
+     yet still reads -e, -E, and -n the way bash does, so a bash config that runs
+     echo -e in the snapped session prints the way it expects rather than leaving
+     a literal -e. The options combine, such as -ne. */
   let interpret_escapes = !cxt.is_bash_compatible();
 
-  if (cxt.is_bash_compatible()) {
+  if (!cxt.is_posix_mode()) {
     while (start < args.count()) {
       const StringView arg = args[start].view();
       if (arg.length < 2 || arg[0] != '-') break;
