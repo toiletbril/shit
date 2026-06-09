@@ -29,9 +29,14 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  /* A leading -- ends eval's own option scan, so the code that follows it runs
+     even when it begins with a dash, the way bash treats eval -- "$code". */
+  usize first = 1;
+  if (ec.args().count() > 1 && ec.args()[1] == "--") first = 2;
+
   let joined = String{};
-  for (usize i = 1; i < ec.args().count(); i++) {
-    if (i > 1) joined += ' ';
+  for (usize i = first; i < ec.args().count(); i++) {
+    if (i > first) joined += ' ';
     joined.append(ec.args()[i].view());
   }
 

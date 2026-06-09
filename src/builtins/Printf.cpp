@@ -205,6 +205,11 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
     format_index = 3;
   }
 
+  /* A -- ends the option scan, so a format that begins with a dash still reads
+     as the format the way the POSIX printf -- "%s" does. */
+  if (format_index < ec.args().count() && ec.args()[format_index] == "--")
+    format_index++;
+
   if (format_index >= ec.args().count()) return 0;
 
   let const &fmt = ec.args()[format_index];

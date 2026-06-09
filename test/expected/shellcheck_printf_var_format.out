@@ -35,4 +35,4 @@ shit: 1:8: warning: printf format comes from a variable, the data can inject for
 shit: 3:11: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
      3 |  printf -- "$1"
        |            ^~~~ here.
-ok--[Code 0]
+ok[Code 0]
