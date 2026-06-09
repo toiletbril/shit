@@ -12,6 +12,11 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-signal] %job|pid [...]");
+HELP_DESCRIPTION_DECL(
+    "The kill builtin sends a signal to each named job or process. The signal "
+    "defaults to TERM and is named with a leading minus, such as -KILL, -9, or "
+    "-SIGKILL. A target with a leading percent names a job, otherwise it is a "
+    "process id.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

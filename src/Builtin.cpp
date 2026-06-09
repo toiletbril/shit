@@ -10,13 +10,18 @@
 
 namespace shit {
 
-cold fn show_builtin_help_impl(const ExecContext &ec,
+cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
                                const ArrayList<StringView> &hs,
                                const ArrayList<Flag *> &fl) throws -> void
 {
   ASSERT(!ec.args().is_empty());
 
   String help_text{};
+  if (!description.is_empty()) {
+    help_text += "DESCRIPTION\n  ";
+    help_text += description;
+    help_text += "\n\n";
+  }
   help_text += make_synopsis(ec.args()[0].view(), hs);
   help_text += '\n';
   help_text += make_flag_help(fl);

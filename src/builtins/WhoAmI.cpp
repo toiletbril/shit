@@ -6,6 +6,10 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
 
+HELP_DESCRIPTION_DECL(
+    "The whoami builtin prints the name of the current user. The status is "
+    "non-zero when the user cannot be determined.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

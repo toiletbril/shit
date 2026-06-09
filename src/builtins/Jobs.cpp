@@ -10,6 +10,9 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
+HELP_DESCRIPTION_DECL(
+    "The jobs builtin lists the background jobs and the state each one is in, "
+    "then forgets the jobs that have finished.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

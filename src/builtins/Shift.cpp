@@ -9,6 +9,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[n]");
 
+HELP_DESCRIPTION_DECL(
+    "The shift builtin drops the first n positional parameters and renumbers "
+    "the rest, with n defaulting to one. It returns a failure status when n is "
+    "negative or larger than the number of parameters.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

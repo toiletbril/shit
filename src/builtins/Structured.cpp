@@ -6,7 +6,14 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("<format>");
+HELP_SYNOPSIS_DECL("from json | to json | to table | get path");
+
+HELP_DESCRIPTION_DECL(
+    "The from builtin parses the JSON text on its input into a value and prints "
+    "it back as JSON. The to builtin reads JSON on its input and renders it as "
+    "JSON or as an aligned table. The get builtin walks a dotted path into the "
+    "JSON value and prints the part it reaches. Every stage reads text and "
+    "writes text, so it composes with the rest of a pipeline.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

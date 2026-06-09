@@ -4,6 +4,9 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
+HELP_DESCRIPTION_DECL(
+    "The false builtin does nothing and always exits with a failure status of "
+    "1, ignoring any arguments.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

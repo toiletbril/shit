@@ -26,6 +26,14 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 HELP_SYNOPSIS_DECL("[--runs n] [--duration ms] command [command ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The bench builtin runs each command repeatedly as a measured child and "
+    "prints a summary of wall time, peak resident set, and the available perf "
+    "counters as mean, standard deviation, and range. With more than one "
+    "command it also prints each later command against the first as a relative "
+    "speedup. Sampling stops at the run count given by --runs, otherwise at the "
+    "--duration budget in milliseconds.");
+
 namespace shit {
 
 namespace {

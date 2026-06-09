@@ -7,6 +7,11 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[NAME[=VALUE] ...]");
+HELP_DESCRIPTION_DECL(
+    "The export builtin moves each named variable into the environment so later "
+    "commands and child processes inherit it, and it assigns a new value when "
+    "NAME=VALUE is given. A read-only variable rejects a new value, and "
+    "exporting PATH refreshes command resolution.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

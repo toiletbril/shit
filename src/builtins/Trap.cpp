@@ -14,6 +14,12 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[action condition ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The trap builtin sets the action to run for each named condition, resets "
+    "those conditions to their defaults when the action is a lone dash, and "
+    "resets a single named condition given with no action. With no argument it "
+    "lists the set traps, and the EXIT action runs when the shell ends.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

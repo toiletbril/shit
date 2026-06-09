@@ -7,7 +7,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-OPTIONS] <program> [program, ...]");
+HELP_SYNOPSIS_DECL("[-a] program [program ...]");
+
+HELP_DESCRIPTION_DECL(
+    "The which builtin prints how each named program resolves, naming it a "
+    "shell builtin or printing its PATH location. With -a it prints every PATH "
+    "match instead of the first. The status is non-zero when no name resolves.");
 
 FLAG(ALL, Bool, 'a', "all", "Show all matches.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

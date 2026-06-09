@@ -19,6 +19,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("command [argument ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The time builtin runs the given command once and prints to standard error "
+    "how long it took, the real elapsed time plus the user and system time its "
+    "children consumed. It returns the status of the timed command.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

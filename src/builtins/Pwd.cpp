@@ -6,6 +6,9 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("");
+HELP_DESCRIPTION_DECL(
+    "The pwd builtin prints the absolute path of the current working directory "
+    "to standard output.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -11,6 +11,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[%job|pid ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The wait builtin blocks until the named jobs finish, or until every job "
+    "finishes when no operand is given. An operand names a job by %number or a "
+    "child by pid, and the status is that of the last job waited for.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

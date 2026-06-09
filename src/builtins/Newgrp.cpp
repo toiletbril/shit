@@ -14,6 +14,10 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[group]");
+HELP_DESCRIPTION_DECL(
+    "The newgrp builtin changes the real and effective group of the shell by "
+    "handing off to the system newgrp program, which sets the group and starts "
+    "a fresh shell, so newgrp never returns on success.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

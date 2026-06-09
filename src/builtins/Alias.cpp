@@ -9,6 +9,12 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[name[=value] ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The alias builtin defines a word replacement that the shell expands before "
+    "it resolves a command. A name=value operand defines an alias, a bare name "
+    "operand prints that alias, and with no operand the builtin lists every "
+    "alias already defined.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

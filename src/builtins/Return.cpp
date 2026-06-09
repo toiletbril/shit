@@ -6,6 +6,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[n]");
 
+HELP_DESCRIPTION_DECL(
+    "The return builtin stops the current function or sourced file and returns "
+    "the status n to its caller. With no argument it returns the status of the "
+    "last command run.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

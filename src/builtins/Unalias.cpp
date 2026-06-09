@@ -8,6 +8,10 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-a] name [name ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The unalias builtin removes each named alias, or with -a removes every "
+    "alias. The status is non-zero when a named alias does not exist.");
+
 FLAG(ALL, Bool, 'a', "", "Remove every alias.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -10,6 +10,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("file");
 
+HELP_DESCRIPTION_DECL(
+    "The source builtin reads the named file and runs it in the current shell, "
+    "so its variable assignments and function definitions persist in the "
+    "caller. It is also spelled as the dot command.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

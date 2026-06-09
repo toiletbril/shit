@@ -17,6 +17,13 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-HSacdflmnpstuvw] [limit]");
 
+HELP_DESCRIPTION_DECL(
+    "The ulimit builtin reads or sets a resource limit of the shell, choosing "
+    "the resource by flag and defaulting to the file size. A bare flag prints "
+    "the limit, an operand sets it, and -a prints every limit. On a platform "
+    "without resource limits every limit reads as unlimited and a set is "
+    "ignored.");
+
 FLAG(CPU_TIME, Bool, 't', "", "The most CPU time in seconds.");
 FLAG(FILE_SIZE, Bool, 'f', "",
      "The largest file the shell may create, in 512-byte blocks.");

@@ -14,6 +14,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-S] [mask]");
 
+HELP_DESCRIPTION_DECL(
+    "The umask builtin prints the current file creation mask when no operand "
+    "is given, in octal by default and in symbolic form under -S, and sets the "
+    "mask from an octal operand or a symbolic operand such as u=rwx,g=rx,o.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

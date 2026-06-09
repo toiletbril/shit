@@ -10,6 +10,11 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("name[=value] ...");
+HELP_DESCRIPTION_DECL(
+    "The local builtin declares each named variable local to the current "
+    "function, so the value it had in the caller returns when the function "
+    "ends, and it assigns a value when name=value is given. It is an error "
+    "outside a function.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

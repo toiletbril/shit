@@ -12,6 +12,11 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[%job]");
 
+HELP_DESCRIPTION_DECL(
+    "The bg builtin resumes a stopped job and runs it in the background by "
+    "sending it a continue signal. With a %job operand it resumes that job, and "
+    "with no operand it resumes the most recent job.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

@@ -14,6 +14,12 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[command [argument ...]]");
 
+HELP_DESCRIPTION_DECL(
+    "The exec builtin replaces the shell with the named command instead of "
+    "forking a child, so control does not return on success. The command names "
+    "an executable file, not a builtin. With no command the builtin applies its "
+    "redirections to the shell itself and returns.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

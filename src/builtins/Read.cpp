@@ -10,6 +10,11 @@
 FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-r] [name ...]");
+HELP_DESCRIPTION_DECL(
+    "The read builtin reads one line from standard input and splits it on IFS "
+    "into the named variables, with the last variable taking the remainder. "
+    "With no name the line goes to REPLY, and a line ended by end of input "
+    "rather than a newline yields a non-zero status.");
 
 FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

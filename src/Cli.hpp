@@ -10,6 +10,11 @@
 #define HELP_SYNOPSIS_DECL(...)                                                \
   static shit::ArrayList<shit::StringView> HELP_SYNOPSIS { __VA_ARGS__ }
 
+#define HELP_DESCRIPTION T__FLAG_HELP_DESCRIPTION
+
+#define HELP_DESCRIPTION_DECL(text)                                            \
+  static shit::StringView HELP_DESCRIPTION { text }
+
 #define FLAG_LIST_DECL()                                                       \
   static shit::ArrayList<shit::Flag *> FLAG_LIST { shit::heap_allocator() }
 

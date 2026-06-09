@@ -11,6 +11,12 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("name [name ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The type builtin reports how each name resolves, checking the order the "
+    "shell uses to run a command, a keyword first, then an alias, then a "
+    "function, then a builtin, then the PATH. The status is non-zero when any "
+    "name resolves to nothing.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
