@@ -367,17 +367,13 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (name.count() == 1) {
     switch (first_byte) {
-    case '?':
-      return String{heap_allocator(), utils::int_to_text(m_last_exit_status)};
-    case '$':
-      return String{heap_allocator(),
-                    utils::int_to_text(os::get_shell_process_id())};
+    case '?': return utils::int_to_text(m_last_exit_status);
+    case '$': return utils::int_to_text(os::get_shell_process_id());
     case '!':
       return m_last_background_pid
-                 ? String{heap_allocator(),
-                          utils::int_to_text(*m_last_background_pid)}
+                 ? utils::int_to_text(*m_last_background_pid)
                  : String{};
-    case '-': return String{heap_allocator(), option_flags_string()};
+    case '-': return option_flags_string();
     case '#':
       return String{heap_allocator(),
                     utils::uint_to_text(m_positional_params.count())};
@@ -462,7 +458,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                            ? utils::line_number_at(m_current_source->view(),
                                                    m_current_location_position)
                            : 1;
-    return String{heap_allocator(), utils::uint_to_text(line)};
+    return utils::uint_to_text(line);
   }
 
   /* The bash dynamic variables are computed on each read. They only apply in
@@ -476,21 +472,17 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                    static_cast<unsigned>(os::get_shell_process_id()));
         m_random_seeded = true;
       }
-      return String{heap_allocator(), utils::uint_to_text(static_cast<usize>(
-                                          std::rand() % 32768))};
+      return utils::uint_to_text(static_cast<usize>(std::rand() % 32768));
     }
     if (first_byte == 'S' && name == "SECONDS") {
-      return String{heap_allocator(),
-                    utils::int_to_text(static_cast<i64>(std::time(nullptr)) -
-                                       m_shell_start_time)};
+      return utils::int_to_text(static_cast<i64>(std::time(nullptr)) -
+                                m_shell_start_time);
     }
     if (first_byte == 'E' && name == "EPOCHSECONDS") {
-      return String{heap_allocator(),
-                    utils::int_to_text(static_cast<i64>(std::time(nullptr)))};
+      return utils::int_to_text(static_cast<i64>(std::time(nullptr)));
     }
     if (first_byte == 'B' && name == "BASHPID") {
-      return String{heap_allocator(),
-                    utils::int_to_text(os::get_shell_process_id())};
+      return utils::int_to_text(os::get_shell_process_id());
     }
     /* The subshell nesting level, zero at the top, the way bash reports it. */
     if (first_byte == 'B' && name == "BASH_SUBSHELL") {
@@ -1774,7 +1766,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
               heap_allocator(),
               utils::uint_to_text(associative_keys(array_name).count())};
         if (let const *array = lookup_indexed_array(array_name))
-          return String{heap_allocator(), utils::uint_to_text(array->count())};
+          return utils::uint_to_text(array->count());
         return String{heap_allocator(),
                       utils::uint_to_text(
                           get_variable_value(array_name).has_value() ? 1 : 0)};
