@@ -801,6 +801,15 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         continue;
       }
 
+      /* $"..." is bash locale translation. With no message catalog it is the
+         plain double-quoted string, so the dollar is dropped and the following
+         quote lexes as an ordinary double quote, with expansions inside still
+         active. Inside an existing double quote a $" is a dollar then the close
+         quote, so this only fires at the top level. */
+      if (next == '"' && m_bash_compatible && !is_in_double_quotes) {
+        continue;
+      }
+
       if (next == '(') {
         /* Command substitution. Scan to the matching close paren, honoring
            quotes and nesting so an inner ) does not end it early. */
