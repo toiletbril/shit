@@ -2180,6 +2180,102 @@ fn WhileLoop::as_while_loop() const wontthrow -> const WhileLoop *
   return this;
 }
 
+SelectLoop::SelectLoop(SourceLocation location, StringView variable_name,
+                       ArrayList<const Token *> &&words, bool has_in_clause,
+                       const Expression *body)
+    : CompoundCommand(location), m_variable_name(variable_name),
+      m_has_in_clause(has_in_clause), m_body(body)
+{
+  for (const Token *word : words)
+    m_words.push(word);
+  words.clear();
+}
+
+SelectLoop::~SelectLoop() = default;
+
+cold fn SelectLoop::to_string() const throws -> String
+{
+  return "SelectLoop \"" + StringView{m_variable_name} + "\"";
+}
+
+cold fn SelectLoop::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_body != nullptr);
+  let const pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + "]\n" + pad + EXPRESSION_AST_INDENT +
+         m_body->to_ast_string(layer + 1);
+}
+
+fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_body != nullptr);
+  cxt.set_terminal_exec_allowed(false);
+
+  let const values =
+      m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
+  if (values.is_empty()) return 0;
+
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
+
+  i64 ret = 0;
+  bool reprint_menu = true;
+  for (;;) {
+    /* The numbered menu and the prompt go to standard error, the way bash keeps
+       them out of the command's captured output. The menu reprints only after
+       an empty line. */
+    if (reprint_menu) {
+      String menu{};
+      for (usize i = 0; i < values.count(); i++) {
+        menu += utils::int_to_text(static_cast<i64>(i + 1));
+        menu += ") ";
+        menu.append(values[i].view());
+        menu += '\n';
+      }
+      shit::print_error(menu.view());
+      reprint_menu = false;
+    }
+    shit::print_error(cxt.get_variable_value("PS3").value_or(String{"#? "}));
+
+    bool was_newline_terminated = false;
+    let const input =
+        utils::read_line_from_fd(SHIT_STDIN, was_newline_terminated);
+    /* End of input ends the loop, and bash echoes a newline to standard output
+       the way a terminal end-of-file does, so the captured output gains a final
+       blank line that a break does not. */
+    if (!input) {
+      shit::print("\n");
+      break;
+    }
+
+    const String reply{StringView{*input}};
+    cxt.set_shell_variable("REPLY", reply.view());
+    if (reply.is_empty()) {
+      reprint_menu = true;
+      continue;
+    }
+
+    /* A line that is a valid menu number binds the name to that word, any other
+       input binds the name to the empty string, the way bash reports a bad
+       choice. */
+    let const choice = utils::parse_decimal_integer(reply.view());
+    if (!choice.is_error() && choice.value() >= 1 &&
+        static_cast<usize>(choice.value()) <= values.count())
+    {
+      cxt.set_shell_variable(
+          m_variable_name,
+          values[static_cast<usize>(choice.value()) - 1].view());
+    } else {
+      cxt.set_shell_variable(m_variable_name, "");
+    }
+
+    ret = m_body->evaluate(cxt);
+    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
+  }
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
 ForLoop::ForLoop(SourceLocation location, StringView variable_name,
                  ArrayList<const Token *> &&words, bool has_in_clause,
                  const Expression *body)

@@ -885,6 +885,12 @@ hot fn Parser::parse_simple_command() throws -> Command *
         return attach_trailing_redirections(parse_conditional_command());
       }
 
+      /* select is not a reserved word in the lexer, so it is matched on the
+         text in bash mode and parsed like a for header that menus its words. */
+      if (m_lexer.is_bash_compatible() && is_unquoted_word(token, "select")) {
+        return attach_trailing_redirections(parse_select());
+      }
+
       switch (token->kind()) {
       case Token::Kind::If: return attach_trailing_redirections(parse_if());
       case Token::Kind::While:
@@ -1250,6 +1256,72 @@ hot fn Parser::parse_for() throws -> Command *
 
   return m_lexer.arena().create<ForLoop>(location, variable_name.view(),
                                          steal(words), has_in_clause, body);
+}
+
+/* A bash select loop, select name in words; do BODY; done. It shares the for
+   header shape, a name then an optional in clause, but at run time it prints a
+   numbered menu and reads a choice rather than walking the words. */
+hot fn Parser::parse_select() throws -> Command *
+{
+  Token *keyword = m_lexer.next_shell_token();
+  ASSERT(keyword != nullptr);
+  ASSERT(is_unquoted_word(keyword, "select"));
+  const let location = keyword->source_location();
+
+  Token *name_token = m_lexer.next_shell_token();
+  ASSERT(name_token != nullptr);
+  if (name_token->kind() != Token::Kind::Word) {
+    throw ErrorWithLocation{name_token->source_location(),
+                            "Expected a variable name after 'select'"};
+  }
+  const let variable_name = name_token->raw_string();
+
+  ArrayList<const Token *> words{};
+  bool has_in_clause = false;
+  Token *peeked = m_lexer.peek_shell_token();
+  ASSERT(peeked != nullptr);
+  if (peeked->kind() == Token::Kind::Word && peeked->raw_string() == "in") {
+    m_lexer.advance_past_last_peek();
+    has_in_clause = true;
+    for (;;) {
+      Token *word = m_lexer.peek_shell_token();
+      ASSERT(word != nullptr);
+      if (word->kind() != Token::Kind::Word) break;
+      m_lexer.advance_past_last_peek();
+      words.push(word);
+    }
+  }
+
+  for (;;) {
+    Token *t = m_lexer.peek_shell_token();
+    ASSERT(t != nullptr);
+    if (t->kind() == Token::Kind::Semicolon ||
+        t->kind() == Token::Kind::Newline)
+    {
+      m_lexer.advance_past_last_peek();
+      continue;
+    }
+    break;
+  }
+
+  Token *do_token = m_lexer.next_shell_token();
+  ASSERT(do_token != nullptr);
+  if (do_token->kind() != Token::Kind::Do) {
+    throw ErrorWithLocationAndDetails{location, "Unterminated select loop",
+                                      do_token->source_location(),
+                                      "Expected 'do'"};
+  }
+
+  Expression *body = parse_command_list({Token::Kind::Done});
+  Token *done_token = m_lexer.next_shell_token();
+  ASSERT(done_token != nullptr);
+  if (done_token->kind() != Token::Kind::Done) {
+    throw_unterminated(location, "Unterminated select loop", m_lexer.source(),
+                       "done", done_token->source_location());
+  }
+
+  return m_lexer.arena().create<SelectLoop>(location, variable_name.view(),
+                                            steal(words), has_in_clause, body);
 }
 
 hot fn Parser::parse_case() throws -> Command *

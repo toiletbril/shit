@@ -678,6 +678,30 @@ protected:
   const Expression *m_body;
 };
 
+/* The bash select loop, select name in words; do BODY; done. It prints a
+   numbered menu of the words, reads a choice from standard input, binds the
+   name to the chosen word and REPLY to the raw input, runs the body, and
+   repeats until end of input or a break. */
+class SelectLoop : public CompoundCommand
+{
+public:
+  SelectLoop(SourceLocation location, StringView variable_name,
+             ArrayList<const Token *> &&words, bool has_in_clause,
+             const Expression *body);
+  ~SelectLoop() override;
+
+  fn to_string() const throws -> String override;
+  fn to_ast_string(usize layer = 0) const throws -> String override;
+
+protected:
+  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  String m_variable_name;
+  ArrayList<const Token *> m_words{heap_allocator()};
+  bool m_has_in_clause;
+  const Expression *m_body;
+};
+
 /* A bash indexed-array assignment, NAME=(words) or the appending NAME+=(words).
    The element words expand with field splitting and globbing at run time, the
    way bash builds the array, then they are stored under the name. */

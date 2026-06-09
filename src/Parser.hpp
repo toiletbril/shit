@@ -122,6 +122,7 @@ private:
   mustuse fn parse_if() throws -> Command *;
   mustuse fn parse_while_or_until(bool is_until) throws -> Command *;
   mustuse fn parse_for() throws -> Command *;
+  mustuse fn parse_select() throws -> Command *;
   mustuse fn parse_case() throws -> Command *;
   mustuse fn parse_brace_group() throws -> Command *;
   mustuse fn parse_paren_command() throws -> Command *;
