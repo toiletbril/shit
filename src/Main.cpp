@@ -376,7 +376,7 @@ static fn format_prompt_duration(u64 nanos) throws -> String
 /* Expand the common prompt escapes in PS1 and PS2. */
 static fn expand_prompt_escapes(StringView prompt, StringView user,
                                 StringView working_directory,
-                                EvalContext &context) -> String
+                                EvalContext &context) throws -> String
 {
   String out{};
   for (usize i = 0; i < prompt.length; i++) {

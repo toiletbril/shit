@@ -946,6 +946,10 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
   return resolve_along_path(program_name, false);
 }
 
+/* The rolling distance rows are fixed-width stack arrays, so a candidate name
+   longer than this is treated as too far rather than indexed past the row. */
+constexpr usize OSA_ROW_WIDTH = 256;
+
 /* The optimal-string-alignment distance, the edit distance that also counts an
    adjacent transposition as one edit, so a typo such as gti for git scores one
    rather than two. Bounded by max_distance, returning max_distance + 1 once the
@@ -960,11 +964,13 @@ static pure fn bounded_osa_distance(StringView a, StringView b,
     return max_distance + 1;
   if (la == 0) return lb;
   if (lb == 0) return la;
+  /* The rolling rows are indexed up to lb, so a candidate longer than the row
+     width is rejected before the rows are reserved. */
+  if (lb + 1 > OSA_ROW_WIDTH) return max_distance + 1;
 
-  usize previous_previous[256];
-  usize previous[256];
-  usize current[256];
-  if (lb + 1 > 256) return max_distance + 1;
+  usize previous_previous[OSA_ROW_WIDTH];
+  usize previous[OSA_ROW_WIDTH];
+  usize current[OSA_ROW_WIDTH];
 
   for (usize j = 0; j <= lb; j++) previous[j] = j;
   for (usize i = 1; i <= la; i++) {
@@ -1011,8 +1017,8 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     if (a.length != b.length) return false;
     i32 counts[256] = {0};
     for (usize i = 0; i < a.length; i++) {
-      counts[static_cast<unsigned char>(a[i])]++;
-      counts[static_cast<unsigned char>(b[i])]--;
+      counts[static_cast<u8>(a[i])]++;
+      counts[static_cast<u8>(b[i])]--;
     }
     for (i32 count : counts)
       if (count != 0) return false;

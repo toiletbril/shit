@@ -17,6 +17,10 @@ namespace shit {
 
 namespace {
 
+/* The store keeps at most this many directories, so a long-lived shell does not
+   grow ~/.shit_dirs without bound and the per-cd rewrite stays cheap. */
+constexpr usize Z_FRECENCY_MAX = 500;
+
 /* One directory in the frecency store, its visit count and the epoch second of
    the last visit. The score weights the count by how recently it was seen. */
 struct frecency_entry
@@ -105,8 +109,15 @@ static fn write_frecency_store(const ArrayList<frecency_entry> &entries) throws
   Maybe<os::descriptor> fd =
       os::open_file_descriptor(path->text().view(), os::file_open_mode::Truncate);
   if (!fd) return;
-  Maybe<usize> written = os::write_fd(*fd, out.c_str(), out.count());
-  unused(written);
+  /* The store was just truncated, so a short write would drop entries. The write
+     loops until the whole buffer lands or the descriptor stops accepting it. */
+  usize total_written = 0;
+  while (total_written < out.count()) {
+    Maybe<usize> written =
+        os::write_fd(*fd, out.c_str() + total_written, out.count() - total_written);
+    if (!written || *written == 0) break;
+    total_written += *written;
+  }
   os::close_fd(*fd);
 }
 
@@ -149,7 +160,19 @@ fn record_directory_access(StringView directory) throws -> void
       break;
     }
   }
-  if (!found) entries.push(frecency_entry{String{directory}, 1, now});
+  if (!found) {
+    entries.push(frecency_entry{String{directory}, 1, now});
+    /* When the store overflows its bound, the least-visited directory is
+       dropped by overwriting it with the last entry and shrinking, since the
+       order of the store does not matter to the ranking. */
+    if (entries.count() > Z_FRECENCY_MAX) {
+      usize weakest = 0;
+      for (usize i = 1; i < entries.count(); i++)
+        if (entries[i].rank < entries[weakest].rank) weakest = i;
+      entries[weakest] = steal(entries[entries.count() - 1]);
+      entries.pop_back();
+    }
+  }
   write_frecency_store(entries);
 }
 

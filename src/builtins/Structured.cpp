@@ -201,9 +201,7 @@ private:
     return out;
   }
 
-  /* Decode a \uXXXX escape to UTF-8. A surrogate half is encoded on its own,
-     since a paired surrogate is rare in shell-handled JSON. */
-  fn append_unicode_escape(String &out) throws -> void
+  fn read_hex4() throws -> u32
   {
     if (m_pos + 4 > m_text.length) fail("a \\u escape is too short");
     u32 code = 0;
@@ -219,29 +217,81 @@ private:
       else
         fail("a \\u escape has a bad hex digit");
     }
+    return code;
+  }
+
+  static fn encode_utf8(u32 code, String &out) throws -> void
+  {
     if (code < 0x80) {
       out += static_cast<char>(code);
     } else if (code < 0x800) {
       out += static_cast<char>(0xC0 | (code >> 6));
       out += static_cast<char>(0x80 | (code & 0x3F));
-    } else {
+    } else if (code < 0x10000) {
       out += static_cast<char>(0xE0 | (code >> 12));
+      out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (code & 0x3F));
+    } else {
+      out += static_cast<char>(0xF0 | (code >> 18));
+      out += static_cast<char>(0x80 | ((code >> 12) & 0x3F));
       out += static_cast<char>(0x80 | ((code >> 6) & 0x3F));
       out += static_cast<char>(0x80 | (code & 0x3F));
     }
   }
 
+  /* Decode a \uXXXX escape to UTF-8, combining a high and low surrogate pair
+     into the single astral code point it encodes so an emoji round-trips as
+     valid UTF-8 rather than two invalid surrogate halves. */
+  fn append_unicode_escape(String &out) throws -> void
+  {
+    u32 code = read_hex4();
+    if (code >= 0xD800 && code <= 0xDBFF && m_pos + 1 < m_text.length &&
+        m_text[m_pos] == '\\' && m_text[m_pos + 1] == 'u')
+    {
+      m_pos += 2;
+      const u32 low = read_hex4();
+      if (low >= 0xDC00 && low <= 0xDFFF) {
+        code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+      } else {
+        /* The second escape is not a low surrogate, so the high half stands on
+           its own and the second value is encoded after it. */
+        encode_utf8(code, out);
+        code = low;
+      }
+    }
+    encode_utf8(code, out);
+  }
+
+  fn at_digit() const wontthrow -> bool
+  {
+    const char c = peek();
+    return c >= '0' && c <= '9';
+  }
+
+  /* Scan a JSON number by the grammar, so a malformed run such as a lone '-',
+     '1.2.3', or '1e' is rejected rather than stored and re-emitted as invalid
+     JSON. The source text is kept verbatim to preserve precision. */
   fn parse_number() throws -> json_value
   {
     const usize start = m_pos;
     if (peek() == '-') m_pos++;
-    while (m_pos < m_text.length) {
-      const char c = m_text[m_pos];
-      if ((c >= '0' && c <= '9') || c == '.' || c == 'e' || c == 'E' ||
-          c == '+' || c == '-')
-        m_pos++;
-      else
-        break;
+    if (peek() == '0') {
+      m_pos++;
+    } else if (at_digit()) {
+      while (at_digit()) m_pos++;
+    } else {
+      fail("a number has no integer digits");
+    }
+    if (peek() == '.') {
+      m_pos++;
+      if (!at_digit()) fail("a number has no fraction digits");
+      while (at_digit()) m_pos++;
+    }
+    if (peek() == 'e' || peek() == 'E') {
+      m_pos++;
+      if (peek() == '+' || peek() == '-') m_pos++;
+      if (!at_digit()) fail("a number has no exponent digits");
+      while (at_digit()) m_pos++;
     }
     json_value value;
     value.kind = json_value::Kind::Number;
