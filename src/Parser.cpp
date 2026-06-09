@@ -1224,6 +1224,9 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   return m_lexer.arena().create<WhileLoop>(location, condition, body, is_until);
 }
 
+static fn word_token_from_assignment(BumpArena &arena, const Assignment *a)
+    throws -> tokens::WordToken *;
+
 hot fn Parser::parse_for() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
@@ -1297,6 +1300,14 @@ hot fn Parser::parse_for() throws -> Command *
     for (;;) {
       Token *word = m_lexer.peek_shell_token();
       ASSERT(word != nullptr);
+      /* A NAME=VALUE word in the list lexes as an assignment, so it is rebuilt
+         into a plain word the way a case pattern is. */
+      if (word->kind() == Token::Kind::Assignment) {
+        m_lexer.advance_past_last_peek();
+        words.push(word_token_from_assignment(m_lexer.arena(),
+                                              static_cast<Assignment *>(word)));
+        continue;
+      }
       if (word->kind() != Token::Kind::Word) break;
       m_lexer.advance_past_last_peek();
       words.push(word);
@@ -1369,6 +1380,14 @@ hot fn Parser::parse_select() throws -> Command *
     for (;;) {
       Token *word = m_lexer.peek_shell_token();
       ASSERT(word != nullptr);
+      /* A NAME=VALUE word in the list lexes as an assignment, so it is rebuilt
+         into a plain word the way a case pattern is. */
+      if (word->kind() == Token::Kind::Assignment) {
+        m_lexer.advance_past_last_peek();
+        words.push(word_token_from_assignment(m_lexer.arena(),
+                                              static_cast<Assignment *>(word)));
+        continue;
+      }
       if (word->kind() != Token::Kind::Word) break;
       m_lexer.advance_past_last_peek();
       words.push(word);
