@@ -142,6 +142,10 @@ struct eval_state_snapshot
   usize environment_undo_mark;
 };
 
+/* Record a visit to a directory in the frecency store at ~/.shit_dirs, for the z
+   smart-cd builtin. Called after a successful cd. */
+fn record_directory_access(StringView directory) throws -> void;
+
 class EvalContext
 {
 public:

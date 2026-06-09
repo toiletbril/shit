@@ -115,6 +115,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
+    /* Track the visit for the z smart-cd builtin's frecency ranking. */
+    record_directory_access(target.text().view());
     /* cd - and a move through a nonempty CDPATH entry report the directory they
        moved to, so a script sees where it landed. A plain cd stays silent. */
     if (is_to_previous || reached_through_cdpath)
