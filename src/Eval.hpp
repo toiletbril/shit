@@ -666,6 +666,12 @@ public:
      unchanged. */
   fn capture_command_substitution(const WordSegment &segment) throws -> String;
 
+  /* The $(< file) shorthand reads the named file directly the way bash does,
+     when the substitution body is only an input redirection naming one word with
+     no command. None when the body is anything else, so the caller parses and
+     runs it normally. */
+  fn read_redirect_substitution(StringView source) throws -> Maybe<String>;
+
   /* Run a <(...) or >(...) process substitution. The text leads with the
      direction byte. A pipe is opened, the inner command runs in a forked child
      on one end, and the shell keeps the other end open and returns its /dev/fd

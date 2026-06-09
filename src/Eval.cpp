@@ -4223,9 +4223,47 @@ fn drain_command_substitution_pipe(void *raw_context) wontthrow -> void
   } catch (...) {}
 }
 
+fn EvalContext::read_redirect_substitution(StringView source) throws
+    -> Maybe<String>
+{
+  usize i = 0;
+  while (i < source.length &&
+         (source[i] == ' ' || source[i] == '\t' || source[i] == '\n'))
+    i++;
+  if (i >= source.length || source[i] != '<') return None;
+  i++;
+
+  if (AST_ARENA == nullptr) return None;
+  let lexer = Lexer{String{source.substring_of_length(i, source.length - i)},
+                    *AST_ARENA, false, None, is_bash_compatible()};
+  Token *name = lexer.next_shell_token();
+  if (name == nullptr || name->kind() != Token::Kind::Word) return None;
+  /* Anything after the single filename means this is not the bare read form, so
+     the normal parse-and-run path handles it. */
+  Token *after = lexer.next_shell_token();
+  if (after != nullptr && after->kind() != Token::Kind::EndOfFile &&
+      after->kind() != Token::Kind::Newline)
+    return None;
+
+  let const filename = expand_word_for_assignment(
+      static_cast<const tokens::WordToken *>(name)->word());
+  let content = utils::read_entire_file(filename.view());
+  /* An unreadable file yields an empty substitution, the way bash leaves
+     COMPREPLY-style reads empty rather than aborting. */
+  if (!content.has_value()) return String{};
+  let result = steal(*content);
+  while (!result.is_empty() && result.back() == '\n')
+    result.pop_back();
+  return result;
+}
+
 fn EvalContext::capture_command_substitution(const String &source) throws
     -> String
 {
+  if (Maybe<String> file = read_redirect_substitution(source.view());
+      file.has_value())
+    return steal(*file);
+
   /* Parse the inner command into the active parse arena. It coexists with the
      outer tree and is reclaimed when the arena resets. */
   if (AST_ARENA == nullptr)
@@ -4350,6 +4388,10 @@ fn EvalContext::cleanup_process_substitutions() wontthrow -> void
 fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
     -> String
 {
+  if (Maybe<String> file = read_redirect_substitution(segment.text.view());
+      file.has_value())
+    return steal(*file);
+
   if (AST_ARENA == nullptr)
     throw Error{"Command substitution outside of a parse"};
 
