@@ -221,12 +221,21 @@ fn EvalContext::append_indexed_array(StringView name,
 fn EvalContext::set_array_element(StringView name, usize index,
                                   StringView value) throws -> void
 {
-  /* The dense array model stores every slot up to the subscript, so a far
-     subscript is rejected rather than padding a huge gap into memory. bash
-     holds such an index sparsely, which this model does not. */
+  /* A subscript past the dense limit is held sparsely by its decimal key rather
+     than padding a huge gap into memory, the way bash stores an indexed array.
+     The name still reads as indexed, so an empty dense array marks it and a
+     later read consults the sparse map when the dense lookup falls short. */
   if (index > MAX_DENSE_ARRAY_INDEX) {
-    throw Error{"array subscript " + utils::uint_to_text(index) +
-                " is too large"};
+    if (is_readonly(name))
+      throw Error{"Unable to assign '" + name + "' because it is read only"};
+    m_shell_variables.erase(name);
+    if (lookup_indexed_array(name) == nullptr)
+      set_indexed_array(name, ArrayList<String>{heap_allocator()});
+    let key = String{heap_allocator(), name};
+    key.push('\x01');
+    key.append(utils::uint_to_text(index).view());
+    m_sparse_array_values.set(key.view(), value);
+    return;
   }
 
   /* An existing array is edited in place, so building one element at a time
@@ -2384,7 +2393,17 @@ fn EvalContext::apply_array_subscript(StringView name,
   }
   const i64 count = static_cast<i64>(array->count());
   if (index < 0) index += count;
-  if (index < 0 || index >= count) return String{heap_allocator()};
+  if (index < 0 || index >= count) {
+    /* A subscript past the dense end may name a sparsely-held far element. */
+    if (index >= 0) {
+      let probe = String{heap_allocator(), name};
+      probe.push('\x01');
+      probe.append(utils::uint_to_text(static_cast<usize>(index)).view());
+      if (let const *sparse = m_sparse_array_values.find(probe.view()))
+        return String{heap_allocator(), sparse->view()};
+    }
+    return String{heap_allocator()};
+  }
   return String{heap_allocator(), (*array)[static_cast<usize>(index)].view()};
 }
 

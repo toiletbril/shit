@@ -843,6 +843,10 @@ protected:
   HashMap<completion_spec> m_completion_specs{heap_allocator()};
   HashSet m_associative_names{heap_allocator()};
   HashMap<String> m_associative_values{heap_allocator()};
+  /* An indexed array element whose subscript is past the dense limit, held by
+     its name and decimal index so a sparse far subscript such as a bitmask key
+     does not pad a huge dense gap. The name still reads as indexed. */
+  HashMap<String> m_sparse_array_values{heap_allocator()};
   HashMap<bool> m_shopt_options{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
