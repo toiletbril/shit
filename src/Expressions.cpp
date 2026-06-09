@@ -871,7 +871,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      finishes, restored in reverse on every exit path. The standard fds are
      routed here so a later 2>&1 copies the descriptor its source points at now,
      in source order, rather than the one a deferred slot would place last. */
-  ArrayList<os::saved_descriptor> dup_saved_descriptors{heap_allocator()};
+  ArrayList<os::saved_descriptor> dup_saved_descriptors{cxt.scratch_allocator()};
   defer
   {
     for (usize i = dup_saved_descriptors.count(); i > 0; i--)
@@ -1162,14 +1162,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     String name;
     Maybe<String> previous_value;
   };
-  ArrayList<saved_env_var> saved_env{heap_allocator()};
+  ArrayList<saved_env_var> saved_env{cxt.scratch_allocator()};
   /* A prefix IFS=... drives the shell's own word splitting for this command,
      read by the read builtin and by every expansion in the command, which take
      it from the live separator cache rather than the environment. The effective
      separators are saved before the first such prefix and restored on exit, the
      way the prefix PATH save below reverts the resolver. */
   bool ifs_was_assigned = false;
-  String saved_ifs_separators{heap_allocator()};
+  String saved_ifs_separators{cxt.scratch_allocator()};
   /* The assignments apply left to right, each committed to the environment
      before the next is expanded, so a later value reads an earlier same-line
      one and a repeated name or a += accumulates. The previous environment
@@ -2433,7 +2433,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
          carries a parallel mask the matcher reads. A pattern token that is not
          a plain word, such as a reserved word arm, has no quoting structure and
          stays fully active. */
-      let pattern_active = ArrayList<bool>{heap_allocator()};
+      let pattern_active = ArrayList<bool>{cxt.scratch_allocator()};
       String pattern{};
       if (pattern_token->kind() == Token::Kind::Word) {
         pattern = cxt.expand_case_pattern_masked(
@@ -3029,7 +3029,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      The backups restore in reverse on every exit path, a normal return, a
      thrown diagnostic, or a pending break, continue, return, or exit that
      propagates through the child. */
-  ArrayList<os::saved_descriptor> saved_descriptors{heap_allocator()};
+  ArrayList<os::saved_descriptor> saved_descriptors{cxt.scratch_allocator()};
   defer
   {
     /* Any buffered shell output belongs on the redirected target, so it is

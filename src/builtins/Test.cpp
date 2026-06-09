@@ -312,6 +312,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   ArrayList<String> operands{};
+  operands.reserve(expression_end - 1);
   for (usize i = 1; i < expression_end; i++)
     operands.push(arguments[i]);
 

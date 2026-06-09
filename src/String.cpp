@@ -99,7 +99,10 @@ fn String::append(StringView other) throws -> void
 fn String::reserve(usize needed) throws -> void
 {
   if (needed + 1 <= m_capacity) return;
-  usize new_capacity = m_capacity * 2;
+  /* A small buffer quadruples so a string built one append at a time leaves the
+     inline size in one realloc rather than several, while a large buffer doubles
+     to keep the overshoot bounded. */
+  usize new_capacity = m_capacity < 64 ? m_capacity * 4 : m_capacity * 2;
   while (new_capacity < needed + 1)
     new_capacity *= 2;
   char *fresh = m_allocator.alloc_array<char>(new_capacity);

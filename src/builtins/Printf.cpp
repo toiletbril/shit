@@ -198,6 +198,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const &fmt = ec.args()[format_index];
   ArrayList<String> operands{};
+  operands.reserve(ec.args().count() - (format_index + 1));
   for (usize i = format_index + 1; i < ec.args().count(); i++)
     operands.push(ec.args()[i]);
 

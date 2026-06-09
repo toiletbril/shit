@@ -42,6 +42,7 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* ArrayList has no erase, so the kept tail is copied into a fresh list from
      index count onward. */
   ArrayList<String> shifted{heap_allocator()};
+  shifted.reserve(params.count() - static_cast<usize>(count));
   for (usize i = static_cast<usize>(count); i < params.count(); i++)
     shifted.push(String{heap_allocator(), params[i]});
   cxt.set_positional_params(steal(shifted));

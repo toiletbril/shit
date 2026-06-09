@@ -127,7 +127,12 @@ public:
   void reserve(usize needed)
   {
     if (needed <= m_capacity) return;
-    usize new_capacity = m_capacity == 0 ? 8 : m_capacity * 2;
+    /* A small list quadruples so a list grown one push at a time reaches a
+       useful size in fewer reallocations, while a large list doubles to keep the
+       overshoot bounded. */
+    usize new_capacity = m_capacity == 0 ? 16
+                         : m_capacity < 64 ? m_capacity * 4
+                                           : m_capacity * 2;
     while (new_capacity < needed)
       new_capacity *= 2;
     T *fresh = m_allocator.alloc_array<T>(new_capacity);
