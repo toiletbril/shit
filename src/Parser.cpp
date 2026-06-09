@@ -1454,6 +1454,18 @@ static fn word_token_from_assignment(BumpArena &arena,
   return arena.create<tokens::WordToken>(a->source_location(), steal(word));
 }
 
+/* A keyword such as done or for is a plain literal word when it sits in a case
+   pattern, so it is rebuilt into a word token from its source text. */
+static fn word_token_from_raw(BumpArena &arena, StringView text,
+                              SourceLocation location) throws
+    -> tokens::WordToken *
+{
+  Word word{};
+  word.segments.push(
+      WordSegment{WordSegment::Kind::UnquotedText, String{text}, false});
+  return arena.create<tokens::WordToken>(location, steal(word));
+}
+
 hot fn Parser::parse_case() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
@@ -1509,9 +1521,19 @@ hot fn Parser::parse_case() throws -> Command *
         pattern = word_token_from_assignment(
             m_lexer.arena(), static_cast<Assignment *>(pattern));
       } else if (pattern->kind() != Token::Kind::Word) {
-        throw ErrorWithLocationAndDetails{
-            location, "Unterminated case", pattern->source_location(),
-            "Expected a pattern to start an arm, or 'esac' to end the case"};
+        /* A keyword such as done used as a literal pattern, the way ble.sh
+           writes (done), is taken by its source text rather than rejected. */
+        const SourceLocation pattern_location = pattern->source_location();
+        const StringView text = m_lexer.source().substring_of_length(
+            pattern_location.position, pattern_location.length);
+        if (KEYWORDS.find(text).has_value()) {
+          pattern =
+              word_token_from_raw(m_lexer.arena(), text, pattern_location);
+        } else {
+          throw ErrorWithLocationAndDetails{
+              location, "Unterminated case", pattern_location,
+              "Expected a pattern to start an arm, or 'esac' to end the case"};
+        }
       }
 
       patterns.push(pattern);
