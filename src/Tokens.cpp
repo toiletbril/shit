@@ -141,9 +141,19 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   if (name_length == 0) return shit::None;
 
   if (!lexer::is_variable_name_start(first.text[0])) return shit::None;
-  for (usize i = 1; i < name_length; i++) {
-    if (!lexer::is_variable_name(first.text[i])) return shit::None;
+  usize name_cursor = 1;
+  while (name_cursor < name_length &&
+         lexer::is_variable_name(first.text[name_cursor]))
+    name_cursor++;
+  /* A name may carry a [subscript] for a bash array element assignment, such as
+     the a[1] in a[1]=x. The subscript is non-empty and runs to the closing
+     bracket at the end of the name. */
+  if (name_cursor < name_length && first.text[name_cursor] == '[') {
+    if (first.text[name_length - 1] != ']' || name_length - name_cursor < 3)
+      return shit::None;
+    name_cursor = name_length;
   }
+  if (name_cursor != name_length) return shit::None;
 
   const let name_view = first.text.substring_of_length(0, name_length);
   String name{name_view};

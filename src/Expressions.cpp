@@ -483,6 +483,36 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_last_exit_status(0);
   let value = cxt.expand_word_for_assignment(m_assignment->value_word());
 
+  /* a[i]=v and a[i]+=v assign one array element. The subscript is arithmetic
+     and a negative index counts from the current end. */
+  const StringView key_view = m_assignment->key().view();
+  if (let const bracket = key_view.find_character('[');
+      bracket.has_value() && key_view[key_view.length - 1] == ']')
+  {
+    const StringView array_name = key_view.substring_of_length(0, *bracket);
+    const StringView subscript = key_view.substring_of_length(
+        *bracket + 1, key_view.length - *bracket - 2);
+    i64 index = cxt.evaluate_arithmetic(subscript);
+    if (index < 0) {
+      if (let const *array = cxt.lookup_indexed_array(array_name))
+        index += static_cast<i64>(array->count());
+    }
+    if (index < 0)
+      throw ErrorWithLocation{source_location(),
+                              array_name + ": bad array subscript"};
+    if (m_assignment->is_append()) {
+      String existing{heap_allocator()};
+      if (let const *array = cxt.lookup_indexed_array(array_name))
+        if (static_cast<usize>(index) < array->count())
+          existing = String{(*array)[static_cast<usize>(index)].view()};
+      existing += value;
+      value = steal(existing);
+    }
+    cxt.set_array_element(array_name, static_cast<usize>(index), value.view());
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
   /* The append form NAME+=VALUE prepends the current value of NAME, treating an
      unset name as empty, so the store receives the concatenation. */
   if (m_assignment->is_append()) {

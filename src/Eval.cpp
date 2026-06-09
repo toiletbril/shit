@@ -1556,6 +1556,28 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     if (name == "@" || name == "*")
       return String{heap_allocator(),
                     utils::uint_to_text(m_positional_params.count())};
+
+    /* ${#a[@]} is the number of elements, while ${#a[i]} is the length of one
+       element. A scalar counts as a single element. */
+    if (let const bracket = name.find_character('[');
+        bracket.has_value() && *bracket > 0 && name[name.length - 1] == ']' &&
+        lexer::is_variable_name_start(name[0]))
+    {
+      const StringView array_name = name.substring_of_length(0, *bracket);
+      const StringView subscript =
+          name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
+      if (subscript == "@" || subscript == "*") {
+        if (let const *array = lookup_indexed_array(array_name))
+          return String{heap_allocator(), utils::uint_to_text(array->count())};
+        return String{heap_allocator(),
+                      utils::uint_to_text(
+                          get_variable_value(array_name).has_value() ? 1 : 0)};
+      }
+      return String{heap_allocator(),
+                    utils::uint_to_text(
+                        apply_array_subscript(array_name, subscript).length())};
+    }
+
     let const value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
       throw Error{name + ": parameter not set"};
@@ -1971,6 +1993,27 @@ fn EvalContext::apply_array_subscript(StringView name,
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 {
   if (body.is_empty()) return String{heap_allocator()};
+
+  /* ${!a[@]} and ${!a[*]} list the subscripts of an array, zero through the
+     last index, the way bash enumerates its keys. */
+  if (body.length >= 4 && body[body.length - 1] == ']' &&
+      (body[body.length - 2] == '@' || body[body.length - 2] == '*') &&
+      body[body.length - 3] == '[' && lexer::is_variable_name_start(body[0]))
+  {
+    const StringView array_name = body.substring_of_length(0, body.length - 3);
+    let out = String{heap_allocator()};
+    if (let const *array = lookup_indexed_array(array_name)) {
+      for (usize i = 0; i < array->count(); i++) {
+        if (i > 0) out.push(' ');
+        out.append(utils::uint_to_text(i).view());
+      }
+      return out;
+    }
+    /* A scalar has the single index zero, an unset name has none. */
+    if (get_variable_value(array_name).has_value())
+      return String{heap_allocator(), "0"};
+    return out;
+  }
 
   const char last = body[body.length - 1];
   if (last == '*' || last == '@') {
