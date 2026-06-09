@@ -523,6 +523,25 @@ static fn prompt_hostname(bool need_full) throws -> String
   return String{host.view().substring_of_length(0, dot)};
 }
 
+/* Collapse a leading home directory to ~ the way bash does, only when the home
+   prefix ends on a path boundary so HOME=/home/sd and cwd=/home/sderp keeps the
+   full path rather than rendering ~erp. */
+static fn collapse_home_prefix(StringView path) throws -> String
+{
+  let shown = String{path};
+  Maybe<Path> home = os::get_home_directory();
+  if (home && shown.starts_with(home->text()) &&
+      (shown.length() == home->count() ||
+       shown.view()[home->count()] == '/'))
+  {
+    let collapsed = String{};
+    collapsed += "~";
+    collapsed += shown.substring(home->count());
+    shown = steal(collapsed);
+  }
+  return shown;
+}
+
 static fn expand_prompt_escapes(StringView prompt, StringView user,
                                 StringView working_directory,
                                 EvalContext &context) throws -> String
@@ -557,30 +576,26 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     /* \h is the hostname up to the first dot, \H is the full name. */
     case 'h': out += prompt_hostname(false); break;
     case 'H': out += prompt_hostname(true); break;
-    case 'w': {
-      let shown = String{working_directory};
-      Maybe<Path> home = os::get_home_directory();
-      /* The home prefix collapses to ~ only when it ends on a path boundary, so
-         HOME=/home/sd and cwd=/home/sderp keeps the full path rather than
-         rendering ~erp. The byte after the prefix must be a separator or the
-         end of the string. */
-      if (home && shown.starts_with(home->text()) &&
-          (shown.length() == home->count() ||
-           shown.view()[home->count()] == '/'))
-      {
-        let collapsed = String{};
-        collapsed += "~";
-        collapsed += shown.substring(home->count());
-        shown = steal(collapsed);
-      }
-      out += shown;
-    } break;
+    case 'w': out += collapse_home_prefix(working_directory); break;
     case 'W': out += Path{working_directory}.filename(); break;
-    /* The working directory shortened from the front with an ellipsis, the form
-       the default prompt uses so a deep path stays short. */
+    /* The working directory with the home collapsed to ~ and then shortened from
+       the front with an ellipsis, the form the default prompt uses so a deep path
+       stays short. */
     case 'P':
-      out += shorten_path_with_ellipsis(working_directory, PROMPT_PWD_LENGTH);
+      out += shorten_path_with_ellipsis(
+          collapse_home_prefix(working_directory).view(), PROMPT_PWD_LENGTH);
       break;
+    /* The git branch wrapped in parentheses with a trailing space when the cwd
+       is inside a work tree, empty otherwise, the form the default prompt uses.
+       The bare \g escape stays the unwrapped name for a custom prompt. */
+    case 'G': {
+      let const branch = git_branch();
+      if (!branch.is_empty()) {
+        out += "(";
+        out += branch.view();
+        out += ") ";
+      }
+    } break;
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
     case 'r': out += '\r'; break;
@@ -662,7 +677,7 @@ fn default_prompt_template() -> String
   } else {
     template_string += "\\P";
   }
-  template_string += " \\$ ";
+  template_string += " \\G\\$ ";
   return template_string;
 }
 
@@ -881,7 +896,7 @@ fn default_prompt_template() -> String
   } else {
     template_string += "\\P";
   }
-  template_string += " \\$ ";
+  template_string += " \\G\\$ ";
   return template_string;
 }
 
