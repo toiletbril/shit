@@ -105,6 +105,10 @@ public:
     return const_cast<Value *>(static_cast<const HashMap *>(this)->find(key));
   }
 
+  /* The allocator the table owns, handed to a value built for it so a managed
+     insert keeps the value on the same arena or heap as the table. */
+  pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
+
   /* Store a value the table owns by move. */
   hot fn set(StringView key, Value value) throws -> void { set_value(key, steal(value)); }
 

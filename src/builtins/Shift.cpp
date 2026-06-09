@@ -44,7 +44,7 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
   let shifted = ArrayList<String>{heap_allocator()};
   shifted.reserve(params.count() - static_cast<usize>(count));
   for (usize i = static_cast<usize>(count); i < params.count(); i++)
-    shifted.push(String{heap_allocator(), params[i]});
+    shifted.push_managed(params[i]);
   cxt.set_positional_params(steal(shifted));
   return 0;
 }

@@ -89,7 +89,7 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       i++;
       continue;
     }
-    commands.push(String{heap_allocator(), arg});
+    commands.push_managed(arg);
     i++;
   }
 

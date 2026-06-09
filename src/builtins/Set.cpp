@@ -197,7 +197,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const &arg = args[i];
 
     if (collecting_operands) {
-      operands.push(String{heap_allocator(), arg});
+      operands.push_managed(arg);
       continue;
     }
 
@@ -254,7 +254,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
        positional parameters. */
     collecting_operands = true;
     should_rebind = true;
-    operands.push(String{heap_allocator(), arg});
+    operands.push_managed(arg);
   }
 
   if (should_rebind) cxt.set_positional_params(steal(operands));

@@ -46,9 +46,9 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let command_args = ArrayList<String>{};
-  command_args.push(String{heap_allocator(), "newgrp"});
+  command_args.push_managed("newgrp");
   for (usize i = 1; i < args.count(); i++)
-    command_args.push(String{heap_allocator(), args[i]});
+    command_args.push_managed(args[i]);
 
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(found[0]),

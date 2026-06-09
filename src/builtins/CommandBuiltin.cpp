@@ -113,7 +113,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      resolves against a builtin or the PATH and never a function. */
   let operand_args = ArrayList<String>{};
   for (usize i = 1; i < args.count(); i++)
-    operand_args.push(String{heap_allocator(), args[i]});
+    operand_args.push_managed(args[i]);
 
   /* An operand that does not resolve is non-fatal, the same as a bare command
      word. Report it to stderr and return 127 rather than letting the not-found

@@ -259,9 +259,9 @@ fn EvalContext::set_array_element(StringView name, usize index,
    */
   let elements = ArrayList<String>{heap_allocator()};
   if (let const *scalar = m_shell_variables.find(name))
-    elements.push(String{heap_allocator(), scalar->view()});
+    elements.push_managed(scalar->view());
   while (elements.count() <= index)
-    elements.push(String{heap_allocator()});
+    elements.push_managed();
   elements[index] = String{heap_allocator(), value};
   set_indexed_array(name, steal(elements));
 }
@@ -350,7 +350,7 @@ fn EvalContext::associative_keys(StringView name) const throws
     unused(value);
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
-      keys.push(String{heap_allocator(), composite.substring(prefix.count())});
+      keys.push_managed(composite.substring(prefix.count()));
   });
   return keys;
 }
@@ -363,7 +363,7 @@ fn EvalContext::associative_values(StringView name) const throws
   m_associative_values.for_each([&](StringView composite, const String &value) {
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
-      values.push(String{heap_allocator(), value.view()});
+      values.push_managed(value.view());
   });
   return values;
 }
@@ -378,7 +378,7 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
   m_associative_values.for_each([&](StringView composite, const String &) {
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
-      to_erase.push(String{heap_allocator(), composite});
+      to_erase.push_managed(composite);
   });
   for (const String &composite : to_erase)
     m_associative_values.erase(composite.view());
@@ -897,7 +897,7 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
   let out = ArrayList<String>{};
   out.reserve(m_readonly_names.count());
   m_readonly_names.for_each(
-      [&](StringView name) { out.push(String{heap_allocator(), name}); });
+      [&](StringView name) { out.push_managed(name); });
   utils::sort_ascending(out);
   return out;
 }
@@ -974,7 +974,7 @@ fn EvalContext::declare_local(StringView name) throws -> void
       let copy = ArrayList<String>{heap_allocator()};
       copy.reserve(array->count());
       for (const String &element : *array)
-        copy.push(String{heap_allocator(), element.view()});
+        copy.push_managed(element.view());
       previous_array = steal(copy);
     }
 
@@ -2434,7 +2434,7 @@ fn EvalContext::collect_array_elements(StringView name) const throws
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
     out.reserve(array->count());
     for (const String &element : *array)
-      out.push(String{heap_allocator(), element.view()});
+      out.push_managed(element.view());
     return out;
   }
   /* A plain scalar reads as a one-element array, the way bash treats $a as
@@ -2452,7 +2452,7 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
   auto consider = [&](StringView candidate) throws {
     if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
       seen.add(candidate);
-      names.push(String{heap_allocator(), candidate});
+      names.push_managed(candidate);
     }
   };
   m_shell_variables.for_each([&](StringView variable_name, const String &v) {
@@ -4844,7 +4844,7 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
   let previous_shell_name = String{m_shell_name};
   let params = ArrayList<String>{};
   for (usize i = 1; i < ec.args().count(); i++)
-    params.push(String{heap_allocator(), ec.args()[i].view()});
+    params.push_managed(ec.args()[i].view());
 
   /* The script body is its own source, so an error inside it renders against
      this text. */
@@ -5010,7 +5010,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   let comp_words = ArrayList<String>{};
   comp_words.reserve(words.count());
   for (const String &word : words)
-    comp_words.push(String{heap_allocator(), word.view()});
+    comp_words.push_managed(word.view());
   set_indexed_array("COMP_WORDS", steal(comp_words));
   set_shell_variable("COMP_CWORD", utils::int_to_text(static_cast<i64>(cword)));
   set_shell_variable("COMP_LINE", line);
@@ -5062,7 +5062,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   {
     result.reserve(reply->count());
     for (const String &entry : *reply)
-      result.push(String{heap_allocator(), entry.view()});
+      result.push_managed(entry.view());
   }
   return result;
 }
@@ -5403,7 +5403,7 @@ fn brace_group_alternatives(StringView content) throws
           heap_allocator(), content.substring_of_length(start, comma - start)});
       start = comma + 1;
     }
-    alternatives.push(String{heap_allocator(), content.substring(start)});
+    alternatives.push_managed(content.substring(start));
     return alternatives;
   }
 
@@ -5461,7 +5461,7 @@ fn brace_expand_text(StringView text, usize depth = 0) throws
   let results = ArrayList<String>{heap_allocator()};
   let const group = find_brace_group(text);
   if (!group.has_value() || depth >= MAX_BRACE_DEPTH) {
-    results.push(String{heap_allocator(), text});
+    results.push_managed(text);
     return results;
   }
 

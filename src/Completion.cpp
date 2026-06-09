@@ -560,7 +560,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     if (status != 124) {
       let loaded = ArrayList<String>{};
       for (const String &entry : reply)
-        loaded.push(String{heap_allocator(), entry.view()});
+        loaded.push_managed(entry.view());
       if (loaded.is_empty() && def->use_default) return None;
       return loaded;
     }
@@ -594,7 +594,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     let const reply = context.run_completion_function(spec->function_name.view(),
                                                       words, cword, line, cursor);
     for (const String &entry : reply)
-      candidates.push(String{heap_allocator(), entry.view()});
+      candidates.push_managed(entry.view());
   }
 
   if (candidates.is_empty() && spec->use_default) return None;

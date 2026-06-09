@@ -49,7 +49,7 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (name == "-l" || name == "--list") {
     let sorted = ArrayList<String>{};
     for (const String &builtin_name : builtin_names())
-      sorted.push(String{heap_allocator(), builtin_name});
+      sorted.push_managed(builtin_name);
     utils::sort_ascending(sorted);
 
     usize longest = 0;
@@ -90,7 +90,7 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      both skipped. */
   let forwarded = ArrayList<String>{};
   for (usize i = 1; i < ec.args().count(); i++)
-    forwarded.push(String{heap_allocator(), ec.args()[i]});
+    forwarded.push_managed(ec.args()[i]);
   let sub = ExecContext::from_resolved(ec.source_location(),
                                        ResolvedCommand::from_builtin(*target),
                                        steal(forwarded));

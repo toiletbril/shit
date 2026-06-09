@@ -83,7 +83,7 @@ FlagManyStrings::FlagManyStrings(char short_name, StringView long_name,
 
 fn FlagManyStrings::append(StringView v) throws -> void
 {
-  m_values.push(String{heap_allocator(), v});
+  m_values.push_managed(v);
 }
 
 pure fn FlagManyStrings::is_empty() const wontthrow -> bool
@@ -224,7 +224,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
          the script as a positional parameter, not to the shell, the way
          `sh script -x` passes -x to the script. */
       const bool is_program_name = args.is_empty();
-      args.push(String{heap_allocator(), StringView{argv[i]}});
+      args.push_managed(StringView{argv[i]});
       if (!is_program_name) ignore_rest = true;
       continue;
     }
@@ -244,7 +244,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       if (is_long)
         ignore_rest = true;
       else
-        args.push(String{heap_allocator(), StringView{argv[i]}});
+        args.push_managed(StringView{argv[i]});
 
       continue;
     }

@@ -98,6 +98,19 @@ public:
     m_length++;
   }
 
+  /* The allocator the list owns, handed to an element so a transient pushed onto
+     a scratch-arena list lives on the arena rather than the heap. */
+  pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
+
+  /* Build the element with the list's own allocator and push it, so a call site
+     never spells out the allocator and a scratch list stops minting heap values.
+     The element type is constructed from the allocator and the forwarded
+     arguments, the way String takes an allocator and a view. */
+  template <typename... Args> hot fn push_managed(Args &&...args) throws -> void
+  {
+    push(T{m_allocator, static_cast<Args &&>(args)...});
+  }
+
   /* Destroy and drop the last element. The caller guarantees the list is not
      empty. */
   fn pop_back() wontthrow -> void

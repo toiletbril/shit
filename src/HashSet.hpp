@@ -14,6 +14,9 @@ class HashSet
 public:
   explicit HashSet(Allocator allocator) : m_map(allocator) {}
 
+  /* The allocator the set owns, taken from the backing map. */
+  pure fn allocator() const wontthrow -> Allocator { return m_map.allocator(); }
+
   hot fn add(StringView key) throws -> void { m_map.set(key, Nothing{}); }
 
   cold fn remove(StringView key) throws -> void { m_map.erase(key); }
