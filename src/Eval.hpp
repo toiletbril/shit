@@ -257,6 +257,13 @@ public:
   fn associative_keys(StringView name) const throws -> ArrayList<String>;
   fn associative_values(StringView name) const throws -> ArrayList<String>;
 
+  /* Every element of an array name as a list, the indexed elements in order, the
+     associative values in store order, or a one-element list for a plain scalar.
+     A "${a[@]}" expansion emits one field per element from this, the way "$@"
+     keeps each positional parameter its own field. An unset name yields an empty
+     list. */
+  fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
+
   /* Log a name's current process-environment value before a write that outlives
      the current statement, so a subshell restore can revert it. Called before
      an export or an allexport assignment writes the environment. Outside a

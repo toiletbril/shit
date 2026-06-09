@@ -209,6 +209,11 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
+  /* NO_COLOR is honored live, so a runtime export NO_COLOR=1 draws the line
+     plain on the next keystroke. The callback is registered unconditionally and
+     gated here rather than at startup, so the decision follows the environment
+     for the whole session. */
+  if (!shit::colors::stdout_wants_color()) return 0;
 
   try {
     const usize byte_length = std::strlen(buffer);
@@ -283,11 +288,10 @@ fn enable_completion(shit::EvalContext &context) -> void
 {
   COMPLETION_CONTEXT = &context;
   ::tl_set_complete_callback(shit_completion_callback);
-  /* The highlighter shares the completion context and the same enable path, so
-     the first word is colored only when completion is on, and a non-tty or the
-     -T flag leaves the line plain. */
-  if (shit::colors::stdout_wants_color())
-    ::tl_set_highlight_callback(shit_highlight_callback);
+  /* The highlighter is registered unconditionally and gates itself on the live
+     color decision, so a runtime change to NO_COLOR takes effect without
+     re-registering. The callback returns no spans when color is off. */
+  ::tl_set_highlight_callback(shit_highlight_callback);
 }
 
 fn disable_completion() -> void
@@ -725,6 +729,31 @@ static fn unguard_prompt_backslashes(StringView expanded) throws -> String
   return out;
 }
 
+/* Remove the ANSI SGR color sequences, an escape followed by '[' then the
+   parameters then 'm', from the rendered prompt. NO_COLOR is honored live by
+   running this on the finished prompt when color is off, so the baked default
+   color and a user PS1's color both fall away. A non-color CSI sequence, one
+   that ends in a byte other than 'm', is left in place. */
+static fn strip_ansi_color(StringView text) throws -> String
+{
+  String out{};
+  usize i = 0;
+  while (i < text.length) {
+    if (text[i] == '\x1b' && i + 1 < text.length && text[i + 1] == '[') {
+      usize end = i + 2;
+      while (end < text.length && (text[end] < '@' || text[end] > '~'))
+        end++;
+      if (end < text.length && text[end] == 'm') {
+        i = end + 1;
+        continue;
+      }
+    }
+    out.push(text[i]);
+    i++;
+  }
+  return out;
+}
+
 fn build_prompt(EvalContext &context) -> String
 {
   String full_pwd{Path::current_directory().text()};
@@ -757,9 +786,12 @@ fn build_prompt(EvalContext &context) -> String
      a command substitution here must not clobber $? for the next command. The
      backslash escapes are decoded last on either path, inserting the cwd, the
      user, and the clock as literal text the expansion never sees. */
-  if (ps1_template.view() == PROMPT_CACHE_KEY.view())
-    return expand_prompt_escapes(PROMPT_CACHE_VALUE.view(), CACHED_USER.view(),
-                                 full_pwd.view(), context);
+  if (ps1_template.view() == PROMPT_CACHE_KEY.view()) {
+    String rendered = expand_prompt_escapes(
+        PROMPT_CACHE_VALUE.view(), CACHED_USER.view(), full_pwd.view(), context);
+    if (!colors::stdout_wants_color()) return strip_ansi_color(rendered.view());
+    return rendered;
+  }
 
   const i32 saved_status = context.last_exit_status();
   String guarded = guard_prompt_backslashes(ps1_template.view());
@@ -777,8 +809,10 @@ fn build_prompt(EvalContext &context) -> String
   context.set_last_exit_status(saved_status);
   PROMPT_CACHE_KEY = ps1_template;
   PROMPT_CACHE_VALUE = expanded;
-  return expand_prompt_escapes(expanded.view(), CACHED_USER.view(),
-                               full_pwd.view(), context);
+  String rendered = expand_prompt_escapes(expanded.view(), CACHED_USER.view(),
+                                          full_pwd.view(), context);
+  if (!colors::stdout_wants_color()) return strip_ansi_color(rendered.view());
+  return rendered;
 }
 
 } /* namespace toiletline */

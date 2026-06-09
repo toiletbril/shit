@@ -262,6 +262,11 @@ fn get_shell_process_id() wontthrow -> i64
   return static_cast<i64>(PARENT_SHELL_PID);
 }
 
+fn is_running_setuid() wontthrow -> bool
+{
+  return geteuid() != getuid() || getegid() != getgid();
+}
+
 fn process_id_of(process p) wontthrow -> i64 { return static_cast<i64>(p); }
 
 fn is_stdin_a_tty() wontthrow -> bool { return isatty(SHIT_STDIN); }
@@ -1373,6 +1378,10 @@ fn is_child_process() -> bool
 }
 
 fn get_shell_process_id() -> i64 { return static_cast<i64>(PARENT_SHELL_PID); }
+
+/* Windows has no setuid or setgid notion, so the shell is never privileged in
+   this sense and always reads its config. */
+fn is_running_setuid() wontthrow -> bool { return false; }
 
 fn process_id_of(process p) -> i64 { return static_cast<i64>(GetProcessId(p)); }
 

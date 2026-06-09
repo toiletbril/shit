@@ -249,6 +249,13 @@ fn is_child_process() wontthrow -> bool;
 /* The process id of the shell itself, for $$. */
 fn get_shell_process_id() wontthrow -> i64;
 
+/* Whether the shell runs with an effective user or group id that differs from
+   its real one, the setuid or setgid case. The shell skips its startup config
+   files then, so a file an attacker controls cannot run with the raised
+   privileges, the way bash enters privileged mode. A platform without the
+   distinction reports false. */
+fn is_running_setuid() wontthrow -> bool;
+
 /* The numeric process id of a spawned process, for $!. */
 fn process_id_of(process p) wontthrow -> i64;
 

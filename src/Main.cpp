@@ -63,6 +63,16 @@ FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
      "reported and evaluation begins sooner.");
 FLAG(LOGIN, Bool, 'l', "login",
      "Act as a login shell and source the profiles.");
+FLAG(INIT_AS_BASH, Bool, 'L', "init-as-bash",
+     "Initialize as bash, sourcing the bash config files in bash mode, then "
+     "snap to the default mode with all diagnostics at the interactive prompt. "
+     "Sources the bash login scripts only when combined with -l. The "
+     "SHIT_INIT_AS_BASH environment variable enables this when set.");
+FLAG(PRIVILEGED, Bool, 'p', "privileged",
+     "Run in privileged mode and skip every startup config file, so a config a "
+     "less-privileged user controls cannot run with raised privileges. Turned "
+     "on automatically when the effective and the real user or group id differ, "
+     "the setuid or setgid case.");
 
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
@@ -279,8 +289,14 @@ static fn run_script_contents(const String &script_contents,
        either mode and reports every error as a warning, and --no-diagnostics
        always skips it. The default mode keeps the analysis, so the diagnostics
        stay intact. */
+    /* The compat decision reads the live context rather than the static mode
+       helper, so init-as-bash, which runs the config in bash mode then turns
+       bash mode off at the interactive seam, flips the analysis stage back on
+       for the session. The context fields are seeded from the same helpers at
+       startup, so a non-snapping run behaves exactly as before. */
     let const run_analysis =
-        (!should_run_in_compat_mode() || FLAG_WARNINGS.is_enabled()) &&
+        (!(context.is_bash_compatible() || context.is_posix_mode()) ||
+         FLAG_WARNINGS.is_enabled()) &&
         !FLAG_SUPPRESS_DIAGNOSTICS.is_enabled();
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
@@ -341,17 +357,37 @@ static fn run_script_contents(const String &script_contents,
 }
 
 /* Read a whole file and run it in the given context. A missing file is not an
-   error, since a login shell sources profiles that may not exist. */
+   error, since a login shell sources profiles that may not exist. Returns
+   whether the file existed and ran, so a caller that wants the first existing of
+   several candidates, the way bash picks one login profile, can stop after the
+   first hit. */
 static fn source_file(const Path &path, EvalContext &context,
-                      BumpArena &ast_arena) -> void
+                      BumpArena &ast_arena) -> bool
 {
   Maybe<String> contents = utils::read_entire_file(path.text());
-  if (!contents) return;
+  if (!contents) return false;
 
   /* The profile path names the source, so a parse error in it and a backtrace
      caret for a file it sources both carry the file rather than a bare
      line:col. */
   run_script_contents(*contents, context, ast_arena, path.text().view());
+  return true;
+}
+
+/* Source the bash login files in bash login order, /etc/profile then the first
+   existing of ~/.bash_profile, ~/.bash_login, ~/.profile. A login shell in bash
+   mode and an init-as-bash login shell both read this set. */
+static fn source_bash_login_files(EvalContext &context,
+                                  BumpArena &ast_arena) throws -> void
+{
+  source_file(Path{"/etc/profile"}, context, ast_arena);
+  if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
+    for (const char *name : {".bash_profile", ".bash_login", ".profile"}) {
+      Path candidate = *home;
+      candidate.push_component(name);
+      if (source_file(candidate, context, ast_arena)) break;
+    }
+  }
 }
 
 } /* namespace shit */
@@ -430,6 +466,24 @@ fn main(int argc, char **argv) -> int
     return *code;
 
   if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
+
+  /* init-as-bash initializes from the bash config files in bash mode, then snaps
+     to the default at the interactive prompt. The SHIT_INIT_AS_BASH environment
+     variable enables it when set and not empty, the same as passing -L. */
+  bool init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
+  if (!init_as_bash) {
+    if (shit::Maybe<shit::String> env =
+            shit::os::get_environment_variable("SHIT_INIT_AS_BASH");
+        env.has_value() && !env->is_empty())
+      init_as_bash = true;
+  }
+
+  /* A privileged shell skips every startup config file, so a profile or rc that
+     a less-privileged user controls cannot run with the raised privileges. The
+     -p flag forces it, and a setuid or setgid invocation turns it on by
+     default. */
+  const bool is_privileged =
+      FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
 
   /* Both stdin and interactive flags are enabled, but there will be only the
    * last man standing. */
@@ -542,6 +596,10 @@ fn main(int argc, char **argv) -> int
   context.set_failglob(!shit::should_run_in_compat_mode());
   context.set_bash_compatible(shit::should_run_in_bash_mode());
   context.set_posix_mode(shit::should_run_in_posix_mode());
+  /* init-as-bash runs the bash config files in bash mode, so the parser accepts
+     their bash syntax and the analysis stage stays off while they source. The
+     interactive seam below snaps this back off for the session itself. */
+  if (init_as_bash) context.set_bash_compatible(true);
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);
@@ -566,7 +624,7 @@ fn main(int argc, char **argv) -> int
      name and takes a working branch rather than a fragile fallback. A bash
      invocation advertises BASH_VERSION, every other mode advertises the sh and
      dash names. The shit version above stays present in every mode. */
-  if (shit::should_run_in_bash_mode()) {
+  if (shit::should_run_in_bash_mode() || init_as_bash) {
     context.set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
     /* $BASH is the path the shell was invoked with, the way bash records the
        executable that started it. */
@@ -624,61 +682,104 @@ fn main(int argc, char **argv) -> int
   shit::BumpArena function_arena{};
   shit::FUNCTION_ARENA = &function_arena;
 
-  /* A login shell reads /etc/profile and ~/.profile if they exist, then the
-     file named by ENV when that is set. A missing file is silently skipped. */
-  if (is_login_shell) {
-    source_file(shit::Path{"/etc/profile"}, context, ast_arena);
-    if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-        home.has_value())
-    {
-      shit::Path profile = *home;
-      profile.push_component(".profile");
-      source_file(profile, context, ast_arena);
+  if (is_privileged) {
+    /* A privileged shell sources nothing, the way bash's privileged mode leaves
+       the profiles and rc files unread. */
+  } else if (init_as_bash) {
+    /* init-as-bash sources the bash config files in bash mode so an existing
+       bash setup loads. With -l it reads /etc/profile then the first existing of
+       ~/.bash_profile, ~/.bash_login, and ~/.profile, the bash login order. An
+       interactive shell reads ~/.bashrc. The shit rc and the POSIX ENV are
+       skipped, since the intent is to initialize from the bash files. */
+    if (is_login_shell) source_bash_login_files(context, ast_arena);
+    if (should_be_interactive) {
+      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+          home.has_value())
+      {
+        shit::Path bashrc = *home;
+        bashrc.push_component(".bashrc");
+        source_file(bashrc, context, ast_arena);
+      }
     }
-    if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
-        env.has_value() && !env->is_empty())
-    {
-      source_file(shit::Path{env->view()}, context, ast_arena);
+  } else {
+    /* A login shell reads the login files of the shell it emulates. Bash mode
+       reads the bash login order, so --bash-compatible -l or a bash invocation
+       gets the bash profiles. POSIX mode reads the strict dash login order,
+       /etc/profile then ~/.profile, while the file named by ENV is an
+       interactive feature read below rather than part of the login set. The
+       default shit mode keeps /etc/profile, ~/.profile, and ENV. A missing file
+       is silently skipped. */
+    if (is_login_shell && shit::should_run_in_bash_mode()) {
+      source_bash_login_files(context, ast_arena);
+    } else if (is_login_shell && shit::should_run_in_posix_mode()) {
+      source_file(shit::Path{"/etc/profile"}, context, ast_arena);
+      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+          home.has_value())
+      {
+        shit::Path profile = *home;
+        profile.push_component(".profile");
+        source_file(profile, context, ast_arena);
+      }
+    } else if (is_login_shell) {
+      source_file(shit::Path{"/etc/profile"}, context, ast_arena);
+      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+          home.has_value())
+      {
+        shit::Path profile = *home;
+        profile.push_component(".profile");
+        source_file(profile, context, ast_arena);
+      }
+      if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
+          env.has_value() && !env->is_empty())
+      {
+        source_file(shit::Path{env->view()}, context, ast_arena);
+      }
     }
-  }
 
-  /* An interactive shell reads ~/.shitrc, the home for interactive config such
-     as aliases, options, and the prompt. A login shell reads it too, after the
-     profiles, so a setting lands in every interactive session. A missing file
-     is silently skipped. */
-  if (should_be_interactive) {
-    if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-        home.has_value())
-    {
-      shit::Path shitrc = *home;
-      shitrc.push_component(".shitrc");
-      source_file(shitrc, context, ast_arena);
+    /* An interactive shell reads ~/.shitrc, the home for interactive config such
+       as aliases, options, and the prompt. A login shell reads it too, after the
+       profiles, so a setting lands in every interactive session. A missing file
+       is silently skipped. */
+    if (should_be_interactive) {
+      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+          home.has_value())
+      {
+        shit::Path shitrc = *home;
+        shitrc.push_component(".shitrc");
+        source_file(shitrc, context, ast_arena);
+      }
     }
-  }
 
-  /* A compatibility mode also reads the interactive rc its host shell would, so
-     a user's existing bashrc or sh ENV file is honored. The shit rc above runs
-     first in every mode. The login path already read ENV, so a non-login sh
-     reads it here instead. A missing file is silently skipped. */
-  if (should_be_interactive && shit::should_run_in_bash_mode()) {
-    if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-        home.has_value())
-    {
-      shit::Path bashrc = *home;
-      bashrc.push_component(".bashrc");
-      source_file(bashrc, context, ast_arena);
+    /* A compatibility mode also reads the interactive rc its host shell would,
+       so a user's existing bashrc or sh ENV file is honored. The shit rc above
+       runs first in every mode. The login path already read ENV, so a non-login
+       sh reads it here instead. A missing file is silently skipped. */
+    if (should_be_interactive && shit::should_run_in_bash_mode()) {
+      if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+          home.has_value())
+      {
+        shit::Path bashrc = *home;
+        bashrc.push_component(".bashrc");
+        source_file(bashrc, context, ast_arena);
+      }
+    } else if (should_be_interactive && shit::should_run_in_posix_mode()) {
+      /* An interactive dash reads the file named by ENV, whether or not it is a
+         login shell, so the POSIX login path above leaves ENV to here. */
+      if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
+          env.has_value() && !env->is_empty())
+        source_file(shit::Path{env->view()}, context, ast_arena);
     }
-  } else if (should_be_interactive && shit::should_run_in_posix_mode() &&
-             !is_login_shell)
-  {
-    if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
-        env.has_value() && !env->is_empty())
-      source_file(shit::Path{env->view()}, context, ast_arena);
   }
 
   /* The startup files have finished, so a command typed at the prompt may now
      retitle the terminal. */
   context.set_startup_finished();
+
+  /* init-as-bash ran the bash config in bash mode. The interactive session is
+     shit-native, so bash mode is turned off here, and the strict parser and the
+     analysis stage take over from the first prompt. A non-interactive
+     init-as-bash run has no prompt, so it stays in bash mode for the whole run. */
+  if (init_as_bash && should_be_interactive) context.set_bash_compatible(false);
 
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
@@ -734,9 +835,10 @@ fn main(int argc, char **argv) -> int
            */
           toiletline::set_ghost_enabled(!FLAG_NO_COMPLETION.is_enabled());
           shit::show_message(
-              shit::should_run_in_posix_mode()  ? "POSIX me harder!"
-              : shit::should_run_in_bash_mode() ? "Bash me harder!"
-                                                : "Welcome :3");
+              init_as_bash                        ? "Bash me harder?"
+              : shit::should_run_in_posix_mode()  ? "POSIX me harder!"
+              : shit::should_run_in_bash_mode()   ? "Bash me harder!"
+                                                  : "Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
            * previosly! */

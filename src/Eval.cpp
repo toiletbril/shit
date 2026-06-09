@@ -2253,6 +2253,25 @@ fn EvalContext::apply_array_subscript(StringView name,
   return String{heap_allocator(), (*array)[static_cast<usize>(index)].view()};
 }
 
+fn EvalContext::collect_array_elements(StringView name) const throws
+    -> ArrayList<String>
+{
+  if (is_associative_array(name)) return associative_values(name);
+
+  let out = ArrayList<String>{heap_allocator()};
+  if (const ArrayList<String> *array = lookup_indexed_array(name)) {
+    out.reserve(array->count());
+    for (const String &element : *array)
+      out.push(String{heap_allocator(), element.view()});
+    return out;
+  }
+  /* A plain scalar reads as a one-element array, the way bash treats $a as
+     ${a[0]}, so "${a[@]}" of a scalar yields its single value. */
+  if (Maybe<String> scalar = get_variable_value(name); scalar.has_value())
+    out.push(steal(*scalar));
+  return out;
+}
+
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 {
   if (body.is_empty()) return String{heap_allocator()};
@@ -3842,6 +3861,53 @@ hot fn EvalContext::expand_word(const Word &word) throws
                            true);
         }
         break;
+      }
+      /* "${a[@]}" emits one field per array element, the way "$@" does for the
+         positional parameters, while "${a[*]}" joins them by the first IFS
+         character into one field. An unquoted ${a[@]} or ${a[*]} keeps each
+         element its own field and splits it under IFS. The general path below
+         joins to a single string, which would lose the per-element boundary, so
+         the array @ and * forms are emitted here. A spec with a trailing
+         modifier does not end in ']' and falls through. */
+      if (segment_text.length >= 4 &&
+          segment_text[segment_text.length - 1] == ']' &&
+          segment_text[segment_text.length - 3] == '[' &&
+          (segment_text[segment_text.length - 2] == '@' ||
+           segment_text[segment_text.length - 2] == '*') &&
+          lexer::is_variable_name_start(segment_text[0]))
+      {
+        let const array_name =
+            segment_text.substring_of_length(0, segment_text.length - 3);
+        let is_plain_array_name = true;
+        for (usize i = 0; i < array_name.length; i++)
+          if (!lexer::is_variable_name(array_name[i])) {
+            is_plain_array_name = false;
+            break;
+          }
+        if (is_plain_array_name) {
+          let const is_star = segment_text[segment_text.length - 2] == '*';
+          let const elements = collect_array_elements(array_name);
+          if (segment.is_in_double_quotes && is_star) {
+            let const ifs = m_field_separators.view();
+            String joined{heap_allocator()};
+            for (usize i = 0; i < elements.count(); i++) {
+              if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+              joined.append(elements[i].view());
+            }
+            append_run(joined, false);
+          } else if (segment.is_in_double_quotes) {
+            for (usize i = 0; i < elements.count(); i++) {
+              if (i > 0) flush();
+              append_run(elements[i].view(), false);
+            }
+          } else {
+            for (usize i = 0; i < elements.count(); i++) {
+              if (i > 0) flush();
+              append_split_run(elements[i].view(), true);
+            }
+          }
+          break;
+        }
       }
       /* A plain $name that names a set scalar appends the stored value by view,
          with no copy, since the full parameter expansion would read the same
