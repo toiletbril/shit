@@ -435,8 +435,45 @@ fn main(int argc, char **argv) -> int
   bool is_login_shell = false;
   let file_names = shit::ArrayList<shit::String>{};
 
+  /* SHIT_FLAGS supplies command line options through the environment, such as
+     SHIT_FLAGS='-ahmu --bash-compatible -I', so a user sets the shell's defaults
+     once rather than on every invocation. The tokens are split on whitespace and
+     spliced in right after the program name, before the real arguments, so a flag
+     given on the command line still has the final say. The token strings and the
+     spliced pointer array outlive the parse below, so the views stay valid. */
+  shit::ArrayList<shit::String> shit_flags_tokens{};
+  shit::ArrayList<const char *> spliced_argv{};
+  if (shit::Maybe<shit::String> shit_flags =
+          shit::os::get_environment_variable("SHIT_FLAGS");
+      shit_flags.has_value() && !shit_flags->is_empty())
+  {
+    let const view = shit_flags->view();
+    usize token_start = 0;
+    for (usize i = 0; i <= view.length; i++) {
+      let const c = i < view.length ? view[i] : ' ';
+      if (c == ' ' || c == '\t' || c == '\n') {
+        if (i > token_start)
+          shit_flags_tokens.push(
+              shit::String{view.substring_of_length(token_start, i - token_start)});
+        token_start = i + 1;
+      }
+    }
+  }
+
+  if (!shit_flags_tokens.is_empty() && argc > 0) {
+    spliced_argv.push(argv[0]);
+    for (const shit::String &token : shit_flags_tokens)
+      spliced_argv.push(token.c_str());
+    for (int i = 1; i < argc; i++)
+      spliced_argv.push(argv[i]);
+  }
+
   try {
-    file_names = shit::parse_flags(FLAG_LIST, argc, argv);
+    if (spliced_argv.is_empty())
+      file_names = shit::parse_flags(FLAG_LIST, argc, argv);
+    else
+      file_names = shit::parse_flags(
+          FLAG_LIST, static_cast<int>(spliced_argv.count()), spliced_argv.begin());
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
     /* A flag error is a usage error, so the shell exits with the POSIX usage
@@ -969,9 +1006,6 @@ fn main(int argc, char **argv) -> int
     /* Execute the contents through the shared pipeline. */
     exit_code = run_script_contents(script_contents, context, ast_arena,
                                     source_filename);
-
-    /* TODO: Make ExecutionErrorWithLocation to distinguish execution
-     * errors? Or statically check commands before they are executed? */
 
     /* We can get here from child process if they didn't exec()
      * properly to print error. */
