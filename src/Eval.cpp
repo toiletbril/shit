@@ -385,6 +385,27 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
   m_associative_names.remove(name);
 }
 
+fn EvalContext::unset_array_element(StringView name,
+                                    StringView subscript) throws -> void
+{
+  if (is_readonly(name))
+    throw Error{"Unable to unset '" + name + "' because it is read only"};
+
+  if (is_associative_array(name)) {
+    m_associative_values.erase(
+        associative_composite_key(name, subscript).view());
+    return;
+  }
+
+  if (ArrayList<String> *array = m_indexed_arrays.find(name)) {
+    const i64 index = evaluate_arithmetic(subscript);
+    const i64 count = static_cast<i64>(array->count());
+    const i64 resolved = index < 0 ? index + count : index;
+    if (resolved >= 0 && resolved < count)
+      array->remove(static_cast<usize>(resolved));
+  }
+}
+
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
   m_shell_variables.erase(name);

@@ -270,6 +270,12 @@ public:
   fn seed_shell_identity_variables(bool bash_identity) throws -> void;
   fn unset_shell_variable(StringView name) throws -> void;
 
+  /* Remove a single array element or associative key, backing unset name[sub].
+     An indexed element is removed and the later elements shift down, an
+     associative key is dropped, and a subscript on a name that is not an array
+     does nothing. */
+  fn unset_array_element(StringView name, StringView subscript) throws -> void;
+
   /* The bash indexed arrays, a name to an ordered list of element strings. They
      live beside the scalar variables, and a scalar read of an array name yields
      element zero the way bash treats $a as ${a[0]}. */

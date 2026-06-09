@@ -40,6 +40,21 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const &name = names[i];
     if (unset_function) {
       cxt.unset_function(name);
+    } else if (let const bracket = name.view().find_character('[');
+               bracket.has_value() && name.count() > 0 &&
+               name.view()[name.count() - 1] == ']') {
+      /* A name[subscript] operand removes one array element or key rather than
+         the whole variable. */
+      const StringView array_name = name.view().substring_of_length(0, *bracket);
+      const StringView subscript = name.view().substring_of_length(
+          *bracket + 1, name.count() - *bracket - 2);
+      try {
+        cxt.unset_array_element(array_name, subscript);
+      } catch (const Error &) {
+        report_soft_builtin_error(ec, cxt,
+                                  StringView{"'"} + name + "' is read-only");
+        had_error = true;
+      }
     } else {
       /* A read-only variable makes unset_shell_variable throw. The remaining
          names are still unset and the builtin reports a non-zero status, the
