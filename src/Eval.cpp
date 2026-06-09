@@ -4219,7 +4219,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
 
-  return run_captured_substitution(ast);
+  return run_captured_substitution(ast, source);
 }
 
 fn EvalContext::setup_process_substitution(StringView text) throws -> String
@@ -4351,16 +4351,31 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   }
   ASSERT(segment.cached_substitution_ast != nullptr);
 
-  return run_captured_substitution(segment.cached_substitution_ast);
+  return run_captured_substitution(segment.cached_substitution_ast,
+                                   segment.text);
 }
 
-fn EvalContext::run_captured_substitution(const Expression *ast) throws
-    -> String
+fn EvalContext::run_captured_substitution(const Expression *ast,
+                                          const String &source) throws -> String
 {
   ASSERT(ast != nullptr);
 
   /* A cd or an assignment inside the substitution must not leak. */
   let snapshot = snapshot_state();
+
+  /* The substitution body is its own source, so a located error inside it
+     carries an offset into that text. The current source is pointed at it for
+     the run, so an error rendered inline, such as a command not found, marks the
+     right byte, and the error caught below is formatted against it too. */
+  let const previous_source = m_current_source;
+  let const previous_origin = m_current_origin;
+  let const previous_location_position = m_current_location_position;
+  set_current_source(&source, String{"command substitution"});
+  defer
+  {
+    set_current_source(previous_source, previous_origin);
+    m_current_location_position = previous_location_position;
+  };
 
   let const pipe = os::make_pipe();
   if (!pipe) throw Error{"Could not open a pipe for command substitution"};
@@ -4428,7 +4443,28 @@ fn EvalContext::run_captured_substitution(const Expression *ast) throws
   os::close_fd(pipe->in);
   restore_state(steal(snapshot));
 
-  if (error) std::rethrow_exception(error);
+  if (error) {
+    /* A throw inside the substitution exits its subshell, the way bash contains
+       a fatal expansion error such as ${x?} to the command substitution rather
+       than aborting the parent. The error is rendered here against the
+       substitution source so its caret marks the right byte, with the source
+       backtrace under it, then the parent continues with the partial output and
+       a failing status. */
+    try {
+      std::rethrow_exception(error);
+    } catch (const ErrorWithLocationAndDetails &e) {
+      show_message(e.to_string(source.view()));
+      show_message(e.details_to_string(source.view()));
+      print_source_backtrace();
+    } catch (const ErrorWithLocation &e) {
+      show_message(e.to_string(source.view()));
+      print_source_backtrace();
+    } catch (const Error &e) {
+      show_message(e.to_string());
+      print_source_backtrace();
+    }
+    set_last_exit_status(1);
+  }
 
   while (!captured.is_empty() && captured.back() == '\n')
     captured.pop_back();

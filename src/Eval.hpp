@@ -628,7 +628,8 @@ public:
   /* Run a parsed inner command under the substitution machinery, capturing its
      stdout and snapshotting state so a cd or an assignment inside does not
      leak. Both capture overloads share this once they hold an AST. */
-  fn run_captured_substitution(const Expression *ast) throws -> String;
+  fn run_captured_substitution(const Expression *ast,
+                               const String &source) throws -> String;
 
   /* Lex, parse, and evaluate a source string in the current context, without
      capturing output or snapshotting state. The eval and dot builtins use this,
