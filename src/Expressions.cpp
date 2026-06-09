@@ -2411,6 +2411,32 @@ cold fn BraceGroup::register_defined_functions(
   m_body->register_defined_functions(actx);
 }
 
+ConditionalCommand::ConditionalCommand(SourceLocation location,
+                                       ArrayList<conditional_element> elements)
+    : CompoundCommand(location), m_elements(steal(elements))
+{}
+
+ConditionalCommand::~ConditionalCommand() = default;
+
+cold fn ConditionalCommand::to_string() const throws -> String
+{
+  return "ConditionalCommand";
+}
+
+cold fn ConditionalCommand::to_ast_string(usize layer) const throws -> String
+{
+  return indent_for_layer(layer) + "[" + to_string() + "]";
+}
+
+fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  /* A true conditional exits zero, the way the [[ ]] command reports success.
+   */
+  const i64 status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
+  cxt.set_last_exit_status(static_cast<i32>(status));
+  return status;
+}
+
 Subshell::Subshell(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}

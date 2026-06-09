@@ -35,6 +35,29 @@ class Word;
 class WordSegment;
 class Expression;
 
+/* One element of a [[ ]] conditional. An operand carries a word the evaluator
+   expands without field splitting, and the rest are the operators the
+   double-bracket grammar reads, the logical joiners, the parentheses, and the
+   string-comparison angles. A word operator such as == or -f arrives as an
+   operand and the evaluator classifies it by its text. */
+struct conditional_element
+{
+  enum class Kind : u8
+  {
+    Operand,
+    And,
+    Or,
+    Not,
+    OpenParen,
+    CloseParen,
+    Less,
+    Greater,
+  };
+
+  Kind kind;
+  const Token *word{nullptr};
+};
+
 /* A pending non-local jump the evaluator carries instead of throwing. The break
    and continue builtins request a loop jump, return requests a function jump,
    and exit inside a subshell requests an exit. The tree-walk checks for a
@@ -412,6 +435,12 @@ public:
   /* Expand a word in assignment context, with variable, tilde, and command
      substitution but no field splitting and no globbing. */
   fn expand_word_for_assignment(const Word &word) throws -> String;
+
+  /* Evaluate a [[ ]] conditional element list and report whether it is true.
+     The operands expand without field splitting, == and != glob match their
+     right side, < and > compare strings, and && and || join primaries. */
+  fn evaluate_conditional(const ArrayList<conditional_element> &elements) throws
+      -> bool;
 
   /* Expand a case pattern word the same way assignment context expands, with no
      field splitting and no pathname globbing, plus a parallel mask that marks

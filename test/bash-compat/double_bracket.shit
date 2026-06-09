@@ -1,0 +1,29 @@
+#!/bin/bash
+# Bash [[ ]] conditional command, checked byte-for-byte against bash. Covers glob
+# == and !=, string and numeric comparison, && || ! and parentheses, unary file
+# and string tests, and a lone operand.
+[[ abc == a* ]] && echo 1
+[[ abc != x* ]] && echo 2
+f=hello.txt
+[[ $f == *.txt ]] && echo 3
+[[ $f == *.md ]] || echo 4
+[[ 5 -gt 3 ]] && echo 5
+[[ 2 -lt 1 ]] || echo 6
+[[ -z "" ]] && echo 7
+[[ -n abc ]] && echo 8
+[[ abc < bcd ]] && echo 9
+[[ bcd > abc ]] && echo 10
+[[ a == a && b == b ]] && echo 11
+[[ a == x || b == b ]] && echo 12
+[[ ! a == x ]] && echo 13
+[[ ( a == a || b == c ) && d == d ]] && echo 14
+[[ -e /etc/hostname ]] && echo 15
+[[ -d /nonexistent_dir_xyz ]] || echo 16
+[[ "a b c" == "a b c" ]] && echo 17
+[[ foo == f?o ]] && echo 18
+n=42
+[[ $n -eq 42 ]] && echo 19
+[[ abc ]] && echo 20
+[[ "" ]] || echo 21
+word=Hello
+[[ $word == H* ]] && [[ $word == *o ]] && echo 22

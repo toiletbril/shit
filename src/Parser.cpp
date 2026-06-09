@@ -65,6 +65,24 @@ hot pure static fn is_brace_word(const Token *token, char brace) wontthrow
          word.segments[0].text[0] == brace;
 }
 
+/* True when the token is a single unquoted word with exactly the given text,
+   the way [[ and ]] arrive from the lexer as ordinary words rather than
+   dedicated operator tokens. */
+hot pure static fn is_unquoted_word(const Token *token,
+                                    StringView text) wontthrow -> bool
+{
+  if (token == nullptr || token->kind() != Token::Kind::Word) return false;
+  const Word &word = static_cast<const tokens::WordToken *>(token)->word();
+  if (word.segments.count() != 1 ||
+      word.segments[0].kind != WordSegment::Kind::UnquotedText)
+    return false;
+  const auto &segment_text = word.segments[0].text;
+  if (segment_text.count() != text.length) return false;
+  for (usize i = 0; i < text.length; i++)
+    if (segment_text[i] != text[i]) return false;
+  return true;
+}
+
 /* Whether the peeked token terminates a command list. The closing brace of a
    brace group is a '}' word rather than a token kind, so RightBracket in the
    terminator set stands for a standalone '}' word here. */
@@ -775,6 +793,12 @@ hot fn Parser::parse_simple_command() throws -> Command *
       }
       if (is_brace_word(token, '}')) return nullptr;
 
+      /* [[ arrives as an ordinary word, so it is matched on the text before the
+         kind switch, the way the braces are. */
+      if (is_unquoted_word(token, "[[")) {
+        return attach_trailing_redirections(parse_conditional_command());
+      }
+
       switch (token->kind()) {
       case Token::Kind::If: return attach_trailing_redirections(parse_if());
       case Token::Kind::While:
@@ -785,6 +809,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
       case Token::Kind::Case: return attach_trailing_redirections(parse_case());
       case Token::Kind::LeftParen:
         return attach_trailing_redirections(parse_subshell());
+      case Token::Kind::DoubleLeftSquareBracket:
+        return attach_trailing_redirections(parse_conditional_command());
 
       case Token::Kind::Then:
       case Token::Kind::Do:
@@ -1220,6 +1246,64 @@ hot fn Parser::parse_subshell() throws -> Command *
   }
 
   return m_lexer.arena().create<Subshell>(open->source_location(), body);
+}
+
+hot fn Parser::parse_conditional_command() throws -> Command *
+{
+  Token *open = m_lexer.next_shell_token();
+  ASSERT(open != nullptr);
+  ASSERT(is_unquoted_word(open, "[["));
+
+  /* The tokens between [[ and ]] are collected raw rather than run through the
+     command parser, so a < or > inside is a string comparison and not a
+     redirection, and && and || join primaries. The operand words are kept for
+     the evaluator to expand without field splitting. */
+  ArrayList<conditional_element> elements{};
+  for (;;) {
+    Token *t = m_lexer.next_shell_token();
+    ASSERT(t != nullptr);
+    if (is_unquoted_word(t, "]]")) break;
+    if (t->kind() == Token::Kind::EndOfFile) {
+      throw ErrorWithLocationAndDetails{open->source_location(),
+                                        "Unterminated '[['",
+                                        t->source_location(), "Expected ']]'"};
+    }
+
+    using Kind = conditional_element::Kind;
+    switch (t->kind()) {
+    case Token::Kind::DoubleAmpersand:
+      elements.push({Kind::And, nullptr});
+      break;
+    case Token::Kind::DoublePipe: elements.push({Kind::Or, nullptr}); break;
+    case Token::Kind::LeftParen:
+      elements.push({Kind::OpenParen, nullptr});
+      break;
+    case Token::Kind::RightParen:
+      elements.push({Kind::CloseParen, nullptr});
+      break;
+    case Token::Kind::Less: elements.push({Kind::Less, nullptr}); break;
+    case Token::Kind::Greater: elements.push({Kind::Greater, nullptr}); break;
+    case Token::Kind::Newline: continue;
+    case Token::Kind::Word: {
+      /* A bare ! is the negation operator, every other word is an operand the
+         evaluator classifies by its text. */
+      if (static_cast<tokens::WordToken *>(t)->word().to_literal_string() ==
+          "!")
+        elements.push({Kind::Not, nullptr});
+      else
+        elements.push({Kind::Operand, t});
+      break;
+    }
+    default:
+      /* A reserved word or other token used as an operand keeps its token so
+         the evaluator can read its text. */
+      elements.push({Kind::Operand, t});
+      break;
+    }
+  }
+
+  return m_lexer.arena().create<expressions::ConditionalCommand>(
+      open->source_location(), steal(elements));
 }
 
 hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *

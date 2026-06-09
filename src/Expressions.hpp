@@ -617,6 +617,26 @@ protected:
   const Expression *m_body;
 };
 
+/* The bash [[ ... ]] conditional command. It holds the collected elements and
+   evaluates them with the double-bracket grammar, which does no field splitting
+   on the operands, treats the right side of == and != as a glob pattern, and
+   joins primaries with && and || rather than -a and -o. */
+class ConditionalCommand : public CompoundCommand
+{
+public:
+  ConditionalCommand(SourceLocation location,
+                     ArrayList<conditional_element> elements);
+  ~ConditionalCommand() override;
+
+  fn to_string() const throws -> String override;
+  fn to_ast_string(usize layer = 0) const throws -> String override;
+
+protected:
+  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  ArrayList<conditional_element> m_elements;
+};
+
 /* A compound command with trailing redirections, such as { cmd; } >file or
    (cmd) 2>&1. A compound command runs in the shell process, so the redirections
    are applied to the shell's own descriptors around the child and restored

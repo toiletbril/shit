@@ -1913,6 +1913,216 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   return expand_variable(target->view());
 }
 
+namespace {
+
+/* A recursive-descent evaluator over the [[ ]] element list. The grammar joins
+   primaries with && and ||, allows ! and parentheses, and reads unary and
+   binary primaries the way the double-bracket conditional does, with no field
+   splitting on the operands. */
+struct ConditionalEvaluator
+{
+  EvalContext &cxt;
+  const ArrayList<conditional_element> &elements;
+  usize pos = 0;
+
+  using Kind = conditional_element::Kind;
+
+  pure bool at_end() const wontthrow { return pos >= elements.count(); }
+  pure Kind kind_at(usize i) const wontthrow { return elements[i].kind; }
+
+  /* The literal source text of an operand, used to recognize a word operator
+     such as == or -f without expanding it. */
+  String operand_literal(const conditional_element &e) throws
+  {
+    if (e.word != nullptr && e.word->kind() == Token::Kind::Word)
+      return static_cast<const tokens::WordToken *>(e.word)
+          ->word()
+          .to_literal_string();
+    if (e.word != nullptr) return e.word->raw_string();
+    return String{heap_allocator()};
+  }
+
+  /* The expanded value of an operand, with no field splitting. */
+  String operand_value(const conditional_element &e) throws
+  {
+    if (e.word != nullptr && e.word->kind() == Token::Kind::Word)
+      return cxt.expand_word_for_assignment(
+          static_cast<const tokens::WordToken *>(e.word)->word());
+    if (e.word != nullptr) return e.word->raw_string();
+    return String{heap_allocator()};
+  }
+
+  static pure bool is_unary_op(StringView s) wontthrow
+  {
+    return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
+           s == "-r" || s == "-w" || s == "-x" || s == "-s" || s == "-h" ||
+           s == "-L" || s == "-b" || s == "-c" || s == "-p" || s == "-S" ||
+           s == "-g" || s == "-u" || s == "-k" || s == "-O" || s == "-G" ||
+           s == "-v";
+  }
+
+  static pure bool is_binary_word_op(StringView s) wontthrow
+  {
+    return s == "=" || s == "==" || s == "!=" || s == "-eq" || s == "-ne" ||
+           s == "-lt" || s == "-le" || s == "-gt" || s == "-ge" || s == "-ef" ||
+           s == "-nt" || s == "-ot";
+  }
+
+  /* Glob match the value against the pattern, marking the unescaped *, ?, and [
+     as active so an unquoted pattern globs the way [[ == does. */
+  bool glob_equal(StringView value, StringView pattern) throws
+  {
+    let active = ArrayList<bool>{heap_allocator()};
+    for (usize i = 0; i < pattern.length; i++)
+      active.push(pattern[i] == '*' || pattern[i] == '?' || pattern[i] == '[');
+    return utils::glob_matches(pattern, value, active, 0);
+  }
+
+  bool eval_unary(StringView op, StringView operand) throws
+  {
+    if (op == "-z") return operand.is_empty();
+    if (op == "-n") return !operand.is_empty();
+    if (op == "-v") return cxt.get_variable_value(operand).has_value();
+    const Path path{operand};
+    if (op == "-e") return path.exists();
+    if (op == "-f") return path.is_regular_file();
+    if (op == "-d") return path.is_directory();
+    if (op == "-r") return path.is_readable();
+    if (op == "-w") return path.is_writable();
+    if (op == "-x") return path.is_executable();
+    if (op == "-s") {
+      let const size = path.file_size();
+      return size.has_value() && size.value() > 0;
+    }
+    /* The remaining file-type tests fall back to existence, which covers the
+       common scripts without a full stat-mode surface. */
+    return path.exists();
+  }
+
+  bool eval_binary(StringView left, StringView op, StringView right) throws
+  {
+    if (op == "==" || op == "=") return glob_equal(left, right);
+    if (op == "!=") return !glob_equal(left, right);
+    if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
+    if (op == "-nt") return Path{left}.is_newer_than(Path{right});
+    if (op == "-ot") return Path{left}.is_older_than(Path{right});
+
+    let const left_parsed = utils::parse_decimal_integer(left);
+    let const right_parsed = utils::parse_decimal_integer(right);
+    if (left_parsed.is_error() || right_parsed.is_error())
+      throw Error{"[[: integer operand expected"};
+    const i64 a = left_parsed.value();
+    const i64 b = right_parsed.value();
+    if (op == "-eq") return a == b;
+    if (op == "-ne") return a != b;
+    if (op == "-lt") return a < b;
+    if (op == "-le") return a <= b;
+    if (op == "-gt") return a > b;
+    return a >= b;
+  }
+
+  bool eval_primary() throws
+  {
+    if (at_end()) throw Error{"[[: unexpected end of expression"};
+    const conditional_element &first = elements[pos];
+    if (first.kind != Kind::Operand)
+      throw Error{"[[: unexpected operator in expression"};
+
+    const String first_literal = operand_literal(first);
+
+    /* A unary operator followed by an operand. */
+    if (is_unary_op(first_literal.view()) && pos + 1 < elements.count() &&
+        kind_at(pos + 1) == Kind::Operand)
+    {
+      const String operand = operand_value(elements[pos + 1]);
+      pos += 2;
+      return eval_unary(first_literal.view(), operand.view());
+    }
+
+    /* A binary primary, with the operator either a < or > angle or a word
+       operator such as == or -eq. */
+    if (pos + 1 < elements.count()) {
+      const Kind next = kind_at(pos + 1);
+      if (next == Kind::Less || next == Kind::Greater) {
+        if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
+          throw Error{"[[: expected operand after a comparison"};
+        const String left = operand_value(first);
+        const String right = operand_value(elements[pos + 2]);
+        pos += 3;
+        return next == Kind::Less ? left < right : right < left;
+      }
+      if (next == Kind::Operand) {
+        const String op = operand_literal(elements[pos + 1]);
+        if (is_binary_word_op(op.view())) {
+          if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
+            throw Error{"[[: expected operand after '" + op + "'"};
+          const String left = operand_value(first);
+          const String right = operand_value(elements[pos + 2]);
+          pos += 3;
+          return eval_binary(left.view(), op.view(), right.view());
+        }
+      }
+    }
+
+    /* A lone operand is true when it is non-empty. */
+    const String value = operand_value(first);
+    pos++;
+    return !value.is_empty();
+  }
+
+  bool eval_term() throws
+  {
+    if (!at_end() && kind_at(pos) == Kind::Not) {
+      pos++;
+      return !eval_term();
+    }
+    if (!at_end() && kind_at(pos) == Kind::OpenParen) {
+      pos++;
+      const bool inner = eval_or();
+      if (at_end() || kind_at(pos) != Kind::CloseParen)
+        throw Error{"[[: expected ')'"};
+      pos++;
+      return inner;
+    }
+    return eval_primary();
+  }
+
+  bool eval_and() throws
+  {
+    bool result = eval_term();
+    while (!at_end() && kind_at(pos) == Kind::And) {
+      pos++;
+      const bool rhs = eval_term();
+      result = result && rhs;
+    }
+    return result;
+  }
+
+  bool eval_or() throws
+  {
+    bool result = eval_and();
+    while (!at_end() && kind_at(pos) == Kind::Or) {
+      pos++;
+      const bool rhs = eval_and();
+      result = result || rhs;
+    }
+    return result;
+  }
+};
+
+} /* namespace */
+
+fn EvalContext::evaluate_conditional(
+    const ArrayList<conditional_element> &elements) throws -> bool
+{
+  if (elements.is_empty()) throw Error{"[[: empty conditional expression"};
+  ConditionalEvaluator evaluator{*this, elements};
+  const bool result = evaluator.eval_or();
+  if (!evaluator.at_end())
+    throw Error{"[[: unexpected token after conditional expression"};
+  return result;
+}
+
 cold fn EvalContext::make_stats_string() const throws -> String
 {
   let s = String{};

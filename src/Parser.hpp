@@ -108,6 +108,7 @@ private:
   mustuse fn parse_case() throws -> Command *;
   mustuse fn parse_brace_group() throws -> Command *;
   mustuse fn parse_subshell() throws -> Command *;
+  mustuse fn parse_conditional_command() throws -> Command *;
   mustuse fn parse_function_definition(Token *name_token) throws -> Command *;
 
   /* A bash array assignment NAME=(...) or NAME+=(...) is unsupported in this
