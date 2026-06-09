@@ -16,7 +16,16 @@
 #if SHIT_PLATFORM_IS POSIX
 #include <fcntl.h>
 #include <spawn.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <time.h>
+
+#if defined __linux__
+#include <linux/perf_event.h>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
+#endif
 
 /* posix_spawn takes the child environment as an envp argument. The shell passes
    its own process environment, which prefix assignments mutate before the spawn
@@ -783,6 +792,180 @@ fn set_default_signal_handlers() throws -> void
   check_syscall(sigaction(SIGINT, &si, nullptr));
 }
 
+fn monotonic_nanos() wontthrow -> u64
+{
+  struct timespec now{};
+  if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return 0;
+  return static_cast<u64>(now.tv_sec) * 1000000000ULL +
+         static_cast<u64>(now.tv_nsec);
+}
+
+namespace {
+
+#if defined __linux__
+
+/* One hardware counter the measured run opens through perf_event_open. The
+   first event of the group is the group leader and the rest are its members, so
+   enabling and reading the leader sweeps the whole group at once. */
+struct perf_event_request
+{
+  u32 type;
+  u64 config;
+  u64 *destination;
+};
+
+/* perf_event_open has no libc wrapper, so the raw syscall is issued here. The
+   child inherits the group through inherit and enable_on_exec, so the counts
+   cover the exec'd program and not the fork bookkeeping. */
+fn open_perf_event(const struct perf_event_attr &attr, int group_fd) wontthrow
+    -> int
+{
+  return static_cast<int>(
+      syscall(SYS_perf_event_open, &attr, 0, -1, group_fd, PERF_FLAG_FD_CLOEXEC));
+}
+
+/* Open the counter group, run runner while the group counts, and write the
+   five counts into out. Returns false when the kernel denies perf_event_open,
+   such as a restrictive perf_event_paranoid, so the caller falls back to wall
+   time and resident set alone. The runner forks and waits for the child, since
+   enable_on_exec ties the counting window to the exec inside it. */
+template <typename Runner>
+fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
+{
+  perf_event_request requests[] = {
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, &out.cpu_cycles},
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS, &out.instructions},
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES, &out.cache_references},
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES, &out.cache_misses},
+      {PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES, &out.branch_misses},
+  };
+  constexpr usize PERF_COUNT = sizeof(requests) / sizeof(requests[0]);
+
+  int perf_fds[PERF_COUNT];
+  for (usize i = 0; i < PERF_COUNT; i++) perf_fds[i] = -1;
+
+  defer
+  {
+    for (usize i = 0; i < PERF_COUNT; i++)
+      if (perf_fds[i] != -1) close(perf_fds[i]);
+  };
+
+  for (usize i = 0; i < PERF_COUNT; i++) {
+    struct perf_event_attr attr{};
+    attr.size = sizeof(attr);
+    attr.type = requests[i].type;
+    attr.config = requests[i].config;
+    attr.disabled = 1;
+    attr.exclude_kernel = 1;
+    attr.exclude_hv = 1;
+    attr.inherit = 1;
+    attr.enable_on_exec = 1;
+
+    const int group_fd = (i == 0) ? -1 : perf_fds[0];
+    perf_fds[i] = open_perf_event(attr, group_fd);
+    if (perf_fds[i] == -1) return false;
+  }
+
+  ioctl(perf_fds[0], PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP);
+  ioctl(perf_fds[0], PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP);
+
+  runner();
+
+  ioctl(perf_fds[0], PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP);
+
+  for (usize i = 0; i < PERF_COUNT; i++) {
+    u64 value = 0;
+    if (read(perf_fds[i], &value, sizeof(value)) == static_cast<ssize_t>(sizeof(value)))
+      *requests[i].destination = value;
+  }
+
+  return true;
+}
+
+#endif /* __linux__ */
+
+/* Fork the child, point its output at the null device when asked, exec argv,
+   and wait4 for it so the rusage is captured. The decoded wait status goes into
+   status_out and the peak resident set into peak_rss_out. Returns false when
+   the fork itself failed, since an exec failure surfaces as the child's exit
+   127 the way the shell reports a missing command. ru_maxrss is kilobytes on
+   Linux, so it is scaled to bytes. */
+fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
+                   i64 &status_out, u64 &peak_rss_out) wontthrow -> bool
+{
+  os::os_args raw_argv{};
+  for (usize i = 0; i < argv.count(); i++) raw_argv.push(argv[i].c_str());
+  raw_argv.push(nullptr);
+
+  const pid_t child_pid = fork();
+  if (child_pid == -1) return false;
+
+  if (child_pid == 0) {
+    if (suppress_output) {
+      const int null_fd = open("/dev/null", O_WRONLY);
+      if (null_fd != -1) {
+        dup2(null_fd, STDOUT_FILENO);
+        dup2(null_fd, STDERR_FILENO);
+        if (null_fd != STDOUT_FILENO && null_fd != STDERR_FILENO) close(null_fd);
+      }
+    }
+    execvp(raw_argv[0], const_cast<char *const *>(raw_argv.begin()));
+    _exit(127);
+  }
+
+  int status = 0;
+  struct rusage usage{};
+  for (;;) {
+    const pid_t waited = wait4(child_pid, &status, 0, &usage);
+    if (waited == -1 && errno == EINTR) continue;
+    break;
+  }
+
+  if (WIFEXITED(status))
+    status_out = WEXITSTATUS(status);
+  else if (WIFSIGNALED(status))
+    status_out = 128 + WTERMSIG(status);
+  else
+    status_out = -1;
+
+  peak_rss_out = static_cast<u64>(usage.ru_maxrss) * 1024ULL;
+  return true;
+}
+
+} /* namespace */
+
+fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
+    -> Maybe<measured_result>
+{
+  if (argv.is_empty()) return None;
+
+  measured_result result{};
+
+  i64 status = 0;
+  u64 peak_rss = 0;
+  bool forked_ok = false;
+
+  const u64 start_nanos = monotonic_nanos();
+
+#if defined __linux__
+  result.has_perf = collect_perf_counts(result.perf, [&]() wontthrow {
+    forked_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
+  });
+  if (!result.has_perf)
+    forked_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
+#else
+  forked_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
+#endif
+
+  result.wall_nanos = monotonic_nanos() - start_nanos;
+
+  if (!forked_ok) return None;
+
+  result.exit_status = status;
+  result.peak_rss_bytes = peak_rss;
+  return result;
+}
+
 } /* namespace os */
 
 } /* namespace shit */
@@ -790,6 +973,7 @@ fn set_default_signal_handlers() throws -> void
 #elif SHIT_PLATFORM_IS WIN32
 
 #include <io.h>
+#include <psapi.h>
 
 namespace shit {
 
@@ -1381,6 +1565,90 @@ fn reset_signal_handlers() -> void
      spawn. A stale one would make the evaluator throw Interrupted before the
      child runs, so it is cleared here alongside the handler reset. */
   INTERRUPT_REQUESTED = 0;
+}
+
+fn monotonic_nanos() wontthrow -> u64
+{
+  LARGE_INTEGER frequency;
+  LARGE_INTEGER counter;
+  if (QueryPerformanceFrequency(&frequency) == 0) return 0;
+  if (QueryPerformanceCounter(&counter) == 0) return 0;
+  /* The counter is scaled to nanoseconds through the frequency, splitting the
+     whole seconds from the remainder so the multiply never overflows the way a
+     raw counter times a billion would. */
+  const u64 whole_seconds = counter.QuadPart / frequency.QuadPart;
+  const u64 remainder = counter.QuadPart % frequency.QuadPart;
+  return whole_seconds * 1000000000ULL +
+         (remainder * 1000000000ULL) / static_cast<u64>(frequency.QuadPart);
+}
+
+fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
+    -> Maybe<measured_result>
+{
+  if (argv.is_empty()) return None;
+
+  /* Windows carries no hardware perf counters here, so a measured run reports
+     wall time, the peak working set, and the user and system process times. The
+     child output is pointed at the null device when suppressed, the same as the
+     POSIX path. */
+  measured_result result{};
+
+  String command_line{};
+  for (usize i = 0; i < argv.count(); i++) {
+    if (i > 0) command_line.push(' ');
+    command_line.append(argv[i].view());
+  }
+
+  STARTUPINFOA startup{};
+  startup.cb = sizeof(startup);
+
+  HANDLE null_handle = INVALID_HANDLE_VALUE;
+  if (suppress_output) {
+    SECURITY_ATTRIBUTES inherit_sa{};
+    inherit_sa.nLength = sizeof(inherit_sa);
+    inherit_sa.bInheritHandle = TRUE;
+    null_handle = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE, &inherit_sa,
+                              OPEN_EXISTING, 0, nullptr);
+    if (null_handle != INVALID_HANDLE_VALUE) {
+      startup.dwFlags |= STARTF_USESTDHANDLES;
+      startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+      startup.hStdOutput = null_handle;
+      startup.hStdError = null_handle;
+    }
+  }
+  defer
+  {
+    if (null_handle != INVALID_HANDLE_VALUE) CloseHandle(null_handle);
+  };
+
+  PROCESS_INFORMATION process_info{};
+  String mutable_command_line = command_line;
+
+  const u64 start_nanos = monotonic_nanos();
+
+  if (CreateProcessA(nullptr, mutable_command_line.data(), nullptr, nullptr, TRUE,
+                     0, nullptr, nullptr, &startup, &process_info) == 0)
+    return None;
+
+  WaitForSingleObject(process_info.hProcess, INFINITE);
+
+  result.wall_nanos = monotonic_nanos() - start_nanos;
+
+  DWORD exit_code = 0;
+  GetExitCodeProcess(process_info.hProcess, &exit_code);
+  result.exit_status = static_cast<i64>(exit_code);
+
+  PROCESS_MEMORY_COUNTERS memory_counters{};
+  memory_counters.cb = sizeof(memory_counters);
+  if (GetProcessMemoryInfo(process_info.hProcess, &memory_counters,
+                           sizeof(memory_counters)) != 0)
+    result.peak_rss_bytes =
+        static_cast<u64>(memory_counters.PeakWorkingSetSize);
+
+  CloseHandle(process_info.hProcess);
+  CloseHandle(process_info.hThread);
+
+  return result;
 }
 
 } /* namespace os */

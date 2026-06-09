@@ -57,6 +57,8 @@ public:
     Bg,
     Wait,
     Kill,
+    Time,
+    Bench,
   };
 
   void set_fds(os::descriptor in, os::descriptor out) throws;
@@ -113,6 +115,8 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("bg"),       Builtin::Kind::Bg            },
     {PackedStringKey::from_literal("wait"),     Builtin::Kind::Wait          },
     {PackedStringKey::from_literal("kill"),     Builtin::Kind::Kill          },
+    {PackedStringKey::from_literal("time"),     Builtin::Kind::Time          },
+    {PackedStringKey::from_literal("bench"),    Builtin::Kind::Bench         },
 };
 
 inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
@@ -159,7 +163,9 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Fg);                                                                  \
   B_CASE(Bg);                                                                  \
   B_CASE(Wait);                                                                \
-  B_CASE(Kill)
+  B_CASE(Kill);                                                                \
+  B_CASE(Time);                                                                \
+  B_CASE(Bench)
 
 #define BUILTIN_STRUCT(b)                                                      \
   class b : public Builtin                                                     \
@@ -208,6 +214,8 @@ BUILTIN_STRUCT(Fg);
 BUILTIN_STRUCT(Bg);
 BUILTIN_STRUCT(Wait);
 BUILTIN_STRUCT(Kill);
+BUILTIN_STRUCT(Time);
+BUILTIN_STRUCT(Bench);
 
 class Exit : public Builtin
 {

@@ -257,6 +257,47 @@ fn reset_signal_handlers() throws -> void;
    The main loop clears it before each interactive command. */
 extern volatile sig_atomic_t INTERRUPT_REQUESTED;
 
+/* A monotonic clock reading in nanoseconds, immune to wall-clock jumps, for
+   measuring an elapsed interval. POSIX reads CLOCK_MONOTONIC and Windows reads
+   QueryPerformanceCounter scaled to nanoseconds. */
+fn monotonic_nanos() wontthrow -> u64;
+
+/* The Linux hardware performance counters a measured run collects. The counts
+   are valid only when measured_result::has_perf is true, which happens on Linux
+   when perf_event_open succeeded. Every other platform leaves has_perf false. */
+struct perf_counts
+{
+  u64 cpu_cycles{0};
+  u64 instructions{0};
+  u64 cache_references{0};
+  u64 cache_misses{0};
+  u64 branch_misses{0};
+};
+
+/* The result of running a command as a measured child. wall_nanos is the
+   monotonic elapsed time around the child, peak_rss_bytes is the high-water
+   resident set the child reached, and exit_status is its wait status decoded
+   the way the shell reports one. The perf counts are filled only when has_perf
+   is true. */
+struct measured_result
+{
+  u64 wall_nanos{0};
+  u64 peak_rss_bytes{0};
+  i64 exit_status{0};
+  bool has_perf{false};
+  perf_counts perf{};
+};
+
+/* Run argv as a child process, wait for it, and return the measurement, or None
+   when the child could not be spawned. When suppress_output is true the child's
+   standard output and standard error are pointed at the null device so a
+   benchmark loop stays quiet. The child keeps the shell's standard input. On
+   Linux the hardware perf counters are collected when perf_event_open is
+   permitted, and a non-Linux platform or a denied perf_event_open returns the
+   wall time and peak resident set alone. */
+fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
+    -> Maybe<measured_result>;
+
 fn execute_program(ExecContext &&ec) throws -> process;
 
 /* Fork a child for a compound command used as a pipeline stage. In the child it

@@ -140,6 +140,12 @@ cold static fn builtin_help(Builtin::Kind kind) throws -> BuiltinHelp
     return {"wait [%job|pid ...]", "Wait for jobs to finish."};
   case Builtin::Kind::Kill:
     return {"kill [-signal] %job|pid ...", "Send a signal to a job or pid."};
+  case Builtin::Kind::Time:
+    return {"time command [argument ...]",
+            "Run the command once and print its real, user, and system time."};
+  case Builtin::Kind::Bench:
+    return {"bench [--runs n] [--duration ms] command [command ...]",
+            "Sample each command repeatedly and compare their performance."};
   }
   return {"", ""};
 }
