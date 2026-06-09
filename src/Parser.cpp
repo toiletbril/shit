@@ -244,8 +244,7 @@ cold fn Parser::recover_to_next_statement() throws -> void
    boundary. A clean file parses in a single iteration whose tree is returned
    for the caller to run. Once any error is recorded the tree never runs, so the
    remaining iterations only keep parsing to collect more errors. */
-cold fn Parser::construct_ast(ArrayList<ErrorWithLocation> &errors) throws
-    -> Expression *
+cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
 {
   Expression *first_piece = nullptr;
   SourceLocation last_location{};
@@ -260,8 +259,14 @@ cold fn Parser::construct_ast(ArrayList<ErrorWithLocation> &errors) throws
       Expression *piece = parse_command_list({});
       ASSERT(piece != nullptr);
       if (first_piece == nullptr) first_piece = piece;
+    } catch (const ErrorWithLocationAndDetails &e) {
+      /* Render both parts here, since the detail note would be sliced off a
+         base-class copy and its hint lost. */
+      errors.push(e.to_string(m_lexer.source()));
+      errors.push(e.details_to_string(m_lexer.source()));
+      recover_to_next_statement();
     } catch (const ErrorWithLocation &e) {
-      errors.push(e);
+      errors.push(e.to_string(m_lexer.source()));
       recover_to_next_statement();
     }
   }
@@ -1012,6 +1017,32 @@ hot fn Parser::parse_for() throws -> Command *
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
   }
+
+  /* The loop variable must be a plain name. A $ expansion such as for $f, a
+     quoted word, or a non-identifier names a variable the user did not mean, so
+     it is rejected the way dash and bash reject it. */
+  const Word &name_word =
+      static_cast<const tokens::WordToken *>(name_token)->word();
+  bool name_is_plain =
+      name_word.segments.count() == 1 &&
+      name_word.segments[0].kind == WordSegment::Kind::UnquotedText;
+  if (name_is_plain) {
+    const StringView name_text = name_word.segments[0].text.view();
+    let const is_name_start = [](char c) wontthrow -> bool {
+      return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+    };
+    name_is_plain = name_text.length > 0 && is_name_start(name_text[0]);
+    for (usize i = 1; name_is_plain && i < name_text.length; i++)
+      name_is_plain =
+          is_name_start(name_text[i]) || (name_text[i] >= '0' && name_text[i] <= '9');
+  }
+  if (!name_is_plain) {
+    throw ErrorWithLocation{
+        name_token->source_location(),
+        StringView{"Bad for loop variable, '"} + name_token->raw_string() +
+            "' is not a plain name, drop the '$' and any quotes"};
+  }
+
   const let variable_name = name_token->raw_string();
 
   ArrayList<const Token *> words{};

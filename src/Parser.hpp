@@ -21,10 +21,11 @@ public:
 
   /* Parse the whole input, recovering from each syntax error by resynchronizing
      to the next statement boundary and continuing, so one pass collects every
-     error rather than stopping at the first. The located errors are appended to
-     errors, and the returned tree is meant to run only when errors stays empty.
-   */
-  fn construct_ast(ArrayList<ErrorWithLocation> &errors) throws -> Expression *;
+     error rather than stopping at the first. Each error is appended as a fully
+     rendered message, the primary line and any detail note, so a detail hint is
+     not lost the way storing the base ErrorWithLocation by value would slice it
+     off. The returned tree is meant to run only when errors stays empty. */
+  fn construct_ast(ArrayList<String> &errors) throws -> Expression *;
 
   pure fn debug_words() const wontthrow -> const ArrayList<Word> &;
 

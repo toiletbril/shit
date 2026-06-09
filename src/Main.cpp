@@ -111,16 +111,17 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
     String h{};
-    h += "\n  Shit, a pedantic, super-fast and awesome posix-compatible "
-         "command line interpreter\n  or a friendly interactive shell for "
-         "gigachads.\n\n";
+    h += "\n";
+    h += "  Shit, a pedantic, super-fast and awesome POSIX-compatible command line\n";
+    h += "  interpreter, or a friendly interactive shell for gigachads.\n\n";
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
     h += make_flag_help(FLAG_LIST);
     h += '\n';
     print_error(h);
     return EXIT_SUCCESS;
-  } else if (FLAG_LIST_CHECKS.is_enabled()) {
+  }
+  if (FLAG_LIST_CHECKS.is_enabled()) {
     String l{};
     for (const shellcheck_check &check : SHELLCHECK_CHECKS) {
       l += check.code;
@@ -130,10 +131,12 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     }
     print(l);
     return EXIT_SUCCESS;
-  } else if (FLAG_VERSION.is_enabled()) {
+  }
+  if (FLAG_VERSION.is_enabled()) {
     show_version();
     return EXIT_SUCCESS;
-  } else if (FLAG_SHORT_VERSION.is_enabled()) {
+  }
+  if (FLAG_SHORT_VERSION.is_enabled()) {
     show_short_version();
     return EXIT_SUCCESS;
   }
@@ -212,12 +215,12 @@ static fn run_script_contents(const String &script_contents,
     /* Recover from each parse error so the whole file is reported at once. A
        file with any parse error must not run, so a non-empty error list prints
        every error and fails without evaluating the partial tree. */
-    ArrayList<ErrorWithLocation> parse_errors{heap_allocator()};
+    ArrayList<shit::String> parse_errors{heap_allocator()};
     Expression *ast = p.construct_ast(parse_errors);
 
     if (!parse_errors.is_empty()) {
-      for (const ErrorWithLocation &e : parse_errors)
-        show_message(e.to_string(script_contents));
+      for (const shit::String &e : parse_errors)
+        show_message(e);
       context.set_last_exit_status(EXIT_FAILURE);
       return EXIT_FAILURE;
     }
