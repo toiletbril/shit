@@ -510,7 +510,7 @@ static fn read_all_input(ExecContext &ec) throws -> String
 
 static fn parse_input_json(ExecContext &ec) throws -> json_value
 {
-  String input = read_all_input(ec);
+  let const input = read_all_input(ec);
   JsonParser parser{input.view()};
   return parser.parse();
 }

@@ -588,7 +588,7 @@ fn Parser::build_heredoc_redirection(
       static_cast<tokens::WordToken *>(delimiter_token)->word();
 
   const let delimiter_literal = delimiter_word.to_literal_string();
-  StringView delimiter = delimiter_literal.view();
+  let delimiter = delimiter_literal.view();
   bool strip_tabs = false;
   /* <<- strips leading tabs, the dash touching the operator. The dash counts
      only when it is unquoted, so <<'-EOF' keeps the dash as part of the

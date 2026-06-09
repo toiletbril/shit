@@ -326,27 +326,45 @@ static fn source_file(const Path &path, EvalContext &context,
    A detached HEAD shows the short commit hash. */
 static fn git_branch() throws -> String
 {
-  Path dir = Path::current_directory();
+  let dir = Path::current_directory();
   for (;;) {
-    Path head = dir;
+    let head = dir;
     head.push_component(".git");
-    head.push_component("HEAD");
-    if (Maybe<String> content = utils::read_entire_file(head.text().view())) {
-      StringView text = content->view();
+    /* A linked worktree or a submodule stores .git as a file holding a
+       'gitdir: <path>' pointer rather than a directory, so the real git dir is
+       followed before reading HEAD. */
+    let git_dir = head;
+    if (let const dot_git = utils::read_entire_file(head.text().view())) {
+      let const pointer = dot_git->view();
+      let const gitdir_prefix = StringView{"gitdir: "};
+      if (pointer.starts_with(gitdir_prefix)) {
+        let line = pointer.substring(gitdir_prefix.length);
+        while (!line.is_empty() &&
+               (line[line.length - 1] == '\n' || line[line.length - 1] == '\r'))
+        {
+          line = line.substring_of_length(0, line.length - 1);
+        }
+        git_dir = Path{line};
+      }
+    }
+    let git_head = git_dir;
+    git_head.push_component("HEAD");
+    if (let const content = utils::read_entire_file(git_head.text().view())) {
+      let text = content->view();
       while (!text.is_empty() &&
              (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
       {
         text = text.substring_of_length(0, text.length - 1);
       }
-      const StringView ref_prefix = "ref: refs/heads/";
+      let const ref_prefix = StringView{"ref: refs/heads/"};
       if (text.starts_with(ref_prefix))
         return String{text.substring(ref_prefix.length)};
       return String{
           text.substring_of_length(0, text.length < 7 ? text.length : 7)};
     }
-    Path parent = dir;
+    let parent = dir;
     parent.push_component("..");
-    Path normalized = parent.to_absolute().normalized();
+    let normalized = parent.to_absolute().normalized();
     if (normalized.text() == dir.text()) break;
     dir = steal(normalized);
   }

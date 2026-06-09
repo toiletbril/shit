@@ -81,7 +81,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         Path candidate = entry.is_empty()
                              ? Path{arg_path}
                              : Path{entry}.push_component(arg_path.view());
-        Path resolved = candidate.to_absolute().normalized();
+        let resolved = candidate.to_absolute().normalized();
         if (resolved.is_directory()) {
           target = steal(resolved);
           reached_through_cdpath = !entry.is_empty();

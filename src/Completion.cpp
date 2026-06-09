@@ -177,7 +177,7 @@ static fn complete_command(StringView token, bool token_is_glob,
   if (Maybe<String> path = os::get_environment_variable("PATH");
       path.has_value())
   {
-    StringView path_view = path->view();
+    let path_view = path->view();
     usize segment_start = 0;
     for (usize i = 0; i <= path_view.length; i++) {
       if (i != path_view.length && path_view[i] != os::PATH_DELIMITER) continue;
@@ -244,7 +244,7 @@ static fn resolve_listing_directory(StringView directory_part,
     Maybe<Path> home = name.is_empty() ? os::get_home_directory()
                                        : os::get_home_for_user(name);
     if (home.has_value()) {
-      Path resolved = *home;
+      let resolved = *home;
       /* Drop the name and the separator after it, then append the rest. */
       usize rest_start = name_end;
       if (rest_start < directory_part.length &&
@@ -262,7 +262,7 @@ static fn resolve_listing_directory(StringView directory_part,
   const Path directory{directory_part};
   if (directory.is_absolute()) return directory;
 
-  Path resolved = base_directory;
+  let resolved = base_directory;
   resolved.push_component(directory_part);
   return resolved;
 }
@@ -284,7 +284,7 @@ static fn complete_filesystem(StringView token,
       static_cast<int>(parts.basename_part.length), parts.basename_part.data,
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
 
-  Path listing_directory =
+  let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory);
 
   Maybe<ArrayList<String>> entries = Path::read_directory(listing_directory);
@@ -307,7 +307,7 @@ static fn complete_filesystem(StringView token,
     /* Path::read_directory hands back names only, so the trailing slash needs a
        stat per entry. Threading the dirent d_type through read_directory would
        change its signature and the Windows path, so the stat stays. */
-    Path full = listing_directory;
+    let full = listing_directory;
     full.push_component(entry.view());
     if (full.is_directory()) candidate += '/';
 
@@ -332,7 +332,7 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
   TRACELN("resolving glob token '%.*s'", static_cast<int>(token.length),
           token.data);
 
-  Path listing_directory =
+  let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory);
 
   Maybe<ArrayList<String>> entries = Path::read_directory(listing_directory);
@@ -362,7 +362,7 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
     String candidate{parts.directory_part};
     candidate += entry.view();
 
-    Path full = listing_directory;
+    let full = listing_directory;
     full.push_component(entry.view());
     if (full.is_directory()) candidate += '/';
 
@@ -395,7 +395,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
      The brace form is reproduced on every candidate. */
   bool has_brace = token.length >= 2 && token[1] == '{';
   usize name_start = has_brace ? 2 : 1;
-  StringView prefix = token.substring(name_start);
+  let const prefix = token.substring(name_start);
 
   TRACELN("completing variable token '%.*s', prefix '%.*s', brace %d",
           static_cast<int>(token.length), token.data,
@@ -437,7 +437,7 @@ static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
 static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 {
   ArrayList<String> candidates{};
-  StringView prefix = token.substring(1);
+  let const prefix = token.substring(1);
   for (const String &user : os::enumerate_users()) {
     if (!user.view().starts_with(prefix)) continue;
     String candidate{};
@@ -449,8 +449,8 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
   return candidates;
 }
 
-fn complete(StringView line, usize cursor, EvalContext &context,
-            const Path &base_directory) throws -> completion_result
+flatten fn complete(StringView line, usize cursor, EvalContext &context,
+                    const Path &base_directory) throws -> completion_result
 {
   if (cursor > line.length) cursor = line.length;
 
@@ -494,7 +494,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       String joined{};
       for (usize i = 0; i < candidates.count(); i++) {
         if (i > 0) joined += ' ';
-        StringView match = candidates[i].view();
+        let match = candidates[i].view();
         if (!match.is_empty() && match[match.length - 1] == '/')
           match = match.substring_of_length(0, match.length - 1);
         joined.append(match);
@@ -516,7 +516,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 
   utils::sort_ascending(candidates);
 
-  String longest_common_prefix = compute_longest_common_prefix(candidates);
+  let longest_common_prefix = compute_longest_common_prefix(candidates);
 
   return completion_result{
       steal(candidates), steal(longest_common_prefix), token_start, token_end,

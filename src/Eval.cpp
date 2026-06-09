@@ -2506,9 +2506,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
   let const scratch = scratch_allocator();
 
   /* Only copy the segments when a leading tilde must be rewritten. The common
-     word has no tilde and reads its segments in place. */
+     word has no tilde and reads its segments in place. The copy, when it
+     happens, lives only until this word finishes expanding, so it goes on the
+     scratch arena the command reclaims rather than the heap. */
   let const *segments = &word.segments;
-  let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
+  let tilde_expanded_segments = ArrayList<WordSegment>{scratch};
   if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~')

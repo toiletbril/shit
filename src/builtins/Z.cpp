@@ -33,9 +33,9 @@ struct frecency_entry
 /* The store lives at ~/.shit_dirs. None when the home directory is unknown. */
 static fn frecency_store_path() throws -> Maybe<Path>
 {
-  Maybe<Path> home = os::get_home_directory();
+  let home = os::get_home_directory();
   if (!home) return None;
-  Path path = *home;
+  let path = *home;
   path.push_component(".shit_dirs");
   return path;
 }
@@ -58,9 +58,9 @@ static fn recency_weight(i64 age_seconds) wontthrow -> double
 static fn read_frecency_store() throws -> ArrayList<frecency_entry>
 {
   ArrayList<frecency_entry> entries{};
-  Maybe<Path> path = frecency_store_path();
+  let path = frecency_store_path();
   if (!path) return entries;
-  Maybe<String> content = utils::read_entire_file(path->text().view());
+  let content = utils::read_entire_file(path->text().view());
   if (!content) return entries;
 
   let const text = content->view();
@@ -73,10 +73,10 @@ static fn read_frecency_store() throws -> ArrayList<frecency_entry>
 
     /* Each line is path, rank, and last-access, tab separated. A malformed line
        is skipped rather than failing the whole read. */
-    Maybe<usize> first_tab = line.find_character('\t');
+    let const first_tab = line.find_character('\t');
     if (!first_tab) continue;
     let const after_path = line.substring(*first_tab + 1);
-    Maybe<usize> second_tab = after_path.find_character('\t');
+    let const second_tab = after_path.find_character('\t');
     if (!second_tab) continue;
 
     let const path_field = line.substring_of_length(0, *first_tab);
@@ -93,10 +93,10 @@ static fn read_frecency_store() throws -> ArrayList<frecency_entry>
 static fn write_frecency_store(const ArrayList<frecency_entry> &entries) throws
     -> void
 {
-  Maybe<Path> path = frecency_store_path();
+  let path = frecency_store_path();
   if (!path) return;
 
-  String out{};
+  let out = String{};
   for (const frecency_entry &entry : entries) {
     out.append(entry.path.view());
     out += '\t';
@@ -106,14 +106,14 @@ static fn write_frecency_store(const ArrayList<frecency_entry> &entries) throws
     out += '\n';
   }
 
-  Maybe<os::descriptor> fd =
+  let const fd =
       os::open_file_descriptor(path->text().view(), os::file_open_mode::Truncate);
   if (!fd) return;
   /* The store was just truncated, so a short write would drop entries. The write
      loops until the whole buffer lands or the descriptor stops accepting it. */
   usize total_written = 0;
   while (total_written < out.count()) {
-    Maybe<usize> written =
+    let const written =
         os::write_fd(*fd, out.c_str() + total_written, out.count() - total_written);
     if (!written || *written == 0) break;
     total_written += *written;
@@ -149,9 +149,9 @@ fn record_directory_access(StringView directory) throws -> void
 {
   if (directory.is_empty()) return;
 
-  ArrayList<frecency_entry> entries = read_frecency_store();
-  const i64 now = now_epoch_seconds();
-  bool found = false;
+  let entries = read_frecency_store();
+  let const now = now_epoch_seconds();
+  let found = false;
   for (frecency_entry &entry : entries) {
     if (entry.path.view() == directory) {
       entry.rank += 1;
@@ -162,14 +162,17 @@ fn record_directory_access(StringView directory) throws -> void
   }
   if (!found) {
     entries.push(frecency_entry{String{directory}, 1, now});
-    /* When the store overflows its bound, the least-visited directory is
-       dropped by overwriting it with the last entry and shrinking, since the
-       order of the store does not matter to the ranking. */
+    /* When the store overflows its bound, the least-visited of the older
+       directories is dropped by overwriting it with the just-added last entry
+       and shrinking, since the order of the store does not matter to the
+       ranking. The search excludes the new entry, so a brand-new directory that
+       is the rank minimum is kept rather than evicting itself. */
     if (entries.count() > Z_FRECENCY_MAX) {
+      let const newest = entries.count() - 1;
       usize weakest = 0;
-      for (usize i = 1; i < entries.count(); i++)
+      for (usize i = 1; i < newest; i++)
         if (entries[i].rank < entries[weakest].rank) weakest = i;
-      entries[weakest] = steal(entries[entries.count() - 1]);
+      entries[weakest] = steal(entries[newest]);
       entries.pop_back();
     }
   }
@@ -193,16 +196,16 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     query.append(ec.args()[i]);
   }
 
-  ArrayList<frecency_entry> entries = read_frecency_store();
-  const i64 now = now_epoch_seconds();
+  let entries = read_frecency_store();
+  let const now = now_epoch_seconds();
 
   const frecency_entry *best = nullptr;
-  double best_score = -1.0;
+  let best_score = -1.0;
   for (const frecency_entry &entry : entries) {
     if (!query.is_empty() && !contains_ignore_case(entry.path.view(), query.view()))
       continue;
-    const double score = static_cast<double>(entry.rank) *
-                         recency_weight(now - entry.last_access);
+    let const score = static_cast<double>(entry.rank) *
+                      recency_weight(now - entry.last_access);
     if (score > best_score) {
       best_score = score;
       best = &entry;
@@ -212,11 +215,11 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (best == nullptr)
     throw Error{StringView{"z: no matching directory for '"} + query + "'"};
 
-  Path target = Path{best->path.view()}.to_absolute().normalized();
+  let const target = Path{best->path.view()}.to_absolute().normalized();
   if (!target.is_directory())
     throw Error{StringView{"z: '"} + best->path + "' is no longer a directory"};
 
-  const Path old_directory = Path::current_directory();
+  let const old_directory = Path::current_directory();
   if (Path::set_current_directory(target).is_error())
     throw Error{StringView{"z: could not cd to '"} + target.text() + "'"};
   utils::invalidate_path_cache();

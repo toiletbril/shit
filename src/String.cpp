@@ -136,8 +136,9 @@ fn String::operator+=(char c) throws -> String &
 
 fn String::operator<(const String &other) const wontthrow -> bool
 {
-  usize shared = m_length < other.m_length ? m_length : other.m_length;
-  int order = shared == 0 ? 0 : std::memcmp(c_str(), other.c_str(), shared);
+  let const shared = m_length < other.m_length ? m_length : other.m_length;
+  let const order =
+      shared == 0 ? 0 : std::memcmp(c_str(), other.c_str(), shared);
   if (order != 0) return order < 0;
   return m_length < other.m_length;
 }
@@ -147,7 +148,7 @@ fn String::find_substring(StringView needle, usize from) const wontthrow
 {
   if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
   if (needle.length > m_length) return None;
-  for (usize i = from; i + needle.length <= m_length; i++)
+  for (let i = from; i + needle.length <= m_length; i++)
     if (std::memcmp(m_data + i, needle.data, needle.length) == 0) return i;
   return None;
 }

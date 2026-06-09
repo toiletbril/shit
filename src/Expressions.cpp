@@ -26,7 +26,7 @@ static fn indent_for_layer(usize layer) throws -> String
   return pad;
 }
 
-Expression::Expression(SourceLocation location) : m_location(location) {}
+Expression::Expression(SourceLocation location) : m_location(steal(location)) {}
 
 pure fn Expression::source_location() const wontthrow -> SourceLocation
 {
@@ -459,7 +459,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  String value = cxt.expand_word_for_assignment(m_assignment->value_word());
+  let value = cxt.expand_word_for_assignment(m_assignment->value_word());
 
   /* The append form NAME+=VALUE prepends the current value of NAME, treating an
      unset name as empty, so the store receives the concatenation. */
@@ -1055,7 +1055,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        += accumulates against what the store already holds. */
     for (const prefix_assignment &var : m_local_vars) {
       const StringView name = var.name.view();
-      String value = cxt.expand_word_for_assignment(var.value);
+      let value = cxt.expand_word_for_assignment(var.value);
       if (var.is_append) {
         String appended{cxt.get_variable_value(name).value_or("")};
         appended += value;
@@ -1102,7 +1102,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   for (const prefix_assignment &var : m_local_vars) {
     const StringView name = var.name.view();
     Maybe<String> previous = os::get_environment_variable(name);
-    String expanded_value = cxt.expand_word_for_assignment(var.value);
+    let expanded_value = cxt.expand_word_for_assignment(var.value);
     /* The append form prepends the current value of NAME, which a prefix reads
        from the shell store before the environment so a non-exported shell
        variable still contributes, treating an unset name as empty. */
@@ -3273,8 +3273,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))
   {
-    String message = StringView{"Command '"} + StringView{*name} +
-                     StringView{"' was not found"};
+    let message = StringView{"Command '"} + StringView{*name} +
+                  StringView{"' was not found"};
     /* A close function, alias, builtin, or PATH program is offered as a
        did-you-mean hint, so a typo points at the command it resembles. */
     ArrayList<String> local_names{};

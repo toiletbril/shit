@@ -35,7 +35,7 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
 {
   if (!colors::stderr_wants_color()) return diagnostic_color{};
 
-  StringView severity = colors::ansi::BOLD_CYAN;
+  let severity = colors::ansi::BOLD_CYAN;
   if (severity_word == StringView{"error"})
     severity = colors::ansi::BOLD_RED;
   else if (severity_word == StringView{"warning"})
@@ -339,7 +339,7 @@ cold fn Note::severity_word() const wontthrow -> String { return "note"; }
 
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
-    : ErrorBase(message), m_location(location)
+    : ErrorBase(message), m_location(steal(location))
 {}
 
 cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
@@ -411,6 +411,9 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += m_message;
     result += '.';
     result += color.reset;
+  } else {
+    /* It must be trace. Anyway's, we're showing the location next. */
+    result += " location:";
   }
   result += '\n';
 
@@ -421,12 +424,12 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 }
 
 CommandNotFound::CommandNotFound(SourceLocation location, StringView message)
-    : ErrorWithLocation(location, message)
+    : ErrorWithLocation(steal(location), message)
 {}
 
 WarningWithLocation::WarningWithLocation(SourceLocation location,
                                          StringView message)
-    : ErrorWithLocation(location, message)
+    : ErrorWithLocation(steal(location), message)
 {}
 
 cold fn WarningWithLocation::severity_word() const wontthrow -> String
@@ -435,7 +438,7 @@ cold fn WarningWithLocation::severity_word() const wontthrow -> String
 }
 
 TraceWithLocation::TraceWithLocation(SourceLocation location)
-    : ErrorWithLocation(location, {})
+    : ErrorWithLocation(steal(location), {})
 {}
 
 cold fn TraceWithLocation::severity_word() const wontthrow -> String
@@ -446,8 +449,9 @@ cold fn TraceWithLocation::severity_word() const wontthrow -> String
 ErrorWithLocationAndDetails::ErrorWithLocationAndDetails(
     SourceLocation location, StringView message,
     SourceLocation details_location, StringView details_message)
-    : ErrorWithLocation(location, message),
-      m_details_location(details_location), m_details_message(details_message)
+    : ErrorWithLocation(steal(location), message),
+      m_details_location(steal(details_location)),
+      m_details_message(details_message)
 {}
 
 cold fn ErrorWithLocationAndDetails::details_to_string(
