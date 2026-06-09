@@ -239,8 +239,8 @@ static fn run_script_contents(const String &script_contents,
 
     Parser p{
         Lexer{String{script_contents.view()}, ast_arena,
-              FLAG_ESCAPE_MAP.is_enabled(), filename},
-        context.is_bash_compatible()
+              FLAG_ESCAPE_MAP.is_enabled(), filename,
+              context.is_bash_compatible()}
     };
 
     /* Recover from each parse error so the whole file is reported at once. A

@@ -14,7 +14,7 @@ using namespace expressions;
 class Parser
 {
 public:
-  Parser(Lexer &&lexer, bool bash_compatible = false);
+  Parser(Lexer &&lexer);
   ~Parser();
 
   fn construct_ast() throws -> Expression *;
@@ -39,11 +39,6 @@ private:
   static constexpr usize MAX_COMMAND_DEPTH = 512;
 
   Lexer m_lexer;
-
-  /* Whether bash-compatible parsing is active, the (( )) arithmetic command and
-     the C-style for. Handed in at construction from the EvalContext mode rather
-     than read from a global. */
-  bool m_bash_compatible;
 
   usize m_command_depth{0};
   usize m_recursion_depth{0};

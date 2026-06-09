@@ -3685,8 +3685,8 @@ fn EvalContext::capture_command_substitution(const String &source) throws
     throw Error{"Command substitution outside of a parse"};
 
   let parser = Parser{
-      Lexer{String{source.view()}, *AST_ARENA},
-      is_bash_compatible()
+      Lexer{String{source.view()}, *AST_ARENA, false, None,
+            is_bash_compatible()}
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
@@ -3709,8 +3709,8 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
       segment.cached_substitution_generation != generation)
   {
     let parser = Parser{
-        Lexer{String{segment.text.view()}, *AST_ARENA},
-        is_bash_compatible()
+        Lexer{String{segment.text.view()}, *AST_ARENA, false, None,
+              is_bash_compatible()}
     };
     segment.cached_substitution_ast = parser.construct_ast();
     segment.cached_substitution_generation = generation;
@@ -3877,8 +3877,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
      the wrong line. */
   try {
     let parser = Parser{
-        Lexer{String{source}, *AST_ARENA, false, stable_filename},
-        is_bash_compatible()
+        Lexer{String{source}, *AST_ARENA, false, stable_filename,
+              is_bash_compatible()}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this

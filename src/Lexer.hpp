@@ -44,8 +44,15 @@ class Lexer
 public:
   Lexer(String source, BumpArena &arena,
         bool should_collect_debug_words = false,
-        Maybe<StringView> filename = None);
+        Maybe<StringView> filename = None, bool bash_compatible = false);
   ~Lexer();
+
+  /* Whether bash-compatible lexing is active, which the $'...' ANSI-C quoting
+     reads. Handed in at construction from the EvalContext mode. */
+  pure fn is_bash_compatible() const wontthrow -> bool
+  {
+    return m_bash_compatible;
+  }
 
   /* A lexer holds the pending-heredoc state and the source, so a copy would
      duplicate that state. Moving transfers it and leaves the source empty, and
@@ -89,6 +96,7 @@ protected:
      such as an interactive line. It travels into every SourceLocation the lexer
      stamps. */
   Maybe<StringView> m_filename{};
+  bool m_bash_compatible{false};
   usize m_cursor_position{0};
   usize m_cached_offset{0};
 

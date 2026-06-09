@@ -133,8 +133,9 @@ hot pure fn is_variable_name(char ch) wontthrow -> bool
 } /* namespace lexer */
 
 Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
-             Maybe<StringView> filename)
+             Maybe<StringView> filename, bool bash_compatible)
     : m_source(steal(source)), m_arena(&arena), m_filename(filename),
+      m_bash_compatible(bash_compatible),
       m_should_collect_debug_words(should_collect_debug_words)
 {}
 
@@ -514,6 +515,130 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     if (ch == '$') {
       byte_count++;
       char next = chop_character(byte_count);
+
+      /* $'...' is bash ANSI-C quoting. The backslash escapes are decoded here
+         and the result is a final literal segment that neither expands nor
+         globs, the way single quotes produce a literal but with escapes. */
+      if (next == '\'' && m_bash_compatible) {
+        byte_count++;
+        auto emit_literal = [&](char byte) {
+          append_char(WordSegment::Kind::LiteralText, byte);
+        };
+        auto hex_value = [](char h) -> int {
+          if (h >= '0' && h <= '9') return h - '0';
+          if (h >= 'a' && h <= 'f') return h - 'a' + 10;
+          if (h >= 'A' && h <= 'F') return h - 'A' + 10;
+          return -1;
+        };
+        auto emit_codepoint = [&](u32 cp) {
+          if (cp < 0x80) {
+            emit_literal(static_cast<char>(cp));
+          } else if (cp < 0x800) {
+            emit_literal(static_cast<char>(0xC0 | (cp >> 6)));
+            emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
+          } else if (cp < 0x10000) {
+            emit_literal(static_cast<char>(0xE0 | (cp >> 12)));
+            emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
+          } else {
+            emit_literal(static_cast<char>(0xF0 | (cp >> 18)));
+            emit_literal(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+            emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
+          }
+        };
+
+        for (;;) {
+          const char c = chop_character(byte_count);
+          if (c == lexer::CEOF) {
+            throw ErrorWithLocationAndDetails{
+                here(m_cursor_position, byte_count),
+                "Unterminated $'...' string",
+                here(m_cursor_position + byte_count, 1), "Expected ' here"};
+          }
+          byte_count++;
+          if (c == '\'') break;
+          if (c != '\\') {
+            emit_literal(c);
+            continue;
+          }
+          const char e = chop_character(byte_count);
+          if (e == lexer::CEOF) {
+            emit_literal('\\');
+            break;
+          }
+          byte_count++;
+          switch (e) {
+          case 'n': emit_literal('\n'); break;
+          case 't': emit_literal('\t'); break;
+          case 'r': emit_literal('\r'); break;
+          case 'a': emit_literal('\a'); break;
+          case 'b': emit_literal('\b'); break;
+          case 'f': emit_literal('\f'); break;
+          case 'v': emit_literal('\v'); break;
+          case 'e':
+          case 'E': emit_literal('\x1b'); break;
+          case '\\': emit_literal('\\'); break;
+          case '\'': emit_literal('\''); break;
+          case '"': emit_literal('"'); break;
+          case '?': emit_literal('?'); break;
+          case 'x': {
+            int value = 0;
+            int digits = 0;
+            while (digits < 2 && hex_value(chop_character(byte_count)) >= 0) {
+              value = value * 16 + hex_value(chop_character(byte_count));
+              byte_count++;
+              digits++;
+            }
+            if (digits == 0) {
+              emit_literal('\\');
+              emit_literal('x');
+            } else {
+              emit_literal(static_cast<char>(value));
+            }
+          } break;
+          case 'u':
+          case 'U': {
+            const int max_digits = e == 'u' ? 4 : 8;
+            u32 codepoint = 0;
+            int digits = 0;
+            while (digits < max_digits &&
+                   hex_value(chop_character(byte_count)) >= 0)
+            {
+              codepoint =
+                  codepoint * 16 +
+                  static_cast<u32>(hex_value(chop_character(byte_count)));
+              byte_count++;
+              digits++;
+            }
+            if (digits == 0) {
+              emit_literal('\\');
+              emit_literal(e);
+            } else {
+              emit_codepoint(codepoint);
+            }
+          } break;
+          default:
+            if (e >= '0' && e <= '7') {
+              int value = e - '0';
+              int digits = 1;
+              while (digits < 3) {
+                const char o = chop_character(byte_count);
+                if (o < '0' || o > '7') break;
+                value = value * 8 + (o - '0');
+                byte_count++;
+                digits++;
+              }
+              emit_literal(static_cast<char>(value));
+            } else {
+              emit_literal('\\');
+              emit_literal(e);
+            }
+            break;
+          }
+        }
+        continue;
+      }
 
       if (next == '(') {
         /* Command substitution. Scan to the matching close paren, honoring
