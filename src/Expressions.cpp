@@ -2727,6 +2727,13 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 .to_literal_string()
           : m_args[0]->raw_string();
 
+  /* A user-defined function or alias of a builtin name runs that user code, not
+     the builtin, so a lint that keys on the builtin name must stay quiet here.
+     This is the predicate the missing-command check below also reads. */
+  let const command_is_shadowed =
+      actx.defined_functions.contains(command_literal.view()) ||
+      actx.known_aliases.contains(command_literal.view());
+
   /* A dot, source, eval, or alias runs or defines code the prepass cannot see,
      so any later unresolved command must not be a hard failure. */
   if (command_literal == "." || command_literal == "source" ||
@@ -2776,8 +2783,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   /* read without -r lets a backslash in the input escape the next byte, so a
      path or a line with a backslash is mangled. This is shellcheck SC2162. A
      combined short flag such as -rs carries the r, a long option or a value does
-     not. */
-  if (command_literal == "read") {
+     not. A function or alias named read is the user's own, so the lint is off
+     for it. */
+  if (command_literal == "read" && !command_is_shadowed) {
     bool has_raw_flag = false;
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
@@ -2798,18 +2806,42 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 "read the line literally");
   }
 
-  /* printf reads its first argument as a format, so a variable or a command
+  /* printf reads its format argument as the template, so a variable or a command
      substitution there lets the data control the format directives. This is
-     shellcheck SC2059, write printf '%s' \"$var\" instead. A leading option is
-     skipped conservatively rather than risk a wrong format word. */
-  if (command_literal == "printf" && m_args.count() >= 2 &&
-      m_args[1]->kind() == Token::Kind::Word)
-  {
-    let const &format =
-        static_cast<const tokens::WordToken *>(m_args[1])->word();
-    let const literal = format.to_literal_string();
-    let const is_option = literal.length() >= 1 && literal.view()[0] == '-';
-    if (!is_option) {
+     shellcheck SC2059, write printf '%s' \"$var\" instead. The format is the
+     first non-option word, so a leading -v or other dash run is skipped and a --
+     ends the options and forces the next word as the format, which keeps
+     printf -- "$fmt" inspected. A function or alias named printf is the user's
+     own, so the lint is off for it. */
+  if (command_literal == "printf" && !command_is_shadowed) {
+    usize format_index = 0;
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) {
+        /* A non-literal word can be neither -- nor an option to skip, so it is
+           the format. */
+        format_index = i;
+        break;
+      }
+      let const literal =
+          static_cast<const tokens::WordToken *>(m_args[i])->word()
+              .to_literal_string();
+      let const view = literal.view();
+      if (view == "--") {
+        /* The options end here, so the word after -- is the format. */
+        if (i + 1 < m_args.count()) format_index = i + 1;
+        break;
+      }
+      if (!(view.length >= 1 && view[0] == '-')) {
+        format_index = i;
+        break;
+      }
+    }
+
+    if (format_index != 0 &&
+        m_args[format_index]->kind() == Token::Kind::Word)
+    {
+      let const &format =
+          static_cast<const tokens::WordToken *>(m_args[format_index])->word();
       bool format_has_expansion = false;
       for (const WordSegment &segment : format.segments) {
         if (segment.kind == WordSegment::Kind::VariableReference ||
@@ -2820,7 +2852,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         }
       }
       if (format_has_expansion)
-        actx.warn(m_args[1]->source_location(),
+        actx.warn(m_args[format_index]->source_location(),
                   "printf format comes from a variable, the data can inject "
                   "format directives, use printf '%s' to print it");
     }
@@ -2829,12 +2861,14 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   /* Obsolescent or redundant test forms, each a shellcheck check. -a and -o
      joining two conditions is obsolescent and misparses with some operands, so
      prefer a separate test joined with && or || (SC2166). The operator is binary
-     only past the first operand, so a unary -a file test does not trip it. A
-     negated -z or -n has a direct operator, -n or -z (SC2236, SC2237). The test
-     commands resolve as builtins, so this never meets the missing-command
-     check. */
-  if (command_literal == "[" || command_literal == "test" ||
-      command_literal == "[[")
+     only past the first operand, so a unary -a file test does not trip it, and a
+     -a right after a ! is the negated unary file test rather than the binary
+     AND. A negated -z or -n has a direct operator, -n or -z (SC2236, SC2237). A
+     function or alias named test or [ is the user's own, so the lint is off for
+     it. */
+  if ((command_literal == "[" || command_literal == "test" ||
+       command_literal == "[[") &&
+      !command_is_shadowed)
   {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
@@ -2842,7 +2876,14 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           static_cast<const tokens::WordToken *>(m_args[i])->word()
               .to_literal_string();
       let const view = literal.view();
-      if (i >= 2 && (view == "-a" || view == "-o")) {
+      /* The word right before -a or -o, used to tell a negated unary -a file
+         test from the binary AND operator. */
+      let const previous_is_bang =
+          m_args[i - 1]->kind() == Token::Kind::Word &&
+          static_cast<const tokens::WordToken *>(m_args[i - 1])->word()
+                  .to_literal_string()
+                  .view() == "!";
+      if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
         actx.warn(m_args[i]->source_location(),
                   "test with -a or -o is obsolescent, join two tests with && or "
                   "|| instead");

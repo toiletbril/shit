@@ -1,3 +1,4 @@
 [ -f a -a -f b ]
 [ ! -z "$x" ]
 [ ! -n "$y" ]
+false && [ ! -a /nonexistent ]

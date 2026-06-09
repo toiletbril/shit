@@ -5,6 +5,10 @@
     [SimpleCommand "[" "!" "-z" "$x" "]"]
   [CompoundListCondition, None]
     [SimpleCommand "[" "!" "-n" "$y" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "[" "!" "-a" "/nonexistent" "]"]
 [Word
   Unquoted "["
 ]
@@ -56,6 +60,24 @@
 [Word
   Unquoted "]"
 ]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "/nonexistent"
+]
+[Word
+  Unquoted "]"
+]
 shit: 1:8: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
      1 |  [ -f a -a -f b ]
        |         ^~ here.
@@ -65,4 +87,4 @@ shit: 2:3: warning: a negated -z is just -n, test with -n instead.
 shit: 3:3: warning: a negated -n is just -z, test with -z instead.
      3 |  [ ! -n "$y" ]
        |    ^~ here.
-[Code 0]
+[Code 1]

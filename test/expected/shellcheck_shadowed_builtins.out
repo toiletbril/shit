@@ -1,0 +1,107 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "read"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "my read $1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "line"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "printf"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "my printf $1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "$1"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "test"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "my test $1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "-f" "a" "-a" "-f" "b"]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "my read "
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "line"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "my printf "
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "my test "
+  Variable "1"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "b"
+]
+my read line
+my printf 
+my test -f
+[Code 0]
