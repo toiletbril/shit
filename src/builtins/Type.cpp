@@ -75,7 +75,13 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
        -t form prints names each class, while the default form spells it out. */
     StringView word{};
     Maybe<String> alias_value;
-    if (utils::is_posix_reserved_word(name.view())) {
+    /* The POSIX reserved words plus the bash reserved words shit recognizes, the
+       [[ ]] conditional brackets and the time and function keywords, all
+       classify as a keyword the way bash reports them. */
+    if (utils::is_posix_reserved_word(name.view()) || name.view() == "[[" ||
+        name.view() == "]]" || name.view() == "function" ||
+        name.view() == "time")
+    {
       word = "keyword";
     } else if (let const alias = cxt.get_alias(name.view());
                alias.has_value()) {
