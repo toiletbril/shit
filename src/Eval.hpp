@@ -1031,6 +1031,15 @@ protected:
      first character and a doubled one touches every character, and an optional
      glob after the operator limits which characters are affected. */
   fn apply_case_modification(StringView name, StringView spec) throws -> String;
+  /* The value-only core of the case modification, shared with the array element
+     paths. */
+  fn apply_case_modification_to_value(StringView value, StringView spec) throws
+      -> String;
+  /* Apply one trailing value-transform modifier, the / replacement, the # and %
+     trims, or the ^ and , case changes, to a single value, so an array element
+     and a [@]/[*] field element share one mapping. */
+  fn apply_value_modifier(StringView value, StringView modifier) throws
+      -> String;
 
   /* Expand the bash array element reference ${name[subscript]}. A subscript of
      @ or * yields every element, an arithmetic subscript yields one, and a

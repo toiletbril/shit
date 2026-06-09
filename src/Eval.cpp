@@ -1995,14 +1995,18 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       /* Nothing after the ] is the plain element read. */
       if (*close + 1 == rest.length)
         return apply_array_subscript(name, subscript);
-      /* A /pat/rep after the ] modifies the one element. The @ and * forms map
-         per element and are produced in the field path, so only a single
-         subscript is handled here. */
+      /* A value-transform modifier after the ], the / replacement, the # and %
+         trims, or the ^ and , case changes, modifies the one element. The @ and
+         * forms map per element and are produced in the field path, so only a
+         single subscript is handled here. A different modifier such as :- falls
+         through to the general parameter expansion. */
       const StringView modifier = rest.substring(*close + 1);
-      if (subscript != "@" && subscript != "*" && !modifier.is_empty() &&
-          modifier[0] == '/')
-        return pattern_replace_value(apply_array_subscript(name, subscript),
-                                     modifier);
+      const char modifier_op = modifier.is_empty() ? '\0' : modifier[0];
+      if (subscript != "@" && subscript != "*" &&
+          (modifier_op == '/' || modifier_op == '#' || modifier_op == '%' ||
+           modifier_op == '^' || modifier_op == ','))
+        return apply_value_modifier(
+            apply_array_subscript(name, subscript).view(), modifier);
     }
   }
 
@@ -2327,8 +2331,16 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
   if (m_error_unset && !current.has_value())
     throw Error{"Unable to expand '" + name +
                 "' because the parameter is not set"};
-  let const value = current.value_or(String{});
+  return apply_case_modification_to_value(current.value_or(String{}).view(),
+                                          spec);
+}
 
+/* The value-only core of the case modification, so an array element and the
+   scalar name path share one implementation. */
+fn EvalContext::apply_case_modification_to_value(StringView value,
+                                                 StringView spec) throws
+    -> String
+{
   const char op = spec[0];
   /* A doubled operator touches every matching character, a single one only the
      first. */
@@ -2347,11 +2359,11 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
   }
 
   let out = String{heap_allocator()};
-  for (usize i = 0; i < value.length(); i++) {
-    char c = value.view()[i];
+  for (usize i = 0; i < value.length; i++) {
+    char c = value[i];
     const bool affected = modify_all || i == 0;
     if (affected && utils::glob_matches(pattern.view(),
-                                        value.view().substring_of_length(i, 1),
+                                        value.substring_of_length(i, 1),
                                         pattern_active, 0, extglob_enabled()))
     {
       const unsigned char byte = static_cast<unsigned char>(c);
@@ -2361,6 +2373,33 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
     out.push(c);
   }
   return out;
+}
+
+/* Apply a trailing parameter-expansion modifier to a single value, the / pattern
+   replacement, the # and % prefix and suffix trims, and the ^ and , case
+   changes. An array element and an element of the [@]/[*] field path share this
+   so each modifier maps over the element the way bash does. A modifier byte that
+   is not a value transform leaves the value unchanged, since the caller only
+   routes the transform modifiers here. */
+fn EvalContext::apply_value_modifier(StringView value, StringView modifier) throws
+    -> String
+{
+  if (modifier.is_empty()) return String{heap_allocator(), value};
+  const char op = modifier[0];
+  if (op == '/') return pattern_replace_value(String{heap_allocator(), value},
+                                              modifier);
+  if (op == '^' || op == ',')
+    return apply_case_modification_to_value(value, modifier);
+  if (op == '#' || op == '%') {
+    const bool is_doubled = modifier.length > 1 && modifier[1] == op;
+    const StringView pattern_word = modifier.substring(is_doubled ? 2 : 1);
+    let pattern_active = ArrayList<bool>{scratch_allocator()};
+    let const pattern = expand_modifier_word_masked(pattern_word, pattern_active);
+    return trim_matching(value, pattern.view(), pattern_active,
+                         op == '#' ? TrimEnd::Prefix : TrimEnd::Suffix,
+                         is_doubled, extglob_enabled());
+  }
+  return String{heap_allocator(), value};
 }
 
 fn EvalContext::apply_array_subscript(StringView name,
@@ -4256,21 +4295,27 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
-      /* "${a[@]/pat/rep}" maps the pattern replacement over each element, one
-         field per element the way "${a[@]}" does, while "${a[*]/pat/rep}" joins
-         the modified elements. Only the pattern-replacement modifier is mapped
-         here, the others fall through to the general scalar path. */
+      /* "${a[@]MOD}" maps a value-transform modifier over each element, one
+         field per element the way "${a[@]}" does, while "${a[*]MOD}" joins the
+         modified elements. The / replacement, the # and % trims, and the ^ and ,
+         case changes all map here, a different modifier falls through to the
+         general scalar path. */
       if (lexer::is_variable_name_start(segment_text[0])) {
         usize name_end = 1;
         while (name_end < segment_text.length &&
                lexer::is_variable_name(segment_text[name_end]))
           name_end++;
+        const char field_modifier_op =
+            name_end + 3 < segment_text.length ? segment_text[name_end + 3]
+                                               : '\0';
         if (name_end + 3 < segment_text.length &&
             segment_text[name_end] == '[' &&
             (segment_text[name_end + 1] == '@' ||
              segment_text[name_end + 1] == '*') &&
             segment_text[name_end + 2] == ']' &&
-            segment_text[name_end + 3] == '/')
+            (field_modifier_op == '/' || field_modifier_op == '#' ||
+             field_modifier_op == '%' || field_modifier_op == '^' ||
+             field_modifier_op == ','))
         {
           let const array_name = segment_text.substring_of_length(0, name_end);
           let const modifier = segment_text.substring(name_end + 3);
@@ -4281,13 +4326,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let joined = String{heap_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
-              joined.append(pattern_replace_value(elements[i], modifier).view());
+              joined.append(
+                  apply_value_modifier(elements[i].view(), modifier).view());
             }
             append_run(joined, false);
           } else {
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0) flush();
-              let const modified = pattern_replace_value(elements[i], modifier);
+              let const modified =
+                  apply_value_modifier(elements[i].view(), modifier);
               if (segment.is_in_double_quotes)
                 append_run(modified.view(), false);
               else
