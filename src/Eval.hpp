@@ -469,6 +469,15 @@ public:
     return m_bash_compatible;
   }
 
+  /* POSIX mode behaves like dash. The non-posix-breaking bash additions that
+     are on in the default mode too, such as the extended globs, read this to
+     stay off only here. */
+  fn set_posix_mode(bool enabled) wontthrow -> void { m_posix_mode = enabled; }
+  pure fn is_posix_mode() const wontthrow -> bool { return m_posix_mode; }
+  /* The extended globs are on everywhere except POSIX mode, the way bash treats
+     a feature that POSIX rejects anyway as a pure addition. */
+  pure fn extglob_enabled() const wontthrow -> bool { return !m_posix_mode; }
+
   /* The bash shopt option states, set and read by the shopt builtin. A name
      with no entry reads as off. */
   fn set_shopt_option(StringView name, bool enabled) throws -> void
@@ -746,6 +755,7 @@ protected:
   bool m_export_all{false};
   bool m_no_exec{false};
   bool m_bash_compatible{false};
+  bool m_posix_mode{false};
   /* The unix time the shell started, the base $SECONDS counts from. */
   i64 m_shell_start_time{0};
   bool m_failglob{true};

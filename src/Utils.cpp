@@ -557,10 +557,225 @@ static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,
   return index < glob_active.count() && glob_active[index];
 }
 
-fn glob_matches(StringView glob, StringView str,
-                const ArrayList<bool> &glob_active, usize mask_offset) throws
+namespace {
+
+/* One alternative of a bash extended-glob group, a slice of the glob and the
+   mask offset that slice begins at, so the recursive matcher reads the same
+   per-byte activity. */
+struct extglob_alternative
+{
+  StringView pattern;
+  usize mask_offset;
+};
+
+hot fn extglob_active(const ArrayList<bool> &mask, usize index) wontthrow
     -> bool
 {
+  return index < mask.count() ? mask[index] : true;
+}
+
+/* True when glob at index opens an extended-glob group, one of ?, *, +, @, or !
+   immediately followed by (. The caller has opted into extglob, so the group
+   structure is read from the text rather than the metacharacter mask, which
+   only distinguishes a leaf star or bracket from a quoted literal. */
+fn extglob_opens_group(StringView glob, usize index) wontthrow -> bool
+{
+  if (index + 1 >= glob.count()) return false;
+  const char op = glob[index];
+  if (op != '?' && op != '*' && op != '+' && op != '@' && op != '!')
+    return false;
+  return glob[index + 1] == '(';
+}
+
+/* The index of the ) that closes the group whose ( sits at glob[1], tracking
+   nested groups by text. Returns glob.count() when the group is unbalanced. */
+fn extglob_group_close(StringView glob) wontthrow -> usize
+{
+  usize depth = 0;
+  for (usize i = 1; i < glob.count(); i++) {
+    if (glob[i] == '(')
+      depth++;
+    else if (glob[i] == ')') {
+      depth--;
+      if (depth == 0) return i;
+    }
+  }
+  return glob.count();
+}
+
+fn extglob_full_match(StringView glob, StringView str,
+                      const ArrayList<bool> &mask, usize mask_offset) throws
+    -> bool;
+
+/* Match min_reps or more repetitions of one of the alternatives against the
+   front of str, then the suffix against the rest. The min drops to zero after
+   the first repetition, so a + needs one and a * needs none. */
+fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
+                            StringView suffix, usize suffix_offset,
+                            StringView str, const ArrayList<bool> &mask,
+                            usize min_reps) throws -> bool
+{
+  if (min_reps == 0 && extglob_full_match(suffix, str, mask, suffix_offset))
+    return true;
+  for (const extglob_alternative &alternative : alternatives) {
+    for (usize length = 1; length <= str.count(); length++) {
+      if (!extglob_full_match(alternative.pattern,
+                              str.substring_of_length(0, length), mask,
+                              alternative.mask_offset))
+        continue;
+      const usize next_min = min_reps > 0 ? min_reps - 1 : 0;
+      if (extglob_match_repetition(alternatives, suffix, suffix_offset,
+                                   str.substring(length), mask, next_min))
+        return true;
+    }
+  }
+  return false;
+}
+
+fn extglob_full_match(StringView glob, StringView str,
+                      const ArrayList<bool> &mask, usize mask_offset) throws
+    -> bool
+{
+  if (glob.is_empty()) return str.is_empty();
+
+  const bool active = extglob_active(mask, mask_offset);
+  const char head = glob[0];
+
+  /* An extended-glob group such as @(a|b), *(a|b), or !(a) drives the match
+     through the alternatives split on the top-level |. */
+  if (extglob_opens_group(glob, 0)) {
+    const usize close = extglob_group_close(glob);
+    if (close < glob.count()) {
+      const StringView content = glob.substring_of_length(2, close - 2);
+      const usize content_offset = mask_offset + 2;
+      const StringView suffix = glob.substring(close + 1);
+      const usize suffix_offset = mask_offset + close + 1;
+
+      ArrayList<extglob_alternative> alternatives{heap_allocator()};
+      usize depth = 0;
+      usize start = 0;
+      for (usize i = 0; i <= content.count(); i++) {
+        const bool boundary =
+            i == content.count() || (content[i] == '|' && depth == 0);
+        if (boundary) {
+          alternatives.push({content.substring_of_length(start, i - start),
+                             content_offset + start});
+          start = i + 1;
+        } else if (content[i] == '(')
+          depth++;
+        else if (content[i] == ')')
+          depth--;
+      }
+
+      switch (head) {
+      case '*':
+        return extglob_match_repetition(alternatives, suffix, suffix_offset,
+                                        str, mask, 0);
+      case '+':
+        return extglob_match_repetition(alternatives, suffix, suffix_offset,
+                                        str, mask, 1);
+      case '?':
+      case '@':
+        for (const extglob_alternative &alternative : alternatives) {
+          for (usize length = head == '?' ? 0 : 1; length <= str.count();
+               length++)
+          {
+            if (extglob_full_match(alternative.pattern,
+                                   str.substring_of_length(0, length), mask,
+                                   alternative.mask_offset) &&
+                extglob_full_match(suffix, str.substring(length), mask,
+                                   suffix_offset))
+              return true;
+          }
+        }
+        /* A ? group also matches zero occurrences, so the suffix may follow
+           with nothing consumed. */
+        return head == '?' &&
+               extglob_full_match(suffix, str, mask, suffix_offset);
+      case '!':
+        /* A negated group consumes a prefix that none of the alternatives
+           match, then the suffix matches the rest. */
+        for (usize length = 0; length <= str.count(); length++) {
+          bool any_alternative_matches = false;
+          for (const extglob_alternative &alternative : alternatives) {
+            if (extglob_full_match(alternative.pattern,
+                                   str.substring_of_length(0, length), mask,
+                                   alternative.mask_offset))
+            {
+              any_alternative_matches = true;
+              break;
+            }
+          }
+          if (!any_alternative_matches &&
+              extglob_full_match(suffix, str.substring(length), mask,
+                                 suffix_offset))
+            return true;
+        }
+        return false;
+      default: break;
+      }
+    }
+  }
+
+  /* A trailing * matches the rest of the string, so it is taken without trying
+     every split. */
+  if (active && head == '*') {
+    for (usize eaten = 0; eaten <= str.count(); eaten++) {
+      if (extglob_full_match(glob.substring(1), str.substring(eaten), mask,
+                             mask_offset + 1))
+        return true;
+    }
+    return false;
+  }
+
+  if (str.is_empty()) return false;
+
+  if (active && head == '?')
+    return extglob_full_match(glob.substring(1), str.substring(1), mask,
+                              mask_offset + 1);
+
+  if (active && head == '[') {
+    /* Reuse the iterative matcher for a single bracket class by matching one
+       character, then continue with the rest of the glob and the string. */
+    usize span = 1;
+    while (span < glob.count() &&
+           !(glob[span] == ']' && extglob_active(mask, mask_offset + span)))
+      span++;
+    if (span < glob.count()) {
+      span++; /* past the ] */
+      const bool class_matched =
+          glob_matches(glob.substring_of_length(0, span),
+                       str.substring_of_length(0, 1), mask, mask_offset);
+      if (!class_matched) return false;
+      return extglob_full_match(glob.substring(span), str.substring(1), mask,
+                                mask_offset + span);
+    }
+  }
+
+  if (str[0] != head) return false;
+  return extglob_full_match(glob.substring(1), str.substring(1), mask,
+                            mask_offset + 1);
+}
+
+} /* namespace */
+
+fn glob_matches(StringView glob, StringView str,
+                const ArrayList<bool> &glob_active, usize mask_offset,
+                bool extglob) throws -> bool
+{
+  /* The extended-glob grammar needs backtracking over alternatives and
+     repetition, so it runs in a separate recursive matcher. It is taken only
+     when extglob is on and the pattern actually holds a group, so a plain glob
+     keeps the iterative matcher below, unchanged, and pays nothing. */
+  if (extglob) {
+    for (usize i = 0; i + 1 < glob.count(); i++) {
+      const char c = glob[i];
+      if ((c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
+          glob[i + 1] == '(')
+        return extglob_full_match(glob, str, glob_active, mask_offset);
+    }
+  }
+
   usize s = 0;
   usize g = 0;
 

@@ -156,9 +156,12 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void;
 fn search_program_path(StringView program_name, bool find_all = false) throws
     -> ArrayList<Path>;
 
+/* Match str against glob, reading glob_active for which bytes act as
+   metacharacters. With extglob set the bash extended-glob groups ?(..), *(..),
+   +(..), @(..), and !(..) are recognized, otherwise they are plain bytes. */
 fn glob_matches(StringView glob, StringView str,
-                const ArrayList<bool> &glob_active, usize mask_offset) throws
-    -> bool;
+                const ArrayList<bool> &glob_active, usize mask_offset,
+                bool extglob = false) throws -> bool;
 
 /* Record whether the shell runs at a real interactive prompt, set once from
    Main when the invocation mode is known. quit reads it so the goodbye message

@@ -680,6 +680,7 @@ fn main(int argc, char **argv) -> int
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
   context.set_failglob(!shit::should_run_in_compat_mode());
   context.set_bash_compatible(shit::should_run_in_bash_mode());
+  context.set_posix_mode(shit::should_run_in_posix_mode());
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);

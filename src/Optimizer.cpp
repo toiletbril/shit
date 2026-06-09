@@ -382,6 +382,13 @@ pure fn word_segment_has_glob_metacharacter(
   for (usize i = 0; i < segment.text.count(); i++) {
     const char c = segment.text[i];
     if (c == '*' || c == '?' || c == '[') return true;
+    /* An extended-glob opener such as @( carries no plain * or ? but still
+       globs against names, so it keeps the word off the literal fast path. The
+       matcher leaves it literal when extglob is off, so this only costs a rare
+       word a directory scan. */
+    if ((c == '+' || c == '@' || c == '!') && i + 1 < segment.text.count() &&
+        segment.text[i + 1] == '(')
+      return true;
   }
   return false;
 }

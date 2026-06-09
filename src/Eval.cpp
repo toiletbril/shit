@@ -1322,8 +1322,8 @@ enum class TrimEnd
    parallel to pattern and marks which pattern bytes may act as glob
    metacharacters, so a quoted or escaped * or ? matches itself. */
 fn trim_matching(StringView value, StringView pattern,
-                 const ArrayList<bool> &active, TrimEnd end,
-                 bool longest) throws -> String
+                 const ArrayList<bool> &active, TrimEnd end, bool longest,
+                 bool extglob_enabled) throws -> String
 {
   ASSERT(active.count() == pattern.length);
 
@@ -1333,14 +1333,14 @@ fn trim_matching(StringView value, StringView pattern,
     if (longest) {
       for (usize length = value.length;; length--) {
         if (utils::glob_matches(pattern, value.substring_of_length(0, length),
-                                active, 0))
+                                active, 0, extglob_enabled))
           return String{heap_allocator(), value.substring(length)};
         if (length == 0) break;
       }
     } else {
       for (usize length = 0; length <= value.length; length++) {
         if (utils::glob_matches(pattern, value.substring_of_length(0, length),
-                                active, 0))
+                                active, 0, extglob_enabled))
           return String{heap_allocator(), value.substring(length)};
       }
     }
@@ -1350,12 +1350,14 @@ fn trim_matching(StringView value, StringView pattern,
      */
     if (longest) {
       for (usize start = 0; start <= value.length; start++) {
-        if (utils::glob_matches(pattern, value.substring(start), active, 0))
+        if (utils::glob_matches(pattern, value.substring(start), active, 0,
+                                extglob_enabled))
           return String{heap_allocator(), value.substring_of_length(0, start)};
       }
     } else {
       for (usize start = value.length;; start--) {
-        if (utils::glob_matches(pattern, value.substring(start), active, 0))
+        if (utils::glob_matches(pattern, value.substring(start), active, 0,
+                                extglob_enabled))
           return String{heap_allocator(), value.substring_of_length(0, start)};
         if (start == 0) break;
       }
@@ -1863,7 +1865,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     let pattern_active = ArrayList<bool>{heap_allocator()};
     let const pattern = expand_modifier_word_masked(word, pattern_active);
     return trim_matching(value.view(), pattern.view(), pattern_active,
-                         TrimEnd::Prefix, is_doubled);
+                         TrimEnd::Prefix, is_doubled, extglob_enabled());
   }
 
   case '%': {
@@ -1871,7 +1873,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     let pattern_active = ArrayList<bool>{heap_allocator()};
     let const pattern = expand_modifier_word_masked(word, pattern_active);
     return trim_matching(value.view(), pattern.view(), pattern_active,
-                         TrimEnd::Suffix, is_doubled);
+                         TrimEnd::Suffix, is_doubled, extglob_enabled());
   }
 
   default: return expand_variable(name);
@@ -1974,13 +1976,13 @@ static fn find_replacement_separator(StringView body) wontthrow -> usize
    the leftmost-longest match. */
 static fn longest_pattern_match_at(StringView pattern,
                                    const ArrayList<bool> &pattern_active,
-                                   StringView value, usize start) throws
-    -> Maybe<usize>
+                                   StringView value, usize start,
+                                   bool extglob) throws -> Maybe<usize>
 {
   for (usize end = value.length; end >= start; end--) {
     if (utils::glob_matches(pattern,
                             value.substring_of_length(start, end - start),
-                            pattern_active, 0))
+                            pattern_active, 0, extglob))
       return end - start;
     if (end == start) break;
   }
@@ -2034,7 +2036,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
      front is replaced and the rest is kept. */
   if (anchor_start) {
     if (let const matched = longest_pattern_match_at(
-            pattern.view(), pattern_active, value.view(), 0))
+            pattern.view(), pattern_active, value.view(), 0, extglob_enabled()))
     {
       out += replacement;
       out.append(value.view().substring(*matched));
@@ -2049,7 +2051,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
   if (anchor_end) {
     for (usize start = 0; start <= value.length(); start++) {
       if (utils::glob_matches(pattern.view(), value.view().substring(start),
-                              pattern_active, 0))
+                              pattern_active, 0, extglob_enabled()))
       {
         out.append(value.view().substring_of_length(0, start));
         out += replacement;
@@ -2069,7 +2071,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
     Maybe<usize> matched;
     if (!has_replaced || replace_all)
       matched = longest_pattern_match_at(pattern.view(), pattern_active,
-                                         value.view(), i);
+                                         value.view(), i, extglob_enabled());
     if (matched.has_value()) {
       out += replacement;
       has_replaced = true;
@@ -2122,7 +2124,7 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
     const bool affected = modify_all || i == 0;
     if (affected && utils::glob_matches(pattern.view(),
                                         value.view().substring_of_length(i, 1),
-                                        pattern_active, 0))
+                                        pattern_active, 0, extglob_enabled()))
     {
       const unsigned char byte = static_cast<unsigned char>(c);
       c = static_cast<char>(op == '^' ? std::toupper(byte)
@@ -2356,7 +2358,8 @@ struct ConditionalEvaluator
     let active = ArrayList<bool>{heap_allocator()};
     for (usize i = 0; i < pattern.length; i++)
       active.push(pattern[i] == '*' || pattern[i] == '?' || pattern[i] == '[');
-    return utils::glob_matches(pattern, value, active, 0);
+    return utils::glob_matches(pattern, value, active, 0,
+                               cxt.extglob_enabled());
   }
 
   bool eval_unary(StringView op, StringView operand) throws
@@ -2691,7 +2694,9 @@ fn EvalContext::expand_path_once(const glob_field &field,
     /* TODO: Figure the rules of hidden file expansion. */
     if (glob[0] != '.' && !filename.is_empty() && filename[0] == '.') continue;
 
-    if (utils::glob_matches(glob, filename, field.glob_active, stem_start)) {
+    if (utils::glob_matches(glob, filename, field.glob_active, stem_start,
+                            extglob_enabled()))
+    {
       add_expansion();
 
       /* A real filename is literal, so the resulting field never globs again.
@@ -2715,14 +2720,21 @@ namespace {
    without a later ']' is a literal bracket, not a glob, so a field such as the
    command word '[' needs no directory scan at all. Returns nullopt when the
    field is all literal. */
-hot pure fn first_active_glob(StringView text,
-                              const ArrayList<bool> &mask) wontthrow
-    -> Maybe<usize>
+hot pure fn first_active_glob(StringView text, const ArrayList<bool> &mask,
+                              bool extglob) wontthrow -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};
   for (usize i = 0; i < mask.count(); i++) {
-    if (!mask[i]) continue;
     let const ch = text.data[i];
+    /* An extended-glob opener such as @( forces a directory scan even though
+       the opener byte is not a metacharacter in the mask, since the
+       alternatives it holds match real names. The structure is read from the
+       text the way the matcher reads it. */
+    if (extglob && i + 1 < text.length &&
+        (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
+        text.data[i + 1] == '(')
+      return i;
+    if (!mask[i]) continue;
     if (ch == '*' || ch == '?') return i;
     if (ch == '[') {
       if (!open_bracket) open_bracket = i;
@@ -2790,7 +2802,8 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
 
     /* An empty mask is the all-literal convention, so a field without one holds
        no live glob metacharacter. */
-    let const expand_ch = first_active_glob(text, field.glob_active);
+    let const expand_ch =
+        first_active_glob(text, field.glob_active, extglob_enabled());
 
     if (!expand_ch) {
       /* No glob remains. This field is a literal suffix appended after an
@@ -2989,7 +3002,8 @@ hot fn EvalContext::expand_path(glob_field field,
      current directory. */
   let const has_glob =
       m_enable_path_expansion &&
-      first_active_glob(field.text.view(), field.glob_active).has_value();
+      first_active_glob(field.text.view(), field.glob_active, extglob_enabled())
+          .has_value();
 
   if (!has_glob) {
     let single = ArrayList<String>{scratch};

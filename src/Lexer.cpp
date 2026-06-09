@@ -429,6 +429,32 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       break;
     }
 
+    /* An extended-glob group such as @(a|b) is captured whole so its (, the
+       nested |, and ) stay in the word as bytes the matcher reads, rather than
+       the ( ending the word as a sentinel. The opener is one of ?*+@! followed
+       with no space by (. The matcher honors the group only when shopt extglob
+       is on, so this capture is a pure addition that dash rejects anyway. */
+    if (!is_inside_quote_or_escape &&
+        (ch == '?' || ch == '*' || ch == '+' || ch == '@' || ch == '!') &&
+        chop_character(byte_count + 1) == '(')
+    {
+      const let group_start = byte_count;
+      byte_count += 2; /* the opener and the ( */
+      usize depth = 1;
+      while (depth > 0) {
+        const char c = chop_character(byte_count);
+        if (c == lexer::CEOF) break;
+        byte_count++;
+        if (c == '(')
+          depth++;
+        else if (c == ')')
+          depth--;
+      }
+      append_unquoted_run(m_source.view().substring_of_length(
+          m_cursor_position + group_start, byte_count - group_start));
+      continue;
+    }
+
     /* The common case in a large script is a run of plain identifier bytes
        outside any quote or escape. Scan the whole run and append it in one
        String append, which removes the per-byte lambda call, the per-byte
@@ -438,9 +464,19 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
        byte falls through to the unchanged per-byte handling. */
     if (!is_inside_quote_or_escape && lexer::is_plain_unquoted_run_byte(ch)) {
       const let run_start = byte_count;
-      do {
+      /* The run stops before an extended-glob opener such as the ? of ?(, so
+         the opener reaches the group capture above on the next turn rather than
+         being swallowed as a plain byte. */
+      auto opens_extglob_at = [this](usize offset) -> bool {
+        const char c = chop_character(offset);
+        return (c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
+               chop_character(offset + 1) == '(';
+      };
+      while (!opens_extglob_at(byte_count)) {
         byte_count++;
-      } while (lexer::is_plain_unquoted_run_byte(chop_character(byte_count)));
+        if (!lexer::is_plain_unquoted_run_byte(chop_character(byte_count)))
+          break;
+      }
       append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + run_start, byte_count - run_start));
       continue;

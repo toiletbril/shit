@@ -2444,7 +2444,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
         for (usize k = 0; k < pattern.count(); k++)
           pattern_active.push(true);
       }
-      if (utils::glob_matches(pattern, subject, pattern_active, 0)) {
+      if (utils::glob_matches(pattern, subject, pattern_active, 0,
+                              cxt.extglob_enabled())) {
         let const ret = item.body->evaluate(cxt);
         cxt.set_last_exit_status(static_cast<i32>(ret));
         return ret;
