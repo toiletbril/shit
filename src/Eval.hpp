@@ -284,6 +284,11 @@ public:
   pure fn positional_params() const wontthrow -> const ArrayList<String> &;
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
 
+  /* Move the positional parameters out, leaving the store empty, so a function
+     call saves the caller's parameters without a deep copy and restores them by
+     moving the saved list back. */
+  fn take_positional_params() wontthrow -> ArrayList<String>;
+
   fn set_last_exit_status(i32 status) wontthrow -> void;
   pure fn last_exit_status() const wontthrow -> i32;
 
@@ -808,6 +813,9 @@ protected:
   bool m_posix_mode{false};
   /* The unix time the shell started, the base $SECONDS counts from. */
   i64 m_shell_start_time{0};
+  /* Whether the $RANDOM generator has been seeded, set on the first read so a
+     run that never reads RANDOM pays neither the seed nor its syscall. */
+  mutable bool m_random_seeded{false};
   bool m_failglob{true};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
@@ -823,9 +831,9 @@ protected:
      dispositions match it. */
   fn install_trap_dispositions() throws -> void;
 
-  /* The names marked read-only, scanned by set_shell_variable only when the
-     list is not empty. */
-  ArrayList<String> m_readonly_names{heap_allocator()};
+  /* The names marked read-only, checked by set_shell_variable on every
+     assignment, so a set gives the membership test in O(1). */
+  HashSet m_readonly_names{heap_allocator()};
   /* The alias name to replacement table. */
   HashMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed

@@ -49,11 +49,10 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
      empty while m_field_separators is initialized to whitespace. */
   set_field_separators(m_field_separators.view());
 
-  /* The shell start time anchors $SECONDS, and the random seed mixes the time
-     and the pid the way bash seeds $RANDOM. */
+  /* The shell start time anchors $SECONDS. The $RANDOM seed is deferred to the
+     first read of RANDOM, so a run that never reads it, the common -c case, pays
+     neither the seed nor the syscall it mixes in. */
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
-  std::srand(static_cast<unsigned>(m_shell_start_time) ^
-             static_cast<unsigned>(os::get_shell_process_id()));
 }
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
@@ -472,6 +471,11 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      byte gates each compare so an ordinary name skips them. */
   if (m_bash_compatible) {
     if (first_byte == 'R' && name == "RANDOM") {
+      if (!m_random_seeded) {
+        std::srand(static_cast<unsigned>(m_shell_start_time) ^
+                   static_cast<unsigned>(os::get_shell_process_id()));
+        m_random_seeded = true;
+      }
       return String{heap_allocator(), utils::uint_to_text(static_cast<usize>(
                                           std::rand() % 32768))};
     }
@@ -520,6 +524,11 @@ fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow
     -> void
 {
   m_positional_params = steal(params);
+}
+
+fn EvalContext::take_positional_params() wontthrow -> ArrayList<String>
+{
+  return steal(m_positional_params);
 }
 
 fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
@@ -788,24 +797,20 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
 
 fn EvalContext::mark_readonly(StringView name) throws -> void
 {
-  if (is_readonly(name)) return;
-  m_readonly_names.push(String{heap_allocator(), name});
+  m_readonly_names.add(name);
 }
 
 fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
-  if (m_readonly_names.count() == 0) return false;
-  for (const String &readonly_name : m_readonly_names)
-    if (readonly_name == name) return true;
-  return false;
+  return m_readonly_names.contains(name);
 }
 
 fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{};
   out.reserve(m_readonly_names.count());
-  for (const String &name : m_readonly_names)
-    out.push(String{heap_allocator(), name});
+  m_readonly_names.for_each(
+      [&](StringView name) { out.push(String{heap_allocator(), name}); });
   utils::sort_ascending(out);
   return out;
 }
@@ -835,10 +840,9 @@ fn EvalContext::leave_function_scope() throws -> void
     else
       force_unset_shell_variable(binding.name);
   }
-  let kept = ArrayList<ArrayList<local_binding>>{};
-  for (usize i = 0; i + 1 < m_local_scopes.count(); i++)
-    kept.push(steal(m_local_scopes[i]));
-  m_local_scopes = steal(kept);
+  /* The innermost scope is the one just restored, so it is dropped in place
+     rather than rebuilding the whole stack into a fresh list on every return. */
+  m_local_scopes.pop_back();
 }
 
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
@@ -3804,8 +3808,31 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
         break;
       }
-      let const value = String{heap_allocator(),
-                               apply_parameter_expansion(segment.text.view())};
+      /* A plain $name that names a set scalar appends the stored value by view,
+         with no copy, since the full parameter expansion would read the same
+         string. A spec with a modifier, an unset name, or a synthesized name is
+         not found in the store and falls through to the general path. */
+      if (!segment_text.is_empty() &&
+          lexer::is_variable_name_start(segment_text[0]))
+      {
+        let is_plain_name = true;
+        for (usize i = 1; i < segment_text.length; i++)
+          if (!lexer::is_variable_name(segment_text[i])) {
+            is_plain_name = false;
+            break;
+          }
+        if (is_plain_name)
+          if (let const *stored = lookup_shell_variable(segment_text)) {
+            if (segment.is_in_double_quotes)
+              append_run(stored->view(), false);
+            else
+              append_split_run(stored->view(), true);
+            break;
+          }
+      }
+      /* apply_parameter_expansion already returns an owned String, so it is
+         bound directly rather than copied into a second allocation. */
+      let const value = apply_parameter_expansion(segment.text.view());
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -3815,8 +3842,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     } break;
 
     case WordSegment::Kind::CommandSubstitution: {
-      let const output =
-          String{heap_allocator(), capture_command_substitution(segment)};
+      let const output = capture_command_substitution(segment);
       if (segment.is_in_double_quotes)
         append_run(output, false);
       else
@@ -3836,7 +3862,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
       let const result = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
                              : evaluate_arithmetic(segment.text.view());
-      let const value = String{heap_allocator(), utils::int_to_text(result)};
+      let const value = utils::int_to_text(result);
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
@@ -3921,13 +3947,11 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       break;
     case WordSegment::Kind::UnquotedText: emit_run(segment_text, true); break;
     case WordSegment::Kind::VariableReference: {
-      let const value =
-          String{heap_allocator(), apply_parameter_expansion(segment_text)};
+      let const value = apply_parameter_expansion(segment_text);
       emit_run(value.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
-      let const output =
-          String{heap_allocator(), capture_command_substitution(segment)};
+      let const output = capture_command_substitution(segment);
       emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::ProcessSubstitution: {
