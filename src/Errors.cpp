@@ -45,11 +45,15 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
                           colors::ansi::BOLD_GREEN, colors::ansi::RESET};
 }
 
-/* The line a byte falls on and the offset of the newline that starts it. */
+/* The line a byte falls on and the offset of the newline that starts it. The
+   has_preceding_newline flag tells the two apart from a byte on the first line,
+   since a newline at offset zero starts line two yet shares the zero offset with
+   the no-newline case. */
 struct precise_location
 {
   usize line_number;
   usize last_newline_location;
+  bool has_preceding_newline;
 };
 
 /* A per-source index that turns the line and column lookup from a scan over the
@@ -109,9 +113,11 @@ public:
   pure fn locate(usize byte_position) const wontthrow -> precise_location
   {
     const usize newlines_before = count_newlines_before(byte_position);
+    const bool has_preceding_newline = newlines_before != 0;
     const usize last_newline_location =
-        newlines_before == 0 ? 0 : m_newline_offsets[newlines_before - 1];
-    return precise_location{newlines_before, last_newline_location};
+        has_preceding_newline ? m_newline_offsets[newlines_before - 1] : 0;
+    return precise_location{newlines_before, last_newline_location,
+                            has_preceding_newline};
   }
 
   /* The code point count of the bytes in the half open range before the byte,
@@ -189,14 +195,17 @@ cold static fn number_string_length(T n) throws -> usize
 
 cold static fn get_context_pointing_to(
     StringView source, usize byte_position, usize byte_count, usize line_number,
-    usize last_newline_location, usize unicode_position,
-    Maybe<StringView> message, const diagnostic_color &color) throws -> String
+    usize last_newline_location, bool has_preceding_newline,
+    usize unicode_position, Maybe<StringView> message,
+    const diagnostic_color &color) throws -> String
 {
   usize start_offset = byte_position - last_newline_location;
 
-  /* If we have a newline before, start_offset points to this newline. Get rid
-   * of it. */
-  if (last_newline_location != 0 && start_offset > 0) start_offset--;
+  /* A preceding newline puts start_offset on that newline, so it steps one past
+     to the first byte of the line. A newline at offset zero starts line two and
+     must step too, which the flag captures where the bare offset zero could not.
+   */
+  if (has_preceding_newline && start_offset > 0) start_offset--;
 
   usize line_byte_count = 0;
 
@@ -354,7 +363,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     byte_position++;
   }
 
-  auto [line_number, last_newline_location] =
+  auto [line_number, last_newline_location, has_preceding_newline] =
       calc_precise_position(source, byte_position);
 
   const usize unicode_position =
@@ -364,11 +373,12 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
      must be code point counts, since subtracting the newline's byte offset from
      a code point count underflows once a preceding line holds a multibyte byte.
      On the first line there is no newline, so the count from the source start
-     plus one gives the column. */
+     plus one gives the column. A newline at offset zero still starts line two,
+     so the flag rather than the bare offset decides whether a line precedes. */
   const usize codepoints_before_line =
-      (last_newline_location > 0) ? SOURCE_LINE_INDEX.codepoints_before(
-                                        source, last_newline_location + 1)
-                                  : 0;
+      has_preceding_newline ? SOURCE_LINE_INDEX.codepoints_before(
+                                  source, last_newline_location + 1)
+                            : 0;
   const usize line_byte_position =
       unicode_position - codepoints_before_line + 1;
 
@@ -404,7 +414,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 
   result += get_context_pointing_to(
       source, byte_position, byte_count, line_number, last_newline_location,
-      unicode_position, StringView{"here"}, color);
+      has_preceding_newline, unicode_position, StringView{"here"}, color);
   return result;
 }
 
@@ -452,7 +462,8 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
       source[byte_position - 1] == '\n')
     byte_position--;
 
-  auto [details_line_number, details_last_newline_location] =
+  auto [details_line_number, details_last_newline_location,
+        details_has_preceding_newline] =
       calc_precise_position(source, byte_position);
 
   const usize unicode_details_position =
@@ -460,9 +471,10 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   /* The column counts code points from the line start to the caret, so both
      terms stay in code points. See ErrorWithLocation::to_string for why a byte
-     offset here would underflow on a multibyte preceding line. */
+     offset here would underflow on a multibyte preceding line, and why a newline
+     at offset zero needs the flag rather than the bare offset. */
   const usize codepoints_before_details_line =
-      (details_last_newline_location > 0)
+      details_has_preceding_newline
           ? SOURCE_LINE_INDEX.codepoints_before(
                 source, details_last_newline_location + 1)
           : 0;
@@ -486,8 +498,8 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   result += get_context_pointing_to(
       source, byte_position, byte_count, details_line_number,
-      details_last_newline_location, unicode_details_position,
-      m_details_message.view(), color);
+      details_last_newline_location, details_has_preceding_newline,
+      unicode_details_position, m_details_message.view(), color);
   return result;
 }
 

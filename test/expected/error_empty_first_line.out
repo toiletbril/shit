@@ -1,0 +1,6 @@
+shit: 2:1: error: Unterminated string literal.
+     2 |  "unterminated
+       |  ^~~~~~~~~~~~~ here.
+shit: 2:14: note:
+     2 |  "unterminated
+       |               ^~ Expected " here.
