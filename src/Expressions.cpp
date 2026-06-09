@@ -1407,10 +1407,24 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      already errored and the elements never reach here. */
   if (!m_array_args.is_empty()) {
     let const is_local = array_command_name == "local";
-    let const is_function_local =
-        (array_command_name == "declare" || array_command_name == "typeset") &&
-        cxt.in_function_scope();
+    let const is_declare =
+        array_command_name == "declare" || array_command_name == "typeset";
+    let const is_function_local = is_declare && cxt.in_function_scope();
     let const is_export = array_command_name == "export";
+    /* readonly NAME=(...), and declare -r NAME=(...), mark the array name so a
+       later assignment to it is rejected the way bash refuses a readonly. The -r
+       flag sits in the builtin's arguments, so it is read off them. */
+    let is_readonly_request = array_command_name == "readonly";
+    if (!is_readonly_request && is_declare)
+      for (const Token *arg : m_args) {
+        let const text = arg->raw_string();
+        if (text.length() >= 2 && text.view()[0] == '-' &&
+            text.view().find_character('r').has_value())
+        {
+          is_readonly_request = true;
+          break;
+        }
+      }
     for (const array_builtin_assignment &assignment : m_array_args) {
       if (is_local || is_function_local) cxt.declare_local(assignment.name);
       ArrayList<String> values = cxt.process_args(assignment.elements);
@@ -1419,6 +1433,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       else
         cxt.set_indexed_array(assignment.name, steal(values));
       if (is_export) cxt.mark_exported(assignment.name);
+      if (is_readonly_request) cxt.mark_readonly(assignment.name);
     }
   }
 

@@ -245,6 +245,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
                                      StringView value, bool is_append) throws
     -> void
 {
+  if (is_readonly(name))
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
   if (is_associative_array(name)) {
     const String key = expand_modifier_word(subscript);
     if (is_append) {
