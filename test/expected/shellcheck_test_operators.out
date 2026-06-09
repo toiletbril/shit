@@ -78,13 +78,13 @@
 [Word
   Unquoted "]"
 ]
-shit: 1:8: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
-     1 |  [ -f a -a -f b ]
+shit: 2:8: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
+     2 |  [ -f a -a -f b ]
        |         ^~ here.
-shit: 2:3: warning: a negated -z is just -n, test with -n instead.
-     2 |  [ ! -z "$x" ]
+shit: 3:3: warning: a negated -z is just -n, test with -n instead.
+     3 |  [ ! -z "$x" ]
        |    ^~ here.
-shit: 3:3: warning: a negated -n is just -z, test with -z instead.
-     3 |  [ ! -n "$y" ]
+shit: 4:3: warning: a negated -n is just -z, test with -z instead.
+     4 |  [ ! -n "$y" ]
        |    ^~ here.
 [Code 1]

@@ -1,0 +1,6 @@
+#!/bin/env shit
+case x in #comment
+ x) echo m;; esac
+case posix in #(
+ *posix*) echo p;; #(
+ *) echo o;; esac

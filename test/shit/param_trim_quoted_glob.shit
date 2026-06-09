@@ -1,0 +1,7 @@
+#!/bin/env shit
+x='a*c'; printf "%s\n" "${x%"*c"}"
+x=abc; p='*'; printf "%s\n" "${x##"$p"}"
+x="a*c"; printf "[%s]\n" "${x#a\*}"
+x=aXc; printf "[%s]\n" "${x#a\X}"
+x="abc"; printf "[%s]\n" "${x#a*}"
+v='a*b*c'; printf "[%s]\n" "${v%%"*"*}"

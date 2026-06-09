@@ -9,6 +9,6 @@
 [Word
   Unquoted "doesnotexist_xyz*"
 ]
-shit: 2:1: error: No matches for the glob pattern 'doesnotexist_xyz*'.
-     2 |  doesnotexist_xyz*
+shit: 3:1: error: No matches for the glob pattern 'doesnotexist_xyz*'.
+     3 |  doesnotexist_xyz*
        |  ^~~~~~~~~~~~~~~~~ here.

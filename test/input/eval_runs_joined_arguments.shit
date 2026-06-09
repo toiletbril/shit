@@ -1,3 +1,0 @@
-eval 'x=5; echo "eval set x=$x"'
-cmd="echo evaluated"
-eval "$cmd"

@@ -1,6 +1,0 @@
-echo \*\*;
-echo \~\*\*;
-echo \\\\;
-echo data/\*/\*;
-test -e ~/\* && echo no such file;
-test -d \~ && echo no such dir;

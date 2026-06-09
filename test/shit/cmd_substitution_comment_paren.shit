@@ -1,0 +1,11 @@
+#!/bin/env shit
+result=$(echo hello  # a ) comment
+)
+echo "$result"
+mid=$(echo foo#bar)
+echo "$mid"
+quoted=$(echo "a # ) b")
+echo "$quoted"
+nested=$(echo $(echo inner # ) cmt
+))
+echo "$nested"

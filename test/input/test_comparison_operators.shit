@@ -1,6 +1,0 @@
-test 1 -eq 1; echo "eq=$?"
-test 1 -ne 2; echo "ne=$?"
-[ abc = abc ]; echo "streq=$?"
-[ -z "" ]; echo "empty=$?"
-[ -n "x" ]; echo "nonempty=$?"
-[ 5 -gt 3 ]; echo "gt=$?"

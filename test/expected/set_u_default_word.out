@@ -26,6 +26,6 @@
 [Word
   Unquoted "unreachable"
 ]
-shit: 2:13: error: Unable to expand 'y' because the parameter is not set.
-     2 |  printf '%s' "${x-$y}"
+shit: 3:13: error: Unable to expand 'y' because the parameter is not set.
+     3 |  printf '%s' "${x-$y}"
        |              ^~~~~~~~~ here.

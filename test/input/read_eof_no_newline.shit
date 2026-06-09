@@ -1,7 +1,0 @@
-printf abc > /tmp/shit_read_eof.txt
-read x < /tmp/shit_read_eof.txt
-echo "no_newline=[$x] $?"
-printf 'def\n' > /tmp/shit_read_eof.txt
-read y < /tmp/shit_read_eof.txt
-echo "with_newline=[$y] $?"
-rm -f /tmp/shit_read_eof.txt

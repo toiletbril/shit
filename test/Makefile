@@ -17,17 +17,29 @@ export SHIT_HISTORY := $(CURDIR)/.test_history
 export SHIT_DIRECTORY_HISTORY := $(CURDIR)/.test_directory_history
 
 FAILED_LIST := failed.diff
-INPUT_FILES := $(wildcard input/*.shit)
+INPUT_FILES := $(wildcard shit/*.shit)
 
-TEST_NAMES := $(INPUT_FILES:input/%.shit=%)
+TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
 
 # TODO: Custom test runner?
+# A test passes when its output matches the primary expected file or, for a test
+# whose output is not fully deterministic such as the ordering of two background
+# jobs, an alternative expected/NAME_1.out. The output is captured once to a
+# temporary so the byte-for-byte trailing-newline comparison is preserved, then
+# diffed against each accepted file in turn. Only the primary diff is recorded on
+# a real failure.
 %: expected/%.out
-	cat input/$@.shit | \
-	$(BIN) $(BIN_FLAGS) - 2>&1 | \
-	diff $(DIFF_FLAGS) $< - >> $(FAILED_LIST) && \
-	printf "	%-64s ok\n" $@ || \
-	printf "	%-64s FAILED :c\n" $@
+	@out=$$(mktemp); \
+	cat shit/$@.shit | $(BIN) $(BIN_FLAGS) - > $$out 2>&1; \
+	if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1 || \
+	   { [ -f expected/$@_1.out ] && \
+	     diff $(DIFF_FLAGS) expected/$@_1.out $$out >/dev/null 2>&1; }; then \
+		printf "	%-64s ok\n" $@; \
+	else \
+		diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
+		printf "	%-64s FAILED :c\n" $@; \
+	fi; \
+	rm -f $$out
 
 clean:
 	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
@@ -37,14 +49,16 @@ test: $(BIN)
 	@$(MAKE) -B run_tests
 	@$(MAKE) -B dashdiff
 	@$(MAKE) -B bashdiff
-	cat $(FAILED_LIST)
+	@$(MAKE) -B mimicrydiff
+	@cat $(FAILED_LIST)
+	@test ! -s $(FAILED_LIST)
 
 run_tests: $(TEST_NAMES)
 
 refill:
 	for f in $(TEST_NAMES); do \
 		printf "	%-64s $$f.out\n" $$f.shit; \
-		cat input/$$f.shit | $(BIN) $(BIN_FLAGS) - > expected/$$f.out 2>&1; \
+		cat shit/$$f.shit | $(BIN) $(BIN_FLAGS) - > expected/$$f.out 2>&1; \
 	done || true
 
 # Run each posix script through the shell and through dash, then diff their
@@ -52,7 +66,7 @@ refill:
 # is appended to the failed list and the line is marked, the same shape the
 # golden run_tests target uses. The goal is byte-identical output with dash.
 DASH ?= dash
-POSIX_COMPAT := $(wildcard posix/*.shit)
+SH_COMPAT := $(wildcard sh/*.sh)
 
 # The diff targets compare two live shells through process substitution, so they
 # run in bash rather than the system /bin/sh. The scope is these two targets so
@@ -60,7 +74,7 @@ POSIX_COMPAT := $(wildcard posix/*.shit)
 dashdiff bashdiff mimicrydiff: SHELL := bash
 
 dashdiff: $(BIN)
-	@for f in $(POSIX_COMPAT); do \
+	@for f in $(SH_COMPAT); do \
 		s="$$($(BIN) "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (dash)" \
@@ -74,7 +88,7 @@ dashdiff: $(BIN)
 # difference is appended to the failed list. The goal is byte-identical output
 # with real bash for the bash extensions.
 BASH ?= bash
-BASH_COMPAT := $(wildcard bash/*.shit)
+BASH_COMPAT := $(wildcard bash/*.bash)
 
 bashdiff: $(BIN)
 	@for f in $(BASH_COMPAT); do \
@@ -86,23 +100,29 @@ bashdiff: $(BIN)
 			|| printf "	%-64s FAILED :c\n" "$$f"; \
 	done
 
-# Run each shebang script through shit mimicry and through the interpreter the
-# shebang names, then diff their output the way dashdiff and bashdiff do. The
-# script is run as a command with -I -c so the shebang chooses the mood, since
-# mimicry intercepts a command, not the main file. A bash shebang compares
-# against bash, any other shebang against dash, since the POSIX mood targets
-# dash semantics.
-MIMIC_SCRIPTS := $(wildcard mimicry/*.sh)
-
+# Push every bash and sh diff script through mimicry as well, so each one runs a
+# second time and the shell picks its mood from the script's own shebang rather
+# than an explicit flag. The script is run as a command with -I -c, which is what
+# triggers mimicry, and the reference shell runs the same path so $0 and the
+# positional parameters stay identical. A bash script compares against bash, an
+# sh script against dash, since the POSIX mood targets dash semantics. stderr is
+# dropped, so a shifted diagnostic line number does not affect the comparison.
 mimicrydiff: $(BIN)
-	@for f in $(MIMIC_SCRIPTS); do \
-		case "$$(head -1 $$f)" in *bash*) ref="$(BASH)";; *) ref="$(DASH)";; esac; \
-		s="$$($(BIN) -I -c "$$PWD/$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
-		r="$$($$ref "$$f" 2>/dev/null; printf X)"; r="$${r%X}"; \
-		diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f ($$ref)" \
-			<(printf '%s' "$$s") <(printf '%s' "$$r") >> $(FAILED_LIST) \
-			&& printf "	%-64s ok\n" "$$f" \
-			|| printf "	%-64s FAILED :c\n" "$$f"; \
+	@for f in $(BASH_COMPAT); do \
+		s="$$($(BIN) -I -c "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
+		diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f (bash)" \
+			<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST) \
+			&& printf "	%-64s mimic ok\n" "$$f" \
+			|| printf "	%-64s mimic FAILED :c\n" "$$f"; \
+	done; \
+	for f in $(SH_COMPAT); do \
+		s="$$($(BIN) -I -c "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
+		diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f (dash)" \
+			<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST) \
+			&& printf "	%-64s mimic ok\n" "$$f" \
+			|| printf "	%-64s mimic FAILED :c\n" "$$f"; \
 	done
 
 # Time the builtin-only configure script through each shell, after checking that
@@ -132,4 +152,4 @@ bench:
 		done'; \
 	rm -f /tmp/shit_bench_d /tmp/shit_bench_s
 
-.PHONY: test clean run_tests refill dashdiff bashdiff bench
+.PHONY: test clean run_tests refill dashdiff bashdiff mimicrydiff bench

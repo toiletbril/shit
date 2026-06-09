@@ -1,3 +1,0 @@
-f() { local X=1; readonly X; echo "in=$X"; }
-f
-echo "after"

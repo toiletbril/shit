@@ -1,3 +1,0 @@
-Y=data/*
-echo $Y
-echo "$Y"

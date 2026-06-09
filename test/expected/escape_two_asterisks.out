@@ -8,6 +8,6 @@
   Unquoted "*"
   Literal "*"
 ]
-shit: 1:6: error: No matches for the glob pattern '**'.
-     1 |  echo *\*
+shit: 2:6: error: No matches for the glob pattern '**'.
+     2 |  echo *\*
        |       ^~~ here.

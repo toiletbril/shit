@@ -1,0 +1,4 @@
+#!/bin/env shit
+f() { break; }
+for i in 1 2 3; do f; echo "$i"; done
+echo "loop_done"

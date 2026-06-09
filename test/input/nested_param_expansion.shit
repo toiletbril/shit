@@ -1,3 +1,0 @@
-x=; y=; echo "${x:-${y:-N}}"
-HOME=/h; echo "${HOME:+${HOME}/bin}"
-a=1; echo "${z:-${a}${a}}"

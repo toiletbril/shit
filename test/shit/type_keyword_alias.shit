@@ -1,0 +1,8 @@
+#!/bin/env shit
+alias ll='ls -l'
+type if
+type ll
+command -v if
+command -v ll
+command -V if
+command -V ll

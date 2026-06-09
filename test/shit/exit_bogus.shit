@@ -1,0 +1,2 @@
+#!/bin/env shit
+exit "hello world" "hello world"

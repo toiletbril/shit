@@ -35,7 +35,7 @@
 [Word
   Unquoted "esac"
 ]
-shit: 1:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
-     1 |  case a in a) ;; esac
+shit: 2:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
+     2 |  case a in a) ;; esac
        |       ^~ here.
 [Code 0]

@@ -10,6 +10,6 @@
 [Word
   DoubleQuoted "hello world"
 ]
-shit: 1:1: error: Builtin 'exit': 'hello world' is not a valid integer.
-     1 |  exit "hello world" "hello world"
+shit: 2:1: error: Builtin 'exit': 'hello world' is not a valid integer.
+     2 |  exit "hello world" "hello world"
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.

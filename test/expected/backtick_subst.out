@@ -92,20 +92,20 @@
 [Word
   CommandSubstitution "echo $foo"
 ]
-shit: 1:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
-     1 |  echo `echo hi`
+shit: 2:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     2 |  echo `echo hi`
        |       ^~~~~~~~~ here.
-shit: 4:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
-     4 |  case `echo x` in x) echo matched;; esac
+shit: 5:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
+     5 |  case `echo x` in x) echo matched;; esac
        |       ^~~~~~~~ here.
-shit: 5:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
-     5 |  echo `(echo y) 2>/dev/null`
-       |       ^~~~~~~~~~~~~~~~~~~~~~ here.
 shit: 6:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
-     6 |  echo `echo "a b"`
+     6 |  echo `(echo y) 2>/dev/null`
+       |       ^~~~~~~~~~~~~~~~~~~~~~ here.
+shit: 7:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     7 |  echo `echo "a b"`
        |       ^~~~~~~~~~~~ here.
-shit: 8:15: warning: an unquoted command substitution splits its output, quote it to keep one argument.
-     8 |  foo=bar; echo `echo \$foo`
+shit: 9:15: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     9 |  foo=bar; echo `echo \$foo`
        |                ^~~~~~~~~~~~ here.
 hi
 abc

@@ -1,6 +1,0 @@
-cat <<'-EOF'
-body
--EOF
-cat <<-'-EOF'
-	indented
--EOF

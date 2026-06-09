@@ -1,3 +1,0 @@
-awk '{print}' /proc/self/fd/3 3<<EOF
-body
-EOF

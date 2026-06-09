@@ -1,0 +1,2 @@
+#!/bin/env shit
+cd /tmp && rm -rf shit_glob_dot_t && mkdir shit_glob_dot_t && cd shit_glob_dot_t && : > a.sh && : > b.sh && echo ./*.sh && echo *.sh && cd /tmp && rm -rf shit_glob_dot_t

@@ -24,8 +24,8 @@
 [Word
   CommandSubstitution "echo hi"
 ]
-shit: 1:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
-     1 |  echo $(echo hi)
+shit: 2:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     2 |  echo $(echo hi)
        |       ^~~~~~~~~~ here.
 hi
 hi

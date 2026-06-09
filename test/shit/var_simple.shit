@@ -1,0 +1,5 @@
+#!/bin/env shit
+FOO=bar
+echo $FOO
+echo ${FOO}
+echo "$FOO and more"

@@ -1,0 +1,4 @@
+#!/bin/env shit
+f() { echo "x is $X"; }
+X=hi f
+echo "after=$X"

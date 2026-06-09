@@ -1,0 +1,2 @@
+#!/bin/env shit
+which sh >/dev/null 2>&1

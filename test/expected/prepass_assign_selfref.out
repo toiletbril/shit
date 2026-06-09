@@ -10,8 +10,8 @@
 [Word
   Variable "VAR"
 ]
-shit: 1:12: warning: The assignment prefix does not affect this command, 'VAR' is read before it is set.
-     1 |  VAR=1 echo $VAR
+shit: 2:12: warning: The assignment prefix does not affect this command, 'VAR' is read before it is set.
+     2 |  VAR=1 echo $VAR
        |             ^~~~ here.
 
 [Code 0]

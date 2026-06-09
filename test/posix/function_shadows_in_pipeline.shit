@@ -1,7 +1,0 @@
-# A function shadows a builtin and a program inside a pipeline, like dash does.
-myfunc() { echo from_function; }
-myfunc | cat
-cd() { echo cd_function; }
-cd | cat
-greet() { echo "hi $1"; }
-echo ignored_input | greet world

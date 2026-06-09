@@ -1,0 +1,4 @@
+#!/bin/env shit
+cat 0<<B
+hi
+B

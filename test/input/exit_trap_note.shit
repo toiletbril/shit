@@ -1,2 +1,0 @@
-trap 'rm -f nonexistent_zzz_glob_*.tmp' EXIT
-echo hello

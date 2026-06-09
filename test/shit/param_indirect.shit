@@ -1,0 +1,2 @@
+#!/bin/env shit
+a=b; b=hi; foo1=1; foo2=2; echo "${!a}"; echo ${!foo*}

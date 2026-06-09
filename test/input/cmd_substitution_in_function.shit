@@ -1,6 +1,0 @@
-f(){ echo "$(echo hi)"; }
-f
-:
-f
-:
-f

@@ -1,0 +1,7 @@
+#!/bin/env shit
+printf "%.2f\n" 3.5
+printf "%b\n" "a\tb\n"
+printf "%*d\n" 4 7
+printf "[%*.*f]\n" 8 2 3.5
+printf "%b" "stop\chere"
+echo

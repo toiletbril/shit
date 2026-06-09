@@ -1,0 +1,7 @@
+#!/bin/env shit
+x=outer
+f() { local x; echo "[$x]"; x=inner; echo "[$x]"; }
+f
+echo "[$x]"
+g() { local y; echo "[${y-UNSET}]"; }
+g

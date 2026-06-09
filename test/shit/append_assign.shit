@@ -1,0 +1,2 @@
+#!/bin/env shit
+x=a; x+=bc; echo "$x"; n+=z; echo "$n"

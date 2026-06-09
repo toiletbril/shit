@@ -1,6 +1,6 @@
-shit: 1:1: error: 'fi' has no matching 'if'.
-     1 |  fi
+shit: 2:1: error: 'fi' has no matching 'if'.
+     2 |  fi
        |  ^~ here.
-shit: 3:1: error: 'done' has no matching 'while', 'until', or 'for'.
-     3 |  done
+shit: 4:1: error: 'done' has no matching 'while', 'until', or 'for'.
+     4 |  done
        |  ^~~~ here.

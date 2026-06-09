@@ -1,0 +1,8 @@
+#!/bin/bash
+for v in color color=always other; do
+  case $v in
+    (color|color=always) echo "matched: $v" ;;
+    foo=bar) echo "fb: $v" ;;
+    *) echo "default: $v" ;;
+  esac
+done

@@ -1,4 +1,0 @@
-readonly R=5
-echo "R=$R"
-R=9
-echo "after=$R"

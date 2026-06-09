@@ -1,1 +1,0 @@
-test / -ef /; echo "ef_same:$?"; test /dev/null -ef /; echo "ef_diff:$?"

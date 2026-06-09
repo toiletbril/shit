@@ -1,0 +1,7 @@
+#!/bin/env shit
+cd /tmp || exit 1
+: > zz_cd_target_xyz
+cd zz_cd_target_xyz
+echo "after rc=$?"
+pwd
+rm -f /tmp/zz_cd_target_xyz

@@ -12,7 +12,7 @@
 [Word
   Unquoted "after"
 ]
-shit: 1:1: error: Command 'nosuchcmd_xyz' was not found.
-     1 |  nosuchcmd_xyz
+shit: 2:1: error: Command 'nosuchcmd_xyz' was not found.
+     2 |  nosuchcmd_xyz
        |  ^~~~~~~~~~~~~ here.
 [Code 1]

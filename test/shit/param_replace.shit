@@ -1,0 +1,2 @@
+#!/bin/env shit
+v=hello; echo "${v//l/L}|${v/#he/HE}|${v/0/X}|${v//[lo]/_}"

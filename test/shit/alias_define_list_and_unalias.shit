@@ -1,0 +1,6 @@
+#!/bin/env shit
+alias greet="echo hello"
+alias
+greet
+unalias greet
+alias

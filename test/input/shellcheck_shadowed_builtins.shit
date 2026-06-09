@@ -1,6 +1,0 @@
-read() { echo "my read $1"; }
-read line
-printf() { echo "my printf $1"; }
-printf "$1"
-test() { echo "my test $1"; }
-test -f a -a -f b

@@ -1,2 +1,0 @@
-read x < /dev/null
-read -r y < /dev/null

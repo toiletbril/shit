@@ -1,0 +1,4 @@
+#!/bin/env shit
+printf "$1"
+printf '%s' ok
+printf -- "$1"

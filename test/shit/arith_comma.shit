@@ -1,0 +1,2 @@
+#!/bin/env shit
+echo $(( (1,2,3) )); s=0; echo $(( s=5, s+1 ))

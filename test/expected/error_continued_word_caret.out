@@ -4,7 +4,7 @@
 [Word
   Unquoted "xyzzy_undefined"
 ]
-shit: 1:1: error: Command 'xyzzy_undefined' was not found.
-     1 |  xy\
+shit: 2:1: error: Command 'xyzzy_undefined' was not found.
+     2 |  xy\
        |  ^~~ here.
 [Code 1]

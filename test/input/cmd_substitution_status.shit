@@ -1,4 +1,0 @@
-x=$(false)
-echo after_false=$?
-y=$(true)
-echo after_true=$?

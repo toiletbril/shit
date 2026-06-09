@@ -1,0 +1,7 @@
+#!/bin/env shit
+printf '%d\n' "'A"
+printf '%x\n' "'A"
+printf '%o\n' "'A"
+printf '%u\n' "'A"
+printf '%d\n' '"A'
+printf '%d\n' "'AB"

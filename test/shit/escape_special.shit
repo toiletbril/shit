@@ -1,0 +1,8 @@
+#!/bin/env shit
+echo "\""
+echo '\'
+echo "\$?"
+echo "'"
+echo a'''\ hello'\ \ world"lol" "\"";
+echo "*"
+echo '*'

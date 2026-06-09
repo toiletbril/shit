@@ -1,0 +1,2 @@
+#!/bin/env shit
+x=1 | cat

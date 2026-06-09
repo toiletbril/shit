@@ -1,0 +1,4 @@
+#!/bin/env shit
+X="a  b   c"
+echo $X
+echo "$X"

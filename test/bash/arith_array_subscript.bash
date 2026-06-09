@@ -1,0 +1,14 @@
+#!/bin/bash
+a=(5 2 0)
+echo "read: $((a[0]*100+a[1]))"
+i=2
+echo "var-index: $((a[i]+a[i-1]))"
+a[0]=9
+echo "write: $((a[0]))"
+(( a[1]++ ))
+echo "postinc: ${a[1]}"
+declare -A m
+m[k]=10
+echo "assoc: $((m[k]+5))"
+n=$(( a[0] + a[1] ))
+echo "captured: $n"

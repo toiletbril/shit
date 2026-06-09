@@ -1,3 +1,0 @@
-case a in a|b) echo match;; esac
-case b in a|b) echo match;; esac
-case c in a|b) echo match;; *) echo default;; esac

@@ -1,6 +1,6 @@
-shit: 1:6: error: Unterminated string literal.
-     1 |  first"second
+shit: 2:6: error: Unterminated string literal.
+     2 |  first"second
        |       ^~~~~~~ here.
-shit: 1:13: note:
-     1 |  first"second
+shit: 2:13: note:
+     2 |  first"second
        |              ^~ Expected " here.

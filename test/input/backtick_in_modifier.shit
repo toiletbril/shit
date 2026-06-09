@@ -1,3 +1,0 @@
-echo "${x-`echo bt`}"
-x=set; echo "${x-`echo bt`}"
-y=foo; echo "${z:-`echo $y`}"

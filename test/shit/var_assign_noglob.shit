@@ -1,0 +1,4 @@
+#!/bin/env shit
+Y=data/*
+echo $Y
+echo "$Y"

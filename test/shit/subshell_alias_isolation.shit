@@ -1,0 +1,6 @@
+#!/bin/env shit
+( alias sub_only='echo hi' )
+if alias sub_only >/dev/null 2>&1; then echo "leaked from subshell"; else echo "isolated from subshell"; fi
+cs=$( alias cs_only='echo hi'; echo defined-inside )
+echo "cmdsub reported: $cs"
+if alias cs_only >/dev/null 2>&1; then echo "leaked from cmdsub"; else echo "isolated from cmdsub"; fi

@@ -1,4 +1,0 @@
-command -v echo
-command -v set
-ls() { echo function_ls; }
-command -v ls

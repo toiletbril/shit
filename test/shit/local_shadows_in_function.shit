@@ -1,0 +1,5 @@
+#!/bin/env shit
+v=outer
+f() { local v=inner; echo "in=$v"; }
+f
+echo "out=$v"

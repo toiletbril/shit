@@ -1,0 +1,2 @@
+#!/bin/env shit
+while false; do echo no; done; echo after

@@ -1,3 +1,0 @@
-X="a  b   c"
-echo $X
-echo "$X"

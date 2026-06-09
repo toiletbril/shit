@@ -66,10 +66,10 @@
 [Word
   Unquoted "top=5"
 ]
-shit: 1:7: warning: This assignment to 'x' in a function has no local, so the value leaks to the global scope, declare it with local to keep it inside the function.
-     1 |  f() { x=1; }
+shit: 2:7: warning: This assignment to 'x' in a function has no local, so the value leaks to the global scope, declare it with local to keep it inside the function.
+     2 |  f() { x=1; }
        |        ^~~ here.
-shit: 3:7: warning: This assignment to 'z' in a function has no local, so the value leaks to the global scope, declare it with local to keep it inside the function.
-     3 |  h() { z=4; }
+shit: 4:7: warning: This assignment to 'z' in a function has no local, so the value leaks to the global scope, declare it with local to keep it inside the function.
+     4 |  h() { z=4; }
        |        ^~~ here.
 [Code 0]

@@ -1,0 +1,2 @@
+#!/bin/env shit
+for w in $(echo x y z); do echo i=$w; done

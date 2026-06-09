@@ -1,1 +1,0 @@
-printf '%d %d %x %o\n' 42 010 0x1f 8

@@ -1,0 +1,10 @@
+#!/bin/env shit
+export FOO=1
+FOO=2
+printenv FOO
+export BAR
+BAR=baz
+printenv BAR
+NOPE=hidden
+printenv NOPE
+echo done

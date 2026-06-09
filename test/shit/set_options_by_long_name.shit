@@ -1,0 +1,7 @@
+#!/bin/env shit
+set -u
+echo "${UNSET_VAR_XYZ:-default}"
+set +u
+set -o noclobber
+set +o noclobber
+echo done

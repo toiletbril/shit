@@ -1,0 +1,4 @@
+#!/bin/env shit
+case x in a) echo m ;; *) echo d ;; esac
+case a in a) ;; esac
+echo done

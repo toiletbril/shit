@@ -29,10 +29,10 @@
 [Word
   Variable "1"
 ]
-shit: 1:8: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
-     1 |  printf "$1"
+shit: 2:8: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+     2 |  printf "$1"
        |         ^~~~ here.
-shit: 3:11: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
-     3 |  printf -- "$1"
+shit: 4:11: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+     4 |  printf -- "$1"
        |            ^~~~ here.
 ok[Code 0]

@@ -1,2 +1,0 @@
-(echo hi) | cat
-(echo a; echo b) | wc -l

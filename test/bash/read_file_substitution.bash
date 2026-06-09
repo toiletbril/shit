@@ -1,0 +1,10 @@
+#!/bin/bash
+tmp=$(mktemp)
+printf 'java,kotlin,scala\n' > "$tmp"
+echo "direct: $(< "$tmp")"
+v=$(< "$tmp")
+echo "var: $v"
+IFS=','
+candidates=($(< "$tmp"))
+echo "count: ${#candidates[@]} first: ${candidates[0]}"
+rm -f "$tmp"

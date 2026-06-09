@@ -1,5 +1,0 @@
-alias greet="echo hello"
-alias
-greet
-unalias greet
-alias

@@ -1,5 +1,0 @@
-echo \
-is_escaped\* \
-word \
-\
-does_not_exist*

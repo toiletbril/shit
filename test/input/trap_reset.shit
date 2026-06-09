@@ -1,4 +1,0 @@
-trap "echo hi" INT
-trap INT
-trap
-echo done
