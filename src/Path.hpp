@@ -65,6 +65,12 @@ public:
   /* True when the path itself is a symbolic link, tested without following it,
      for the test builtin's -L and -h primaries. */
   mustuse fn is_symbolic_link() const wontthrow -> bool;
+  /* The POSIX file-type tests the test builtin's -b -c -p -S primaries need.
+     Each is always false on Windows where the type has no equivalent. */
+  mustuse fn is_block_device() const wontthrow -> bool;
+  mustuse fn is_character_device() const wontthrow -> bool;
+  mustuse fn is_fifo() const wontthrow -> bool;
+  mustuse fn is_socket() const wontthrow -> bool;
   mustuse fn file_size() const wontthrow -> Maybe<u64>;
 
   /* The access checks the test builtin asks for, each one access() call. */

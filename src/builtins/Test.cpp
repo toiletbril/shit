@@ -54,8 +54,23 @@ public:
     if (op == "-w") return operand_path.is_writable();
     if (op == "-x") return operand_path.is_executable();
     if (op == "-L" || op == "-h") return operand_path.is_symbolic_link();
+    if (op == "-b") return operand_path.is_block_device();
+    if (op == "-c") return operand_path.is_character_device();
+    if (op == "-p") return operand_path.is_fifo();
+    if (op == "-S") return operand_path.is_socket();
+    /* -t takes a file-descriptor number rather than a path and is true when that
+       descriptor is a terminal. The common 0, 1, and 2 map to the standard
+       streams, and any other descriptor reads as not a terminal. */
+    if (op == "-t") {
+      i64 file_descriptor = 0;
+      if (!parse_integer(operand.view(), file_descriptor)) return false;
+      if (file_descriptor == 0) return os::is_stdin_a_tty();
+      if (file_descriptor == 1) return os::is_stdout_a_tty();
+      if (file_descriptor == 2) return os::is_stderr_a_tty();
+      return false;
+    }
     fail(StringView{"unknown unary operator '"} + op +
-         "', expected one of -z -n -e -f -d -s -r -w -x -L -h");
+         "', expected one of -z -n -e -f -d -s -r -w -x -L -h -b -c -p -S -t");
     return false;
   }
 
@@ -111,7 +126,8 @@ public:
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
            s == "-s" || s == "-r" || s == "-w" || s == "-x" || s == "-L" ||
-           s == "-h";
+           s == "-h" || s == "-b" || s == "-c" || s == "-p" || s == "-S" ||
+           s == "-t";
   }
 
   pure bool is_binary_operator(const String &s) const wontthrow

@@ -210,6 +210,34 @@ fn Path::is_symbolic_link() const wontthrow -> bool
   return S_ISLNK(info.st_mode);
 }
 
+fn Path::is_block_device() const wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(m_text.c_str(), &info) != 0) return false;
+  return S_ISBLK(info.st_mode);
+}
+
+fn Path::is_character_device() const wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(m_text.c_str(), &info) != 0) return false;
+  return S_ISCHR(info.st_mode);
+}
+
+fn Path::is_fifo() const wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(m_text.c_str(), &info) != 0) return false;
+  return S_ISFIFO(info.st_mode);
+}
+
+fn Path::is_socket() const wontthrow -> bool
+{
+  struct stat info{};
+  if (::stat(m_text.c_str(), &info) != 0) return false;
+  return S_ISSOCK(info.st_mode);
+}
+
 fn Path::file_size() const wontthrow -> Maybe<u64>
 {
   struct stat info{};
@@ -347,6 +375,13 @@ fn Path::is_symbolic_link() const -> bool
   return attributes != INVALID_FILE_ATTRIBUTES &&
          (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
+
+/* Windows has no POSIX block, character, FIFO, or socket file type, so these
+   primaries are always false there. */
+fn Path::is_block_device() const -> bool { return false; }
+fn Path::is_character_device() const -> bool { return false; }
+fn Path::is_fifo() const -> bool { return false; }
+fn Path::is_socket() const -> bool { return false; }
 
 fn Path::file_size() const -> Maybe<u64>
 {
