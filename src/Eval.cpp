@@ -3737,11 +3737,162 @@ pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
 /* The leftmost brace group that holds a top-level comma, the open and close
    indices with the comma offsets. A { with no matching } or no top-level comma
    is literal, so the search moves to the next {. */
+/* Parse a signed integer and report the width of its digit run, so a sequence
+   such as {01..10} can pad its output to the wider operand. None when the text
+   is not a plain optionally-signed integer. */
+struct sequence_integer
+{
+  i64 value;
+  usize digit_width;
+  bool has_leading_zero;
+};
+
+fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
+{
+  if (text.is_empty()) return None;
+  usize i = 0;
+  if (text[0] == '-' || text[0] == '+') i++;
+  const usize digit_start = i;
+  for (; i < text.length; i++)
+    if (text[i] < '0' || text[i] > '9') return None;
+  if (i == digit_start) return None;
+
+  i64 magnitude = 0;
+  for (usize j = digit_start; j < text.length; j++)
+    magnitude = magnitude * 10 + (text[j] - '0');
+  const i64 value = text[0] == '-' ? -magnitude : magnitude;
+  const usize width = text.length - digit_start;
+  const bool leading_zero = width > 1 && text[digit_start] == '0';
+  return sequence_integer{value, width, leading_zero};
+}
+
+/* Split a sequence body on its .. separators into two or three parts, the
+   start, the end, and an optional step. */
+fn split_sequence_parts(StringView content) throws -> ArrayList<StringView>
+{
+  let parts = ArrayList<StringView>{heap_allocator()};
+  usize start = 0;
+  usize i = 0;
+  while (i + 1 < content.length) {
+    if (content[i] == '.' && content[i + 1] == '.') {
+      parts.push(content.substring_of_length(start, i - start));
+      i += 2;
+      start = i;
+      continue;
+    }
+    i++;
+  }
+  parts.push(content.substring(start));
+  return parts;
+}
+
+/* The elements of a {start..end} or {start..end..step} sequence, numeric or
+   single-letter, or None when the body is not a sequence. */
+fn parse_brace_sequence(StringView content) throws -> Maybe<ArrayList<String>>
+{
+  let const parts = split_sequence_parts(content);
+  if (parts.count() != 2 && parts.count() != 3) return None;
+
+  i64 step = 1;
+  if (parts.count() == 3) {
+    let const parsed_step = parse_sequence_integer(parts[2]);
+    if (!parsed_step.has_value()) return None;
+    step = parsed_step->value;
+  }
+  if (step == 0) step = 1;
+  const i64 magnitude = step < 0 ? -step : step;
+
+  let const start_int = parse_sequence_integer(parts[0]);
+  let const end_int = parse_sequence_integer(parts[1]);
+  if (start_int.has_value() && end_int.has_value()) {
+    const i64 from = start_int->value;
+    const i64 to = end_int->value;
+    const i64 increment = from <= to ? magnitude : -magnitude;
+    const bool pad = start_int->has_leading_zero || end_int->has_leading_zero;
+    const usize width = pad ? (start_int->digit_width > end_int->digit_width
+                                   ? start_int->digit_width
+                                   : end_int->digit_width)
+                            : 0;
+    let elements = ArrayList<String>{heap_allocator()};
+    for (i64 v = from; increment > 0 ? v <= to : v >= to; v += increment) {
+      String number = utils::int_to_text(v);
+      if (pad) {
+        const bool negative = !number.is_empty() && number.view()[0] == '-';
+        const StringView digits = number.view().substring(negative ? 1 : 0);
+        if (digits.length < width) {
+          String padded{heap_allocator()};
+          if (negative) padded.push('-');
+          for (usize z = digits.length; z < width; z++)
+            padded.push('0');
+          padded.append(digits);
+          number = steal(padded);
+        }
+      }
+      elements.push(steal(number));
+    }
+    return elements;
+  }
+
+  /* A single-letter range counts through the alphabet. */
+  if (parts[0].length == 1 && parts[1].length == 1) {
+    const char from = parts[0][0];
+    const char to = parts[1][0];
+    const bool from_alpha =
+        (from >= 'a' && from <= 'z') || (from >= 'A' && from <= 'Z');
+    const bool to_alpha = (to >= 'a' && to <= 'z') || (to >= 'A' && to <= 'Z');
+    if (from_alpha && to_alpha) {
+      const i64 increment = from <= to ? magnitude : -magnitude;
+      let elements = ArrayList<String>{heap_allocator()};
+      for (i64 c = from; increment > 0 ? c <= to : c >= to; c += increment) {
+        String element{heap_allocator()};
+        element.push(static_cast<char>(c));
+        elements.push(steal(element));
+      }
+      return elements;
+    }
+  }
+  return None;
+}
+
+/* The alternatives of a brace group body, the comma-separated list or the
+   sequence it spells, or None when the body is neither and the braces are
+   literal. */
+fn brace_group_alternatives(StringView content) throws
+    -> Maybe<ArrayList<String>>
+{
+  usize depth = 0;
+  let comma_positions = ArrayList<usize>{heap_allocator()};
+  for (usize i = 0; i < content.length; i++) {
+    const char c = content[i];
+    if (c == '{') {
+      depth++;
+    } else if (c == '}') {
+      if (depth > 0) depth--;
+    } else if (c == ',' && depth == 0) {
+      comma_positions.push(i);
+    }
+  }
+
+  if (!comma_positions.is_empty()) {
+    let alternatives = ArrayList<String>{heap_allocator()};
+    usize start = 0;
+    for (const usize comma : comma_positions) {
+      alternatives.push(String{
+          heap_allocator(), content.substring_of_length(start, comma - start)});
+      start = comma + 1;
+    }
+    alternatives.push(String{heap_allocator(), content.substring(start)});
+    return alternatives;
+  }
+
+  return parse_brace_sequence(content);
+}
+
 struct brace_group
 {
   usize open;
   usize close;
-  ArrayList<usize> commas{heap_allocator()};
+  ArrayList<String> alternatives{heap_allocator()};
 };
 
 fn find_brace_group(StringView text) throws -> Maybe<brace_group>
@@ -3749,7 +3900,6 @@ fn find_brace_group(StringView text) throws -> Maybe<brace_group>
   for (usize open = 0; open < text.length; open++) {
     if (text[open] != '{') continue;
     usize depth = 0;
-    let commas = ArrayList<usize>{heap_allocator()};
     for (usize j = open; j < text.length; j++) {
       const char c = text[j];
       if (c == '{') {
@@ -3757,15 +3907,15 @@ fn find_brace_group(StringView text) throws -> Maybe<brace_group>
       } else if (c == '}') {
         depth--;
         if (depth == 0) {
-          if (!commas.is_empty()) {
+          let alternatives = brace_group_alternatives(
+              text.substring_of_length(open + 1, j - open - 1));
+          if (alternatives.has_value()) {
             brace_group group{open, j, {}};
-            group.commas = steal(commas);
+            group.alternatives = steal(*alternatives);
             return group;
           }
           break;
         }
-      } else if (c == ',' && depth == 1) {
-        commas.push(j);
       }
     }
   }
@@ -3788,16 +3938,8 @@ fn brace_expand_text(StringView text) throws -> ArrayList<String>
   const StringView postamble = text.substring(group->close + 1);
   let const post_expansions = brace_expand_text(postamble);
 
-  let alternatives = ArrayList<StringView>{heap_allocator()};
-  usize start = group->open + 1;
-  for (const usize comma : group->commas) {
-    alternatives.push(text.substring_of_length(start, comma - start));
-    start = comma + 1;
-  }
-  alternatives.push(text.substring_of_length(start, group->close - start));
-
-  for (const StringView alternative : alternatives) {
-    for (const String &expanded_alt : brace_expand_text(alternative)) {
+  for (const String &alternative : group->alternatives) {
+    for (const String &expanded_alt : brace_expand_text(alternative.view())) {
       for (const String &expanded_post : post_expansions) {
         let combined = String{heap_allocator(), preamble};
         combined.append(expanded_alt.view());
