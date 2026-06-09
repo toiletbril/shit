@@ -1827,11 +1827,52 @@ hot fn Parser::parse_conditional_command() throws -> Command *
     case Token::Kind::Word: {
       /* A bare ! is the negation operator, every other word is an operand the
          evaluator classifies by its text. */
-      if (static_cast<tokens::WordToken *>(t)->word().to_literal_string() ==
-          "!")
+      const String word_literal =
+          static_cast<tokens::WordToken *>(t)->word().to_literal_string();
+      if (word_literal == "!") {
         elements.push({Kind::Not, nullptr});
-      else
-        elements.push({Kind::Operand, t});
+        break;
+      }
+      elements.push({Kind::Operand, t});
+
+      /* The right side of =~ is a regular expression where (, ), and | are
+         ordinary characters, so the lexer's split into separate paren and word
+         tokens is rejoined here. Tokens with no whitespace between them form one
+         regex operand, taken from the source span so the metacharacters survive.
+         A single token, such as a variable or a quoted regex, is left alone so
+         its expansion still happens. */
+      if (word_literal == "=~") {
+        Token *peek = m_lexer.peek_shell_token();
+        if (peek != nullptr && !is_unquoted_word(peek, "]]") &&
+            peek->kind() != Token::Kind::EndOfFile)
+        {
+          m_lexer.advance_past_last_peek();
+          Token *first = peek;
+          const usize start = first->source_location().position;
+          usize end = start + first->source_location().length;
+          usize joined_token_count = 1;
+          for (;;) {
+            Token *next = m_lexer.peek_shell_token();
+            if (next == nullptr || is_unquoted_word(next, "]]") ||
+                next->kind() == Token::Kind::EndOfFile)
+              break;
+            if (next->source_location().position != end) break;
+            m_lexer.advance_past_last_peek();
+            end = next->source_location().position +
+                  next->source_location().length;
+            joined_token_count++;
+          }
+          if (joined_token_count == 1) {
+            elements.push({Kind::Operand, first});
+          } else {
+            const StringView regex_source =
+                m_lexer.source().substring_of_length(start, end - start);
+            elements.push({Kind::Operand,
+                           word_token_from_raw(m_lexer.arena(), regex_source,
+                                               first->source_location())});
+          }
+        }
+      }
       break;
     }
     default:

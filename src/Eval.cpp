@@ -2668,10 +2668,11 @@ struct ConditionalEvaluator
   }
 
   /* The =~ operator matches the value against an extended regular expression. A
-     std::regex with the POSIX extended grammar mirrors the ERE bash uses, and a
+     POSIX regcomp with the extended grammar mirrors the ERE bash uses, and a
      search rather than a full match finds the pattern anywhere in the value,
-     the way [[ =~ does. BASH_REMATCH waits for the array work, so only the
-     boolean result is reported here. */
+     the way [[ =~ does. On a match BASH_REMATCH is filled with the whole match
+     at index 0 and each capture group after it, an unmatched group reading as
+     an empty string the way bash leaves it. */
   bool regex_match(StringView value, StringView pattern) throws
   {
 #if SHIT_PLATFORM_IS POSIX
@@ -2686,10 +2687,27 @@ struct ConditionalEvaluator
       throw Error{"Unable to evaluate the [[ ]] because the regular expression "
                   "is invalid"};
     }
+    let const group_count = compiled.re_nsub + 1;
+    let matches = ArrayList<regmatch_t>{heap_allocator()};
+    for (usize i = 0; i < group_count; i++) matches.push(regmatch_t{});
     const int match_result =
-        regexec(&compiled, value_text.c_str(), 0, nullptr, 0);
+        regexec(&compiled, value_text.c_str(), group_count, matches.begin(), 0);
     regfree(&compiled);
-    return match_result == 0;
+    if (match_result != 0) return false;
+
+    let rematch = ArrayList<String>{heap_allocator()};
+    for (usize i = 0; i < group_count; i++) {
+      if (matches[i].rm_so < 0) {
+        rematch.push(String{heap_allocator()});
+        continue;
+      }
+      let const start = static_cast<usize>(matches[i].rm_so);
+      let const end = static_cast<usize>(matches[i].rm_eo);
+      rematch.push(
+          String{heap_allocator(), value.substring_of_length(start, end - start)});
+    }
+    cxt.set_indexed_array("BASH_REMATCH", steal(rematch));
+    return true;
 #else
     unused(value);
     unused(pattern);
