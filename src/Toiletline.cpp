@@ -669,7 +669,7 @@ static String PROMPT_CACHE_VALUE{};
 fn default_prompt_template() -> String
 {
   let template_string = String{};
-  template_string += R"(\s\u@\h )";
+  template_string += R"(\s@\u@\h )";
   if (colors::stdout_wants_color()) {
     template_string += colors::ansi::GREEN;
     template_string += R"(\P)";
@@ -888,7 +888,7 @@ fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 fn default_prompt_template() -> String
 {
   let template_string = String{};
-  template_string += "\\u@\\h ";
+  template_string += "\\s@\\u@\\h ";
   if (shit::colors::stdout_wants_color()) {
     template_string += shit::colors::ansi::GREEN;
     template_string += "\\P";
