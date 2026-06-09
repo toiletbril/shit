@@ -2723,6 +2723,46 @@ public:
     return parse_arithmetic_operand(value.view());
   }
 
+  /* The name of the variable at the cursor, or an empty view when no name sits
+     there. Used as the target of an increment or a decrement. */
+  fn read_lvalue_name() wontthrow -> StringView
+  {
+    skip_spaces();
+    if (pos >= source.length || !lexer::is_variable_name_start(source[pos]))
+      return StringView{};
+    let const name_start = pos;
+    while (pos < source.length && lexer::is_variable_name(source[pos]))
+      pos++;
+    return source.substring_of_length(name_start, pos - name_start);
+  }
+
+  /* Store a new integer value for a name unless the parser is walking a skipped
+     branch of a ternary, where the assignment must not take effect. */
+  fn write_variable(StringView name, i64 value) throws -> void
+  {
+    if (m_is_skipping) return;
+    ASSERT(context != nullptr);
+    context->set_shell_variable(name, utils::int_to_text(value));
+  }
+
+  /* A prefix ++ or -- changes the variable and yields the new value. */
+  fn prefix_step(i64 delta) throws -> i64
+  {
+    const StringView name = read_lvalue_name();
+    if (name.is_empty()) fail("expected a variable after '++' or '--'");
+    const i64 updated = arithmetic_add(read_variable_value(name), delta);
+    write_variable(name, updated);
+    return updated;
+  }
+
+  /* A postfix ++ or -- yields the old value and then changes the variable. */
+  fn postfix_step(StringView name, i64 delta) throws -> i64
+  {
+    const i64 original = read_variable_value(name);
+    write_variable(name, arithmetic_add(original, delta));
+    return original;
+  }
+
   fn parse() throws -> i64
   {
     let const result = parse_assignment();
@@ -2985,6 +3025,10 @@ public:
 
   fn parse_unary() throws -> i64
   {
+    /* The doubled operators are checked before the single + and - so a leading
+       ++ or -- is read as one prefix step rather than two unary signs. */
+    if (consume("++")) return prefix_step(1);
+    if (consume("--")) return prefix_step(-1);
     if (consume("!")) return parse_unary() == 0 ? 1 : 0;
     if (consume("~")) return ~parse_unary();
     if (consume("-")) return arithmetic_subtract(0, parse_unary());
@@ -3027,13 +3071,12 @@ public:
     }
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
       /* The name is a contiguous slice of the expression the parser holds for
-         the whole evaluation, so a view into it avoids a per-read allocation.
-       */
-      let const name_start = pos;
-      while (pos < source.length && lexer::is_variable_name(source[pos]))
-        pos++;
-      return read_variable_value(
-          source.substring_of_length(name_start, pos - name_start));
+         the whole evaluation, so a view into it avoids a per-read allocation. A
+         trailing ++ or -- right after the name is a postfix step on it. */
+      const StringView name = read_lvalue_name();
+      if (consume("++")) return postfix_step(name, 1);
+      if (consume("--")) return postfix_step(name, -1);
+      return read_variable_value(name);
     }
     fail("unexpected character");
   }

@@ -1,0 +1,1 @@
+x=5; x=$(( x + 3 )); echo $x; echo $(( x++ )); echo $x; echo $(( ++x )); echo $(( 2 * (3+4) )); i=10; echo $(( i-- )); echo $i

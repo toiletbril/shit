@@ -1,0 +1,81 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=5]
+  [CompoundListCondition, None]
+    [Assign x=$(( x + 3 ))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( x++ ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( ++x ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 2 * (3+4) ))"]
+  [CompoundListCondition, None]
+    [Assign i=10]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( i-- ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$i"]
+[Word
+  Unquoted "x=5"
+]
+[Word
+  Unquoted "x="
+  ArithmeticExpansion " x + 3 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " x++ "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " ++x "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 2 * (3+4) "
+]
+[Word
+  Unquoted "i=10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " i-- "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "i"
+]
+8
+8
+9
+10
+14
+10
+9
+[Code 0]

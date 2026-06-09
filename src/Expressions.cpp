@@ -2437,6 +2437,33 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   return status;
 }
 
+ArithmeticCommand::ArithmeticCommand(SourceLocation location, String expression)
+    : CompoundCommand(location), m_expression(steal(expression))
+{}
+
+ArithmeticCommand::~ArithmeticCommand() = default;
+
+cold fn ArithmeticCommand::to_string() const throws -> String
+{
+  return "ArithmeticCommand";
+}
+
+cold fn ArithmeticCommand::to_ast_string(usize layer) const throws -> String
+{
+  return indent_for_layer(layer) + "[" + to_string() + " \"" +
+         m_expression.view() + "\"]";
+}
+
+fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  /* A non-zero arithmetic value is success, a zero value is failure, the
+     opposite of the value-to-status convention of the rest of the shell. */
+  const i64 value = cxt.evaluate_arithmetic(m_expression.view());
+  const i64 status = value != 0 ? 0 : 1;
+  cxt.set_last_exit_status(static_cast<i32>(status));
+  return status;
+}
+
 Subshell::Subshell(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}

@@ -439,6 +439,10 @@ public:
   /* Evaluate a [[ ]] conditional element list and report whether it is true.
      The operands expand without field splitting, == and != glob match their
      right side, < and > compare strings, and && and || join primaries. */
+  /* Compute the integer value of a $((...)) or (( )) expression, resolving
+     shell variables and applying any assignments inside it. */
+  fn evaluate_arithmetic(StringView expression) throws -> i64;
+
   fn evaluate_conditional(const ArrayList<conditional_element> &elements) throws
       -> bool;
 
@@ -718,10 +722,6 @@ protected:
      Otherwise it is indirect, body names a variable whose value names the
      variable to expand. */
   fn apply_indirect_or_name_listing(StringView body) throws -> String;
-
-  /* Compute the integer value of a $((...)) expression, resolving shell
-     variables and applying any assignments inside it. */
-  fn evaluate_arithmetic(StringView expression) throws -> i64;
 
   /* Turn a word into fields, applying tilde, variable expansion, command
      substitution, and IFS field splitting, but not globbing. */

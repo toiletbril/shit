@@ -179,4 +179,10 @@ public:
 namespace shit {
 constexpr const char *EXPRESSION_AST_INDENT = " ";
 constexpr const char *EXPRESSION_DOUBLE_AST_INDENT = "  ";
+
+/* Whether bash extensions that change the meaning of valid POSIX syntax are
+   active. The lexer and parser read it because they hold no EvalContext, so a
+   (( )) arithmetic command or a brace expansion is enabled only in bash mode
+   and stays POSIX otherwise. Main sets it once after parsing the flags. */
+extern bool BASH_COMPATIBLE_MODE;
 } /* namespace shit */

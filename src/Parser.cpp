@@ -808,7 +808,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
       case Token::Kind::For: return attach_trailing_redirections(parse_for());
       case Token::Kind::Case: return attach_trailing_redirections(parse_case());
       case Token::Kind::LeftParen:
-        return attach_trailing_redirections(parse_subshell());
+        return attach_trailing_redirections(parse_paren_command());
       case Token::Kind::DoubleLeftSquareBracket:
         return attach_trailing_redirections(parse_conditional_command());
 
@@ -1229,9 +1229,30 @@ hot fn Parser::parse_brace_group() throws -> Command *
   return m_lexer.arena().create<BraceGroup>(open->source_location(), body);
 }
 
-hot fn Parser::parse_subshell() throws -> Command *
+/* A parenthesis in command position opens either a subshell or, when a second
+   parenthesis sits right against it, a (( )) arithmetic command. The first
+   parenthesis is consumed here so the next token can be peeked to choose. */
+hot fn Parser::parse_paren_command() throws -> Command *
 {
   Token *open = m_lexer.next_shell_token();
+  ASSERT(open != nullptr);
+  ASSERT(open->kind() == Token::Kind::LeftParen);
+
+  /* A (( )) arithmetic command changes the POSIX meaning of two opening
+     parentheses, which is a nested subshell, so it is taken only in bash mode.
+     POSIX and the default mode keep the nested-subshell reading. */
+  Token *next = m_lexer.peek_shell_token();
+  ASSERT(next != nullptr);
+  if (BASH_COMPATIBLE_MODE && next->kind() == Token::Kind::LeftParen &&
+      next->source_location().position == open->source_location().position + 1)
+  {
+    return parse_arithmetic_command(open);
+  }
+  return parse_subshell(open);
+}
+
+hot fn Parser::parse_subshell(Token *open) throws -> Command *
+{
   ASSERT(open != nullptr);
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
@@ -1246,6 +1267,60 @@ hot fn Parser::parse_subshell() throws -> Command *
   }
 
   return m_lexer.arena().create<Subshell>(open->source_location(), body);
+}
+
+/* A (( expr )) arithmetic command. The opening parenthesis is already consumed,
+   so the second parenthesis is taken here and then the tokens are walked,
+   tracking parenthesis depth, until the closing )). The body text is sliced
+   from the source between the two pairs and evaluated as arithmetic at run
+   time. */
+hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
+{
+  ASSERT(open != nullptr);
+  Token *second = m_lexer.next_shell_token();
+  ASSERT(second != nullptr);
+  ASSERT(second->kind() == Token::Kind::LeftParen);
+
+  const usize body_start = second->source_location().position + 1;
+  usize body_end = body_start;
+  usize depth = 0;
+  for (;;) {
+    Token *t = m_lexer.next_shell_token();
+    ASSERT(t != nullptr);
+    if (t->kind() == Token::Kind::EndOfFile) {
+      throw ErrorWithLocationAndDetails{open->source_location(),
+                                        "Unterminated '(('",
+                                        t->source_location(), "Expected '))'"};
+    }
+    if (t->kind() == Token::Kind::LeftParen) {
+      depth++;
+      continue;
+    }
+    if (t->kind() == Token::Kind::RightParen) {
+      if (depth > 0) {
+        depth--;
+        continue;
+      }
+      Token *closing = m_lexer.peek_shell_token();
+      ASSERT(closing != nullptr);
+      if (closing->kind() == Token::Kind::RightParen &&
+          closing->source_location().position ==
+              t->source_location().position + 1)
+      {
+        body_end = t->source_location().position;
+        m_lexer.advance_past_last_peek();
+        break;
+      }
+      throw ErrorWithLocationAndDetails{open->source_location(),
+                                        "Unterminated '(('",
+                                        t->source_location(), "Expected '))'"};
+    }
+  }
+
+  const StringView body =
+      m_lexer.source().substring_of_length(body_start, body_end - body_start);
+  return m_lexer.arena().create<expressions::ArithmeticCommand>(
+      open->source_location(), String{bump_allocator(m_lexer.arena()), body});
 }
 
 hot fn Parser::parse_conditional_command() throws -> Command *

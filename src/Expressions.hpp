@@ -637,6 +637,24 @@ protected:
   ArrayList<conditional_element> m_elements;
 };
 
+/* The bash (( expr )) arithmetic command. It evaluates the expression and
+   reports success when the value is non-zero, the way bash turns an arithmetic
+   value into an exit status. */
+class ArithmeticCommand : public CompoundCommand
+{
+public:
+  ArithmeticCommand(SourceLocation location, String expression);
+  ~ArithmeticCommand() override;
+
+  fn to_string() const throws -> String override;
+  fn to_ast_string(usize layer = 0) const throws -> String override;
+
+protected:
+  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  String m_expression;
+};
+
 /* A compound command with trailing redirections, such as { cmd; } >file or
    (cmd) 2>&1. A compound command runs in the shell process, so the redirections
    are applied to the shell's own descriptors around the child and restored
