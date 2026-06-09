@@ -74,6 +74,9 @@ FLAG(
     "less-privileged user controls cannot run with raised privileges. Turned "
     "on automatically when the effective and the real user or group id differ, "
     "the setuid or setgid case.");
+FLAG(RCFILE, String, '\0', "rcfile",
+     "Source FILE as the interactive rc instead of ~/.bashrc, the way bash reads "
+     "a named rc. The shit rc still runs, and a non-interactive run reads no rc.");
 FLAG(MIMICRY, Bool, 'I', "mimicry",
      "Mimic the shell a script's shebang names. A program whose shebang is a "
      "shell shit can emulate runs in-process in the matching mode rather than "
@@ -726,6 +729,15 @@ fn main(int argc, char **argv) -> int
   let function_arena = shit::BumpArena{};
   shit::FUNCTION_ARENA = &function_arena;
 
+  /* The interactive rc the host bash would read, replaced by the --rcfile file
+     when one is given, the way bash reads a named rc instead of ~/.bashrc. */
+  let const source_bash_rc = [&]() {
+    if (FLAG_RCFILE.is_set())
+      source_file(shit::Path{FLAG_RCFILE.value()}, context, ast_arena);
+    else
+      source_home_file(".bashrc", context, ast_arena);
+  };
+
   if (is_privileged) {
     /* A privileged shell sources nothing, the way bash's privileged mode leaves
        the profiles and rc files unread. */
@@ -737,7 +749,7 @@ fn main(int argc, char **argv) -> int
        interactive shell reads ~/.bashrc. The shit rc and the POSIX ENV are
        skipped, since the intent is to initialize from the bash files. */
     if (is_login_shell) source_bash_login_files(context, ast_arena);
-    if (should_be_interactive) source_home_file(".bashrc", context, ast_arena);
+    if (should_be_interactive) source_bash_rc();
   } else {
     /* A login shell reads the login files of the shell it emulates. Bash mode
        reads the bash login order, so --bash-compatible -l or a bash invocation
@@ -769,7 +781,7 @@ fn main(int argc, char **argv) -> int
        ENV to here. The shit rc above runs first in the default mode. A missing
        file is silently skipped. */
     if (should_be_interactive && shit::should_run_in_bash_mode()) {
-      source_home_file(".bashrc", context, ast_arena);
+      source_bash_rc();
     } else if (should_be_interactive && shit::should_run_in_posix_mode()) {
       if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
           env.has_value() && !env->is_empty())

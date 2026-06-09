@@ -326,19 +326,10 @@ fn initialize() -> void
   if (shit::Maybe<shit::Path> shit_history = history_file_path();
       shit_history.has_value())
   {
-    if (int ret = ::tl_history_load(shit_history->c_str()); ret != TL_SUCCESS) {
-      /* Don't count non-existent history file as an error. */
-      if (ret != -ENOENT) {
-        shit::String err_message = "Toiletline: Could not load history: ";
-        if (errno == EINVAL)
-          err_message += "Non-text byte detected in history file. Truncate it "
-                         "manually";
-        else
-          err_message += shit::os::last_system_error_message();
-        shit::Error e{err_message};
-        shit::show_message(e.to_string());
-      }
-    }
+    /* A history that cannot be loaded is cosmetic, a missing file on the first
+       run above all, so the failure is ignored rather than printed at startup.
+       The session simply starts with no recalled history. */
+    ::tl_history_load(shit_history->c_str());
   }
 
   if (::tl_init() != TL_SUCCESS) {
