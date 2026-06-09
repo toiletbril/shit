@@ -922,8 +922,12 @@ hot fn Parser::parse_simple_command() throws -> Command *
     ASSERT(token != nullptr);
 
     /* A reserved word or a group opener in command position introduces a
-       compound command. A list terminator means there is no command here. */
-    if (args_accumulator.is_empty() && local_vars.count() == 0) {
+       compound command. A list terminator means there is no command here. A
+       bare array assignment already collected leaves array_args non-empty, so
+       the command is not empty and a following terminator must build it rather
+       than be read as a leading keyword. */
+    if (args_accumulator.is_empty() && local_vars.count() == 0 &&
+        array_args.is_empty()) {
       /* A standalone '{' in command position opens a brace group, and a
          standalone '}' closes the enclosing one. Both arrive as words, so they
          are matched on the text before the kind switch. A '}' with no open
