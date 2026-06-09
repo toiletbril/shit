@@ -315,7 +315,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.program() == "[") {
     if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]")
       throw Error{
-          "Unable to evaluate the test because the closing ']' is missing"};
+          "The closing ']' is missing"};
     expression_end = arguments.count() - 1;
   }
 
@@ -336,8 +336,8 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      rather than the original operand count. */
   if (evaluator.pos != evaluator.end) {
     ASSERT(evaluator.pos < evaluator.end);
-    throw Error{StringView{"Unable to evaluate the test because '"} +
-                operands[evaluator.pos] + "' is an unexpected argument"};
+    throw Error{StringView{"'"} + operands[evaluator.pos] +
+                "' is an unexpected argument"};
   }
   return result ? 0 : 1;
 }
