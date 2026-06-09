@@ -616,19 +616,15 @@ fn main(int argc, char **argv) -> int
   context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
-  /* An interactive session outside a compatibility mode defaults to nounset and
-     pipefail, so a typo in a variable name and a failing pipeline stage both
-     fail loudly rather than passing silently. A script and a compatibility mode
-     keep the lax bash and dash defaults so an existing configure-style script
-     still runs, and the init-as-bash phase keeps them off while it sources the
-     bash config, since the snap below restores the interactive defaults once the
-     config has loaded. An explicit set +u or set +o pipefail turns them off. */
-  let const strict_interactive_default = should_be_interactive &&
-                                         !shit::should_run_in_compat_mode() &&
-                                         !init_as_bash;
-  context.set_error_unset(FLAG_NOUNSET.is_enabled() ||
-                          strict_interactive_default);
-  context.set_pipefail(strict_interactive_default);
+  /* The startup config files, the profiles and the rc, source with nounset and
+     pipefail off the way a script does, since they are written for a lax shell
+     and read unset variables such as $BASH_VERSION on the /etc/profile path. The
+     strict interactive defaults are applied at the seam below once the config
+     has loaded, so a typo in a variable name and a failing pipeline stage both
+     fail loudly at the prompt. An explicit set -u or set -o pipefail is honored
+     throughout. */
+  context.set_error_unset(FLAG_NOUNSET.is_enabled());
+  context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
@@ -776,14 +772,15 @@ fn main(int argc, char **argv) -> int
      retitle the terminal. */
   context.set_startup_finished();
 
-  /* init-as-bash ran the bash config in bash mode. The interactive session is
-     shit-native, so bash mode is turned off here, and the strict parser and the
-     analysis stage take over from the first prompt. The strict nounset and
-     pipefail defaults the bash phase suppressed come back for the session. A
-     non-interactive init-as-bash run has no prompt, so it stays in bash mode for
-     the whole run. */
-  if (init_as_bash && should_be_interactive) {
-    context.set_bash_compatible(false);
+  /* The startup config has loaded, so the strict interactive defaults take over
+     for the session. An interactive shit-native shell turns nounset and pipefail
+     on so a typo or a failing pipeline stage fails loudly at the prompt, while a
+     compatibility mode keeps the lax bash or dash defaults. init-as-bash also
+     leaves bash mode here, so the strict parser and the analysis stage take over
+     from the first prompt. A non-interactive run has no prompt, so it keeps the
+     lenient sourcing defaults for the whole run. */
+  if (should_be_interactive) {
+    if (init_as_bash) context.set_bash_compatible(false);
     let const strict = !shit::should_run_in_compat_mode();
     context.set_error_unset(FLAG_NOUNSET.is_enabled() || strict);
     context.set_pipefail(strict);
