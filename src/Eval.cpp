@@ -578,13 +578,13 @@ fn EvalContext::update_jobs() throws -> void
 
     i32 status = 0;
     let const state = os::poll_process(job.pid, status);
-    if (state == os::process_state::Exited) {
+    switch (state) {
+    case os::process_state::Exited:
       job.state = job::State::Done;
       job.last_status = status;
-    } else if (state == os::process_state::Stopped) {
-      job.state = job::State::Stopped;
-    } else {
-      job.state = job::State::Running;
+      break;
+    case os::process_state::Stopped: job.state = job::State::Stopped; break;
+    default: job.state = job::State::Running; break;
     }
   }
 }
@@ -3933,16 +3933,20 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
   let result = String{heap_allocator()};
   for (const WordSegment &segment : *segments) {
     let const segment_text = segment.text.view();
-    if (segment.kind == WordSegment::Kind::VariableReference)
+    switch (segment.kind) {
+    case WordSegment::Kind::VariableReference:
       result += apply_parameter_expansion(segment_text);
-    else if (segment.kind == WordSegment::Kind::CommandSubstitution)
+      break;
+    case WordSegment::Kind::CommandSubstitution:
       result += capture_command_substitution(segment);
-    else if (segment.kind == WordSegment::Kind::ArithmeticExpansion)
+      break;
+    case WordSegment::Kind::ArithmeticExpansion:
       result += utils::int_to_text(segment.folded_arithmetic_result.has_value()
                                        ? *segment.folded_arithmetic_result
                                        : evaluate_arithmetic(segment_text));
-    else
-      result += segment_text;
+      break;
+    default: result += segment_text; break;
+    }
   }
   return result;
 }

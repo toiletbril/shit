@@ -118,7 +118,8 @@ void append_conversion(String &out, const String &spec, char conv,
 {
   char buffer[256];
 
-  if (conv == 's') {
+  switch (conv) {
+  case 's': {
     String with_s = spec;
     with_s.push('s');
     /* A %s argument can be arbitrarily long, so a fixed buffer would truncate
@@ -138,14 +139,19 @@ void append_conversion(String &out, const String &spec, char conv,
         std::free(big);
       }
     }
-  } else if (conv == 'c') {
-    out += arg.is_empty() ? '\0' : arg[0];
-  } else if (conv == 'd' || conv == 'i') {
+  } break;
+  case 'c': out += arg.is_empty() ? '\0' : arg[0]; break;
+  case 'd':
+  case 'i': {
     let const with_ll = spec + "lld";
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<long long>(parse_printf_integer(arg)));
     out += buffer;
-  } else if (conv == 'x' || conv == 'X' || conv == 'o' || conv == 'u') {
+  } break;
+  case 'x':
+  case 'X':
+  case 'o':
+  case 'u': {
     String with_ll = spec + "ll";
     with_ll.push(conv);
     /* The unsigned conversions share the char-code and base parsing with the
@@ -153,9 +159,12 @@ void append_conversion(String &out, const String &spec, char conv,
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<unsigned long long>(parse_printf_integer(arg)));
     out += buffer;
-  } else if (conv == 'f' || conv == 'e' || conv == 'E' || conv == 'g' ||
-             conv == 'G')
-  {
+  } break;
+  case 'f':
+  case 'e':
+  case 'E':
+  case 'g':
+  case 'G': {
     /* The float conversions parse the argument as a double through strtod, the
        way the C printf renders it, so the width and the precision in the spec
        are honored. A malformed argument parses as zero. */
@@ -164,10 +173,12 @@ void append_conversion(String &out, const String &spec, char conv,
     const double value = std::strtod(arg.c_str(), nullptr);
     std::snprintf(buffer, sizeof(buffer), with_conv.c_str(), value);
     out += buffer;
-  } else {
+  } break;
+  default:
     /* An unknown conversion is emitted verbatim. */
     out += spec;
     out += conv;
+    break;
   }
 }
 

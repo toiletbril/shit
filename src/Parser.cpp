@@ -603,12 +603,15 @@ fn Parser::build_file_or_dup_redirection(
     throw ErrorWithLocation{target->source_location(),
                             "Expected a filename after the redir"};
   }
-  if (op_kind == Token::Kind::Greater)
+  switch (op_kind) {
+  case Token::Kind::Greater:
     redir.kind = expressions::Redirection::Kind::TruncateOutput;
-  else if (op_kind == Token::Kind::DoubleGreater)
+    break;
+  case Token::Kind::DoubleGreater:
     redir.kind = expressions::Redirection::Kind::AppendOutput;
-  else
-    redir.kind = expressions::Redirection::Kind::ReadInput;
+    break;
+  default: redir.kind = expressions::Redirection::Kind::ReadInput; break;
+  }
   redir.target = target;
   out.push(redir);
 }

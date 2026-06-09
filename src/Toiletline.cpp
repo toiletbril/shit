@@ -688,21 +688,20 @@ static fn guard_prompt_backslashes(StringView template_string) throws -> String
   String out{};
   for (usize i = 0; i < template_string.length; i++) {
     if (template_string[i] == '\\' && i + 1 < template_string.length) {
-      let const next = template_string[i + 1];
-      if (next == '$') {
+      switch (template_string[i + 1]) {
+      case '$':
         out.push(PROMPT_GUARD_DOLLAR);
         i++;
         continue;
-      }
-      if (next == '\\') {
+      case '\\':
         out.push(PROMPT_GUARD_BACKSLASH);
         i++;
         continue;
-      }
-      if (next == '`') {
+      case '`':
         out.push(PROMPT_GUARD_BACKTICK);
         i++;
         continue;
+      default: break;
       }
     }
     out.push(template_string[i]);
