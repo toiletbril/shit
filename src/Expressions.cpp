@@ -2625,9 +2625,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   let const subject = expand_no_glob(m_word);
 
-  for (const case_item &item : m_items) {
-    ASSERT(item.body != nullptr);
-
+  auto arm_matches = [&](const case_item &item) throws -> bool {
     for (const Token *pattern_token : item.patterns) {
       /* A pattern keeps its glob metacharacters for matching, yet a quoted or
          escaped metacharacter in the pattern is a literal, so the expansion
@@ -2652,16 +2650,49 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
       if (utils::glob_matches(pattern, subject, pattern_active, 0,
                               cxt.extglob_enabled()))
-      {
-        let const ret = item.body->evaluate(cxt);
-        cxt.set_last_exit_status(static_cast<i32>(ret));
-        return ret;
-      }
+        return true;
     }
+    return false;
+  };
+
+  /* The index walks the arms so a ;& fall-through can run the next arm body
+     without matching it, and a ;;& can resume matching at the arms past the one
+     that just ran. */
+  i64 result = 0;
+  bool did_run_a_body = false;
+  usize i = 0;
+  while (i < m_items.count()) {
+    if (!arm_matches(m_items[i])) {
+      i++;
+      continue;
+    }
+
+    bool should_resume_matching = false;
+    for (;;) {
+      ASSERT(m_items[i].body != nullptr);
+      result = m_items[i].body->evaluate(cxt);
+      cxt.set_last_exit_status(static_cast<i32>(result));
+      did_run_a_body = true;
+
+      let const terminator = m_items[i].terminator;
+      if (terminator == CaseTerminator::FallThrough &&
+          i + 1 < m_items.count())
+      {
+        i++;
+        continue;
+      }
+      if (terminator == CaseTerminator::ContinueMatch) {
+        i++;
+        should_resume_matching = true;
+      }
+      break;
+    }
+    if (should_resume_matching) continue;
+    return result;
   }
 
-  cxt.set_last_exit_status(0);
-  return 0;
+  if (!did_run_a_body) cxt.set_last_exit_status(0);
+  return result;
 }
 
 cold fn CaseClause::analyze(AnalysisContext &actx,

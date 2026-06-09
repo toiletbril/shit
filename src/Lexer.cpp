@@ -1356,7 +1356,29 @@ hot fn Lexer::lex_sentinel() throws -> Token *
     switch (*op) {
       TOKEN_CASE_ONE(RightParen);
       TOKEN_CASE_ONE(LeftParen);
-      TOKEN_CASE_TWO(Semicolon, ';', DoubleSemicolon);
+    /* ; is a separator, ;; ends a case arm, and the bash fall-through forms ;&
+       and ;;& continue into the next arm or keep matching. They are a pure
+       addition since dash rejects an & after a semicolon, so they stay on in
+       every mode the way [[ ]] does. */
+    case Token::Kind::Semicolon: {
+      if (chop_character(1) == ';') {
+        if (chop_character(2) == '&') {
+          tok = m_arena->create<tokens::DoubleSemicolonAmpersand>(
+              here(m_cursor_position, 3));
+          extra_length += 2;
+        } else {
+          tok = m_arena->create<tokens::DoubleSemicolon>(
+              here(m_cursor_position, 2));
+          extra_length++;
+        }
+      } else if (chop_character(1) == '&') {
+        tok = m_arena->create<tokens::SemicolonAmpersand>(
+            here(m_cursor_position, 2));
+        extra_length++;
+      } else {
+        tok = m_arena->create<tokens::Semicolon>(here(m_cursor_position, 1));
+      }
+    } break;
       TOKEN_CASE_ONE(Dot);
       TOKEN_CASE_ONE(Newline);
       TOKEN_CASE_ONE(Plus);

@@ -145,6 +145,8 @@ public:
     Newline,
     Semicolon,
     DoubleSemicolon,
+    SemicolonAmpersand,
+    DoubleSemicolonAmpersand,
     Dot,
     Dollar,
 
@@ -326,6 +328,8 @@ TOKEN_STRUCT(EndOfFile);
 TOKEN_STRUCT(Newline);
 TOKEN_STRUCT(Semicolon);
 TOKEN_STRUCT(DoubleSemicolon);
+TOKEN_STRUCT(SemicolonAmpersand);
+TOKEN_STRUCT(DoubleSemicolonAmpersand);
 TOKEN_STRUCT(AmpersandGreater);
 TOKEN_STRUCT(AmpersandDoubleGreater);
 TOKEN_STRUCT(PipeAmpersand);

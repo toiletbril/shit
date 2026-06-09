@@ -1,0 +1,11 @@
+#!/bin/env shit
+case b in
+  a) echo a ;;
+  b) echo b ;&
+  c) echo c ;;
+esac
+case hi in
+  h*) echo h ;;&
+  *i) echo i ;;&
+  hi) echo exact ;;
+esac

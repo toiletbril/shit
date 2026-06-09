@@ -1552,18 +1552,35 @@ hot fn Parser::parse_case() throws -> Command *
                               "Expected '|' or ')' in a case pattern"};
     }
 
-    Expression *body =
-        parse_command_list({Token::Kind::DoubleSemicolon, Token::Kind::Esac});
-    items.push(case_item{steal(patterns), body});
+    Expression *body = parse_command_list(
+        {Token::Kind::DoubleSemicolon, Token::Kind::SemicolonAmpersand,
+         Token::Kind::DoubleSemicolonAmpersand, Token::Kind::Esac});
 
     Token *after = m_lexer.peek_shell_token();
     ASSERT(after != nullptr);
-    if (after->kind() == Token::Kind::DoubleSemicolon) {
-      m_lexer.advance_past_last_peek();
-    } else if (after->kind() == Token::Kind::Esac) {
+    CaseTerminator terminator = CaseTerminator::Break;
+    bool is_last_arm = false;
+    switch (after->kind()) {
+    case Token::Kind::DoubleSemicolon:
       m_lexer.advance_past_last_peek();
       break;
+    case Token::Kind::SemicolonAmpersand:
+      terminator = CaseTerminator::FallThrough;
+      m_lexer.advance_past_last_peek();
+      break;
+    case Token::Kind::DoubleSemicolonAmpersand:
+      terminator = CaseTerminator::ContinueMatch;
+      m_lexer.advance_past_last_peek();
+      break;
+    case Token::Kind::Esac:
+      m_lexer.advance_past_last_peek();
+      is_last_arm = true;
+      break;
+    default: break;
     }
+
+    items.push(case_item{steal(patterns), body, terminator});
+    if (is_last_arm) break;
   }
 
   return m_lexer.arena().create<CaseClause>(location, word, steal(items));

@@ -592,11 +592,22 @@ protected:
   const Expression *m_body;
 };
 
-/* One arm of a case, a set of patterns and the body that runs on a match. */
+/* How an arm ends. ;; stops the case, ;& falls into the next arm body without
+   matching it, and ;;& resumes matching at the following arms. */
+enum class CaseTerminator
+{
+  Break,
+  FallThrough,
+  ContinueMatch,
+};
+
+/* One arm of a case, a set of patterns, the body that runs on a match, and the
+   terminator that decides what happens after the body. */
 struct case_item
 {
   ArrayList<const Token *> patterns;
   const Expression *body;
+  CaseTerminator terminator;
 };
 
 class CaseClause : public CompoundCommand
