@@ -64,6 +64,17 @@ private:
       Maybe<SourceLocation> &first_location,
       ArrayList<expressions::Redirection> &out) throws -> void;
 
+  /* Build the &> and &>> both-streams redirection, fd 1 to the file followed by
+     fd 2 duplicating fd 1, the way bash expands &>file into >file 2>&1. */
+  fn build_both_streams_redirection(
+      bool append, SourceLocation op_location,
+      Maybe<SourceLocation> &first_location,
+      ArrayList<expressions::Redirection> &out) throws -> void;
+
+  /* Wrap a command in a 2>&1 redirection, the stderr-to-stdout dup a |& pipe
+     stage applies to the command on its left. */
+  mustuse fn wrap_with_stderr_to_stdout(Command *command) throws -> Command *;
+
   /* Build one heredoc redirection on descriptor fd. The << operator is already
      consumed and op_location is its position. A digit prefix such as the 3 in
      3<<EOF supplies a non-zero fd. */

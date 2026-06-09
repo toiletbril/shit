@@ -216,6 +216,9 @@ SENTINEL_TOKEN_DECLS_COMPOUND(Semicolon, ";");
 
 SENTINEL_TOKEN_DECLS(EndOfFile, "end of input");
 SENTINEL_TOKEN_DECLS(DoubleSemicolon, ";;");
+SENTINEL_TOKEN_DECLS(AmpersandGreater, "&>");
+SENTINEL_TOKEN_DECLS(AmpersandDoubleGreater, "&>>");
+SENTINEL_TOKEN_DECLS(PipeAmpersand, "|&");
 SENTINEL_TOKEN_DECLS(Dot, ".");
 
 SENTINEL_TOKEN_DECLS(LeftParen, "(");

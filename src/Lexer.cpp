@@ -1201,8 +1201,43 @@ hot fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_TWO(RightSquareBracket, ']', DoubleRightSquareBracket);
       TOKEN_CASE_TWO(LeftSquareBracket, '[', DoubleLeftSquareBracket);
       TOKEN_CASE_TWO(ExclamationMark, '=', ExclamationEquals);
-      TOKEN_CASE_TWO(Ampersand, '&', DoubleAmpersand);
-      TOKEN_CASE_TWO(Pipe, '|', DoublePipe);
+    /* & is the background operator, && the logical and. In bash mode &> and &>>
+       redirect both standard streams to a file, so they are recognized here
+       before the plain & since they change the POSIX meaning. */
+    case Token::Kind::Ampersand: {
+      if (m_bash_compatible && chop_character(1) == '>') {
+        if (chop_character(2) == '>') {
+          tok = m_arena->create<tokens::AmpersandDoubleGreater>(
+              here(m_cursor_position, 3));
+          extra_length += 2;
+        } else {
+          tok = m_arena->create<tokens::AmpersandGreater>(
+              here(m_cursor_position, 2));
+          extra_length++;
+        }
+      } else if (chop_character(1) == '&') {
+        tok = m_arena->create<tokens::DoubleAmpersand>(
+            here(m_cursor_position, 2));
+        extra_length++;
+      } else {
+        tok = m_arena->create<tokens::Ampersand>(here(m_cursor_position, 1));
+      }
+    } break;
+
+    /* | is a pipe, || the logical or. In bash mode |& pipes both standard
+       output and standard error, the shorthand for 2>&1 |. */
+    case Token::Kind::Pipe: {
+      if (chop_character(1) == '|') {
+        tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
+        extra_length++;
+      } else if (m_bash_compatible && chop_character(1) == '&') {
+        tok =
+            m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
+        extra_length++;
+      } else {
+        tok = m_arena->create<tokens::Pipe>(here(m_cursor_position, 1));
+      }
+    } break;
       TOKEN_CASE_TWO(Equals, '=', DoubleEquals);
 
       TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);

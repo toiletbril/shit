@@ -160,6 +160,9 @@ public:
     Tilde,
     Ampersand,
     DoubleAmpersand,
+    AmpersandGreater,
+    AmpersandDoubleGreater,
+    PipeAmpersand,
     Greater,
     DoubleGreater,
     GreaterEquals,
@@ -318,6 +321,9 @@ TOKEN_STRUCT(EndOfFile);
 TOKEN_STRUCT(Newline);
 TOKEN_STRUCT(Semicolon);
 TOKEN_STRUCT(DoubleSemicolon);
+TOKEN_STRUCT(AmpersandGreater);
+TOKEN_STRUCT(AmpersandDoubleGreater);
+TOKEN_STRUCT(PipeAmpersand);
 
 TOKEN_STRUCT(Dot);
 TOKEN_STRUCT(LeftParen);

@@ -410,38 +410,49 @@ hot fn Parser::parse_command_list(
       }
     } break;
 
-    case Token::Kind::Pipe: {
+    case Token::Kind::Pipe:
+    case Token::Kind::PipeAmpersand: {
       if (lhs == nullptr) {
         throw shit::ErrorWithLocation{token->source_location(),
                                       "Expected a command before the pipe"};
       }
 
+      /* A |& pipe routes the standard error of the command on its left into the
+         pipe as well, the shorthand for 2>&1 |. */
+      const bool left_pipes_stderr =
+          token->kind() == Token::Kind::PipeAmpersand;
       m_lexer.advance_past_last_peek();
       skip_newlines_after_pipe();
 
       Pipeline *pipeline =
           m_lexer.arena().create<Pipeline>(token->source_location());
-      pipeline->append_command(lhs);
+      pipeline->append_command(
+          left_pipes_stderr ? wrap_with_stderr_to_stdout(lhs) : lhs);
 
       Token *last_pipe_token = token;
 
       for (;;) {
         Command *rhs = parse_simple_command();
-
-        if (rhs != nullptr) {
-          pipeline->append_command(rhs);
-          last_pipe_token = m_lexer.peek_shell_token();
-          ASSERT(last_pipe_token != nullptr);
-          if (last_pipe_token->kind() == Token::Kind::Pipe) {
-            m_lexer.advance_past_last_peek();
-            skip_newlines_after_pipe();
-            continue;
-          }
-        } else {
+        if (rhs == nullptr) {
           throw shit::ErrorWithLocation{last_pipe_token->source_location(),
                                         "Nowhere to pipe output to"};
         }
 
+        last_pipe_token = m_lexer.peek_shell_token();
+        ASSERT(last_pipe_token != nullptr);
+        const bool another_pipe =
+            last_pipe_token->kind() == Token::Kind::Pipe ||
+            last_pipe_token->kind() == Token::Kind::PipeAmpersand;
+        const bool this_pipes_stderr =
+            last_pipe_token->kind() == Token::Kind::PipeAmpersand;
+        pipeline->append_command(another_pipe && this_pipes_stderr
+                                     ? wrap_with_stderr_to_stdout(rhs)
+                                     : rhs);
+        if (another_pipe) {
+          m_lexer.advance_past_last_peek();
+          skip_newlines_after_pipe();
+          continue;
+        }
         break;
       }
 
@@ -589,6 +600,40 @@ fn Parser::build_file_or_dup_redirection(
   out.push(redir);
 }
 
+fn Parser::build_both_streams_redirection(
+    bool append, SourceLocation op_location,
+    Maybe<SourceLocation> &first_location,
+    ArrayList<expressions::Redirection> &out) throws -> void
+{
+  /* The standard output goes to the file, then the standard error is made to
+     follow it, the same pair bash builds for &>file. */
+  build_file_or_dup_redirection(
+      1, append ? Token::Kind::DoubleGreater : Token::Kind::Greater,
+      op_location, first_location, out);
+
+  expressions::Redirection dup{};
+  dup.fd = 2;
+  dup.target = nullptr;
+  dup.kind = expressions::Redirection::Kind::DuplicateOutput;
+  dup.dup_fd = 1;
+  out.push(dup);
+}
+
+mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
+    -> Command *
+{
+  ASSERT(command != nullptr);
+  ArrayList<expressions::Redirection> redirections{};
+  expressions::Redirection dup{};
+  dup.fd = 2;
+  dup.target = nullptr;
+  dup.kind = expressions::Redirection::Kind::DuplicateOutput;
+  dup.dup_fd = 1;
+  redirections.push(dup);
+  return m_lexer.arena().create<RedirectedCommand>(
+      command->source_location(), command, steal(redirections));
+}
+
 fn Parser::build_heredoc_redirection(
     i32 fd, SourceLocation op_location, Maybe<SourceLocation> &first_location,
     ArrayList<expressions::Redirection> &out) throws -> void
@@ -697,6 +742,17 @@ mustuse fn Parser::try_parse_trailing_redirection(
     build_file_or_dup_redirection((op_kind == Token::Kind::Less) ? 0 : 1,
                                   op_kind, op_location, ignored_first_location,
                                   out);
+    return true;
+  }
+
+  case Token::Kind::AmpersandGreater:
+  case Token::Kind::AmpersandDoubleGreater: {
+    const let op_kind = token->kind();
+    const let op_location = token->source_location();
+    m_lexer.advance_past_last_peek();
+    build_both_streams_redirection(op_kind ==
+                                       Token::Kind::AmpersandDoubleGreater,
+                                   op_location, ignored_first_location, out);
     return true;
   }
 
@@ -940,6 +996,16 @@ hot fn Parser::parse_simple_command() throws -> Command *
       m_lexer.advance_past_last_peek();
       add_redirection((op_kind == Token::Kind::Less) ? 0 : 1, op_kind,
                       op_location);
+    } break;
+
+    case Token::Kind::AmpersandGreater:
+    case Token::Kind::AmpersandDoubleGreater: {
+      const let op_kind = token->kind();
+      const let op_location = token->source_location();
+      m_lexer.advance_past_last_peek();
+      build_both_streams_redirection(
+          op_kind == Token::Kind::AmpersandDoubleGreater, op_location,
+          source_location, redirections);
     } break;
 
     case Token::Kind::DoubleLess: {
