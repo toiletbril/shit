@@ -1,0 +1,106 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "-a" "val" "-bc" "arg"]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "getopts" "a:bc" "opt"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "opt=$opt arg=$OPTARG"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rest=$1 ind=$OPTIND"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "-x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "getopts" ":a:" "o"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "silent=$o arg=$OPTARG"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "val"
+]
+[Word
+  Unquoted "-bc"
+]
+[Word
+  Unquoted "arg"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "getopts"
+]
+[Word
+  DoubleQuoted "a:bc"
+]
+[Word
+  Unquoted "opt"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "opt="
+  Variable "opt"
+  DoubleQuoted " arg="
+  Variable "OPTARG"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rest="
+  Variable "1"
+  DoubleQuoted " ind="
+  Variable "OPTIND"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "-x"
+]
+[Word
+  Unquoted "getopts"
+]
+[Word
+  DoubleQuoted ":a:"
+]
+[Word
+  Unquoted "o"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "silent="
+  Variable "o"
+  DoubleQuoted " arg="
+  Variable "OPTARG"
+]
+opt=a arg=val
+opt=b arg=
+opt=c arg=
+rest=-a ind=4
+silent=? arg=
+[Code 0]

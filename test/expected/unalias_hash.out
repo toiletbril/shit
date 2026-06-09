@@ -1,0 +1,106 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias" "greet=echo hi"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unalias" "greet"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rm=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unalias" "missing"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "miss=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias" "a=1" "b=2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unalias" "-a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "alias"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "all=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "hash" "-r"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "hash=$?"]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "greet="
+  Literal "echo hi"
+]
+[Word
+  Unquoted "unalias"
+]
+[Word
+  Unquoted "greet"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rm="
+  Variable "?"
+]
+[Word
+  Unquoted "unalias"
+]
+[Word
+  Unquoted "missing"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "miss="
+  Variable "?"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "a=1"
+]
+[Word
+  Unquoted "b=2"
+]
+[Word
+  Unquoted "unalias"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "all="
+  Variable "?"
+]
+[Word
+  Unquoted "hash"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "hash="
+  Variable "?"
+]
+rm=0
+missing: not found
+miss=1
+all=0
+hash=0
+[Code 0]

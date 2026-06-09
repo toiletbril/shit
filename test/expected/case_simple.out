@@ -1,0 +1,31 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "hi"]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "esac"
+]
+shit: 2:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
+     2 |  case x in a) echo hi;; esac
+       |       ^~ here.
+[Code 0]

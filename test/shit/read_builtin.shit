@@ -1,0 +1,4 @@
+#!/bin/env shit
+printf 'a b c\n' | { read first rest; echo "first=$first rest=$rest"; }
+printf '1 2 3\n' | { read -a arr; echo "n=${#arr[@]} a0=${arr[0]} a2=${arr[2]}"; }
+printf 'noeol' | { read v; echo "rc=$? v=$v"; }

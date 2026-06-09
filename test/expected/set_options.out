@@ -1,0 +1,132 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "pipefail"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "on=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "pipefail"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "off=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "one" "two" "three"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$1 $3 count=$#"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-Z"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bad=$?"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "-e"]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "notreached"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after=$?"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "pipefail"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "on="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "pipefail"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "off="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "three"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "1"
+  DoubleQuoted " "
+  Variable "3"
+  DoubleQuoted " count="
+  Variable "#"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-Z"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "bad="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "notreached"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after="
+  Variable "?"
+]
+on=0
+off=0
+one three count=3
+shit: 5:1: error: Builtin 'set': unknown option '-Z'.
+     5 |  set -Z 2>&1; echo "bad=$?"
+       |  ^~~~~~ here.

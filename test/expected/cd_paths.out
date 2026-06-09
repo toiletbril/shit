@@ -1,0 +1,99 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "pwd"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/tmp"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" ".."]
+  [CompoundListCondition, None]
+    [SimpleCommand "pwd"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "pwd"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cdpath=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/nonexistent-xyz-dir"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "miss=$?"]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "pwd"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted ".."
+]
+[Word
+  Unquoted "pwd"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "pwd"
+]
+[Word
+  Unquoted "CDPATH=:"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cdpath="
+  Variable "?"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/nonexistent-xyz-dir"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "miss="
+  Variable "?"
+]
+/
+/
+/tmp
+/tmp
+cdpath=0
+shit: 6:1: error: Builtin 'cd': Unable to change directory because the path '/nonexistent-xyz-dir' does not exist.
+     6 |  cd /nonexistent-xyz-dir 2>&1; echo "miss=$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~ here.

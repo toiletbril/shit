@@ -1,0 +1,88 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "hi"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "trunc=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "exec"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rw=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "dup=done"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "close=$?"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "trunc="
+  Variable "?"
+]
+[Word
+  Unquoted "exec"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rw="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "dup=done"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "close="
+  Variable "?"
+]
+trunc=0
+rw=0
+dup=done
+close=0
+[Code 0]

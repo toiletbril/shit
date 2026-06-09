@@ -1,0 +1,6 @@
+#!/bin/env shit
+cd /; pwd
+cd /tmp; cd ..; pwd
+cd -; pwd
+CDPATH=: cd /; echo "cdpath=$?"
+cd /nonexistent-xyz-dir 2>&1; echo "miss=$?"

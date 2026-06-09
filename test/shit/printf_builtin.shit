@@ -1,0 +1,11 @@
+#!/bin/env shit
+printf "tab\tnl\nff\fvt\v\n"
+printf "%b\n" "\012x"
+printf "%b\n" "lit\\\\"
+printf "[%c]\n" ""
+printf "100%%\n"
+printf "%Q\n" hi
+printf "%d\n" +5
+printf "%.3s\n" abcdef
+printf "end%"
+echo

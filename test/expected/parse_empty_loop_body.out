@@ -1,0 +1,3 @@
+shit: 2:16: error: Unable to parse the loop because its body between 'do' and 'done' is empty, a command is required there.
+     2 |  while true; do done
+       |                 ^~~~ here.

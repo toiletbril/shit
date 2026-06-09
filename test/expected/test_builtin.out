@@ -1,0 +1,154 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "-s" "/dev/null"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "5" "-le" "10"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "abc" "-eq" "5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "!" ""]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "a" "-a" "b" "c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "/dev/null" "-nt" "/dev/null"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$?"]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "-le"
+]
+[Word
+  Unquoted "10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "-nt"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "?"
+]
+shit: 7:8: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
+     7 |  test a -a b c; echo $?
+       |         ^~ here.
+1
+0
+shit: 4:1: error: Builtin 'test': Unable to compare with '-eq' because 'abc' is not an integer.
+     4 |  test abc -eq 5; echo $?
+       |  ^~~~~~~~~~~~~~ here.

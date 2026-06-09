@@ -1,0 +1,76 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 + 2 * 3 - 4 / 2 % 3 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 << 4 | 2 & 3 ^ 5 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( ~0 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 2 ** 10 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 5 > 3 ? 10 : 20 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 1 && 0 || 1 ))"]
+  [CompoundListCondition, None]
+    [Assign x=7]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( x++ + ++x ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( 010 + 0x1f ))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 + 2 * 3 - 4 / 2 % 3 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 << 4 | 2 & 3 ^ 5 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " ~0 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 2 ** 10 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 5 > 3 ? 10 : 20 "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 1 && 0 || 1 "
+]
+[Word
+  Unquoted "x=7"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " x++ + ++x "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " 010 + 0x1f "
+]
+5
+23
+-1
+shit: 5:6: error: Arithmetic: unexpected character.
+     5 |  echo $(( 2 ** 10 ))
+       |       ^~~~~~~~~~~~~~ here.

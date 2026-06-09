@@ -1,0 +1,5 @@
+#!/bin/env shit
+readonly x=1
+x=2; echo "assign=$?"
+export y=1; readonly y; export y=2; echo "export=$?"
+unset x; echo "unset=$?"

@@ -1,0 +1,106 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "a" "b" "c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$@"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#"]
+  [CompoundListCondition, None]
+    [Assign IFS=:]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$999:-fallback"]
+  [CompoundListCondition, None]
+    [Assign x=hello]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x#he" "$x%lo" "$#x" "$x:1:3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$nope:-def" "$x:+yes"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "marker$!end"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "@"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#"
+]
+[Word
+  Unquoted "IFS=:"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "999:-fallback"
+]
+[Word
+  Unquoted "x=hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x#he"
+]
+[Word
+  Variable "x%lo"
+]
+[Word
+  Variable "#x"
+]
+[Word
+  Variable "x:1:3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "nope:-def"
+]
+[Word
+  Variable "x:+yes"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "marker"
+  Variable "!"
+  DoubleQuoted "end"
+]
+a b c
+3
+a:b:c
+fallback
+llo hel 5 ell
+def yes
+markerend
+[Code 0]

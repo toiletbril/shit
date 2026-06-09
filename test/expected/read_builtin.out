@@ -1,0 +1,130 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "a b c\n"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "first" "rest"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "first=$first rest=$rest"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "1 2 3\n"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "-a" "arr"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "n=$#arr[@] a0=$arr[0] a2=$arr[2]"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "noeol"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "v"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "rc=$? v=$v"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a b c\n"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "rest"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "first="
+  Variable "first"
+  DoubleQuoted " rest="
+  Variable "rest"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "1 2 3\n"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "arr"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "n="
+  Variable "#arr[@]"
+  DoubleQuoted " a0="
+  Variable "arr[0]"
+  DoubleQuoted " a2="
+  Variable "arr[2]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "noeol"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "v"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rc="
+  Variable "?"
+  DoubleQuoted " v="
+  Variable "v"
+]
+[Word
+  Unquoted "}"
+]
+shit: 2:22: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+     2 |  printf 'a b c\n' | { read first rest; echo "first=$first rest=$rest"; }
+       |                       ^~~~~~~~~~~~~~~ here.
+shit: 3:22: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+     3 |  printf '1 2 3\n' | { read -a arr; echo "n=${#arr[@]} a0=${arr[0]} a2=${arr[2]}"; }
+       |                       ^~~~~~~~~~~ here.
+shit: 4:20: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+     4 |  printf 'noeol' | { read v; echo "rc=$? v=$v"; }
+       |                     ^~~~~~ here.
+first=a rest=b c
+n=3 a0=1 a2=3
+rc=1 v=noeol
+[Code 0]
