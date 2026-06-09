@@ -209,6 +209,17 @@ enum class MimicMode : u8
   Bash,
 };
 
+/* A programmable-completion spec the complete builtin registers for a command.
+   The interactive engine consults it when completing an argument to that
+   command. function_name is the -F function, word_list is the -W word list, and
+   use_default falls back to filename completion when the spec yields nothing. */
+struct completion_spec
+{
+  String function_name{};
+  String word_list{};
+  bool use_default{false};
+};
+
 class EvalContext
 {
 public:
@@ -388,6 +399,19 @@ public:
   /* The names of every defined function, so the prepass of a later command
      knows a function defined earlier resolves. */
   fn function_names() const throws -> HashSet;
+
+  /* Programmable completion. register_completion_spec records what the complete
+     builtin registers for a command, lookup returns it for the engine, and
+     run_completion_function calls a -F function with the COMP_ variables set and
+     returns the COMPREPLY entries it produced. */
+  fn register_completion_spec(StringView command, completion_spec spec) throws
+      -> void;
+  pure fn lookup_completion_spec(StringView command) const wontthrow
+      -> const completion_spec *;
+  fn run_completion_function(StringView function_name,
+                             const ArrayList<String> &words, usize cword,
+                             StringView line, usize point) throws
+      -> ArrayList<String>;
 
   /* The names of every shell variable, so variable completion can offer them
      after a '$'. The environment names are added by the caller, since they live
@@ -803,6 +827,8 @@ protected:
   BumpArena m_scratch_arena{};
   HashMap<String> m_shell_variables{heap_allocator()};
   HashMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
+  /* The completion specs the complete builtin registered, keyed by command. */
+  HashMap<completion_spec> m_completion_specs{heap_allocator()};
   HashSet m_associative_names{heap_allocator()};
   HashMap<String> m_associative_values{heap_allocator()};
   HashMap<bool> m_shopt_options{heap_allocator()};

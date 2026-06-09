@@ -4631,6 +4631,97 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
   return status;
 }
 
+fn EvalContext::register_completion_spec(StringView command,
+                                         completion_spec spec) throws -> void
+{
+  m_completion_specs.set(command, steal(spec));
+}
+
+pure fn EvalContext::lookup_completion_spec(StringView command) const wontthrow
+    -> const completion_spec *
+{
+  return m_completion_specs.find(command);
+}
+
+fn EvalContext::run_completion_function(StringView function_name,
+                                        const ArrayList<String> &words,
+                                        usize cword, StringView line,
+                                        usize point) throws -> ArrayList<String>
+{
+  const Expression *body =
+      has_functions() ? find_function(function_name) : nullptr;
+  if (body == nullptr) return ArrayList<String>{};
+
+  /* A completion function is bash code that reads and writes arrays, COMP_WORDS
+     and COMPREPLY above all, so the call evaluates in bash mode whatever the
+     interactive session's mode, then the mode is put back. */
+  let const saved_bash_compatible = m_bash_compatible;
+  let const saved_posix_mode = m_posix_mode;
+  m_bash_compatible = true;
+  m_posix_mode = false;
+  defer {
+    m_bash_compatible = saved_bash_compatible;
+    m_posix_mode = saved_posix_mode;
+  };
+
+  /* The completion variables bash exposes to the function, the words of the
+     line, the index of the word under the cursor, and the raw line and byte. */
+  let comp_words = ArrayList<String>{};
+  comp_words.reserve(words.count());
+  for (const String &word : words)
+    comp_words.push(String{heap_allocator(), word.view()});
+  set_indexed_array("COMP_WORDS", steal(comp_words));
+  set_shell_variable("COMP_CWORD", utils::int_to_text(static_cast<i64>(cword)));
+  set_shell_variable("COMP_LINE", line);
+  set_shell_variable("COMP_POINT", utils::int_to_text(static_cast<i64>(point)));
+
+  /* bash invokes the function with the command, the current word, and the
+     previous word as its first three positional parameters. */
+  let call_params = ArrayList<String>{};
+  call_params.push(words.is_empty() ? String{}
+                                    : String{heap_allocator(), words[0].view()});
+  call_params.push(cword < words.count()
+                       ? String{heap_allocator(), words[cword].view()}
+                       : String{});
+  call_params.push(cword > 0 && cword - 1 < words.count()
+                       ? String{heap_allocator(), words[cword - 1].view()}
+                       : String{});
+
+  let saved_params = take_positional_params();
+  set_positional_params(steal(call_params));
+  defer { set_positional_params(steal(saved_params)); };
+
+  enter_function_call(SourceLocation{});
+  defer { leave_function_call(); };
+  let const saved_loop_depth = loop_depth();
+  set_loop_depth(0);
+  defer { set_loop_depth(saved_loop_depth); };
+  enter_function_scope();
+  defer { leave_function_scope(); };
+  let const saved_terminal_exec = terminal_exec_allowed();
+  set_terminal_exec_allowed(false);
+  defer { set_terminal_exec_allowed(saved_terminal_exec); };
+
+  /* A completion function that errors must not abort the prompt, so any error is
+     swallowed and yields no candidates, and a stray break or return is consumed
+     so it does not escape into the line editor. */
+  try {
+    body->evaluate(*this);
+  } catch (const ErrorBase &) {
+  }
+  if (has_pending_control_flow()) clear_control_flow();
+
+  let result = ArrayList<String>{};
+  if (const ArrayList<String> *reply = lookup_indexed_array("COMPREPLY");
+      reply != nullptr)
+  {
+    result.reserve(reply->count());
+    for (const String &entry : *reply)
+      result.push(String{heap_allocator(), entry.view()});
+  }
+  return result;
+}
+
 fn EvalContext::run_source(StringView source, StringView origin,
                            bool consume_return, Maybe<SourceLocation> call_site,
                            Maybe<StringView> filename) throws -> i32

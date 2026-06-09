@@ -462,6 +462,95 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
   return candidates;
 }
 
+/* The first whitespace-delimited word of the line, the command a registered
+   completion spec is looked up by. */
+static fn command_word_of(StringView line) wontthrow -> StringView
+{
+  usize i = 0;
+  while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+    i++;
+  const usize start = i;
+  while (i < line.length && line[i] != ' ' && line[i] != '\t')
+    i++;
+  return line.substring_of_length(start, i - start);
+}
+
+/* Split the line into whitespace words for COMP_WORDS, reporting the index of
+   the word the cursor sits in. An empty trailing word is appended when the
+   cursor is past the last one, so the function reads an empty current word. */
+static fn split_completion_words(StringView line, usize cursor,
+                                 usize &cword) throws -> ArrayList<String>
+{
+  let words = ArrayList<String>{};
+  usize i = 0;
+  bool found = false;
+  while (i < line.length) {
+    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+      i++;
+    if (i >= line.length) break;
+    const usize start = i;
+    while (i < line.length && line[i] != ' ' && line[i] != '\t')
+      i++;
+    if (cursor >= start && cursor <= i) {
+      cword = words.count();
+      found = true;
+    }
+    words.push(String{line.substring_of_length(start, i - start)});
+  }
+  if (!found) {
+    cword = words.count();
+    words.push(String{});
+  }
+  return words;
+}
+
+/* Consult the completion spec registered for the line's command, when one
+   exists. The word list filters to the entries that start with the token, and
+   the -F function runs only on an explicit tab so the ghost does not run it on
+   every keystroke. None means no spec applied, so the caller completes
+   filenames, which is also the result when a -o default spec found nothing. */
+static fn complete_from_spec(StringView line, StringView token, usize cursor,
+                             bool for_listing, EvalContext &context) throws
+    -> Maybe<ArrayList<String>>
+{
+  const StringView command = command_word_of(line);
+  if (command.is_empty()) return None;
+  const completion_spec *spec = context.lookup_completion_spec(command);
+  if (spec == nullptr) return None;
+
+  let candidates = ArrayList<String>{};
+
+  if (!spec->word_list.is_empty()) {
+    const StringView list = spec->word_list.view();
+    usize start = 0;
+    for (usize i = 0; i <= list.length; i++) {
+      const char c = i < list.length ? list[i] : ' ';
+      if (c == ' ' || c == '\t' || c == '\n') {
+        if (i > start) {
+          const StringView word = list.substring_of_length(start, i - start);
+          if (token.is_empty() || word.starts_with(token))
+            candidates.push(String{word});
+        }
+        start = i + 1;
+      }
+    }
+  }
+
+  /* The function returns the final candidate list in COMPREPLY, already filtered
+     to the current word, so its entries are taken as they are. */
+  if (for_listing && !spec->function_name.is_empty()) {
+    usize cword = 0;
+    let const words = split_completion_words(line, cursor, cword);
+    let const reply = context.run_completion_function(spec->function_name.view(),
+                                                      words, cword, line, cursor);
+    for (const String &entry : reply)
+      candidates.push(String{heap_allocator(), entry.view()});
+  }
+
+  if (candidates.is_empty() && spec->use_default) return None;
+  return candidates;
+}
+
 flatten fn complete(StringView line, usize cursor, EvalContext &context,
                     const Path &base_directory, bool for_listing) throws
     -> completion_result
@@ -532,7 +621,15 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
   } else {
-    candidates = complete_filesystem(token, base_directory);
+    /* An argument to a command that registered a completion spec consults the
+       spec first, the way bash runs a programmable completion, and falls back to
+       filenames when no spec applies or a -o default spec found nothing. */
+    if (Maybe<ArrayList<String>> from_spec =
+            complete_from_spec(line, token, cursor, for_listing, context);
+        from_spec.has_value())
+      candidates = steal(*from_spec);
+    else
+      candidates = complete_filesystem(token, base_directory);
   }
 
   /* A token that matched nothing skips the sort and the prefix scan, the common

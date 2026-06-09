@@ -5,9 +5,11 @@
 
 /* complete registers a programmable-completion spec for a command, the bash
    builtin a completion script calls, such as complete -o default -F _name name.
-   The shell accepts the spec and its options so a bash config that registers
-   completions sources cleanly. The interactive completion engine does not yet
-   consult the registered specs, so the registration is recorded as a no-op. */
+   The spec is stored on the context, and the interactive completion engine
+   consults it when an argument to that command is completed. The -F function and
+   the -W word list drive the candidates, and -o default falls back to filename
+   completion when the spec yields nothing. The remaining options are accepted so
+   a config sources cleanly. */
 
 FLAG_LIST_DECL();
 
@@ -34,14 +36,62 @@ pure fn Complete::kind() const wontthrow -> Builtin::Kind
 
 fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(cxt);
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* The spec and its options are accepted and ignored, so a config that calls
-     complete to register a completion keeps running. */
+  /* The spec the options build, then registered for each named command. */
+  let function_name = String{};
+  let word_list = String{};
+  bool use_default = false;
+  let commands = ArrayList<String>{};
+
+  for (usize i = 1; i < args.count();) {
+    let const arg = args[i].view();
+    if (arg == "-F") {
+      if (++i < args.count()) function_name = String{heap_allocator(), args[i]};
+      i++;
+      continue;
+    }
+    if (arg == "-W") {
+      if (++i < args.count()) word_list = String{heap_allocator(), args[i]};
+      i++;
+      continue;
+    }
+    if (arg == "-o") {
+      if (++i < args.count() &&
+          (args[i] == "default" || args[i] == "bashdefault" ||
+           args[i] == "dirnames"))
+        use_default = true;
+      i++;
+      continue;
+    }
+    /* These options carry a value that is accepted without effect, so the value
+       argument is skipped with them. */
+    if (arg == "-A" || arg == "-G" || arg == "-C" || arg == "-X" ||
+        arg == "-P" || arg == "-S")
+    {
+      i += 2;
+      continue;
+    }
+    /* Any other dash option, such as -p, -r, -f, or the action letters, is
+       accepted without effect. */
+    if (!arg.is_empty() && arg[0] == '-') {
+      i++;
+      continue;
+    }
+    commands.push(String{heap_allocator(), arg});
+    i++;
+  }
+
+  for (const String &command : commands) {
+    let spec = completion_spec{};
+    spec.function_name = String{heap_allocator(), function_name};
+    spec.word_list = String{heap_allocator(), word_list};
+    spec.use_default = use_default;
+    cxt.register_completion_spec(command.view(), steal(spec));
+  }
   return 0;
 }
 
