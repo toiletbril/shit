@@ -169,9 +169,10 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
             resource.units_per_value;
   }
 
-  /* -H sets only the hard limit, -S only the soft, and neither sets both. */
-  if (!FLAG_SOFT.is_enabled()) limit.rlim_max = value;
-  if (!FLAG_HARD.is_enabled()) limit.rlim_cur = value;
+  /* -H sets the hard limit, -S the soft, and naming neither, or both together,
+     sets both, the way dash does. */
+  if (FLAG_HARD.is_enabled() || !FLAG_SOFT.is_enabled()) limit.rlim_max = value;
+  if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) limit.rlim_cur = value;
 
   if (setrlimit(resource.which, &limit) != 0)
     throw Error{"could not set the limit: " + os::last_system_error_message()};

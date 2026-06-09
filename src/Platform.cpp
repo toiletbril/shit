@@ -955,15 +955,14 @@ fn clear_trap_handler(i32 signal_number) throws -> void
 
 fn take_pending_signal() wontthrow -> i32
 {
+  /* The fast SIGNAL_PENDING flag is owned by the drain, which clears it before
+     consuming, so this only reports and clears the per-signal flags. */
   for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
     if (PENDING_SIGNAL_FLAGS[number] != 0) {
       PENDING_SIGNAL_FLAGS[number] = 0;
       return number;
     }
   }
-  /* No flag remained set, so the single fast flag is cleared too. A signal that
-     arrives after this point sets both again and the next boundary drains it. */
-  SIGNAL_PENDING = 0;
   return 0;
 }
 
@@ -1833,13 +1832,14 @@ fn clear_trap_handler(i32 signal_number) -> void
 
 fn take_pending_signal() wontthrow -> i32
 {
+  /* The fast SIGNAL_PENDING flag is owned by the drain, which clears it before
+     consuming, so this only reports and clears the per-signal flags. */
   for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
     if (PENDING_SIGNAL_FLAGS[number] != 0) {
       PENDING_SIGNAL_FLAGS[number] = 0;
       return number;
     }
   }
-  SIGNAL_PENDING = 0;
   return 0;
 }
 

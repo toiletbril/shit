@@ -799,6 +799,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       os::close_fd(*redirect_in_fd);
   };
 
+  /* Set just before a redirection resource failure throws, an open that failed
+     or a descriptor that is not open, so the catch tells those apart from an
+     expansion error in a target word, which must stay fatal. */
+  bool redirection_open_failed = false;
   try {
   for (const Redirection &redir : m_redirections) {
     /* A heredoc body becomes the standard input through an anonymous temp
@@ -884,6 +888,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           const SourceLocation location = redir.target != nullptr
                                               ? redir.target->source_location()
                                               : source_location();
+          redirection_open_failed = true;
           throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
                                                 ": Bad file descriptor"};
         }
@@ -921,6 +926,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         const SourceLocation location = redir.target != nullptr
                                             ? redir.target->source_location()
                                             : source_location();
+        redirection_open_failed = true;
         throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
                                               ": Bad file descriptor"};
       }
@@ -952,6 +958,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
     if (!opened) {
+      redirection_open_failed = true;
       throw ErrorWithLocation{redir.target->source_location(),
                               "Could not open '" + target_path +
                                   "': " + os::last_system_error_message()};
@@ -1001,6 +1008,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
   } catch (const ErrorWithLocation &redirection_error) {
+    /* An expansion error in a target word, such as ${x?msg} on an unset name or
+       a division by zero, is fatal the way it is anywhere else, so only an open
+       or dup failure is caught here. */
+    if (!redirection_open_failed) throw;
     /* A redirection that cannot open its target, or names a closed descriptor,
        fails the command rather than the shell, the way dash continues past it. A
        special builtin is the exception, since its redirection error exits a

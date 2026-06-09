@@ -476,6 +476,16 @@ fn EvalContext::run_pending_traps() throws -> void
   m_running_traps = true;
   defer { m_running_traps = false; };
 
+  /* The fast flag is cleared before the per-signal flags are consumed, so a
+     signal that arrives during the drain re-sets it and the next boundary drains
+     again rather than dropping the arrival. */
+  os::SIGNAL_PENDING = 0;
+
+  /* A trap action must not change the $? the interrupted code goes on to read,
+     so the status is saved here and restored after the actions run, the way dash
+     keeps a trap transparent to $?. */
+  const i32 saved_exit_status = m_last_exit_status;
+
   for (i32 number = os::take_pending_signal(); number != 0;
        number = os::take_pending_signal())
   {
@@ -485,6 +495,8 @@ fn EvalContext::run_pending_traps() throws -> void
       if (action->count() > 0)
         run_source(action->view(), "the " + *name + " trap");
   }
+
+  m_last_exit_status = saved_exit_status;
 }
 
 pure fn EvalContext::traps() const wontthrow -> const HashMap<String> &
