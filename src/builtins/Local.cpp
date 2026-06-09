@@ -35,7 +35,7 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (!cxt.in_function_scope())
-    throw Error{"'local' can only be used inside a function"};
+    throw Error{"Unable to declare a local variable outside a function"};
 
   /* Leading flags carry the bash attributes. -a declares an indexed array and
      -A an associative one, the rest are accepted without backing behavior so a

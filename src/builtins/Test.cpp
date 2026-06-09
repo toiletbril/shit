@@ -169,7 +169,7 @@ public:
   bool parse_factor() throws
   {
     if (at_end()) {
-      fail("argument expected");
+      fail("Unable to evaluate the test because an argument is expected");
       return false;
     }
     if (current() == "!") {
@@ -186,7 +186,7 @@ public:
       pos++;
       let const result = parse_expression();
       if (at_end() || current() != ")")
-        fail("expected ')'");
+        fail("Unable to evaluate the test because a ')' is expected");
       else
         pos++;
       return result;
@@ -307,7 +307,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
   usize expression_end = arguments.count();
   if (ec.program() == "[") {
     if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]")
-      throw Error{"missing closing ']'"};
+      throw Error{"Unable to evaluate the test because the closing ']' is missing"};
     expression_end = arguments.count() - 1;
   }
 

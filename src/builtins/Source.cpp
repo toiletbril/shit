@@ -30,7 +30,7 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  if (ec.args().count() < 2) throw Error{"Filename argument is required"};
+  if (ec.args().count() < 2) throw Error{"Unable to source because a filename argument is required"};
 
   const String path{ec.args()[1]};
   let const contents = utils::read_entire_file(path);

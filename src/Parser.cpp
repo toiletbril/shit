@@ -435,7 +435,7 @@ hot fn Parser::parse_command_list(
         Command *rhs = parse_simple_command();
         if (rhs == nullptr) {
           throw shit::ErrorWithLocation{last_pipe_token->source_location(),
-                                        "Nowhere to pipe output to"};
+                                        "Unable to build the pipeline because no command follows the pipe to receive the output"};
         }
 
         last_pipe_token = m_lexer.peek_shell_token();

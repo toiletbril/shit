@@ -52,7 +52,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
     if (!old_directory || old_directory->is_empty())
-      throw Error{"OLDPWD not set"};
+      throw Error{"Unable to return to the previous directory because OLDPWD is not set"};
     arg_path.append(old_directory->view());
   } else if (ec.args().count() > 1) {
     arg_path.append(ec.args()[1]);
@@ -63,7 +63,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   } else {
     /* Empty cd should go to the home directory. */
     let const p = os::get_home_directory();
-    if (!p) throw Error{"Could not figure out home directory"};
+    if (!p) throw Error{"Unable to determine the home directory"};
     arg_path.append(p->text());
   }
 
