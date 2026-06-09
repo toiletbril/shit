@@ -96,19 +96,25 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool enable = false;
   bool disable = false;
   bool quiet = false;
+  bool operate_on_set_options = false;
   let names = ArrayList<StringView>{heap_allocator()};
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
-    if (arg == "-s") {
-      enable = true;
-    } else if (arg == "-u") {
-      disable = true;
-    } else if (arg == "-q") {
-      quiet = true;
-    } else if (!arg.is_empty() && arg[0] == '-') {
-      /* Other flags such as -p or -o are accepted without effect. */
-      continue;
+    /* The options combine into one argument, such as the -qo of shopt -qo posix,
+       so each letter is read in turn. A -p or any other letter is accepted
+       without effect. */
+    if (arg.length >= 2 && arg[0] == '-') {
+      for (usize k = 1; k < arg.length; k++) {
+        if (arg[k] == 's')
+          enable = true;
+        else if (arg[k] == 'u')
+          disable = true;
+        else if (arg[k] == 'q')
+          quiet = true;
+        else if (arg[k] == 'o')
+          operate_on_set_options = true;
+      }
     } else {
       names.push(arg);
     }
@@ -117,11 +123,39 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   i32 status = 0;
   auto reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
-    shit::print_error(StringView{"shopt: "} + name +
-                      ": invalid shell option name\n");
+    if (!quiet)
+      shit::print_error(StringView{"shopt: "} + name +
+                        ": invalid shell option name\n");
     status = 1;
     return true;
   };
+
+  /* shopt -o operates on the set -o options rather than the shopt names, the
+     bridge bash provides so the same options answer either builtin. A config
+     probes shopt -qo posix to detect the POSIX mode. */
+  if (operate_on_set_options) {
+    for (const StringView name : names) {
+      if (enable || disable) {
+        if (!apply_shell_option(cxt, name, enable)) {
+          if (!quiet)
+            shit::print_error(StringView{"shopt: "} + name +
+                              ": invalid shell option name\n");
+          status = 1;
+        }
+      } else if (Maybe<bool> on = query_shell_option(cxt, name);
+                 on.has_value())
+      {
+        if (!*on) status = 1;
+        if (!quiet) ec.print_to_stdout(shopt_status_line(name, *on).view());
+      } else {
+        if (!quiet)
+          shit::print_error(StringView{"shopt: "} + name +
+                            ": invalid shell option name\n");
+        status = 1;
+      }
+    }
+    return status;
+  }
 
   if (enable || disable) {
     for (const StringView name : names) {

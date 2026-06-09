@@ -294,4 +294,12 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;
 
+/* The state of a set -o option by name, or None when the name is not a known
+   shell option, so shopt -o can bridge to the same options set -o drives.
+   apply_shell_option sets one and reports whether the name was known. */
+fn query_shell_option(const EvalContext &cxt, StringView name) throws
+    -> Maybe<bool>;
+fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
+    -> bool;
+
 } /* namespace shit */

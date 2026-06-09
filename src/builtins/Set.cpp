@@ -48,6 +48,8 @@ const SetOption SET_OPTIONS[] = {
      "Treat an unset variable as an error."                                                                                            },
     {'\0', "pipefail",         &EvalContext::set_pipefail,         &EvalContext::pipefail,
      "Report a pipeline's status as the rightmost stage that failed."                                                                  },
+    {'\0', "posix",            &EvalContext::set_posix_mode,       &EvalContext::is_posix_mode,
+     "Behave like dash, the POSIX mode."                                                                                               },
     {'a',  "allexport",        &EvalContext::set_export_all,       &EvalContext::export_all,
      "Mark every assigned variable for the environment."                                                                               },
     {'C',  "noclobber",        &EvalContext::set_no_clobber,       &EvalContext::no_clobber,
@@ -140,6 +142,23 @@ String list_options_with_help(const EvalContext &cxt) throws
 }
 
 } /* namespace */
+
+fn query_shell_option(const EvalContext &cxt, StringView name) throws
+    -> Maybe<bool>
+{
+  const SetOption *option = find_option_by_name(name);
+  if (option == nullptr) return None;
+  return option_is_on(cxt, *option);
+}
+
+fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
+    -> bool
+{
+  const SetOption *option = find_option_by_name(name);
+  if (option == nullptr) return false;
+  if (option->set != nullptr) (cxt.*(option->set))(enable);
+  return true;
+}
 
 Set::Set() = default;
 
