@@ -107,6 +107,18 @@ public:
     m_data[m_length].~T();
   }
 
+  /* Remove the element at index, shifting every later element down by one so the
+     order is kept. The shift moves rather than copies, so no element is
+     duplicated. The caller guarantees index is in range. */
+  fn remove(usize index) wontthrow -> void
+  {
+    ASSERT(index < m_length, "remove past the end of the list");
+    for (usize i = index; i + 1 < m_length; i++)
+      m_data[i] = steal(m_data[i + 1]);
+    m_length--;
+    m_data[m_length].~T();
+  }
+
   /* Destroy the elements but keep the storage, so a reused list does not
      reallocate. */
   fn clear() wontthrow -> void

@@ -509,13 +509,11 @@ fn main(int argc, char **argv) -> int
   let program_path = shit::String{};
 
   if (file_names.count() > 0) {
-    program_path = file_names[0];
-    /* Drop the program path, the first element. The list has no erase, so the
-       rest is rebuilt from the second element on. */
-    let rest = shit::ArrayList<shit::String>{};
-    for (usize i = 1; i < file_names.count(); i++)
-      rest.push(shit::String{shit::heap_allocator(), file_names[i]});
-    file_names = steal(rest);
+    /* The program path is the first argument. Move it out, then drop that slot
+       so the operands behind it shift to the front, with no copy of either the
+       path or the operands. */
+    program_path = steal(file_names[0]);
+    file_names.remove(0);
   } else {
     program_path = "<unknown>";
   }
