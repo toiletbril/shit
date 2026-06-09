@@ -110,14 +110,19 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
+  /* Each stage's status is recorded against its position, so pipefail can report
+     the rightmost stage that failed and the plain case can read the last stage.
+     A builtin stage yields its status at once and an external one's status
+     arrives from the wait below, tracked by the parallel child-to-stage list. */
+  let const stage_count = ecs.count();
+  ArrayList<i32> stage_status{};
+  stage_status.reserve(stage_count);
+  for (usize i = 0; i < stage_count; i++)
+    stage_status.push(0);
+  ArrayList<usize> child_stage{};
+
   bool is_first = true;
-  /* The pipeline status is the last stage's, builtin or external. A builtin
-     stage runs in this process and yields its status at once, so the last
-     stage's nature decides where the result comes from. Otherwise a builtin
-     final stage, such as `false | read x`, would lose its status to the last
-     external child the wait loop reaps. */
-  bool last_stage_is_builtin = false;
-  i32 last_builtin_status = 0;
+  usize stage_index = 0;
 
   for (ExecContext &ec : ecs) {
     Maybe<os::Pipe> pipe;
@@ -150,19 +155,17 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     if (!ec.is_builtin()) {
       let const child = os::execute_program(steal(ec));
       children.push(child);
+      child_stage.push(stage_index);
       last_child = child;
-      if (is_last) last_stage_is_builtin = false;
     } else {
       /* A builtin runs in this process, so its status stands in for the stage.
        */
       ret = execute_builtin(steal(ec), cxt);
-      if (is_last) {
-        last_stage_is_builtin = true;
-        last_builtin_status = ret;
-      }
+      stage_status[stage_index] = ret;
     }
 
     is_first = false;
+    stage_index++;
   }
 
   if (is_async) {
@@ -178,18 +181,21 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     return ret;
   }
 
-  /* Wait for every stage so none lingers as a zombie. The pipeline status is
-     the last stage's. When that stage is an external child the wait that reaps
-     it supplies the result, and when it is a builtin the status it already
-     returned stands, so the external wait must not overwrite it. */
-  for (const os::process child : children) {
-    const i32 status = os::wait_and_monitor_process(child);
-    if (!last_stage_is_builtin && child == last_child) ret = status;
+  /* Wait for every stage so none lingers as a zombie, recording each external
+     stage's status against its position. */
+  for (usize i = 0; i < children.count(); i++)
+    stage_status[child_stage[i]] = os::wait_and_monitor_process(children[i]);
+
+  /* pipefail reports the rightmost stage that failed, or zero when every stage
+     succeeded. Otherwise the pipeline reports the last stage alone. */
+  if (cxt.pipefail()) {
+    for (usize i = stage_count; i > 0; i--)
+      if (stage_status[i - 1] != 0)
+        return stage_status[i - 1];
+    return 0;
   }
 
-  if (last_stage_is_builtin) ret = last_builtin_status;
-
-  return ret;
+  return stage_status[stage_count - 1];
 }
 
 /* The offset of the first occurrence of needle at or after start, or

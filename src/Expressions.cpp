@@ -489,43 +489,53 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The status defaults to 0, but a command substitution in the value sets it
      to the status of that substitution, which the assignment then reports. */
   cxt.set_last_exit_status(0);
-  let value = cxt.expand_word_for_assignment(m_assignment->value_word());
 
-  /* a[i]=v and m[k]=v assign one array element. The evaluator routes the
-     subscript to the indexed or the associative store. */
-  const StringView key_view = m_assignment->key().view();
-  if (let const bracket = key_view.find_character('[');
-      bracket.has_value() && key_view[key_view.length - 1] == ']')
-  {
-    const StringView array_name = key_view.substring_of_length(0, *bracket);
-    const StringView subscript = key_view.substring_of_length(
-        *bracket + 1, key_view.length - *bracket - 2);
-    cxt.assign_array_element(array_name, subscript, value.view(),
-                             m_assignment->is_append());
-    cxt.set_last_exit_status(0);
-    return 0;
-  }
+  /* The value expansion and the store throw a plain Error, an unset variable
+     under set -u or a readonly name. The assignment has a source location, so
+     the error is relocated to a caret at it the way process_args does for a
+     command argument. An already located error from a deeper command
+     substitution rides through, since it is a separate branch under ErrorBase. */
+  try {
+    let value = cxt.expand_word_for_assignment(m_assignment->value_word());
 
-  /* The append form NAME+=VALUE prepends the current value of NAME, treating an
-     unset name as empty, so the store receives the concatenation. */
-  if (m_assignment->is_append()) {
-    String appended{cxt.get_variable_value(m_assignment->key()).value_or("")};
-    appended += value;
-    value = steal(appended);
-  }
+    /* a[i]=v and m[k]=v assign one array element. The evaluator routes the
+       subscript to the indexed or the associative store. */
+    const StringView key_view = m_assignment->key().view();
+    if (let const bracket = key_view.find_character('[');
+        bracket.has_value() && key_view[key_view.length - 1] == ']')
+    {
+      const StringView array_name = key_view.substring_of_length(0, *bracket);
+      const StringView subscript = key_view.substring_of_length(
+          *bracket + 1, key_view.length - *bracket - 2);
+      cxt.assign_array_element(array_name, subscript, value.view(),
+                               m_assignment->is_append());
+      cxt.set_last_exit_status(0);
+      return 0;
+    }
 
-  /* The assignment goes through set_shell_variable first, so it still rejects a
-     readonly name and refreshes the cached IFS. Under allexport it is then
-     marked for the environment so a child inherits it, while a later lookup
-     still finds the shell copy. */
-  cxt.set_shell_variable(m_assignment->key(), value);
-  if (cxt.export_all()) {
-    let const &key = m_assignment->key();
-    cxt.record_environment_change(key);
-    os::set_environment_variable(key, value);
-    cxt.mark_exported(key);
+    /* The append form NAME+=VALUE prepends the current value of NAME, treating
+       an unset name as empty, so the store receives the concatenation. */
+    if (m_assignment->is_append()) {
+      String appended{cxt.get_variable_value(m_assignment->key()).value_or("")};
+      appended += value;
+      value = steal(appended);
+    }
+
+    /* The assignment goes through set_shell_variable first, so it still rejects
+       a readonly name and refreshes the cached IFS. Under allexport it is then
+       marked for the environment so a child inherits it, while a later lookup
+       still finds the shell copy. */
+    cxt.set_shell_variable(m_assignment->key(), value);
+    if (cxt.export_all()) {
+      let const &key = m_assignment->key();
+      cxt.record_environment_change(key);
+      os::set_environment_variable(key, value);
+      cxt.mark_exported(key);
+    }
+    return cxt.last_exit_status();
+  } catch (const Error &e) {
+    throw ErrorWithLocation{source_location(), e.message()};
   }
-  return cxt.last_exit_status();
 }
 
 cold fn AssignCommand::to_string() const throws -> String
@@ -1180,7 +1190,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   for (const prefix_assignment &var : m_local_vars) {
     const StringView name = var.name.view();
     Maybe<String> previous = os::get_environment_variable(name);
-    let expanded_value = cxt.expand_word_for_assignment(var.value);
+    /* The value expansion throws a plain Error, an unset variable under set -u,
+       so it is relocated to a caret at the command the prefix leads. */
+    String expanded_value{};
+    try {
+      expanded_value = cxt.expand_word_for_assignment(var.value);
+    } catch (const Error &e) {
+      throw ErrorWithLocation{source_location(), e.message()};
+    }
     /* The append form prepends the current value of NAME, which a prefix reads
        from the shell store before the environment so a non-exported shell
        variable still contributes, treating an unset name as empty. */
@@ -1743,10 +1760,22 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     return 0;
   }
 
-  i32 ret = 0;
-  for (const os::process child : children) {
-    const i32 status = os::wait_and_monitor_process(child);
-    if (child == last_child) ret = status;
+  /* The children are pushed in pipeline order, so their statuses are collected
+     in order. pipefail reports the rightmost stage that failed, or zero when all
+     succeeded, while the plain case reports the last stage alone. */
+  ArrayList<i32> stage_status{};
+  stage_status.reserve(children.count());
+  for (const os::process child : children)
+    stage_status.push(os::wait_and_monitor_process(child));
+
+  i32 ret = stage_status.is_empty() ? 0 : stage_status.back();
+  if (cxt.pipefail()) {
+    ret = 0;
+    for (usize i = stage_status.count(); i > 0; i--)
+      if (stage_status[i - 1] != 0) {
+        ret = stage_status[i - 1];
+        break;
+      }
   }
 
   cxt.set_last_exit_status(ret);
@@ -2429,8 +2458,14 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   auto expand_no_glob = [&cxt](const Token *t) -> String {
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Word) {
-      return cxt.expand_word_for_assignment(
-          static_cast<const tokens::WordToken *>(t)->word());
+      /* The subject expansion throws a plain Error, an unset variable under set
+         -u, so it is relocated to a caret at the case word. */
+      try {
+        return cxt.expand_word_for_assignment(
+            static_cast<const tokens::WordToken *>(t)->word());
+      } catch (const Error &e) {
+        throw ErrorWithLocation{t->source_location(), e.message()};
+      }
     }
     return t->raw_string();
   };
@@ -2449,9 +2484,14 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       let pattern_active = ArrayList<bool>{cxt.scratch_allocator()};
       String pattern{};
       if (pattern_token->kind() == Token::Kind::Word) {
-        pattern = cxt.expand_case_pattern_masked(
-            static_cast<const tokens::WordToken *>(pattern_token)->word(),
-            pattern_active);
+        try {
+          pattern = cxt.expand_case_pattern_masked(
+              static_cast<const tokens::WordToken *>(pattern_token)->word(),
+              pattern_active);
+        } catch (const Error &e) {
+          throw ErrorWithLocation{pattern_token->source_location(),
+                                  e.message()};
+        }
       } else {
         pattern = pattern_token->raw_string();
         for (usize k = 0; k < pattern.count(); k++)

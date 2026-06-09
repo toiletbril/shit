@@ -46,6 +46,8 @@ const SetOption SET_OPTIONS[] = {
      "Print each command after expansion before it runs."                                                                              },
     {'u',  "nounset",          &EvalContext::set_error_unset,      &EvalContext::error_unset,
      "Treat an unset variable as an error."                                                                                            },
+    {'\0', "pipefail",         &EvalContext::set_pipefail,         &EvalContext::pipefail,
+     "Report a pipeline's status as the rightmost stage that failed."                                                                  },
     {'a',  "allexport",        &EvalContext::set_export_all,       &EvalContext::export_all,
      "Mark every assigned variable for the environment."                                                                               },
     {'C',  "noclobber",        &EvalContext::set_no_clobber,       &EvalContext::no_clobber,

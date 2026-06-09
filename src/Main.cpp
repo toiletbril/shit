@@ -616,14 +616,19 @@ fn main(int argc, char **argv) -> int
   context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
-  /* An interactive session outside compatibility mode defaults to nounset, so a
-     typo in a variable name at the prompt fails loudly rather than expanding to
-     nothing. A script keeps the lax POSIX default so an existing
-     configure-style script that reads unset variables still runs, and an
-     explicit set +u turns it off. */
-  context.set_error_unset(
-      FLAG_NOUNSET.is_enabled() ||
-      (should_be_interactive && !shit::should_run_in_compat_mode()));
+  /* An interactive session outside a compatibility mode defaults to nounset and
+     pipefail, so a typo in a variable name and a failing pipeline stage both
+     fail loudly rather than passing silently. A script and a compatibility mode
+     keep the lax bash and dash defaults so an existing configure-style script
+     still runs, and the init-as-bash phase keeps them off while it sources the
+     bash config, since the snap below restores the interactive defaults once the
+     config has loaded. An explicit set +u or set +o pipefail turns them off. */
+  let const strict_interactive_default = should_be_interactive &&
+                                         !shit::should_run_in_compat_mode() &&
+                                         !init_as_bash;
+  context.set_error_unset(FLAG_NOUNSET.is_enabled() ||
+                          strict_interactive_default);
+  context.set_pipefail(strict_interactive_default);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
@@ -773,10 +778,16 @@ fn main(int argc, char **argv) -> int
 
   /* init-as-bash ran the bash config in bash mode. The interactive session is
      shit-native, so bash mode is turned off here, and the strict parser and the
-     analysis stage take over from the first prompt. A non-interactive
-     init-as-bash run has no prompt, so it stays in bash mode for the whole run.
-   */
-  if (init_as_bash && should_be_interactive) context.set_bash_compatible(false);
+     analysis stage take over from the first prompt. The strict nounset and
+     pipefail defaults the bash phase suppressed come back for the session. A
+     non-interactive init-as-bash run has no prompt, so it stays in bash mode for
+     the whole run. */
+  if (init_as_bash && should_be_interactive) {
+    context.set_bash_compatible(false);
+    let const strict = !shit::should_run_in_compat_mode();
+    context.set_error_unset(FLAG_NOUNSET.is_enabled() || strict);
+    context.set_pipefail(strict);
+  }
 
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */

@@ -465,6 +465,11 @@ public:
   fn set_error_unset(bool enabled) wontthrow -> void;
   pure fn error_unset() const wontthrow -> bool;
 
+  /* pipefail makes a pipeline report the status of the rightmost stage that
+     failed rather than the last stage alone. */
+  fn set_pipefail(bool enabled) wontthrow -> void;
+  pure fn pipefail() const wontthrow -> bool;
+
   /* noclobber rejects an overwrite of an existing file through a plain >, set
      by -C and set -o noclobber. */
   fn set_no_clobber(bool enabled) wontthrow -> void;
@@ -833,6 +838,7 @@ protected:
   ArrayList<String *> m_retained_sources{heap_allocator()};
 
   bool m_error_unset{false};
+  bool m_pipefail{false};
   bool m_no_clobber{false};
   bool m_export_all{false};
   bool m_no_exec{false};

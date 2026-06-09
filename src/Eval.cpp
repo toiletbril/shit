@@ -1098,6 +1098,16 @@ pure fn EvalContext::error_unset() const wontthrow -> bool
   return m_error_unset;
 }
 
+fn EvalContext::set_pipefail(bool enabled) wontthrow -> void
+{
+  m_pipefail = enabled;
+}
+
+pure fn EvalContext::pipefail() const wontthrow -> bool
+{
+  return m_pipefail;
+}
+
 fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
 {
   m_no_clobber = enabled;
@@ -2384,12 +2394,19 @@ struct ConditionalEvaluator
     return String{heap_allocator()};
   }
 
-  /* The expanded value of an operand, with no field splitting. */
+  /* The expanded value of an operand, with no field splitting. The expansion
+     throws a plain Error, an unset variable under set -u, so it is relocated to
+     a caret at the operand the way process_args locates a command argument. */
   String operand_value(const conditional_element &e) throws
   {
-    if (e.word != nullptr && e.word->kind() == Token::Kind::Word)
-      return cxt.expand_word_for_assignment(
-          static_cast<const tokens::WordToken *>(e.word)->word());
+    if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
+      try {
+        return cxt.expand_word_for_assignment(
+            static_cast<const tokens::WordToken *>(e.word)->word());
+      } catch (const Error &err) {
+        throw ErrorWithLocation{e.word->source_location(), err.message()};
+      }
+    }
     if (e.word != nullptr) return e.word->raw_string();
     return String{heap_allocator()};
   }
