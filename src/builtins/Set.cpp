@@ -67,6 +67,13 @@ const SetOption SET_OPTIONS[] = {
     {'b',  "notify",           nullptr,                            nullptr,                   "Accepted without effect."               },
     {'h',  "hashall",          nullptr,                            nullptr,                   "Accepted without effect."               },
     {'v',  "verbose",          nullptr,                            nullptr,                   "Accepted without effect."               },
+    /* The keyword-assignment and the DEBUG/RETURN trace toggles are accepted so
+       a bash config that sets them keeps sourcing. Brace expansion is always on
+       in shit, so -B is already the behavior and +B is accepted without turning
+       it off. */
+    {'k',  "keyword",          nullptr,                            nullptr,                   "Accepted without effect."               },
+    {'T',  "functrace",        nullptr,                            nullptr,                   "Accepted without effect."               },
+    {'B',  "braceexpand",      nullptr,                            nullptr,                   "Accepted without effect."               },
     /* The shell's own debug toggles, so set -A turns the AST dump on at runtime
        the same way the -A flag does at startup. */
     {'A',  "show-ast",         &EvalContext::set_show_ast,         &EvalContext::show_ast,
