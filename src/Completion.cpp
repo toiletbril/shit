@@ -4,6 +4,7 @@
 #include "Colors.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
+#include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
@@ -19,7 +20,7 @@ namespace completion {
    sits in. */
 static pure fn is_word_separator(char c) wontthrow -> bool
 {
-  return c == ' ' || c == '\t' || c == '\n';
+  return lexer::is_whitespace(c) || c == '\n';
 }
 
 /* True for a byte that ends one command and begins another, so the word right
@@ -733,12 +734,12 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
 
 static pure fn is_highlight_name_start(char c) wontthrow -> bool
 {
-  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+  return lexer::is_variable_name_start(c);
 }
 
 static pure fn is_highlight_name_char(char c) wontthrow -> bool
 {
-  return is_highlight_name_start(c) || (c >= '0' && c <= '9');
+  return lexer::is_variable_name(c);
 }
 
 /* A word that is a single plain identifier, the form a for loop variable must
@@ -756,7 +757,7 @@ static pure fn is_plain_identifier(StringView word) wontthrow -> bool
    word. */
 static pure fn is_highlight_word_break(char c) wontthrow -> bool
 {
-  return c == ' ' || c == '\t' || c == '\n' || c == '|' || c == '&' ||
+  return lexer::is_whitespace(c) || c == '\n' || c == '|' || c == '&' ||
          c == ';' || c == '<' || c == '>' || c == '(' || c == ')';
 }
 
@@ -789,11 +790,7 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar,
       i++;
     return i;
   }
-  if (c == '?' || c == '!' || c == '#' || c == '$' || c == '*' || c == '@' ||
-      c == '-')
-  {
-    return i + 1;
-  }
+  if (lexer::is_special_parameter_char(c)) return i + 1;
   if (is_highlight_name_start(c)) {
     while (i < end && is_highlight_name_char(line[i]))
       i++;

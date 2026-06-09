@@ -130,6 +130,12 @@ hot pure fn is_variable_name(char ch) wontthrow -> bool
   return is_variable_name_start(ch) || is_number(ch);
 }
 
+pure fn is_special_parameter_char(char ch) wontthrow -> bool
+{
+  return ch == '?' || ch == '!' || ch == '#' || ch == '$' || ch == '*' ||
+         ch == '@' || ch == '-';
+}
+
 } /* namespace lexer */
 
 Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
@@ -1091,8 +1097,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         }
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        steal(name), is_in_double_quotes});
-      } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
-                 next == '$' || next == '!' || next == '-' ||
+      } else if (lexer::is_special_parameter_char(next) ||
                  lexer::is_number(next))
       {
         byte_count++;

@@ -34,6 +34,10 @@ pure fn is_expandable_char(char ch) wontthrow -> bool;
 pure fn is_variable_name_start(char ch) wontthrow -> bool;
 pure fn is_variable_name(char ch) wontthrow -> bool;
 
+/* A special shell parameter named by a single punctuation byte, $? $! $# $$ $*
+   $@ $- , distinct from a positional digit or an ordinary name. */
+pure fn is_special_parameter_char(char ch) wontthrow -> bool;
+
 } /* namespace lexer */
 
 /* Dumb note: Main idea is that none of the routines except
