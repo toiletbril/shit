@@ -6,6 +6,7 @@
    accessed through get_if rather than get, so the no-exceptions build never
    reaches a throwing path. */
 
+#include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -16,7 +17,7 @@ namespace utils {
 /* Declared here rather than included from Utils.hpp, since Utils.hpp includes
    ErrorOr.hpp and the include would close a cycle. The definition lives in
    Utils.cpp. */
-String int_to_text(i64 value);
+String int_to_text(i64 value, Allocator allocator = heap_allocator());
 } /* namespace utils */
 
 /* The success payload of a fallible function that returns no value. A caller

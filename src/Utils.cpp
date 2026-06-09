@@ -286,11 +286,12 @@ static fn not_an_integer_error(StringView text) throws -> Error
   return Error{"'" + text + "' is not a valid integer"};
 }
 
-fn uint_to_text(u64 value) throws -> String
+fn uint_to_text(u64 value, Allocator allocator) throws -> String
 {
   /* The digits are written into a fixed buffer from the least significant end,
      since a u64 never needs more than twenty decimal digits, then copied out in
-     order. No allocation happens until the result String is built. */
+     order. The result String draws from the caller's allocator, so a transient
+     conversion comes from the scratch arena rather than the heap. */
   char buffer[20];
   usize offset = sizeof(buffer);
   do {
@@ -299,18 +300,37 @@ fn uint_to_text(u64 value) throws -> String
     value /= 10;
   } while (value > 0);
   return String{
-      StringView{buffer + offset, sizeof(buffer) - offset}
+      allocator, StringView{buffer + offset, sizeof(buffer) - offset}
   };
 }
 
-fn int_to_text(i64 value) throws -> String
+fn int_to_text(i64 value, Allocator allocator) throws -> String
 {
-  if (value >= 0) return uint_to_text(static_cast<u64>(value));
+  if (value >= 0) return uint_to_text(static_cast<u64>(value), allocator);
   /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
   const u64 magnitude = ~static_cast<u64>(value) + 1;
-  String result{"-"};
-  result.append(uint_to_text(magnitude));
+  String result{allocator, "-"};
+  result.append(uint_to_text(magnitude, allocator));
   return result;
+}
+
+fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
+    -> StringView
+{
+  /* The digits are written from the least significant end of the buffer, the
+     same scheme uint_to_text uses, then a leading minus is prepended. A u64
+     never needs more than twenty digits, so twenty-one bytes hold any i64. */
+  ASSERT(buffer_size >= 21, "the buffer must hold a sign and twenty digits");
+  const bool is_negative = value < 0;
+  u64 magnitude =
+      is_negative ? ~static_cast<u64>(value) + 1 : static_cast<u64>(value);
+  usize offset = buffer_size;
+  do {
+    buffer[--offset] = static_cast<char>('0' + magnitude % 10);
+    magnitude /= 10;
+  } while (magnitude > 0);
+  if (is_negative) buffer[--offset] = '-';
+  return StringView{buffer + offset, buffer_size - offset};
 }
 
 fn format_minutes_seconds(double seconds) throws -> String

@@ -82,8 +82,18 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 /* Format a signed integer as decimal into a fresh String, the StringView-native
    replacement for std::to_string. The unsigned form is for ids and sizes that
    exceed the i64 range. */
-fn int_to_text(i64 value) throws -> String;
-fn uint_to_text(u64 value) throws -> String;
+/* The default allocator lives on the forward declaration in ErrorOr.hpp, so it
+   is not repeated here. */
+fn int_to_text(i64 value, Allocator allocator) throws -> String;
+fn uint_to_text(u64 value, Allocator allocator = heap_allocator()) throws
+    -> String;
+
+/* Write the decimal text of value into the caller's buffer, which must hold at
+   least twenty-one bytes, and return a view of the written span. No allocation
+   happens, so a hot conversion such as an arithmetic assignment whose result the
+   variable store copies for itself never touches the heap. */
+fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
+    -> StringView;
 
 /* Format a count of seconds as the whole minutes and fractional seconds form
    the time and times builtins print, such as 0m0.123s. The seconds carry three

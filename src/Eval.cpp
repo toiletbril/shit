@@ -3295,7 +3295,12 @@ public:
   {
     if (m_is_skipping) return;
     ASSERT(context != nullptr);
-    context->set_shell_variable(name, utils::int_to_text(value));
+    /* The store copies the value into its own heap String, so the conversion
+       writes into a stack buffer and passes a view, with no transient heap
+       allocation at all. */
+    char buffer[24];
+    context->set_shell_variable(
+        name, utils::int_to_text_into(value, buffer, sizeof(buffer)));
   }
 
   /* A prefix ++ or -- changes the variable and yields the new value. */
@@ -3395,7 +3400,9 @@ public:
               apply_compound(read_variable_value(name), rhs, kind);
           if (!m_is_skipping) {
             ASSERT(context != nullptr);
-            context->set_shell_variable(name, utils::int_to_text(result));
+            char buffer[24];
+            context->set_shell_variable(
+                name, utils::int_to_text_into(result, buffer, sizeof(buffer)));
           }
           return result;
         }
@@ -3405,7 +3412,9 @@ public:
         let const rhs = parse_assignment();
         if (!m_is_skipping) {
           ASSERT(context != nullptr);
-          context->set_shell_variable(name, utils::int_to_text(rhs));
+          char buffer[24];
+          context->set_shell_variable(
+              name, utils::int_to_text_into(rhs, buffer, sizeof(buffer)));
         }
         return rhs;
       }
@@ -3862,7 +3871,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
       let const result = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
                              : evaluate_arithmetic(segment.text.view());
-      let const value = utils::int_to_text(result);
+      /* The field copies the digits in, so the conversion writes into a stack
+         buffer and appends a view, with no heap allocation. */
+      char buffer[24];
+      let const value = utils::int_to_text_into(result, buffer, sizeof(buffer));
       if (segment.is_in_double_quotes)
         append_run(value, false);
       else
