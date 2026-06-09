@@ -24,6 +24,9 @@ FLAG(TYPE_PATH, Bool, 'p', "",
 FLAG(TYPE_FORCE_PATH, Bool, 'P', "",
      "Search the PATH and print the disk path even for a name that is also a "
      "builtin.");
+FLAG(TYPE_ALL, Bool, 'a', "",
+     "Print every location of each name, the keyword, alias, function, or "
+     "builtin and every matching file on the PATH.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -82,6 +85,54 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
       word = "function";
     } else if (search_builtin(name.view()).has_value()) {
       word = "builtin";
+    }
+
+    /* -a prints every location, the class word followed by each PATH match,
+       which is what type -at does to enumerate a name's resolutions. */
+    if (FLAG_TYPE_ALL.is_enabled()) {
+      bool any = false;
+      if (!word.is_empty()) {
+        any = true;
+        if (want_word) {
+          out += word;
+          out += "\n";
+        } else if (!want_path) {
+          out += name;
+          if (word == "alias") {
+            out += " is an alias for ";
+            out += *alias_value;
+          } else if (word == "keyword") {
+            out += " is a shell keyword";
+          } else if (word == "function") {
+            out += " is a shell function";
+          } else {
+            out += " is a shell builtin";
+          }
+          out += "\n";
+        }
+      }
+      for (const Path &path : utils::search_program_path(name)) {
+        any = true;
+        if (want_word) {
+          out += "file\n";
+        } else if (want_path) {
+          out += path.text();
+          out += "\n";
+        } else {
+          out += name;
+          out += " is ";
+          out += path.text();
+          out += "\n";
+        }
+      }
+      if (!any) {
+        if (!want_word && !want_path) {
+          out += name;
+          out += ": not found\n";
+        }
+        all_found = false;
+      }
+      continue;
     }
 
     if (!word.is_empty()) {

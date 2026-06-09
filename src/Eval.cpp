@@ -3608,6 +3608,10 @@ public:
 
   fn parse() throws -> i64
   {
+    /* An empty expression is zero, the way bash reads $(( )) and ${a[$unset]}
+       with the subscript expanding to nothing. */
+    skip_spaces();
+    if (pos == source.length) return 0;
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) fail("unexpected trailing characters");
