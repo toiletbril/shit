@@ -90,8 +90,8 @@ fn uint_to_text(u64 value, Allocator allocator = heap_allocator()) throws
 
 /* Write the decimal text of value into the caller's buffer, which must hold at
    least twenty-one bytes, and return a view of the written span. No allocation
-   happens, so a hot conversion such as an arithmetic assignment whose result the
-   variable store copies for itself never touches the heap. */
+   happens, so a hot conversion such as an arithmetic assignment whose result
+   the variable store copies for itself never touches the heap. */
 fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
     -> StringView;
 

@@ -257,11 +257,11 @@ public:
   fn associative_keys(StringView name) const throws -> ArrayList<String>;
   fn associative_values(StringView name) const throws -> ArrayList<String>;
 
-  /* Every element of an array name as a list, the indexed elements in order, the
-     associative values in store order, or a one-element list for a plain scalar.
-     A "${a[@]}" expansion emits one field per element from this, the way "$@"
-     keeps each positional parameter its own field. An unset name yields an empty
-     list. */
+  /* Every element of an array name as a list, the indexed elements in order,
+     the associative values in store order, or a one-element list for a plain
+     scalar. A "${a[@]}" expansion emits one field per element from this, the
+     way "$@" keeps each positional parameter its own field. An unset name
+     yields an empty list. */
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
   /* Log a name's current process-environment value before a write that outlives
@@ -270,8 +270,8 @@ public:
      subshell the write is permanent, so nothing is logged. */
   fn record_environment_change(StringView name) throws -> void;
 
-  /* The names that currently live in the process environment, the exported ones,
-     mirrored so an assignment tests an O(1) set rather than scanning the
+  /* The names that currently live in the process environment, the exported
+     ones, mirrored so an assignment tests an O(1) set rather than scanning the
      environment on every write. mark_exported and unmark_exported keep it in
      step with each environment write, and the set is seeded from the inherited
      environment at construction. */
@@ -279,11 +279,12 @@ public:
   fn unmark_exported(StringView name) throws -> void;
   pure fn is_exported(StringView name) const wontthrow -> bool;
 
-  /* Re-point the exported set after an environment value is restored, adding the
-     name when the restore writes a value and removing it when the restore
+  /* Re-point the exported set after an environment value is restored, adding
+     the name when the restore writes a value and removing it when the restore
      unsets, the way a subshell exit and a command-prefix teardown both rewind
      the environment. */
-  fn sync_exported_after_restore(StringView name, bool has_value) throws -> void;
+  fn sync_exported_after_restore(StringView name, bool has_value) throws
+      -> void;
 
   /* Set IFS and refresh the separator table together, so the table never drifts
      from the cached value. A prefix IFS=... for a command applies it for the

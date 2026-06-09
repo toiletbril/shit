@@ -787,8 +787,9 @@ fn build_prompt(EvalContext &context) -> String
      backslash escapes are decoded last on either path, inserting the cwd, the
      user, and the clock as literal text the expansion never sees. */
   if (ps1_template.view() == PROMPT_CACHE_KEY.view()) {
-    String rendered = expand_prompt_escapes(
-        PROMPT_CACHE_VALUE.view(), CACHED_USER.view(), full_pwd.view(), context);
+    String rendered =
+        expand_prompt_escapes(PROMPT_CACHE_VALUE.view(), CACHED_USER.view(),
+                              full_pwd.view(), context);
     if (!colors::stdout_wants_color()) return strip_ansi_color(rendered.view());
     return rendered;
   }

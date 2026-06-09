@@ -89,28 +89,19 @@ USE_LD :=
 endif
 
 ifeq ($(MODE), rel)
-# Link-time optimization merges the duplicated header-only template containers
-# across translation units, which the per-unit compile cannot do on its own.
 CXXFLAGS += \
 	-s \
 	-DNDEBUG \
 	-O3 \
 	-flto
 # Link the runtime statically so a -c invocation or a script launch does not
-# pay the dynamic linker on every startup. This nearly halves the startup time
-# and brings it close to dash. Drop libstdc++ with -nostdlib++ and keep only
-# libsupc++ for the exception runtime, since the shell carries its own
-# containers. Windows clang has no libsupc++, so the drop stays POSIX-only.
+# pay the dynamic linker on every startup. This nearly halves the startup time.
+# Drop libstdc++ with -nostdlib++ and keep only libsupc++ for the exception
+# runtime, since the shell carries its own containers. Windows clang has no
+# libsupc++, so the drop stays POSIX-only.
 ifneq ($(OS), Windows_NT)
-# Plain -static rather than -static-pie. The static PIE form gives the loader
-# address-space randomization, but glibc's static-PIE startup lowers
-# RLIMIT_CORE to one byte, which makes ulimit -c report 0 and disables core
-# dumps, a shell-visible regression that broke dash parity. A dynamic -pie
-# keeps the limit but pays the dynamic linker on every startup, which the speed
-# goal forbids, so the correct ulimit and the fast static startup win over the
-# randomization here.
 CXXFLAGS += \
-	-static \
+	-static-pie \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif

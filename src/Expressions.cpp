@@ -1266,8 +1266,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       function_body != nullptr)
   {
     /* The caller's parameters are moved out and restored by moving back, so a
-       deep copy of the list is not paid on every call. The store is empty in the
-       window between, which the call-param build below does not read. */
+       deep copy of the list is not paid on every call. The store is empty in
+       the window between, which the call-param build below does not read. */
     let saved_params = cxt.take_positional_params();
     ArrayList<String> call_params{};
     call_params.reserve(program_args.count() - 1);

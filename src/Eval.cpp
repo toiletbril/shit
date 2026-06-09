@@ -50,8 +50,8 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_field_separators(m_field_separators.view());
 
   /* The shell start time anchors $SECONDS. The $RANDOM seed is deferred to the
-     first read of RANDOM, so a run that never reads it, the common -c case, pays
-     neither the seed nor the syscall it mixes in. */
+     first read of RANDOM, so a run that never reads it, the common -c case,
+     pays neither the seed nor the syscall it mixes in. */
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
 
   /* Every inherited environment variable is exported, so the set starts from
@@ -109,8 +109,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
      the exported-names set, an O(1) test, so a non-exported assignment, the
      common loop counter, never scans the environment. */
   if (m_exported_names.contains(name)) {
-    /* The environment write outlives the current statement, so inside a subshell
-       the name's prior value is read and logged for the restore on the
+    /* The environment write outlives the current statement, so inside a
+       subshell the name's prior value is read and logged for the restore on the
        subshell's exit. Outside a subshell the log stays empty, so the prior
        value is never read. */
     if (m_subshell_depth > 0)
@@ -400,9 +400,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     case '?': return utils::int_to_text(m_last_exit_status);
     case '$': return utils::int_to_text(os::get_shell_process_id());
     case '!':
-      return m_last_background_pid
-                 ? utils::int_to_text(*m_last_background_pid)
-                 : String{};
+      return m_last_background_pid ? utils::int_to_text(*m_last_background_pid)
+                                   : String{};
     case '-': return option_flags_string();
     case '#':
       return String{heap_allocator(),
@@ -863,7 +862,8 @@ fn EvalContext::leave_function_scope() throws -> void
       force_unset_shell_variable(binding.name);
   }
   /* The innermost scope is the one just restored, so it is dropped in place
-     rather than rebuilding the whole stack into a fresh list on every return. */
+     rather than rebuilding the whole stack into a fresh list on every return.
+   */
   m_local_scopes.pop_back();
 }
 

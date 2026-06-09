@@ -68,11 +68,12 @@ FLAG(INIT_AS_BASH, Bool, 'L', "init-as-bash",
      "snap to the default mode with all diagnostics at the interactive prompt. "
      "Sources the bash login scripts only when combined with -l. The "
      "SHIT_INIT_AS_BASH environment variable enables this when set.");
-FLAG(PRIVILEGED, Bool, 'p', "privileged",
-     "Run in privileged mode and skip every startup config file, so a config a "
-     "less-privileged user controls cannot run with raised privileges. Turned "
-     "on automatically when the effective and the real user or group id differ, "
-     "the setuid or setgid case.");
+FLAG(
+    PRIVILEGED, Bool, 'p', "privileged",
+    "Run in privileged mode and skip every startup config file, so a config a "
+    "less-privileged user controls cannot run with raised privileges. Turned "
+    "on automatically when the effective and the real user or group id differ, "
+    "the setuid or setgid case.");
 
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
@@ -358,9 +359,9 @@ static fn run_script_contents(const String &script_contents,
 
 /* Read a whole file and run it in the given context. A missing file is not an
    error, since a login shell sources profiles that may not exist. Returns
-   whether the file existed and ran, so a caller that wants the first existing of
-   several candidates, the way bash picks one login profile, can stop after the
-   first hit. */
+   whether the file existed and ran, so a caller that wants the first existing
+   of several candidates, the way bash picks one login profile, can stop after
+   the first hit. */
 static fn source_file(const Path &path, EvalContext &context,
                       BumpArena &ast_arena) -> bool
 {
@@ -386,8 +387,9 @@ static fn source_home_file(StringView name, EvalContext &context,
   }
 }
 
-/* Source the dash login files in POSIX login order, /etc/profile then ~/.profile.
-   The file named by ENV is an interactive feature read separately. */
+/* Source the dash login files in POSIX login order, /etc/profile then
+   ~/.profile. The file named by ENV is an interactive feature read separately.
+ */
 static fn source_posix_login_files(EvalContext &context,
                                    BumpArena &ast_arena) throws -> void
 {
@@ -488,9 +490,10 @@ fn main(int argc, char **argv) -> int
 
   if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
 
-  /* init-as-bash initializes from the bash config files in bash mode, then snaps
-     to the default at the interactive prompt. The SHIT_INIT_AS_BASH environment
-     variable enables it when set and not empty, the same as passing -L. */
+  /* init-as-bash initializes from the bash config files in bash mode, then
+     snaps to the default at the interactive prompt. The SHIT_INIT_AS_BASH
+     environment variable enables it when set and not empty, the same as passing
+     -L. */
   let init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
   if (!init_as_bash) {
     if (shit::Maybe<shit::String> env =
@@ -500,9 +503,9 @@ fn main(int argc, char **argv) -> int
   }
 
   /* init-as-bash and POSIX mode contradict each other, one initializes as bash
-     and the other forces the dash semantics. POSIX takes precedence, the way the
-     shell resolves the other incompatible option pairs, and a warning names the
-     fallback. */
+     and the other forces the dash semantics. POSIX takes precedence, the way
+     the shell resolves the other incompatible option pairs, and a warning names
+     the fallback. */
   if (init_as_bash && shit::should_run_in_posix_mode()) {
     shit::show_message("Both '--init-as-bash' and POSIX mode were specified. "
                        "Falling back to POSIX mode.");
@@ -718,13 +721,13 @@ fn main(int argc, char **argv) -> int
        the profiles and rc files unread. */
   } else if (init_as_bash) {
     /* init-as-bash sources the bash config files in bash mode so an existing
-       bash setup loads. With -l it reads /etc/profile then the first existing of
+       bash setup loads. With -l it reads /etc/profile then the first existing
+       of
        ~/.bash_profile, ~/.bash_login, and ~/.profile, the bash login order. An
        interactive shell reads ~/.bashrc. The shit rc and the POSIX ENV are
        skipped, since the intent is to initialize from the bash files. */
     if (is_login_shell) source_bash_login_files(context, ast_arena);
-    if (should_be_interactive)
-      source_home_file(".bashrc", context, ast_arena);
+    if (should_be_interactive) source_home_file(".bashrc", context, ast_arena);
   } else {
     /* A login shell reads the login files of the shell it emulates. Bash mode
        reads the bash login order, so --bash-compatible -l or a bash invocation
@@ -744,12 +747,11 @@ fn main(int argc, char **argv) -> int
         source_file(shit::Path{env->view()}, context, ast_arena);
     }
 
-    /* An interactive shell reads ~/.shitrc, the home for interactive config such
-       as aliases, options, and the prompt. A login shell reads it too, after the
-       profiles, so a setting lands in every interactive session. A missing file
-       is silently skipped. */
-    if (should_be_interactive)
-      source_home_file(".shitrc", context, ast_arena);
+    /* An interactive shell reads ~/.shitrc, the home for interactive config
+       such as aliases, options, and the prompt. A login shell reads it too,
+       after the profiles, so a setting lands in every interactive session. A
+       missing file is silently skipped. */
+    if (should_be_interactive) source_home_file(".shitrc", context, ast_arena);
 
     /* A compatibility mode reads the interactive rc its host shell would. Bash
        mode reads ~/.bashrc, and POSIX mode reads the file named by ENV whether
@@ -772,7 +774,8 @@ fn main(int argc, char **argv) -> int
   /* init-as-bash ran the bash config in bash mode. The interactive session is
      shit-native, so bash mode is turned off here, and the strict parser and the
      analysis stage take over from the first prompt. A non-interactive
-     init-as-bash run has no prompt, so it stays in bash mode for the whole run. */
+     init-as-bash run has no prompt, so it stays in bash mode for the whole run.
+   */
   if (init_as_bash && should_be_interactive) context.set_bash_compatible(false);
 
   /* A simple return cannot be used after this point, since we need a special
@@ -829,10 +832,10 @@ fn main(int argc, char **argv) -> int
            */
           toiletline::set_ghost_enabled(!FLAG_NO_COMPLETION.is_enabled());
           shit::show_message(
-              init_as_bash                        ? "Bash me harder?"
-              : shit::should_run_in_posix_mode()  ? "POSIX me harder!"
-              : shit::should_run_in_bash_mode()   ? "Bash me harder!"
-                                                  : "Welcome :3");
+              init_as_bash                       ? "Bash me harder?"
+              : shit::should_run_in_posix_mode() ? "POSIX me harder!"
+              : shit::should_run_in_bash_mode()  ? "Bash me harder!"
+                                                 : "Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
            * previosly! */
