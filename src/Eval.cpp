@@ -4474,6 +4474,71 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
+      /* "${a[@]:off:len}" and "${a[*]:off:len}" slice the element list, off
+         naming the first element and len the count, with a negative off counted
+         from the end. The @ form keeps each sliced element its own field, the *
+         form joins them. */
+      if (lexer::is_variable_name_start(segment_text[0])) {
+        usize name_end = 1;
+        while (name_end < segment_text.length &&
+               lexer::is_variable_name(segment_text[name_end]))
+          name_end++;
+        if (name_end + 4 <= segment_text.length &&
+            segment_text[name_end] == '[' &&
+            (segment_text[name_end + 1] == '@' ||
+             segment_text[name_end + 1] == '*') &&
+            segment_text[name_end + 2] == ']' &&
+            name_end + 3 < segment_text.length &&
+            segment_text[name_end + 3] == ':')
+        {
+          let const array_name = segment_text.substring_of_length(0, name_end);
+          let const is_star = segment_text[name_end + 1] == '*';
+          let const slice = segment_text.substring(name_end + 4);
+          let const elements = collect_array_elements(array_name);
+          const i64 total = static_cast<i64>(elements.count());
+
+          const usize sep = find_substring_length_separator(slice);
+          const StringView offset_text = slice.substring_of_length(0, sep);
+          const i64 offset =
+              offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
+          i64 start = offset < 0 ? total + offset : offset;
+          if (start < 0) start = 0;
+          if (start > total) start = total;
+          i64 end = total;
+          if (sep < slice.length) {
+            const StringView length_text = slice.substring(sep + 1);
+            const i64 length =
+                length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
+            /* Unlike a string substring, an array slice rejects a negative
+               length the way bash does rather than counting from the end. */
+            if (length < 0) throw Error{"substring expression < 0"};
+            end = start + length;
+          }
+          if (end > total) end = total;
+          if (end < start) end = start;
+
+          if (segment.is_in_double_quotes && is_star) {
+            let const ifs = m_field_separators.view();
+            let joined = String{heap_allocator()};
+            for (i64 j = start; j < end; j++) {
+              if (j > start && !ifs.is_empty()) joined.push(ifs[0]);
+              joined.append(elements[static_cast<usize>(j)].view());
+            }
+            append_run(joined, false);
+          } else if (segment.is_in_double_quotes) {
+            for (i64 j = start; j < end; j++) {
+              if (j > start) flush();
+              append_run(elements[static_cast<usize>(j)].view(), false);
+            }
+          } else {
+            for (i64 j = start; j < end; j++) {
+              if (j > start) flush();
+              append_split_run(elements[static_cast<usize>(j)].view(), true);
+            }
+          }
+          break;
+        }
+      }
       /* "${a[@]MOD}" maps a value-transform modifier over each element, one
          field per element the way "${a[@]}" does, while "${a[*]MOD}" joins the
          modified elements. The / replacement, the # and % trims, and the ^ and ,
