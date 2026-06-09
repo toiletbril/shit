@@ -1294,15 +1294,30 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     const bool is_last_node = index + 1 >= m_nodes.count();
     cxt.set_terminal_exec_allowed(was_terminal_exec_allowed && is_last_node);
 
+    /* An Or operand runs only after a failure and an And operand only after a
+       success, so a short-circuited operand does not run at all. The flag marks
+       whether this node ran, since set -e keys off the command that actually
+       produced the status, not a status carried over from a short-circuited
+       sibling. */
+    bool did_execute = false;
     switch (n->kind()) {
-    case CompoundListCondition::Kind::None: ret = n->evaluate(cxt); break;
+    case CompoundListCondition::Kind::None:
+      ret = n->evaluate(cxt);
+      did_execute = true;
+      break;
 
     case CompoundListCondition::Kind::Or:
-      if (ret != 0) ret = n->evaluate(cxt);
+      if (ret != 0) {
+        ret = n->evaluate(cxt);
+        did_execute = true;
+      }
       break;
 
     case CompoundListCondition::Kind::And:
-      if (ret == 0) ret = n->evaluate(cxt);
+      if (ret == 0) {
+        ret = n->evaluate(cxt);
+        did_execute = true;
+      }
       break;
     }
 
@@ -1310,14 +1325,19 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
        list and unwinds to the boundary that consumes it. */
     if (cxt.has_pending_control_flow()) break;
 
-    /* Under set -e the shell exits once a command at the end of its and-or
-       chain fails, unless this list is the condition of an if, a while, or an
-       and-or operand. */
+    /* POSIX exempts set -e for a command that is an operand of && or || and not
+       the last command of the and-or list, and for a command the ! reserved
+       word negates. So the exit fires only when the node that ran is the last of
+       its chain, the next node starts a fresh chain or the list ends, and the
+       command carries no leading !. A short-circuited node did not run and so
+       cannot trigger the exit, which is what keeps a failing non-last operand
+       such as the false in `false && cmd` from exiting the shell. */
     const bool ends_and_or_chain =
         index + 1 >= m_nodes.count() ||
         m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
-    if (cxt.error_exit() && !cxt.in_condition() && ends_and_or_chain &&
-        ret != 0 && ret != NOTHING_WAS_EXECUTED)
+    if (cxt.error_exit() && !cxt.in_condition() && did_execute &&
+        !n->is_negated() && ends_and_or_chain && ret != 0 &&
+        ret != NOTHING_WAS_EXECUTED)
     {
       cxt.set_last_exit_status(static_cast<i32>(ret));
       if (cxt.in_subshell()) {
@@ -1342,6 +1362,12 @@ CompoundListCondition::CompoundListCondition(SourceLocation location, Kind kind,
 CompoundListCondition::~CompoundListCondition() = default;
 
 pure fn CompoundListCondition::kind() const wontthrow -> Kind { return m_kind; }
+
+pure fn CompoundListCondition::is_negated() const wontthrow -> bool
+{
+  ASSERT(m_cmd != nullptr);
+  return m_cmd->is_negated();
+}
 
 cold fn CompoundListCondition::to_string() const throws -> String
 {

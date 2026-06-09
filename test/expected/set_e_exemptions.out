@@ -1,0 +1,307 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-e"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "never-and"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-and"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-neg"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-or-ok"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-neg-ok"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Subshell]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "set" "-e"]
+              [CompoundListCondition, None]
+                [SimpleCommand "true"]
+              [CompoundListCondition, &&]
+                [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "sub-ok"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "sub-exited"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Subshell]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "set" "-e"]
+              [CompoundListCondition, None]
+                [SimpleCommand "false"]
+              [CompoundListCondition, ||]
+                [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "or-ok"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "or-exited"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Subshell]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "set" "-e"]
+              [CompoundListCondition, None]
+                [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bare-ok"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "bare-exited"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Subshell]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "set" "-e"]
+              [CompoundListCondition, None]
+                [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg-ok"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg-exited"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never-and"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-and"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-neg"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-or-ok"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-neg-ok"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "sub-ok"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "sub-exited"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "or-ok"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "or-exited"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bare-ok"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bare-exited"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg-ok"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg-exited"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+after-and
+after-neg
+after-or-ok
+after-neg-ok
+sub-exited
+or-exited
+bare-exited
+neg-ok
+done
+[Code 0]

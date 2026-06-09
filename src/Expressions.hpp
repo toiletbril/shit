@@ -345,6 +345,10 @@ public:
 
   pure fn kind() const wontthrow -> Kind;
 
+  /* True when the command this node holds carries a leading !, which set -e
+     exempts from its exit. */
+  pure fn is_negated() const wontthrow -> bool;
+
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
