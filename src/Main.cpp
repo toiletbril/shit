@@ -468,12 +468,18 @@ fn main(int argc, char **argv) -> int
       spliced_argv.push(argv[i]);
   }
 
+  const char *const *parse_argv =
+      spliced_argv.is_empty() ? argv : spliced_argv.begin();
+  let const parse_argc =
+      spliced_argv.is_empty() ? argc : static_cast<int>(spliced_argv.count());
   try {
-    if (spliced_argv.is_empty())
-      file_names = shit::parse_flags(FLAG_LIST, argc, argv);
-    else
-      file_names = shit::parse_flags(
-          FLAG_LIST, static_cast<int>(spliced_argv.count()), spliced_argv.begin());
+    file_names = shit::parse_flags(FLAG_LIST, parse_argc, parse_argv);
+  } catch (const shit::ErrorWithLocation &e) {
+    /* An unknown flag carries a caret into the joined command line, so the
+       reader sees which argument the parser rejected. */
+    shit::show_message(
+        e.to_string(shit::join_command_line(parse_argc, parse_argv)));
+    return 2;
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
     /* A flag error is a usage error, so the shell exits with the POSIX usage

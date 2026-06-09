@@ -347,7 +347,14 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           }
           s += "'";
 
-          throw Error{s};
+          /* The caret points at the whole offending argument in the joined
+             command line, so its offset is the length of every earlier argument
+             plus one space each. */
+          usize caret_offset = 0;
+          for (int k = 0; k < i; k++)
+            caret_offset += std::strlen(argv[k]) + 1;
+          throw ErrorWithLocation{
+              SourceLocation{caret_offset, std::strlen(argv[i])}, s};
         }
       }
     }
@@ -364,6 +371,16 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
   }
 
   return args;
+}
+
+fn join_command_line(int argc, const char *const *argv) throws -> String
+{
+  let s = String{};
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) s.push(' ');
+    s.append(StringView{argv[i], std::strlen(argv[i])});
+  }
+  return s;
 }
 
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void

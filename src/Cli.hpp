@@ -119,6 +119,11 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
 fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                const char *const *argv) throws -> ArrayList<String>;
 
+/* Join the arguments into one space-separated line, the source a located flag
+   error renders its caret against. The caller rebuilds the same line the parser
+   measured its offsets in, so the caret lands under the offending flag. */
+fn join_command_line(int argc, const char *const *argv) throws -> String;
+
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void;
 
 fn show_version() throws -> void;
