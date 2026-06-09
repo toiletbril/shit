@@ -14,6 +14,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 
 #if !defined(SHIT_NO_TOILETLINE)
 
@@ -151,7 +152,7 @@ fn byte_offset_of_codepoint(const char *bytes, usize byte_length,
    codepoint indices here. Returns 1 when at least one candidate was produced, 0
    otherwise. */
 fn shit_completion_callback(const char *buffer, size_t cursor,
-                            tl_completion *out) -> int
+                            tl_completion *out, int for_listing) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
 
@@ -168,7 +169,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
         byte_offset_of_codepoint(buffer, byte_length, cursor);
 
     shit::completion::completion_result result = shit::completion::complete(
-        line, byte_cursor, *COMPLETION_CONTEXT, base);
+        line, byte_cursor, *COMPLETION_CONTEXT, base, for_listing != 0);
 
     if (result.candidates.is_empty()) return 0;
 
@@ -235,8 +236,14 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 
 namespace toiletline {
 
+using shit::EvalContext;
+using shit::Maybe;
+using shit::Path;
 using shit::String;
 using shit::StringView;
+namespace colors = shit::colors;
+namespace os = shit::os;
+namespace utils = shit::utils;
 
 struct input_result
 {
@@ -288,6 +295,11 @@ fn disable_completion() -> void
   COMPLETION_CONTEXT = nullptr;
   ::tl_set_complete_callback(nullptr);
   ::tl_set_highlight_callback(nullptr);
+}
+
+fn set_ghost_enabled(bool enabled) -> void
+{
+  ::tl_set_ghost_enabled(enabled ? 1 : 0);
 }
 
 fn utf8_strlen(const String &s, usize count) -> usize
@@ -385,6 +397,391 @@ fn emit_newlines(StringView buffer) -> void
     throw shit::Error{"Toiletline: Couldn't emit newlines"};
 }
 
+/* The cwd shown in a prompt is shortened from the front with a leading ... once
+   it runs past this many bytes, so a deep path does not push the cursor across
+   the terminal. */
+static constexpr usize PROMPT_PWD_LENGTH = 24;
+
+static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
+    -> String
+{
+  if (path.length <= max_length) return String{path};
+  /* The ellipsis is three bytes, so a max below it cannot leave a tail and the
+     whole path is returned rather than read past its end. */
+  if (max_length < 3) return String{path};
+  /* The byte cut can land in the middle of a multibyte codepoint, so it
+     advances to the next codepoint boundary, the first byte that is not a UTF-8
+     continuation byte, before the tail is taken. */
+  usize tail_start = path.length - max_length + 3;
+  while (tail_start < path.length &&
+         (static_cast<unsigned char>(path[tail_start]) & 0xC0) == 0x80)
+    tail_start++;
+  String shortened{};
+  shortened += "...";
+  shortened += StringView{path.data + tail_start, path.length - tail_start};
+  return shortened;
+}
+
+/* The current git branch read from .git/HEAD without forking git, walking up
+   from the working directory to the filesystem root. Empty outside a
+   repository. A detached HEAD shows the short commit hash. */
+static fn git_branch() throws -> String
+{
+  let dir = Path::current_directory();
+  for (;;) {
+    let head = dir;
+    head.push_component(".git");
+    /* A linked worktree or a submodule stores .git as a file holding a
+       'gitdir: <path>' pointer rather than a directory, so the real git dir is
+       followed before reading HEAD. */
+    let git_dir = head;
+    if (let const dot_git = utils::read_entire_file(head.text().view())) {
+      let const pointer = dot_git->view();
+      let const gitdir_prefix = StringView{"gitdir: "};
+      if (pointer.starts_with(gitdir_prefix)) {
+        let line = pointer.substring(gitdir_prefix.length);
+        while (!line.is_empty() &&
+               (line[line.length - 1] == '\n' || line[line.length - 1] == '\r'))
+        {
+          line = line.substring_of_length(0, line.length - 1);
+        }
+        let resolved_gitdir = Path{line};
+        /* A relative gitdir pointer is relative to the directory holding the
+           .git file, not the current directory. */
+        if (!resolved_gitdir.is_absolute()) {
+          resolved_gitdir = dir;
+          resolved_gitdir.push_component(line);
+        }
+        git_dir = steal(resolved_gitdir);
+      }
+    }
+    let git_head = git_dir;
+    git_head.push_component("HEAD");
+    if (let const content = utils::read_entire_file(git_head.text().view())) {
+      let text = content->view();
+      while (!text.is_empty() &&
+             (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
+      {
+        text = text.substring_of_length(0, text.length - 1);
+      }
+      let const ref_prefix = StringView{"ref: refs/heads/"};
+      if (text.starts_with(ref_prefix))
+        return String{text.substring(ref_prefix.length)};
+      return String{
+          text.substring_of_length(0, text.length < 7 ? text.length : 7)};
+    }
+    let parent = dir;
+    parent.push_component("..");
+    let normalized = parent.to_absolute().normalized();
+    if (normalized.text() == dir.text()) break;
+    dir = steal(normalized);
+  }
+  return String{};
+}
+
+/* A human duration for the \D prompt segment, quiet under a few milliseconds,
+   then milliseconds, then seconds with one decimal. */
+static fn format_prompt_duration(u64 nanos) throws -> String
+{
+  const u64 milliseconds = nanos / 1000000ULL;
+  if (milliseconds < 5) return String{};
+  String out{};
+  if (milliseconds < 1000) {
+    out.append(utils::int_to_text(static_cast<i64>(milliseconds)));
+    out += "ms";
+    return out;
+  }
+  const u64 tenths = nanos / 100000000ULL;
+  out.append(utils::int_to_text(static_cast<i64>(tenths / 10)));
+  out += '.';
+  out.append(utils::int_to_text(static_cast<i64>(tenths % 10)));
+  out += 's';
+  return out;
+}
+
+/* The current local time formatted with strftime into a fixed buffer, used by
+   the clock prompt escapes. localtime is read on the single interactive thread,
+   so the shared static tm it returns is not a race. */
+static fn prompt_strftime(const char *format) throws -> String
+{
+  std::time_t now = std::time(nullptr);
+  std::tm *local = std::localtime(&now);
+  if (local == nullptr) return String{};
+  char buffer[128];
+  usize written = std::strftime(buffer, sizeof(buffer), format, local);
+  return String{
+      StringView{buffer, written}
+  };
+}
+
+/* The hostname, the full name for need_full and the part before the first dot
+   otherwise, falling back to the HOSTNAME variable and then localhost. */
+static fn prompt_hostname(bool need_full) throws -> String
+{
+  String host = os::get_hostname().value_or(
+      os::get_environment_variable("HOSTNAME").value_or("localhost"));
+  if (need_full) return host;
+  usize dot = 0;
+  while (dot < host.length() && host.view()[dot] != '.')
+    dot++;
+  return String{host.view().substring_of_length(0, dot)};
+}
+
+static fn expand_prompt_escapes(StringView prompt, StringView user,
+                                StringView working_directory,
+                                EvalContext &context) throws -> String
+{
+  String out{};
+  for (usize i = 0; i < prompt.length; i++) {
+    if (prompt[i] != '\\' || i + 1 >= prompt.length) {
+      out += prompt[i];
+      continue;
+    }
+    u8 escaped = static_cast<u8>(prompt[i + 1]);
+
+    /* An octal escape \nnn takes up to three octal digits after the backslash
+       and emits the byte they name, the way bash does. */
+    if (escaped >= '0' && escaped <= '7') {
+      u32 value = 0;
+      usize digits = 0;
+      while (digits < 3 && i + 1 < prompt.length && prompt[i + 1] >= '0' &&
+             prompt[i + 1] <= '7')
+      {
+        value = value * 8 + static_cast<u32>(prompt[i + 1] - '0');
+        i++;
+        digits++;
+      }
+      out += static_cast<char>(value & 0xFF);
+      continue;
+    }
+
+    i++;
+    switch (escaped) {
+    case 'u': out += user; break;
+    /* \h is the hostname up to the first dot, \H is the full name. */
+    case 'h': out += prompt_hostname(false); break;
+    case 'H': out += prompt_hostname(true); break;
+    case 'w': {
+      String shown{working_directory};
+      Maybe<Path> home = os::get_home_directory();
+      /* The home prefix collapses to ~ only when it ends on a path boundary, so
+         HOME=/home/sd and cwd=/home/sderp keeps the full path rather than
+         rendering ~erp. The byte after the prefix must be a separator or the
+         end of the string. */
+      if (home && shown.starts_with(home->text()) &&
+          (shown.length() == home->count() ||
+           shown.view()[home->count()] == '/'))
+      {
+        String collapsed{};
+        collapsed += "~";
+        collapsed += shown.substring(home->count());
+        shown = steal(collapsed);
+      }
+      out += shown;
+    } break;
+    case 'W': out += Path{working_directory}.filename(); break;
+    /* The working directory shortened from the front with an ellipsis, the form
+       the default prompt uses so a deep path stays short. */
+    case 'P':
+      out += shorten_path_with_ellipsis(working_directory, PROMPT_PWD_LENGTH);
+      break;
+    case '$': out += (user == "root") ? '#' : '$'; break;
+    case 'n': out += '\n'; break;
+    case 'r': out += '\r'; break;
+    case 'e': out += '\x1b'; break;
+    case 'a': out += '\a'; break;
+    /* \[ and \] wrap non-printing bytes in bash so the width count skips them.
+       The line editor already skips ANSI runs when it measures the prompt, so
+       the markers are dropped and the bytes between them are emitted plainly.
+     */
+    case '[': break;
+    case ']': break;
+    /* The clock escapes match bash, so \t is the 24-hour time rather than a
+       literal tab, and the date and 12-hour forms follow strftime. */
+    case 't': out += prompt_strftime("%H:%M:%S"); break;
+    case 'T': out += prompt_strftime("%I:%M:%S"); break;
+    case '@': out += prompt_strftime("%I:%M %p"); break;
+    case 'A': out += prompt_strftime("%H:%M"); break;
+    case 'd': out += prompt_strftime("%a %b %d"); break;
+    /* \s is the shell name, the basename of the zeroth positional parameter. */
+    case 's': {
+      if (Maybe<String> argv0 = context.get_variable_value("0");
+          argv0.has_value())
+        out += Path{argv0->view()}.filename();
+    } break;
+    case 'v':
+    case 'V':
+      if (Maybe<String> version = context.get_variable_value("BASH_VERSION");
+          version.has_value())
+        out += *version;
+      break;
+    /* The last exit status, colored green on success and red on failure when
+       the terminal takes color. */
+    case '?': {
+      const i32 status = context.last_exit_status();
+      const bool wants_color = colors::stdout_wants_color();
+      if (wants_color)
+        out += status == 0 ? colors::ansi::GREEN : colors::ansi::RED;
+      out += utils::int_to_text(status);
+      if (wants_color) out += colors::ansi::RESET;
+    } break;
+    /* The number of background jobs. */
+    case 'j':
+      out += utils::int_to_text(static_cast<i64>(context.jobs().count()));
+      break;
+    /* The time the last command took, empty for an instant command. */
+    case 'D':
+      out += format_prompt_duration(context.last_command_duration_ns());
+      break;
+    /* The current git branch, empty outside a repository. */
+    case 'g': out += git_branch(); break;
+    /* \! and \# are the history and command numbers, which this shell does not
+       track, so they expand to nothing rather than printing the escape raw. */
+    case '!': break;
+    case '#': break;
+    case '\\': out += '\\'; break;
+    default:
+      out += '\\';
+      out += static_cast<char>(escaped);
+      break;
+    }
+  }
+  return out;
+}
+
+/* The decoded prompt and the result of its parameter pass from the previous
+   draw. While the decoded prompt is unchanged the expansion is reused, so a
+   command substitution in PS1 does not run again until a prompt input moves. */
+static String PROMPT_CACHE_KEY{};
+static String PROMPT_CACHE_VALUE{};
+
+fn default_prompt_template() -> String
+{
+  String template_string{};
+  template_string += "\\u@\\h ";
+  if (colors::stdout_wants_color()) {
+    template_string += colors::ansi::GREEN;
+    template_string += "\\P";
+    template_string += colors::ansi::RESET;
+  } else {
+    template_string += "\\P";
+  }
+  template_string += " \\$ ";
+  return template_string;
+}
+
+/* The backslash escapes the parameter pass would otherwise unescape, mapped to
+   a control-byte marker so they survive expansion and reach the escape pass
+   intact. A realistic prompt holds none of these control bytes, so the round
+   trip is lossless in practice. A PS1 that embeds a literal 0x01 to 0x03, which
+   no normal prompt does, sees that byte rewritten to its escape, an accepted
+   cosmetic edge rather than a crash. */
+static constexpr char PROMPT_GUARD_DOLLAR = '\x01';
+static constexpr char PROMPT_GUARD_BACKSLASH = '\x02';
+static constexpr char PROMPT_GUARD_BACKTICK = '\x03';
+
+/* Replace \$, \\, and \` with markers so expand_heredoc_body, which has heredoc
+   backslash semantics, does not consume them before the escape pass decodes \$
+   and \\. The ${...} and $(...) the user wrote still expand. */
+static fn guard_prompt_backslashes(StringView template_string) throws -> String
+{
+  String out{};
+  for (usize i = 0; i < template_string.length; i++) {
+    if (template_string[i] == '\\' && i + 1 < template_string.length) {
+      let const next = template_string[i + 1];
+      if (next == '$') {
+        out.push(PROMPT_GUARD_DOLLAR);
+        i++;
+        continue;
+      }
+      if (next == '\\') {
+        out.push(PROMPT_GUARD_BACKSLASH);
+        i++;
+        continue;
+      }
+      if (next == '`') {
+        out.push(PROMPT_GUARD_BACKTICK);
+        i++;
+        continue;
+      }
+    }
+    out.push(template_string[i]);
+  }
+  return out;
+}
+
+/* Restore the guarded escapes after expansion, so the escape pass sees \$ and
+   \\ the way the user wrote them. */
+static fn unguard_prompt_backslashes(StringView expanded) throws -> String
+{
+  String out{};
+  for (usize i = 0; i < expanded.length; i++) {
+    switch (expanded[i]) {
+    case PROMPT_GUARD_DOLLAR: out += "\\$"; break;
+    case PROMPT_GUARD_BACKSLASH: out += "\\\\"; break;
+    case PROMPT_GUARD_BACKTICK: out += "\\`"; break;
+    default: out.push(expanded[i]); break;
+    }
+  }
+  return out;
+}
+
+fn build_prompt(EvalContext &context) -> String
+{
+  String full_pwd{Path::current_directory().text()};
+  set_title("shit @ " + full_pwd);
+
+  /* The user is stable for the session, so it is resolved once and reused. The
+     fallback path rescans /etc/passwd, which a per-prompt call would repeat on
+     every draw in a bare-environment container. */
+  static String CACHED_USER{};
+  static bool USER_RESOLVED = false;
+  if (!USER_RESOLVED) {
+    CACHED_USER = os::get_current_user().value_or("???");
+    USER_RESOLVED = true;
+  }
+
+  /* The PS1 template, the user's when set, otherwise the built-in default. */
+  String ps1_template;
+  if (Maybe<String> ps1 = context.get_variable_value("PS1");
+      ps1.has_value() && !ps1->is_empty())
+    ps1_template = steal(*ps1);
+  else
+    ps1_template = default_prompt_template();
+
+  /* The raw template takes parameter expansion, command substitution, and
+     arithmetic first, so ${debian_chroot:+...} and $(...) render. This runs
+     before the backslash escapes are decoded, so the cwd, the user, and the
+     other escape-inserted text below are literal and never re-expanded. A
+     directory named $(...) therefore cannot run a command at the prompt. The
+     result is cached on the raw template and the exit status is restored, since
+     a command substitution here must not clobber $? for the next command. The
+     backslash escapes are decoded last on either path, inserting the cwd, the
+     user, and the clock as literal text the expansion never sees. */
+  if (ps1_template.view() == PROMPT_CACHE_KEY.view())
+    return expand_prompt_escapes(PROMPT_CACHE_VALUE.view(), CACHED_USER.view(),
+                                 full_pwd.view(), context);
+
+  const i32 saved_status = context.last_exit_status();
+  String guarded = guard_prompt_backslashes(ps1_template.view());
+  String expanded;
+  try {
+    expanded = unguard_prompt_backslashes(
+        context.expand_heredoc_body(guarded.view()).view());
+  } catch (const shit::ErrorBase &) {
+    /* A located error such as a command-not-found in a $(...) or an unset
+       variable under set -u derives from ErrorBase rather than Error, so the
+       broad base is caught. The template stands rather than letting the prompt
+       draw take down the whole interactive shell. */
+    expanded = ps1_template;
+  }
+  context.set_last_exit_status(saved_status);
+  PROMPT_CACHE_KEY = ps1_template;
+  PROMPT_CACHE_VALUE = expanded;
+  return expand_prompt_escapes(expanded.view(), CACHED_USER.view(),
+                               full_pwd.view(), context);
+}
+
 } /* namespace toiletline */
 
 #else /* SHIT_NO_TOILETLINE */
@@ -408,6 +805,8 @@ fn set_title(const String &title) -> void { unused(title); }
 fn enable_completion(shit::EvalContext &context) -> void { unused(context); }
 
 fn disable_completion() -> void {}
+
+fn set_ghost_enabled(bool enabled) -> void { unused(enabled); }
 
 fn utf8_strlen(const String &s, usize count) -> usize
 {
@@ -444,6 +843,27 @@ fn enter_raw_mode() -> void {}
 fn exit_raw_mode() -> void {}
 
 fn emit_newlines(StringView buffer) -> void { unused(buffer); }
+
+fn default_prompt_template() -> String
+{
+  String template_string{};
+  template_string += "\\u@\\h ";
+  if (shit::colors::stdout_wants_color()) {
+    template_string += shit::colors::ansi::GREEN;
+    template_string += "\\P";
+    template_string += shit::colors::ansi::RESET;
+  } else {
+    template_string += "\\P";
+  }
+  template_string += " \\$ ";
+  return template_string;
+}
+
+fn build_prompt(shit::EvalContext &context) -> String
+{
+  unused(context);
+  throw shit::Error{"This build has no line editor"};
+}
 
 } /* namespace toiletline */
 

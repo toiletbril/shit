@@ -63,7 +63,8 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       default: {
         String invalid{};
         invalid += arg[c];
-        throw Error{"local: -" + invalid + ": invalid option"};
+        throw Error{"Unable to declare a local because '-" + invalid +
+                    "' is not a valid option"};
       }
       }
     }

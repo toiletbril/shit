@@ -163,10 +163,12 @@ fn glob_matches(StringView glob, StringView str,
                 const ArrayList<bool> &glob_active, usize mask_offset,
                 bool extglob = false) throws -> bool;
 
-/* Record whether the shell runs at a real interactive prompt, set once from
-   Main when the invocation mode is known. quit reads it so the goodbye message
-   appears only at a prompt and never for a script, a -c, or a subshell. */
-fn set_shell_is_interactive(bool is_interactive) wontthrow -> void;
+/* Hand quit the one context it reads the interactive state and the memory
+   report flag from, set once from Main when the context exists. quit gates the
+   goodbye message on the interactive state so it appears only at a prompt and
+   never for a script, a -c, or a subshell, and gates the memory report on the
+   --show-memory flag the context carries. */
+fn set_quit_context(const EvalContext *context) wontthrow -> void;
 
 /* Do a cleanup if necessary, then call exit(code). */
 [[noreturn]] fn quit(i32 code, bool should_goodbye = false) throws -> void;

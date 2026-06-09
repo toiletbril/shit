@@ -294,6 +294,17 @@ cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
   return first_piece;
 }
 
+fn Parser::reject_empty_loop_body(const Expression *body) throws -> void
+{
+  if (!body->is_dummy()) return;
+  Token *terminator = m_lexer.peek_shell_token();
+  ASSERT(terminator != nullptr);
+  throw shit::ErrorWithLocation{
+      terminator->source_location(),
+      "Unable to parse the loop because its body between 'do' and 'done' is "
+      "empty, a command is required there"};
+}
+
 hot fn Parser::parse_command_list(
     std::initializer_list<Token::Kind> terminators) throws -> Expression *
 {
@@ -937,8 +948,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     case Token::Kind::Case:
     case Token::Kind::Esac:
     case Token::Kind::Time:
-    case Token::Kind::When:
-    case Token::Kind::Function: {
+    case Token::Kind::When: {
       /* A run of digits touching a redir operator is a descriptor prefix,
          such as the 2 in 2>file or 2>&1, not an argument. */
       if (token->kind() == Token::Kind::Word) {
@@ -962,6 +972,19 @@ hot fn Parser::parse_simple_command() throws -> Command *
       if (!source_location) source_location = token->source_location();
       args_accumulator.push(token);
     } break;
+
+    case Token::Kind::Function:
+      /* The bash function keyword begins a definition when it leads the
+         command, with an optional empty () pair before the body. Anywhere else
+         it is an ordinary command word. */
+      if (args_accumulator.is_empty() && local_vars.count() == 0) {
+        m_lexer.advance_past_last_peek();
+        return parse_keyword_function_definition();
+      }
+      m_lexer.advance_past_last_peek();
+      if (!source_location) source_location = token->source_location();
+      args_accumulator.push(token);
+      break;
 
     case Token::Kind::LeftParen:
       /* A single word followed by () is a function definition. */
@@ -1135,6 +1158,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   }
 
   Expression *body = parse_command_list({Token::Kind::Done});
+  reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
   if (done_token->kind() != Token::Kind::Done) {
@@ -1250,6 +1274,7 @@ hot fn Parser::parse_for() throws -> Command *
   }
 
   Expression *body = parse_command_list({Token::Kind::Done});
+  reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
   if (done_token->kind() != Token::Kind::Done) {
@@ -1316,6 +1341,7 @@ hot fn Parser::parse_select() throws -> Command *
   }
 
   Expression *body = parse_command_list({Token::Kind::Done});
+  reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
   if (done_token->kind() != Token::Kind::Done) {
@@ -1590,6 +1616,7 @@ hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
   }
 
   Expression *body = parse_command_list({Token::Kind::Done});
+  reject_empty_loop_body(body);
   Token *done_token = m_lexer.next_shell_token();
   ASSERT(done_token != nullptr);
   if (done_token->kind() != Token::Kind::Done) {
@@ -1673,6 +1700,56 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
   if (close->kind() != Token::Kind::RightParen) {
     throw ErrorWithLocation{close->source_location(),
                             "Expected ')' in a function definition"};
+  }
+
+  /* Skip newlines before the body. */
+  for (;;) {
+    Token *t = m_lexer.peek_shell_token();
+    ASSERT(t != nullptr);
+    if (t->kind() != Token::Kind::Newline) break;
+    m_lexer.advance_past_last_peek();
+  }
+
+  /* The body is parsed into the persistent function arena, so it outlives the
+     command that defined it once the per-command arena resets. */
+  BumpArena &per_command_arena = m_lexer.arena();
+  if (FUNCTION_ARENA != nullptr) m_lexer.set_arena(*FUNCTION_ARENA);
+  Command *body = parse_simple_command();
+  m_lexer.set_arena(per_command_arena);
+
+  if (body == nullptr) {
+    throw ErrorWithLocation{location,
+                            "Expected a compound command as the function body"};
+  }
+
+  return m_lexer.arena().create<FunctionDefinition>(location, name.view(),
+                                                    body);
+}
+
+fn Parser::parse_keyword_function_definition() throws -> Command *
+{
+  /* The 'function' keyword was consumed by the caller, so the name follows. */
+  Token *name_token = m_lexer.next_shell_token();
+  ASSERT(name_token != nullptr);
+  if (name_token->kind() != Token::Kind::Word) {
+    throw ErrorWithLocation{name_token->source_location(),
+                            "Expected a name after the 'function' keyword"};
+  }
+  const let location = name_token->source_location();
+  const let name = name_token->raw_string();
+
+  /* An empty () pair may follow the name in the bash function form, where the
+     POSIX form requires it. */
+  Token *after_name = m_lexer.peek_shell_token();
+  ASSERT(after_name != nullptr);
+  if (after_name->kind() == Token::Kind::LeftParen) {
+    m_lexer.advance_past_last_peek();
+    Token *close = m_lexer.next_shell_token();
+    ASSERT(close != nullptr);
+    if (close->kind() != Token::Kind::RightParen) {
+      throw ErrorWithLocation{close->source_location(),
+                              "Expected ')' in a function definition"};
+    }
   }
 
   /* Skip newlines before the body. */

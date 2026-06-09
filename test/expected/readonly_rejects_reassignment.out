@@ -31,4 +31,4 @@
   Variable "R"
 ]
 R=5
-shit: error: 'R' is read only and cannot be assigned.
+shit: error: Unable to assign 'R' because it is read only.

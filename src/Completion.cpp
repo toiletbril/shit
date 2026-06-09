@@ -463,7 +463,8 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 }
 
 flatten fn complete(StringView line, usize cursor, EvalContext &context,
-                    const Path &base_directory) throws -> completion_result
+                    const Path &base_directory, bool for_listing) throws
+    -> completion_result
 {
   if (cursor > line.length) cursor = line.length;
 
@@ -523,10 +524,10 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     /* An empty command token, the state right after a ; or a space in command
        position, would enumerate and sort every command in PATH on each
        keystroke for the ghost, which freezes the prompt on a large PATH and
-       suggests nothing. Command completion runs only once a prefix is typed,
-       and an explicit tab on an empty word still lists nothing rather than
-       stalling. */
-    if (!token.is_empty())
+       suggests nothing. Command completion runs only once a prefix is typed.
+       An explicit tab on an empty word does list every command, since the user
+       asked for the menu rather than a single suggestion. */
+    if (!token.is_empty() || for_listing)
       candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
@@ -588,10 +589,15 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
       else
         return false;
     }
+    /* An existing regular file resolves, even when it is not executable, since
+       the name is found rather than missing and a process substitution such as
+       <(/etc/profile) names a real file the highlighter should not flag. A
+       non-executable file is a runtime permission matter, not a not-found one.
+     */
     if (Maybe<Path> canonical = utils::canonicalize_path(expanded.view());
         canonical.has_value())
     {
-      return canonical->is_regular_file() && canonical->is_executable();
+      return canonical->is_regular_file() || canonical->is_directory();
     }
     return false;
   }
@@ -699,15 +705,59 @@ enum class highlight_construct : u8
 
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
-                               ArrayList<highlight_span> &spans) throws -> void;
+                               ArrayList<highlight_span> &spans,
+                               const HashSet &known_vars) throws -> void;
+
+/* The plain variable name a $ expansion references when it is a simple $name or
+   ${name}, None when the expansion carries an operator such as ${x:-y} or a
+   form like ${#x} that is not a bare reference. The name may still be a special
+   parameter or a positional, which the set check treats as always set. */
+static fn simple_dollar_name(StringView line, usize i,
+                             usize expansion_end) wontthrow -> Maybe<StringView>
+{
+  if (i + 1 >= expansion_end) return shit::None;
+  if (line[i + 1] == '{') {
+    if (expansion_end < i + 3 || line[expansion_end - 1] != '}')
+      return shit::None;
+    StringView inner =
+        line.substring_of_length(i + 2, expansion_end - (i + 2) - 1);
+    if (inner.is_empty()) return shit::None;
+    for (usize k = 0; k < inner.length; k++)
+      if (!is_highlight_name_char(inner[k])) return shit::None;
+    return inner;
+  }
+  return line.substring_of_length(i + 1, expansion_end - (i + 1));
+}
+
+/* Whether a $ variable reference names something that is set, read without any
+   side effect so the highlighter never advances RANDOM or reads the clock. A
+   special parameter, a positional, a shell variable, an environment variable,
+   and a synthesized dynamic variable all count as set. */
+static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
+    -> bool
+{
+  if (name.is_empty()) return true;
+  if (name.length == 1 && !is_highlight_name_start(name[0])) return true;
+
+  bool all_digits = true;
+  for (usize k = 0; k < name.length; k++)
+    if (name[k] < '0' || name[k] > '9') {
+      all_digits = false;
+      break;
+    }
+  if (all_digits) return true;
+
+  if (known_vars.contains(name)) return true;
+  return os::get_environment_variable(name).has_value();
+}
 
 /* Color a $ expansion that begins at i within the window. A $(...) recurses so
    its inner command line colors like any other, while ${...}, $name, and the
-   special parameters are colored cyan as one span. Returns the index past it.
- */
+   special parameters are colored cyan as one span, or bold red when the named
+   variable is not set. Returns the index past it. */
 static fn color_dollar(StringView line, usize i, usize end,
-                       ArrayList<highlight_span> &spans,
-                       EvalContext &context) throws -> usize
+                       ArrayList<highlight_span> &spans, EvalContext &context,
+                       const HashSet &known_vars) throws -> usize
 {
   if (i + 1 < end && line[i + 1] == '(') {
     usize depth = 0;
@@ -729,12 +779,18 @@ static fn color_dollar(StringView line, usize i, usize end,
        $( and ) frame in the default color. */
     let const inner_begin = i + 2 < end ? i + 2 : end;
     let const inner_end = close < inner_begin ? inner_begin : close;
-    scan_highlight_range(line, inner_begin, inner_end, context, spans);
+    scan_highlight_range(line, inner_begin, inner_end, context, spans,
+                         known_vars);
     return j;
   }
   let const expansion_end = scan_dollar_expansion(line, i, end);
-  if (expansion_end > i)
-    spans.push(highlight_span{i, expansion_end, colors::ansi::CYAN});
+  if (expansion_end > i) {
+    StringView sgr = colors::ansi::CYAN;
+    if (Maybe<StringView> name = simple_dollar_name(line, i, expansion_end);
+        name.has_value() && !dollar_name_is_set(*name, known_vars))
+      sgr = colors::ansi::BOLD_RED;
+    spans.push(highlight_span{i, expansion_end, sgr});
+  }
   return expansion_end;
 }
 
@@ -743,7 +799,8 @@ static fn color_dollar(StringView line, usize i, usize end,
    state, so a nested command line colors on its own. */
 static fn scan_highlight_range(StringView line, usize begin, usize end,
                                EvalContext &context,
-                               ArrayList<highlight_span> &spans) throws -> void
+                               ArrayList<highlight_span> &spans,
+                               const HashSet &known_vars) throws -> void
 {
   let push = [&](usize start, usize stop, StringView sgr) throws -> void {
     if (start < stop) spans.push(highlight_span{start, stop, sgr});
@@ -832,7 +889,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
             if (i > literal_start)
               word_spans.push(
                   highlight_span{literal_start, i, colors::ansi::YELLOW});
-            i = color_dollar(line, i, end, word_spans, context);
+            i = color_dollar(line, i, end, word_spans, context, known_vars);
             literal_start = i;
             continue;
           }
@@ -850,9 +907,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           i++;
         let const inner_end = i;
         if (i < end) i++;
-        scan_highlight_range(line, inner_begin, inner_end, context, word_spans);
+        scan_highlight_range(line, inner_begin, inner_end, context, word_spans,
+                             known_vars);
       } else if (d == '$') {
-        i = color_dollar(line, i, end, word_spans, context);
+        i = color_dollar(line, i, end, word_spans, context, known_vars);
       } else if (d == '\\' && i + 1 < end) {
         i += 2;
       } else {
@@ -990,7 +1048,30 @@ fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>
 {
   ArrayList<highlight_span> spans{};
-  scan_highlight_range(line, 0, line.length, context, spans);
+  /* The set of named variables is read once per line so the per-expansion check
+     does no allocation and triggers no dynamic-variable side effect. A line
+     with no $ never references a variable, so the whole walk over the variable
+     store is skipped on the common plain-command keystroke. */
+  HashSet known_vars{heap_allocator()};
+  if (line.find_character('$').has_value()) {
+    known_vars = context.variable_names();
+    /* The variables the evaluator synthesizes on read are not in the store, so
+       they are added here as set rather than computed, which would advance
+       RANDOM or read the clock on a keystroke. IFS and LINENO exist in every
+       mode, while the rest are bash-mode only, the way get_variable_value gates
+       them, so a POSIX run reds an unset $RANDOM. */
+    known_vars.add(StringView{"IFS"});
+    known_vars.add(StringView{"LINENO"});
+    if (context.is_bash_compatible()) {
+      known_vars.add(StringView{"RANDOM"});
+      known_vars.add(StringView{"SECONDS"});
+      known_vars.add(StringView{"EPOCHSECONDS"});
+      known_vars.add(StringView{"BASHPID"});
+      known_vars.add(StringView{"BASH_SUBSHELL"});
+      known_vars.add(StringView{"BASH_SOURCE"});
+    }
+  }
+  scan_highlight_range(line, 0, line.length, context, spans, known_vars);
   return spans;
 }
 

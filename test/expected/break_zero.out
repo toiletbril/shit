@@ -47,6 +47,6 @@
 [Word
   Unquoted "after"
 ]
-shit: 1:18: error: Builtin 'break': Illegal number: 0.
+shit: 1:18: error: Builtin 'break': Unable to break because '0' is not a valid loop count.
      1 |  for i in 1 2; do break 0; echo unreached; done
        |                   ^~~~~~~ here.

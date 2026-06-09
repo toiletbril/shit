@@ -39,7 +39,8 @@ struct completion_result
    slash on a directory and the glob matches when the token holds a live glob
    metacharacter. */
 fn complete(StringView line, usize cursor, EvalContext &context,
-            const Path &base_directory) throws -> completion_result;
+            const Path &base_directory, bool for_listing = false) throws
+    -> completion_result;
 
 /* One colored stretch of the input line for live syntax highlighting. The span
    runs from the byte offset start to end, and sgr is the ANSI escape that opens

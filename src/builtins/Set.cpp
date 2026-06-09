@@ -35,24 +35,46 @@ public:
   StringView name;
   void (EvalContext::*set)(bool);
   bool (EvalContext::*get)() const;
+  StringView help;
 };
 
 const SetOption SET_OPTIONS[] = {
-    {'e',  "errexit",   &EvalContext::set_error_exit,    &EvalContext::error_exit },
-    {'x',  "xtrace",    &EvalContext::set_echo_expanded,
-     &EvalContext::should_echo_expanded                                           },
-    {'u',  "nounset",   &EvalContext::set_error_unset,   &EvalContext::error_unset},
-    {'a',  "allexport", &EvalContext::set_export_all,    &EvalContext::export_all },
-    {'C',  "noclobber", &EvalContext::set_no_clobber,    &EvalContext::no_clobber },
-    {'f',  "noglob",    &EvalContext::set_no_glob,       &EvalContext::no_glob    },
-    {'n',  "noexec",    &EvalContext::set_no_exec,       &EvalContext::no_exec    },
-    {'m',  "monitor",   &EvalContext::set_monitor,       &EvalContext::monitor    },
+    {'e',  "errexit",          &EvalContext::set_error_exit,       &EvalContext::error_exit,
+     "Exit on the first command that fails."                                                                                           },
+    {'x',  "xtrace",           &EvalContext::set_echo_expanded,
+     &EvalContext::should_echo_expanded,
+     "Print each command after expansion before it runs."                                                                              },
+    {'u',  "nounset",          &EvalContext::set_error_unset,      &EvalContext::error_unset,
+     "Treat an unset variable as an error."                                                                                            },
+    {'a',  "allexport",        &EvalContext::set_export_all,       &EvalContext::export_all,
+     "Mark every assigned variable for the environment."                                                                               },
+    {'C',  "noclobber",        &EvalContext::set_no_clobber,       &EvalContext::no_clobber,
+     "Refuse to overwrite an existing file through '>'."                                                                               },
+    {'f',  "noglob",           &EvalContext::set_no_glob,          &EvalContext::no_glob,
+     "Disable pathname expansion."                                                                                                     },
+    {'n',  "noexec",           &EvalContext::set_no_exec,          &EvalContext::no_exec,
+     "Read and parse commands but do not run them."                                                                                    },
+    {'m',  "monitor",          &EvalContext::set_monitor,          &EvalContext::monitor,
+     "Run background jobs in their own process group with notifications."                                                              },
     /* failglob has no short letter, so '\0' keeps find_option_by_letter from
        ever matching a parsed option character. */
-    {'\0', "failglob",  &EvalContext::set_failglob,      &EvalContext::failglob   },
-    {'b',  "notify",    nullptr,                         nullptr                  },
-    {'h',  "hashall",   nullptr,                         nullptr                  },
-    {'v',  "verbose",   nullptr,                         nullptr                  },
+    {'\0', "failglob",         &EvalContext::set_failglob,         &EvalContext::failglob,
+     "Fail a command whose glob matches nothing."                                                                                      },
+    {'b',  "notify",           nullptr,                            nullptr,                   "Accepted without effect."               },
+    {'h',  "hashall",          nullptr,                            nullptr,                   "Accepted without effect."               },
+    {'v',  "verbose",          nullptr,                            nullptr,                   "Accepted without effect."               },
+    /* The shell's own debug toggles, so set -A turns the AST dump on at runtime
+       the same way the -A flag does at startup. */
+    {'A',  "show-ast",         &EvalContext::set_show_ast,         &EvalContext::show_ast,
+     "Print the AST before each command runs."                                                                                         },
+    {'M',  "show-lexed-words", &EvalContext::set_show_lexed_words,
+     &EvalContext::show_lexed_words,
+     "Print the escape bitmap after each parse."                                                                                       },
+    {'E',  "show-exit-code",   &EvalContext::set_show_exit_code,
+     &EvalContext::show_exit_code,                                                            "Print the exit code after each command."},
+    {'S',  "show-stats",       &EvalContext::set_stats_enabled,
+     &EvalContext::stats_enabled,
+     "Print evaluation statistics after each run."                                                                                     },
 };
 
 const SetOption *find_option_by_letter(char letter) throws
@@ -74,14 +96,43 @@ bool option_is_on(const EvalContext &cxt, const SetOption &option) throws
   return option.get != nullptr ? (cxt.*(option.get))() : false;
 }
 
-/* The reusable command form that set -o and set +o print, one line each. */
+/* The reusable command form that set -o and set +o print, one line each. The
+   shell's own debug toggles, named show-*, are left out so set -o lists only
+   the standard options a portable script expects, the way bash never prints a
+   non-standard option name. set -p still lists them for discovery. */
 String list_options(const EvalContext &cxt) throws
 {
   String out{};
   for (const SetOption &option : SET_OPTIONS) {
+    if (option.name.starts_with(StringView{"show-"})) continue;
     out += option_is_on(cxt, option) ? "set -o " : "set +o ";
     out += option.name;
     out += '\n';
+  }
+  return out;
+}
+
+/* The full table that set -p prints, every toggleable option with its letter,
+   its long name, its current state, and a one-line description, so a user can
+   discover what is available without leaving the shell. */
+String list_options_with_help(const EvalContext &cxt) throws
+{
+  String out{};
+  for (const SetOption &option : SET_OPTIONS) {
+    out += "  ";
+    if (option.letter != '\0') {
+      out.push('-');
+      out.push(option.letter);
+    } else {
+      out += "  ";
+    }
+    out += "  ";
+    out += option.name;
+    for (usize pad = option.name.length; pad < 18; pad++)
+      out.push(' ');
+    out += option_is_on(cxt, option) ? "[on]  " : "[off] ";
+    out += option.help;
+    out.push('\n');
   }
   return out;
 }
@@ -144,6 +195,15 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (option->set != nullptr) (cxt.*(option->set))(enable);
       continue;
     }
+
+    /* set -p prints the toggleable options with their state and help, a
+       discovery aid available in every mode. The +p form is accepted without
+       effect, since this shell has no privileged mode to turn off. */
+    if (arg == "-p") {
+      ec.print_to_stdout(list_options_with_help(cxt));
+      continue;
+    }
+    if (arg == "+p") continue;
 
     /* A minus enables each following letter, a plus disables each one. */
     if (arg.length() > 1 && (arg[0] == '-' || arg[0] == '+')) {

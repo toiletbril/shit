@@ -651,12 +651,51 @@ public:
   pure fn should_echo_expanded() const wontthrow -> bool;
   pure fn shell_is_interactive() const wontthrow -> bool;
 
+  /* False until the startup profile and rc files finish sourcing, so the
+     per-command terminal title is not set for the commands those files run, the
+     way bash leaves the title alone while reading its startup files. */
+  pure fn startup_finished() const wontthrow -> bool
+  {
+    return m_startup_finished;
+  }
+  fn set_startup_finished() wontthrow -> void { m_startup_finished = true; }
+
   fn make_stats_string() const throws -> String;
 
   /* Stats counting is off unless -S asked for the report. The evaluate path
      tests this so the per-node bookkeeping never runs when nobody reads it. */
   fn set_stats_enabled(bool enabled) wontthrow -> void;
   pure fn stats_enabled() const wontthrow -> bool;
+
+  /* The shell's own debug toggles, seeded from the -A, -M, and -E flags and
+     flipped at runtime by set. The run loop reads the context rather than the
+     flags so set -A turns the dump on for the next command. */
+  fn set_show_ast(bool enabled) wontthrow -> void { m_show_ast = enabled; }
+  pure fn show_ast() const wontthrow -> bool { return m_show_ast; }
+  fn set_show_lexed_words(bool enabled) wontthrow -> void
+  {
+    m_show_lexed_words = enabled;
+  }
+  pure fn show_lexed_words() const wontthrow -> bool
+  {
+    return m_show_lexed_words;
+  }
+  fn set_show_exit_code(bool enabled) wontthrow -> void
+  {
+    m_show_exit_code = enabled;
+  }
+  pure fn show_exit_code() const wontthrow -> bool { return m_show_exit_code; }
+
+  /* The granular memory report at exit, requested by --show-memory and read by
+     quit through the context pointer rather than a separate global. */
+  fn set_memory_stats_enabled(bool enabled) wontthrow -> void
+  {
+    m_memory_stats_enabled = enabled;
+  }
+  pure fn memory_stats_enabled() const wontthrow -> bool
+  {
+    return m_memory_stats_enabled;
+  }
 
   pure fn last_expressions_executed() const wontthrow -> usize;
   pure fn total_expressions_executed() const wontthrow -> usize;
@@ -669,6 +708,10 @@ public:
 
 protected:
   bool m_stats_enabled{false};
+  bool m_show_ast{false};
+  bool m_show_lexed_words{false};
+  bool m_show_exit_code{false};
+  bool m_memory_stats_enabled{false};
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
   usize m_expansions_last{0};
@@ -722,6 +765,10 @@ protected:
      forever is the motivating case. */
   usize m_source_depth{0};
   usize m_function_call_depth{0};
+
+  /* Set once the startup files finish, so the per-command title is quiet while
+     they run. */
+  bool m_startup_finished{false};
 
   /* The pending non-local jump, Normal when none is pending. */
   control_flow m_control_flow{};

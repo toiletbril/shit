@@ -1309,7 +1309,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     return function_ret;
   }
 
-  if (cxt.shell_is_interactive())
+  if (cxt.shell_is_interactive() && cxt.startup_finished())
     toiletline::set_title(utils::merge_args_to_string(program_args));
 
   /* Reuse a memoized resolution when the command word is unchanged, otherwise

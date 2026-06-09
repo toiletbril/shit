@@ -76,6 +76,9 @@ FLAG(STATS, Bool, 'S', "show-stats",
      "Print statistics after each executed command, including commands "
      "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
      "peak.");
+FLAG(MEMORY, Bool, 'G', "show-memory",
+     "Print a granular memory report at exit, the AST and function arena bytes "
+     "with their reserved capacity and the malloc heap in use.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion",
      "Disable interactive tab completion and ghost-text.");
 FLAG(DUMB, Bool, '\0', "dumb",
@@ -239,7 +242,7 @@ static fn run_script_contents(const String &script_contents,
 
     Parser p{
         Lexer{String{script_contents.view()}, ast_arena,
-              FLAG_ESCAPE_MAP.is_enabled(), filename,
+              context.show_lexed_words(), filename,
               context.is_bash_compatible()}
     };
 
@@ -256,12 +259,12 @@ static fn run_script_contents(const String &script_contents,
       return EXIT_FAILURE;
     }
 
-    if (FLAG_AST.is_enabled()) {
+    if (context.show_ast()) {
       print(ast->to_ast_string());
       print("\n");
     }
 
-    if (FLAG_ESCAPE_MAP.is_enabled()) {
+    if (context.show_lexed_words()) {
       for (const auto &word : p.debug_words()) {
         print(word.to_pretty_string());
         print("\n");
@@ -307,10 +310,10 @@ static fn run_script_contents(const String &script_contents,
     }
     context.set_last_exit_status(static_cast<i32>(exit_code));
 
-    if (FLAG_EXIT_CODE.is_enabled())
+    if (context.show_exit_code())
       print("[Code " + utils::int_to_text(exit_code) + "]\n");
 
-    if (FLAG_STATS.is_enabled()) {
+    if (context.stats_enabled()) {
       print(context.make_stats_string());
       print("\n");
     }
@@ -349,202 +352,6 @@ static fn source_file(const Path &path, EvalContext &context,
      caret for a file it sources both carry the file rather than a bare
      line:col. */
   run_script_contents(*contents, context, ast_arena, path.text().view());
-}
-
-/* The current git branch read from .git/HEAD without forking git, walking up
-   from the working directory to the filesystem root. Empty outside a
-   repository. A detached HEAD shows the short commit hash. */
-static fn git_branch() throws -> String
-{
-  let dir = Path::current_directory();
-  for (;;) {
-    let head = dir;
-    head.push_component(".git");
-    /* A linked worktree or a submodule stores .git as a file holding a
-       'gitdir: <path>' pointer rather than a directory, so the real git dir is
-       followed before reading HEAD. */
-    let git_dir = head;
-    if (let const dot_git = utils::read_entire_file(head.text().view())) {
-      let const pointer = dot_git->view();
-      let const gitdir_prefix = StringView{"gitdir: "};
-      if (pointer.starts_with(gitdir_prefix)) {
-        let line = pointer.substring(gitdir_prefix.length);
-        while (!line.is_empty() &&
-               (line[line.length - 1] == '\n' || line[line.length - 1] == '\r'))
-        {
-          line = line.substring_of_length(0, line.length - 1);
-        }
-        let resolved_gitdir = Path{line};
-        /* A relative gitdir pointer is relative to the directory holding the
-           .git file, not the current directory. */
-        if (!resolved_gitdir.is_absolute()) {
-          resolved_gitdir = dir;
-          resolved_gitdir.push_component(line);
-        }
-        git_dir = steal(resolved_gitdir);
-      }
-    }
-    let git_head = git_dir;
-    git_head.push_component("HEAD");
-    if (let const content = utils::read_entire_file(git_head.text().view())) {
-      let text = content->view();
-      while (!text.is_empty() &&
-             (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
-      {
-        text = text.substring_of_length(0, text.length - 1);
-      }
-      let const ref_prefix = StringView{"ref: refs/heads/"};
-      if (text.starts_with(ref_prefix))
-        return String{text.substring(ref_prefix.length)};
-      return String{
-          text.substring_of_length(0, text.length < 7 ? text.length : 7)};
-    }
-    let parent = dir;
-    parent.push_component("..");
-    let normalized = parent.to_absolute().normalized();
-    if (normalized.text() == dir.text()) break;
-    dir = steal(normalized);
-  }
-  return String{};
-}
-
-/* A human duration for the \D prompt segment, quiet under a few milliseconds,
-   then milliseconds, then seconds with one decimal. */
-static fn format_prompt_duration(u64 nanos) throws -> String
-{
-  const u64 milliseconds = nanos / 1000000ULL;
-  if (milliseconds < 5) return String{};
-  String out{};
-  if (milliseconds < 1000) {
-    out.append(utils::int_to_text(static_cast<i64>(milliseconds)));
-    out += "ms";
-    return out;
-  }
-  const u64 tenths = nanos / 100000000ULL;
-  out.append(utils::int_to_text(static_cast<i64>(tenths / 10)));
-  out += '.';
-  out.append(utils::int_to_text(static_cast<i64>(tenths % 10)));
-  out += 's';
-  return out;
-}
-
-/* Expand the common prompt escapes in PS1 and PS2. */
-/* The cwd shown in a prompt is shortened from the front with a leading ... once
-   it runs past this many bytes, so a deep path does not push the cursor across
-   the terminal. */
-static constexpr usize PROMPT_PWD_LENGTH = 24;
-
-static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
-    -> String
-{
-  if (path.length <= max_length) return String{path};
-  /* The ellipsis is three bytes, so a max below it cannot leave a tail and the
-     whole path is returned rather than read past its end. */
-  if (max_length < 3) return String{path};
-  /* The byte cut can land in the middle of a multibyte codepoint, so it
-     advances to the next codepoint boundary, the first byte that is not a UTF-8
-     continuation byte, before the tail is taken. */
-  usize tail_start = path.length - max_length + 3;
-  while (tail_start < path.length &&
-         (static_cast<unsigned char>(path[tail_start]) & 0xC0) == 0x80)
-    tail_start++;
-  String shortened{};
-  shortened += "...";
-  shortened += StringView{path.data + tail_start, path.length - tail_start};
-  return shortened;
-}
-
-/* The prompt used when PS1 is unset, user@host then the cwd shortened with an
-   ellipsis in green then a $ or a # for root, expressed through the same
-   escapes a user PS1 uses. The color is baked in only when the terminal takes
-   color. */
-static fn default_prompt_template() throws -> String
-{
-  String template_string{};
-  template_string += "\\u@\\h ";
-  if (colors::stdout_wants_color()) {
-    template_string += colors::ansi::GREEN;
-    template_string += "\\P";
-    template_string += colors::ansi::RESET;
-  } else {
-    template_string += "\\P";
-  }
-  template_string += " \\$ ";
-  return template_string;
-}
-
-static fn expand_prompt_escapes(StringView prompt, StringView user,
-                                StringView working_directory,
-                                EvalContext &context) throws -> String
-{
-  String out{};
-  for (usize i = 0; i < prompt.length; i++) {
-    if (prompt[i] != '\\' || i + 1 >= prompt.length) {
-      out += prompt[i];
-      continue;
-    }
-    u8 escaped = prompt[++i];
-    switch (escaped) {
-    case 'u': out += user; break;
-    case 'h':
-      out += os::get_hostname().value_or(
-          os::get_environment_variable("HOSTNAME").value_or("localhost"));
-      break;
-    case 'w': {
-      String shown{working_directory};
-      Maybe<Path> home = os::get_home_directory();
-      /* The home prefix collapses to ~ only when it ends on a path boundary, so
-         HOME=/home/sd and cwd=/home/sderp keeps the full path rather than
-         rendering ~erp. The byte after the prefix must be a separator or the
-         end of the string. */
-      if (home && shown.starts_with(home->text()) &&
-          (shown.length() == home->count() ||
-           shown.view()[home->count()] == '/'))
-      {
-        String collapsed{};
-        collapsed += "~";
-        collapsed += shown.substring(home->count());
-        shown = steal(collapsed);
-      }
-      out += shown;
-    } break;
-    case 'W': out += Path{working_directory}.filename(); break;
-    /* The working directory shortened from the front with an ellipsis, the form
-       the default prompt uses so a deep path stays short. */
-    case 'P':
-      out += shorten_path_with_ellipsis(working_directory, PROMPT_PWD_LENGTH);
-      break;
-    case '$': out += (user == "root") ? '#' : '$'; break;
-    case 'n': out += '\n'; break;
-    case 't': out += '\t'; break;
-    /* The last exit status, colored green on success and red on failure when
-       the terminal takes color. */
-    case '?': {
-      const i32 status = context.last_exit_status();
-      const bool wants_color = colors::stdout_wants_color();
-      if (wants_color)
-        out += status == 0 ? colors::ansi::GREEN : colors::ansi::RED;
-      out += utils::int_to_text(status);
-      if (wants_color) out += colors::ansi::RESET;
-    } break;
-    /* The number of background jobs. */
-    case 'j':
-      out += utils::int_to_text(static_cast<i64>(context.jobs().count()));
-      break;
-    /* The time the last command took, empty for an instant command. */
-    case 'D':
-      out += format_prompt_duration(context.last_command_duration_ns());
-      break;
-    /* The current git branch, empty outside a repository. */
-    case 'g': out += git_branch(); break;
-    case '\\': out += '\\'; break;
-    default:
-      out += '\\';
-      out += escaped;
-      break;
-    }
-  }
-  return out;
 }
 
 } /* namespace shit */
@@ -710,12 +517,17 @@ fn main(int argc, char **argv) -> int
                             shit::String{shell_name},
                             steal(positional_params)};
 
-  /* quit lives outside the context, so the goodbye gate is told the same
-     interactive state the context was built with. */
-  shit::utils::set_shell_is_interactive(should_be_interactive);
+  /* quit is a free function with no context in scope, so it is handed a pointer
+     to the one context to read the interactive state and the memory-report flag
+     from, rather than mirroring them into globals. */
+  shit::utils::set_quit_context(&context);
 
   /* Apply the remaining option flags that the constructor does not take. */
   context.set_stats_enabled(FLAG_STATS.is_enabled());
+  context.set_show_ast(FLAG_AST.is_enabled());
+  context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
+  context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
+  context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
   /* An interactive session outside compatibility mode defaults to nounset, so a
      typo in a variable name at the prompt fails loudly rather than expanding to
      nothing. A script keeps the lax POSIX default so an existing
@@ -756,6 +568,9 @@ fn main(int argc, char **argv) -> int
      dash names. The shit version above stays present in every mode. */
   if (shit::should_run_in_bash_mode()) {
     context.set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+    /* $BASH is the path the shell was invoked with, the way bash records the
+       executable that started it. */
+    context.set_shell_variable("BASH", program_path);
   } else {
     context.set_shell_variable("SH_VERSION", version_string);
     context.set_shell_variable("DASH_VERSION", version_string);
@@ -783,7 +598,7 @@ fn main(int argc, char **argv) -> int
      environment already supplies one. An interactive unset of PS1 still falls
      back to the same default when the prompt is built. */
   if (!shit::os::get_environment_variable("PS1").has_value())
-    context.set_shell_variable("PS1", shit::default_prompt_template());
+    context.set_shell_variable("PS1", toiletline::default_prompt_template());
 
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
   i32 exit_code = EXIT_SUCCESS;
@@ -858,6 +673,10 @@ fn main(int argc, char **argv) -> int
       source_file(shit::Path{env->view()}, context, ast_arena);
   }
 
+  /* The startup files have finished, so a command typed at the prompt may now
+     retitle the terminal. */
+  context.set_startup_finished();
+
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
   for (;;) {
@@ -907,6 +726,10 @@ fn main(int argc, char **argv) -> int
              completion callback and no ghost-text. */
           if (!FLAG_NO_COMPLETION.is_enabled())
             toiletline::enable_completion(context);
+          /* The no-completion flag also silences the ghost suggestion, so the
+             history source does not keep offering one after completion is off.
+           */
+          toiletline::set_ghost_enabled(!FLAG_NO_COMPLETION.is_enabled());
           shit::show_message(
               shit::should_run_in_posix_mode()  ? "POSIX me harder!"
               : shit::should_run_in_bash_mode() ? "Bash me harder!"
@@ -922,23 +745,7 @@ fn main(int argc, char **argv) -> int
            the interactive branch, so a script never reaches it. */
         context.notify_done_jobs();
 
-        shit::String full_pwd{shit::Path::current_directory().text()};
-        toiletline::set_title("shit @ " + full_pwd);
-
-        shit::String u = shit::os::get_current_user().value_or("???");
-
-        /* The PS1 template, the user's when set, otherwise the built-in
-           default, both run through the same escape pass so the two render
-           identically. The \P escape shortens the cwd with an ellipsis the way
-           the old hardcoded default did. */
-        shit::String ps1_template;
-        if (shit::Maybe<shit::String> ps1 = context.get_variable_value("PS1");
-            ps1.has_value() && !ps1->is_empty())
-          ps1_template = steal(*ps1);
-        else
-          ps1_template = shit::default_prompt_template();
-        shit::String prompt = expand_prompt_escapes(
-            ps1_template.view(), u.view(), full_pwd.view(), context);
+        shit::String prompt = toiletline::build_prompt(context);
 
         /* Ask for input until we get one. */
         for (;;) {
@@ -1022,7 +829,7 @@ fn main(int argc, char **argv) -> int
        tail position from here, since the compound nodes clear it on every path
        but the terminal simple command. */
     const bool prints_post_run_trailer =
-        FLAG_EXIT_CODE.is_enabled() || FLAG_STATS.is_enabled();
+        context.show_exit_code() || context.stats_enabled();
     context.set_terminal_exec_allowed(
         should_quit && !context.shell_is_interactive() &&
         !context.has_exit_trap() && !prints_post_run_trailer);

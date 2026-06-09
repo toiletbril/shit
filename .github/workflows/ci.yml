@@ -7,24 +7,14 @@ on:
 jobs:
   build-test-bench:
     runs-on: ubuntu-24.04
-    # The Makefile only forces clang++ on Windows, so on Linux it would fall
-    # back to make's built-in g++. Pin the compiler to the clang installed below
-    # so the build uses the toolchain CI just set up.
     env:
       CXX: clang++-18
     steps:
-      # src/toiletline is a submodule the build needs, so fetch it too.
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # The official script installs clang, lld, and compiler-rt for the pinned
-      # version. The sanitizer build needs the compiler-rt runtime. The symlinks
-      # give the Makefile's which-lld check and clang's -fuse-ld=lld the
-      # unversioned names. The version probes fail the step early if the install
-      # named the binaries differently. dash backs the benchmark comparison and
-      # zsh fills the table.
       - name: Install clang, lld, and compiler-rt
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -36,21 +26,12 @@ jobs:
           clang++-18 --version
           ld.lld-18 --version
 
-      # The default goal is all, shit then test, so this compiles the dbg
-      # sanitizer binary and runs the golden suite.
       - name: Build and test
         run: make
 
-      # The optimized static binary, the one the benchmark measures.
       - name: Build the release binary
         run: make MODE=rel shit
 
-      # The make target prints the output-matches-dash line and the timing table
-      # for the log. The comparison then times dash and the release shit and
-      # fails the job when shit is not strictly faster. run_min returns non-zero
-      # when a timed run fails, and the numeric guards reject an empty or
-      # non-numeric time, so a broken shit that produces no measurement cannot
-      # coerce to zero and pass the awk gate as falsely faster.
       - name: Benchmark and assert shit beats dash
         run: |
           SCALE=200 make -C test bench
@@ -70,9 +51,6 @@ jobs:
             done
             echo "$min"
           }
-          # The benchmark measures evaluation speed, and dash has no analysis
-          # prepass, so time shit with --no-diagnostics for an apples-to-apples
-          # comparison, the same flag the make bench parity check uses.
           dash_seconds=$(run_min dash) || exit 1
           shit_seconds=$(run_min ../shit --no-diagnostics) || exit 1
           echo "dash=$dash_seconds shit=$shit_seconds"

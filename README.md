@@ -46,6 +46,25 @@ $ make
 $ ./shit --help
 ```
 
+## We're watching this shit
+
+Before a single command runs, shit walks the whole parsed tree and checks it.
+A command that cannot resolve, a malformed glob, a busted redirection, the kind
+of crap that makes a normal shell half-run a script and leave you with a mess,
+gets caught up front and the run stops. No bullshit or malformed command gets
+executed, because we are watching this shit.
+
+The same stage carries most of shellcheck built in as warnings. A `read`
+without `-r` that mangles a backslash, a `printf` format that comes from a
+variable and lets data inject directives, a one-operand `test`, a `case` with no
+default, each one names its shellcheck code right there in the message.
+
+It stays out of your way when you want it to. `-P` (POSIX, like dash) and
+`--bash-compatible` skip the stage so a file runs the way those shells run it and
+each command fails at runtime with 127. `-W` keeps the stage but turns every
+error into a warning and lets the run continue. `--no-diagnostics` turns it off,
+and `--dumb` turns everything pedantic off at once.
+
 ## ...
 
 Is it usable?
@@ -67,7 +86,7 @@ Is it good?
 
 Is is exceptional? 
 - [ ] `bash`-compatible.
-- [ ] Most of shellcheck built-in as warnings.
+- [x] Most of shellcheck built-in as warnings.
 - [ ] Arbitrary precision numeric expressions.
 - [ ] Cross-platform replacement for most common Unix programs which Windows
       does not have.

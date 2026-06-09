@@ -54,6 +54,21 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      PATH but not a function, the way command is meant to. */
   if (FLAG_SHOW.is_enabled() || FLAG_SHOW_VERBOSE.is_enabled()) {
     let const verbose = FLAG_SHOW_VERBOSE.is_enabled();
+    /* A name that carries a slash is a pathname, not a command name, so it
+       resolves against the filesystem directly and never a keyword, alias, or
+       builtin, the way bash treats it. It resolves when it is an executable
+       regular file, and the path is printed as typed. */
+    if (name.find_character('/').has_value()) {
+      let const candidate = Path{name.view()};
+      if (candidate.exists() && !candidate.is_directory() &&
+          candidate.is_executable())
+      {
+        ec.print_to_stdout(verbose ? name + " is " + name + "\n" : name + "\n");
+        return 0;
+      }
+      if (verbose) ec.print_to_stdout(name + ": not found\n");
+      return 1;
+    }
     /* A reserved word resolves first, terse to the bare word and verbose to a
        keyword note, matching dash. */
     if (utils::is_posix_reserved_word(name.view())) {

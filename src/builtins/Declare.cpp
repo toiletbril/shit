@@ -87,7 +87,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         String invalid{};
         invalid += arg[0];
         invalid += arg[c];
-        throw Error{"declare: '" + invalid + "' is not a valid option"};
+        throw Error{"Unable to run declare because '" + invalid +
+                    "' is not a valid option"};
       }
       }
     }

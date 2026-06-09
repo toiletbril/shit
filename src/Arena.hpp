@@ -39,6 +39,18 @@ public:
      report how much the current command's tree occupies. */
   fn bytes_used() const wontthrow -> usize;
 
+  /* The number of blocks the arena holds and the total bytes they reserve, read
+     by the memory report so a reader can see the capacity the arena keeps past
+     what it currently uses. */
+  fn block_count() const wontthrow -> usize { return m_blocks.count(); }
+  fn bytes_capacity() const wontthrow -> usize
+  {
+    usize total = 0;
+    for (const block &b : m_blocks)
+      total += b.size;
+    return total;
+  }
+
   /* A saved bump position, so a scope can reclaim everything it allocated above
      the mark while leaving earlier allocations alone. The marks nest, so a
      command substitution inside an expansion releases only its own region. */

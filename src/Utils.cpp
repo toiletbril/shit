@@ -17,6 +17,10 @@
 #include <cstdlib>
 #include <cstring>
 
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
+
 /* TODO: Support background processes. */
 /* TODO: Support setting environment variables. */
 
@@ -930,15 +934,45 @@ fn glob_matches(StringView glob, StringView str,
 
 /* The shell is at a real interactive prompt. quit gates the goodbye on this so
    a script, a -c, or a subshell exits silently the way dash does. */
-static bool SHELL_IS_INTERACTIVE = false;
+/* The one context quit reads the interactive state and the memory-report flag
+   from. A pointer rather than mirrored globals keeps the state on the context,
+   and a null pointer, the state before the context exists, reads as a
+   non-interactive shell with the report off. */
+static const EvalContext *QUIT_CONTEXT = nullptr;
 
-fn set_shell_is_interactive(bool is_interactive) wontthrow -> void
+fn set_quit_context(const EvalContext *context) wontthrow -> void
 {
-  SHELL_IS_INTERACTIVE = is_interactive;
+  QUIT_CONTEXT = context;
+}
+
+/* The granular memory report, the live bump bytes and the reserved capacity of
+   each arena, then the malloc heap in use. The arena capacity counts the blocks
+   the bump allocator holds, while the heap figure counts the String buffers and
+   other long-lived allocations the arenas do not own. */
+cold fn print_memory_report() wontthrow -> void
+{
+  if (AST_ARENA != nullptr)
+    std::fprintf(stderr, "AST arena: used %zu, reserved %zu, blocks %zu\n",
+                 AST_ARENA->bytes_used(), AST_ARENA->bytes_capacity(),
+                 AST_ARENA->block_count());
+  if (FUNCTION_ARENA != nullptr)
+    std::fprintf(stderr, "Function arena: used %zu, reserved %zu, blocks %zu\n",
+                 FUNCTION_ARENA->bytes_used(), FUNCTION_ARENA->bytes_capacity(),
+                 FUNCTION_ARENA->block_count());
+#if defined(__GLIBC__)
+  const struct mallinfo2 info = mallinfo2();
+  std::fprintf(stderr,
+               "Malloc heap: in use %zu, total arena %zu, mmapped %zu\n",
+               static_cast<usize>(info.uordblks),
+               static_cast<usize>(info.arena), static_cast<usize>(info.hblkhd));
+#endif
 }
 
 [[noreturn]] fn quit(i32 code, bool should_goodbye) throws -> void
 {
+  if (QUIT_CONTEXT != nullptr && QUIT_CONTEXT->memory_stats_enabled())
+    print_memory_report();
+
   const u8 actual_code = static_cast<u8>(code);
 
   if (!os::is_child_process()) {
@@ -951,7 +985,9 @@ fn set_shell_is_interactive(bool is_interactive) wontthrow -> void
       }
     }
 
-    if (should_goodbye && SHELL_IS_INTERACTIVE) {
+    if (should_goodbye && QUIT_CONTEXT != nullptr &&
+        QUIT_CONTEXT->shell_is_interactive())
+    {
       String code_str{};
       if (code != 0) {
         code_str += " (Code ";

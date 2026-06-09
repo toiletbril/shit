@@ -145,6 +145,29 @@ public:
     m_capacity = new_capacity;
   }
 
+  /* Release the reserved slots past the current length. A list built once and
+     then left alone keeps the growth overshoot for its whole lifetime, which a
+     long-lived arena never reclaims, so a one-time builder calls this to hand
+     the slack back. */
+  void shrink_to_fit()
+  {
+    if (m_length == m_capacity) return;
+    if (m_length == 0) {
+      if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
+      m_data = nullptr;
+      m_capacity = 0;
+      return;
+    }
+    T *fresh = m_allocator.alloc_array<T>(m_length);
+    for (usize i = 0; i < m_length; i++) {
+      new (&fresh[i]) T(steal(m_data[i]));
+      m_data[i].~T();
+    }
+    m_allocator.free_array(m_data, m_capacity);
+    m_data = fresh;
+    m_capacity = m_length;
+  }
+
 private:
   void destroy_all()
   {

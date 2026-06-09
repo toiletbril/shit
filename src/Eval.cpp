@@ -142,7 +142,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   /* A read-only variable rejects the assignment. The common case has no
      read-only names, so the scan is skipped entirely. */
   if (is_readonly(name))
-    throw Error{"'" + name + "' is read only and cannot be assigned"};
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
 
   assign_variable(name, value);
 }
@@ -152,7 +152,7 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   /* A read-only variable rejects removal the same way it rejects assignment,
      so unset cannot defeat readonly. */
   if (is_readonly(name))
-    throw Error{"'" + name + "' is read only and cannot be unset"};
+    throw Error{"Unable to unset '" + name + "' because it is read only"};
 
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
@@ -162,7 +162,7 @@ fn EvalContext::set_indexed_array(StringView name,
                                   ArrayList<String> values) throws -> void
 {
   if (is_readonly(name))
-    throw Error{"'" + name + "' is read only and cannot be assigned"};
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
   /* The scalar entry is dropped so a $name read falls through to element zero
      the way bash treats $a as ${a[0]}. */
   m_shell_variables.erase(name);
@@ -178,7 +178,7 @@ fn EvalContext::append_indexed_array(StringView name,
      bypasses it. */
   if (let *existing = m_indexed_arrays.find(name)) {
     if (is_readonly(name))
-      throw Error{"'" + name + "' is read only and cannot be assigned"};
+      throw Error{"Unable to assign '" + name + "' because it is read only"};
     m_shell_variables.erase(name);
     for (String &element : values)
       existing->push(steal(element));
@@ -204,7 +204,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
      in-place path bypasses it. */
   if (let *existing = m_indexed_arrays.find(name)) {
     if (is_readonly(name))
-      throw Error{"'" + name + "' is read only and cannot be assigned"};
+      throw Error{"Unable to assign '" + name + "' because it is read only"};
     m_shell_variables.erase(name);
     while (existing->count() <= index)
       existing->push(String{heap_allocator()});
@@ -259,7 +259,9 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     if (let const *array = lookup_indexed_array(name))
       index += static_cast<i64>(array->count());
   }
-  if (index < 0) throw Error{name + ": bad array subscript"};
+  if (index < 0)
+    throw Error{"Unable to index '" + name +
+                "' because the array subscript is invalid"};
 
   String element{heap_allocator(), value};
   if (is_append) {
@@ -661,6 +663,16 @@ fn EvalContext::variable_names() const throws -> HashSet
     unused(value);
     names.add(name);
   });
+  /* An indexed or associative array is a set variable too, so its name joins
+     the scalar names. A reference such as $arr reads element zero, so
+     completion and the unset-variable highlight both treat the array as
+     present. */
+  m_indexed_arrays.for_each(
+      [&](StringView name, const ArrayList<String> &value) {
+        unused(value);
+        names.add(name);
+      });
+  m_associative_names.for_each([&](StringView name) { names.add(name); });
   return names;
 }
 
@@ -1390,7 +1402,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
      the mask the worker fills is discarded here. The default word keeps a
      backslash that sits before an ordinary character, so the pattern-only
      unescape stays off. */
-  let discarded_mask = ArrayList<bool>{heap_allocator()};
+  let discarded_mask = ArrayList<bool>{scratch_allocator()};
   return expand_modifier_word_worker(word, discarded_mask, remove_quotes,
                                      false);
 }
@@ -1626,7 +1638,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          body, obeys set -u the same way a top level reference does, so an unset
          name here aborts rather than expanding to nothing. */
       if (m_error_unset && !get_variable_value(name).has_value())
-        throw Error{name + ": parameter not set"};
+        throw Error{"Unable to expand '" + name +
+                    "' because the parameter is not set"};
       emit_run(expand_variable(name), !in_double_quote);
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
@@ -1712,7 +1725,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
     {
       let const special_name = StringView{&next, 1};
       if (m_error_unset && !get_variable_value(special_name).has_value())
-        throw Error{special_name + ": parameter not set"};
+        throw Error{"Unable to expand '" + special_name +
+                    "' because the parameter is not set"};
       emit_run(expand_variable(special_name), !in_double_quote);
       i++;
     } else {
@@ -1768,7 +1782,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
     let const value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
-      throw Error{name + ": parameter not set"};
+      throw Error{"Unable to expand '" + name +
+                  "' because the parameter is not set"};
     return String{heap_allocator(),
                   utils::uint_to_text(value.value_or(String{}).length())};
   }
@@ -1808,7 +1823,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
        while a form with a modifier such as ${x:-w} handles the unset case
        itself. */
     if (m_error_unset && !get_variable_value(name).has_value())
-      throw Error{name + ": parameter not set"};
+      throw Error{"Unable to expand '" + name +
+                  "' because the parameter is not set"};
     return expand_variable(name);
   }
 
@@ -1869,7 +1885,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     return expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {
-      if (word.is_empty()) throw Error{name + ": parameter not set or empty"};
+      if (word.is_empty())
+        throw Error{"Unable to expand '" + name +
+                    "' because the parameter is not set or is empty"};
       throw Error{expand_modifier_word(word)};
     }
     ASSERT(current.has_value());
@@ -1926,7 +1944,8 @@ fn EvalContext::apply_substring_expansion(StringView name,
 {
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
-    throw Error{name + ": parameter not set"};
+    throw Error{"Unable to expand '" + name +
+                "' because the parameter is not set"};
   let const value = current.value_or(String{});
   const i64 value_length = static_cast<i64>(value.length());
 
@@ -2009,7 +2028,8 @@ fn EvalContext::apply_pattern_replacement(StringView name,
 {
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
-    throw Error{name + ": parameter not set"};
+    throw Error{"Unable to expand '" + name +
+                "' because the parameter is not set"};
   let const value = current.value_or(String{});
 
   /* The spec opens with the slash operator. A doubled slash replaces every
@@ -2113,7 +2133,8 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
 {
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
-    throw Error{name + ": parameter not set"};
+    throw Error{"Unable to expand '" + name +
+                "' because the parameter is not set"};
   let const value = current.value_or(String{});
 
   const char op = spec[0];
@@ -2269,11 +2290,14 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
      expands that variable. */
   const Maybe<String> target = get_variable_value(body);
   if (!target.has_value()) {
-    if (m_error_unset) throw Error{body + ": parameter not set"};
+    if (m_error_unset)
+      throw Error{"Unable to expand '" + body +
+                  "' because the parameter is not set"};
     return String{heap_allocator()};
   }
   if (m_error_unset && !get_variable_value(target->view()).has_value())
-    throw Error{*target + ": parameter not set"};
+    throw Error{"Unable to expand '" + *target +
+                "' because the parameter is not set"};
   return expand_variable(target->view());
 }
 
@@ -2372,7 +2396,7 @@ struct ConditionalEvaluator
      as active so an unquoted pattern globs the way [[ == does. */
   bool glob_equal(StringView value, StringView pattern) throws
   {
-    let active = ArrayList<bool>{heap_allocator()};
+    let active = ArrayList<bool>{cxt.scratch_allocator()};
     for (usize i = 0; i < pattern.length; i++)
       active.push(pattern[i] == '*' || pattern[i] == '?' || pattern[i] == '[');
     return utils::glob_matches(pattern, value, active, 0,
@@ -4571,24 +4595,35 @@ fn find_brace_group(StringView text) throws -> Maybe<brace_group>
   return None;
 }
 
+/* The deepest brace nesting expanded before the recursion is cut, so a
+   pathological input such as {a,{b,{c,...}}} cannot overflow the native stack.
+   The cap matches the globstar one for one consistent bound on user-driven
+   recursion. */
+constexpr usize MAX_BRACE_DEPTH = 256;
+
 /* Expand the brace structure in a template string, leaving any opaque marker
    untouched. The recursion handles a nested group inside an alternative and a
-   further group after the close, so the result is the cartesian product. */
-fn brace_expand_text(StringView text) throws -> ArrayList<String>
+   further group after the close, so the result is the cartesian product. A
+   nesting past the cap leaves the remaining text literal rather than recursing
+   further, the way a runaway expansion is bounded instead of crashing. */
+fn brace_expand_text(StringView text, usize depth = 0) throws
+    -> ArrayList<String>
 {
   let results = ArrayList<String>{heap_allocator()};
   let const group = find_brace_group(text);
-  if (!group.has_value()) {
+  if (!group.has_value() || depth >= MAX_BRACE_DEPTH) {
     results.push(String{heap_allocator(), text});
     return results;
   }
 
   const StringView preamble = text.substring_of_length(0, group->open);
   const StringView postamble = text.substring(group->close + 1);
-  let const post_expansions = brace_expand_text(postamble);
+  let const post_expansions = brace_expand_text(postamble, depth + 1);
 
   for (const String &alternative : group->alternatives) {
-    for (const String &expanded_alt : brace_expand_text(alternative.view())) {
+    for (const String &expanded_alt :
+         brace_expand_text(alternative.view(), depth + 1))
+    {
       for (const String &expanded_post : post_expansions) {
         let combined = String{heap_allocator(), preamble};
         combined.append(expanded_alt.view());

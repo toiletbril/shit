@@ -284,6 +284,11 @@ pure fn Assignment::value_word() const wontthrow -> const Word &
 WordToken::WordToken(SourceLocation location, Word word)
     : Value(location, ""), m_word(steal(word))
 {
+  /* The segment list over-reserves while the word is lexed, so the slack is
+     handed back once the word is final. The token may live in the function
+     arena that never resets, where the reserved slots would otherwise stay
+     allocated for the whole session. */
+  m_word.segments.shrink_to_fit();
   m_value = m_word.to_literal_string();
 }
 

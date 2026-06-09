@@ -102,6 +102,13 @@ CXXFLAGS += \
 # libsupc++ for the exception runtime, since the shell carries its own
 # containers. Windows clang has no libsupc++, so the drop stays POSIX-only.
 ifneq ($(OS), Windows_NT)
+# Plain -static rather than -static-pie. The static PIE form gives the loader
+# address-space randomization, but glibc's static-PIE startup lowers
+# RLIMIT_CORE to one byte, which makes ulimit -c report 0 and disables core
+# dumps, a shell-visible regression that broke dash parity. A dynamic -pie
+# keeps the limit but pays the dynamic linker on every startup, which the speed
+# goal forbids, so the correct ulimit and the fast static startup win over the
+# randomization here.
 CXXFLAGS += \
 	-static \
 	-nostdlib++
@@ -177,8 +184,10 @@ CXXFLAGS += \
 endif
 
 # Making objects in o/$MODE/<...>.o. -MMD writes the header dependency
-# list next to each object, and -MP guards against a removed header.
-o/$(MODE)/%.o: %.cpp
+# list next to each object, and -MP guards against a removed header. The
+# Makefile is a prerequisite so a change to the flags, such as the link mode,
+# forces a recompile rather than relinking stale objects built with old flags.
+o/$(MODE)/%.o: %.cpp Makefile
 	printf "\t%-42s $@\n" $<
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
 

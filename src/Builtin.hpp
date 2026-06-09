@@ -43,6 +43,7 @@ public:
     Exec,
     Type,
     CommandBuiltin,
+    BuiltinBuiltin,
     Readonly,
     Local,
     Declare,
@@ -106,6 +107,7 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("exec"),      Builtin::Kind::Exec          },
     {PackedStringKey::from_literal("type"),      Builtin::Kind::Type          },
     {PackedStringKey::from_literal("command"),   Builtin::Kind::CommandBuiltin},
+    {PackedStringKey::from_literal("builtin"),   Builtin::Kind::BuiltinBuiltin},
     {PackedStringKey::from_literal("readonly"),  Builtin::Kind::Readonly      },
     {PackedStringKey::from_literal("local"),     Builtin::Kind::Local         },
     {PackedStringKey::from_literal("declare"),   Builtin::Kind::Declare       },
@@ -165,6 +167,7 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Exec);                                                                \
   B_CASE(Type);                                                                \
   B_CASE(CommandBuiltin);                                                      \
+  B_CASE(BuiltinBuiltin);                                                      \
   B_CASE(Readonly);                                                            \
   B_CASE(Local);                                                               \
   B_CASE(Declare);                                                             \
@@ -220,6 +223,7 @@ BUILTIN_STRUCT(Trap);
 BUILTIN_STRUCT(Exec);
 BUILTIN_STRUCT(Type);
 BUILTIN_STRUCT(CommandBuiltin);
+BUILTIN_STRUCT(BuiltinBuiltin);
 BUILTIN_STRUCT(Readonly);
 BUILTIN_STRUCT(Local);
 BUILTIN_STRUCT(Declare);

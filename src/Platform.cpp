@@ -142,6 +142,8 @@ fn close_shell_fd(i32 shell_fd) wontthrow -> bool
   return close(shell_fd) != -1;
 }
 
+static fn passwd_field(StringView line, usize index) wontthrow -> StringView;
+
 fn get_current_user() throws -> Maybe<String>
 {
   /* The name comes from the environment rather than getpwuid, which a static
@@ -151,6 +153,24 @@ fn get_current_user() throws -> Maybe<String>
     return String{StringView{name}};
   if (const char *name = std::getenv("USER"); name != nullptr)
     return String{StringView{name}};
+
+  /* A container that exports neither leaves the environment bare, so the name
+     is read from /etc/passwd by the current uid, the same direct read
+     get_home_for_user uses. getuid is a plain syscall, so the static build
+     stays free of the NSS modules getpwuid would pull in. */
+  let const contents = utils::read_entire_file("/etc/passwd");
+  if (!contents) return shit::None;
+  let const wanted_uid = utils::uint_to_text(static_cast<u64>(getuid()));
+  let const text = contents->view();
+  usize line_start = 0;
+  for (usize i = 0; i <= text.length; i++) {
+    if (i != text.length && text[i] != '\n') continue;
+    let const line = text.substring_of_length(line_start, i - line_start);
+    line_start = i + 1;
+    if (passwd_field(line, 2) != wanted_uid.view()) continue;
+    let const name = passwd_field(line, 0);
+    if (!name.is_empty()) return String{name};
+  }
   return shit::None;
 }
 
@@ -579,6 +599,10 @@ fn join_thread(thread t) wontthrow -> void { pthread_join(t.handle, nullptr); }
 fn open_file_descriptor(StringView path, file_open_mode mode) throws
     -> Maybe<descriptor>
 {
+  /* The descriptor is left inheritable rather than O_CLOEXEC, since a
+     redirection such as exec 3>file keeps the descriptor open across an exec
+     for a later command to write, and the high-descriptor redirection suite
+     relies on it. */
   int flags = 0;
   switch (mode) {
   case file_open_mode::Truncate: flags = O_WRONLY | O_CREAT | O_TRUNC; break;

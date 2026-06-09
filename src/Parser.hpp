@@ -119,6 +119,11 @@ private:
   mustuse fn parse_command_list(
       std::initializer_list<Token::Kind> terminators) throws -> Expression *;
 
+  /* A do-group body cannot be empty, the way dash and bash both reject a loop
+     with nothing between 'do' and 'done'. The caret points at the terminator
+     the empty list stopped on. */
+  fn reject_empty_loop_body(const Expression *body) throws -> void;
+
   mustuse fn parse_if() throws -> Command *;
   mustuse fn parse_while_or_until(bool is_until) throws -> Command *;
   mustuse fn parse_for() throws -> Command *;
@@ -133,6 +138,11 @@ private:
       -> Command *;
   mustuse fn parse_conditional_command() throws -> Command *;
   mustuse fn parse_function_definition(Token *name_token) throws -> Command *;
+
+  /* Parse the bash 'function NAME [()] body' form after the function keyword
+     was consumed. The parentheses are optional in this form, unlike the POSIX
+     'NAME()' form parse_function_definition handles. */
+  mustuse fn parse_keyword_function_definition() throws -> Command *;
 
   /* Consume a bash array assignment group NAME=(...) or NAME+=(...) and return
      its element tokens. Bash mode expands them into the array, POSIX mode
