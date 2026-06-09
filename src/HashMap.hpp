@@ -190,7 +190,7 @@ private:
       if (slot.state == slot::Empty) {
         usize target = first_tombstone != m_capacity ? first_tombstone : i;
         if (first_tombstone != m_capacity) m_tombstones--;
-        place(target, key, steal(value));
+        place(target, key, wanted, steal(value));
         return;
       }
       if (slot.state == slot::Tombstone && first_tombstone == m_capacity)
@@ -202,15 +202,18 @@ private:
        this, but reuse a found tombstone rather than lose the insertion. */
     if (first_tombstone != m_capacity) {
       m_tombstones--;
-      place(first_tombstone, key, steal(value));
+      place(first_tombstone, key, wanted, steal(value));
     }
   }
 
-  void place(usize index, StringView key, Value value)
+  /* The caller already computed the packed key for its probe, so it is passed in
+     rather than recomputed from the key bytes here. */
+  void place(usize index, StringView key, const PackedStringKey &packed,
+             Value value)
   {
     slot &slot = m_slots[index];
     slot.key = String{m_allocator, key};
-    slot.packed = PackedStringKey::from_view(key);
+    slot.packed = packed;
     slot.value = steal(value);
     slot.state = slot::Occupied;
     m_count++;

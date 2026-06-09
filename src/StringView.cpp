@@ -15,9 +15,13 @@ fn StringView::operator==(StringView other) const wontthrow -> bool
 
 fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
 {
-  for (usize i = 0; i < length; i++)
-    if (data[i] == wanted) return i;
-  return None;
+  if (length == 0) return None;
+  /* memchr is vectorized in libc, so a single-byte scan beats a per-byte loop
+     on a long line, and the guard keeps a null data pointer out of it. */
+  let const found =
+      std::memchr(data, static_cast<unsigned char>(wanted), length);
+  if (found == nullptr) return None;
+  return static_cast<usize>(static_cast<const char *>(found) - data);
 }
 
 fn StringView::substring(usize start) const wontthrow -> StringView

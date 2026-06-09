@@ -148,8 +148,22 @@ fn String::find_substring(StringView needle, usize from) const wontthrow
 {
   if (needle.length == 0) return from <= m_length ? Maybe<usize>{from} : None;
   if (needle.length > m_length) return None;
-  for (let i = from; i + needle.length <= m_length; i++)
-    if (std::memcmp(m_data + i, needle.data, needle.length) == 0) return i;
+  /* memchr finds each candidate first byte with a vectorized scan and memcmp
+     confirms the rest, which skips the bulk of the per-position compares. The
+     scan is bounded so a first byte never lands where the needle would overrun
+     the end. */
+  let i = from;
+  while (i + needle.length <= m_length) {
+    let const scan_length = m_length - needle.length - i + 1;
+    let const found = std::memchr(
+        m_data + i, static_cast<unsigned char>(needle.data[0]), scan_length);
+    if (found == nullptr) return None;
+    let const candidate =
+        static_cast<usize>(static_cast<const char *>(found) - m_data);
+    if (std::memcmp(m_data + candidate, needle.data, needle.length) == 0)
+      return candidate;
+    i = candidate + 1;
+  }
   return None;
 }
 
