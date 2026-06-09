@@ -1,0 +1,314 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_b_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_b_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_a_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_a_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "member_close_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "member_close_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "member_x_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "member_x_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "member_y_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "member_y_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_member_a_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_member_a_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_member_close_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_member_close_miss"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_member_x_hit"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neg_member_x_miss"]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!a]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_b_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_b_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!a]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_a_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_a_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[]x]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "member_close_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "member_close_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[]x]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "member_x_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "member_x_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[]x]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "member_y_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "member_y_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!]x]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_member_a_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_member_a_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!]x]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_member_close_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_member_close_miss"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "[!]x]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_member_x_hit"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neg_member_x_miss"
+]
+[Word
+  Unquoted "esac"
+]
+neg_b_hit
+neg_a_miss
+member_close_hit
+member_x_hit
+member_y_miss
+neg_member_a_hit
+neg_member_close_miss
+neg_member_x_miss
+[Code 0]

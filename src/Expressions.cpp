@@ -228,12 +228,20 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
       continue;
     }
 
-    /* A leading '^' negates the class and a ']' right after '[' or '[^' is a
-       member, so the search for the closing ']' starts past both, matching the
-       matcher's prescan. */
-    if (scan < bytes.count() && bytes[scan].ch == '^') scan++;
-    if (scan < bytes.count() && bytes[scan].ch == ']') scan++;
+    /* A leading '!' or '^' negates the class, mirroring the matcher which skips
+       either one before it scans for the closing ']'. The prepass skipped only
+       '^' before, so it rejected a form the matcher accepts. */
+    if (scan < bytes.count() &&
+        (bytes[scan].ch == '!' || bytes[scan].ch == '^'))
+      scan++;
 
+    /* The matcher treats a ']' right after '[' or '[^' as a member, then, when
+       no further ']' closes the class, falls back to a literal '[' rather than
+       throwing. The prepass keeps that leading ']' in view rather than skipping
+       past it, so it both opens and closes the degenerate class and [^] and [!]
+       are accepted the way the matcher accepts them. A '[' with no reachable ']'
+       at all, such as [abc, stays the unterminated class the matcher's caller
+       rejects. */
     bool has_closing_bracket = false;
     for (; scan < bytes.count(); scan++) {
       if (bytes[scan].ch == ']') {
