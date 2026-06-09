@@ -12,8 +12,9 @@ class BumpArena;
 
 /* A heredoc whose body is collected when the line that introduced it ends. The
    body buffer has a stable address, so a parsed redirection points at it and
-   reads it once the lexer fills it. The body is a heap String the lexer owns,
-   and a parsed Redirection field holds a pointer into one. */
+   reads it once the lexer fills it. The body is a String allocated in the
+   lexer's arena, so it outlives the lexer and matches the lifetime of the parsed
+   nodes that point at it. */
 struct heredoc_pending
 {
   String delimiter;
@@ -46,9 +47,9 @@ public:
         Maybe<StringView> filename = None);
   ~Lexer();
 
-  /* The lexer owns the heap-allocated heredoc bodies, so a copy would double
-     free them. Moving transfers the pointer array and leaves the source empty,
-     and the copy is deleted so an accidental copy fails to compile. */
+  /* A lexer holds the pending-heredoc state and the source, so a copy would
+     duplicate that state. Moving transfers it and leaves the source empty, and
+     the copy is deleted so an accidental copy fails to compile. */
   Lexer(Lexer &&) = default;
   Lexer &operator=(Lexer &&) = default;
   Lexer(const Lexer &) = delete;
@@ -68,8 +69,9 @@ public:
   fn advance_past_last_peek() throws -> usize;
 
   /* Reserve a heredoc body for the given delimiter, returning the stable buffer
-     the lexer fills when the current line ends. The buffer is a heap String the
-     Eval layer reads through the parsed Redirection field that points at it. */
+     the lexer fills when the current line ends. The buffer is an arena String
+     the Eval layer reads through the parsed Redirection field that points at
+     it. */
   fn register_heredoc(StringView delimiter, bool strip_tabs) throws
       -> const String *;
 
@@ -101,10 +103,9 @@ protected:
   /* Heredoc bodies are filled once the line ends, so the last shell token kind
      is tracked to detect that the consumed token was a newline. */
   bool m_last_shell_token_was_newline{false};
-  /* Each body is heap-allocated so its address is stable. A parsed redirection
-     holds a pointer into one, and the pointer must stay valid while the array
-     of pointers grows. The lexer frees them in its destructor. */
-  ArrayList<String *> m_heredoc_bodies{heap_allocator()};
+  /* Each body is allocated in the arena, so its address is stable and it
+     outlives the lexer. A parsed redirection holds a pointer into one, and the
+     arena reclaims the body when it reclaims the nodes that point at it. */
   ArrayList<heredoc_pending> m_pending_heredocs{heap_allocator()};
   fn collect_pending_heredocs() throws -> void;
 

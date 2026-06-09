@@ -1,0 +1,100 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=$(cat <<EOF
+body
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign y=$(cat <<EOF
+first line
+second line
+third line
+EOF
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$y"]
+  [CompoundListCondition, None]
+    [ForLoop "i"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign z=$(cat <<EOF
+iteration $i
+EOF
+)]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$z"]
+[Word
+  Unquoted "x="
+  CommandSubstitution "cat <<EOF
+body
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "y="
+  CommandSubstitution "cat <<EOF
+first line
+second line
+third line
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "y"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "z="
+  CommandSubstitution "cat <<EOF
+iteration $i
+EOF
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "z"
+]
+[Word
+  Unquoted "done"
+]
+body
+first line
+second line
+third line
+iteration 1
+iteration 2
+iteration 3
+[Code 0]

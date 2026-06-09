@@ -140,11 +140,7 @@ Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
       m_should_collect_debug_words(should_collect_debug_words)
 {}
 
-Lexer::~Lexer()
-{
-  for (String *body : m_heredoc_bodies)
-    delete body;
-}
+Lexer::~Lexer() = default;
 
 flatten fn Lexer::peek_expression_token() throws -> Token *
 {
@@ -216,10 +212,13 @@ hot fn Lexer::advance_past_last_peek() throws -> usize
 cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
     -> const String *
 {
-  let body = new String{};
+  /* The body lives in the same arena as the parsed nodes that point at it, so
+     its lifetime matches the AST. A command substitution caches its parsed tree
+     past the temporary lexer that built it, and a lexer-owned heap body freed in
+     ~Lexer would dangle behind the cached Redirection. */
+  let body = m_arena->create<String>();
   ASSERT(body != nullptr);
 
-  m_heredoc_bodies.push(body);
   m_pending_heredocs.push({String{delimiter}, strip_tabs, body});
 
   return body;
