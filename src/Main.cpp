@@ -44,11 +44,17 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
 FLAG(NO_EXEC, Bool, 'n', "no-exec",
      "Read and parse commands but do not run them.");
 FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
-FLAG(BASH_COMPATIBLE, Bool, 'P', "bash-compatible",
-     "Make the shell Bash and POSIX compatible. The analysis stage is skipped "
-     "so "
-     "a file with an analysis error still runs, an unmatched glob stays its "
-     "literal pattern, and the style warnings are off.");
+/* The variable is POSIX_MODE rather than POSIX, since Platform.hpp defines
+   POSIX as a platform-vector macro that would eat the flag name. */
+FLAG(
+    POSIX_MODE, Bool, 'P', "posix",
+    "Run in POSIX mode, the way dash behaves. The analysis stage is skipped so "
+    "a file with an analysis error still runs, an unmatched glob stays its "
+    "literal pattern, and the style warnings are off.");
+FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible",
+     "Run in Bash-compatible mode. Bash extensions such as [[ ]], arrays, and "
+     "brace expansion are enabled, the analysis stage is skipped, and an "
+     "unmatched glob stays its literal pattern.");
 FLAG(WARNINGS, Bool, 'W', "warnings",
      "Keep the analysis stage but report every error as a warning and let the "
      "run proceed, instead of stopping on the first error.");
@@ -91,18 +97,40 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
 
 namespace shit {
 
-/* Set when the shell is invoked through a name whose basename is sh, bash, or
-   dash, the way a system ln -s shit sh does. bash and zsh switch to their POSIX
-   modes when run as sh, so the shell does the same and a script that names it
-   after a system shell runs compatibility-clean. */
-static bool INVOKED_AS_COMPAT_SHELL = false;
+/* Set when the shell is invoked through a name whose basename is sh or dash,
+   the way a system ln -s shit sh does. A script that names the shell after a
+   system POSIX shell then runs compatibility-clean, the way bash run as sh
+   switches to its POSIX mode. */
+static bool INVOKED_AS_POSIX_SHELL = false;
 
-/* True when POSIX behavior is in effect, either from --bash-compatible or from
-   the sh invocation name. The failglob default and the style-warning
-   suppression both read it. */
+/* Set when the basename is bash, so a script that names the shell bash gets the
+   bash extensions the way real bash does. The invocation name splits here, sh
+   and dash select POSIX mode while bash selects bash mode. */
+static bool INVOKED_AS_BASH = false;
+
+/* True when POSIX behavior is in effect, from --posix or the sh invocation
+   name. The failglob default, the analysis skip, and the style-warning
+   suppression all read it. */
 pure static fn should_run_in_posix_mode() wontthrow -> bool
 {
-  return FLAG_BASH_COMPATIBLE.is_enabled() || INVOKED_AS_COMPAT_SHELL;
+  return FLAG_POSIX_MODE.is_enabled() || INVOKED_AS_POSIX_SHELL;
+}
+
+/* True when bash behavior is in effect, from --bash-compatible or the bash
+   invocation name. Like POSIX mode it skips the analysis stage and leaves an
+   unmatched glob literal, and it additionally enables the bash extensions. */
+pure static fn should_run_in_bash_mode() wontthrow -> bool
+{
+  return FLAG_BASH_COMPATIBLE.is_enabled() || INVOKED_AS_BASH;
+}
+
+/* True in either compatibility mode, POSIX or bash. Both skip the analysis
+   stage and leave an unmatched glob literal, the way dash and bash do, so the
+   analysis gate and the failglob default read this rather than spelling out the
+   pair. */
+pure static fn should_run_in_compat_mode() wontthrow -> bool
+{
+  return should_run_in_posix_mode() || should_run_in_bash_mode();
 }
 
 /* Print the help or version text and return the exit code when one of those
@@ -239,17 +267,16 @@ static fn run_script_contents(const String &script_contents,
       }
     }
 
-    /* Validate the whole tree before running anything. An unconditional
-       problem stops execution, a conditional one only warns. Suppressing
-       diagnostics skips the whole stage, so the tree runs without validation or
-       constant folding and the prompt reaches evaluation sooner. */
-    /* The analysis runs by default and a found error stops the run, so a script
-       with a command that cannot resolve does not half-run. --bash-compatible,
-       which the sh invocation name also sets, skips the whole stage so the file
-       runs the way bash does. -W keeps the stage but reports every error as a
-       warning and lets the run proceed. --no-diagnostics skips it too. */
+    /* Validate the whole tree before running anything. An unconditional problem
+       stops execution and a conditional one only warns. POSIX mode and bash
+       mode both skip the whole stage, since neither dash nor bash runs a
+       shellcheck pass, so the tree runs without validation or constant folding
+       and the prompt reaches evaluation sooner. -W forces the stage back on in
+       either mode and reports every error as a warning, and --no-diagnostics
+       always skips it. The default mode keeps the analysis, so the diagnostics
+       stay intact. */
     let const run_analysis =
-        (!should_run_in_posix_mode() || FLAG_WARNINGS.is_enabled()) &&
+        (!should_run_in_compat_mode() || FLAG_WARNINGS.is_enabled()) &&
         !FLAG_SUPPRESS_DIAGNOSTICS.is_enabled();
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
@@ -498,7 +525,7 @@ fn main(int argc, char **argv) -> int
      environment, so the prompt and the diagnostics stay plain on a dumb
      terminal. */
   if (FLAG_DUMB.is_enabled()) {
-    if (!FLAG_BASH_COMPATIBLE.is_enabled()) FLAG_BASH_COMPATIBLE.toggle();
+    if (!FLAG_POSIX_MODE.is_enabled()) FLAG_POSIX_MODE.toggle();
     if (!FLAG_NO_COMPLETION.is_enabled()) FLAG_NO_COMPLETION.toggle();
     if (!FLAG_SUPPRESS_DIAGNOSTICS.is_enabled())
       FLAG_SUPPRESS_DIAGNOSTICS.toggle();
@@ -525,15 +552,17 @@ fn main(int argc, char **argv) -> int
     program_path = "<unknown>";
   }
 
-  /* A basename of sh, bash, or dash selects compatibility mode, so a symlink
-     that names the shell after a system shell behaves like one. */
+  /* A basename of sh or dash selects POSIX mode and a basename of bash selects
+     bash mode, so a symlink that names the shell after a system shell behaves
+     like that shell. Real bash run as sh switches to POSIX, which the split
+     mirrors. */
   let const last_slash = program_path.find_last_character('/');
   let const program_basename = last_slash.has_value()
                                    ? program_path.substring(*last_slash + 1)
                                    : program_path.view();
-  shit::INVOKED_AS_COMPAT_SHELL = program_basename == "sh" ||
-                                  program_basename == "bash" ||
-                                  program_basename == "dash";
+  shit::INVOKED_AS_POSIX_SHELL =
+      program_basename == "sh" || program_basename == "dash";
+  shit::INVOKED_AS_BASH = program_basename == "bash";
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
@@ -643,7 +672,7 @@ fn main(int argc, char **argv) -> int
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
-  context.set_failglob(!shit::should_run_in_posix_mode());
+  context.set_failglob(!shit::should_run_in_compat_mode());
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);
@@ -766,9 +795,10 @@ fn main(int argc, char **argv) -> int
              completion callback and no ghost-text. */
           if (!FLAG_NO_COMPLETION.is_enabled())
             toiletline::enable_completion(context);
-          shit::show_message(shit::should_run_in_posix_mode()
-                                 ? "POSIX me harder!"
-                                 : "Welcome :3");
+          shit::show_message(
+              shit::should_run_in_posix_mode()  ? "POSIX me harder!"
+              : shit::should_run_in_bash_mode() ? "Bash me harder!"
+                                                : "Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
            * previosly! */

@@ -3027,8 +3027,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* An unquoted variable inside a test silently breaks when it is empty or
      splits into several words. This stays a warning even at the strict default,
-     since the split may be intended, and --bash-compatible skips the analysis
-     entirely so a POSIX script that relies on it runs quietly. */
+     since the split may be intended, and POSIX mode skips the analysis entirely
+     so a POSIX script that relies on it runs quietly. */
   if (command_literal == "[" || command_literal == "test" ||
       command_literal == "[[")
   {
@@ -3338,8 +3338,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
        a command that cannot resolve. After a dot, source, or eval the command
        may be defined by code the prepass cannot see, so it is only a warning
        there.
-       --bash-compatible skips the analysis, so the file runs and the runtime
-       resolution sets 127 per command the way bash does. */
+       POSIX mode skips the analysis, so the file runs and the runtime
+       resolution sets 127 per command the way dash does. */
     if (actx.saw_runtime_definer)
       actx.warn(m_args[0]->source_location(), message);
     else

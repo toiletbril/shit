@@ -28,8 +28,8 @@ public:
   /* The analysis runs by default and a found error is fatal, so a script with a
      command that cannot resolve does not run. -W keeps the analysis but reports
      every error as a warning and lets the run proceed, which this flag carries
-     into fail(). --bash-compatible skips the whole stage, so nothing here runs
-     at all and the file executes the way bash does. */
+     into fail(). POSIX mode and bash mode skip the whole stage, so nothing here
+     runs at all and the file executes the way dash or bash does. */
   bool errors_are_warnings{false};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
      see, so a later unresolved command is a warning rather than a failure. */
