@@ -121,10 +121,10 @@ private:
   mustuse fn parse_conditional_command() throws -> Command *;
   mustuse fn parse_function_definition(Token *name_token) throws -> Command *;
 
-  /* A bash array assignment NAME=(...) or NAME+=(...) is unsupported in this
-     POSIX shell, so the balanced parenthesis group is consumed and the whole
-     assignment evaluates as a no-op rather than aborting the file. */
-  fn consume_bash_array_assignment() throws -> void;
+  /* Consume a bash array assignment group NAME=(...) or NAME+=(...) and return
+     its element tokens. Bash mode expands them into the array, POSIX mode
+     discards the list and evaluates the assignment as a no-op. */
+  fn consume_bash_array_assignment() throws -> ArrayList<const Token *>;
 
   mustuse fn parse_expression(u8 min_precedence = 0) throws -> Expression *;
 };

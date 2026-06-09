@@ -143,6 +143,45 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
     throw Error{"'" + name + "' is read only and cannot be unset"};
 
   force_unset_shell_variable(name);
+  m_indexed_arrays.erase(name);
+}
+
+fn EvalContext::set_indexed_array(StringView name,
+                                  ArrayList<String> values) throws -> void
+{
+  if (is_readonly(name))
+    throw Error{"'" + name + "' is read only and cannot be assigned"};
+  /* The scalar entry is dropped so a $name read falls through to element zero
+     the way bash treats $a as ${a[0]}. */
+  m_shell_variables.erase(name);
+  m_indexed_arrays.set(name, steal(values));
+}
+
+fn EvalContext::append_indexed_array(StringView name,
+                                     ArrayList<String> values) throws -> void
+{
+  let combined = ArrayList<String>{heap_allocator()};
+  if (let const *existing = m_indexed_arrays.find(name))
+    for (const String &element : *existing)
+      combined.push(String{heap_allocator(), element.view()});
+  for (String &element : values)
+    combined.push(steal(element));
+  set_indexed_array(name, steal(combined));
+}
+
+fn EvalContext::set_array_element(StringView name, usize index,
+                                  StringView value) throws -> void
+{
+  let elements = ArrayList<String>{heap_allocator()};
+  if (let const *existing = m_indexed_arrays.find(name))
+    for (const String &element : *existing)
+      elements.push(String{heap_allocator(), element.view()});
+  /* A write past the end pads the gap with empty elements, the way bash grows
+     an indexed array up to the assigned subscript. */
+  while (elements.count() <= index)
+    elements.push(String{heap_allocator()});
+  elements[index] = String{heap_allocator(), value};
+  set_indexed_array(name, steal(elements));
 }
 
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
@@ -251,6 +290,13 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   }
 
   if (let const *stored = m_shell_variables.find(name)) return *stored;
+
+  /* A read of an array name with no scalar yields element zero, the way bash
+     treats $a as ${a[0]}. An existing but empty array still reads as set. */
+  if (let const *array = m_indexed_arrays.find(name)) {
+    if (array->is_empty()) return String{};
+    return array->front();
+  }
 
   /* IFS is held live in m_field_separators rather than the store, so a read
      with no prior assignment must report the cached separators. The store
@@ -1532,6 +1578,21 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   let const name = spec.substring_of_length(0, name_end);
   let const rest = spec.substring(name_end);
+
+  /* ${name[subscript]} reads one element of an indexed array, or every element
+     when the subscript is @ or *. Only the plain form with nothing after the
+     ] is handled here, the modifier forms on an element are left for later. */
+  if (!rest.is_empty() && rest[0] == '[' && !name.is_empty() &&
+      lexer::is_variable_name_start(name[0]))
+  {
+    if (let const close = rest.find_character(']');
+        close.has_value() && *close + 1 == rest.length)
+    {
+      return apply_array_subscript(name,
+                                   rest.substring_of_length(1, *close - 1));
+    }
+  }
+
   if (rest.is_empty()) {
     /* Under set -u a plain reference to a variable that is not set is an error,
        while a form with a modifier such as ${x:-w} handles the unset case
@@ -1872,6 +1933,39 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
     out.push(c);
   }
   return out;
+}
+
+fn EvalContext::apply_array_subscript(StringView name,
+                                      StringView subscript) throws -> String
+{
+  const ArrayList<String> *array = lookup_indexed_array(name);
+
+  /* @ and * name the whole array, joined with a space. The single-string return
+     loses the per-element split of a quoted "${a[@]}", which is the same
+     limitation the positional "$@" has here. */
+  if (subscript == "@" || subscript == "*") {
+    if (array == nullptr) return get_variable_value(name).value_or(String{});
+    let out = String{heap_allocator()};
+    for (usize i = 0; i < array->count(); i++) {
+      if (i > 0) out.push(' ');
+      out.append((*array)[i].view());
+    }
+    return out;
+  }
+
+  /* An arithmetic subscript selects one element, with a negative index counting
+     from the end the way bash does. */
+  i64 index = evaluate_arithmetic(subscript);
+  if (array == nullptr) {
+    /* A scalar reads as a one-element array, so ${name[0]} is the value and any
+       other index is empty. */
+    if (index == 0) return get_variable_value(name).value_or(String{});
+    return String{heap_allocator()};
+  }
+  const i64 count = static_cast<i64>(array->count());
+  if (index < 0) index += count;
+  if (index < 0 || index >= count) return String{heap_allocator()};
+  return String{heap_allocator(), (*array)[static_cast<usize>(index)].view()};
 }
 
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String

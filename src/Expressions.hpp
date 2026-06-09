@@ -677,6 +677,30 @@ protected:
   const Expression *m_body;
 };
 
+/* A bash indexed-array assignment, NAME=(words) or the appending NAME+=(words).
+   The element words expand with field splitting and globbing at run time, the
+   way bash builds the array, then they are stored under the name. */
+class ArrayAssignCommand : public Command
+{
+public:
+  ArrayAssignCommand(SourceLocation location, StringView name,
+                     ArrayList<const Token *> elements, bool is_append);
+  ~ArrayAssignCommand() override;
+
+  fn to_string() const throws -> String override;
+  fn to_ast_string(usize layer = 0) const throws -> String override;
+
+  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
+  fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
+
+protected:
+  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  String m_name;
+  ArrayList<const Token *> m_elements{heap_allocator()};
+  bool m_is_append;
+};
+
 /* A compound command with trailing redirections, such as { cmd; } >file or
    (cmd) 2>&1. A compound command runs in the shell process, so the redirections
    are applied to the shell's own descriptors around the child and restored

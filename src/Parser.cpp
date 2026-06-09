@@ -897,16 +897,20 @@ hot fn Parser::parse_simple_command() throws -> Command *
       Token *next = m_lexer.peek_shell_token();
       ASSERT(next != nullptr);
 
-      /* NAME=(...) and NAME+=(...) are bash array assignments. The group is
-         consumed and the scalar assignment of the empty value word stands in,
-         so a login profile that uses one keeps sourcing instead of aborting on
-         the '('. The append form leaves NAME untouched and the plain form
-         clears it, which a scalar read of the array name mirrors. */
+      /* NAME=(...) and NAME+=(...) are bash array assignments. In bash mode the
+         element words are captured into an array assignment, otherwise the
+         group is consumed and a scalar assignment of the empty value word
+         stands in so a POSIX login profile that uses one keeps sourcing. */
       if (next->kind() == Token::Kind::LeftParen &&
           next->source_location().position ==
               a->source_location().position + a->source_location().length)
       {
-        consume_bash_array_assignment();
+        ArrayList<const Token *> elements = consume_bash_array_assignment();
+        if (m_bash_compatible) {
+          return m_lexer.arena().create<ArrayAssignCommand>(
+              *source_location, a->key().view(), steal(elements),
+              a->is_append());
+        }
         return m_lexer.arena().create<AssignCommand>(*source_location, a);
       }
 
@@ -1520,14 +1524,17 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
                                                     body);
 }
 
-fn Parser::consume_bash_array_assignment() throws -> void
+fn Parser::consume_bash_array_assignment() throws -> ArrayList<const Token *>
 {
   Token *open = m_lexer.next_shell_token();
   ASSERT(open != nullptr);
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
   /* The elements are arbitrary words and may nest further parens, so the depth
-     counter tracks the matching close rather than the first one. */
+     counter tracks the matching close rather than the first one. Every token
+     inside the outermost pair is kept so bash mode can expand them as the array
+     elements, while POSIX mode discards the list. */
+  ArrayList<const Token *> elements{};
   usize depth = 1;
   for (;;) {
     Token *t = m_lexer.next_shell_token();
@@ -1536,13 +1543,18 @@ fn Parser::consume_bash_array_assignment() throws -> void
       throw ErrorWithLocation{open->source_location(),
                               "Unterminated array assignment, expected ')'"};
     }
-    if (t->kind() == Token::Kind::LeftParen)
+    if (t->kind() == Token::Kind::LeftParen) {
       depth++;
-    else if (t->kind() == Token::Kind::RightParen) {
+      elements.push(t);
+    } else if (t->kind() == Token::Kind::RightParen) {
       depth--;
       if (depth == 0) break;
+      elements.push(t);
+    } else {
+      if (t->kind() != Token::Kind::Newline) elements.push(t);
     }
   }
+  return elements;
 }
 
 /* A standard pratt-parser for expressions. */

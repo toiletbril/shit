@@ -199,6 +199,21 @@ public:
   fn set_shell_variable(StringView name, StringView value) throws -> void;
   fn unset_shell_variable(StringView name) throws -> void;
 
+  /* The bash indexed arrays, a name to an ordered list of element strings. They
+     live beside the scalar variables, and a scalar read of an array name yields
+     element zero the way bash treats $a as ${a[0]}. */
+  fn set_indexed_array(StringView name, ArrayList<String> values) throws
+      -> void;
+  fn append_indexed_array(StringView name, ArrayList<String> values) throws
+      -> void;
+  fn set_array_element(StringView name, usize index, StringView value) throws
+      -> void;
+  pure fn lookup_indexed_array(StringView name) const wontthrow
+      -> const ArrayList<String> *
+  {
+    return m_indexed_arrays.find(name);
+  }
+
   /* Log a name's current process-environment value before a write that outlives
      the current statement, so a subshell restore can revert it. Called before
      an export or an allexport assignment writes the environment. Outside a
@@ -586,6 +601,7 @@ protected:
 
   BumpArena m_scratch_arena{};
   HashMap<String> m_shell_variables{heap_allocator()};
+  HashMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
   String m_field_separators{" \t\n"};
@@ -730,6 +746,12 @@ protected:
      first character and a doubled one touches every character, and an optional
      glob after the operator limits which characters are affected. */
   fn apply_case_modification(StringView name, StringView spec) throws -> String;
+
+  /* Expand the bash array element reference ${name[subscript]}. A subscript of
+     @ or * yields every element, an arithmetic subscript yields one, and a
+     negative index counts from the end. */
+  fn apply_array_subscript(StringView name, StringView subscript) throws
+      -> String;
 
   /* Expand the bash ${!body} form. When body ends with * or @ it lists the
      variable names that start with the prefix, sorted and space joined.

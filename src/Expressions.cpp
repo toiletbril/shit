@@ -2497,6 +2497,54 @@ cold fn CStyleForLoop::to_ast_string(usize layer) const throws -> String
          EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
 }
 
+ArrayAssignCommand::ArrayAssignCommand(SourceLocation location, StringView name,
+                                       ArrayList<const Token *> elements,
+                                       bool is_append)
+    : Command(location), m_name(name), m_elements(steal(elements)),
+      m_is_append(is_append)
+{}
+
+ArrayAssignCommand::~ArrayAssignCommand() = default;
+
+cold fn ArrayAssignCommand::to_string() const throws -> String
+{
+  return "ArrayAssignCommand";
+}
+
+cold fn ArrayAssignCommand::to_ast_string(usize layer) const throws -> String
+{
+  return indent_for_layer(layer) + "[" + to_string() + " " + m_name.view() +
+         (m_is_append ? "+=(...)" : "=(...)") + "]";
+}
+
+fn ArrayAssignCommand::redirect_to(usize d, String &f, bool duplicate) throws
+    -> void
+{
+  unused(d);
+  unused(f);
+  unused(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+fn ArrayAssignCommand::append_to(usize d, String &f, bool duplicate) throws
+    -> void
+{
+  redirect_to(d, f, duplicate);
+}
+
+fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  /* The elements expand the way command arguments do, with field splitting and
+     globbing, so a=( $list *.txt ) builds the array bash would. */
+  ArrayList<String> values = cxt.process_args(m_elements);
+  if (m_is_append)
+    cxt.append_indexed_array(m_name.view(), steal(values));
+  else
+    cxt.set_indexed_array(m_name.view(), steal(values));
+  cxt.set_last_exit_status(0);
+  return 0;
+}
+
 fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
