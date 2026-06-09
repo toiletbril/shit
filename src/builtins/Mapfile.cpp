@@ -37,18 +37,35 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   bool strip_newline = false;
   StringView array_name = "MAPFILE";
+  /* The maximum number of lines to read, where zero is bash's unlimited. */
+  i64 max_lines = 0;
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
-    if (arg == "-t")
+    if (arg == "-t") {
       strip_newline = true;
-    else if (!arg.is_empty() && arg[0] == '-')
+    } else if (arg == "-n") {
+      /* -n takes the count as the next argument. */
+      if (i + 1 < args.count()) {
+        if (let const count = utils::parse_decimal_integer(args[++i].view());
+            !count.is_error() && count.value() >= 0)
+          max_lines = count.value();
+      }
+    } else if (arg.length > 2 && arg[0] == '-' && arg[1] == 'n') {
+      /* The attached form -nN carries the count in the same argument. */
+      if (let const count =
+              utils::parse_decimal_integer(arg.substring(2));
+          !count.is_error() && count.value() >= 0)
+        max_lines = count.value();
+    } else if (!arg.is_empty() && arg[0] == '-') {
       continue;
-    else
+    } else {
       array_name = arg;
+    }
   }
 
   let lines = ArrayList<String>{heap_allocator()};
   for (;;) {
+    if (max_lines > 0 && static_cast<i64>(lines.count()) >= max_lines) break;
     bool was_newline_terminated = false;
     let const read = utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN),
                                               was_newline_terminated);
