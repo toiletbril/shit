@@ -22,9 +22,12 @@ jobs:
           sudo ./llvm.sh 18 all
           sudo ln -sf /usr/bin/lld-18    /usr/local/bin/lld
           sudo ln -sf /usr/bin/ld.lld-18 /usr/local/bin/ld.lld
-          sudo apt-get install -y zsh dash
+          sudo apt-get install -y zsh dash golang-go
+          go install mvdan.cc/sh/v3/cmd/gosh@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           clang++-18 --version
           ld.lld-18 --version
+          "$(go env GOPATH)/bin/gosh" -c 'echo gosh installed'
 
       - name: Build ASAN binary
         run: make shit
