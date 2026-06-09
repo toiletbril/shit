@@ -600,6 +600,18 @@ fn Parser::build_file_or_dup_redirection(
   out.push(redir);
 }
 
+/* The 2>&1 record that points the standard error at the standard output, the
+   dup both the &> redirection and the |& pipe stage build. */
+static fn stderr_to_stdout_dup() wontthrow -> expressions::Redirection
+{
+  expressions::Redirection dup{};
+  dup.fd = 2;
+  dup.target = nullptr;
+  dup.kind = expressions::Redirection::Kind::DuplicateOutput;
+  dup.dup_fd = 1;
+  return dup;
+}
+
 fn Parser::build_both_streams_redirection(
     bool append, SourceLocation op_location,
     Maybe<SourceLocation> &first_location,
@@ -610,13 +622,7 @@ fn Parser::build_both_streams_redirection(
   build_file_or_dup_redirection(
       1, append ? Token::Kind::DoubleGreater : Token::Kind::Greater,
       op_location, first_location, out);
-
-  expressions::Redirection dup{};
-  dup.fd = 2;
-  dup.target = nullptr;
-  dup.kind = expressions::Redirection::Kind::DuplicateOutput;
-  dup.dup_fd = 1;
-  out.push(dup);
+  out.push(stderr_to_stdout_dup());
 }
 
 fn Parser::build_here_string_redirection(
@@ -647,12 +653,7 @@ mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
 {
   ASSERT(command != nullptr);
   ArrayList<expressions::Redirection> redirections{};
-  expressions::Redirection dup{};
-  dup.fd = 2;
-  dup.target = nullptr;
-  dup.kind = expressions::Redirection::Kind::DuplicateOutput;
-  dup.dup_fd = 1;
-  redirections.push(dup);
+  redirections.push(stderr_to_stdout_dup());
   return m_lexer.arena().create<RedirectedCommand>(
       command->source_location(), command, steal(redirections));
 }

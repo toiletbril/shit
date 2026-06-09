@@ -92,6 +92,14 @@ public:
     return nullptr;
   }
 
+  /* The mutable value for the key, or nullptr when absent, so a caller can edit
+     a stored value in place without a copy-out then set. The pointer is stable
+     until the next set that grows the table. */
+  mustuse Value *find(StringView key)
+  {
+    return const_cast<Value *>(static_cast<const HashMap *>(this)->find(key));
+  }
+
   /* Store a value the table owns by move. */
   void set(StringView key, Value value) { set_value(key, steal(value)); }
 

@@ -29,6 +29,11 @@
 
 namespace shit {
 
+/* The largest subscript the dense indexed-array model accepts, since a write
+   pads every slot up to the index. A value past this would pad gigabytes, so it
+   is rejected rather than exhausting memory. */
+static constexpr usize MAX_DENSE_ARRAY_INDEX = 4 * 1024 * 1024;
+
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
                          bool should_error_exit, String shell_name,
@@ -167,24 +172,42 @@ fn EvalContext::set_indexed_array(StringView name,
 fn EvalContext::append_indexed_array(StringView name,
                                      ArrayList<String> values) throws -> void
 {
-  let combined = ArrayList<String>{heap_allocator()};
-  if (let const *existing = m_indexed_arrays.find(name))
-    for (const String &element : *existing)
-      combined.push(String{heap_allocator(), element.view()});
-  for (String &element : values)
-    combined.push(steal(element));
-  set_indexed_array(name, steal(combined));
+  /* An existing array grows in place, so appending element by element stays
+     linear rather than rebuilding the whole array on each call. */
+  if (let *existing = m_indexed_arrays.find(name)) {
+    for (String &element : values)
+      existing->push(steal(element));
+    return;
+  }
+  set_indexed_array(name, steal(values));
 }
 
 fn EvalContext::set_array_element(StringView name, usize index,
                                   StringView value) throws -> void
 {
+  /* The dense array model stores every slot up to the subscript, so a far
+     subscript is rejected rather than padding a huge gap into memory. bash
+     holds such an index sparsely, which this model does not. */
+  if (index > MAX_DENSE_ARRAY_INDEX) {
+    throw Error{"array subscript " + utils::uint_to_text(index) +
+                " is too large"};
+  }
+
+  /* An existing array is edited in place, so building one element at a time
+     stays linear rather than copying the whole array on each write. */
+  if (let *existing = m_indexed_arrays.find(name)) {
+    while (existing->count() <= index)
+      existing->push(String{heap_allocator()});
+    (*existing)[index] = String{heap_allocator(), value};
+    return;
+  }
+
+  /* A first write creates the array, which clears any same-named scalar so a
+     later $name reads element zero. A write past the end pads the gap with
+     empty elements, the way bash grows an indexed array up to the assigned
+     subscript.
+   */
   let elements = ArrayList<String>{heap_allocator()};
-  if (let const *existing = m_indexed_arrays.find(name))
-    for (const String &element : *existing)
-      elements.push(String{heap_allocator(), element.view()});
-  /* A write past the end pads the gap with empty elements, the way bash grows
-     an indexed array up to the assigned subscript. */
   while (elements.count() <= index)
     elements.push(String{heap_allocator()});
   elements[index] = String{heap_allocator(), value};
@@ -397,11 +420,14 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
   /* A read of an array name with no scalar yields element zero, the way bash
-     treats $a as ${a[0]}. An existing but empty array still reads as set. */
-  if (let const *array = m_indexed_arrays.find(name)) {
-    if (array->is_empty()) return String{};
-    return array->front();
-  }
+     treats $a as ${a[0]}. An existing but empty array still reads as set. The
+     empty-map guard keeps an ordinary shell with no arrays from hashing the
+     name a second time on every variable read. */
+  if (m_indexed_arrays.count() != 0)
+    if (let const *array = m_indexed_arrays.find(name)) {
+      if (array->is_empty()) return String{};
+      return array->front();
+    }
 
   /* IFS is held live in m_field_separators rather than the store, so a read
      with no prior assignment must report the cached separators. The store
