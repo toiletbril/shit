@@ -1,3 +1,7 @@
+# The diff targets compare two live shells through process substitution, so the
+# recipes run in bash rather than the system /bin/sh.
+SHELL := bash
+
 DIFF_FLAGS := -u
 
 ifeq ($(OS), Windows_NT)
@@ -26,8 +30,8 @@ TEST_NAMES := $(INPUT_FILES:input/%.shit=%)
 	cat input/$@.shit | \
 	$(BIN) $(BIN_FLAGS) - 2>&1 | \
 	diff $(DIFF_FLAGS) $< - >> $(FAILED_LIST) && \
-	printf "	%-42s ok\n" $@ || \
-	printf "	%-42s FAILED :c\n" $@
+	printf "	%-64s ok\n" $@ || \
+	printf "	%-64s FAILED :c\n" $@
 
 clean:
 	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
@@ -43,46 +47,43 @@ run_tests: $(TEST_NAMES)
 
 refill:
 	for f in $(TEST_NAMES); do \
-		printf "	%-42s $$f.out\n" $$f.shit; \
+		printf "	%-64s $$f.out\n" $$f.shit; \
 		cat input/$$f.shit | $(BIN) $(BIN_FLAGS) - > expected/$$f.out 2>&1; \
 	done || true
 
-# Run each sh-compat script through the shell and through dash, then compare
-# their standard output and exit status. The goal is byte-identical behavior.
+# Run each posix script through the shell and through dash, then diff their
+# standard output through process substitution, no temporary files. A difference
+# is appended to the failed list and the line is marked, the same shape the
+# golden run_tests target uses. The goal is byte-identical output with dash.
 DASH ?= dash
-SH_COMPAT := $(wildcard sh-compat/*.shit)
+POSIX_COMPAT := $(wildcard posix/*.shit)
 
 dashdiff: $(BIN)
-	@for f in $(SH_COMPAT); do \
-		$(BIN) "$$f" >/tmp/shit_dd_s 2>/dev/null; shit_rc=$$?; \
-		$(DASH) "$$f" >/tmp/shit_dd_d 2>/dev/null; dash_rc=$$?; \
-		if cmp -s /tmp/shit_dd_s /tmp/shit_dd_d && [ "$$shit_rc" = "$$dash_rc" ]; then \
-			printf "	%-42s ok\n" "$$f"; \
-		else \
-			printf "	%-42s DIFF (shit rc=%s dash rc=%s)\n" "$$f" "$$shit_rc" "$$dash_rc"; \
-			diff /tmp/shit_dd_d /tmp/shit_dd_s | head -20; \
-		fi; \
-	done; \
-	rm -f /tmp/shit_dd_s /tmp/shit_dd_d
+	@for f in $(POSIX_COMPAT); do \
+		s="$$($(BIN) "$$f" 2>/dev/null)"; \
+		d="$$($(DASH) "$$f" 2>/dev/null)"; \
+		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (dash)" \
+			<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST) \
+			&& printf "	%-64s ok\n" "$$f" \
+			|| printf "	%-64s FAILED :c\n" "$$f"; \
+	done
 
-# Run each bash-compat script through the shell in bash mode and through bash,
-# then compare their standard output and exit status. The goal is byte-identical
-# behavior with real bash for the bash extensions.
+# Run each bash script through the shell in bash mode and through bash, then diff
+# their standard output through process substitution, no temporary files. A
+# difference is appended to the failed list. The goal is byte-identical output
+# with real bash for the bash extensions.
 BASH ?= bash
-BASH_COMPAT := $(wildcard bash-compat/*.shit)
+BASH_COMPAT := $(wildcard bash/*.shit)
 
 bashdiff: $(BIN)
 	@for f in $(BASH_COMPAT); do \
-		$(BIN) --bash-compatible "$$f" >/tmp/shit_bd_s 2>/dev/null; shit_rc=$$?; \
-		$(BASH) "$$f" >/tmp/shit_bd_b 2>/dev/null; bash_rc=$$?; \
-		if cmp -s /tmp/shit_bd_s /tmp/shit_bd_b && [ "$$shit_rc" = "$$bash_rc" ]; then \
-			printf "	%-42s ok\n" "$$f"; \
-		else \
-			printf "	%-42s DIFF (shit rc=%s bash rc=%s)\n" "$$f" "$$shit_rc" "$$bash_rc"; \
-			diff /tmp/shit_bd_b /tmp/shit_bd_s | head -20; \
-		fi; \
-	done; \
-	rm -f /tmp/shit_bd_s /tmp/shit_bd_b
+		s="$$($(BIN) --bash-compatible "$$f" 2>/dev/null)"; \
+		b="$$($(BASH) "$$f" 2>/dev/null)"; \
+		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (bash)" \
+			<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST) \
+			&& printf "	%-64s ok\n" "$$f" \
+			|| printf "	%-64s FAILED :c\n" "$$f"; \
+	done
 
 # Time the builtin-only configure script through each shell, after checking that
 # the output is identical. Use the optimized shit build, MODE=rel, for a
