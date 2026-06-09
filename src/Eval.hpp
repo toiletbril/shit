@@ -343,6 +343,17 @@ public:
   fn collect_array_subscripts(StringView name) const throws
       -> ArrayList<String>;
 
+  /* Drop every sparsely-held element of an indexed array, so a whole-array
+     reassignment or an unset does not leave a far element behind. */
+  fn clear_sparse_array(StringView name) throws -> void;
+
+  /* Assign an array literal, honoring an explicit [index]=value element that
+     places its value at that subscript, with a bare element taking the next
+     index after it. Without an explicit index this is the plain ordered
+     assignment. An append continues after the highest set index. */
+  fn assign_indexed_array_elements(StringView name, ArrayList<String> elements,
+                                   bool is_append) throws -> void;
+
   /* Log a name's current process-environment value before a write that outlives
      the current statement, so a subshell restore can revert it. Called before
      an export or an allexport assignment writes the environment. Outside a

@@ -29,11 +29,6 @@
 
 namespace shit {
 
-/* The largest subscript the dense indexed-array model accepts, since a write
-   pads every slot up to the index. A value past this would pad gigabytes, so it
-   is rejected rather than exhausting memory. */
-static constexpr usize MAX_DENSE_ARRAY_INDEX = 4 * 1024 * 1024;
-
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
                          bool should_error_exit, String shell_name,
@@ -187,6 +182,7 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
 
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
+  clear_sparse_array(name);
 }
 
 fn EvalContext::set_indexed_array(StringView name,
@@ -195,8 +191,10 @@ fn EvalContext::set_indexed_array(StringView name,
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
   /* The scalar entry is dropped so a $name read falls through to element zero
-     the way bash treats $a as ${a[0]}. */
+     the way bash treats $a as ${a[0]}. Any sparse element of a prior array of
+     the same name is dropped too, since this replaces the whole array. */
   m_shell_variables.erase(name);
+  clear_sparse_array(name);
   m_indexed_arrays.set(name, steal(values));
 }
 
@@ -218,52 +216,163 @@ fn EvalContext::append_indexed_array(StringView name,
   set_indexed_array(name, steal(values));
 }
 
+/* The flat-map key for one sparse indexed element, the array name and the
+   decimal index joined by a byte that cannot occur in a name. */
+static fn sparse_array_key(StringView name, usize index) throws -> String
+{
+  let key = String{heap_allocator(), name};
+  key.push('\x01');
+  key.append(utils::uint_to_text(index).view());
+  return key;
+}
+
+/* One sparse element, its index and its value, used to merge the sparse map
+   into the dense run when an array is enumerated. */
+struct sparse_array_entry
+{
+  usize index;
+  String value;
+};
+
+/* Every sparsely-held element of an array, sorted by ascending index. The
+   sparse indices always sit beyond the dense run, so appending these after the
+   dense elements yields the whole array in index order. */
+static fn collect_sparse_array_entries(const HashMap<String> &sparse,
+                                       StringView name) throws
+    -> ArrayList<sparse_array_entry>
+{
+  let out = ArrayList<sparse_array_entry>{heap_allocator()};
+  let const prefix = sparse_array_key(name, 0);
+  /* The prefix is name plus the separator byte, so the leading "0" of the key
+     for index zero is dropped to leave just the name and separator. */
+  let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
+  sparse.for_each([&](StringView key, const String &value) throws {
+    if (key.length <= name_prefix.length ||
+        key.substring_of_length(0, name_prefix.length) != name_prefix)
+      return;
+    let const index_text = key.substring(name_prefix.length);
+    if (let const parsed = utils::parse_decimal_integer(index_text);
+        !parsed.is_error() && parsed.value() >= 0)
+      out.push(sparse_array_entry{static_cast<usize>(parsed.value()),
+                                  String{heap_allocator(), value.view()}});
+  });
+  /* An insertion sort keeps it simple, since a sparse array holds few far
+     elements. */
+  for (usize i = 1; i < out.count(); i++) {
+    let key = steal(out[i]);
+    usize j = i;
+    while (j > 0 && out[j - 1].index > key.index) {
+      out[j] = steal(out[j - 1]);
+      j--;
+    }
+    out[j] = steal(key);
+  }
+  return out;
+}
+
+fn EvalContext::clear_sparse_array(StringView name) throws -> void
+{
+  let const entries = collect_sparse_array_entries(m_sparse_array_values, name);
+  for (const sparse_array_entry &entry : entries)
+    m_sparse_array_values.erase(sparse_array_key(name, entry.index).view());
+}
+
+/* Whether an array-literal element is the explicit [index]=value form, and if
+   so its subscript text and its value. A leading '[' with a later "]=" marks
+   it, every other element is a positional value. */
+static fn parse_explicit_array_index(StringView element,
+                                     StringView &subscript_out,
+                                     StringView &value_out) wontthrow -> bool
+{
+  if (element.length < 3 || element[0] != '[') return false;
+  for (usize i = 1; i + 1 < element.length; i++) {
+    if (element[i] == ']' && element[i + 1] == '=') {
+      subscript_out = element.substring_of_length(1, i - 1);
+      value_out = element.substring(i + 2);
+      return true;
+    }
+  }
+  return false;
+}
+
+fn EvalContext::assign_indexed_array_elements(StringView name,
+                                              ArrayList<String> elements,
+                                              bool is_append) throws -> void
+{
+  usize running_index = 0;
+  if (is_append) {
+    /* An append continues after the highest set index, the dense end or the
+       last sparse element, whichever is larger. */
+    if (let const *array = lookup_indexed_array(name))
+      running_index = array->count();
+    let const sparse = collect_sparse_array_entries(m_sparse_array_values, name);
+    if (!sparse.is_empty()) {
+      let const next_after_sparse = sparse[sparse.count() - 1].index + 1;
+      if (next_after_sparse > running_index) running_index = next_after_sparse;
+    }
+  } else {
+    /* A plain assignment replaces the array, clearing the dense run, the sparse
+       elements, and any scalar of the same name. */
+    set_indexed_array(name, ArrayList<String>{heap_allocator()});
+  }
+
+  for (const String &element : elements) {
+    StringView subscript;
+    StringView value;
+    usize index = running_index;
+    if (parse_explicit_array_index(element.view(), subscript, value)) {
+      index = static_cast<usize>(evaluate_arithmetic(subscript));
+      set_array_element(name, index, value);
+    } else {
+      set_array_element(name, index, element.view());
+    }
+    running_index = index + 1;
+  }
+}
+
 fn EvalContext::set_array_element(StringView name, usize index,
                                   StringView value) throws -> void
 {
-  /* A subscript past the dense limit is held sparsely by its decimal key rather
-     than padding a huge gap into memory, the way bash stores an indexed array.
-     The name still reads as indexed, so an empty dense array marks it and a
-     later read consults the sparse map when the dense lookup falls short. */
-  if (index > MAX_DENSE_ARRAY_INDEX) {
-    if (is_readonly(name))
-      throw Error{"Unable to assign '" + name + "' because it is read only"};
-    m_shell_variables.erase(name);
-    if (lookup_indexed_array(name) == nullptr)
-      set_indexed_array(name, ArrayList<String>{heap_allocator()});
-    let key = String{heap_allocator(), name};
-    key.push('\x01');
-    key.append(utils::uint_to_text(index).view());
-    m_sparse_array_values.set(key.view(), value);
+  if (is_readonly(name))
+    throw Error{"Unable to assign '" + name + "' because it is read only"};
+
+  /* The dense run holds the contiguous prefix from index zero, and any element
+     past its end lives in the sparse map keyed by index, the way bash keeps an
+     indexed array without padding a gap. An empty dense array still marks the
+     name as indexed so a read routes here. A first write promotes an existing
+     scalar to element zero. */
+  ArrayList<String> *dense = m_indexed_arrays.find(name);
+  if (dense == nullptr) {
+    let elements = ArrayList<String>{heap_allocator()};
+    if (let const *scalar = m_shell_variables.find(name))
+      elements.push(String{heap_allocator(), scalar->view()});
+    set_indexed_array(name, steal(elements));
+    dense = m_indexed_arrays.find(name);
+  }
+  m_shell_variables.erase(name);
+  ASSERT(dense != nullptr);
+
+  const usize count = dense->count();
+  if (index < count) {
+    (*dense)[index] = String{heap_allocator(), value};
     return;
   }
-
-  /* An existing array is edited in place, so building one element at a time
-     stays linear rather than copying the whole array on each write. The
-     readonly guard and the scalar clear match set_indexed_array, since the
-     in-place path bypasses it. */
-  if (let *existing = m_indexed_arrays.find(name)) {
-    if (is_readonly(name))
-      throw Error{"Unable to assign '" + name + "' because it is read only"};
-    m_shell_variables.erase(name);
-    while (existing->count() <= index)
-      existing->push(String{heap_allocator()});
-    (*existing)[index] = String{heap_allocator(), value};
+  if (index == count) {
+    /* The write extends the contiguous run, which may make an earlier sparse
+       element contiguous too, so any element now at the run's end migrates from
+       the sparse map into the dense run. */
+    dense->push(String{heap_allocator(), value});
+    for (;;) {
+      let const key = sparse_array_key(name, dense->count());
+      let const *migrated = m_sparse_array_values.find(key.view());
+      if (migrated == nullptr) break;
+      dense->push(String{heap_allocator(), migrated->view()});
+      m_sparse_array_values.erase(key.view());
+    }
     return;
   }
-
-  /* A first write creates the array. An existing scalar of the same name
-     becomes element zero, the way bash promotes a=5 to a[0]=5 when a[2]=9 is
-     assigned, then the scalar entry is dropped. A write past the end pads the
-     gap with empty elements, the way bash grows the array up to the subscript.
-   */
-  let elements = ArrayList<String>{heap_allocator()};
-  if (let const *scalar = m_shell_variables.find(name))
-    elements.push_managed(scalar->view());
-  while (elements.count() <= index)
-    elements.push_managed();
-  elements[index] = String{heap_allocator(), value};
-  set_indexed_array(name, steal(elements));
+  /* A write past the run's end leaves a gap, so it is held sparsely. */
+  m_sparse_array_values.set(sparse_array_key(name, index).view(), value);
 }
 
 /* The flat-map key for an associative element, the array name and the element
@@ -1983,8 +2092,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
           return String{
               heap_allocator(),
               utils::uint_to_text(associative_keys(array_name).count())};
-        if (let const *array = lookup_indexed_array(array_name))
-          return utils::uint_to_text(array->count());
+        if (lookup_indexed_array(array_name) != nullptr)
+          return utils::uint_to_text(collect_array_elements(array_name).count());
         return String{heap_allocator(),
                       utils::uint_to_text(
                           get_variable_value(array_name).has_value() ? 1 : 0)};
@@ -2512,6 +2621,11 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     out.reserve(array->count());
     for (const String &element : *array)
       out.push_managed(element.view());
+    /* The sparse elements sit past the dense run, so appending them in index
+       order yields the whole array in order. */
+    for (sparse_array_entry &entry :
+         collect_sparse_array_entries(m_sparse_array_values, name))
+      out.push(steal(entry.value));
     return out;
   }
   /* A plain scalar reads as a one-element array, the way bash treats $a as
@@ -2534,7 +2648,12 @@ fn EvalContext::array_element_is_set(StringView name,
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
     const i64 count = static_cast<i64>(array->count());
     const i64 resolved = index < 0 ? index + count : index;
-    return resolved >= 0 && resolved < count;
+    if (resolved >= 0 && resolved < count) return true;
+    /* An index past the dense run may name a sparsely-held element. */
+    return resolved >= 0 &&
+           m_sparse_array_values.find(
+               sparse_array_key(name, static_cast<usize>(resolved)).view()) !=
+               nullptr;
   }
   /* A scalar answers for its sole index zero. */
   return index == 0 && get_variable_value(name).has_value();
@@ -2573,6 +2692,9 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
   if (let const *array = lookup_indexed_array(name)) {
     for (usize i = 0; i < array->count(); i++)
       out.push(utils::uint_to_text(i));
+    for (const sparse_array_entry &entry :
+         collect_sparse_array_entries(m_sparse_array_values, name))
+      out.push(utils::uint_to_text(entry.index));
     return out;
   }
   /* A scalar has the single index zero, an unset name has none. */

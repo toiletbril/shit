@@ -1201,10 +1201,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        order. */
     for (const array_builtin_assignment &assignment : m_array_args) {
       ArrayList<String> values = cxt.process_args(assignment.elements);
-      if (assignment.is_append)
-        cxt.append_indexed_array(assignment.name, steal(values));
-      else
-        cxt.set_indexed_array(assignment.name, steal(values));
+      cxt.assign_indexed_array_elements(assignment.name, steal(values),
+                                        assignment.is_append);
     }
     cxt.set_last_exit_status(0);
     return 0;
@@ -1496,10 +1494,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           }
           cxt.set_associative_element(assignment.name, text, StringView{});
         }
-      } else if (assignment.is_append) {
-        cxt.append_indexed_array(assignment.name, steal(values));
       } else {
-        cxt.set_indexed_array(assignment.name, steal(values));
+        cxt.assign_indexed_array_elements(assignment.name, steal(values),
+                                          assignment.is_append);
       }
       if (is_export) cxt.mark_exported(assignment.name);
       if (is_readonly_request) cxt.mark_readonly(assignment.name);
@@ -2976,10 +2973,7 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The elements expand the way command arguments do, with field splitting and
      globbing, so a=( $list *.txt ) builds the array bash would. */
   ArrayList<String> values = cxt.process_args(m_elements);
-  if (m_is_append)
-    cxt.append_indexed_array(m_name.view(), steal(values));
-  else
-    cxt.set_indexed_array(m_name.view(), steal(values));
+  cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);
   cxt.set_last_exit_status(0);
   return 0;
 }
