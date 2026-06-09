@@ -669,6 +669,11 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+  fn register_defined_functions(AnalysisContext &actx) const throws
+      -> void override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
@@ -692,6 +697,11 @@ public:
 
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
+
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+  fn register_defined_functions(AnalysisContext &actx) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -717,6 +727,9 @@ public:
 
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
+
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;

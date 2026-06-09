@@ -2615,6 +2615,25 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   return status;
 }
 
+cold fn SelectLoop::analyze(AnalysisContext &actx,
+                            bool is_unconditional) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+  unused(is_unconditional);
+  /* The body runs repeatedly and may reassign a name, so a value recorded
+     before the loop does not hold inside it, the same reason ForLoop clears the
+     constant table before analyzing its body. */
+  actx.constant_variables.clear();
+  m_body->analyze(actx, false);
+}
+
+cold fn SelectLoop::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+  m_body->register_defined_functions(actx);
+}
+
 CStyleForLoop::CStyleForLoop(SourceLocation location, String init,
                              String condition, String step,
                              const Expression *body)
@@ -2686,6 +2705,16 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   return 0;
 }
 
+cold fn ArrayAssignCommand::analyze(AnalysisContext &actx,
+                                    bool is_unconditional) const throws -> void
+{
+  unused(is_unconditional);
+  /* An array assignment makes the name no longer a scalar literal, so the
+     constant table forgets it rather than letting a prior scalar constant fold
+     a later $name or $((name)) to a stale value. */
+  actx.constant_variables.erase(m_name.view());
+}
+
 fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
@@ -2714,6 +2743,25 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
+}
+
+cold fn CStyleForLoop::analyze(AnalysisContext &actx,
+                               bool is_unconditional) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+  unused(is_unconditional);
+  /* The header and body reassign the counter on every iteration, so a constant
+     recorded before the loop does not hold inside or after it, the same reason
+     ForLoop clears the constant table before analyzing its body. */
+  actx.constant_variables.clear();
+  m_body->analyze(actx, false);
+}
+
+cold fn CStyleForLoop::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
+{
+  ASSERT(m_body != nullptr);
+  m_body->register_defined_functions(actx);
 }
 
 Subshell::Subshell(SourceLocation location, const Expression *body)
