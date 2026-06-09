@@ -1,5 +1,6 @@
 #include "Builtin.hpp"
 
+#include "Cli.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Platform.hpp"
@@ -121,6 +122,17 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
       unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
     }
   } catch (const Error &e) {
+    /* The bash-compatible mood reports a builtin error the way bash does, a soft
+       failure printed to the command's stderr, which a 2>... on the command
+       still redirects since fd 2 is replaced above this try, and a non-zero
+       status so the surrounding list keeps running rather than aborting. The
+       default and posix moods keep the located throw that stops the run up
+       front. */
+    if (cxt.is_bash_compatible()) {
+      print_error(StringView{"shit: "} + ec.program() + ": " + e.message() +
+                  "\n");
+      return 1;
+    }
     throw ErrorWithLocation{ec.source_location(), StringView{"Builtin '"} +
                                                       ec.program() +
                                                       "': " + e.message()};
