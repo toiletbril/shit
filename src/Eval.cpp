@@ -3711,6 +3711,152 @@ fn EvalContext::expand_heredoc_body(StringView body) throws -> String
   return expand_modifier_word(body, false);
 }
 
+namespace {
+
+/* The byte that stands in for an opaque segment in the brace-expansion
+   template, a quoted run or a variable reference whose braces and commas must
+   not act as brace structure. It is followed by the segment's index. */
+constexpr char BRACE_OPAQUE_MARKER = '\x01';
+
+/* True when a word carries a { in an unquoted segment, the only place brace
+   structure can appear. The scan is cheap so the common brace-free word skips
+   the expansion entirely. */
+pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
+{
+  for (const WordSegment &segment : word.segments) {
+    if (segment.kind != WordSegment::Kind::UnquotedText) continue;
+    for (usize i = 0; i < segment.text.count(); i++)
+      if (segment.text[i] == '{') return true;
+  }
+  return false;
+}
+
+/* The leftmost brace group that holds a top-level comma, the open and close
+   indices with the comma offsets. A { with no matching } or no top-level comma
+   is literal, so the search moves to the next {. */
+struct brace_group
+{
+  usize open;
+  usize close;
+  ArrayList<usize> commas{heap_allocator()};
+};
+
+fn find_brace_group(StringView text) throws -> Maybe<brace_group>
+{
+  for (usize open = 0; open < text.length; open++) {
+    if (text[open] != '{') continue;
+    usize depth = 0;
+    let commas = ArrayList<usize>{heap_allocator()};
+    for (usize j = open; j < text.length; j++) {
+      const char c = text[j];
+      if (c == '{') {
+        depth++;
+      } else if (c == '}') {
+        depth--;
+        if (depth == 0) {
+          if (!commas.is_empty()) {
+            brace_group group{open, j, {}};
+            group.commas = steal(commas);
+            return group;
+          }
+          break;
+        }
+      } else if (c == ',' && depth == 1) {
+        commas.push(j);
+      }
+    }
+  }
+  return None;
+}
+
+/* Expand the brace structure in a template string, leaving any opaque marker
+   untouched. The recursion handles a nested group inside an alternative and a
+   further group after the close, so the result is the cartesian product. */
+fn brace_expand_text(StringView text) throws -> ArrayList<String>
+{
+  let results = ArrayList<String>{heap_allocator()};
+  let const group = find_brace_group(text);
+  if (!group.has_value()) {
+    results.push(String{heap_allocator(), text});
+    return results;
+  }
+
+  const StringView preamble = text.substring_of_length(0, group->open);
+  const StringView postamble = text.substring(group->close + 1);
+  let const post_expansions = brace_expand_text(postamble);
+
+  let alternatives = ArrayList<StringView>{heap_allocator()};
+  usize start = group->open + 1;
+  for (const usize comma : group->commas) {
+    alternatives.push(text.substring_of_length(start, comma - start));
+    start = comma + 1;
+  }
+  alternatives.push(text.substring_of_length(start, group->close - start));
+
+  for (const StringView alternative : alternatives) {
+    for (const String &expanded_alt : brace_expand_text(alternative)) {
+      for (const String &expanded_post : post_expansions) {
+        let combined = String{heap_allocator(), preamble};
+        combined.append(expanded_alt.view());
+        combined.append(expanded_post.view());
+        results.push(steal(combined));
+      }
+    }
+  }
+  return results;
+}
+
+/* Expand the brace structure of a word into the words it spells. The unquoted
+   segments contribute their text to a template while every other segment is
+   recorded as an opaque marker, so a quoted brace or a variable stays intact.
+   Each expanded template is rebuilt into a word. */
+fn expand_braces(const Word &word) throws -> ArrayList<Word>
+{
+  let opaque_segments = ArrayList<const WordSegment *>{heap_allocator()};
+  let word_template = String{heap_allocator()};
+  for (const WordSegment &segment : word.segments) {
+    if (segment.kind == WordSegment::Kind::UnquotedText) {
+      word_template.append(segment.text.view());
+    } else {
+      ASSERT(opaque_segments.count() < 256);
+      word_template.push(BRACE_OPAQUE_MARKER);
+      word_template.push(static_cast<char>(opaque_segments.count()));
+      opaque_segments.push(&segment);
+    }
+  }
+
+  let const expanded = brace_expand_text(word_template.view());
+
+  let words = ArrayList<Word>{heap_allocator()};
+  for (const String &produced : expanded) {
+    Word out{};
+    let run = String{heap_allocator()};
+    for (usize i = 0; i < produced.count(); i++) {
+      const char c = produced[i];
+      if (c == BRACE_OPAQUE_MARKER) {
+        if (!run.is_empty()) {
+          out.segments.push(
+              WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
+          run = String{heap_allocator()};
+        }
+        ASSERT(i + 1 < produced.count());
+        const u8 index = static_cast<u8>(produced[++i]);
+        out.segments.push(*opaque_segments[index]);
+      } else {
+        run.push(c);
+      }
+    }
+    if (!run.is_empty()) {
+      out.segments.push(
+          WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
+    }
+    words.push(steal(out));
+  }
+  return words;
+}
+
+} /* namespace */
+
 hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
     -> ArrayList<String>
 {
@@ -3759,38 +3905,51 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
          splitting, or globbing straight to the heap argument vector. The common
          literal argument such as '-lt', '200000', 'echo', or a plain filename
          takes this path and never enters expand_word or expand_path. */
-      let const plain_kind = word->plain_literal_kind();
-      let took_fast_path = false;
-      if (plain_kind != Word::PlainLiteral::NotPlain) {
-        let literal = String{heap_allocator()};
-        for (const WordSegment &segment : word->segments)
-          literal.append(segment.text.view());
+      auto expand_one_word = [&](const Word &expandable) throws -> void {
+        let const plain_kind = expandable.plain_literal_kind();
+        let took_fast_path = false;
+        if (plain_kind != Word::PlainLiteral::NotPlain) {
+          let literal = String{heap_allocator()};
+          for (const WordSegment &segment : expandable.segments)
+            literal.append(segment.text.view());
 
-        /* A single unquoted segment still needs the IFS check, since an IFS
-           byte in its text would split it into more than one field. With no IFS
-           byte it is one field. */
-        let needs_split = false;
-        if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
-          for (usize i = 0; i < literal.count(); i++)
-            if (is_field_separator(literal[i])) {
-              needs_split = true;
-              break;
-            }
+          /* A single unquoted segment still needs the IFS check, since an IFS
+             byte in its text would split it into more than one field. With no
+             IFS byte it is one field. */
+          let needs_split = false;
+          if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
+            for (usize i = 0; i < literal.count(); i++)
+              if (is_field_separator(literal[i])) {
+                needs_split = true;
+                break;
+              }
+          }
+
+          if (!needs_split) {
+            expanded_args.push(steal(literal));
+            took_fast_path = true;
+          }
         }
 
-        if (!needs_split) {
-          expanded_args.push(steal(literal));
-          took_fast_path = true;
+        if (!took_fast_path) {
+          for (glob_field &field : expand_word(expandable)) {
+            for (String &g : expand_path(steal(field), l))
+              expanded_args.push(String{
+                  heap_allocator(), StringView{g.c_str(), g.count()}
+              });
+          }
         }
-      }
+      };
 
-      if (!took_fast_path) {
-        for (glob_field &field : expand_word(*word)) {
-          for (String &g : expand_path(steal(field), l))
-            expanded_args.push(String{
-                heap_allocator(), StringView{g.c_str(), g.count()}
-            });
-        }
+      /* Brace expansion runs first in bash mode, turning one word into the
+         several the braces spell, each then taking the path above. The brace
+         scan is skipped when no { is present, so a brace-free word pays nothing
+         beyond the cheap check. */
+      if (BASH_COMPATIBLE_MODE && word_has_brace_candidate(*word)) {
+        for (const Word &brace_word : expand_braces(*word))
+          expand_one_word(brace_word);
+      } else {
+        expand_one_word(*word);
       }
     } catch (const Error &e) {
       throw ErrorWithLocation{l, e.message()};
