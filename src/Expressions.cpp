@@ -2833,8 +2833,16 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* A non-zero arithmetic value is success, a zero value is failure, the
-     opposite of the value-to-status convention of the rest of the shell. */
-  const i64 value = cxt.evaluate_arithmetic(m_expression.view());
+     opposite of the value-to-status convention of the rest of the shell. The
+     arithmetic evaluator reports a malformed expression or a division by zero as
+     a plain error, so it is relocated to this command's position to carry a
+     caret at the (( in the source, including the source an eval runs. */
+  i64 value;
+  try {
+    value = cxt.evaluate_arithmetic(m_expression.view());
+  } catch (const Error &e) {
+    throw ErrorWithLocation{source_location(), e.message()};
+  }
   const i64 status = value != 0 ? 0 : 1;
   cxt.set_last_exit_status(static_cast<i32>(status));
   return status;
