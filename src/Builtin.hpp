@@ -306,4 +306,12 @@ fn query_shell_option(const EvalContext &cxt, StringView name) throws
 fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool;
 
+/* Report a builtin error that must not abort the run, such as one bad name in a
+   loop that still processes the rest, with the same located caret in the default
+   and posix moods and the same soft unlocated line in the bash mood that the
+   dispatch gives a thrown error. A builtin that throws gets a fatal located
+   error instead, so this is for the keep-going case. */
+fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
+                             StringView message) throws -> void;
+
 } /* namespace shit */

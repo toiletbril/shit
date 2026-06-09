@@ -140,6 +140,27 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
   unreachable("execute_builtin reached the end without dispatching");
 }
 
+fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
+                             StringView message) throws -> void
+{
+  /* The bash mood prints the same soft unlocated line the dispatch gives a
+     thrown error, while the default and posix moods render the located caret in
+     place rather than throwing, so the loop that called this keeps processing
+     the rest of its names. */
+  if (cxt.is_bash_compatible()) {
+    print_error(StringView{"shit: "} + ec.program() + ": " + message + "\n");
+    return;
+  }
+  const ErrorWithLocation located{
+      ec.source_location(),
+      StringView{"Builtin '"} + ec.program() + "': " + message};
+  if (const String *source = cxt.current_source(); source != nullptr)
+    show_message(located.to_string(source->view()));
+  else
+    print_error(StringView{"shit: Builtin '"} + ec.program() + "': " + message +
+                "\n");
+}
+
 Builtin::Builtin() = default;
 
 } /* namespace shit */

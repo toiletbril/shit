@@ -53,8 +53,8 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        untouched. */
     if (cxt.is_readonly(name)) {
       if (has_new_value) {
-        shit::print_error(StringView{"Unable to export '"} + name +
-                          "' because it is read only\n");
+        report_soft_builtin_error(ec, cxt,
+                                  StringView{"'"} + name + "' is read-only");
         had_error = true;
       }
       continue;

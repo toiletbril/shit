@@ -24,6 +24,8 @@
   DoubleQuoted "x="
   Variable "x"
 ]
-Unable to unset 'x' because it is read only
+shit: 3:1: error: Builtin 'unset': 'x' is read-only.
+     3 |  unset x
+       |  ^~~~~~~ here.
 x=1
 [Code 0]

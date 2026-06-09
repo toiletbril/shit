@@ -80,8 +80,8 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const target = search_builtin(name.view());
   if (!target.has_value()) {
-    show_message("Unable to run '" + name +
-                 "' because it is not a shell builtin");
+    report_soft_builtin_error(
+        ec, cxt, StringView{"'"} + name + "' is not a shell builtin");
     return 1;
   }
 

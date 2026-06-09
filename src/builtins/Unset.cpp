@@ -46,9 +46,9 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
          way dash continues past a read-only name. */
       try {
         cxt.unset_shell_variable(name);
-      } catch (const Error &e) {
-        shit::print_error(StringView{"Unable to unset '"} + name +
-                          "' because it is read only\n");
+      } catch (const Error &) {
+        report_soft_builtin_error(ec, cxt,
+                                  StringView{"'"} + name + "' is read-only");
         had_error = true;
       }
     }

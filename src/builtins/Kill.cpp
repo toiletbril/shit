@@ -59,16 +59,16 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       const ErrorOr<i64> parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));
       if (parsed.is_error()) {
-        show_message(Error{"Kill: '" + target_text +
-                           "' is not a valid job or process id"}
-                         .to_string());
+        report_soft_builtin_error(ec, cxt,
+                                  StringView{"'"} + target_text +
+                                      "' is not a valid job or process id");
         status = 1;
         continue;
       }
       job *const job = cxt.find_job(static_cast<int>(parsed.value()));
       if (job == nullptr) {
-        show_message(Error{"Kill: '" + target_text + "' is not a known job"}
-                         .to_string());
+        report_soft_builtin_error(ec, cxt, StringView{"'"} + target_text +
+                                               "' is not a known job");
         status = 1;
         continue;
       }
@@ -79,9 +79,9 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (parsed.is_error()) {
         /* A non-numeric target must not fall through to kill(0), which would
            signal the whole process group including this shell. */
-        show_message(Error{"Kill: '" + target_text +
-                           "' is not a valid job or process id"}
-                         .to_string());
+        report_soft_builtin_error(ec, cxt,
+                                  StringView{"'"} + target_text +
+                                      "' is not a valid job or process id");
         status = 1;
         continue;
       }
@@ -89,9 +89,10 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
 
     if (!os::signal_process(pid, signal_number)) {
-      show_message(Error{"Kill: could not signal '" + target_text +
-                         "': " + os::last_system_error_message()}
-                       .to_string());
+      report_soft_builtin_error(ec, cxt,
+                                StringView{"cannot signal '"} + target_text +
+                                    "' because " +
+                                    os::last_system_error_message());
       status = 1;
     }
   }
