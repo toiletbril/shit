@@ -1984,11 +1984,19 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (!rest.is_empty() && rest[0] == '[' && !name.is_empty() &&
       lexer::is_variable_name_start(name[0]))
   {
-    if (let const close = rest.find_character(']');
-        close.has_value() && *close + 1 == rest.length)
-    {
-      return apply_array_subscript(name,
-                                   rest.substring_of_length(1, *close - 1));
+    if (let const close = rest.find_character(']'); close.has_value()) {
+      const StringView subscript = rest.substring_of_length(1, *close - 1);
+      /* Nothing after the ] is the plain element read. */
+      if (*close + 1 == rest.length)
+        return apply_array_subscript(name, subscript);
+      /* A /pat/rep after the ] modifies the one element. The @ and * forms map
+         per element and are produced in the field path, so only a single
+         subscript is handled here. */
+      const StringView modifier = rest.substring(*close + 1);
+      if (subscript != "@" && subscript != "*" && !modifier.is_empty() &&
+          modifier[0] == '/')
+        return pattern_replace_value(apply_array_subscript(name, subscript),
+                                     modifier);
     }
   }
 
@@ -2204,8 +2212,12 @@ fn EvalContext::apply_pattern_replacement(StringView name,
   if (m_error_unset && !current.has_value())
     throw Error{"Unable to expand '" + name +
                 "' because the parameter is not set"};
-  let const value = current.value_or(String{});
+  return pattern_replace_value(current.value_or(String{}), spec);
+}
 
+fn EvalContext::pattern_replace_value(const String &value, StringView spec) throws
+    -> String
+{
   /* The spec opens with the slash operator. A doubled slash replaces every
      match, and a # or % after the first slash anchors the pattern to the start
      or the end of the value. */
@@ -4234,6 +4246,47 @@ hot fn EvalContext::expand_word(const Word &word) throws
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0) flush();
               append_split_run(elements[i].view(), true);
+            }
+          }
+          break;
+        }
+      }
+      /* "${a[@]/pat/rep}" maps the pattern replacement over each element, one
+         field per element the way "${a[@]}" does, while "${a[*]/pat/rep}" joins
+         the modified elements. Only the pattern-replacement modifier is mapped
+         here, the others fall through to the general scalar path. */
+      if (lexer::is_variable_name_start(segment_text[0])) {
+        usize name_end = 1;
+        while (name_end < segment_text.length &&
+               lexer::is_variable_name(segment_text[name_end]))
+          name_end++;
+        if (name_end + 3 < segment_text.length &&
+            segment_text[name_end] == '[' &&
+            (segment_text[name_end + 1] == '@' ||
+             segment_text[name_end + 1] == '*') &&
+            segment_text[name_end + 2] == ']' &&
+            segment_text[name_end + 3] == '/')
+        {
+          let const array_name = segment_text.substring_of_length(0, name_end);
+          let const modifier = segment_text.substring(name_end + 3);
+          let const is_star = segment_text[name_end + 1] == '*';
+          let const elements = collect_array_elements(array_name);
+          if (segment.is_in_double_quotes && is_star) {
+            let const ifs = m_field_separators.view();
+            let joined = String{heap_allocator()};
+            for (usize i = 0; i < elements.count(); i++) {
+              if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+              joined.append(pattern_replace_value(elements[i], modifier).view());
+            }
+            append_run(joined, false);
+          } else {
+            for (usize i = 0; i < elements.count(); i++) {
+              if (i > 0) flush();
+              let const modified = pattern_replace_value(elements[i], modifier);
+              if (segment.is_in_double_quotes)
+                append_run(modified.view(), false);
+              else
+                append_split_run(modified.view(), true);
             }
           }
           break;

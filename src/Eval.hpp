@@ -1008,6 +1008,12 @@ protected:
   fn apply_pattern_replacement(StringView name, StringView spec) throws
       -> String;
 
+  /* The pattern-replacement core that works on an already-resolved value rather
+     than a name, so an array element ${a[i]/pat/rep} and the per-element form
+     ${a[@]/pat/rep} reuse it. */
+  fn pattern_replace_value(const String &value, StringView spec) throws
+      -> String;
+
   /* Expand the bash case-modification forms ${name^}, ${name^^}, ${name,}, and
      ${name,,}. The ^ raises and the , lowers, a single operator touches the
      first character and a doubled one touches every character, and an optional
