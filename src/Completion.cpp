@@ -1,6 +1,7 @@
 #include "Completion.hpp"
 
 #include "Builtin.hpp"
+#include "Colors.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Path.hpp"
@@ -472,12 +473,39 @@ fn complete(StringView line, usize cursor, EvalContext &context,
           static_cast<int>(line.length), line.data, cursor,
           static_cast<int>(token.length), token.data, is_command ? 1 : 0);
 
+  /* A glob word with the cursor right after it expands inline to its file
+     matches, even in command position, the way the shell expands it before
+     running a command. */
+  const bool inline_glob = token_is_glob && cursor == token_end;
+
   ArrayList<String> candidates{};
 
   if (token_is_variable(token)) {
     candidates = complete_variable(token, context);
   } else if (token_is_tilde_user_prefix(token)) {
     candidates = complete_tilde_user(token);
+  } else if (inline_glob) {
+    candidates = complete_glob(token, base_directory);
+    if (!candidates.is_empty()) {
+      /* The matches replace the pattern as one space-joined run of fields. The
+         trailing slash a directory match carries for the listing UI is dropped
+         so the expansion reads as plain names. */
+      utils::sort_ascending(candidates);
+      String joined{};
+      for (usize i = 0; i < candidates.count(); i++) {
+        if (i > 0) joined += ' ';
+        StringView match = candidates[i].view();
+        if (!match.is_empty() && match[match.length - 1] == '/')
+          match = match.substring_of_length(0, match.length - 1);
+        joined.append(match);
+      }
+      candidates.clear();
+      candidates.push(steal(joined));
+    } else if (is_command && !token_has_path_separator) {
+      /* A command-position glob that matches no file falls back to matching
+         command names, so ec* still finds echo. */
+      candidates = complete_command(token, token_is_glob, context);
+    }
   } else if (is_command && !token_has_path_separator) {
     candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
@@ -496,12 +524,6 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   };
 }
 
-/* Whether the byte begins a shell word, used to find the start of the first
-   command word past any leading whitespace. */
-static pure fn is_leading_whitespace(char c) wontthrow -> bool
-{
-  return c == ' ' || c == '\t';
-}
 
 /* Whether the first word names a runnable command. The word resolves when it is
    a reserved keyword the shell runs as syntax, a builtin, a function, an alias,
@@ -532,42 +554,337 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   return utils::search_program_path(word).count() > 0;
 }
 
-fn highlight_first_word(StringView line, EvalContext &context) throws
-    -> highlight_result
+static pure fn is_highlight_name_start(char c) wontthrow -> bool
 {
-  highlight_result result{0, 0, false};
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
 
-  usize word_start = 0;
-  while (word_start < line.length && is_leading_whitespace(line[word_start]))
-    word_start++;
+static pure fn is_highlight_name_char(char c) wontthrow -> bool
+{
+  return is_highlight_name_start(c) || (c >= '0' && c <= '9');
+}
 
-  /* An empty line or one that opens a subshell or group has no command word to
-     color, so it stays plain. */
-  if (word_start >= line.length) return result;
-  if (line[word_start] == '(') return result;
+/* A byte that ends a top-level word, whitespace or an operator the scanner
+   stops on. '{' and '}' are left out so a brace word such as a{1,2} stays one
+   word. */
+static pure fn is_highlight_word_break(char c) wontthrow -> bool
+{
+  return c == ' ' || c == '\t' || c == '\n' || c == '|' || c == '&' ||
+         c == ';' || c == '<' || c == '>' || c == '(' || c == ')';
+}
 
-  usize word_end = word_start;
-  while (word_end < line.length && !is_token_boundary(line[word_end]))
-    word_end++;
+/* The byte just past a $ expansion that begins at dollar and stays within end,
+   covering $name, the special and positional parameters, and ${...} with
+   balanced braces. The $(...) form is handled by the caller so it can recurse
+   into the inner command. */
+static pure fn scan_dollar_expansion(StringView line, usize dollar, usize end)
+    wontthrow -> usize
+{
+  usize i = dollar + 1;
+  if (i >= end) return i;
 
-  const StringView word =
-      line.substring_of_length(word_start, word_end - word_start);
-
-  /* A leading assignment such as VAR=value is not a command, so a '=' before
-     any slash leaves the line plain the way the parser treats it as an
-     assignment prefix. */
-  for (usize i = 0; i < word.length; i++) {
-    if (word[i] == '/') break;
-    if (word[i] == '=') return result;
+  let const c = line[i];
+  if (c == '{') {
+    usize depth = 0;
+    for (; i < end; i++) {
+      if (line[i] == '{') depth++;
+      else if (line[i] == '}') {
+        i++;
+        depth--;
+        if (depth == 0) break;
+      }
+    }
+    return i;
   }
+  if (c >= '0' && c <= '9') {
+    while (i < end && line[i] >= '0' && line[i] <= '9') i++;
+    return i;
+  }
+  if (c == '?' || c == '!' || c == '#' || c == '$' || c == '*' || c == '@' ||
+      c == '-')
+  {
+    return i + 1;
+  }
+  if (is_highlight_name_start(c)) {
+    while (i < end && is_highlight_name_char(line[i])) i++;
+    return i;
+  }
+  return i;
+}
 
-  TRACELN("highlighting first word '%.*s'", static_cast<int>(word.length),
-          word.data);
+/* A word of the form NAME=... that the parser reads as an assignment prefix
+   rather than a command, so it leaves the next word in command position. */
+static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
+{
+  if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
+  for (usize i = 1; i < word.length; i++) {
+    if (word[i] == '=') return true;
+    if (!is_highlight_name_char(word[i])) return false;
+  }
+  return false;
+}
 
-  result.word_start = word_start;
-  result.word_end = word_end;
-  result.should_color = !first_word_resolves(word, context);
-  return result;
+/* The open shell constructs, so a continuation or closing keyword can be checked
+   against the construct it belongs to. */
+enum class highlight_construct : u8
+{
+  If,
+  WhileUntil,
+  For,
+  Case,
+  Function,
+};
+
+static fn scan_highlight_range(StringView line, usize begin, usize end,
+                               EvalContext &context,
+                               ArrayList<highlight_span> &spans) throws -> void;
+
+/* Color a $ expansion that begins at i within the window. A $(...) recurses so
+   its inner command line colors like any other, while ${...}, $name, and the
+   special parameters are colored cyan as one span. Returns the index past it. */
+static fn color_dollar(StringView line, usize i, usize end,
+                       ArrayList<highlight_span> &spans, EvalContext &context)
+    throws -> usize
+{
+  if (i + 1 < end && line[i + 1] == '(') {
+    usize depth = 0;
+    usize close = end;
+    usize j = i + 1;
+    for (; j < end; j++) {
+      if (line[j] == '(') depth++;
+      else if (line[j] == ')') {
+        depth--;
+        if (depth == 0) {
+          close = j;
+          j++;
+          break;
+        }
+      }
+    }
+    /* The bytes between the ( and the ) are the inner command line, which the
+       $( and ) frame in the default color. */
+    let const inner_begin = i + 2 < end ? i + 2 : end;
+    let const inner_end = close < inner_begin ? inner_begin : close;
+    scan_highlight_range(line, inner_begin, inner_end, context, spans);
+    return j;
+  }
+  let const expansion_end = scan_dollar_expansion(line, i, end);
+  if (expansion_end > i)
+    spans.push(highlight_span{i, expansion_end, colors::ansi::CYAN});
+  return expansion_end;
+}
+
+/* Color one command line, the window [begin, end). A command substitution
+   recurses through color_dollar with its own command-position and construct
+   state, so a nested command line colors on its own. */
+static fn scan_highlight_range(StringView line, usize begin, usize end,
+                               EvalContext &context,
+                               ArrayList<highlight_span> &spans) throws -> void
+{
+  let push = [&](usize start, usize stop, StringView sgr) throws -> void {
+    if (start < stop) spans.push(highlight_span{start, stop, sgr});
+  };
+
+  ArrayList<highlight_construct> stack{};
+  bool command_position = true;
+  bool expecting_in = false;
+
+  usize i = begin;
+  while (i < end) {
+    let const c = line[i];
+
+    if (c == ' ' || c == '\t' || c == '\n') {
+      i++;
+      continue;
+    }
+
+    if (c == '#') {
+      push(i, end, colors::ansi::DIM);
+      break;
+    }
+
+    /* An operator run, left in the default color. A separator or an opener moves
+       the next word back to command position, a redirection does not. */
+    if (c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '(' ||
+        c == ')' || c == '{' || c == '}')
+    {
+      bool has_separator = false;
+      bool has_redirect = false;
+      bool has_opener = false;
+      while (i < end) {
+        let const o = line[i];
+        if (o == '|' || o == '&' || o == ';') {
+          has_separator = true;
+          i++;
+        } else if (o == '<' || o == '>') {
+          has_redirect = true;
+          i++;
+        } else if (o == '(' || o == '{') {
+          has_opener = true;
+          i++;
+          break;
+        } else if (o == ')' || o == '}') {
+          i++;
+          break;
+        } else {
+          break;
+        }
+      }
+      if (has_opener || (has_separator && !has_redirect)) {
+        command_position = true;
+        expecting_in = false;
+      }
+      continue;
+    }
+
+    /* A word, scanned to its break. Its quoted strings and expansions are
+       colored into word_spans, which stand for an argument or an
+       expansion-built command. A plain command or keyword word is colored
+       whole below. */
+    let const word_start = i;
+    ArrayList<highlight_span> word_spans{};
+    while (i < end && !is_highlight_word_break(line[i])) {
+      let const d = line[i];
+      if (d == '\'') {
+        let const string_start = i;
+        i++;
+        while (i < end && line[i] != '\'') i++;
+        if (i < end) i++;
+        word_spans.push(highlight_span{string_start, i, colors::ansi::YELLOW});
+      } else if (d == '"') {
+        /* literal_start tracks the start of the current yellow run, which
+           begins at the opening quote and resumes after every expansion. */
+        i++;
+        usize literal_start = i - 1;
+        while (i < end && line[i] != '"') {
+          if (line[i] == '\\' && i + 1 < end) {
+            i += 2;
+            continue;
+          }
+          if (line[i] == '$') {
+            if (i > literal_start)
+              word_spans.push(
+                  highlight_span{literal_start, i, colors::ansi::YELLOW});
+            i = color_dollar(line, i, end, word_spans, context);
+            literal_start = i;
+            continue;
+          }
+          i++;
+        }
+        if (i < end) i++;
+        if (i > literal_start)
+          word_spans.push(
+              highlight_span{literal_start, i, colors::ansi::YELLOW});
+      } else if (d == '`') {
+        /* A backtick substitution recurses the same way $(...) does. */
+        let const inner_begin = i + 1;
+        i++;
+        while (i < end && line[i] != '`') i++;
+        let const inner_end = i;
+        if (i < end) i++;
+        scan_highlight_range(line, inner_begin, inner_end, context, word_spans);
+      } else if (d == '$') {
+        i = color_dollar(line, i, end, word_spans, context);
+      } else if (d == '\\' && i + 1 < end) {
+        i += 2;
+      } else {
+        i++;
+      }
+    }
+    let const word_end = i;
+    let const word = line.substring_of_length(word_start, word_end - word_start);
+    let const plain = word_spans.is_empty();
+    let const is_assignment = word_looks_like_assignment(word);
+
+    /* A for or case awaits its in, which is the keyword there. */
+    if (expecting_in && plain && word == "in") {
+      push(word_start, word_end, colors::ansi::GREEN);
+      expecting_in = false;
+      command_position = false;
+      continue;
+    }
+
+    if (command_position && plain && !is_assignment) {
+      bool is_keyword = true;
+      bool keyword_ok = true;
+      bool next_is_command = true;
+      bool opens_in = false;
+      if (word == "if") {
+        stack.push(highlight_construct::If);
+      } else if (word == "while" || word == "until") {
+        stack.push(highlight_construct::WhileUntil);
+      } else if (word == "for") {
+        stack.push(highlight_construct::For);
+        next_is_command = false;
+        opens_in = true;
+      } else if (word == "case") {
+        stack.push(highlight_construct::Case);
+        next_is_command = false;
+        opens_in = true;
+      } else if (word == "function") {
+        stack.push(highlight_construct::Function);
+        next_is_command = false;
+      } else if (word == "then") {
+        keyword_ok = !stack.is_empty() && stack.back() == highlight_construct::If;
+      } else if (word == "do") {
+        keyword_ok = !stack.is_empty() &&
+                     (stack.back() == highlight_construct::WhileUntil ||
+                      stack.back() == highlight_construct::For);
+      } else if (word == "else" || word == "elif") {
+        keyword_ok = !stack.is_empty() && stack.back() == highlight_construct::If;
+      } else if (word == "fi") {
+        keyword_ok = !stack.is_empty() && stack.back() == highlight_construct::If;
+        if (keyword_ok) stack.pop_back();
+      } else if (word == "done") {
+        keyword_ok = !stack.is_empty() &&
+                     (stack.back() == highlight_construct::WhileUntil ||
+                      stack.back() == highlight_construct::For);
+        if (keyword_ok) stack.pop_back();
+      } else if (word == "esac") {
+        keyword_ok =
+            !stack.is_empty() && stack.back() == highlight_construct::Case;
+        if (keyword_ok) stack.pop_back();
+      } else if (word == "time" || word == "when") {
+        /* A prefix keyword, the command follows it. */
+      } else if (word == "in") {
+        /* An in outside a for or case is misplaced. */
+        keyword_ok = false;
+        next_is_command = false;
+      } else {
+        is_keyword = false;
+      }
+
+      if (is_keyword) {
+        push(word_start, word_end,
+             keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
+        command_position = next_is_command;
+        if (opens_in) expecting_in = true;
+        continue;
+      }
+
+      /* A command name. A resolved command keeps the default color, an
+         unresolved one is red. */
+      if (!first_word_resolves(word, context))
+        push(word_start, word_end, colors::ansi::RED);
+      command_position = false;
+      continue;
+    }
+
+    /* An argument, an expansion-built command, or an assignment prefix. The
+       inner spans stand. An assignment prefix keeps the next word in command
+       position, an expansion-built command moves past it. */
+    for (const highlight_span &inner : word_spans)
+      push(inner.start, inner.end, inner.sgr);
+    if (command_position && !is_assignment) command_position = false;
+  }
+}
+
+fn highlight_line(StringView line, EvalContext &context) throws
+    -> ArrayList<highlight_span>
+{
+  ArrayList<highlight_span> spans{};
+  scan_highlight_range(line, 0, line.length, context, spans);
+  return spans;
 }
 
 } /* namespace completion */

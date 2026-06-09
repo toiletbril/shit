@@ -22,6 +22,7 @@ inline const StringView YELLOW = "\x1b[33m";
 inline const StringView BOLD_RED = "\x1b[1;31m";
 inline const StringView BOLD_GREEN = "\x1b[1;32m";
 inline const StringView BOLD_YELLOW = "\x1b[1;33m";
+inline const StringView CYAN = "\x1b[36m";
 inline const StringView BOLD_MAGENTA = "\x1b[1;35m";
 inline const StringView BOLD_CYAN = "\x1b[1;36m";
 } /* namespace ansi */

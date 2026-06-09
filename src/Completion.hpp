@@ -41,26 +41,26 @@ struct completion_result
 fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory) throws -> completion_result;
 
-/* The first word of the line and whether it names a runnable command. The byte
-   span runs from word_start to word_end, the command word the interactive
-   highlighter colors. should_color is true when the word is a plain command
-   name that resolves to nothing, a builtin, a function, an alias, a PATH
-   executable, or, when it holds a slash, an existing executable path. A leading
-   assignment, a reserved word, an opening parenthesis, or an empty line leave
-   should_color false so the line stays plain. */
-struct highlight_result
+/* One colored stretch of the input line for live syntax highlighting. The span
+   runs from the byte offset start to end, and sgr is the ANSI escape that opens
+   it, a colors::ansi constant whose data is a stable null-terminated literal.
+   The spans come back sorted by start and non-overlapping. */
+struct highlight_span
 {
-  usize word_start;
-  usize word_end;
-  bool should_color;
+  usize start;
+  usize end;
+  StringView sgr;
 };
 
-/* Decide whether the first word of the line should be colored as an
-   unresolvable command. The context supplies the function, alias, and builtin
-   sets and PATH drives the executable search, the same resolution the command
-   evaluator performs. */
-fn highlight_first_word(StringView line, EvalContext &context) throws
-    -> highlight_result;
+/* Color the whole line by token for the interactive editor. A command word is
+   green when it resolves and red when it does not, a reserved word is magenta, a
+   quoted string is yellow, a variable or command substitution is cyan, an
+   operator or redirection is bold, and a comment is dim. The scan tolerates a
+   half-typed line, an unterminated quote or expansion colors to the end rather
+   than throwing, so a line is always colored. The context drives the
+   command-name resolution, the same one the evaluator performs. */
+fn highlight_line(StringView line, EvalContext &context) throws
+    -> ArrayList<highlight_span>;
 
 } /* namespace completion */
 

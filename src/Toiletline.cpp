@@ -194,15 +194,17 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 }
 
 /* Bridge toiletline's render-time highlight query onto the shell. The shell
-   decides whether the first word of the line resolves to a command and, when it
-   does not, returns the word's span so the editor colors it.
+   colors the whole line by token, a command word by whether it resolves, a
+   reserved word, a string, an expansion, an operator, and a comment, and returns
+   the colored spans.
 
-   Toiletline edits in codepoints and renders the highlight span in codepoints,
-   while the shell parses in bytes, so the byte span the highlighter returns is
-   converted back to codepoint indices here, the same conversion the completion
-   bridge performs. Returns 1 when the span should be colored, 0 otherwise. The
-   body is guarded because toiletline calls it through a C function pointer, so
-   a throw must not unwind through the C frames. */
+   Toiletline edits in codepoints and renders the spans in codepoints, while the
+   shell scans in bytes, so each byte span is converted back to codepoint
+   indices here, the same conversion the completion bridge performs. The
+   conversion is monotonic, so the spans stay sorted and non-overlapping. Returns
+   1 when at least one span is filled, 0 otherwise. The body is guarded because
+   toiletline calls it through a C function pointer, so a throw must not unwind
+   through the C frames. */
 fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;
@@ -211,15 +213,19 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
     const usize byte_length = std::strlen(buffer);
     shit::StringView line{buffer, byte_length};
 
-    shit::completion::highlight_result result =
-        shit::completion::highlight_first_word(line, *COMPLETION_CONTEXT);
+    shit::ArrayList<shit::completion::highlight_span> result =
+        shit::completion::highlight_line(line, *COMPLETION_CONTEXT);
 
-    if (!result.should_color) return 0;
-
-    out->token_start = ::tl_utf8_strnlen(buffer, result.word_start);
-    out->token_end = ::tl_utf8_strnlen(buffer, result.word_end);
-    out->should_color = 1;
-    return 1;
+    size_t filled = 0;
+    for (const shit::completion::highlight_span &span : result) {
+      if (filled >= out->capacity) break;
+      out->spans[filled].start = ::tl_utf8_strnlen(buffer, span.start);
+      out->spans[filled].end = ::tl_utf8_strnlen(buffer, span.end);
+      out->spans[filled].sgr = span.sgr.data;
+      filled++;
+    }
+    out->count = filled;
+    return filled > 0 ? 1 : 0;
   } catch (...) {
     return 0;
   }
