@@ -8,8 +8,6 @@
 #include "Tokens.hpp"
 #include "Utils.hpp"
 
-#include <cstdio>
-
 /* TODO: Rewrite the lexer and parser to suit the shell language better. */
 /* TODO: Cache the token for repeated peeks. */
 

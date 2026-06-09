@@ -7,9 +7,6 @@
 #include "String.hpp"
 #include "StringView.hpp"
 
-#include <new>
-#include <utility>
-
 namespace shit {
 
 /* An open-addressing hash table from a string key to a Value over an explicit

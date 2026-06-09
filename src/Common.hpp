@@ -49,8 +49,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
-#include <tuple>
+#include <type_traits>
 #include <utility>
 
 /* Crablang types. */

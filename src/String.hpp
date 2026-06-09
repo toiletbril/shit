@@ -7,7 +7,6 @@
 #include "StringView.hpp"
 
 #include <cstring>
-#include <new>
 
 namespace shit {
 

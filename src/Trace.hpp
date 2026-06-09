@@ -8,9 +8,6 @@
 #include "Common.hpp"
 #include "Containers.hpp"
 
-#include <cstdio>
-#include <type_traits>
-
 namespace shit {
 
 enum class verbosity : u8

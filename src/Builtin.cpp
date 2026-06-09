@@ -6,8 +6,6 @@
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 
-#include <optional>
-
 namespace shit {
 
 cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,

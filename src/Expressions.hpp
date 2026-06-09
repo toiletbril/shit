@@ -4,8 +4,6 @@
 #include "Eval.hpp"
 #include "Tokens.hpp"
 
-#include <utility>
-
 namespace shit {
 
 using namespace tokens;

@@ -3,6 +3,7 @@
 #include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Cli.hpp"
+#include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -12,9 +13,6 @@
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
-
-#include <optional>
-#include <utility>
 
 namespace shit {
 
@@ -38,7 +36,8 @@ cold fn Expression::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
-hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
+hot flatten forceinline fn Expression::evaluate(EvalContext &cxt) const throws
+    -> i64
 {
   /* A Ctrl-C sets the interrupt flag, and the check here runs before every
      node, so a running command, including a loop body or condition, stops

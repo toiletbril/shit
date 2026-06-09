@@ -176,7 +176,8 @@ static fn path_command_names() throws -> const ArrayList<String> &
     segment_start = i + 1;
     const Path directory{segment.is_empty() ? StringView{"."} : segment};
     if (Maybe<ArrayList<String>> entries = Path::read_directory(directory)) {
-      for (String &entry : *entries) CACHED_PATH_COMMANDS.push(steal(entry));
+      for (String &entry : *entries)
+        CACHED_PATH_COMMANDS.push(steal(entry));
     }
   }
   CACHED_COMPLETION_PATH = String{current};

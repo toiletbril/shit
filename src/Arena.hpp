@@ -3,9 +3,7 @@
 #include "ArrayList.hpp"
 #include "Common.hpp"
 
-#include <new>
 #include <type_traits>
-#include <utility>
 
 namespace shit {
 

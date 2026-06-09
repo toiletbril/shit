@@ -309,9 +309,7 @@ fn initialize() -> void
   if (shit::Maybe<shit::Path> shit_history = history_file_path();
       shit_history.has_value())
   {
-    if (int ret = ::tl_history_load(shit_history->c_str());
-        ret != TL_SUCCESS)
-    {
+    if (int ret = ::tl_history_load(shit_history->c_str()); ret != TL_SUCCESS) {
       /* Don't count non-existent history file as an error. */
       if (ret != -ENOENT) {
         shit::String err_message = "Toiletline: Could not load history: ";

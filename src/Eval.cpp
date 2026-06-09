@@ -14,7 +14,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cstdlib>

@@ -2,9 +2,6 @@
 
 #include "Debug.hpp"
 
-#include <new>
-#include <utility>
-
 namespace shit {
 
 /* The empty state of a Maybe. A function returns None to say it produced no

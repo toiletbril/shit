@@ -5,9 +5,6 @@
 #include "Eval.hpp"
 #include "Maybe.hpp"
 
-#include <memory>
-#include <utility>
-
 namespace shit {
 
 class Expression;

@@ -4,8 +4,6 @@
 #include "Common.hpp"
 #include "Path.hpp"
 
-#include <utility>
-
 namespace shit {
 
 /* A command name resolved to what runs it, either a builtin chosen by its Kind
