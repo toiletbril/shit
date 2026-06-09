@@ -370,8 +370,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
 {
   Word word{};
 
-  usize byte_count = 0, escaped_newline_count = 0,
-        relative_last_quote_char_pos = 0;
+  usize byte_count = 0, relative_last_quote_char_pos = 0;
 
   bool should_escape = false;
 
@@ -445,11 +444,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
 
     if (should_escape) {
       /* The previous character was a backslash. A backslash before a newline
-         continues the line and leaves None behind. */
+         continues the line and leaves None behind, so the newline byte is
+         consumed without appending anything. */
       should_escape = false;
-      if (ch == '\n')
-        escaped_newline_count++;
-      else
+      if (ch != '\n')
         append_char(WordSegment::Kind::LiteralText, ch);
       byte_count++;
       continue;
@@ -797,7 +795,13 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         here(m_cursor_position + byte_count, 1), "Expected a character here"};
   }
 
-  const let actual_cursor_position = m_cursor_position + escaped_newline_count;
+  /* The token spans from the word's first byte over byte_count bytes, the
+     continuation backslash and newline included, so the location starts at the
+     cursor rather than past the continuations. An earlier form shifted the start
+     by the continuation count, which moved a continued word's caret off its
+     first byte onto a later line. The keyword token macro reads this name too,
+     so it stays a local. */
+  const let actual_cursor_position = m_cursor_position;
   ASSERT(actual_cursor_position <= m_source.length());
 
   if (m_should_collect_debug_words &&

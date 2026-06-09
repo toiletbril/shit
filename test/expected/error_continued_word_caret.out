@@ -1,0 +1,10 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "xyzzy_undefined"]
+[Word
+  Unquoted "xyzzy_undefined"
+]
+shit: 1:1: error: Command 'xyzzy_undefined' was not found.
+     1 |  xy\
+       |  ^~~ here.
+[Code 1]
