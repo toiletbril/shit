@@ -219,8 +219,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const &name = args[++i];
       let const option = find_option_by_name(name);
       if (option == nullptr)
-        throw Error{"Unable to set the shell option because '" + name +
-                    "' is not a valid option name"};
+        throw Error{StringView{"unknown -o option '"} + name + "'"};
       if (option->set != nullptr) (cxt.*(option->set))(enable);
       continue;
     }
@@ -244,8 +243,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
           let invalid_option = String{};
           invalid_option += arg[0];
           invalid_option += letter;
-          throw Error{"Unable to set the shell option because '" +
-                      invalid_option + "' is not a valid option"};
+          throw Error{StringView{"unknown option '"} + invalid_option + "'"};
         }
         if (option->set != nullptr) (cxt.*(option->set))(enable);
       }

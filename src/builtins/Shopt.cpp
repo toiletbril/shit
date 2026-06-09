@@ -6,6 +6,20 @@
    option whose pattern engine is not yet wired still records its state so a
    later query reads it back. */
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-suqo] [optname ...]");
+
+HELP_DESCRIPTION_DECL(
+    "The shopt builtin sets, unsets, and queries the bash shell options such as "
+    "extglob, globstar, nullglob, and dotglob. The -s flag enables an option, "
+    "-u disables it, -q suppresses the status output for a scripted probe, and "
+    "-o operates on the set -o options instead of the shopt names. With no flag "
+    "a named option is queried, and with no name every option that has a "
+    "recorded state is listed.");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 namespace {
@@ -93,6 +107,9 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
+  if (args.count() > 1 && args[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   bool enable = false;
   bool disable = false;
   bool quiet = false;
@@ -123,11 +140,14 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   i32 status = 0;
   auto reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
-    if (!quiet)
-      shit::print_error(StringView{"Unable to set the shopt option because '"} +
-                        name + "' is not a valid shell option name\n");
-    status = 1;
-    return true;
+    /* A -q probe wants the status without the message, so it stays silent. Any
+       other invocation throws a located error the dispatch renders with a caret
+       at the command, kept short rather than the long Unable-to-because form. */
+    if (quiet) {
+      status = 1;
+      return true;
+    }
+    throw Error{StringView{"unknown shopt option '"} + name + "'"};
   };
 
   /* shopt -o operates on the set -o options rather than the shopt names, the
@@ -137,11 +157,10 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
     for (const StringView name : names) {
       if (enable || disable) {
         if (!apply_shell_option(cxt, name, enable)) {
-          if (!quiet)
-            shit::print_error(
-                StringView{"Unable to set the shopt option because '"} + name +
-                "' is not a valid shell option name\n");
-          status = 1;
+          if (quiet)
+            status = 1;
+          else
+            throw Error{StringView{"unknown shopt option '"} + name + "'"};
         }
       } else if (Maybe<bool> on = query_shell_option(cxt, name);
                  on.has_value())
@@ -149,11 +168,10 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
         if (!*on) status = 1;
         if (!quiet) ec.print_to_stdout(shopt_status_line(name, *on).view());
       } else {
-        if (!quiet)
-          shit::print_error(
-              StringView{"Unable to query the shopt option because '"} + name +
-              "' is not a valid shell option name\n");
-        status = 1;
+        if (quiet)
+          status = 1;
+        else
+          throw Error{StringView{"unknown shopt option '"} + name + "'"};
       }
     }
     return status;
