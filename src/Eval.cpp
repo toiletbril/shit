@@ -849,7 +849,7 @@ fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
 
 fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
-  return eval_state_snapshot{m_shell_variables, m_functions,
+  return eval_state_snapshot{m_shell_variables, m_functions, m_aliases,
                              m_positional_params, Path::current_directory()};
 }
 
@@ -857,6 +857,9 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
   m_shell_variables = steal(snapshot.shell_variables);
   m_functions = steal(snapshot.functions);
+  /* An alias defined or removed inside a subshell or a command substitution
+     stays inside it, the way bash isolates an alias change in a subshell. */
+  m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
   /* set_current_directory reports an error through ErrorOr, ignored here to
      match the prior void call that swallowed a failed chdir. */
@@ -917,14 +920,14 @@ enum class TrimEnd
 
 /* Remove the shortest or longest prefix or suffix of value that matches pattern
    as a glob, returning the surviving part. The candidate substrings are views
-   over value, so only the returned remainder allocates, and the pattern's
-   all-active glob mask is built once rather than per length tested. */
-fn trim_matching(StringView value, StringView pattern, TrimEnd end,
+   over value, so only the returned remainder allocates. The active mask runs
+   parallel to pattern and marks which pattern bytes may act as glob
+   metacharacters, so a quoted or escaped * or ? matches itself. */
+fn trim_matching(StringView value, StringView pattern,
+                 const ArrayList<bool> &active, TrimEnd end,
                  bool longest) throws -> String
 {
-  let active = ArrayList<bool>{heap_allocator()};
-  for (usize k = 0; k < pattern.length; k++)
-    active.push(true);
+  ASSERT(active.count() == pattern.length);
 
   if (end == TrimEnd::Prefix) {
     /* The longest match scans down from the whole string and the shortest
@@ -968,7 +971,45 @@ fn trim_matching(StringView value, StringView pattern, TrimEnd end,
 fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
     -> String
 {
+  /* The default, assign, alternate, error, and arithmetic forms never glob, so
+     the mask the worker fills is discarded here. The default word keeps a
+     backslash that sits before an ordinary character, so the pattern-only
+     unescape stays off. */
+  let discarded_mask = ArrayList<bool>{heap_allocator()};
+  return expand_modifier_word_worker(word, discarded_mask, remove_quotes, false);
+}
+
+fn EvalContext::expand_modifier_word_masked(StringView word,
+                                            ArrayList<bool> &active_out,
+                                            bool remove_quotes) throws -> String
+{
+  /* A # or % pattern word has every backslash quote the next byte, so the byte
+     is emitted literally and marked inactive in the mask. */
+  return expand_modifier_word_worker(word, active_out, remove_quotes, true);
+}
+
+fn EvalContext::expand_modifier_word_worker(StringView word,
+                                            ArrayList<bool> &active_out,
+                                            bool remove_quotes,
+                                            bool is_pattern_word) throws -> String
+{
   let out = String{heap_allocator()};
+
+  /* Append one byte and record whether it may act as a glob metacharacter, so
+     the mask stays parallel to out. */
+  auto emit_byte = [&](char byte, bool is_active) {
+    out += byte;
+    active_out.push(is_active);
+  };
+
+  /* Append a run of bytes that share one glob-active state, used for an
+     expansion result whose every byte takes the same mask. */
+  auto emit_run = [&](StringView bytes, bool is_active) {
+    out.append(bytes);
+    for (usize k = 0; k < bytes.length; k++)
+      active_out.push(is_active);
+  };
+
   let in_single_quote = false;
   let in_double_quote = false;
   for (usize i = 0; i < word.length; i++) {
@@ -984,7 +1025,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
       continue;
     }
     if (in_single_quote) {
-      out += word[i];
+      emit_byte(word[i], false);
       continue;
     }
 
@@ -995,12 +1036,21 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
        other backslash is kept literally, matching the shell in a heredoc body
        and a parameter word. */
     if (word[i] == '\\') {
+      /* In a # or % pattern word a backslash quotes whatever byte follows, so
+         the byte is emitted literally and inactive and the backslash is dropped,
+         which makes a quoted glob character such as \* match itself. A trailing
+         backslash with no following byte is kept literally. */
+      if (is_pattern_word && i + 1 < word.length) {
+        emit_byte(word[i + 1], false);
+        i++;
+        continue;
+      }
       if (i + 1 < word.length) {
         const char next = word[i + 1];
         if (next == '$' || next == '`' || next == '\\' ||
             (remove_quotes && next == '"'))
         {
-          out += next;
+          emit_byte(next, false);
           i++;
           continue;
         }
@@ -1009,7 +1059,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
           continue;
         }
       }
-      out += '\\';
+      emit_byte('\\', false);
       continue;
     }
 
@@ -1032,17 +1082,17 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
         if (word[j] == '`') break;
         inner += word[j];
       }
-      out += capture_command_substitution(inner);
+      emit_run(capture_command_substitution(inner), !in_double_quote);
       i = j;
       continue;
     }
 
     if (word[i] != '$') {
-      out += word[i];
+      emit_byte(word[i], !in_double_quote);
       continue;
     }
     if (i + 1 >= word.length) {
-      out += '$';
+      emit_byte('$', !in_double_quote);
       break;
     }
 
@@ -1061,7 +1111,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
         inner += word[j];
         j++;
       }
-      out += apply_parameter_expansion(inner);
+      emit_run(apply_parameter_expansion(inner), !in_double_quote);
       i = j;
     } else if (lexer::is_variable_name_start(next)) {
       String name{heap_allocator()};
@@ -1073,7 +1123,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
          name here aborts rather than expanding to nothing. */
       if (m_error_unset && !get_variable_value(name).has_value())
         throw Error{name + ": parameter not set"};
-      out += expand_variable(name);
+      emit_run(expand_variable(name), !in_double_quote);
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
       /* Arithmetic $((...)), scanned to the matching )). */
@@ -1092,7 +1142,9 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
         }
         inner += word[j];
       }
-      out += utils::int_to_text(evaluate_arithmetic(inner));
+      /* An arithmetic result is decimal digits and an optional minus, none of
+         which can glob, so the bytes are emitted inactive. */
+      emit_run(utils::int_to_text(evaluate_arithmetic(inner)), false);
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). */
@@ -1108,7 +1160,7 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
         }
         inner += word[j];
       }
-      out += capture_command_substitution(inner);
+      emit_run(capture_command_substitution(inner), !in_double_quote);
       i = j;
     } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                next == '$' || next == '!' || next == '-' ||
@@ -1117,10 +1169,10 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
       let const special_name = StringView{&next, 1};
       if (m_error_unset && !get_variable_value(special_name).has_value())
         throw Error{special_name + ": parameter not set"};
-      out += expand_variable(special_name);
+      emit_run(expand_variable(special_name), !in_double_quote);
       i++;
     } else {
-      out += '$';
+      emit_byte('$', !in_double_quote);
     }
   }
   return out;
@@ -1210,13 +1262,17 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   case '#': {
     let const value = current.value_or(String{});
-    return trim_matching(value.view(), expand_modifier_word(word),
+    let pattern_active = ArrayList<bool>{heap_allocator()};
+    let const pattern = expand_modifier_word_masked(word, pattern_active);
+    return trim_matching(value.view(), pattern.view(), pattern_active,
                          TrimEnd::Prefix, is_doubled);
   }
 
   case '%': {
     let const value = current.value_or(String{});
-    return trim_matching(value.view(), expand_modifier_word(word),
+    let pattern_active = ArrayList<bool>{heap_allocator()};
+    let const pattern = expand_modifier_word_masked(word, pattern_active);
+    return trim_matching(value.view(), pattern.view(), pattern_active,
                          TrimEnd::Suffix, is_doubled);
   }
 

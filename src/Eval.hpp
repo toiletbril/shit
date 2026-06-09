@@ -116,6 +116,7 @@ struct eval_state_snapshot
 {
   HashMap<String> shell_variables;
   HashMap<const Expression *> functions;
+  HashMap<String> aliases;
   ArrayList<String> positional_params;
   Path working_directory;
 };
@@ -418,6 +419,22 @@ public:
 
   fn expand_modifier_word(StringView word, bool remove_quotes = true) throws
       -> String;
+
+  /* The same expansion, plus a parallel mask that marks which output bytes may
+     act as glob metacharacters. A byte from a quoted, single-quoted, or escaped
+     region is inactive, an unquoted literal byte is active, and a byte from an
+     unquoted expansion is active so a * or ? in the value globs. The ${x#pat}
+     and ${x%pat} forms read the mask so a quoted * in the pattern matches
+     literally rather than as a wildcard. */
+  fn expand_modifier_word_masked(StringView word, ArrayList<bool> &active_out,
+                                 bool remove_quotes = true) throws -> String;
+
+  /* The shared body behind the two public forms. is_pattern_word makes a
+     backslash quote the following byte and mark it inactive, the # and % rule,
+     while the plain form keeps a backslash that precedes an ordinary byte. */
+  fn expand_modifier_word_worker(StringView word, ArrayList<bool> &active_out,
+                                 bool remove_quotes,
+                                 bool is_pattern_word) throws -> String;
 
   pure fn should_echo() const wontthrow -> bool;
   pure fn should_echo_expanded() const wontthrow -> bool;

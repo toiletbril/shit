@@ -1,0 +1,132 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "alias" "sub_only=echo hi"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "alias" "sub_only"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "leaked from subshell"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "isolated from subshell"]
+  [CompoundListCondition, None]
+    [Assign cs=$( alias cs_only='echo hi'; echo defined-inside )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cmdsub reported: $cs"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "alias" "cs_only"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "leaked from cmdsub"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "isolated from cmdsub"]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "sub_only="
+  Literal "echo hi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "sub_only"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "leaked from subshell"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "isolated from subshell"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "cs="
+  CommandSubstitution " alias cs_only='echo hi'; echo defined-inside "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cmdsub reported: "
+  Variable "cs"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "alias"
+]
+[Word
+  Unquoted "cs_only"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "leaked from cmdsub"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "isolated from cmdsub"
+]
+[Word
+  Unquoted "fi"
+]
+isolated from subshell
+cmdsub reported: defined-inside
+isolated from cmdsub
+[Code 0]

@@ -1,0 +1,114 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=a*c]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "$x%"*c""]
+  [CompoundListCondition, None]
+    [Assign x=abc]
+  [CompoundListCondition, None]
+    [Assign p=*]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "$x##"$p""]
+  [CompoundListCondition, None]
+    [Assign x=a*c]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x#a\*"]
+  [CompoundListCondition, None]
+    [Assign x=aXc]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x#a\X"]
+  [CompoundListCondition, None]
+    [Assign x=abc]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x#a*"]
+  [CompoundListCondition, None]
+    [Assign v=a*b*c]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$v%%"*"*"]
+[Word
+  Unquoted "x="
+  Literal "a*c"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "%s\n"
+]
+[Word
+  Variable "x%"*c""
+]
+[Word
+  Unquoted "x=abc"
+]
+[Word
+  Unquoted "p="
+  Literal "*"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "%s\n"
+]
+[Word
+  Variable "x##"$p""
+]
+[Word
+  Unquoted "x="
+  DoubleQuoted "a*c"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]\n"
+]
+[Word
+  Variable "x#a\*"
+]
+[Word
+  Unquoted "x=aXc"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]\n"
+]
+[Word
+  Variable "x#a\X"
+]
+[Word
+  Unquoted "x="
+  DoubleQuoted "abc"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]\n"
+]
+[Word
+  Variable "x#a*"
+]
+[Word
+  Unquoted "v="
+  Literal "a*b*c"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]\n"
+]
+[Word
+  Variable "v%%"*"*"
+]
+a
+abc
+[c]
+[c]
+[bc]
+[a]
+[Code 0]
