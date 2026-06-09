@@ -298,16 +298,19 @@ hot fn execute_program(ExecContext &&ec) throws -> process
 
   /* Each redirect is placed onto its standard descriptor and the original is
      closed, in this order, so the child sees the same descriptor layout the
-     fork child built. */
-  if (ec.in_fd) {
+     fork child built. A descriptor that already sits on its target slot, as
+     when the inherited standard input is passed as in_fd, is left in place,
+     since the dup2 onto itself is a no-op and the close would shut the live
+     descriptor and leave the child with no standard input. */
+  if (ec.in_fd && *ec.in_fd != STDIN_FILENO) {
     posix_spawn_file_actions_adddup2(&file_actions, *ec.in_fd, STDIN_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.in_fd);
   }
-  if (ec.out_fd) {
+  if (ec.out_fd && *ec.out_fd != STDOUT_FILENO) {
     posix_spawn_file_actions_adddup2(&file_actions, *ec.out_fd, STDOUT_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.out_fd);
   }
-  if (ec.err_fd) {
+  if (ec.err_fd && *ec.err_fd != STDERR_FILENO) {
     posix_spawn_file_actions_adddup2(&file_actions, *ec.err_fd, STDERR_FILENO);
     posix_spawn_file_actions_addclose(&file_actions, *ec.err_fd);
   }
