@@ -1,10 +1,10 @@
 DIFF_FLAGS := -u
 
 ifeq ($(OS), Windows_NT)
-BIN := ../shit.exe
+BIN ?= ../shit.exe
 DIFF_FLAGS += -w # CRLF on Windows SMH
 else
-BIN := ../shit
+BIN ?= ../shit
 endif
 
 BIN_FLAGS := -AEM
@@ -90,10 +90,12 @@ bashdiff: $(BIN)
 # the output is identical. Use the optimized shit build, MODE=rel, for a
 # fair comparison. SCALE scales the work, the default keeps dash near 0.1s.
 ZSH ?= zsh
-BENCH := bench/configure.shit
-SCALE ?= 40
+GOSH ?= gosh
 
-bench: $(BIN)
+BENCH := bench/configure.shit
+SCALE ?= 100
+
+bench:
 	@SCALE=$(SCALE) $(DASH) $(BENCH) >/tmp/shit_bench_d 2>&1; \
 	SCALE=$(SCALE) $(BIN) --no-diagnostics $(BENCH) >/tmp/shit_bench_s 2>&1; \
 	if cmp -s /tmp/shit_bench_d /tmp/shit_bench_s; then \
@@ -104,7 +106,7 @@ bench: $(BIN)
 	fi; \
 	echo "wall-clock seconds at SCALE=$(SCALE), lower is better:"; \
 	$(BASH) -c 'export TIMEFORMAT="  %R"; \
-		for sh in "$(DASH)" "$(BASH)" "$(ZSH)" "$(BIN)"; do \
+		for sh in "$(DASH)" "$(BASH)" "$(ZSH)" "$(GOSH)" "$(BIN)"; do \
 			printf "  %-10s" "$$sh"; \
 			flags=; [ "$$sh" = "$(BIN)" ] && flags=--no-diagnostics; \
 			( time SCALE=$(SCALE) $$sh $$flags $(BENCH) >/dev/null 2>&1 ) 2>&1; \

@@ -183,6 +183,7 @@ cold static fn calc_precise_position(StringView source,
 }
 
 template <class T>
+  requires std::is_integral_v<T>
 cold static fn number_string_length(T n) throws -> usize
 {
   usize len = 0;
