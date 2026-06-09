@@ -5,6 +5,12 @@
 
 /* shift drops the first n positional parameters, n defaulting to 1. */
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[n]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Shift::Shift() = default;
@@ -14,6 +20,9 @@ pure Builtin::Kind Shift::kind() const wontthrow { return Kind::Shift; }
 i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   ASSERT(!ec.args().is_empty());
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   i64 count = 1;
   if (ec.args().count() > 1) {

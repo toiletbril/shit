@@ -2,6 +2,12 @@
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[n]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 Break::Break() = default;
@@ -12,6 +18,9 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   /* The optional argument is how many enclosing loops to break, default one. */
   i64 level = 1;
   if (ec.args().count() > 1) {
@@ -21,7 +30,7 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
   /* A non-positive count is rejected the way dash rejects an illegal number,
      rather than clamped, so break 0 aborts instead of breaking one loop. */
-  if (level < 1) throw Error{"break: Illegal number: " + ec.args()[1]};
+  if (level < 1) throw Error{"Illegal number: " + ec.args()[1]};
 
   cxt.request_break(level, ec.source_location());
   return 0;

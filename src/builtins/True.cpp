@@ -1,7 +1,11 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 
-/* Always returns success. */
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -11,8 +15,11 @@ pure Builtin::Kind True::kind() const wontthrow { return Kind::True; }
 
 i32 True::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  unused(ec);
   unused(cxt);
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   return 0;
 }
 

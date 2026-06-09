@@ -9,7 +9,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("wait [%job|pid ...]");
+HELP_SYNOPSIS_DECL("[%job|pid ...]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -35,6 +37,8 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());
+
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   i32 status = 0;
 

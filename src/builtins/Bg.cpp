@@ -10,7 +10,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("bg [%job]");
+HELP_SYNOPSIS_DECL("[%job]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -23,17 +25,19 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   job *job = nullptr;
   if (args.count() > 1 && !args[1].is_empty() && args[1][0] == '%') {
     let const parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
     if (parsed.is_error())
-      throw Error{"Bg: '" + args[1] + "' is not a valid job"};
+      throw Error{"'" + args[1] + "' is not a valid job"};
     job = cxt.find_job(static_cast<int>(parsed.value()));
   } else
     job = cxt.most_recent_job();
 
-  if (job == nullptr) throw Error{"Bg: there is no such job"};
+  if (job == nullptr) throw Error{"there is no such job"};
   ASSERT(job != nullptr);
 
   if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))

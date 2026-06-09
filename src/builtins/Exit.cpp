@@ -2,7 +2,11 @@
 #include "../Eval.hpp"
 #include "../Utils.hpp"
 
-/* No flags. */
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[n]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -13,6 +17,9 @@ pure fn Exit::kind() const wontthrow -> Builtin::Kind { return Kind::Exit; }
 fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* exit with no argument uses the status of the last command. */
   i64 status = cxt.last_exit_status();
