@@ -2561,6 +2561,26 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
   return names;
 }
 
+fn EvalContext::collect_array_subscripts(StringView name) const throws
+    -> ArrayList<String>
+{
+  let out = ArrayList<String>{heap_allocator()};
+  if (is_associative_array(name)) {
+    for (const String &key : associative_keys(name))
+      out.push(String{heap_allocator(), key.view()});
+    return out;
+  }
+  if (let const *array = lookup_indexed_array(name)) {
+    for (usize i = 0; i < array->count(); i++)
+      out.push(utils::uint_to_text(i));
+    return out;
+  }
+  /* A scalar has the single index zero, an unset name has none. */
+  if (get_variable_value(name).has_value())
+    out.push(String{heap_allocator(), "0"});
+  return out;
+}
+
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 {
   if (body.is_empty()) return String{heap_allocator()};
@@ -2572,25 +2592,12 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
       body[body.length - 3] == '[' && lexer::is_variable_name_start(body[0]))
   {
     const StringView array_name = body.substring_of_length(0, body.length - 3);
+    let const subscripts = collect_array_subscripts(array_name);
     let out = String{heap_allocator()};
-    if (is_associative_array(array_name)) {
-      let const keys = associative_keys(array_name);
-      for (usize i = 0; i < keys.count(); i++) {
-        if (i > 0) out.push(' ');
-        out.append(keys[i].view());
-      }
-      return out;
+    for (usize i = 0; i < subscripts.count(); i++) {
+      if (i > 0) out.push(' ');
+      out.append(subscripts[i].view());
     }
-    if (let const *array = lookup_indexed_array(array_name)) {
-      for (usize i = 0; i < array->count(); i++) {
-        if (i > 0) out.push(' ');
-        out.append(utils::uint_to_text(i).view());
-      }
-      return out;
-    }
-    /* A scalar has the single index zero, an unset name has none. */
-    if (get_variable_value(array_name).has_value())
-      return String{heap_allocator(), "0"};
     return out;
   }
 
@@ -4380,6 +4387,42 @@ hot fn EvalContext::expand_word(const Word &word) throws
           for (usize i = 0; i < names.count(); i++) {
             if (i > 0) flush();
             append_split_run(names[i].view(), true);
+          }
+        }
+        break;
+      }
+      /* "${!a[@]}" emits one field per subscript, the way "${a[@]}" emits one
+         per element, while "${!a[*]}" joins them by the first IFS character. The
+         joined string path loses the per-subscript boundary, so the field form
+         is produced here. The body is a leading '!' and a trailing [@] or [*]. */
+      if (segment_text.length >= 5 && segment_text[0] == '!' &&
+          segment_text[segment_text.length - 1] == ']' &&
+          segment_text[segment_text.length - 3] == '[' &&
+          (segment_text[segment_text.length - 2] == '@' ||
+           segment_text[segment_text.length - 2] == '*') &&
+          lexer::is_variable_name_start(segment_text[1]))
+      {
+        const StringView array_name = segment_text.substring_of_length(
+            1, segment_text.length - 4);
+        let const is_star = segment_text[segment_text.length - 2] == '*';
+        let const subscripts = collect_array_subscripts(array_name);
+        if (segment.is_in_double_quotes && is_star) {
+          let const ifs = m_field_separators.view();
+          let joined = String{heap_allocator()};
+          for (usize i = 0; i < subscripts.count(); i++) {
+            if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+            joined.append(subscripts[i].view());
+          }
+          append_run(joined, false);
+        } else if (segment.is_in_double_quotes) {
+          for (usize i = 0; i < subscripts.count(); i++) {
+            if (i > 0) flush();
+            append_run(subscripts[i].view(), false);
+          }
+        } else {
+          for (usize i = 0; i < subscripts.count(); i++) {
+            if (i > 0) flush();
+            append_split_run(subscripts[i].view(), true);
           }
         }
         break;

@@ -337,6 +337,12 @@ public:
      the arithmetic index is within the stored elements. */
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
 
+  /* The subscripts of an array as a list, the indices of an indexed array or
+     the keys of an associative one, backing both the joined ${!a[@]} string and
+     the per-field quoted "${!a[@]}" expansion. */
+  fn collect_array_subscripts(StringView name) const throws
+      -> ArrayList<String>;
+
   /* Log a name's current process-environment value before a write that outlives
      the current statement, so a subshell restore can revert it. Called before
      an export or an allexport assignment writes the environment. Outside a
