@@ -674,7 +674,7 @@ fn main(int argc, char **argv) -> int
      explicit set +u turns it off. */
   context.set_error_unset(
       FLAG_NOUNSET.is_enabled() ||
-      (should_be_interactive && !shit::should_run_in_posix_mode()));
+      (should_be_interactive && !shit::should_run_in_compat_mode()));
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());

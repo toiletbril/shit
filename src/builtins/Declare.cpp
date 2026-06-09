@@ -15,6 +15,12 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-aAirxp] [name[=value] ...]");
 
+HELP_DESCRIPTION_DECL(
+    "The declare builtin, also spelled typeset, declares variables and sets "
+    "their attributes. -a declares an indexed array, -A an associative array, "
+    "-i an integer, -r a readonly, -x an exported variable, and -p prints the "
+    "declarations. In bash mode it backs the array and associative types.");
+
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {

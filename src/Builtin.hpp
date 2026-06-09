@@ -133,7 +133,10 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
     BUILTIN_ENTRIES, sizeof(BUILTIN_ENTRIES) / sizeof(BUILTIN_ENTRIES[0])};
 
 #define B_CASE(btin)                                                           \
-  case Builtin::Kind::btin: b.reset(new btin); break
+  case Builtin::Kind::btin: {                                                  \
+    btin builtin;                                                              \
+    return builtin.execute(ec, cxt);                                           \
+  }
 
 #define BUILTIN_SWITCH_CASES()                                                 \
   B_CASE(Echo);                                                                \

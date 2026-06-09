@@ -60,13 +60,6 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
-  std::unique_ptr<Builtin> b{};
-
-  switch (ec.builtin_kind()) {
-    BUILTIN_SWITCH_CASES();
-  default: unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
-  }
-
   /* A builtin runs inside the shell process, so it keeps the shell's own signal
      handlers. Resetting them to the default here would let a Ctrl-C during a
      builtin terminate the whole shell, and it cost two extra syscalls on every
@@ -118,14 +111,21 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
       os::restore_descriptor(saved_descriptors[i - 1]);
   };
 
-  ASSERT(b != nullptr);
+  /* Each builtin is a stateless dispatch object, so its case constructs it on
+     the stack and runs it, which avoids a heap allocation on every builtin
+     command. */
   try {
-    return b->execute(ec, cxt);
+    switch (ec.builtin_kind()) {
+      BUILTIN_SWITCH_CASES();
+    default:
+      unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
+    }
   } catch (const Error &e) {
     throw ErrorWithLocation{ec.source_location(), StringView{"Builtin '"} +
                                                       ec.program() +
                                                       "': " + e.message()};
   }
+  unreachable("execute_builtin reached the end without dispatching");
 }
 
 Builtin::Builtin() = default;

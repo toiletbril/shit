@@ -36,7 +36,7 @@ cold fn Expression::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
-hot flatten forceinline fn Expression::evaluate(EvalContext &cxt) const throws
+hot flatten fn Expression::evaluate(EvalContext &cxt) const throws
     -> i64
 {
   /* A Ctrl-C sets the interrupt flag, and the check here runs before every

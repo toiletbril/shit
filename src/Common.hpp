@@ -90,7 +90,7 @@ using uintptr = uintptr_t;
 
 #define donteliminate t__used
 #define forceinline   t__forceinline
-#define unused(x)     (std::ignore = (x))
+#define unused(x)     ((void) (x))
 
 #define t__concat_literal(x, y) x##y
 #define concat_literal(x, y)    t__concat_literal(x, y)
