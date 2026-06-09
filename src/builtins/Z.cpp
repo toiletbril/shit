@@ -225,6 +225,10 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!query.is_empty() &&
         !contains_ignore_case(entry.path.view(), query.view()))
       continue;
+    /* A stale entry whose directory was removed is skipped, so z falls through
+       to the next live match rather than erroring on a dead top rank. */
+    if (!Path{entry.path.view()}.to_absolute().normalized().is_directory())
+      continue;
     let const score = static_cast<double>(entry.rank) *
                       recency_weight(now - entry.last_access);
     if (score > best_score) {
@@ -237,8 +241,6 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{StringView{"z: no matching directory for '"} + query + "'"};
 
   let const target = Path{best->path.view()}.to_absolute().normalized();
-  if (!target.is_directory())
-    throw Error{StringView{"z: '"} + best->path + "' is no longer a directory"};
 
   let const old_directory = Path::current_directory();
   if (Path::set_current_directory(target).is_error())
