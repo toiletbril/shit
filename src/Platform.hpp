@@ -158,6 +158,12 @@ fn signal_process(process p, i32 signal_number) wontthrow -> bool;
    None when the name is not known. */
 fn signal_number_from_name(StringView name) throws -> Maybe<i32>;
 
+/* Resolve a signal number such as 2 or 15 to its bare upper-case name such as
+   INT or TERM, or None when the number names no known signal. The trap builtin
+   uses it so a trap set or listed by number reports the same name a trap set by
+   name reports. */
+fn signal_name_from_number(i32 number) throws -> Maybe<String>;
+
 /* Turn a numeric process id into the process handle the os layer uses. On POSIX
    the id is the handle. On Windows a handle is opened for it, which may be the
    invalid handle when the process is gone or not permitted. */

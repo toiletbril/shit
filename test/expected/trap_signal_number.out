@@ -1,0 +1,64 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo got_int" "INT"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "-" "2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cleared_by_number"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo got_term" "15"]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "set_by_number"]
+[Word
+  Unquoted "trap"
+]
+[Word
+  DoubleQuoted "echo got_int"
+]
+[Word
+  Unquoted "INT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "cleared_by_number"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  DoubleQuoted "echo got_term"
+]
+[Word
+  Unquoted "15"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "set_by_number"
+]
+cleared_by_number
+trap -- 'echo got_term' TERM
+set_by_number
+[Code 0]

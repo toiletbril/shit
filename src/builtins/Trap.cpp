@@ -1,5 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
+#include "../Platform.hpp"
+#include "../Utils.hpp"
 
 #include <cctype>
 
@@ -23,7 +25,9 @@ pure Builtin::Kind Trap::kind() const wontthrow { return Kind::Trap; }
 namespace {
 
 /* Normalize a condition name to its bare upper-case form, so SIGINT, sigint,
-   int, and the number 2 all name the same condition, and 0 names EXIT. */
+   int, and the number 2 all name the same condition, and 0 names EXIT. A trap
+   set by name and cleared or listed by number must resolve to one key, so a
+   bare number maps through the os signal name table the way dash lists it. */
 String normalize_condition(StringView raw) throws
 {
   String name{};
@@ -31,7 +35,24 @@ String normalize_condition(StringView raw) throws
     name.push(static_cast<char>(toupper(static_cast<unsigned char>(raw[i]))));
   if (name.starts_with("SIG") && name.count() > 3)
     name = String{name.substring(3)};
-  if (name == "0") name = "EXIT";
+  if (name == "0") return String{"EXIT"};
+
+  /* A condition written as a bare number names a signal, so it folds to the same
+     name the name form yields. The number 0 already became EXIT above. */
+  let is_all_digits = !name.is_empty();
+  for (usize i = 0; i < name.count(); i++)
+    if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
+      is_all_digits = false;
+      break;
+    }
+  if (is_all_digits) {
+    let const parsed = utils::parse_decimal_integer(name.view());
+    if (!parsed.is_error()) {
+      if (let const signal_name =
+              os::signal_name_from_number(static_cast<i32>(parsed.value())))
+        return *signal_name;
+    }
+  }
   return name;
 }
 

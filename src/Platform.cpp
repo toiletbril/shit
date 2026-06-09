@@ -713,6 +713,36 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
   return NAMES.find(bare);
 }
 
+fn signal_name_from_number(i32 number) throws -> Maybe<String>
+{
+  /* The pairs mirror signal_number_from_name's table, so a number and the name
+     it carries round-trip through the two helpers. The list is short, so a
+     linear scan beats a second map. */
+  struct signal_pair
+  {
+    i32 number;
+    StringView name;
+  };
+  static const signal_pair SIGNAL_PAIRS[] = {
+      {SIGHUP,  "HUP" },
+      {SIGINT,  "INT" },
+      {SIGQUIT, "QUIT"},
+      {SIGKILL, "KILL"},
+      {SIGTERM, "TERM"},
+      {SIGSTOP, "STOP"},
+      {SIGTSTP, "TSTP"},
+      {SIGCONT, "CONT"},
+      {SIGUSR1, "USR1"},
+      {SIGUSR2, "USR2"},
+      {SIGABRT, "ABRT"},
+      {SIGALRM, "ALRM"},
+      {SIGPIPE, "PIPE"},
+  };
+  for (const signal_pair &pair : SIGNAL_PAIRS)
+    if (pair.number == number) return String{pair.name};
+  return shit::None;
+}
+
 hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
 {
   ASSERT(args.count() > 0, "argv must carry at least the program name");
@@ -1489,6 +1519,19 @@ fn signal_number_from_name(StringView name) -> Maybe<i32>
   if (bare == "KILL") return 9;
   if (bare == "TERM") return 15;
   if (bare == "INT") return 2;
+  return None;
+}
+
+fn signal_name_from_number(i32 number) -> Maybe<String>
+{
+  /* The numbers mirror the Windows signal_number_from_name above, so a trap set
+     or listed by number on Windows reports the same name a trap set by name
+     reports. */
+  if (number == 1) return String{"HUP"};
+  if (number == 2) return String{"INT"};
+  if (number == 3) return String{"QUIT"};
+  if (number == 9) return String{"KILL"};
+  if (number == 15) return String{"TERM"};
   return None;
 }
 

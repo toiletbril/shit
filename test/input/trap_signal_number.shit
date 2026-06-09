@@ -1,0 +1,7 @@
+trap "echo got_int" INT
+trap - 2
+trap
+echo cleared_by_number
+trap "echo got_term" 15
+trap
+echo set_by_number
