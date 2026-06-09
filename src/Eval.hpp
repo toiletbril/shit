@@ -95,14 +95,17 @@ struct control_flow
 struct source_frame
 {
   source_frame(String origin, SourceLocation call_site,
-               const String *parent_source)
+               const String *parent_source, String source_path)
       : origin(steal(origin)), call_site(call_site),
-        parent_source(parent_source)
+        parent_source(parent_source), source_path(steal(source_path))
   {}
 
   String origin;
   SourceLocation call_site;
   const String *parent_source;
+  /* The bare path of a sourced file, the value BASH_SOURCE reports. It is empty
+     for an eval or a sourced command with no backing file. */
+  String source_path;
 };
 
 /* A variable binding saved when a local shadows it. The previous value is

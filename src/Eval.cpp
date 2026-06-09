@@ -486,6 +486,21 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return String{heap_allocator(),
                     utils::int_to_text(os::get_shell_process_id())};
     }
+    /* The subshell nesting level, zero at the top, the way bash reports it. */
+    if (first_byte == 'B' && name == "BASH_SUBSHELL") {
+      return String{heap_allocator(),
+                    utils::int_to_text(static_cast<i64>(m_subshell_depth))};
+    }
+    /* The path of the file being sourced, the scalar form of BASH_SOURCE[0].
+       The array form is backed by m_source_paths so ${BASH_SOURCE[0]} resolves
+       through the ordinary subscript path. */
+    if (first_byte == 'B' && name == "BASH_SOURCE") {
+      if (!m_source_frames.is_empty())
+        return String{
+            heap_allocator(),
+            m_source_frames[m_source_frames.count() - 1].source_path.view()};
+      return String{heap_allocator()};
+    }
   }
 
   if (let const env = os::get_environment_variable(name))
@@ -4187,7 +4202,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
   m_source_frames.push(source_frame{
       String{origin},
       call_site ? *call_site : SourceLocation{0, 0},
-      parent_source
+      parent_source,
+      filename.has_value() ? String{*filename} : String{}
   });
   defer { m_source_frames.pop_back(); };
 

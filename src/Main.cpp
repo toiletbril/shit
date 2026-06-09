@@ -429,6 +429,46 @@ static fn format_prompt_duration(u64 nanos) throws -> String
 }
 
 /* Expand the common prompt escapes in PS1 and PS2. */
+/* The cwd shown in a prompt is shortened from the front with a leading ... once
+   it runs past this many bytes, so a deep path does not push the cursor across
+   the terminal. */
+static constexpr usize PROMPT_PWD_LENGTH = 24;
+
+static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
+    -> String
+{
+  if (path.length <= max_length) return String{path};
+  /* The byte cut can land in the middle of a multibyte codepoint, so it
+     advances to the next codepoint boundary, the first byte that is not a UTF-8
+     continuation byte, before the tail is taken. */
+  usize tail_start = path.length - max_length + 3;
+  while (tail_start < path.length &&
+         (static_cast<unsigned char>(path[tail_start]) & 0xC0) == 0x80)
+    tail_start++;
+  String shortened{};
+  shortened += "...";
+  shortened += StringView{path.data + tail_start, path.length - tail_start};
+  return shortened;
+}
+
+/* The prompt used when PS1 is unset, user@host then the cwd shortened with an
+   ellipsis in green then a $ or a # for root, expressed through the same escapes
+   a user PS1 uses. The color is baked in only when the terminal takes color. */
+static fn default_prompt_template() throws -> String
+{
+  String template_string{};
+  template_string += "\\u@\\h ";
+  if (colors::stdout_wants_color()) {
+    template_string += colors::ansi::GREEN;
+    template_string += "\\P";
+    template_string += colors::ansi::RESET;
+  } else {
+    template_string += "\\P";
+  }
+  template_string += " \\$ ";
+  return template_string;
+}
+
 static fn expand_prompt_escapes(StringView prompt, StringView user,
                                 StringView working_directory,
                                 EvalContext &context) throws -> String
@@ -465,6 +505,11 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       out += shown;
     } break;
     case 'W': out += Path{working_directory}.filename(); break;
+    /* The working directory shortened from the front with an ellipsis, the form
+       the default prompt uses so a deep path stays short. */
+    case 'P':
+      out += shorten_path_with_ellipsis(working_directory, PROMPT_PWD_LENGTH);
+      break;
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
     case 't': out += '\t'; break;
@@ -701,6 +746,38 @@ fn main(int argc, char **argv) -> int
   context.set_shell_variable("SHIT_BUILD_MODE", SHIT_BUILD_MODE);
   context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);
 
+  /* Shell identity, so a script that probes for its host shell finds a known
+     name and takes a working branch rather than a fragile fallback. A bash
+     invocation advertises BASH_VERSION, every other mode advertises the sh and
+     dash names. The shit version above stays present in every mode. */
+  if (shit::should_run_in_bash_mode()) {
+    context.set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+  } else {
+    context.set_shell_variable("SH_VERSION", version_string);
+    context.set_shell_variable("DASH_VERSION", version_string);
+  }
+
+  /* SHLVL counts shell nesting. It is read from the inherited environment,
+     incremented, and exported so a child shell continues the count. */
+  i64 shell_level = 0;
+  if (shit::Maybe<shit::String> inherited =
+          shit::os::get_environment_variable("SHLVL");
+      inherited.has_value())
+  {
+    if (shit::ErrorOr<i64> parsed =
+            shit::utils::parse_decimal_integer(inherited->view());
+        !parsed.is_error() && parsed.value() > 0)
+      shell_level = parsed.value();
+  }
+  shit::os::set_environment_variable(
+      "SHLVL", shit::utils::int_to_text(shell_level + 1));
+
+  /* The default prompt lives in PS1 so it is visible and editable, unless the
+     environment already supplies one. An interactive unset of PS1 still falls
+     back to the same default when the prompt is built. */
+  if (!shit::os::get_environment_variable("PS1").has_value())
+    context.set_shell_variable("PS1", shit::default_prompt_template());
+
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
   int exit_code = EXIT_SUCCESS;
 
@@ -752,6 +829,26 @@ fn main(int argc, char **argv) -> int
       shitrc.push_component(".shitrc");
       source_file(shitrc, context, ast_arena);
     }
+  }
+
+  /* A compatibility mode also reads the interactive rc its host shell would, so
+     a user's existing bashrc or sh ENV file is honored. The shit rc above runs
+     first in every mode. The login path already read ENV, so a non-login sh
+     reads it here instead. A missing file is silently skipped. */
+  if (should_be_interactive && shit::should_run_in_bash_mode()) {
+    if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
+        home.has_value())
+    {
+      shit::Path bashrc = *home;
+      bashrc.push_component(".bashrc");
+      source_file(bashrc, context, ast_arena);
+    }
+  } else if (should_be_interactive && shit::should_run_in_posix_mode() &&
+             !is_login_shell)
+  {
+    if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
+        env.has_value() && !env->is_empty())
+      source_file(shit::Path{env->view()}, context, ast_arena);
   }
 
   /* A simple return cannot be used after this point, since we need a special
@@ -818,54 +915,23 @@ fn main(int argc, char **argv) -> int
            the interactive branch, so a script never reaches it. */
         context.notify_done_jobs();
 
-        static constexpr usize PWD_LENGTH = 24;
-
         shit::String full_pwd{shit::Path::current_directory().text()};
         toiletline::set_title("shit @ " + full_pwd);
 
-        shit::String pwd{full_pwd};
-        if (pwd.length() > PWD_LENGTH) {
-          /* The byte slice can land in the middle of a multibyte codepoint, so
-             advance the start forward to the next codepoint boundary, the first
-             byte that is not a UTF-8 continuation byte. */
-          usize tail_start = pwd.length() - PWD_LENGTH + 3;
-          while (tail_start < pwd.length() &&
-                 (static_cast<unsigned char>(pwd.view()[tail_start]) & 0xC0) ==
-                     0x80)
-          {
-            tail_start++;
-          }
-          shit::String shortened{};
-          shortened += "...";
-          shortened += pwd.substring(tail_start);
-          pwd = steal(shortened);
-        }
-
         shit::String u = shit::os::get_current_user().value_or("???");
 
-        /* shit % ...wd1/pwd2/pwd3/pwd4/pwd5 $ command */
-        shit::String prompt{};
+        /* The PS1 template, the user's when set, otherwise the built-in default,
+           both run through the same escape pass so the two render identically.
+           The \P escape shortens the cwd with an ellipsis the way the old
+           hardcoded default did. */
+        shit::String ps1_template;
         if (shit::Maybe<shit::String> ps1 = context.get_variable_value("PS1");
             ps1.has_value() && !ps1->is_empty())
-        {
-          /* A user-set PS1 expands its escape sequences, \u \h \w \W \$ \? \j
-             \D \g and the like. */
-          prompt = expand_prompt_escapes(ps1->view(), u.view(), full_pwd.view(),
-                                         context);
-        } else {
-          shit::String host = shit::os::get_hostname().value_or(
-              shit::os::get_environment_variable("HOSTNAME")
-                  .value_or("localhost"));
-          const bool wants_color = shit::colors::stdout_wants_color();
-          prompt += u;
-          prompt += '@';
-          prompt += host;
-          prompt += ' ';
-          if (wants_color) prompt += shit::colors::ansi::GREEN;
-          prompt += pwd;
-          if (wants_color) prompt += shit::colors::ansi::RESET;
-          prompt += (u == "root") ? " # " : " $ ";
-        }
+          ps1_template = steal(*ps1);
+        else
+          ps1_template = shit::default_prompt_template();
+        shit::String prompt = expand_prompt_escapes(
+            ps1_template.view(), u.view(), full_pwd.view(), context);
 
         /* Ask for input until we get one. */
         for (;;) {
