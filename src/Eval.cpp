@@ -1144,7 +1144,6 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
                   utils::uint_to_text(value.value_or(String{}).length())};
   }
 
-  /* Split the parameter name from an optional operator and its word. */
   ASSERT(!spec.is_empty());
   usize name_end = 0;
   if (lexer::is_variable_name_start(spec[0])) {
@@ -2759,7 +2758,6 @@ fn ExecContext::print_to_stdout(StringView s) const throws -> void
 fn ExecContext::make_from(SourceLocation location,
                           ArrayList<String> &&args) throws -> ExecContext
 {
-  /* Make sure we always include at least one argument, the program path. */
   ASSERT(args.count() > 0);
 
   let const &program = args[0];
