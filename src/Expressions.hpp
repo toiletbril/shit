@@ -304,6 +304,9 @@ public:
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
 
+  fn register_defined_functions(AnalysisContext &actx) const throws
+      -> void override;
+
   fn try_static_condition_verdict(const AnalysisContext &actx) const wontthrow
       -> Maybe<bool> override;
 

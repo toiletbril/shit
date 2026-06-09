@@ -2710,6 +2710,24 @@ BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
+cold fn SimpleCommand::register_defined_functions(AnalysisContext &actx)
+    const throws -> void
+{
+  if (m_args.is_empty() || m_args[0]->raw_string() != "alias") return;
+
+  /* An alias defined anywhere in the input resolves a later use of its name, the
+     same way a function does, so the prepass records each alias name before the
+     resolution check runs and an in-chunk alias is not flagged as missing. The
+     NAME=value operand lexes as an assignment token rather than a word, so the
+     name is taken from the raw token text up to the '='. */
+  for (usize i = 1; i < m_args.count(); i++) {
+    let const text = m_args[i]->raw_string();
+    let const equals_position = text.find_character('=');
+    if (equals_position.has_value() && *equals_position > 0)
+      actx.known_aliases.add(StringView{text.data(), *equals_position});
+  }
+}
+
 cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
@@ -2744,20 +2762,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       command_literal == "eval" || command_literal == "alias")
   {
     actx.saw_runtime_definer = true;
-  }
-
-  /* An alias defined earlier in the same input resolves at runtime, so record
-     each name this alias command defines for the later resolution check. */
-  if (command_literal == "alias") {
-    for (usize i = 1; i < m_args.count(); i++) {
-      if (m_args[i]->kind() != Token::Kind::Word) continue;
-      let const literal = static_cast<const tokens::WordToken *>(m_args[i])
-                              ->word()
-                              .to_literal_string();
-      let const equals_position = literal.find_character('=');
-      if (equals_position.has_value() && *equals_position > 0)
-        actx.known_aliases.add(StringView{literal.data(), *equals_position});
-    }
   }
 
   /* A glob pattern with an unterminated bracket expression can never compile
