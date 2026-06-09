@@ -67,3 +67,57 @@ jobs:
           awk -v s="$shit_seconds" -v d="$dash_seconds" \
               'BEGIN { exit !(s + 0 > 0 && s + 0 < d + 0) }' \
             || { echo "shit is not faster than dash"; exit 1; }
+
+      - name: Build coverage binary
+        run: rm -f shit && make MODE=cov shit
+
+      - name: Run tests under coverage
+        run: |
+          mkdir -p coverage/profraw
+          LLVM_PROFILE_FILE="$PWD/coverage/profraw/shit-%p.profraw" \
+            make -C test test || true
+
+      - name: Record coverage
+        if: always()
+        run: |
+          llvm-profdata-18 merge -sparse coverage/profraw/*.profraw \
+            -o coverage/shit.profdata
+          {
+            echo '## Coverage'
+            echo
+            echo '| File | Line cover | Branch cover |'
+            echo '| --- | --- | --- |'
+            llvm-cov-18 report ./shit \
+              -instr-profile=coverage/shit.profdata src \
+              -ignore-filename-regex='toiletline' \
+              | awk 'NF>=13 && $1!="Filename" && $1!~/^-/ \
+                     { print "| "$1" | "$10" | "$13" |" }'
+            echo
+            echo '<details><summary>Uncovered line ranges</summary>'
+            echo
+            echo '| File | Uncovered lines |'
+            echo '| --- | --- |'
+            llvm-cov-18 export ./shit \
+              -instr-profile=coverage/shit.profdata src \
+              -ignore-filename-regex='toiletline' -format=lcov \
+              | awk '
+                  /^SF:/ { f=$0; sub(/^SF:/,"",f); sub(/.*\/src\//,"",f);
+                           s=0; p=0; next }
+                  /^DA:/ {
+                    split(substr($0,4),a,","); l=a[1]+0; c=a[2]+0;
+                    if (c==0) {
+                      if (s==0) { s=l; p=l }
+                      else if (l==p+1) { p=l }
+                      else { r[f]=r[f] (r[f]?", ":"") (s==p?s:s"-"p); s=l; p=l }
+                    }
+                    next
+                  }
+                  /^end_of_record/ {
+                    if (s!=0) r[f]=r[f] (r[f]?", ":"") (s==p?s:s"-"p);
+                    s=0; p=0; next
+                  }
+                  END { for (f in r) print "| "f" | "r[f]" |" }
+                ' | sort
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"

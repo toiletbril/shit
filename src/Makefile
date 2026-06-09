@@ -157,8 +157,27 @@ CXXFLAGS += \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif
+else ifeq ($(MODE), cov)
+# Mirror prof, but instrument for clang source-based coverage instead of a
+# sampling profiler. Build at -O0 and without LTO so a coverage region maps to a
+# single source branch, and keep -DNDEBUG so a compiled-out assert does not read
+# as a permanently uncovered branch. Unlike prof the line editor stays in, since
+# coverage has no timing to perturb and the editor backs the UTF-8 width logic
+# the error caret uses, so the suite reproduces the golden output and passes.
+CXXFLAGS += \
+	-g3 \
+	-DNDEBUG \
+	-fno-omit-frame-pointer \
+	-O0 \
+	-fprofile-instr-generate \
+	-fcoverage-mapping
+ifneq ($(OS), Windows_NT)
+CXXFLAGS += \
+	-nostdlib++
+LINK_LIBS += -lsupc++
+endif
 else
-$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cosmo")
+$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cov", "cosmo")
 endif
 
 # The command-substitution drain runs on a pthread, so every POSIX build links
@@ -223,6 +242,7 @@ clean:
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
 	rm -rf ../shit.com.dbg ../shit.aarch64.elf # Cosmopolitan
 	rm -rf ../perf*
+	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 
 .PHONY: dirs shit install tidy fmt clean
 
