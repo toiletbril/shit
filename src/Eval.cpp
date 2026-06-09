@@ -286,6 +286,34 @@ fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow
   m_positional_params = steal(params);
 }
 
+pure fn EvalContext::directory_stack() const wontthrow
+    -> const ArrayList<String> &
+{
+  return m_directory_stack;
+}
+
+fn EvalContext::push_directory(String directory) throws -> void
+{
+  /* The most recently pushed directory sits at the front, so dirs reads the
+     stack left to right from newest to oldest. */
+  ArrayList<String> next{};
+  next.push(steal(directory));
+  for (String &existing : m_directory_stack)
+    next.push(steal(existing));
+  m_directory_stack = steal(next);
+}
+
+fn EvalContext::pop_directory() throws -> Maybe<String>
+{
+  if (m_directory_stack.is_empty()) return None;
+  String top = steal(m_directory_stack[0]);
+  ArrayList<String> rest{};
+  for (usize i = 1; i < m_directory_stack.count(); i++)
+    rest.push(steal(m_directory_stack[i]));
+  m_directory_stack = steal(rest);
+  return top;
+}
+
 fn EvalContext::set_last_background_pid(i64 pid) wontthrow -> void
 {
   m_last_background_pid = pid;

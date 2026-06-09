@@ -1,0 +1,7 @@
+cd /tmp
+pushd /usr
+pushd /etc
+dirs
+popd
+popd
+pwd

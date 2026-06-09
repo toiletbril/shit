@@ -198,6 +198,13 @@ public:
   pure fn positional_params() const wontthrow -> const ArrayList<String> &;
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
 
+  /* The directory stack for pushd, popd, and dirs. The current directory is the
+     conceptual top, so the stack holds only the saved directories, the most
+     recently pushed at the front. */
+  pure fn directory_stack() const wontthrow -> const ArrayList<String> &;
+  fn push_directory(String directory) throws -> void;
+  fn pop_directory() throws -> Maybe<String>;
+
   fn set_last_exit_status(i32 status) wontthrow -> void;
   pure fn last_exit_status() const wontthrow -> i32;
 
@@ -544,6 +551,8 @@ protected:
 
   String m_shell_name{};
   ArrayList<String> m_positional_params{heap_allocator()};
+
+  ArrayList<String> m_directory_stack{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   HashMap<const Expression *> m_functions{heap_allocator()};
   usize m_subshell_depth{0};
