@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Platform.hpp"
 #include "../Utils.hpp"
 
 /* Reads one line from standard input and splits it on IFS into the named
@@ -19,6 +20,11 @@ HELP_DESCRIPTION_DECL(
 FLAG(READ_RAW, Bool, 'r', "", "Do not treat a backslash as an escape.");
 FLAG(READ_ARRAY, String, 'a', "",
      "Split the line into the named indexed array.");
+FLAG(READ_PROMPT, String, 'p', "",
+     "Print the prompt before reading, when reading from a terminal.");
+FLAG(READ_TIMEOUT, String, 't', "", "Time out after the given seconds.");
+FLAG(READ_NCHARS, String, 'n', "", "Read at most the given number of bytes.");
+FLAG(READ_SILENT, Bool, 's', "", "Do not echo the input from a terminal.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -38,6 +44,11 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   ASSERT(!names.is_empty());
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  /* A -p prompt prints to standard error, and only when the input is a
+     terminal, the way bash stays quiet for a redirected or piped read. */
+  if (FLAG_READ_PROMPT.is_set() && os::is_stdin_a_tty())
+    shit::print_error(FLAG_READ_PROMPT.value());
 
   /* With no operand the line goes to REPLY, otherwise to the operands in
      order. The operand names are addressed by an offset into names. */
