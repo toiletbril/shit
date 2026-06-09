@@ -1,3 +1,0 @@
-echo '{ "name": "alice", "age": 30, "tags": ["a", "b"] }' | from json
-echo '{"users":[{"name":"alice","age":30},{"name":"bob","age":25}]}' | get users | to table
-echo '{"users":[{"name":"alice"},{"name":"bob"}]}' | get users.1.name
