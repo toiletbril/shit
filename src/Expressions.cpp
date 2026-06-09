@@ -674,6 +674,22 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       continue;
     }
 
+    if (redir.kind == Redirection::Kind::HereString) {
+      ASSERT(redir.target != nullptr);
+      String body = cxt.expand_word_for_assignment(
+          static_cast<const tokens::WordToken *>(redir.target)->word());
+      body += "\n";
+
+      let opened = os::write_to_temp_file(body);
+      if (!opened)
+        throw Error{"Could not stage the here-string: " +
+                    os::last_system_error_message()};
+
+      if (ec.in_fd) os::close_fd(*ec.in_fd);
+      ec.in_fd = opened.take();
+      continue;
+    }
+
     if (redir.kind == Redirection::Kind::DuplicateOutput ||
         redir.kind == Redirection::Kind::DuplicateInput)
     {
@@ -862,12 +878,19 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (const Redirection &redir : m_redirections) {
       /* A heredoc body becomes the standard input through an anonymous temp
          file, expanded when the delimiter was unquoted. */
-      if (redir.kind == Redirection::Kind::Heredoc) {
-        ASSERT(redir.heredoc_body != nullptr);
-
-        String body{*redir.heredoc_body};
-        if (redir.heredoc_expand) {
-          body = cxt.expand_heredoc_body(body);
+      if (redir.kind == Redirection::Kind::Heredoc ||
+          redir.kind == Redirection::Kind::HereString)
+      {
+        String body{};
+        if (redir.kind == Redirection::Kind::Heredoc) {
+          ASSERT(redir.heredoc_body != nullptr);
+          body = String{*redir.heredoc_body};
+          if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
+        } else {
+          ASSERT(redir.target != nullptr);
+          body = cxt.expand_word_for_assignment(
+              static_cast<const tokens::WordToken *>(redir.target)->word());
+          body += "\n";
         }
 
         let opened = os::write_to_temp_file(body);
@@ -2848,11 +2871,20 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   for (const Redirection &redir : m_redirections) {
     /* A heredoc body becomes the standard input through an anonymous temp file,
        expanded when the delimiter was unquoted. */
-    if (redir.kind == Redirection::Kind::Heredoc) {
-      ASSERT(redir.heredoc_body != nullptr);
-
-      String body{*redir.heredoc_body};
-      if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
+    if (redir.kind == Redirection::Kind::Heredoc ||
+        redir.kind == Redirection::Kind::HereString)
+    {
+      String body{};
+      if (redir.kind == Redirection::Kind::Heredoc) {
+        ASSERT(redir.heredoc_body != nullptr);
+        body = String{*redir.heredoc_body};
+        if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
+      } else {
+        ASSERT(redir.target != nullptr);
+        body = cxt.expand_word_for_assignment(
+            static_cast<const tokens::WordToken *>(redir.target)->word());
+        body += "\n";
+      }
 
       let opened = os::write_to_temp_file(body);
       if (!opened)

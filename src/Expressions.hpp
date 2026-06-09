@@ -257,7 +257,8 @@ public:
     ReadWrite,              /* <>   */
     DuplicateOutput,        /* >&   */
     DuplicateInput,         /* <&   */
-    Heredoc                 /* <<   */
+    Heredoc,                /* <<   */
+    HereString              /* <<<  */
   };
 
   /* The dup_fd value that marks the close-descriptor form, as in 2>&- and <&-,

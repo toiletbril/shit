@@ -1241,7 +1241,25 @@ hot fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_TWO(Equals, '=', DoubleEquals);
 
       TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
-      TOKEN_CASE_THREE(Less, '<', DoubleLess, '=', LessEquals);
+
+    /* < is input redirect, << a heredoc, <= a comparison. <<< is the bash
+       here-string, which feeds a single expanded word as standard input. */
+    case Token::Kind::Less: {
+      if (chop_character(1) == '<') {
+        if (chop_character(2) == '<') {
+          tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
+          extra_length += 2;
+        } else {
+          tok = m_arena->create<tokens::DoubleLess>(here(m_cursor_position, 2));
+          extra_length++;
+        }
+      } else if (chop_character(1) == '=') {
+        tok = m_arena->create<tokens::LessEquals>(here(m_cursor_position, 2));
+        extra_length++;
+      } else {
+        tok = m_arena->create<tokens::Less>(here(m_cursor_position, 1));
+      }
+    } break;
 
     default: unreachable("unhandled operator of type %d", ENUM(*op));
     }

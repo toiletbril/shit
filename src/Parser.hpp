@@ -75,6 +75,12 @@ private:
      stage applies to the command on its left. */
   mustuse fn wrap_with_stderr_to_stdout(Command *command) throws -> Command *;
 
+  /* Build the <<< here-string redirection, fd 0 fed by the expanded word that
+     follows the operator. */
+  fn build_here_string_redirection(
+      SourceLocation op_location, Maybe<SourceLocation> &first_location,
+      ArrayList<expressions::Redirection> &out) throws -> void;
+
   /* Build one heredoc redirection on descriptor fd. The << operator is already
      consumed and op_location is its position. A digit prefix such as the 3 in
      3<<EOF supplies a non-zero fd. */

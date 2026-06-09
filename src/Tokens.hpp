@@ -168,6 +168,7 @@ public:
     GreaterEquals,
     Less,
     DoubleLess,
+    TripleLess,
     LessEquals,
     Pipe,
     DoublePipe,
@@ -324,6 +325,7 @@ TOKEN_STRUCT(DoubleSemicolon);
 TOKEN_STRUCT(AmpersandGreater);
 TOKEN_STRUCT(AmpersandDoubleGreater);
 TOKEN_STRUCT(PipeAmpersand);
+TOKEN_STRUCT(TripleLess);
 
 TOKEN_STRUCT(Dot);
 TOKEN_STRUCT(LeftParen);

@@ -219,6 +219,7 @@ SENTINEL_TOKEN_DECLS(DoubleSemicolon, ";;");
 SENTINEL_TOKEN_DECLS(AmpersandGreater, "&>");
 SENTINEL_TOKEN_DECLS(AmpersandDoubleGreater, "&>>");
 SENTINEL_TOKEN_DECLS(PipeAmpersand, "|&");
+SENTINEL_TOKEN_DECLS(TripleLess, "<<<");
 SENTINEL_TOKEN_DECLS(Dot, ".");
 
 SENTINEL_TOKEN_DECLS(LeftParen, "(");

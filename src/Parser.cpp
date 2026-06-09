@@ -619,6 +619,29 @@ fn Parser::build_both_streams_redirection(
   out.push(dup);
 }
 
+fn Parser::build_here_string_redirection(
+    SourceLocation op_location, Maybe<SourceLocation> &first_location,
+    ArrayList<expressions::Redirection> &out) throws -> void
+{
+  if (!first_location) first_location = op_location;
+
+  Token *word = m_lexer.next_shell_token();
+  ASSERT(word != nullptr);
+  if (word->kind() != Token::Kind::Word) {
+    throw ErrorWithLocation{word->source_location(),
+                            "Expected a word after '<<<'"};
+  }
+
+  expressions::Redirection redir{};
+  redir.fd = 0;
+  redir.kind = expressions::Redirection::Kind::HereString;
+  redir.target = word;
+  redir.dup_fd = -1;
+  redir.heredoc_body = nullptr;
+  redir.heredoc_expand = false;
+  out.push(redir);
+}
+
 mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
     -> Command *
 {
@@ -760,6 +783,13 @@ mustuse fn Parser::try_parse_trailing_redirection(
     const let op_location = token->source_location();
     m_lexer.advance_past_last_peek();
     build_heredoc_redirection(0, op_location, ignored_first_location, out);
+    return true;
+  }
+
+  case Token::Kind::TripleLess: {
+    const let op_location = token->source_location();
+    m_lexer.advance_past_last_peek();
+    build_here_string_redirection(op_location, ignored_first_location, out);
     return true;
   }
 
@@ -1012,6 +1042,12 @@ hot fn Parser::parse_simple_command() throws -> Command *
       const let op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       build_heredoc_redirection(0, op_location, source_location, redirections);
+    } break;
+
+    case Token::Kind::TripleLess: {
+      const let op_location = token->source_location();
+      m_lexer.advance_past_last_peek();
+      build_here_string_redirection(op_location, source_location, redirections);
     } break;
 
     /* A separator, an operator, or a list terminator ends the command. */
