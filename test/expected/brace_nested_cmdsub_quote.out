@@ -1,0 +1,19 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$x:-$(printf ")")"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]"
+]
+[Word
+  Variable "x:-$(printf ")")"
+]
+[Word
+  Unquoted "echo"
+]
+[)]
+[Code 0]

@@ -789,19 +789,44 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             continue;
           }
           if (c == '$' && chop_character(byte_count) == '(') {
-            /* Copy a nested $(...) or $((...)) by paren balance. */
+            /* Copy a nested $(...) or $((...)) by paren balance, honoring
+               quotes inside it so an inner ) within a string does not unbalance
+               the count. */
             name += c;
             name += chop_character(byte_count);
             byte_count++;
             usize paren_depth = 1;
+            char nested_quote = 0;
             for (;;) {
               const let p = chop_character(byte_count);
               if (p == lexer::CEOF) break;
               byte_count++;
               name += p;
-              if (p == '(')
+              if (nested_quote != 0) {
+                if (nested_quote == '"' && p == '\\') {
+                  const let escaped = chop_character(byte_count);
+                  if (escaped != lexer::CEOF) {
+                    byte_count++;
+                    name += escaped;
+                  }
+                  continue;
+                }
+                if (p == nested_quote) nested_quote = 0;
+                continue;
+              }
+              if (p == '\\') {
+                const let escaped = chop_character(byte_count);
+                if (escaped != lexer::CEOF) {
+                  byte_count++;
+                  name += escaped;
+                }
+                continue;
+              }
+              if (p == '\'' || p == '"') {
+                nested_quote = p;
+              } else if (p == '(') {
                 paren_depth++;
-              else if (p == ')') {
+              } else if (p == ')') {
                 paren_depth--;
                 if (paren_depth == 0) break;
               }
