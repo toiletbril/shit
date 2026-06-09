@@ -17,19 +17,22 @@ bool parse_integer(StringView text, i64 &out) throws
 }
 
 /* A recursive-descent evaluator over the test arguments, following the POSIX
-   test grammar so -a binds tighter than -o and ! and parentheses nest. */
+   test grammar so -a binds tighter than -o and ! and parentheses nest. The
+   window is [pos, end), so the argument-count rules can strip a wrapping paren
+   pair by narrowing end and pos before the grammar runs. */
 class TestEvaluator
 {
 public:
   const ArrayList<String> &args;
   usize pos;
+  usize end;
 
   pure const String &current() const wontthrow
   {
-    ASSERT(pos < args.count());
+    ASSERT(pos < end);
     return args[pos];
   }
-  pure bool at_end() const wontthrow { return pos >= args.count(); }
+  pure bool at_end() const wontthrow { return pos >= end; }
 
   /* A malformed expression throws, so the builtin dispatch wraps the message
      with the test name and a caret at the command word. */
@@ -59,6 +62,10 @@ public:
   {
     if (op == "=") return left == right;
     if (op == "!=") return left != right;
+    /* < and > compare the two operands byte by byte, the locale-byte order
+       POSIX specifies, so the same memcmp order String::operator< gives. */
+    if (op == "<") return left < right;
+    if (op == ">") return right < left;
 
     i64 a = 0, b = 0;
     if (op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
@@ -79,16 +86,40 @@ public:
     return false;
   }
 
-  bool is_unary_operator(const String &s) throws
+  pure bool is_unary_operator(const String &s) const wontthrow
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
            s == "-s" || s == "-r" || s == "-w" || s == "-x";
   }
 
-  bool is_binary_operator(const String &s) throws
+  pure bool is_binary_operator(const String &s) const wontthrow
   {
-    return s == "=" || s == "!=" || s == "-eq" || s == "-ne" || s == "-lt" ||
-           s == "-le" || s == "-gt" || s == "-ge";
+    return s == "=" || s == "!=" || s == "<" || s == ">" || s == "-eq" ||
+           s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" || s == "-ge";
+  }
+
+  /* A unary operator at index reads as a plain operand rather than an operator
+     when nothing follows it, or when two or more tokens follow and the next is a
+     binary operator, mirroring dash's isoperand. With exactly one token after
+     it the operator is a real unary primary. */
+  pure bool is_unary_in_operand_position(usize index) const wontthrow
+  {
+    if (index + 1 >= end) return true;
+    if (index + 2 >= end) return false;
+    return is_binary_operator(args[index + 1]);
+  }
+
+  /* A bare ( reads as a plain operand rather than a grouping paren when no token
+     follows it, mirroring dash's t_lex special case for a trailing paren. */
+  pure bool is_open_paren_token(usize index) const wontthrow
+  {
+    return args[index] == "(" && index + 1 < end;
+  }
+
+  pure bool is_unary_operator_token(usize index) const wontthrow
+  {
+    return is_unary_operator(args[index]) &&
+           !is_unary_in_operand_position(index);
   }
 
   bool parse_factor() throws
@@ -100,14 +131,14 @@ public:
     if (current() == "!") {
       /* A lone ! with nothing after it is the one-argument test of a non-empty
          string, which is true, not a negation missing its operand. */
-      if (pos + 1 >= args.count()) {
+      if (pos + 1 >= end) {
         pos++;
         return true;
       }
       pos++;
       return !parse_factor();
     }
-    if (current() == "(") {
+    if (is_open_paren_token(pos)) {
       pos++;
       let const result = parse_expression();
       if (at_end() || current() != ")")
@@ -116,12 +147,18 @@ public:
         pos++;
       return result;
     }
+    if (is_unary_operator_token(pos)) {
+      let const &op = args[pos];
+      let const &operand = args[pos + 1];
+      pos += 2;
+      return evaluate_unary(op, operand);
+    }
     /* A binary test needs the operator in the next position, otherwise a single
        argument is true when it is non-empty. */
-    if (pos + 1 < args.count() && is_binary_operator(args[pos + 1])) {
-      if (pos + 2 >= args.count()) {
+    if (pos + 1 < end && is_binary_operator(args[pos + 1])) {
+      if (pos + 2 >= end) {
         fail(StringView{"argument expected after '"} + args[pos + 1] + "'");
-        pos = args.count();
+        pos = end;
         return false;
       }
       let const &left = args[pos];
@@ -129,12 +166,6 @@ public:
       let const &right = args[pos + 2];
       pos += 3;
       return evaluate_binary(left, op, right);
-    }
-    if (is_unary_operator(current()) && pos + 1 < args.count()) {
-      let const &op = args[pos];
-      let const &operand = args[pos + 1];
-      pos += 2;
-      return evaluate_unary(op, operand);
     }
     let const result = !current().is_empty();
     pos++;
@@ -161,6 +192,55 @@ public:
       result = result || right;
     }
     return result;
+  }
+
+  /* The POSIX argument-count rules disambiguate the short forms before the
+     grammar runs, mirroring dash's testcmd. A three-argument form whose middle
+     operand is a binary primary is the binary test, so a literal paren in the
+     first or third operand stays a plain operand. A three or four argument form
+     wrapped in a paren pair strips the pair, and one led by ! strips the bang
+     and flips the verdict, then rechecks the shorter window. Whatever remains
+     runs through the grammar, where a paren groups and -a and -o connect. The
+     window narrows by pos and end so the stripping needs no copy. */
+  bool evaluate_top() throws
+  {
+    let should_negate = false;
+    for (;;) {
+      let const count = end - pos;
+      if (count < 1) return !should_negate;
+
+      /* A three-argument form whose middle operand is a binary primary is the
+         binary test, so the first and third operands are plain strings rather
+         than a grouping paren or a unary primary. dash evaluates it directly
+         with the first token forced to an operand, so the binary is evaluated
+         here without entering the paren-aware grammar. */
+      if (count == 3 && is_binary_operator(args[pos + 1])) {
+        let const result =
+            evaluate_binary(args[pos], args[pos + 1], args[pos + 2]);
+        pos = end;
+        return should_negate ? !result : result;
+      }
+
+      /* A three or four argument form wrapped in a paren pair strips the pair,
+         and one led by ! strips the bang and flips the verdict, then rechecks
+         the shorter window. */
+      if (count == 3 || count == 4) {
+        if (args[pos] == "(" && args[end - 1] == ")") {
+          pos++;
+          end--;
+          continue;
+        }
+        if (args[pos] == "!") {
+          should_negate = !should_negate;
+          pos++;
+          continue;
+        }
+      }
+      break;
+    }
+
+    let const result = parse_expression();
+    return should_negate ? !result : result;
   }
 };
 
@@ -195,10 +275,13 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      arguments. */
   if (operands.is_empty()) return 1;
 
-  TestEvaluator evaluator{operands, 0};
-  let const result = evaluator.parse_expression();
-  if (evaluator.pos != operands.count()) {
-    ASSERT(evaluator.pos < operands.count());
+  TestEvaluator evaluator{operands, 0, operands.count()};
+  let const result = evaluator.evaluate_top();
+  /* A paren pair the argument-count rules stripped narrowed end past the closing
+     paren, so the leftover check runs against the narrowed window rather than
+     the original operand count. */
+  if (evaluator.pos != evaluator.end) {
+    ASSERT(evaluator.pos < evaluator.end);
     throw Error{StringView{"unexpected argument '"} + operands[evaluator.pos] +
                 "'"};
   }

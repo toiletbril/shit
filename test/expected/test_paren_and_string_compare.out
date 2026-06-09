@@ -1,0 +1,338 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "=" "(" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "paren_eq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "paren_single=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" ")" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "rparen_single=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "=" ")" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "paren_ne=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "a" "<" "b" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "lt_true=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "b" "<" "a" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "lt_false=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "a" ">" "b" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "gt_false=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "b" ">" "a" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "gt_true=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "10" "<" "9" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "byte_lt=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "abc" "<" "abd" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "abc_lt_abd=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "a" "=" "a" ")" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "group_eq=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "(" "a" "=" "a" ")" "-a" "-n" "x" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "group_and=$?"]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "="
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "paren_eq="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "paren_single="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted ")"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rparen_single="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  DoubleQuoted "("
+]
+[Word
+  Unquoted "="
+]
+[Word
+  DoubleQuoted ")"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "paren_ne="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "lt_true="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "lt_false="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ">"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "gt_false="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Literal ">"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "gt_true="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "10"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "9"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "byte_lt="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Literal "<"
+]
+[Word
+  Unquoted "abd"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "abc_lt_abd="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Literal "("
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ")"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "group_eq="
+  Variable "?"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Literal "("
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Literal ")"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "group_and="
+  Variable "?"
+]
+shit: 12:15: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
+    12 |  [ \( a = a \) -a -n x ]; echo "group_and=$?"
+       |                ^~ here.
+paren_eq=0
+paren_single=0
+rparen_single=0
+paren_ne=1
+lt_true=0
+lt_false=1
+gt_false=1
+gt_true=0
+byte_lt=0
+abc_lt_abd=0
+group_eq=0
+group_and=0
+[Code 0]
