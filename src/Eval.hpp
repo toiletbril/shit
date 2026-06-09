@@ -678,6 +678,12 @@ protected:
   fn apply_pattern_replacement(StringView name, StringView spec) throws
       -> String;
 
+  /* Expand the bash case-modification forms ${name^}, ${name^^}, ${name,}, and
+     ${name,,}. The ^ raises and the , lowers, a single operator touches the
+     first character and a doubled one touches every character, and an optional
+     glob after the operator limits which characters are affected. */
+  fn apply_case_modification(StringView name, StringView spec) throws -> String;
+
   /* Compute the integer value of a $((...)) expression, resolving shell
      variables and applying any assignments inside it. */
   fn evaluate_arithmetic(StringView expression) throws -> i64;

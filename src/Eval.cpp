@@ -1550,6 +1550,12 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*")
     return apply_pattern_replacement(name, rest);
 
+  /* ${name^}, ${name^^}, ${name,}, ${name,,} are bash case modification. They
+     are the non-colon form whose operator is a caret or a comma. */
+  if (!is_colon_form && (rest[0] == '^' || rest[0] == ',') && name != "@" &&
+      name != "*")
+    return apply_case_modification(name, rest);
+
   let const op = rest[op_index];
   let const is_doubled = (op_index + 1 < rest.length &&
                           rest[op_index + 1] == op && (op == '#' || op == '%'));
@@ -1808,6 +1814,48 @@ fn EvalContext::apply_pattern_replacement(StringView name,
       out.push(value.view()[i]);
       i++;
     }
+  }
+  return out;
+}
+
+fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
+    -> String
+{
+  let const current = get_variable_value(name);
+  if (m_error_unset && !current.has_value())
+    throw Error{name + ": parameter not set"};
+  let const value = current.value_or(String{});
+
+  const char op = spec[0];
+  /* A doubled operator touches every matching character, a single one only the
+     first. */
+  const bool modify_all = spec.length > 1 && spec[1] == op;
+  const StringView pattern_word = spec.substring(modify_all ? 2 : 1);
+
+  /* An omitted pattern means every character matches, the way bash defaults the
+     glob to ?. */
+  let pattern_active = ArrayList<bool>{heap_allocator()};
+  String pattern;
+  if (pattern_word.is_empty()) {
+    pattern = String{heap_allocator(), "?"};
+    pattern_active.push(true);
+  } else {
+    pattern = expand_modifier_word_masked(pattern_word, pattern_active);
+  }
+
+  let out = String{heap_allocator()};
+  for (usize i = 0; i < value.length(); i++) {
+    char c = value.view()[i];
+    const bool affected = modify_all || i == 0;
+    if (affected && utils::glob_matches(pattern.view(),
+                                        value.view().substring_of_length(i, 1),
+                                        pattern_active, 0))
+    {
+      const unsigned char byte = static_cast<unsigned char>(c);
+      c = static_cast<char>(op == '^' ? std::toupper(byte)
+                                      : std::tolower(byte));
+    }
+    out.push(c);
   }
   return out;
 }

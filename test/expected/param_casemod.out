@@ -1,0 +1,29 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign v=hello]
+  [CompoundListCondition, None]
+    [Assign u=WORLD]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v^|$v^^|$u,|$u,,|$v^^l"]
+[Word
+  Unquoted "v=hello"
+]
+[Word
+  Unquoted "u=WORLD"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v^"
+  DoubleQuoted "|"
+  Variable "v^^"
+  DoubleQuoted "|"
+  Variable "u,"
+  DoubleQuoted "|"
+  Variable "u,,"
+  DoubleQuoted "|"
+  Variable "v^^l"
+]
+Hello|HELLO|wORLD|world|heLLo
+[Code 0]

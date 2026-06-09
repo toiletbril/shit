@@ -1,0 +1,1 @@
+v=hello; u=WORLD; echo "${v^}|${v^^}|${u,}|${u,,}|${v^^l}"
