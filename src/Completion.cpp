@@ -526,9 +526,14 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     candidates = complete_filesystem(token, base_directory);
   }
 
-  utils::sort_ascending(candidates);
-
-  let longest_common_prefix = compute_longest_common_prefix(candidates);
+  /* A token that matched nothing skips the sort and the prefix scan, the common
+     case while typing a novel word, so a keystroke that yields no candidate
+     costs nothing past the lookup. */
+  let longest_common_prefix = String{};
+  if (!candidates.is_empty()) {
+    utils::sort_ascending(candidates);
+    longest_common_prefix = compute_longest_common_prefix(candidates);
+  }
 
   return completion_result{
       steal(candidates), steal(longest_common_prefix), token_start, token_end,
