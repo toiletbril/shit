@@ -634,7 +634,13 @@ fn main(int argc, char **argv) -> int
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
-  context.set_failglob(!shit::should_run_in_compat_mode());
+  /* An interactive shell sources its profiles and rc with failglob off the way a
+     lax shell does, since a profile globs script directories that need not match
+     any file. The strict default returns at the prompt seam below. A
+     non-interactive run sources no profiles, so it keeps its mode default. */
+  context.set_failglob(should_be_interactive
+                           ? false
+                           : !shit::should_run_in_compat_mode());
   context.set_bash_compatible(shit::should_run_in_bash_mode());
   context.set_posix_mode(shit::should_run_in_posix_mode());
   /* Mimicry is mirrored onto the context, since the execution path in Utils
@@ -787,6 +793,7 @@ fn main(int argc, char **argv) -> int
     let const strict = !shit::should_run_in_compat_mode();
     context.set_error_unset(FLAG_NOUNSET.is_enabled() || strict);
     context.set_pipefail(strict);
+    context.set_failglob(strict);
   }
 
   /* A simple return cannot be used after this point, since we need a special
