@@ -109,7 +109,10 @@ private:
   mustuse fn parse_brace_group() throws -> Command *;
   mustuse fn parse_paren_command() throws -> Command *;
   mustuse fn parse_subshell(Token *open) throws -> Command *;
+  mustuse fn capture_double_paren_body(Token *open) throws -> StringView;
   mustuse fn parse_arithmetic_command(Token *open) throws -> Command *;
+  mustuse fn parse_c_style_for(SourceLocation location, Token *open) throws
+      -> Command *;
   mustuse fn parse_conditional_command() throws -> Command *;
   mustuse fn parse_function_definition(Token *name_token) throws -> Command *;
 

@@ -1036,6 +1036,27 @@ hot fn Parser::parse_for() throws -> Command *
   ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
+  /* A for header that opens with (( is the bash C-style loop, distinct from the
+     for name in words form. It is gated to bash mode since a bare for needs a
+     name in POSIX. */
+  if (BASH_COMPATIBLE_MODE) {
+    Token *peeked = m_lexer.peek_shell_token();
+    ASSERT(peeked != nullptr);
+    if (peeked->kind() == Token::Kind::LeftParen) {
+      Token *first_paren = m_lexer.next_shell_token();
+      Token *second = m_lexer.peek_shell_token();
+      ASSERT(second != nullptr);
+      if (second->kind() == Token::Kind::LeftParen &&
+          second->source_location().position ==
+              first_paren->source_location().position + 1)
+      {
+        return parse_c_style_for(location, first_paren);
+      }
+      throw ErrorWithLocation{first_paren->source_location(),
+                              "Expected '((' or a variable name after 'for'"};
+    }
+  }
+
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
   if (name_token->kind() != Token::Kind::Word) {
@@ -1269,12 +1290,12 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
   return m_lexer.arena().create<Subshell>(open->source_location(), body);
 }
 
-/* A (( expr )) arithmetic command. The opening parenthesis is already consumed,
-   so the second parenthesis is taken here and then the tokens are walked,
-   tracking parenthesis depth, until the closing )). The body text is sliced
-   from the source between the two pairs and evaluated as arithmetic at run
-   time. */
-hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
+/* Read the body of a (( )) construct. The first parenthesis is already consumed
+   as open, so the second is taken here and then the tokens are walked, tracking
+   parenthesis depth, until the closing )). The returned view points into the
+   source between the two pairs. Shared by the arithmetic command and the
+   C-style for header. */
+hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
 {
   ASSERT(open != nullptr);
   Token *second = m_lexer.next_shell_token();
@@ -1317,10 +1338,86 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
     }
   }
 
-  const StringView body =
-      m_lexer.source().substring_of_length(body_start, body_end - body_start);
+  return m_lexer.source().substring_of_length(body_start,
+                                              body_end - body_start);
+}
+
+/* A (( expr )) arithmetic command. The body is sliced from the source between
+   the parentheses and evaluated as arithmetic at run time. */
+hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
+{
+  const StringView body = capture_double_paren_body(open);
   return m_lexer.arena().create<expressions::ArithmeticCommand>(
       open->source_location(), String{bump_allocator(m_lexer.arena()), body});
+}
+
+/* A bash C-style for, for (( init; cond; step )); do BODY; done. The header
+   slice between the parentheses is split on its two top-level semicolons into
+   the three arithmetic clauses, each evaluated at run time. */
+hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
+    -> Command *
+{
+  const StringView header = capture_double_paren_body(open);
+
+  /* The two clause separators are the semicolons at parenthesis depth zero, so
+     a grouped subexpression in a clause keeps its own semicolon-free shape. */
+  usize separators[2] = {0, 0};
+  usize separator_count = 0;
+  usize depth = 0;
+  for (usize i = 0; i < header.length; i++) {
+    const char c = header[i];
+    if (c == '(') {
+      depth++;
+    } else if (c == ')') {
+      if (depth > 0) depth--;
+    } else if (c == ';' && depth == 0) {
+      if (separator_count < 2) separators[separator_count] = i;
+      separator_count++;
+    }
+  }
+  if (separator_count != 2) {
+    throw ErrorWithLocation{
+        location, "Expected '(( init; condition; step ))' in a C-style for"};
+  }
+
+  const Allocator allocator = bump_allocator(m_lexer.arena());
+  const String init{allocator, header.substring_of_length(0, separators[0])};
+  const String condition{
+      allocator, header.substring_of_length(separators[0] + 1,
+                                            separators[1] - separators[0] - 1)};
+  const String step{allocator, header.substring(separators[1] + 1)};
+
+  /* Skip the separators between the header and 'do'. */
+  for (;;) {
+    Token *t = m_lexer.peek_shell_token();
+    ASSERT(t != nullptr);
+    if (t->kind() == Token::Kind::Semicolon ||
+        t->kind() == Token::Kind::Newline)
+    {
+      m_lexer.advance_past_last_peek();
+      continue;
+    }
+    break;
+  }
+
+  Token *do_token = m_lexer.next_shell_token();
+  ASSERT(do_token != nullptr);
+  if (do_token->kind() != Token::Kind::Do) {
+    throw ErrorWithLocationAndDetails{location, "Unterminated for loop",
+                                      do_token->source_location(),
+                                      "Expected 'do'"};
+  }
+
+  Expression *body = parse_command_list({Token::Kind::Done});
+  Token *done_token = m_lexer.next_shell_token();
+  ASSERT(done_token != nullptr);
+  if (done_token->kind() != Token::Kind::Done) {
+    throw_unterminated(location, "Unterminated for loop", m_lexer.source(),
+                       "done", done_token->source_location());
+  }
+
+  return m_lexer.arena().create<expressions::CStyleForLoop>(
+      location, steal(init), steal(condition), steal(step), body);
 }
 
 hot fn Parser::parse_conditional_command() throws -> Command *

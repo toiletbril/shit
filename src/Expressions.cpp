@@ -2464,6 +2464,69 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   return status;
 }
 
+/* A clause that holds only spaces or tabs is treated as omitted, the way bash
+   reads for (( ; ; )) as an empty header rather than three blank expressions.
+ */
+static pure fn is_blank_clause(StringView text) wontthrow -> bool
+{
+  for (usize i = 0; i < text.length; i++)
+    if (text[i] != ' ' && text[i] != '\t' && text[i] != '\n') return false;
+  return true;
+}
+
+CStyleForLoop::CStyleForLoop(SourceLocation location, String init,
+                             String condition, String step,
+                             const Expression *body)
+    : CompoundCommand(location), m_init(steal(init)),
+      m_condition(steal(condition)), m_step(steal(step)), m_body(body)
+{}
+
+CStyleForLoop::~CStyleForLoop() = default;
+
+cold fn CStyleForLoop::to_string() const throws -> String
+{
+  return "CStyleForLoop";
+}
+
+cold fn CStyleForLoop::to_ast_string(usize layer) const throws -> String
+{
+  ASSERT(m_body != nullptr);
+  let const pad = indent_for_layer(layer);
+  return pad + "[" + to_string() + " \"" + m_init.view() + ";" +
+         m_condition.view() + ";" + m_step.view() + "\"]\n" + pad +
+         EXPRESSION_AST_INDENT + m_body->to_ast_string(layer + 1);
+}
+
+fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
+{
+  ASSERT(m_body != nullptr);
+
+  /* A loop body runs repeatedly in the shell process, so no command in it may
+     replace the shell. */
+  cxt.set_terminal_exec_allowed(false);
+
+  if (!is_blank_clause(m_init.view())) cxt.evaluate_arithmetic(m_init.view());
+
+  /* The body runs inside one more loop level, so a break or a continue clamps
+     its level against the nesting that is actually live. */
+  cxt.enter_loop();
+  defer { cxt.leave_loop(); };
+
+  i64 ret = 0;
+  /* An empty condition is always true, the way for ((;;)) loops forever. */
+  while (is_blank_clause(m_condition.view()) ||
+         cxt.evaluate_arithmetic(m_condition.view()) != 0)
+  {
+    ret = m_body->evaluate(cxt);
+    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
+    /* The step runs after the body on every iteration, including one ended by a
+       continue, the way bash advances the counter. */
+    if (!is_blank_clause(m_step.view())) cxt.evaluate_arithmetic(m_step.view());
+  }
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
+}
+
 Subshell::Subshell(SourceLocation location, const Expression *body)
     : CompoundCommand(location), m_body(body)
 {}

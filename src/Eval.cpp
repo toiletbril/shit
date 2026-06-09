@@ -2765,9 +2765,20 @@ public:
 
   fn parse() throws -> i64
   {
-    let const result = parse_assignment();
+    let const result = parse_comma();
     skip_spaces();
     if (pos != source.length) fail("unexpected trailing characters");
+    return result;
+  }
+
+  /* The comma operator evaluates each subexpression in order and yields the
+     last, the lowest precedence so a C-style for clause such as i=0, j=10
+     runs both assignments. */
+  fn parse_comma() throws -> i64
+  {
+    i64 result = parse_assignment();
+    while (consume(","))
+      result = parse_assignment();
     return result;
   }
 
@@ -3044,7 +3055,7 @@ public:
 
     skip_spaces();
     if (consume("(")) {
-      let const value = parse_assignment();
+      let const value = parse_comma();
       if (!consume(")")) fail("expected ')'");
       return value;
     }

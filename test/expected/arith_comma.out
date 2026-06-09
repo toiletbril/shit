@@ -1,0 +1,25 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( (1,2,3) ))"]
+  [CompoundListCondition, None]
+    [Assign s=0]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( s=5, s+1 ))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " (1,2,3) "
+]
+[Word
+  Unquoted "s=0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " s=5, s+1 "
+]
+3
+6
+[Code 0]

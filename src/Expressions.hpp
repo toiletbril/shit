@@ -655,6 +655,28 @@ protected:
   String m_expression;
 };
 
+/* The bash C-style for, for (( init; condition; step )); do BODY; done. The
+   init runs once, then the body runs while the condition is non-zero, with the
+   step after each iteration. The three clauses are arithmetic expressions. */
+class CStyleForLoop : public CompoundCommand
+{
+public:
+  CStyleForLoop(SourceLocation location, String init, String condition,
+                String step, const Expression *body);
+  ~CStyleForLoop() override;
+
+  fn to_string() const throws -> String override;
+  fn to_ast_string(usize layer = 0) const throws -> String override;
+
+protected:
+  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+
+  String m_init;
+  String m_condition;
+  String m_step;
+  const Expression *m_body;
+};
+
 /* A compound command with trailing redirections, such as { cmd; } >file or
    (cmd) 2>&1. A compound command runs in the shell process, so the redirections
    are applied to the shell's own descriptors around the child and restored
