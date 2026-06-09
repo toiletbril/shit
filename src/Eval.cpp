@@ -78,6 +78,15 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
      re-resolves. */
   if (name == "PATH") utils::set_path_for_resolution(String{value});
   m_shell_variables.set(name, value);
+  /* An exported name lives in the process environment, where export moved it and
+     cleared the shell copy. A plain reassignment writes the shell store above,
+     so an in-process read sees the new value, but a child still inherits the
+     stale environment entry. The environment is refreshed here when the name is
+     already present there, so a child of `export FOO=1; FOO=2` sees 2. A
+     non-exported name is absent from the environment, so the common case only
+     pays the getenv scan the read miss already pays. */
+  if (os::get_environment_variable(name).has_value())
+    os::set_environment_variable(name, value);
 }
 
 fn EvalContext::set_field_separators(StringView value) throws -> void

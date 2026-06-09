@@ -1,0 +1,68 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "FOO=1"]
+  [CompoundListCondition, None]
+    [Assign FOO=2]
+  [CompoundListCondition, None]
+    [SimpleCommand "printenv" "FOO"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "BAR"]
+  [CompoundListCondition, None]
+    [Assign BAR=baz]
+  [CompoundListCondition, None]
+    [SimpleCommand "printenv" "BAR"]
+  [CompoundListCondition, None]
+    [Assign NOPE=hidden]
+  [CompoundListCondition, None]
+    [SimpleCommand "printenv" "NOPE"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "FOO=1"
+]
+[Word
+  Unquoted "FOO=2"
+]
+[Word
+  Unquoted "printenv"
+]
+[Word
+  Unquoted "FOO"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "BAR"
+]
+[Word
+  Unquoted "BAR=baz"
+]
+[Word
+  Unquoted "printenv"
+]
+[Word
+  Unquoted "BAR"
+]
+[Word
+  Unquoted "NOPE=hidden"
+]
+[Word
+  Unquoted "printenv"
+]
+[Word
+  Unquoted "NOPE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+2
+baz
+done
+[Code 0]
