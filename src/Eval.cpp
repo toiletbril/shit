@@ -4073,6 +4073,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
   auto append_run = [&](StringView text, bool glob_active) {
     current.text.append(text);
+    current.glob_active.reserve(current.glob_active.count() + text.length);
     for (usize k = 0; k < text.length; k++)
       current.glob_active.push(glob_active);
     has_current = true;
