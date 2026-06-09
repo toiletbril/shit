@@ -1,0 +1,12 @@
+true | false
+echo "tf=$?"
+false | true
+echo "ft=$?"
+false | read -r x
+echo "fr=$?"
+echo hi | read -r y
+echo "er=$?"
+true | true
+echo "tt=$?"
+! true | false
+echo "neg=$?"

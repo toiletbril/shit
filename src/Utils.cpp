@@ -107,6 +107,13 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
   bool is_first = true;
+  /* The pipeline status is the last stage's, builtin or external. A builtin
+     stage runs in this process and yields its status at once, so the last
+     stage's nature decides where the result comes from. Otherwise a builtin
+     final stage, such as `false | read x`, would lose its status to the last
+     external child the wait loop reaps. */
+  bool last_stage_is_builtin = false;
+  i32 last_builtin_status = 0;
 
   for (ExecContext &ec : ecs) {
     Maybe<os::Pipe> pipe;
@@ -140,10 +147,15 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       let const child = os::execute_program(steal(ec));
       children.push(child);
       last_child = child;
+      if (is_last) last_stage_is_builtin = false;
     } else {
       /* A builtin runs in this process, so its status stands in for the stage.
        */
       ret = execute_builtin(steal(ec), cxt);
+      if (is_last) {
+        last_stage_is_builtin = true;
+        last_builtin_status = ret;
+      }
     }
 
     is_first = false;
@@ -162,12 +174,16 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
     return ret;
   }
 
-  /* Wait for every stage. The pipeline status is the last stage's, so a stage
-     that is the last external child sets the result. */
+  /* Wait for every stage so none lingers as a zombie. The pipeline status is
+     the last stage's. When that stage is an external child the wait that reaps
+     it supplies the result, and when it is a builtin the status it already
+     returned stands, so the external wait must not overwrite it. */
   for (const os::process child : children) {
     const i32 status = os::wait_and_monitor_process(child);
-    if (child == last_child) ret = status;
+    if (!last_stage_is_builtin && child == last_child) ret = status;
   }
+
+  if (last_stage_is_builtin) ret = last_builtin_status;
 
   return ret;
 }

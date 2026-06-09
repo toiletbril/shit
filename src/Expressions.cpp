@@ -1603,7 +1603,13 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     ecs.push(steal(ec));
   }
 
-  return utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
+  /* The pipeline status is the last stage's, and $? reads it from the store, so
+     the result is committed here the way the compound-stage path commits it. The
+     all-simple fast path otherwise returned the status without recording it, so
+     `false | read x; echo $?` read the stale status from before the pipeline. */
+  const i64 ret = utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
+  cxt.set_last_exit_status(static_cast<i32>(ret));
+  return ret;
 }
 
 fn Pipeline::append_to(usize d, String &f, bool duplicate) throws -> void

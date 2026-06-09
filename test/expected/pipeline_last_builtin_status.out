@@ -1,0 +1,140 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "true"]
+      [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tf=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "false"]
+      [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ft=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "false"]
+      [SimpleCommand "read" "-r" "x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "fr=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "hi"]
+      [SimpleCommand "read" "-r" "y"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "er=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "true"]
+      [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "tt=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "true"]
+      [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "neg=$?"]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tf="
+  Variable "?"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ft="
+  Variable "?"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "fr="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "er="
+  Variable "?"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "tt="
+  Variable "?"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "neg="
+  Variable "?"
+]
+tf=1
+ft=0
+fr=1
+er=0
+tt=0
+neg=0
+[Code 0]
