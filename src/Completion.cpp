@@ -231,13 +231,21 @@ static fn resolve_listing_directory(StringView directory_part,
 {
   if (directory_part.is_empty()) return base_directory;
 
-  /* A leading tilde with no user name expands to the home directory, the only
-     tilde form the completion handles. */
+  /* A leading tilde expands to a home directory, the current user's for a bare
+     ~ or the named user's for ~user. The name runs from after the ~ to the
+     first /. An unknown name falls through to the relative-path handling below,
+     which leaves the tilde literal. */
   if (directory_part[0] == '~') {
-    if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
+    usize name_end = 1;
+    while (name_end < directory_part.length && directory_part[name_end] != '/')
+      name_end++;
+    let const name = directory_part.substring_of_length(1, name_end - 1);
+    Maybe<Path> home = name.is_empty() ? os::get_home_directory()
+                                       : os::get_home_for_user(name);
+    if (home.has_value()) {
       Path resolved = *home;
-      /* Drop the tilde and the separator after it, then append the rest. */
-      usize rest_start = 1;
+      /* Drop the name and the separator after it, then append the rest. */
+      usize rest_start = name_end;
       if (rest_start < directory_part.length &&
           directory_part[rest_start] == '/')
       {
@@ -414,6 +422,32 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   return candidates;
 }
 
+/* A token that is a leading ~ with no / yet, such as ~ or ~ro, completes
+   against the system user names. Once a / appears the directory part resolves
+   the user's home and the filesystem handler takes over. */
+static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
+{
+  return token.length >= 1 && token[0] == '~' &&
+         !token.find_character('/').has_value();
+}
+
+/* Complete a ~name token against the system users, each candidate written back
+   as ~name with a trailing / since a home is a directory. */
+static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
+{
+  ArrayList<String> candidates{};
+  StringView prefix = token.substring(1);
+  for (const String &user : os::enumerate_users()) {
+    if (!user.view().starts_with(prefix)) continue;
+    String candidate{};
+    candidate.push('~');
+    candidate.append(user.view());
+    candidate.push('/');
+    candidates.push(steal(candidate));
+  }
+  return candidates;
+}
+
 fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory) throws -> completion_result
 {
@@ -442,6 +476,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 
   if (token_is_variable(token)) {
     candidates = complete_variable(token, context);
+  } else if (token_is_tilde_user_prefix(token)) {
+    candidates = complete_tilde_user(token);
   } else if (is_command && !token_has_path_separator) {
     candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {

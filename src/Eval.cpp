@@ -1808,18 +1808,27 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   let &text = leading_segment.text;
   if (text.is_empty() || text[0] != '~') return;
 
-  /* TODO: There may be several separators supported. */
-  /* Only a bare ~ or a ~/ prefix expands. ~user is left alone for now. */
-  if (text.length() > 1 && text[1] != '/') return;
+  /* The user name runs from after the ~ to the first / or the end of the word,
+     so ~ and ~/path carry an empty name while ~user and ~user/path carry the
+     name. */
+  usize name_end = 1;
+  while (name_end < text.length() && text[name_end] != '/') name_end++;
+  let const name = text.view().substring_of_length(1, name_end - 1);
 
-  let const home = os::get_home_directory();
-  if (!home) throw Error{"Could not figure out home directory"};
+  /* An empty name is the bare ~, which expands to the current home. A named
+     user resolves through the system database, and an unknown name leaves the
+     word untouched the way bash leaves ~baduser literal. */
+  let const home =
+      name.is_empty() ? os::get_home_directory() : os::get_home_for_user(name);
+  if (name.is_empty() && !home)
+    throw Error{"Could not figure out home directory"};
+  if (!home) return;
 
   /* String has no in-place erase or insert, so the home path and the remainder
-     after the tilde are joined into a fresh buffer and moved back. */
+     after the name are joined into a fresh buffer and moved back. */
   let expanded = String{heap_allocator()};
   expanded.append(home->text().view());
-  expanded.append(text.substring(1));
+  expanded.append(text.view().substring(name_end));
   text = steal(expanded);
 }
 

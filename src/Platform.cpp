@@ -171,6 +171,67 @@ fn get_home_directory() throws -> Maybe<Path>
   return shit::None;
 }
 
+/* The colon field at index of an /etc/passwd line, empty when the line has too
+   few fields. The format is name:passwd:uid:gid:gecos:home:shell, so the name
+   is field 0 and the home is field 5. The database is read directly rather than
+   through getpwnam or getpwent, which a static build cannot call without pulling
+   in the runtime glibc NSS modules and which the linker warns about, the same
+   reason get_current_user reads the environment. A user defined only through NSS
+   is not seen, the accepted tradeoff for the static build. */
+static fn passwd_field(StringView line, usize index) wontthrow -> StringView
+{
+  usize field_start = 0;
+  usize field_index = 0;
+  for (usize i = 0; i <= line.length; i++) {
+    if (i != line.length && line[i] != ':') continue;
+    if (field_index == index)
+      return line.substring_of_length(field_start, i - field_start);
+    field_index++;
+    field_start = i + 1;
+  }
+  return StringView{};
+}
+
+fn get_home_for_user(StringView username) throws -> Maybe<Path>
+{
+  if (username.is_empty()) return shit::None;
+
+  let const contents = utils::read_entire_file("/etc/passwd");
+  if (!contents) return shit::None;
+
+  let const text = contents->view();
+  usize line_start = 0;
+  for (usize i = 0; i <= text.length; i++) {
+    if (i != text.length && text[i] != '\n') continue;
+    let const line = text.substring_of_length(line_start, i - line_start);
+    line_start = i + 1;
+    if (passwd_field(line, 0) != username) continue;
+    let const home_field = passwd_field(line, 5);
+    if (home_field.is_empty()) return shit::None;
+    return Path{home_field};
+  }
+  return shit::None;
+}
+
+fn enumerate_users() throws -> ArrayList<String>
+{
+  ArrayList<String> users{};
+
+  let const contents = utils::read_entire_file("/etc/passwd");
+  if (!contents) return users;
+
+  let const text = contents->view();
+  usize line_start = 0;
+  for (usize i = 0; i <= text.length; i++) {
+    if (i != text.length && text[i] != '\n') continue;
+    let const line = text.substring_of_length(line_start, i - line_start);
+    line_start = i + 1;
+    let const name = passwd_field(line, 0);
+    if (!name.is_empty()) users.push(String{name});
+  }
+  return users;
+}
+
 static const pid_t PARENT_SHELL_PID = getpid();
 
 fn is_child_process() wontthrow -> bool { return getpid() != PARENT_SHELL_PID; }
@@ -1171,6 +1232,16 @@ fn get_home_directory() -> Maybe<Path>
     return Path{StringView{*home}};
   return shit::None;
 }
+
+/* Windows has no /etc/passwd, so a named user does not resolve and ~user stays
+   literal. A bare ~ still expands through USERPROFILE above. */
+fn get_home_for_user(StringView username) throws -> Maybe<Path>
+{
+  unused(username);
+  return shit::None;
+}
+
+fn enumerate_users() throws -> ArrayList<String> { return ArrayList<String>{}; }
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 

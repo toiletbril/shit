@@ -256,6 +256,14 @@ fn get_hostname() throws -> Maybe<String>;
 
 fn get_home_directory() throws -> Maybe<Path>;
 
+/* The home directory of a named user, for ~user expansion. None when no such
+   user exists or the system has no user database. */
+fn get_home_for_user(StringView username) throws -> Maybe<Path>;
+
+/* Every user name the system knows, for ~user completion. Empty when the
+   database cannot be read or the platform has none. */
+fn enumerate_users() throws -> ArrayList<String>;
+
 fn set_default_signal_handlers() throws -> void;
 
 fn reset_signal_handlers() throws -> void;
