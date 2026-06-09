@@ -30,7 +30,9 @@ hot pure static fn get_sequence_kind(Token::Kind tk) wontthrow
   }
 }
 
-Parser::Parser(Lexer &&lexer) : m_lexer(steal(lexer)) {}
+Parser::Parser(Lexer &&lexer, bool bash_compatible)
+    : m_lexer(steal(lexer)), m_bash_compatible(bash_compatible)
+{}
 
 Parser::~Parser() = default;
 
@@ -1039,7 +1041,7 @@ hot fn Parser::parse_for() throws -> Command *
   /* A for header that opens with (( is the bash C-style loop, distinct from the
      for name in words form. It is gated to bash mode since a bare for needs a
      name in POSIX. */
-  if (BASH_COMPATIBLE_MODE) {
+  if (m_bash_compatible) {
     Token *peeked = m_lexer.peek_shell_token();
     ASSERT(peeked != nullptr);
     if (peeked->kind() == Token::Kind::LeftParen) {
@@ -1264,7 +1266,7 @@ hot fn Parser::parse_paren_command() throws -> Command *
      POSIX and the default mode keep the nested-subshell reading. */
   Token *next = m_lexer.peek_shell_token();
   ASSERT(next != nullptr);
-  if (BASH_COMPATIBLE_MODE && next->kind() == Token::Kind::LeftParen &&
+  if (m_bash_compatible && next->kind() == Token::Kind::LeftParen &&
       next->source_location().position == open->source_location().position + 1)
   {
     return parse_arithmetic_command(open);

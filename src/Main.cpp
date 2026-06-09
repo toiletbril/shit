@@ -108,10 +108,6 @@ static bool INVOKED_AS_POSIX_SHELL = false;
    and dash select POSIX mode while bash selects bash mode. */
 static bool INVOKED_AS_BASH = false;
 
-/* The definition of the shared bash-mode flag the lexer and parser read. It is
-   set once below after the flags and the invocation name are known. */
-bool BASH_COMPATIBLE_MODE = false;
-
 /* True when POSIX behavior is in effect, from --posix or the sh invocation
    name. The failglob default, the analysis skip, and the style-warning
    suppression all read it. */
@@ -243,7 +239,8 @@ static fn run_script_contents(const String &script_contents,
 
     Parser p{
         Lexer{String{script_contents.view()}, ast_arena,
-              FLAG_ESCAPE_MAP.is_enabled(), filename}
+              FLAG_ESCAPE_MAP.is_enabled(), filename},
+        context.is_bash_compatible()
     };
 
     /* Recover from each parse error so the whole file is reported at once. A
@@ -677,7 +674,7 @@ fn main(int argc, char **argv) -> int
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
   context.set_failglob(!shit::should_run_in_compat_mode());
-  shit::BASH_COMPATIBLE_MODE = shit::should_run_in_bash_mode();
+  context.set_bash_compatible(shit::should_run_in_bash_mode());
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);

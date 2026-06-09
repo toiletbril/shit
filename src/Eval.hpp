@@ -401,6 +401,19 @@ public:
   fn set_failglob(bool enabled) wontthrow -> void;
   pure fn failglob() const wontthrow -> bool;
 
+  /* bash-compatible mode enables the bash extensions that change the meaning of
+     valid POSIX syntax, such as the (( )) arithmetic command and brace
+     expansion. The evaluator reads it for brace expansion and the parser is
+     handed it at construction for the (( )) and C-style for syntax. */
+  fn set_bash_compatible(bool enabled) wontthrow -> void
+  {
+    m_bash_compatible = enabled;
+  }
+  pure fn is_bash_compatible() const wontthrow -> bool
+  {
+    return m_bash_compatible;
+  }
+
   /* A condition, such as an if test or an && operand, suppresses set -e while
      it runs, since its failure is expected. */
   fn enter_condition() wontthrow -> void;
@@ -644,6 +657,7 @@ protected:
   bool m_no_clobber{false};
   bool m_export_all{false};
   bool m_no_exec{false};
+  bool m_bash_compatible{false};
   bool m_failglob{true};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};

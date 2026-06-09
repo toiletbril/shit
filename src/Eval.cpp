@@ -3419,7 +3419,8 @@ fn EvalContext::capture_command_substitution(const String &source) throws
     throw Error{"Command substitution outside of a parse"};
 
   let parser = Parser{
-      Lexer{String{source.view()}, *AST_ARENA}
+      Lexer{String{source.view()}, *AST_ARENA},
+      is_bash_compatible()
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
@@ -3442,7 +3443,8 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
       segment.cached_substitution_generation != generation)
   {
     let parser = Parser{
-        Lexer{String{segment.text.view()}, *AST_ARENA}
+        Lexer{String{segment.text.view()}, *AST_ARENA},
+        is_bash_compatible()
     };
     segment.cached_substitution_ast = parser.construct_ast();
     segment.cached_substitution_generation = generation;
@@ -3609,7 +3611,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
      the wrong line. */
   try {
     let parser = Parser{
-        Lexer{String{source}, *AST_ARENA, false, stable_filename}
+        Lexer{String{source}, *AST_ARENA, false, stable_filename},
+        is_bash_compatible()
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this
@@ -3945,7 +3948,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
          several the braces spell, each then taking the path above. The brace
          scan is skipped when no { is present, so a brace-free word pays nothing
          beyond the cheap check. */
-      if (BASH_COMPATIBLE_MODE && word_has_brace_candidate(*word)) {
+      if (is_bash_compatible() && word_has_brace_candidate(*word)) {
         for (const Word &brace_word : expand_braces(*word))
           expand_one_word(brace_word);
       } else {
