@@ -519,7 +519,14 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       candidates = complete_command(token, token_is_glob, context);
     }
   } else if (is_command && !token_has_path_separator) {
-    candidates = complete_command(token, token_is_glob, context);
+    /* An empty command token, the state right after a ; or a space in command
+       position, would enumerate and sort every command in PATH on each
+       keystroke for the ghost, which freezes the prompt on a large PATH and
+       suggests nothing. Command completion runs only once a prefix is typed,
+       and an explicit tab on an empty word still lists nothing rather than
+       stalling. */
+    if (!token.is_empty())
+      candidates = complete_command(token, token_is_glob, context);
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
   } else {
