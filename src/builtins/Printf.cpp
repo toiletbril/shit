@@ -123,6 +123,74 @@ bool append_b_argument(String &out, const String &arg) throws
   return false;
 }
 
+/* A byte that needs no quoting outside a quoted span, so a word of only these
+   reuses as shell input unchanged. */
+bool is_q_safe_byte(char c)
+{
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+         (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' ||
+         c == '/' || c == ':' || c == '%' || c == '+' || c == '@' || c == '=';
+}
+
+/* Quote the argument so it reads back as one shell word, the way bash %q does.
+   An empty argument becomes '', a string with a control byte becomes the
+   $'...' form so the byte survives, and any other special byte is
+   backslash-escaped. */
+void append_q_argument(String &out, const String &arg) throws
+{
+  if (arg.is_empty()) {
+    out += "''";
+    return;
+  }
+
+  bool has_control_byte = false;
+  for (usize i = 0; i < arg.count(); i++) {
+    const unsigned char byte = static_cast<unsigned char>(arg[i]);
+    if (byte < 0x20 || byte == 0x7f) {
+      has_control_byte = true;
+      break;
+    }
+  }
+
+  if (has_control_byte) {
+    out += "$'";
+    for (usize i = 0; i < arg.count(); i++) {
+      const char c = arg[i];
+      switch (c) {
+      case '\a': out += "\\a"; break;
+      case '\b': out += "\\b"; break;
+      case '\t': out += "\\t"; break;
+      case '\n': out += "\\n"; break;
+      case '\v': out += "\\v"; break;
+      case '\f': out += "\\f"; break;
+      case '\r': out += "\\r"; break;
+      case '\'': out += "\\'"; break;
+      case '\\': out += "\\\\"; break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20 ||
+            static_cast<unsigned char>(c) == 0x7f)
+        {
+          char octal[8];
+          std::snprintf(octal, sizeof(octal), "\\%03o",
+                        static_cast<unsigned int>(static_cast<unsigned char>(c)));
+          out += octal;
+        } else {
+          out += c;
+        }
+        break;
+      }
+    }
+    out += "'";
+    return;
+  }
+
+  for (usize i = 0; i < arg.count(); i++) {
+    const char c = arg[i];
+    if (!is_q_safe_byte(c)) out += '\\';
+    out += c;
+  }
+}
+
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
 void append_conversion(String &out, const String &spec, char conv,
@@ -131,6 +199,7 @@ void append_conversion(String &out, const String &spec, char conv,
   char buffer[256];
 
   switch (conv) {
+  case 'q': append_q_argument(out, arg); break;
   case 's': {
     String with_s = spec.clone();
     with_s.push('s');
