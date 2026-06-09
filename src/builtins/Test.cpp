@@ -64,10 +64,9 @@ public:
     if (op == "-t") {
       i64 file_descriptor = 0;
       if (!parse_integer(operand.view(), file_descriptor)) return false;
-      if (file_descriptor == 0) return os::is_stdin_a_tty();
-      if (file_descriptor == 1) return os::is_stdout_a_tty();
-      if (file_descriptor == 2) return os::is_stderr_a_tty();
-      return false;
+      /* Any descriptor is checked, not only the standard three, since a config
+         dups the controlling terminal onto a higher descriptor and tests it. */
+      return os::is_fd_a_tty(static_cast<os::descriptor>(file_descriptor));
     }
     fail(StringView{"unknown unary operator '"} + op +
          "', expected one of -z -n -e -f -d -s -r -w -x -L -h -b -c -p -S -t");

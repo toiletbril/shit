@@ -2607,16 +2607,14 @@ struct ConditionalEvaluator
       return size.has_value() && size.value() > 0;
     }
     /* -t tests whether a file descriptor is an open terminal, the way a script
-       gates an interactive feature on a real tty. The operand names the
-       descriptor, 0, 1, or 2. */
+       gates an interactive feature on a real tty. Any descriptor is checked, not
+       only the standard three, since a config such as ble.sh dups the controlling
+       terminal onto a higher descriptor and tests that. */
     if (op == "-t") {
       if (ErrorOr<i64> descriptor = utils::parse_decimal_integer(operand);
           !descriptor.is_error())
-      {
-        if (descriptor.value() == 0) return os::is_stdin_a_tty();
-        if (descriptor.value() == 1) return os::is_stdout_a_tty();
-        if (descriptor.value() == 2) return os::is_stderr_a_tty();
-      }
+        return os::is_fd_a_tty(
+            static_cast<os::descriptor>(descriptor.value()));
       return false;
     }
     /* The remaining file-type tests fall back to existence, which covers the
