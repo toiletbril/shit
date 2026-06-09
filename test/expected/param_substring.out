@@ -1,0 +1,22 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign v=abcdefgh]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$v:2:3|$v: -3|$v:2:-1|$v:20"]
+[Word
+  Unquoted "v=abcdefgh"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "v:2:3"
+  DoubleQuoted "|"
+  Variable "v: -3"
+  DoubleQuoted "|"
+  Variable "v:2:-1"
+  DoubleQuoted "|"
+  Variable "v:20"
+]
+cde|fgh|cdefg|
+[Code 0]

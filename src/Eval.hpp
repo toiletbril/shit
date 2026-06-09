@@ -663,6 +663,13 @@ protected:
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
   fn apply_parameter_expansion(StringView spec) throws -> String;
 
+  /* Expand the bash substring form ${name:offset:length}. The body is the text
+     after the first colon, an arithmetic offset and an optional arithmetic
+     length. A negative offset counts from the end, and a negative length leaves
+     that many characters off the end. */
+  fn apply_substring_expansion(StringView name, StringView body) throws
+      -> String;
+
   /* Compute the integer value of a $((...)) expression, resolving shell
      variables and applying any assignments inside it. */
   fn evaluate_arithmetic(StringView expression) throws -> i64;

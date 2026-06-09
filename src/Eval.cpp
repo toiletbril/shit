@@ -1533,6 +1533,17 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   const usize op_index = is_colon_form ? 1 : 0;
   if (op_index >= rest.length) return expand_variable(name);
 
+  /* ${name:offset:length} is bash substring expansion. It is the colon form
+     whose character after the colon is not one of the - = + ? that name the
+     default, assign, alternate, and error modifiers, so those still parse as
+     before. A name of @ or * is a positional slice, left to the array work. */
+  if (is_colon_form) {
+    const char after_colon = rest[op_index];
+    if (after_colon != '-' && after_colon != '=' && after_colon != '+' &&
+        after_colon != '?' && name != "@" && name != "*")
+      return apply_substring_expansion(name, rest.substring(1));
+  }
+
   let const op = rest[op_index];
   let const is_doubled = (op_index + 1 < rest.length &&
                           rest[op_index + 1] == op && (op == '#' || op == '%'));
@@ -1585,6 +1596,81 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   default: return expand_variable(name);
   }
+}
+
+/* The index of the colon that separates the offset from the length in a
+   substring body, or the body length when there is none. Parentheses and a
+   ternary inside the offset are tracked so a colon belonging to a ternary is
+   not mistaken for the separator. */
+static fn find_substring_length_separator(StringView body) wontthrow -> usize
+{
+  usize paren_depth = 0;
+  usize question_depth = 0;
+  for (usize i = 0; i < body.length; i++) {
+    const char c = body[i];
+    if (c == '(') {
+      paren_depth++;
+    } else if (c == ')') {
+      if (paren_depth > 0) paren_depth--;
+    } else if (c == '?' && paren_depth == 0) {
+      question_depth++;
+    } else if (c == ':' && paren_depth == 0) {
+      if (question_depth > 0)
+        question_depth--;
+      else
+        return i;
+    }
+  }
+  return body.length;
+}
+
+fn EvalContext::apply_substring_expansion(StringView name,
+                                          StringView body) throws -> String
+{
+  let const current = get_variable_value(name);
+  if (m_error_unset && !current.has_value())
+    throw Error{name + ": parameter not set"};
+  let const value = current.value_or(String{});
+  const i64 value_length = static_cast<i64>(value.length());
+
+  const usize separator = find_substring_length_separator(body);
+  const StringView offset_text = body.substring_of_length(0, separator);
+  /* An empty offset reads as zero, the way bash treats ${v::length}. */
+  const i64 offset =
+      offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
+
+  /* A negative offset counts from the end. An offset that still lands before
+     the start of the value yields nothing, the way bash returns empty rather
+     than clamping to the whole value. A positive offset past the end clamps to
+     the end so the result is empty too. */
+  i64 start = offset < 0 ? value_length + offset : offset;
+  if (start < 0) return String{heap_allocator()};
+  if (start > value_length) start = value_length;
+
+  i64 end = value_length;
+  if (separator < body.length) {
+    const StringView length_text = body.substring(separator + 1);
+    /* An empty length reads as zero, so ${v:start:} is empty. */
+    i64 length = length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
+    if (length < 0) {
+      /* A negative length names a position counted back from the end rather
+         than a count of characters, so the substring runs up to that point. */
+      end = value_length + length;
+    } else {
+      /* The end clamps to the value length just below, so the length is clamped
+         here first to keep the start-plus-length sum from overflowing i64. */
+      if (length > value_length) length = value_length;
+      end = start + length;
+    }
+  }
+  if (end > value_length) end = value_length;
+  /* A length that resolves to a point before the offset is the bash
+     "substring expression < 0" error, fatal the way bash makes it. */
+  if (end < start) throw Error{"substring expression < 0"};
+
+  return String{heap_allocator(), value.view().substring_of_length(
+                                      static_cast<usize>(start),
+                                      static_cast<usize>(end - start))};
 }
 
 cold fn EvalContext::make_stats_string() const throws -> String
