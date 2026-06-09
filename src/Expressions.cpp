@@ -590,6 +590,12 @@ fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     m_redirections.push(redir);
 }
 
+fn SimpleCommand::set_array_args(
+    ArrayList<array_builtin_assignment> &&array_args) throws -> void
+{
+  m_array_args = steal(array_args);
+}
+
 namespace {
 
 using expressions::Redirection;
@@ -1278,6 +1284,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      builtin unwinds here and supplies the function exit status. */
   ASSERT(!program_args.is_empty());
   let const &program_name = program_args[0];
+
+  /* The command name is copied for the array-argument application below, since
+     the argument vector is moved into the exec context before that point. */
+  String array_command_name{};
+  if (!m_array_args.is_empty())
+    array_command_name = String{program_args[0].view()};
+
   if (const Expression *function_body =
           cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
       function_body != nullptr)
@@ -1384,6 +1397,29 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   redirect_in_fd_handed_off = true;
 
   const i64 ret = utils::execute_context(steal(ec), cxt, is_async());
+
+  /* An assignment builtin with NAME=(...) array arguments applies them after it
+     runs, in the scope the builtin selects. local binds a local array, and a
+     declare or typeset inside a function binds a local while one at the top
+     level reaches the global store, where export marks the name for the
+     environment. The builtin ran first, so a local outside a function has
+     already errored and the elements never reach here. */
+  if (!m_array_args.is_empty()) {
+    let const is_local = array_command_name == "local";
+    let const is_function_local =
+        (array_command_name == "declare" || array_command_name == "typeset") &&
+        cxt.in_function_scope();
+    let const is_export = array_command_name == "export";
+    for (const array_builtin_assignment &assignment : m_array_args) {
+      if (is_local || is_function_local) cxt.declare_local(assignment.name);
+      ArrayList<String> values = cxt.process_args(assignment.elements);
+      if (assignment.is_append)
+        cxt.append_indexed_array(assignment.name, steal(values));
+      else
+        cxt.set_indexed_array(assignment.name, steal(values));
+      if (is_export) cxt.mark_exported(assignment.name);
+    }
+  }
 
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;

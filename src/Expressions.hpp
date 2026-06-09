@@ -188,6 +188,18 @@ struct prefix_assignment
   bool is_append;
 };
 
+/* One NAME=(...) array assignment given as an argument to an assignment builtin
+   such as local or declare. The element words expand the way a command's
+   arguments do, and the command applies them in the scope the builtin selects,
+   so local arr=(...) declares a local array while declare and export reach the
+   global store. */
+struct array_builtin_assignment
+{
+  String name;
+  ArrayList<const Token *> elements;
+  bool is_append;
+};
+
 class Command : public Expression
 {
 public:
@@ -289,6 +301,11 @@ public:
 
   fn set_redirections(ArrayList<Redirection> &&redirections) throws -> void;
 
+  /* The NAME=(...) array assignments given to an assignment builtin, applied
+     after the builtin runs. */
+  fn set_array_args(ArrayList<array_builtin_assignment> &&array_args) throws
+      -> void;
+
   /* Open this command's redirections into an exec context, for a pipeline stage
      that does not go through evaluate_impl. */
   fn redirect_exec_context(ExecContext &ec, EvalContext &cxt) const throws
@@ -327,6 +344,7 @@ protected:
   mutable Maybe<ResolvedCommand> m_resolved_kind{};
 
   ArrayList<Redirection> m_redirections{heap_allocator()};
+  ArrayList<array_builtin_assignment> m_array_args{heap_allocator()};
 };
 
 class CompoundListCondition : public Expression

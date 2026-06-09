@@ -860,6 +860,16 @@ fn EvalContext::leave_function_scope() throws -> void
       assign_variable(binding.name, *binding.previous_value);
     else
       force_unset_shell_variable(binding.name);
+    /* Restore the indexed array the name held before the shadow, or clear the
+       local array when the caller had none, so a local array does not leak. The
+       store is written directly rather than through set_indexed_array, since
+       this runs in a noexcept defer where a readonly check could throw from a
+       destructor. */
+    if (binding.previous_indexed_array.has_value())
+      m_indexed_arrays.set(binding.name.view(),
+                           steal(*binding.previous_indexed_array));
+    else
+      m_indexed_arrays.erase(binding.name.view());
   }
   /* The innermost scope is the one just restored, so it is dropped in place
      rather than rebuilding the whole stack into a fresh list on every return.
@@ -876,8 +886,21 @@ fn EvalContext::declare_local(StringView name) throws -> void
 {
   if (m_local_scopes.is_empty()) return;
   ASSERT(!m_local_scopes.is_empty());
-  m_local_scopes.back().push(
-      local_binding{String{name}, get_variable_value(name)});
+
+  /* The indexed array the name held is saved alongside the scalar value, so a
+     local array restores the caller's array on return. A copy is taken since the
+     body may overwrite the stored array in place. */
+  Maybe<ArrayList<String>> previous_array{};
+  if (let const *array = lookup_indexed_array(name); array != nullptr) {
+    ArrayList<String> copy{heap_allocator()};
+    copy.reserve(array->count());
+    for (const String &element : *array)
+      copy.push(String{heap_allocator(), element.view()});
+    previous_array = steal(copy);
+  }
+
+  m_local_scopes.back().push(local_binding{
+      String{name}, get_variable_value(name), steal(previous_array)});
 }
 
 fn EvalContext::set_alias(StringView name, StringView value) throws -> void

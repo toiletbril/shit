@@ -110,11 +110,14 @@ struct source_frame
 
 /* A variable binding saved when a local shadows it. The previous value is
    None when the name was unset, so leaving the scope restores the unset
-   state rather than an empty string. */
+   state rather than an empty string. The previous indexed array is saved the
+   same way, so a local array such as local arr=(...) restores the caller's
+   array on return and is cleared when the caller had none. */
 struct local_binding
 {
   String name;
   Maybe<String> previous_value;
+  Maybe<ArrayList<String>> previous_indexed_array;
 };
 
 /* A background job, one entry in the job table. The id is the number jobs and

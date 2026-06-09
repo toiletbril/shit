@@ -852,11 +852,21 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
 /* return: a command, a compound command, or nullptr when a list terminator is
    next. A reserved word or a group opener in command position introduces a
    compound command. */
+/* The bash assignment builtins, which parse a NAME=(...) argument as an array
+   assignment rather than a word. local and declare assign in a scope while
+   readonly and export reach the global store. */
+static pure fn is_assignment_builtin_name(StringView name) wontthrow -> bool
+{
+  return name == "local" || name == "declare" || name == "typeset" ||
+         name == "readonly" || name == "export";
+}
+
 hot fn Parser::parse_simple_command() throws -> Command *
 {
   Maybe<SourceLocation> source_location;
   ArrayList<Token *> args_accumulator{};
   ArrayList<prefix_assignment> local_vars{heap_allocator()};
+  ArrayList<array_builtin_assignment> array_args{heap_allocator()};
   ArrayList<expressions::Redirection> redirections{};
 
   auto build_command = [&]() -> Command * {
@@ -870,6 +880,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
     SimpleCommand *c =
         m_lexer.arena().create<SimpleCommand>(*source_location, steal(args));
     if (local_vars.count() != 0) c->set_local_vars(steal(local_vars));
+    if (!array_args.is_empty()) c->set_array_args(steal(array_args));
     if (!redirections.is_empty()) c->set_redirections(steal(redirections));
     return c;
   };
@@ -1002,13 +1013,6 @@ hot fn Parser::parse_simple_command() throws -> Command *
       m_lexer.advance_past_last_peek();
       if (!source_location) source_location = token->source_location();
 
-      /* Once a command word is present, an assignment-looking token is just an
-       * ordinary argument. */
-      if (!args_accumulator.is_empty()) {
-        args_accumulator.push(token);
-        break;
-      }
-
       Assignment *a = static_cast<Assignment *>(token);
 
       /* Peek the next token. A compound list condition, a compound terminator,
@@ -1016,14 +1020,36 @@ hot fn Parser::parse_simple_command() throws -> Command *
       Token *next = m_lexer.peek_shell_token();
       ASSERT(next != nullptr);
 
-      /* NAME=(...) and NAME+=(...) are bash array assignments. In bash mode the
-         element words are captured into an array assignment, otherwise the
-         group is consumed and a scalar assignment of the empty value word
-         stands in so a POSIX login profile that uses one keeps sourcing. */
-      if (next->kind() == Token::Kind::LeftParen &&
+      /* NAME=(...) and NAME+=(...) are bash array assignments when the ( sits
+         immediately after the =, with no space between them. */
+      let const is_array_assignment =
+          next->kind() == Token::Kind::LeftParen &&
           next->source_location().position ==
-              a->source_location().position + a->source_location().length)
-      {
+              a->source_location().position + a->source_location().length;
+
+      /* Once a command word is present, an assignment-looking token is an
+         ordinary argument, except an array assignment given to an assignment
+         builtin such as local. That is captured so the builtin sets the array,
+         rather than the ( being read as a stray command. */
+      if (!args_accumulator.is_empty()) {
+        if (is_array_assignment && m_lexer.is_bash_compatible()) {
+          let const command_name = args_accumulator[0]->raw_string();
+          if (is_assignment_builtin_name(command_name.view())) {
+            ArrayList<const Token *> elements = consume_bash_array_assignment();
+            array_args.push(array_builtin_assignment{
+                String{a->key()}, steal(elements), a->is_append()});
+            break;
+          }
+        }
+        args_accumulator.push(token);
+        break;
+      }
+
+      /* NAME=(...) leading the command is a bash array assignment. In bash mode
+         the element words are captured into an array assignment, otherwise the
+         group is consumed and a scalar assignment of the empty value word stands
+         in so a POSIX login profile that uses one keeps sourcing. */
+      if (is_array_assignment) {
         ArrayList<const Token *> elements = consume_bash_array_assignment();
         if (m_lexer.is_bash_compatible()) {
           return m_lexer.arena().create<ArrayAssignCommand>(
