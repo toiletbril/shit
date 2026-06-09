@@ -14,11 +14,11 @@ class HashSet
 public:
   explicit HashSet(Allocator allocator) : m_map(allocator) {}
 
-  fn add(StringView key) throws -> void { m_map.set(key, Nothing{}); }
+  hot fn add(StringView key) throws -> void { m_map.set(key, Nothing{}); }
 
-  fn remove(StringView key) throws -> void { m_map.erase(key); }
+  cold fn remove(StringView key) throws -> void { m_map.erase(key); }
 
-  mustuse pure fn contains(StringView key) const wontthrow -> bool
+  hot mustuse pure fn contains(StringView key) const wontthrow -> bool
   {
     return m_map.find(key) != nullptr;
   }

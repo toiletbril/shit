@@ -28,9 +28,10 @@ public:
       push(element);
   }
 
-  ArrayList(const ArrayList &other) : m_allocator(other.m_allocator)
+  cold ArrayList(const ArrayList &other) : m_allocator(other.m_allocator)
   {
     reserve(other.m_length);
+#pragma clang loop unroll_count(4)
     for (usize i = 0; i < other.m_length; i++)
       new (&m_data[i]) T(other.m_data[i]);
     m_length = other.m_length;
@@ -58,7 +59,7 @@ public:
     }
     return *this;
   }
-  fn operator=(const ArrayList &other) throws->ArrayList &
+  cold fn operator=(const ArrayList &other) throws->ArrayList &
   {
     if (this != &other) {
       ArrayList copy{other};
@@ -69,24 +70,25 @@ public:
 
   ~ArrayList() { destroy_all(); }
 
-  mustuse pure fn count() const wontthrow -> usize { return m_length; }
+  hot mustuse pure fn count() const wontthrow -> usize { return m_length; }
   mustuse pure fn is_empty() const wontthrow -> bool { return m_length == 0; }
-  mustuse pure fn operator[](usize i) wontthrow->T & { return m_data[i]; }
-  mustuse pure fn operator[](usize i) const wontthrow->const T &
+  hot mustuse pure fn operator[](usize i) wontthrow->T & { return m_data[i]; }
+  hot mustuse pure fn operator[](usize i) const wontthrow->const T &
   {
     return m_data[i];
   }
-  mustuse pure fn begin() wontthrow -> T * { return m_data; }
-  mustuse pure fn end() wontthrow -> T * { return m_data + m_length; }
-  mustuse pure fn begin() const wontthrow -> const T * { return m_data; }
-  mustuse pure fn end() const wontthrow -> const T *
+  hot mustuse pure fn begin() wontthrow -> T * { return m_data; }
+  hot mustuse pure fn end() wontthrow -> T * { return m_data + m_length; }
+  hot mustuse pure fn begin() const wontthrow -> const T * { return m_data; }
+  hot mustuse pure fn end() const wontthrow -> const T *
   {
     return m_data + m_length;
   }
 
-  fn push(T value) throws -> void
+  hot fn push(T value) throws -> void
   {
-    reserve(m_length + 1);
+    if (m_length == m_capacity) [[unlikely]]
+      reserve(m_length + 1);
     new (&m_data[m_length]) T(steal(value));
     m_length++;
   }
@@ -109,12 +111,12 @@ public:
     m_length = 0;
   }
 
-  mustuse pure fn back() wontthrow -> T &
+  hot mustuse pure fn back() wontthrow -> T &
   {
     ASSERT(m_length > 0, "back() on an empty list");
     return m_data[m_length - 1];
   }
-  mustuse pure fn back() const wontthrow -> const T &
+  hot mustuse pure fn back() const wontthrow -> const T &
   {
     ASSERT(m_length > 0, "back() on an empty list");
     return m_data[m_length - 1];
@@ -130,7 +132,7 @@ public:
     return m_data[0];
   }
 
-  fn reserve(usize needed) throws -> void
+  cold fn reserve(usize needed) throws -> void
   {
     if (needed <= m_capacity) return;
     /* A small list quadruples so a list grown one push at a time reaches a
@@ -155,7 +157,7 @@ public:
      then left alone keeps the growth overshoot for its whole lifetime, which a
      long-lived arena never reclaims, so a one-time builder calls this to hand
      the slack back. */
-  fn shrink_to_fit() throws -> void
+  cold fn shrink_to_fit() throws -> void
   {
     if (m_length == m_capacity) return;
     if (m_length == 0) {

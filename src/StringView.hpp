@@ -19,12 +19,18 @@ public:
   StringView(const char *bytes, usize count) : data(bytes), length(count) {}
   StringView(const char *cstr) wontthrow;
 
-  mustuse pure fn count() const wontthrow -> usize { return length; }
-  mustuse pure fn is_empty() const wontthrow -> bool { return length == 0; }
-  mustuse pure fn operator[](usize i) const wontthrow->char { return data[i]; }
+  hot mustuse pure fn count() const wontthrow -> usize { return length; }
+  hot mustuse pure fn is_empty() const wontthrow -> bool
+  {
+    return length == 0;
+  }
+  hot mustuse pure fn operator[](usize i) const wontthrow->char
+  {
+    return data[i];
+  }
 
-  mustuse pure fn operator==(StringView other) const wontthrow->bool;
-  mustuse pure fn operator!=(StringView other) const wontthrow->bool
+  hot mustuse pure fn operator==(StringView other) const wontthrow->bool;
+  hot flatten mustuse pure fn operator!=(StringView other) const wontthrow->bool
   {
     return !(*this == other);
   }
@@ -32,7 +38,8 @@ public:
   /* The index of the first occurrence of a byte, or None when it is absent.
      A Maybe keeps the absent case out of band rather than using a sentinel
      index. */
-  mustuse pure fn find_character(char wanted) const wontthrow -> Maybe<usize>;
+  hot mustuse pure fn find_character(char wanted) const wontthrow
+      -> Maybe<usize>;
 
   /* The view from start to the end. A start past the end yields an empty view.
    */

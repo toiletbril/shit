@@ -45,13 +45,16 @@ public:
 
   ~String() { free_storage(); }
 
-  mustuse pure fn count() const wontthrow -> usize { return m_length; }
-  mustuse pure fn is_empty() const wontthrow -> bool { return m_length == 0; }
-  mustuse pure fn operator[](usize i) const wontthrow->char
+  hot mustuse pure fn count() const wontthrow -> usize { return m_length; }
+  hot mustuse pure fn is_empty() const wontthrow -> bool
+  {
+    return m_length == 0;
+  }
+  hot mustuse pure fn operator[](usize i) const wontthrow->char
   {
     return m_data[i];
   }
-  mustuse pure fn view() const wontthrow -> StringView
+  hot mustuse pure fn view() const wontthrow -> StringView
   {
     return StringView{m_data, m_length};
   }
@@ -59,22 +62,22 @@ public:
      passes to a comparison or a function taking a view without spelling out
      view(). */
   operator StringView() const wontthrow { return StringView{m_data, m_length}; }
-  mustuse pure fn c_str() const wontthrow -> const char *
+  hot mustuse pure fn c_str() const wontthrow -> const char *
   {
     return m_data != nullptr ? m_data : "";
   }
 
   fn clear() wontthrow -> void;
 
-  fn push(char c) throws -> void;
-  fn append(StringView other) throws -> void;
+  hot fn push(char c) throws -> void;
+  hot fn append(StringView other) throws -> void;
 
-  fn reserve(usize needed) throws -> void;
+  cold fn reserve(usize needed) throws -> void;
 
   /* The byte buffer, always null terminated. */
   mustuse pure fn data() const wontthrow -> const char * { return c_str(); }
   mustuse pure fn length() const wontthrow -> usize { return m_length; }
-  mustuse pure fn back() const wontthrow -> char
+  hot mustuse pure fn back() const wontthrow -> char
   {
     ASSERT(m_length > 0, "back() on an empty string");
     return m_data[m_length - 1];
@@ -82,41 +85,43 @@ public:
 
   fn pop_back() wontthrow -> void;
 
-  fn append(char c) throws -> void { push(c); }
+  hot flatten fn append(char c) throws -> void { push(c); }
   fn operator+=(StringView other) throws->String &;
   fn operator+=(char c) throws->String &;
 
   /* Search and slice forward to the view, so the owned string answers the same
      questions through the view without exposing its buffer. */
-  mustuse pure fn find_character(char wanted) const wontthrow -> Maybe<usize>
+  hot flatten mustuse pure fn find_character(char wanted) const wontthrow
+      -> Maybe<usize>
   {
     return view().find_character(wanted);
   }
-  mustuse pure fn substring(usize start) const wontthrow -> StringView
+  flatten mustuse pure fn substring(usize start) const wontthrow -> StringView
   {
     return view().substring(start);
   }
-  mustuse pure fn substring_of_length(usize start, usize count) const wontthrow
+  flatten mustuse pure fn substring_of_length(usize start,
+                                              usize count) const wontthrow
       -> StringView
   {
     return view().substring_of_length(start, count);
   }
-  mustuse pure fn starts_with(StringView prefix) const wontthrow -> bool
+  flatten mustuse pure fn starts_with(StringView prefix) const wontthrow -> bool
   {
     return view().starts_with(prefix);
   }
 
-  mustuse pure fn operator==(StringView other) const wontthrow->bool
+  hot flatten mustuse pure fn operator==(StringView other) const wontthrow->bool
   {
     return view() == other;
   }
-  mustuse pure fn operator!=(StringView other) const wontthrow->bool
+  hot flatten mustuse pure fn operator!=(StringView other) const wontthrow->bool
   {
     return !(view() == other);
   }
 
   /* Byte order, so a sort matches the C locale collating order. */
-  mustuse pure fn operator<(const String &other) const wontthrow->bool;
+  hot mustuse pure fn operator<(const String &other) const wontthrow->bool;
 
   /* The first byte. The caller guarantees the string is not empty. */
   mustuse pure fn first_character() const wontthrow -> char
@@ -136,7 +141,7 @@ public:
       -> Maybe<usize>;
 
 private:
-  fn free_storage() wontthrow -> void;
+  cold fn free_storage() wontthrow -> void;
 
   /* True when the string lives in the inline buffer rather than an allocation.
    */

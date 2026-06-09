@@ -23,10 +23,10 @@ public:
   Path() = default;
   explicit Path(StringView text);
 
-  mustuse pure fn text() const wontthrow -> const String &;
-  mustuse pure fn c_str() const wontthrow -> const char *;
-  mustuse pure fn count() const wontthrow -> usize;
-  mustuse pure fn is_empty() const wontthrow -> bool;
+  hot mustuse pure fn text() const wontthrow -> const String &;
+  hot mustuse pure fn c_str() const wontthrow -> const char *;
+  hot mustuse pure fn count() const wontthrow -> usize;
+  hot mustuse pure fn is_empty() const wontthrow -> bool;
 
   /* The text without a trailing separator, the directory holding this path. An
      empty or root path yields itself. */
@@ -44,7 +44,7 @@ public:
 
   /* Resolve . and .. components and collapse repeated separators, the
      std::filesystem lexically_normal without touching the disk. */
-  mustuse fn normalized() const throws -> Path;
+  cold mustuse fn normalized() const throws -> Path;
 
   /* This path joined onto a base when it is relative, the base being the
      current working directory unless one is given. */
@@ -59,8 +59,8 @@ public:
 
   /* Disk queries, one syscall each. file_size is None when the path is missing
      or is not a regular file. */
-  mustuse fn exists() const wontthrow -> bool;
-  mustuse fn is_directory() const wontthrow -> bool;
+  cold mustuse fn exists() const wontthrow -> bool;
+  cold mustuse fn is_directory() const wontthrow -> bool;
   mustuse fn is_regular_file() const wontthrow -> bool;
   /* True when the path itself is a symbolic link, tested without following it,
      for the test builtin's -L and -h primaries. */
@@ -86,17 +86,17 @@ public:
   mustuse fn is_newer_than(const Path &other) const wontthrow -> bool;
   mustuse fn is_older_than(const Path &other) const wontthrow -> bool;
 
-  mustuse pure fn operator==(const Path &other) const wontthrow->bool;
+  hot mustuse pure fn operator==(const Path &other) const wontthrow->bool;
 
   /* The working directory of the process. */
-  mustuse static fn current_directory() throws -> Path;
+  cold mustuse static fn current_directory() throws -> Path;
   static fn set_current_directory(const Path &path) throws -> ErrorOr<Ok>;
   /* The directory for temporary files, from TMPDIR or a platform default. */
   mustuse static fn temp_directory() throws -> Path;
 
   /* The immediate children of a directory, filenames only, without . and .. .
      None when the path is not a readable directory. */
-  mustuse static fn read_directory(const Path &dir) throws
+  cold mustuse static fn read_directory(const Path &dir) throws
       -> Maybe<ArrayList<String>>;
 
 private:

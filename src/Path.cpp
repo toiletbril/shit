@@ -36,13 +36,13 @@ static pure fn is_directory_separator(char c) wontthrow -> bool
 
 Path::Path(StringView text) : m_text(text) {}
 
-fn Path::text() const wontthrow -> const String & { return m_text; }
+hot fn Path::text() const wontthrow -> const String & { return m_text; }
 
-fn Path::c_str() const wontthrow -> const char * { return m_text.c_str(); }
+hot fn Path::c_str() const wontthrow -> const char * { return m_text.c_str(); }
 
-fn Path::count() const wontthrow -> usize { return m_text.count(); }
+hot fn Path::count() const wontthrow -> usize { return m_text.count(); }
 
-fn Path::is_empty() const wontthrow -> bool { return m_text.is_empty(); }
+hot fn Path::is_empty() const wontthrow -> bool { return m_text.is_empty(); }
 
 fn Path::is_absolute() const wontthrow -> bool
 {
@@ -125,7 +125,7 @@ fn Path::with_extension(StringView new_extension) const throws -> Path
   return result;
 }
 
-fn Path::normalized() const throws -> Path
+cold fn Path::normalized() const throws -> Path
 {
   let const absolute = is_absolute();
 
@@ -176,20 +176,20 @@ fn Path::to_absolute() const throws -> Path
   return result.normalized();
 }
 
-fn Path::operator==(const Path &other) const wontthrow -> bool
+hot fn Path::operator==(const Path &other) const wontthrow -> bool
 {
   return m_text == other.m_text;
 }
 
 #if SHIT_PLATFORM_IS POSIX
 
-fn Path::exists() const wontthrow -> bool
+cold fn Path::exists() const wontthrow -> bool
 {
   struct stat info{};
   return ::stat(m_text.c_str(), &info) == 0;
 }
 
-fn Path::is_directory() const wontthrow -> bool
+cold fn Path::is_directory() const wontthrow -> bool
 {
   struct stat info{};
   if (::stat(m_text.c_str(), &info) != 0) return false;
@@ -291,7 +291,7 @@ fn Path::is_executable() const wontthrow -> bool
   return ::access(m_text.c_str(), X_OK) == 0;
 }
 
-fn Path::current_directory() throws -> Path
+cold fn Path::current_directory() throws -> Path
 {
   /* getcwd fails with ERANGE when the working directory does not fit the
      buffer, so the buffer doubles until the path fits rather than silently
@@ -317,7 +317,7 @@ fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
   return Success;
 }
 
-fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
+cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
   let const handle = ::opendir(dir.c_str());
   if (handle == nullptr) return None;
@@ -350,12 +350,12 @@ fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 
 #elif SHIT_PLATFORM_IS WIN32
 
-fn Path::exists() const wontthrow -> bool
+cold fn Path::exists() const wontthrow -> bool
 {
   return GetFileAttributesA(m_text.c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
-fn Path::is_directory() const wontthrow -> bool
+cold fn Path::is_directory() const wontthrow -> bool
 {
   let const attributes = GetFileAttributesA(m_text.c_str());
   return attributes != INVALID_FILE_ATTRIBUTES &&
@@ -460,7 +460,7 @@ fn Path::is_executable() const wontthrow -> bool
   return exists();
 }
 
-fn Path::current_directory() throws -> Path
+cold fn Path::current_directory() throws -> Path
 {
   char buffer[4096];
   if (_getcwd(buffer, sizeof(buffer)) != nullptr)
@@ -475,7 +475,7 @@ fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
   return Success;
 }
 
-fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
+cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
   String pattern{dir.text()};
   pattern.push(DIRECTORY_SEPARATOR);

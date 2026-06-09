@@ -55,23 +55,35 @@ public:
 
   ~Maybe() { reset(); }
 
-  mustuse pure fn has_value() const wontthrow -> bool { return m_has_value; }
-  mustuse pure explicit operator bool() const wontthrow { return m_has_value; }
+  hot mustuse pure fn has_value() const wontthrow -> bool
+  {
+    return m_has_value;
+  }
+  hot mustuse pure explicit operator bool() const wontthrow
+  {
+    return m_has_value;
+  }
 
-  mustuse pure fn value() wontthrow -> T &
+  hot mustuse pure fn value() wontthrow -> T &
   {
     ASSERT(m_has_value);
     return reference();
   }
-  mustuse pure fn value() const wontthrow -> const T &
+  hot mustuse pure fn value() const wontthrow -> const T &
   {
     ASSERT(m_has_value);
     return reference();
   }
-  mustuse pure fn operator*() wontthrow -> T & { return value(); }
-  mustuse pure fn operator*() const wontthrow -> const T & { return value(); }
-  mustuse pure fn operator->() wontthrow -> T * { return &reference(); }
-  mustuse pure fn operator->() const wontthrow -> const T *
+  hot flatten mustuse pure fn operator*() wontthrow -> T & { return value(); }
+  hot flatten mustuse pure fn operator*() const wontthrow -> const T &
+  {
+    return value();
+  }
+  hot flatten mustuse pure fn operator->() wontthrow -> T *
+  {
+    return &reference();
+  }
+  hot flatten mustuse pure fn operator->() const wontthrow -> const T *
   {
     return &reference();
   }

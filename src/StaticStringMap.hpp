@@ -24,11 +24,12 @@ public:
   const entry *entries;
   usize entry_count;
 
-  mustuse fn find(StringView text) const throws -> Maybe<Value>
+  hot mustuse fn find(StringView text) const throws -> Maybe<Value>
   {
     if (text.count() > 16) return None;
     let const wanted = PackedStringKey::from_view(text);
     /* TODO: slow? */
+#pragma clang loop unroll_count(4)
     for (usize i = 0; i < entry_count; i++)
       if (entries[i].key == wanted) return entries[i].value;
     return None;

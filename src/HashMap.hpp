@@ -23,7 +23,7 @@ class HashMap
 public:
   explicit HashMap(Allocator allocator) : m_allocator(allocator) {}
 
-  HashMap(const HashMap &other) : m_allocator(other.m_allocator)
+  cold HashMap(const HashMap &other) : m_allocator(other.m_allocator)
   {
     rehash(other.m_capacity == 0 ? 16 : other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
@@ -57,7 +57,7 @@ public:
     }
     return *this;
   }
-  fn operator=(const HashMap &other) throws->HashMap &
+  cold fn operator=(const HashMap &other) throws->HashMap &
   {
     if (this != &other) {
       HashMap copy{other};
@@ -72,7 +72,7 @@ public:
 
   /* The value for the key, or nullptr when absent. The pointer is stable until
      the next set that grows the table. */
-  mustuse pure fn find(StringView key) const wontthrow -> const Value *
+  hot mustuse pure fn find(StringView key) const wontthrow -> const Value *
   {
     if (m_capacity == 0) return nullptr;
     let const wanted = PackedStringKey::from_view(key);
@@ -85,7 +85,7 @@ public:
          compare runs, and the byte compare confirms a key past sixteen bytes.
        */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          slot.key == key)
+          slot.key == key) [[likely]]
         return &slot.value;
       i = (i + 1) & mask;
     }
@@ -95,19 +95,19 @@ public:
   /* The mutable value for the key, or nullptr when absent, so a caller can edit
      a stored value in place without a copy-out then set. The pointer is stable
      until the next set that grows the table. */
-  mustuse fn find(StringView key) wontthrow -> Value *
+  hot flatten mustuse fn find(StringView key) wontthrow -> Value *
   {
     return const_cast<Value *>(static_cast<const HashMap *>(this)->find(key));
   }
 
   /* Store a value the table owns by move. */
-  fn set(StringView key, Value value) throws -> void { set_value(key, steal(value)); }
+  hot fn set(StringView key, Value value) throws -> void { set_value(key, steal(value)); }
 
   /* The value for a key, inserting the supplied default when the key is absent,
      then returning a mutable reference. The caller passes the default already
      built with the right allocator. The reference is valid until the next set
      that grows the table. */
-  fn get_or_create(StringView key, Value default_value) throws -> Value &
+  hot fn get_or_create(StringView key, Value default_value) throws -> Value &
   {
     if (const Value *existing = find(key))
       return *const_cast<Value *>(existing);
@@ -125,7 +125,7 @@ public:
      append would read bytes the clear already truncated. Every caller builds
      the value in a fresh String or a stack buffer first, so a self-assignment
      such as x=$x still passes an independent view. */
-  fn set(StringView key, StringView value) throws -> void
+  hot fn set(StringView key, StringView value) throws -> void
   {
     if (Value *existing = find(key)) {
       /* A buffer that once held a large value and now takes a far smaller one
@@ -144,7 +144,7 @@ public:
     set_value(key, String{m_allocator, value});
   }
 
-  fn erase(StringView key) throws -> void
+  hot fn erase(StringView key) throws -> void
   {
     if (m_capacity == 0) return;
     let const mask = m_capacity - 1;
@@ -194,12 +194,13 @@ private:
     Value value{};
   };
 
-  fn set_value(StringView key, Value value) throws -> void
+  hot fn set_value(StringView key, Value value) throws -> void
   {
     /* Tombstones count toward the load, so the table rehashes before a probe
        chain fills with deleted slots. That keeps an Empty slot reachable on
        every chain and an insert is never dropped. */
     if (m_count + m_tombstones + 1 > (m_capacity >> 1) + (m_capacity >> 2))
+        [[unlikely]]
       rehash(m_capacity == 0 ? 16 : m_capacity * 2);
 
     let const wanted = PackedStringKey::from_view(key);
@@ -246,18 +247,20 @@ private:
     m_count++;
   }
 
-  fn rehash(usize new_capacity) throws -> void
+  cold fn rehash(usize new_capacity) throws -> void
   {
     let old_slots = m_slots;
     let const old_capacity = m_capacity;
 
     m_slots = m_allocator.alloc_array<slot>(new_capacity);
+#pragma clang loop unroll_count(4)
     for (usize i = 0; i < new_capacity; i++)
       new (&m_slots[i]) slot{};
     m_capacity = new_capacity;
     m_count = 0;
     m_tombstones = 0;
 
+#pragma clang loop unroll_count(4)
     for (usize i = 0; i < old_capacity; i++) {
       if (old_slots[i].state == slot::Occupied)
         set_value(old_slots[i].key.view(), steal(old_slots[i].value));
@@ -266,7 +269,7 @@ private:
     if (old_slots != nullptr) m_allocator.free_array(old_slots, old_capacity);
   }
 
-  fn destroy_all() wontthrow -> void
+  cold fn destroy_all() wontthrow -> void
   {
     for (usize i = 0; i < m_capacity; i++)
       m_slots[i].~slot();

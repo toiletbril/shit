@@ -35,7 +35,7 @@ public:
   void *context;
   const VTable *vtable;
 
-  fn raw_alloc(usize length, usize alignment) const throws -> void *
+  hot flatten fn raw_alloc(usize length, usize alignment) const throws -> void *
   {
     return vtable->alloc(context, length, alignment);
   }
@@ -44,25 +44,26 @@ public:
   {
     return vtable->resize(context, pointer, old_length, new_length, alignment);
   }
-  fn raw_free(void *pointer, usize length, usize alignment) const wontthrow
-      -> void
+  flatten fn raw_free(void *pointer, usize length, usize alignment) const
+      wontthrow -> void
   {
     vtable->free(context, pointer, length, alignment);
   }
 
   template <class T>
-  fn alloc_array(usize count) const throws -> T *
+  hot flatten fn alloc_array(usize count) const throws -> T *
   {
     /* The product overflows usize for a large enough count, wrapping to a small
        request that the caller then writes past. The division guards the
        multiply, since count times sizeof(T) cannot exceed the max when count is
        at most the max divided by sizeof(T). */
     if (sizeof(T) != 0 && count > (static_cast<usize>(-1) / sizeof(T)))
+        [[unlikely]]
       throw std::bad_alloc{};
     return static_cast<T *>(raw_alloc(count * sizeof(T), alignof(T)));
   }
   template <class T>
-  fn free_array(T *pointer, usize count) const wontthrow -> void
+  flatten fn free_array(T *pointer, usize count) const wontthrow -> void
   {
     raw_free(pointer, count * sizeof(T), alignof(T));
   }
@@ -73,7 +74,7 @@ namespace allocators {
 /* The bump adapter over a BumpArena. A free is a no-op and a resize never grows
    in place, since the arena reclaims everything at once on reset. The whole
    lifetime of its allocations is the lifetime of the arena. */
-inline fn bump_alloc(void *context, usize length, usize alignment) throws
+hot inline fn bump_alloc(void *context, usize length, usize alignment) throws
     -> void *
 {
   return bump_arena_allocate(static_cast<BumpArena *>(context), length,

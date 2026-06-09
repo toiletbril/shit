@@ -16,8 +16,8 @@ fn is_arena_pointer(const void *pointer) wontthrow -> bool
          (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
 }
 
-fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment) throws
-    -> void *
+hot fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment)
+    throws -> void *
 {
   return arena->allocate(length, alignment);
 }
@@ -31,7 +31,7 @@ BumpArena::~BumpArena()
     std::free(block.base);
 }
 
-fn BumpArena::run_destructors_down_to(usize first) wontthrow -> void
+cold fn BumpArena::run_destructors_down_to(usize first) wontthrow -> void
 {
   while (m_destructors.count() > first) {
     let const pending = m_destructors.back();
@@ -60,7 +60,7 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
       let &block = m_blocks.back();
       let const aligned = (block.used + (alignment - 1)) & ~(alignment - 1);
 
-      if (aligned + size <= block.size) {
+      if (aligned + size <= block.size) [[likely]] {
         ASSERT(block.base != nullptr);
 
         let const pointer = block.base + aligned;
@@ -116,7 +116,7 @@ fn BumpArena::release(Mark saved) wontthrow -> void
   }
 }
 
-fn BumpArena::reset() wontthrow -> void
+cold fn BumpArena::reset() wontthrow -> void
 {
   run_destructors_down_to(0);
 

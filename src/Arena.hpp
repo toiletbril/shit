@@ -22,9 +22,9 @@ public:
   BumpArena(const BumpArena &) = delete;
   BumpArena &operator=(const BumpArena &) = delete;
 
-  fn allocate(usize size, usize alignment) throws -> void *;
+  hot fn allocate(usize size, usize alignment) throws -> void *;
   fn owns(const void *pointer) const wontthrow -> bool;
-  fn reset() wontthrow -> void;
+  cold fn reset() wontthrow -> void;
 
   /* Counts how many times the arena has been reset. A cache that holds a
      pointer into this arena stores the generation it was filled in, so a hit

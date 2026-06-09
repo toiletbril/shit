@@ -36,7 +36,7 @@ public:
   }
 
   /* Pack the first sixteen bytes of a view at lookup time. */
-  static fn from_view(StringView text) wontthrow -> PackedStringKey
+  hot static fn from_view(StringView text) wontthrow -> PackedStringKey
   {
     PackedStringKey key{};
     let const count = text.count() < 16 ? text.count() : 16;
@@ -48,7 +48,7 @@ public:
     return key;
   }
 
-  mustuse pure fn operator==(const PackedStringKey &other) const wontthrow
+  hot mustuse pure fn operator==(const PackedStringKey &other) const wontthrow
       -> bool
   {
     return low_word == other.low_word && high_word == other.high_word;
@@ -58,7 +58,7 @@ public:
      sixteen-byte limit. A key built from a name with no embedded NUL and no
      more than sixteen bytes round-trips exactly, which holds for every builtin
      name. */
-  mustuse fn to_string() const throws -> String
+  cold mustuse fn to_string() const throws -> String
   {
     char buffer[16];
     usize length = 0;

@@ -21,7 +21,7 @@ String::String(StringView initial) throws : m_allocator(heap_allocator())
   append(initial);
 }
 
-String::String(const String &other) throws : m_allocator(other.m_allocator)
+cold String::String(const String &other) throws : m_allocator(other.m_allocator)
 {
   reset_to_inline();
   append(other.view());
@@ -80,14 +80,14 @@ fn String::clear() wontthrow -> void
   if (m_data != nullptr) m_data[0] = '\0';
 }
 
-fn String::push(char c) throws -> void
+hot fn String::push(char c) throws -> void
 {
   reserve(m_length + 1);
   m_data[m_length++] = c;
   m_data[m_length] = '\0';
 }
 
-fn String::append(StringView other) throws -> void
+hot fn String::append(StringView other) throws -> void
 {
   if (other.length == 0) return;
   reserve(m_length + other.length);
@@ -96,9 +96,9 @@ fn String::append(StringView other) throws -> void
   m_data[m_length] = '\0';
 }
 
-fn String::reserve(usize needed) throws -> void
+cold fn String::reserve(usize needed) throws -> void
 {
-  if (needed + 1 <= m_capacity) return;
+  if (needed + 1 <= m_capacity) [[likely]] return;
   /* A small buffer quadruples so a string built one append at a time leaves the
      inline size in one realloc rather than several, while a large buffer
      doubles to keep the overshoot bounded. */
@@ -137,7 +137,7 @@ fn String::operator+=(char c) throws -> String &
   return *this;
 }
 
-fn String::operator<(const String &other) const wontthrow -> bool
+hot fn String::operator<(const String &other) const wontthrow -> bool
 {
   let const shared = m_length < other.m_length ? m_length : other.m_length;
   let const order =
@@ -177,7 +177,7 @@ fn String::find_last_character(char wanted) const wontthrow -> Maybe<usize>
   return None;
 }
 
-fn String::free_storage() wontthrow -> void
+cold fn String::free_storage() wontthrow -> void
 {
   /* Only a heap or arena buffer is freed. The inline buffer is part of the
      object. The reset leaves the object a valid empty inline string, which is

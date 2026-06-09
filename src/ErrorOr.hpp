@@ -85,14 +85,14 @@ public:
 
   ~ErrorOr() { destroy(); }
 
-  mustuse pure fn is_error() const wontthrow -> bool { return m_is_error; }
+  hot mustuse pure fn is_error() const wontthrow -> bool { return m_is_error; }
 
-  mustuse pure fn value() wontthrow -> T &
+  hot mustuse pure fn value() wontthrow -> T &
   {
     ASSERT(!m_is_error);
     return value_reference();
   }
-  mustuse pure fn value() const wontthrow -> const T &
+  hot mustuse pure fn value() const wontthrow -> const T &
   {
     ASSERT(!m_is_error);
     return value_reference();
@@ -110,7 +110,7 @@ public:
   }
 
   /* Move the value out, called once the caller has checked is_error. */
-  mustuse fn take() throws -> T
+  hot mustuse fn take() throws -> T
   {
     ASSERT(!m_is_error);
     return steal(value_reference());
@@ -125,11 +125,11 @@ private:
       value_reference().~T();
   }
 
-  fn value_reference() wontthrow -> T &
+  hot flatten fn value_reference() wontthrow -> T &
   {
     return *reinterpret_cast<T *>(&m_storage);
   }
-  fn value_reference() const wontthrow -> const T &
+  hot flatten fn value_reference() const wontthrow -> const T &
   {
     return *reinterpret_cast<const T *>(&m_storage);
   }
@@ -157,7 +157,8 @@ private:
 #define TRY(expr)                                                              \
   ({                                                                           \
     auto t__result = (expr);                                                   \
-    if (t__result.is_error()) return t__result.error();                        \
+    if (t__result.is_error()) [[unlikely]]                                     \
+      return t__result.error();                                                \
     t__result.take();                                                          \
   })
 
