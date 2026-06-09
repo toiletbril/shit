@@ -1,0 +1,1 @@
+export V=parent; (V=child); echo "1:$V"; r=$(V=sub; echo x); echo "2:$V $r"; export W=keep; (unset W); echo "3:[$W]"

@@ -472,6 +472,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_shell_variable(m_assignment->key(), value);
   if (cxt.export_all()) {
     let const &key = m_assignment->key();
+    cxt.record_environment_change(key);
     os::set_environment_variable(key, value);
   }
   return cxt.last_exit_status();
@@ -1004,7 +1005,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         value = steal(appended);
       }
       cxt.set_shell_variable(name, value);
-      if (cxt.export_all()) os::set_environment_variable(name, value.view());
+      if (cxt.export_all()) {
+        cxt.record_environment_change(name);
+        os::set_environment_variable(name, value.view());
+      }
     }
     cxt.set_last_exit_status(0);
     return 0;
@@ -1020,6 +1024,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<String> previous_value;
   };
   ArrayList<saved_env_var> saved_env{heap_allocator()};
+  /* A prefix IFS=... drives the shell's own word splitting for this command,
+     read by the read builtin and by every expansion in the command, which take
+     it from the live separator cache rather than the environment. The effective
+     separators are saved before the first such prefix and restored on exit, the
+     way the prefix PATH save below reverts the resolver. */
+  bool ifs_was_assigned = false;
+  String saved_ifs_separators{heap_allocator()};
   /* The assignments apply left to right, each committed to the environment
      before the next is expanded, so a later value reads an earlier same-line
      one and a repeated name or a += accumulates. The previous environment
@@ -1045,6 +1056,17 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        to the environment alone would not change the search order. */
     if (name == "PATH")
       utils::set_path_for_resolution(String{expanded_value.view()});
+    /* A prefix IFS=... re-aims the separator cache for the command's duration.
+       The value before the first IFS prefix is saved once, so a name repeated
+       on the line still reverts to where it began. */
+    if (name == "IFS") {
+      if (!ifs_was_assigned) {
+        ifs_was_assigned = true;
+        saved_ifs_separators =
+            cxt.get_variable_value("IFS").value_or(String{" \t\n"});
+      }
+      cxt.set_field_separators(expanded_value.view());
+    }
   }
   defer
   {
@@ -1066,6 +1088,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        resolves the way it would have without the prefix. */
     if (path_was_assigned)
       utils::set_path_for_resolution(cxt.get_variable_value("PATH"));
+    /* The prefix IFS reverts to the separators that were effective before the
+       command, so the next command splits the way it would have without it. */
+    if (ifs_was_assigned) cxt.set_field_separators(saved_ifs_separators.view());
   };
 
   /* A function shadows a builtin and a program. Run its body with the call

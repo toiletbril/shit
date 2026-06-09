@@ -1,0 +1,4 @@
+IFS=- read a b c d <<IN
+w-x-y-z
+IN
+echo "[$a][$b][$c][$d]"; printf 'p q r\n' | { read m n o; echo "[$m][$n][$o]"; }

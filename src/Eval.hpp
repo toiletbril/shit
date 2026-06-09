@@ -110,6 +110,15 @@ struct job
   i32 last_status{0};
 };
 
+/* One reverted process-environment write, the prior value of a name an export,
+   an unset, or a reassignment of an exported name changed inside a subshell.
+   The value is absent when the name was unset before the write. */
+struct environment_undo_entry
+{
+  String name;
+  Maybe<String> previous_value;
+};
+
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. The
    set option flags and the trap table are captured too, so a set -e, a set -f,
@@ -126,6 +135,11 @@ struct eval_state_snapshot
   bool enable_path_expansion;
   bool enable_echo;
   bool enable_echo_expanded;
+  /* The length of the environment undo log when the snapshot was taken, the
+     point restore_state rewinds the process environment back to. A subshell
+     that writes no exported name leaves the log untouched, so the restore is a
+     single length comparison. */
+  usize environment_undo_mark;
 };
 
 class EvalContext
@@ -156,6 +170,18 @@ public:
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
   fn unset_shell_variable(StringView name) throws -> void;
+
+  /* Log a name's current process-environment value before a write that outlives
+     the current statement, so a subshell restore can revert it. Called before
+     an export or an allexport assignment writes the environment. Outside a
+     subshell the write is permanent, so nothing is logged. */
+  fn record_environment_change(StringView name) throws -> void;
+
+  /* Set IFS and refresh the separator table together, so the table never drifts
+     from the cached value. A prefix IFS=... for a command applies it for the
+     command's duration and restores it after, the way a prefix PATH=... re-aims
+     the resolver. */
+  fn set_field_separators(StringView value) throws -> void;
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
 
   /* The stored value of a plain shell variable, or nullptr when the name is
@@ -506,9 +532,6 @@ protected:
      256-byte block, the shape a later SIMD scan reads to find separators in
      bulk. It is rebuilt whenever IFS changes. */
   bool m_field_separator_table[256]{};
-  /* Set IFS and refresh the separator table together, so the table never drifts
-     from the cached value. */
-  fn set_field_separators(StringView value) throws -> void;
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
 
@@ -519,6 +542,13 @@ protected:
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
   usize m_loop_depth{0};
+
+  /* The prior values of process-environment names written while a subshell ran,
+     pushed newest last and rewound by restore_state on the subshell's exit. The
+     log is appended to only while m_subshell_depth is above zero, so a
+     top-level export pays nothing and the common command substitution that
+     writes no exported name leaves it empty. */
+  ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each
      bounded so a runaway recursion errors with a located message rather than

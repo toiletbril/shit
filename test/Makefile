@@ -28,6 +28,7 @@ clean:
 test: $(BIN)
 	@$(MAKE) -B clean
 	@$(MAKE) -B run_tests
+	@$(MAKE) -B dashdiff
 	cat $(FAILED_LIST)
 
 run_tests: $(TEST_NAMES)

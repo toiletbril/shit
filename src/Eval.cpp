@@ -85,8 +85,17 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
      name is already present there, so a child of `export FOO=1; FOO=2` sees 2.
      A non-exported name is absent from the environment, so the common case only
      pays the getenv scan the read miss already pays. */
-  if (os::get_environment_variable(name).has_value())
+  Maybe<String> existing_environment_value = os::get_environment_variable(name);
+  if (existing_environment_value.has_value()) {
+    /* The environment write outlives the current statement, so inside a
+       subshell the name's prior value is logged for the restore on the
+       subshell's exit. The getenv above already read it, so the log reuses that
+       value rather than scanning a second time. */
+    if (m_subshell_depth > 0)
+      m_environment_undo_log.push(environment_undo_entry{
+          String{name}, steal(existing_environment_value)});
     os::set_environment_variable(name, value);
+  }
 }
 
 fn EvalContext::set_field_separators(StringView value) throws -> void
@@ -136,7 +145,9 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
   /* An exported variable also lives in the process environment, so it is
      removed there too. Otherwise a later lookup falls back to the stale
      environment value and the variable appears still set, which dash does not
-     do. */
+     do. The removal outlives the current statement, so inside a subshell the
+     prior value is logged first for the restore on the subshell's exit. */
+  record_environment_change(name);
   os::unset_environment_variable(name);
   if (name == "IFS") set_field_separators(" \t\n");
   /* An unset PATH drops the search order, so the resolver falls back to the
@@ -146,6 +157,15 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
      transient on that path. */
   if (name == "PATH")
     utils::set_path_for_resolution(os::get_environment_variable("PATH"));
+}
+
+fn EvalContext::record_environment_change(StringView name) throws -> void
+{
+  /* A top-level write is permanent, so the log stays empty and a later subshell
+     restore finds nothing to rewind. */
+  if (m_subshell_depth == 0) return;
+  m_environment_undo_log.push(
+      environment_undo_entry{String{name}, os::get_environment_variable(name)});
 }
 
 hot fn EvalContext::get_variable_value(StringView name) const throws
@@ -891,7 +911,8 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_error_exit,
                              m_enable_path_expansion,
                              m_enable_echo,
-                             m_enable_echo_expanded};
+                             m_enable_echo_expanded,
+                             m_environment_undo_log.count()};
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -920,6 +941,24 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   /* set_current_directory reports an error through ErrorOr, ignored here to
      match the prior void call that swallowed a failed chdir. */
   (void) Path::set_current_directory(snapshot.working_directory);
+
+  /* An export, an unset, or a reassignment of an exported name inside the
+     subshell wrote the process environment, which the restored variable map
+     above does not cover. Each such write logged the name's prior value while
+     the subshell ran, so they revert newest first back to the mark the snapshot
+     recorded, the way a forked subshell's environment dies with it. A subshell
+     that wrote no exported name logged nothing, so the count already matches
+     the mark and the loop does not run. The rewind precedes the PATH re-point
+     below, so an exported PATH reads its restored value. */
+  while (m_environment_undo_log.count() > snapshot.environment_undo_mark) {
+    const environment_undo_entry &entry = m_environment_undo_log.back();
+    if (entry.previous_value)
+      os::set_environment_variable(entry.name.view(),
+                                   entry.previous_value->view());
+    else
+      os::unset_environment_variable(entry.name.view());
+    m_environment_undo_log.pop_back();
+  }
 
   /* The cached field separators track the restored map, so an IFS change inside
      the subshell or the command substitution does not leak its split behavior

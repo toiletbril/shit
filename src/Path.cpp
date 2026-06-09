@@ -210,6 +210,37 @@ fn Path::file_size() const wontthrow -> Maybe<u64>
   return static_cast<u64>(info.st_size);
 }
 
+fn Path::is_same_file_as(const Path &other) const wontthrow -> bool
+{
+  struct stat a{}, b{};
+  if (::stat(m_text.c_str(), &a) != 0) return false;
+  if (::stat(other.m_text.c_str(), &b) != 0) return false;
+  return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+}
+
+fn Path::is_newer_than(const Path &other) const wontthrow -> bool
+{
+  struct stat a{}, b{};
+  if (::stat(m_text.c_str(), &a) != 0) return false;
+  if (::stat(other.m_text.c_str(), &b) != 0) return false;
+  /* The seconds are compared first and the nanoseconds break a tie, the same
+     st_mtim ordering dash compares so two files written in the same second
+     still order by their finer timestamp. */
+  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
+    return a.st_mtim.tv_sec > b.st_mtim.tv_sec;
+  return a.st_mtim.tv_nsec > b.st_mtim.tv_nsec;
+}
+
+fn Path::is_older_than(const Path &other) const wontthrow -> bool
+{
+  struct stat a{}, b{};
+  if (::stat(m_text.c_str(), &a) != 0) return false;
+  if (::stat(other.m_text.c_str(), &b) != 0) return false;
+  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
+    return a.st_mtim.tv_sec < b.st_mtim.tv_sec;
+  return a.st_mtim.tv_nsec < b.st_mtim.tv_nsec;
+}
+
 fn Path::is_readable() const wontthrow -> bool
 {
   return ::access(m_text.c_str(), R_OK) == 0;
@@ -310,6 +341,57 @@ fn Path::file_size() const -> Maybe<u64>
     return None;
   if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) return None;
   return (static_cast<u64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
+}
+
+fn Path::is_same_file_as(const Path &other) const -> bool
+{
+  /* The volume serial and the file index together name one file the way a
+     device and an inode do on POSIX, read from an opened handle. The backup
+     semantics flag lets a directory open too, so a directory compares like any
+     other path. */
+  HANDLE first = CreateFileA(
+      m_text.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (first == INVALID_HANDLE_VALUE) return false;
+  HANDLE second =
+      CreateFileA(other.m_text.c_str(), 0,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (second == INVALID_HANDLE_VALUE) {
+    CloseHandle(first);
+    return false;
+  }
+  BY_HANDLE_FILE_INFORMATION first_info{}, second_info{};
+  const bool both_read = GetFileInformationByHandle(first, &first_info) != 0 &&
+                         GetFileInformationByHandle(second, &second_info) != 0;
+  CloseHandle(first);
+  CloseHandle(second);
+  if (!both_read) return false;
+  return first_info.dwVolumeSerialNumber == second_info.dwVolumeSerialNumber &&
+         first_info.nFileIndexHigh == second_info.nFileIndexHigh &&
+         first_info.nFileIndexLow == second_info.nFileIndexLow;
+}
+
+fn Path::is_newer_than(const Path &other) const -> bool
+{
+  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
+  if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &a) == 0)
+    return false;
+  if (GetFileAttributesExA(other.m_text.c_str(), GetFileExInfoStandard, &b) ==
+      0)
+    return false;
+  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) > 0;
+}
+
+fn Path::is_older_than(const Path &other) const -> bool
+{
+  WIN32_FILE_ATTRIBUTE_DATA a{}, b{};
+  if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &a) == 0)
+    return false;
+  if (GetFileAttributesExA(other.m_text.c_str(), GetFileExInfoStandard, &b) ==
+      0)
+    return false;
+  return CompareFileTime(&a.ftLastWriteTime, &b.ftLastWriteTime) < 0;
 }
 
 fn Path::is_readable() const -> bool { return _access(m_text.c_str(), 4) == 0; }

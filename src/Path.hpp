@@ -69,6 +69,14 @@ public:
   mustuse fn is_writable() const wontthrow -> bool;
   mustuse fn is_executable() const wontthrow -> bool;
 
+  /* The two-file comparisons the test builtin's -ef, -nt, and -ot ask for. Each
+     stats both paths and reads false when either path is missing, the way dash
+     reports a comparison against an absent file. is_same_file_as matches when
+     the two name one file, equal device and inode. */
+  mustuse fn is_same_file_as(const Path &other) const wontthrow -> bool;
+  mustuse fn is_newer_than(const Path &other) const wontthrow -> bool;
+  mustuse fn is_older_than(const Path &other) const wontthrow -> bool;
+
   mustuse pure fn operator==(const Path &other) const wontthrow->bool;
 
   /* The working directory of the process. */

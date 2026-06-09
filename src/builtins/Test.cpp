@@ -75,6 +75,13 @@ public:
     if (op == "<") return left < right;
     if (op == ">") return right < left;
 
+    /* -ef, -nt, and -ot compare two files on disk rather than their names, so
+       the operands are taken as paths and the result reads false when either
+       path is missing, matching dash. */
+    if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
+    if (op == "-nt") return Path{left}.is_newer_than(Path{right});
+    if (op == "-ot") return Path{left}.is_older_than(Path{right});
+
     i64 a = 0, b = 0;
     if (op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
         op == "-gt" || op == "-ge")
@@ -95,7 +102,7 @@ public:
       return a >= b;
     }
     fail(StringView{"unknown binary operator '"} + op +
-         "', expected one of = != < > -eq -ne -lt -le -gt -ge");
+         "', expected one of = != < > -eq -ne -lt -le -gt -ge -ef -nt -ot");
     return false;
   }
 
@@ -109,10 +116,11 @@ public:
   {
     /* == is listed so the bashism routes to evaluate_binary and is rejected
        there with a suggestion to use =, rather than falling through to the
-       unexpected-argument error. */
+       unexpected-argument error. -ef, -nt, and -ot are the file-compare
+       operators evaluate_binary resolves against the two paths. */
     return s == "=" || s == "==" || s == "!=" || s == "<" || s == ">" ||
            s == "-eq" || s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" ||
-           s == "-ge";
+           s == "-ge" || s == "-ef" || s == "-nt" || s == "-ot";
   }
 
   /* A unary operator at index reads as a plain operand rather than an operator

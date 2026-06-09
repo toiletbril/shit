@@ -1,0 +1,76 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "V=parent"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign V=child]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "1:$V"]
+  [CompoundListCondition, None]
+    [Assign r=$(V=sub; echo x)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "2:$V $r"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "W=keep"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "unset" "W"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "3:[$W]"]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "V=parent"
+]
+[Word
+  Unquoted "V=child"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "1:"
+  Variable "V"
+]
+[Word
+  Unquoted "r="
+  CommandSubstitution "V=sub; echo x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "2:"
+  Variable "V"
+  DoubleQuoted " "
+  Variable "r"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "W=keep"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "W"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "3:["
+  Variable "W"
+  DoubleQuoted "]"
+]
+1:parent
+2:parent x
+3:[keep]
+[Code 0]

@@ -1,0 +1,94 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "a" "b" "c" "d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$a][$b][$c][$d]"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "p q r\n"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "m" "n" "o"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "[$m][$n][$o]"]
+[Word
+  Unquoted "IFS=-"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "IN"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "a"
+  DoubleQuoted "]["
+  Variable "b"
+  DoubleQuoted "]["
+  Variable "c"
+  DoubleQuoted "]["
+  Variable "d"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "p q r\n"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "m"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "o"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "m"
+  DoubleQuoted "]["
+  Variable "n"
+  DoubleQuoted "]["
+  Variable "o"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "}"
+]
+shit: 1:7: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+     1 |  IFS=- read a b c d <<IN
+       |        ^~~~~~~~~~~~ here.
+shit: 4:47: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+     4 |  echo "[$a][$b][$c][$d]"; printf 'p q r\n' | { read m n o; echo "[$m][$n][$o]"; }
+       |                                                ^~~~~~~~~~ here.
+[w][x][y][z]
+[p][q][r]
+[Code 0]

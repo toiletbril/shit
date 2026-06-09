@@ -1,0 +1,50 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "/" "-ef" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ef_same:$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "/dev/null" "-ef" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "ef_diff:$?"]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ef_same:"
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "-ef"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ef_diff:"
+  Variable "?"
+]
+ef_same:0
+ef_diff:1
+[Code 0]
