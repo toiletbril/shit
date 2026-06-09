@@ -45,9 +45,11 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  /* A -p prompt prints to standard error, and only when the input is a
-     terminal, the way bash stays quiet for a redirected or piped read. */
-  if (FLAG_READ_PROMPT.is_set() && os::is_stdin_a_tty())
+  /* A -p prompt prints to standard error, and only when the read's own input is
+     a terminal, the way bash stays quiet for a read whose descriptor is
+     redirected from a file or a pipe even at an interactive prompt. */
+  if (FLAG_READ_PROMPT.is_set() &&
+      os::is_fd_a_tty(ec.in_fd.value_or(SHIT_STDIN)))
     shit::print_error(FLAG_READ_PROMPT.value());
 
   /* With no operand the line goes to REPLY, otherwise to the operands in

@@ -248,6 +248,7 @@ fn process_id_of(process p) wontthrow -> i64;
 fn is_stdin_a_tty() wontthrow -> bool;
 fn is_stdout_a_tty() wontthrow -> bool;
 fn is_stderr_a_tty() wontthrow -> bool;
+fn is_fd_a_tty(descriptor fd) wontthrow -> bool;
 
 fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
 

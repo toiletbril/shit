@@ -1250,10 +1250,12 @@ hot fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_THREE(Greater, '>', DoubleGreater, '=', GreaterEquals);
 
     /* < is input redirect, << a heredoc, <= a comparison. <<< is the bash
-       here-string, which feeds a single expanded word as standard input. */
+       here-string, which feeds a single expanded word as standard input. It
+       changes the POSIX reading of << with a <word delimiter, so it is bash
+       mode only and POSIX mode keeps tokenizing << then <. */
     case Token::Kind::Less: {
       if (chop_character(1) == '<') {
-        if (chop_character(2) == '<') {
+        if (chop_character(2) == '<' && m_bash_compatible) {
           tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
           extra_length += 2;
         } else {

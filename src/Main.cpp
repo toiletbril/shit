@@ -558,9 +558,14 @@ fn main(int argc, char **argv) -> int
      like that shell. Real bash run as sh switches to POSIX, which the split
      mirrors. */
   let const last_slash = program_path.find_last_character('/');
-  let const program_basename = last_slash.has_value()
-                                   ? program_path.substring(*last_slash + 1)
-                                   : program_path.view();
+  shit::StringView program_basename =
+      last_slash.has_value() ? program_path.substring(*last_slash + 1)
+                             : program_path.view();
+  /* A login shell receives argv[0] prefixed with a dash, such as -bash, so the
+     leading dash is dropped before the name is matched, the way bash strips it
+     to recognize its own invocation name. */
+  if (!program_basename.is_empty() && program_basename[0] == '-')
+    program_basename = program_basename.substring(1);
   shit::INVOKED_AS_POSIX_SHELL =
       program_basename == "sh" || program_basename == "dash";
   shit::INVOKED_AS_BASH = program_basename == "bash";
