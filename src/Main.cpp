@@ -78,11 +78,12 @@ FLAG(RCFILE, String, '\0', "rcfile",
      "Source FILE as the interactive rc instead of ~/.bashrc, the way bash reads "
      "a named rc. The shit rc still runs, and a non-interactive run reads no rc.");
 FLAG(MIMICRY, Bool, 'I', "mimicry",
-     "Mimic the shell a script's shebang names. A program whose shebang is a "
-     "shell shit can emulate runs in-process in the matching mode rather than "
-     "launching the shell, where sh and dash run in POSIX mode, bash in bash "
-     "mode, and shit in the default mode. A zsh, ksh, fish, or non-shell shebang "
-     "still launches the real program.");
+     "Mimic the shell a script's shebang names, for speed. A program whose "
+     "shebang is a shell shit can emulate runs in-process in the matching mode "
+     "rather than launching the shell, so a script-heavy run skips the fork and "
+     "the shell startup, where sh and dash run in POSIX mode, bash in bash mode, "
+     "and shit in the default mode. A zsh, ksh, fish, or non-shell shebang still "
+     "launches the real program.");
 
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
@@ -103,7 +104,7 @@ FLAG(NO_COMPLETION, Bool, 'T', "no-completion",
      "Disable interactive tab completion and ghost-text.");
 FLAG(DUMB, Bool, '\0', "dumb",
      "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
-FLAG(LIST_CHECKS, Bool, '\0', "list",
+FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics",
      "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(LOG, Bool, 'X', "enable-debug-logging",
      "Enable verbose internal logging to stderr.");
@@ -169,6 +170,11 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
+    h += wrap_text(
+        "Options are also read from the SHIT_FLAGS environment variable, so a "
+        "flag set there is inherited by every invocation, while a flag given on "
+        "the command line still has the final say.\n\n",
+        HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_flag_help(FLAG_LIST);
     h += '\n';
     print_error(h);

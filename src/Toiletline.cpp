@@ -591,9 +591,9 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case 'G': {
       let const branch = git_branch();
       if (!branch.is_empty()) {
-        out += "(";
+        out += " (";
         out += branch.view();
-        out += ") ";
+        out += ")";
       }
     } break;
     case '$': out += (user == "root") ? '#' : '$'; break;
@@ -669,15 +669,15 @@ static String PROMPT_CACHE_VALUE{};
 fn default_prompt_template() -> String
 {
   let template_string = String{};
-  template_string += "\\u@\\h ";
+  template_string += R"(\s\u@\h )";
   if (colors::stdout_wants_color()) {
     template_string += colors::ansi::GREEN;
-    template_string += "\\P";
+    template_string += R"(\P)";
     template_string += colors::ansi::RESET;
   } else {
-    template_string += "\\P";
+    template_string += R"(\P)";
   }
-  template_string += " \\G\\$ ";
+  template_string += R"(\G $ )";
   return template_string;
 }
 
@@ -896,7 +896,7 @@ fn default_prompt_template() -> String
   } else {
     template_string += "\\P";
   }
-  template_string += " \\G\\$ ";
+  template_string += "\\G \\$ ";
   return template_string;
 }
 

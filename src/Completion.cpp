@@ -695,7 +695,9 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
     -> bool
 {
   /* A reserved word is valid shell syntax rather than a command name, so it is
-     never colored as unresolvable. */
+     never colored as unresolvable. The ! negation and the time keyword lead a
+     command rather than name one, so they resolve the same way. */
+  if (word == "!" || word == "time") return true;
   if (KEYWORDS.find(word).has_value()) return true;
 
   /* A path word resolves against the filesystem the way the evaluator does for

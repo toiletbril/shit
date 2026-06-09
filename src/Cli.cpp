@@ -524,6 +524,9 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
      and the shit-specific groups. A flag not named here falls in the general
      group. */
   let const section_of = [](StringView name) -> int {
+    /* The -h and -m options that carry no long name are the POSIX hashall and
+       monitor, accepted without effect, so they sit in the POSIX group. */
+    if (name.is_empty()) return 1;
     if (name == "interactive" || name == "stdin" || name == "command" ||
         name == "error-exit" || name == "no-glob" || name == "one-command" ||
         name == "verbose" || name == "xtrace" || name == "export-all" ||
@@ -537,8 +540,9 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
     if (name == "mimicry" || name == "warnings" || name == "no-diagnostics" ||
         name == "no-completion" || name == "show-ast" ||
         name == "show-lexed-words" || name == "show-exit-code" ||
-        name == "show-stats" || name == "show-memory" || name == "list" ||
-        name == "enable-debug-logging" || name == "ftrace" || name == "strace")
+        name == "show-stats" || name == "show-memory" ||
+        name == "list-diagnostics" || name == "enable-debug-logging" ||
+        name == "ftrace" || name == "strace")
       return 4;
     return 0;
   };
