@@ -2396,6 +2396,27 @@ fn EvalContext::collect_array_elements(StringView name) const throws
   return out;
 }
 
+fn EvalContext::matching_prefix_names(StringView prefix) const throws
+    -> ArrayList<String>
+{
+  let names = ArrayList<String>{heap_allocator()};
+  let seen = HashSet{heap_allocator()};
+  auto consider = [&](StringView candidate) throws {
+    if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
+      seen.add(candidate);
+      names.push(String{heap_allocator(), candidate});
+    }
+  };
+  m_shell_variables.for_each([&](StringView variable_name, const String &v) {
+    unused(v);
+    consider(variable_name);
+  });
+  for (const String &environment_name : os::environment_names())
+    consider(environment_name.view());
+  utils::sort_ascending(names);
+  return names;
+}
+
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 {
   if (body.is_empty()) return String{heap_allocator()};
@@ -2431,26 +2452,12 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 
   const char last = body[body.length - 1];
   if (last == '*' || last == '@') {
-    /* List the variable names that start with the prefix, gathered from the
-       shell store and the process environment, deduplicated, sorted, and joined
-       with a space the way bash renders ${!prefix*}. */
+    /* List the variable names that start with the prefix, deduplicated, sorted,
+       and joined with a space the way bash renders ${!prefix*}. The quoted
+       "${!prefix@}" per-name field form is produced in the field-expansion path
+       instead, since this string return cannot carry the field boundaries. */
     const StringView prefix = body.substring_of_length(0, body.length - 1);
-    let names = ArrayList<String>{heap_allocator()};
-    let seen = HashSet{heap_allocator()};
-    auto consider = [&](StringView candidate) throws {
-      if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
-        seen.add(candidate);
-        names.push(String{heap_allocator(), candidate});
-      }
-    };
-    m_shell_variables.for_each([&](StringView variable_name, const String &v) {
-      unused(v);
-      consider(variable_name);
-    });
-    for (const String &environment_name : os::environment_names())
-      consider(environment_name.view());
-
-    utils::sort_ascending(names);
+    let const names = matching_prefix_names(prefix);
     let out = String{heap_allocator()};
     for (usize i = 0; i < names.count(); i++) {
       if (i > 0) out.push(' ');
@@ -4113,6 +4120,41 @@ hot fn EvalContext::expand_word(const Word &word) throws
           append_split_run(StringView{m_positional_params[i].data(),
                                       m_positional_params[i].count()},
                            true);
+        }
+        break;
+      }
+      /* "${!prefix@}" emits one field per matching variable name, the way "$@"
+         and "${a[@]}" do, while "${!prefix*}" joins them by the first IFS
+         character into one field. The general path returns a single space-joined
+         string, which loses the per-name boundary, so the name listing is
+         emitted here. The form is a leading '!' and a trailing '@' or '*', which
+         the indirect ${!ref} and the array-key ${!a[@]} do not take. */
+      if (segment_text.length >= 2 && segment_text[0] == '!' &&
+          (segment_text[segment_text.length - 1] == '@' ||
+           segment_text[segment_text.length - 1] == '*'))
+      {
+        const StringView prefix =
+            segment_text.substring_of_length(1, segment_text.length - 2);
+        let const is_star = segment_text[segment_text.length - 1] == '*';
+        let const names = matching_prefix_names(prefix);
+        if (segment.is_in_double_quotes && is_star) {
+          let const ifs = m_field_separators.view();
+          let joined = String{heap_allocator()};
+          for (usize i = 0; i < names.count(); i++) {
+            if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+            joined.append(names[i].view());
+          }
+          append_run(joined, false);
+        } else if (segment.is_in_double_quotes) {
+          for (usize i = 0; i < names.count(); i++) {
+            if (i > 0) flush();
+            append_run(names[i].view(), false);
+          }
+        } else {
+          for (usize i = 0; i < names.count(); i++) {
+            if (i > 0) flush();
+            append_split_run(names[i].view(), true);
+          }
         }
         break;
       }

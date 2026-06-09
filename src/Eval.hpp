@@ -1022,6 +1022,11 @@ protected:
      variable to expand. */
   fn apply_indirect_or_name_listing(StringView body) throws -> String;
 
+  /* The set variable names that start with the prefix, gathered from the shell
+     store and the environment, deduplicated and sorted. Shared by the ${!prefix*}
+     string listing and the "${!prefix@}" per-name field expansion. */
+  fn matching_prefix_names(StringView prefix) const throws -> ArrayList<String>;
+
   /* Turn a word into fields, applying tilde, variable expansion, command
      substitution, and IFS field splitting, but not globbing. */
   fn expand_word(const Word &word) throws -> ArrayList<glob_field>;
