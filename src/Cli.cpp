@@ -519,8 +519,31 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
   static constexpr usize WRAP_WIDTH = 80;
   static constexpr usize TEXT_WIDTH = WRAP_WIDTH - DESCRIPTION_COLUMN;
 
-  s += "OPTIONS";
-  for (const shit::Flag *f : flags) {
+  /* Each flag is grouped under a heading by where it comes from, the general
+     flags with no heading first, then the POSIX, the bash, the compatibility,
+     and the shit-specific groups. A flag not named here falls in the general
+     group. */
+  let const section_of = [](StringView name) -> int {
+    if (name == "interactive" || name == "stdin" || name == "command" ||
+        name == "error-exit" || name == "no-glob" || name == "one-command" ||
+        name == "verbose" || name == "xtrace" || name == "export-all" ||
+        name == "no-clobber" || name == "no-exec" || name == "no-unset" ||
+        name == "login")
+      return 1;
+    if (name == "rcfile" || name == "privileged") return 2;
+    if (name == "posix" || name == "bash-compatible" ||
+        name == "init-as-bash" || name == "dumb")
+      return 3;
+    if (name == "mimicry" || name == "warnings" || name == "no-diagnostics" ||
+        name == "no-completion" || name == "show-ast" ||
+        name == "show-lexed-words" || name == "show-exit-code" ||
+        name == "show-stats" || name == "show-memory" || name == "list" ||
+        name == "enable-debug-logging" || name == "ftrace" || name == "strace")
+      return 4;
+    return 0;
+  };
+
+  let const render_flag = [&](const shit::Flag *f) throws {
     s += "\n";
 
     /* The whole left part, the short form, the long form, and the value
@@ -586,6 +609,22 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
         line_used += word_length;
       }
       word_start = i + 1;
+    }
+  };
+
+  static const StringView SECTION_HEADERS[] = {
+      "OPTIONS", "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
+      "OTHER OPTIONS"};
+  for (int section = 0; section < 5; section++) {
+    bool header_printed = false;
+    for (const shit::Flag *f : flags) {
+      if (section_of(f->long_name()) != section) continue;
+      if (!header_printed) {
+        if (section > 0) s += "\n\n";
+        s += SECTION_HEADERS[section];
+        header_printed = true;
+      }
+      render_flag(f);
     }
   }
 
