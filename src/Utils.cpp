@@ -45,6 +45,23 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     -> i32
 {
   if (!ec.is_builtin()) {
+    /* Mimicry runs a shell script in-process in the matching mode instead of
+       launching the shell. A background command keeps its fork, since an
+       in-process subshell cannot run in the background. */
+    if (cxt.mimicry() && !is_async) {
+      if (Maybe<MimicMode> mode = detect_mimic_shell(ec.program_path());
+          mode.has_value())
+      {
+        LOG(verbosity::Debug, "execute_context mimicking the shell for '%s'",
+            ec.program().c_str());
+        /* The terminal command the shell exits with needs no isolation, the same
+           condition the replace path below uses, so its run skips the snapshot. */
+        let const isolated = !(cxt.terminal_exec_allowed() &&
+                               !cxt.in_subshell() && !cxt.has_exit_trap());
+        return cxt.run_mimicked_script(ec, *mode, isolated);
+      }
+    }
+
     /* The shell is about to exit with this command's status and it is the
        terminal external command of the run, so replace the shell process in
        place rather than fork, exec, and wait, the way dash execs the last
@@ -1350,6 +1367,63 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
   os::close_fd(*file);
 
   return contents;
+}
+
+fn detect_mimic_shell(const Path &program) throws -> Maybe<MimicMode>
+{
+  let const file =
+      os::open_file_descriptor(program.text().view(), os::file_open_mode::Read);
+  if (!file) return None;
+  char buffer[256];
+  let const read_count = os::read_fd(*file, buffer, sizeof(buffer));
+  os::close_fd(*file);
+  if (!read_count || *read_count < 3) return None;
+
+  let const head = StringView{buffer, *read_count};
+  if (!head.starts_with("#!")) return None;
+
+  /* The shebang ends at the first newline, and only its first line is read. */
+  usize line_end = 2;
+  while (line_end < head.length && head[line_end] != '\n')
+    line_end++;
+  let const line = head.substring_of_length(2, line_end - 2);
+
+  /* The basename of a whitespace-delimited token, dropping any directory path. */
+  let const basename_of = [](StringView token) -> StringView {
+    usize slash = token.length;
+    for (usize i = 0; i < token.length; i++)
+      if (token[i] == '/') slash = i;
+    return slash == token.length ? token
+                                 : token.substring(slash + 1);
+  };
+  /* Walk the line token by token, splitting on spaces and tabs. */
+  usize i = 0;
+  let const next_token = [&]() -> StringView {
+    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+      i++;
+    usize const start = i;
+    while (i < line.length && line[i] != ' ' && line[i] != '\t')
+      i++;
+    return line.substring_of_length(start, i - start);
+  };
+
+  StringView shell = basename_of(next_token());
+  /* The /usr/bin/env form names the shell as the next token, after any env
+     options, so the first non-option token is taken. */
+  if (shell == "env") {
+    for (;;) {
+      let const token = next_token();
+      if (token.length == 0) return None;
+      if (token[0] == '-') continue;
+      shell = basename_of(token);
+      break;
+    }
+  }
+
+  if (shell == "sh" || shell == "dash") return MimicMode::Posix;
+  if (shell == "bash") return MimicMode::Bash;
+  if (shell == "shit") return MimicMode::Default;
+  return None;
 }
 
 fn read_entire_standard_input() throws -> String

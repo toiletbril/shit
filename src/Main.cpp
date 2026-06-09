@@ -74,6 +74,12 @@ FLAG(
     "less-privileged user controls cannot run with raised privileges. Turned "
     "on automatically when the effective and the real user or group id differ, "
     "the setuid or setgid case.");
+FLAG(MIMICRY, Bool, 'I', "mimicry",
+     "Mimic the shell a script's shebang names. A program whose shebang is a "
+     "shell shit can emulate runs in-process in the matching mode rather than "
+     "launching the shell, where sh and dash run in POSIX mode, bash in bash "
+     "mode, and shit in the default mode. A zsh, ksh, fish, or non-shell shebang "
+     "still launches the real program.");
 
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
@@ -631,6 +637,10 @@ fn main(int argc, char **argv) -> int
   context.set_failglob(!shit::should_run_in_compat_mode());
   context.set_bash_compatible(shit::should_run_in_bash_mode());
   context.set_posix_mode(shit::should_run_in_posix_mode());
+  /* Mimicry is mirrored onto the context, since the execution path in Utils
+     reads it there rather than the static flag, which is internal to this file.
+   */
+  context.set_mimicry(FLAG_MIMICRY.is_enabled());
   /* init-as-bash runs the bash config files in bash mode, so the parser accepts
      their bash syntax and the analysis stage stays off while they source. The
      interactive seam below snaps this back off for the session itself. */

@@ -1117,6 +1117,9 @@ fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
    level spends many native frames between run_source calls. A run that crosses
    it is a runaway that would otherwise exhaust memory. */
 static constexpr usize MAX_SOURCE_DEPTH = 400;
+/* A cap on nested mimicked scripts, so a script that mimics another that mimics
+   it cannot recurse without limit. */
+static constexpr usize MAX_MIMICRY_DEPTH = 400;
 /* A separate, larger cap on nested function calls, since deep but finite
    recursion in a real script is more common than deep sourcing. It too stays
    below the native stack overflow point, which a function call reaches at a
@@ -4469,6 +4472,149 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   while (!captured.is_empty() && captured.back() == '\n')
     captured.pop_back();
   return captured;
+}
+
+fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
+                                    bool isolated) throws -> i32
+{
+  if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
+    throw Error{"Unable to mimic '" + ec.program() +
+                "' because the script nesting is too deep"};
+  if (AST_ARENA == nullptr)
+    throw Error{"Unable to mimic '" + ec.program() + "' outside of a parse"};
+
+  let contents = utils::read_entire_file(ec.program_path().text());
+  if (!contents.has_value())
+    throw Error{"Unable to mimic '" + ec.program() +
+                "' because the script could not be read"};
+
+  /* The mimic mode decides the lexing and the evaluation, so it is set before
+     the parse. The parent's mode is put back when the run is isolated, while the
+     terminal run leaves it since the shell exits next. */
+  let const previous_bash = m_bash_compatible;
+  let const previous_posix = m_posix_mode;
+  m_bash_compatible = mode == MimicMode::Bash;
+  m_posix_mode = mode == MimicMode::Posix;
+
+  let parser = Parser{Lexer{String{contents->view()}, *AST_ARENA, false, None,
+                            is_bash_compatible()}};
+  const Expression *ast = parser.construct_ast();
+  ASSERT(ast != nullptr);
+
+  /* The script reads $0 as its path and $1 upward as the rest of the command. */
+  let previous_shell_name = String{m_shell_name};
+  let params = ArrayList<String>{};
+  for (usize i = 1; i < ec.args().count(); i++)
+    params.push(String{heap_allocator(), ec.args()[i].view()});
+
+  /* The script body is its own source, so an error inside it renders against
+     this text. */
+  let const previous_source = m_current_source;
+  let const previous_origin = m_current_origin;
+  let const previous_location_position = m_current_location_position;
+
+  /* The redirections the spawn would have applied are applied to the standard
+     descriptors for the in-process run, then put back. A file redirect to stdout
+     or stderr is already staged on the real shell fd by the simple command, so
+     only the descriptors carried on the context are applied here. */
+  let saved_fds = ArrayList<os::saved_descriptor>{};
+  if (ec.in_fd.has_value())
+    saved_fds.push(os::save_and_replace_descriptor(0, *ec.in_fd));
+  if (ec.out_fd.has_value())
+    saved_fds.push(os::save_and_replace_descriptor(1, *ec.out_fd));
+  if (ec.err_fd.has_value())
+    saved_fds.push(os::save_and_replace_descriptor(2, *ec.err_fd));
+  let const restore_fds = [&]() {
+    for (usize i = saved_fds.count(); i > 0; i--)
+      os::restore_descriptor(saved_fds[i - 1]);
+  };
+
+  let const render_error = [&](std::exception_ptr error) {
+    try {
+      std::rethrow_exception(error);
+    } catch (const ErrorWithLocation &e) {
+      show_message(e.to_string(contents->view()));
+      print_source_backtrace();
+    } catch (const Error &e) {
+      show_message(e.to_string());
+      print_source_backtrace();
+    }
+  };
+
+  m_shell_name = String{heap_allocator(), ec.program().view()};
+  set_current_source(&*contents, String{ec.program().view()});
+  m_current_location_position = 0;
+  m_mimicry_depth++;
+
+  /* The terminal command the shell exits with needs no isolation, so the script
+     runs against the current state with no snapshot and the shell exits with its
+     status, the way exec'ing the shell would. A return, break, or exit inside it
+     propagates the way it would from a real script. */
+  /* A mimicked bash advertises BASH_VERSION the way the bash invocation does, so
+     a script that detects bash through it takes its bash path. The set lands
+     after the isolated snapshot so the restore drops it. */
+  if (!isolated) {
+    set_positional_params(steal(params));
+    if (mode == MimicMode::Bash)
+      set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+    std::exception_ptr error;
+    try {
+      ast->evaluate(*this);
+    } catch (...) {
+      error = std::current_exception();
+    }
+    m_mimicry_depth--;
+    restore_fds();
+    if (error) {
+      render_error(error);
+      return 1;
+    }
+    return last_exit_status();
+  }
+
+  /* The isolated run snapshots the mutable state and runs in a subshell, so the
+     script's cd, exports, functions, and exit do not leak to the parent. */
+  let snapshot = snapshot_state();
+  set_positional_params(steal(params));
+  if (mode == MimicMode::Bash)
+    set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+  enter_subshell();
+  clear_inherited_exit_trap();
+  std::exception_ptr error;
+  try {
+    ast->evaluate(*this);
+  } catch (...) {
+    error = std::current_exception();
+  }
+  if (has_pending_control_flow()) {
+    if (pending_control_flow().kind == control_flow::Kind::Exit)
+      set_last_exit_status(static_cast<i32>(pending_control_flow().value));
+    clear_control_flow();
+  }
+  if (!error) {
+    try {
+      run_subshell_exit_trap();
+    } catch (...) {
+      error = std::current_exception();
+    }
+  }
+  leave_subshell();
+  m_mimicry_depth--;
+  restore_fds();
+
+  let const status = last_exit_status();
+  restore_state(steal(snapshot));
+  set_current_source(previous_source, previous_origin);
+  m_current_location_position = previous_location_position;
+  m_bash_compatible = previous_bash;
+  m_posix_mode = previous_posix;
+  m_shell_name = steal(previous_shell_name);
+
+  if (error) {
+    render_error(error);
+    return 1;
+  }
+  return status;
 }
 
 fn EvalContext::run_source(StringView source, StringView origin,

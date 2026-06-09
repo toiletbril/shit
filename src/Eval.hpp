@@ -199,6 +199,16 @@ struct eval_state_snapshot
    successful cd. */
 fn record_directory_access(StringView directory) throws -> void;
 
+/* The mode a mimicked script runs in, chosen from its shebang. A sh or dash
+   shebang gives Posix, a bash shebang gives Bash, and a shit shebang gives
+   Default. */
+enum class MimicMode : u8
+{
+  Default,
+  Posix,
+  Bash,
+};
+
 class EvalContext
 {
 public:
@@ -527,6 +537,18 @@ public:
      stay off only here. */
   fn set_posix_mode(bool enabled) wontthrow -> void { m_posix_mode = enabled; }
   pure fn is_posix_mode() const wontthrow -> bool { return m_posix_mode; }
+
+  /* Mimicry runs a shell script in-process in the matching mode rather than
+     launching the shell, mirrored here so the execution path reads it off the
+     context. */
+  fn set_mimicry(bool enabled) wontthrow -> void { m_mimicry = enabled; }
+  pure fn mimicry() const wontthrow -> bool { return m_mimicry; }
+  /* Run the script at the resolved program in-process in the matching mode. When
+     isolated is true the run is contained in a snapshotted subshell so its cd,
+     exports, and exit do not leak, and when false the run is the terminal command
+     that the shell exits with, so the snapshot is skipped. */
+  fn run_mimicked_script(const ExecContext &ec, MimicMode mode, bool isolated)
+      throws -> i32;
   /* The extended globs are on everywhere except POSIX mode, the way bash treats
      a feature that POSIX rejects anyway as a pure addition. */
   pure fn extglob_enabled() const wontthrow -> bool { return !m_posix_mode; }
@@ -860,6 +882,10 @@ protected:
   bool m_no_clobber{false};
   bool m_export_all{false};
   bool m_no_exec{false};
+  bool m_mimicry{false};
+  /* The nesting of mimicked scripts, bounded so a script that mimics another
+     cannot recurse without limit. */
+  usize m_mimicry_depth{0};
   bool m_bash_compatible{false};
   bool m_posix_mode{false};
   /* The unix time the shell started, the base $SECONDS counts from. */

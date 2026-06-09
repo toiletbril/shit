@@ -128,6 +128,12 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
    iostream file stream is pulled in. Returns None when the open fails. */
 fn read_entire_file(StringView path) throws -> Maybe<String>;
 
+/* The shell a script's shebang names, for the mimicry feature, or None when the
+   resolved program is not a script shit can emulate. Only the first line is read.
+   A sh or dash interpreter maps to POSIX mode, bash to bash mode, and shit to the
+   default mode, including the /usr/bin/env form. */
+fn detect_mimic_shell(const Path &program) throws -> Maybe<MimicMode>;
+
 /* Read everything still available on standard input into a string. */
 fn read_entire_standard_input() throws -> String;
 
