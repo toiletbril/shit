@@ -109,6 +109,9 @@ cold fn Word::to_pretty_string() const throws -> String
     case WordSegment::Kind::CommandSubstitution:
       result += "CommandSubstitution";
       break;
+    case WordSegment::Kind::ProcessSubstitution:
+      result += "ProcessSubstitution";
+      break;
     case WordSegment::Kind::ArithmeticExpansion:
       result += "ArithmeticExpansion";
       break;

@@ -829,6 +829,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   let program_args = cxt.process_args(m_args);
+  /* A <(...) or >(...) in the words opened a pipe and forked a child during the
+     expansion above. The descriptors stay open while the command runs and are
+     closed and the children reaped when this command returns, on every path. */
+  defer { cxt.cleanup_process_substitutions(); };
   expand_command_aliases(cxt, program_args);
 
   /* A bare exec, the word exec with no further argument, applies its

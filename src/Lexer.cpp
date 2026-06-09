@@ -282,7 +282,13 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *t{};
   if (const let ch = chop_character(); ch != lexer::CEOF) [[likely]] {
-    if (lexer::is_shell_sentinel(ch))
+    /* A <(...) or >(...) process substitution is not valid POSIX, so it is a
+       pure addition that is active in the default mode as well as bash mode,
+       the way [[ ]] and (( )) are. The < or > opens it only when a ( follows
+       with no space. */
+    if ((ch == '<' || ch == '>') && chop_character(1) == '(')
+      t = lex_process_substitution(ch);
+    else if (lexer::is_shell_sentinel(ch))
       t = lex_sentinel();
     else if (lexer::is_part_of_identifier(ch)) [[likely]]
       t = lex_identifier();
@@ -1285,6 +1291,71 @@ hot fn Lexer::lex_sentinel() throws -> Token *
   m_cached_offset = 1 + extra_length;
 
   return tok;
+}
+
+hot fn Lexer::lex_process_substitution(char direction) throws -> Token *
+{
+  let const open_position = m_cursor_position;
+  usize byte_count = 0;
+  byte_count++; /* the < or > */
+  byte_count++; /* the ( */
+
+  /* The direction byte leads the segment text so the evaluator knows which way
+     the pipe runs without a second field. */
+  String inner{};
+  inner += direction;
+
+  usize depth = 1;
+  char quote = 0;
+  for (;;) {
+    const char c = chop_character(byte_count);
+    if (c == lexer::CEOF) [[unlikely]] {
+      throw ErrorWithLocationAndDetails{
+          here(open_position, byte_count), "Unterminated process substitution",
+          here(open_position + byte_count, 1), "Expected ) here"};
+    }
+    byte_count++;
+
+    if (quote != 0) {
+      if (c == quote) quote = 0;
+      inner += c;
+      continue;
+    }
+    if (c == '\\') {
+      inner += c;
+      const char escaped = chop_character(byte_count);
+      if (escaped != lexer::CEOF) {
+        byte_count++;
+        inner += escaped;
+      }
+      continue;
+    }
+    if (c == '\'' || c == '"') {
+      quote = c;
+      inner += c;
+      continue;
+    }
+    if (c == '(') {
+      depth++;
+      inner += c;
+      continue;
+    }
+    if (c == ')') {
+      depth--;
+      if (depth == 0) break;
+      inner += c;
+      continue;
+    }
+    inner += c;
+  }
+
+  Word word{};
+  word.segments.push(
+      WordSegment{WordSegment::Kind::ProcessSubstitution, steal(inner), false});
+  let t = m_arena->create<tokens::WordToken>(here(open_position, byte_count),
+                                             steal(word));
+  m_cached_offset = byte_count;
+  return t;
 }
 
 } /* namespace shit */

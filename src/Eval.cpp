@@ -3762,6 +3762,13 @@ hot fn EvalContext::expand_word(const Word &word) throws
         append_split_run(output, true);
     } break;
 
+    case WordSegment::Kind::ProcessSubstitution: {
+      /* The /dev/fd path is a single literal field, so it neither splits on IFS
+         nor globs, the way bash substitutes the process substitution. */
+      let const path = setup_process_substitution(segment.text.view());
+      append_run(path, false);
+    } break;
+
     case WordSegment::Kind::ArithmeticExpansion: {
       /* A constant arithmetic segment was folded at analyze time, so the result
          is read straight from the cache rather than re-parsed here. */
@@ -3862,6 +3869,11 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
           String{heap_allocator(), capture_command_substitution(segment)};
       emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
+    case WordSegment::Kind::ProcessSubstitution: {
+      /* The /dev/fd path is a literal that does not glob. */
+      let const path = setup_process_substitution(segment.text.view());
+      emit_run(path.view(), false);
+    } break;
     case WordSegment::Kind::ArithmeticExpansion: {
       /* An arithmetic result is decimal digits and a sign, so it carries no
          glob metacharacter and stays inactive. */
@@ -3914,6 +3926,112 @@ fn EvalContext::capture_command_substitution(const String &source) throws
   ASSERT(ast != nullptr);
 
   return run_captured_substitution(ast);
+}
+
+fn EvalContext::setup_process_substitution(StringView text) throws -> String
+{
+  if (AST_ARENA == nullptr)
+    throw Error{"Process substitution outside of a parse"};
+  ASSERT(!text.is_empty());
+
+  /* The first byte is the direction marker the lexer wrote, the rest is the
+     inner command source the child runs. */
+  const char direction = text[0];
+  const bool command_writes_the_pipe = direction == '<';
+
+  let parser = Parser{
+      Lexer{String{text.substring(1)}, *AST_ARENA, false, None,
+            is_bash_compatible()}
+  };
+  let const ast = parser.construct_ast();
+  ASSERT(ast != nullptr);
+
+  let const pipe = os::make_pipe();
+  if (!pipe.has_value())
+    throw Error{"Could not open a pipe for the process substitution: " +
+                os::last_system_error_message()};
+
+  /* For <(cmd) the command writes its standard output into the pipe and the
+     shell reads the other end. For >(cmd) the command reads its standard input
+     from the pipe and the shell writes the other end. */
+  const os::process child = command_writes_the_pipe
+                                ? os::fork_compound_stage(None, pipe->out, None)
+                                : os::fork_compound_stage(pipe->in, None, None);
+
+  if (child == 0) {
+    /* The child does not need the shell's end, so it closes it before running
+       the inner command and exits without returning into the parent evaluator
+       inside the duplicated process. */
+    os::close_fd(command_writes_the_pipe ? pipe->in : pipe->out);
+    i32 status = 0;
+    try {
+      ast->evaluate(*this);
+      status = last_exit_status();
+    } catch (...) {
+      status = 1;
+    }
+    os::exit_process_immediately(status);
+  }
+
+  /* The shell keeps the end it reads or writes and closes the child's end. The
+     kept end must survive an exec so the consuming command inherits it and a
+     read of /dev/fd/N reaches this pipe. */
+  const os::descriptor shell_fd =
+      command_writes_the_pipe ? pipe->in : pipe->out;
+  os::close_fd(command_writes_the_pipe ? pipe->out : pipe->in);
+  os::make_fd_inheritable(shell_fd);
+  /* The command currently evaluating is where this substitution was written, so
+     its location points a later reap warning at the right word. */
+  const SourceLocation location{m_current_location_position, 1};
+  const StringView source =
+      m_current_source != nullptr ? m_current_source->view() : StringView{};
+  m_pending_process_substitutions.push(
+      process_substitution{shell_fd, child, location, source});
+
+  String path{"/dev/fd/"};
+  path += utils::int_to_text(static_cast<i64>(shell_fd));
+  return path;
+}
+
+fn EvalContext::cleanup_process_substitutions() wontthrow -> void
+{
+  for (process_substitution &sub : m_pending_process_substitutions) {
+    /* Closing the shell end first sends SIGPIPE to a producer that still has
+       output queued, so it ends rather than blocking the wait below. */
+    os::close_fd(sub.shell_fd);
+    try {
+      os::reap_process_quietly(sub.child);
+    } catch (const Error &e) {
+      /* The child is reaped on a best-effort basis, so a wait failure is shown
+         as a warning and swallowed rather than propagated out of this no-throw
+         cleanup. bash stays silent here, so the warning is suppressed in bash
+         mode, and the show is guarded so a failure to print cannot escape. The
+         warning points a caret at the command when its source is known. */
+      if (!is_bash_compatible()) {
+        try {
+          const String text =
+              "A process substitution child could not be reaped. " +
+              e.message();
+          show_message(sub.source.is_empty()
+                           ? Warning{text}.to_string()
+                           : WarningWithLocation{sub.location, text}.to_string(
+                                 sub.source));
+        } catch (...) {}
+      }
+    } catch (...) {
+      if (!is_bash_compatible()) {
+        try {
+          const StringView text =
+              "A process substitution child could not be reaped.";
+          show_message(sub.source.is_empty()
+                           ? Warning{text}.to_string()
+                           : WarningWithLocation{sub.location, text}.to_string(
+                                 sub.source));
+        } catch (...) {}
+      }
+    }
+  }
+  m_pending_process_substitutions.clear();
 }
 
 fn EvalContext::capture_command_substitution(const WordSegment &segment) throws

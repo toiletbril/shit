@@ -127,6 +127,9 @@ protected:
   fn lex_number() throws -> Token *;
   fn lex_identifier() throws -> Token *;
   fn lex_sentinel() throws -> Token *;
+  /* Capture a <(...) or >(...) process substitution as one word whose single
+     segment carries the direction byte and the inner command source. */
+  fn lex_process_substitution(char direction) throws -> Token *;
 };
 
 } /* namespace shit */

@@ -137,6 +137,13 @@ fn last_system_error_message() throws -> String;
 
 fn wait_and_monitor_process(process p) throws -> i32;
 
+/* Wait for a process and reap it without the job-control reporting of
+   wait_and_monitor_process, returning its exit status or 128 plus the signal.
+   A process substitution helper reaps this way, since its signal, such as the
+   SIGPIPE from a consumer that stops reading, is expected and not a job event.
+ */
+fn reap_process_quietly(process p) throws -> i32;
+
 /* The live state of a process, polled without blocking for the job table. */
 enum class process_state : u8
 {
@@ -249,6 +256,12 @@ fn is_stdin_a_tty() wontthrow -> bool;
 fn is_stdout_a_tty() wontthrow -> bool;
 fn is_stderr_a_tty() wontthrow -> bool;
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool;
+
+/* Clear the close-on-exec flag so the descriptor survives an exec and a spawned
+   command inherits it. A process substitution keeps a pipe end open for the
+   command to reach through /dev/fd, which only works when the end is inherited.
+ */
+fn make_fd_inheritable(descriptor fd) wontthrow -> void;
 
 fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
 

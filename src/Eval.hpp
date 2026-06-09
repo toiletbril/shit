@@ -142,6 +142,23 @@ struct environment_undo_entry
   Maybe<String> previous_value;
 };
 
+/* A live process substitution. The shell keeps one pipe end open as the /dev/fd
+   path the consuming command reads or writes, while the forked child runs the
+   inner command on the other end. The descriptor is closed and the child reaped
+   once the consuming command has finished. */
+struct process_substitution
+{
+  os::descriptor shell_fd;
+  os::process child;
+  /* Where the command that opened the substitution sits, so a reap warning
+     renders a caret under it. The source is the text that location indexes. It
+     stays alive and unchanged through the command, so a view into it is held
+     rather than the owning String. It is empty when there is no surrounding
+     source. */
+  SourceLocation location;
+  StringView source;
+};
+
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. The
    set option flags and the trap table are captured too, so a set -e, a set -f,
@@ -535,6 +552,17 @@ public:
      unchanged. */
   fn capture_command_substitution(const WordSegment &segment) throws -> String;
 
+  /* Run a <(...) or >(...) process substitution. The text leads with the
+     direction byte. A pipe is opened, the inner command runs in a forked child
+     on one end, and the shell keeps the other end open and returns its /dev/fd
+     path. The descriptor and the child are recorded so the command that uses
+     the path can clean them up when it finishes. */
+  fn setup_process_substitution(StringView text) throws -> String;
+  /* Close the descriptors and reap the children of the process substitutions a
+     command opened. Closing first sends SIGPIPE to a producer that has more to
+     write, so it ends rather than blocking the reap. */
+  fn cleanup_process_substitutions() wontthrow -> void;
+
   /* Run a parsed inner command under the substitution machinery, capturing its
      stdout and snapshotting state so a cd or an assignment inside does not
      leak. Both capture overloads share this once they hold an AST. */
@@ -672,6 +700,8 @@ protected:
      top-level export pays nothing and the common command substitution that
      writes no exported name leaves it empty. */
   ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
+  ArrayList<process_substitution> m_pending_process_substitutions{
+      heap_allocator()};
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each
      bounded so a runaway recursion errors with a located message rather than

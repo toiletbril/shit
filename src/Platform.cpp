@@ -251,6 +251,12 @@ fn is_stdout_a_tty() wontthrow -> bool { return isatty(SHIT_STDOUT); }
 fn is_stderr_a_tty() wontthrow -> bool { return isatty(SHIT_STDERR); }
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
 
+fn make_fd_inheritable(descriptor fd) wontthrow -> void
+{
+  const int flags = fcntl(fd, F_GETFD);
+  if (flags != -1) fcntl(fd, F_SETFD, flags & ~FD_CLOEXEC);
+}
+
 /* Cosmopolitan binaries can be run on both Linux and Windows. This will be
  * replaced by a runtime check. */
 #if SHIT_PLATFORM_ISNT COSMO
@@ -707,6 +713,26 @@ fn wait_and_monitor_process(process pid) throws -> i32
   }
 
   unreachable();
+}
+
+fn reap_process_quietly(process pid) throws -> i32
+{
+  ASSERT(pid >= 0);
+
+  i32 status{};
+  for (;;) {
+    const pid_t w = waitpid(pid, &status, 0);
+    if (w == -1 && errno == EINTR) continue;
+    /* The shell reaps a child through its SIGCHLD handling, so the child may be
+       gone by the time this runs. A missing child is the goal, not a failure.
+     */
+    if (w == -1 && errno == ECHILD) return 0;
+    if (check_syscall(w) == pid) break;
+  }
+
+  if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
+  if (WIFEXITED(status)) return WEXITSTATUS(status);
+  return 1;
 }
 
 fn poll_process(process p, i32 &status_out) wontthrow -> process_state
@@ -1622,6 +1648,16 @@ fn wait_and_monitor_process(process p) -> i32
                 last_system_error_message()};
 
   return code;
+}
+
+fn reap_process_quietly(process p) -> i32
+{
+  if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
+    throw Error{"could not wait for the process to finish: " +
+                last_system_error_message()};
+  DWORD code = 1;
+  GetExitCodeProcess(p, &code);
+  return static_cast<i32>(code);
 }
 
 fn poll_process(process p, i32 &status_out) -> process_state

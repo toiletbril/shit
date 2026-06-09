@@ -35,6 +35,10 @@ public:
     /* The text holds the source inside $((...)). The evaluator computes it and
        splices the decimal result. */
     ArithmeticExpansion,
+    /* The text is a direction byte, < or >, then the source inside <(...) or
+       >(...). The evaluator runs the command on a pipe and splices the /dev/fd
+       path of the shell's end. */
+    ProcessSubstitution,
   };
 
   Kind kind;
