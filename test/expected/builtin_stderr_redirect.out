@@ -1,0 +1,96 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "eval" "echo routed_stderr 1>&2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "captured-2to1:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "zz_builtin_redir_xyz"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "eval" "echo to_stderr"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "captured-1to2:"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "zz_builtin_redir_xyz"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-f" "zz_builtin_redir_xyz"]
+[Word
+  Unquoted "eval"
+]
+[Word
+  Literal "echo routed_stderr 1>&2"
+]
+[Word
+  Unquoted "zz_builtin_redir_xyz"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "captured-2to1:"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "zz_builtin_redir_xyz"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "eval"
+]
+[Word
+  Literal "echo to_stderr"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "zz_builtin_redir_xyz"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "captured-1to2:"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "zz_builtin_redir_xyz"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "zz_builtin_redir_xyz"
+]
+captured-2to1:
+routed_stderr
+captured-1to2:
+to_stderr
+[Code 0]
