@@ -523,6 +523,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     let const &key = m_assignment->key();
     cxt.record_environment_change(key);
     os::set_environment_variable(key, value);
+    cxt.mark_exported(key);
   }
   return cxt.last_exit_status();
 }
@@ -1140,6 +1141,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (cxt.export_all()) {
         cxt.record_environment_change(name);
         os::set_environment_variable(name, value.view());
+        cxt.mark_exported(name);
       }
     }
     cxt.set_last_exit_status(0);
@@ -1197,12 +1199,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (cxt.export_all()) {
         cxt.record_environment_change(name);
         os::set_environment_variable(name, expanded_value.view());
+        cxt.mark_exported(name);
       }
       continue;
     }
 
     saved_env.push(saved_env_var{String{name}, steal(previous)});
     os::set_environment_variable(name, expanded_value.view());
+    /* The prefix exports the name for the command, so the set carries it until
+       the defer below rewinds the environment and the set with it. */
+    cxt.mark_exported(name);
     /* A prefix PATH=... applies only to this command, so the resolver follows
        the temporary value while the command runs and reverts on exit. The
        resolver reads its own MAYBE_PATH rather than the environment, so a write
@@ -1235,6 +1241,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                                      restore.previous_value->view());
       else
         os::unset_environment_variable(restore.name.view());
+      /* The exported set follows the rewind, so a name the prefix introduced
+         leaves the set and a name it shadowed stays exported. */
+      cxt.sync_exported_after_restore(restore.name.view(),
+                                      restore.previous_value.has_value());
     }
     /* The prefix PATH reverts to the shell's effective PATH, the store value
        when set and the restored environment otherwise, so the next command

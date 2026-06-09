@@ -53,6 +53,12 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
      first read of RANDOM, so a run that never reads it, the common -c case, pays
      neither the seed nor the syscall it mixes in. */
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
+
+  /* Every inherited environment variable is exported, so the set starts from
+     the process environment. An assignment then tests this set rather than
+     scanning the environment on every write. */
+  for (const String &name : os::environment_names())
+    m_exported_names.add(name.view());
 }
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
@@ -99,18 +105,17 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
      and cleared the shell copy. A plain reassignment writes the shell store
      above, so an in-process read sees the new value, but a child still inherits
      the stale environment entry. The environment is refreshed here when the
-     name is already present there, so a child of `export FOO=1; FOO=2` sees 2.
-     A non-exported name is absent from the environment, so the common case only
-     pays the getenv scan the read miss already pays. */
-  Maybe<String> existing_environment_value = os::get_environment_variable(name);
-  if (existing_environment_value.has_value()) {
-    /* The environment write outlives the current statement, so inside a
-       subshell the name's prior value is logged for the restore on the
-       subshell's exit. The getenv above already read it, so the log reuses that
-       value rather than scanning a second time. */
+     name is exported, so a child of `export FOO=1; FOO=2` sees 2. Membership is
+     the exported-names set, an O(1) test, so a non-exported assignment, the
+     common loop counter, never scans the environment. */
+  if (m_exported_names.contains(name)) {
+    /* The environment write outlives the current statement, so inside a subshell
+       the name's prior value is read and logged for the restore on the
+       subshell's exit. Outside a subshell the log stays empty, so the prior
+       value is never read. */
     if (m_subshell_depth > 0)
       m_environment_undo_log.push(environment_undo_entry{
-          String{name}, steal(existing_environment_value)});
+          String{name}, os::get_environment_variable(name)});
     os::set_environment_variable(name, value);
   }
 }
@@ -335,6 +340,7 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
      prior value is logged first for the restore on the subshell's exit. */
   record_environment_change(name);
   os::unset_environment_variable(name);
+  unmark_exported(name);
   if (name == "IFS") set_field_separators(" \t\n");
   /* An unset PATH drops the search order, so the resolver falls back to the
      process environment's PATH, which this just removed and so reads None. An
@@ -352,6 +358,30 @@ fn EvalContext::record_environment_change(StringView name) throws -> void
   if (m_subshell_depth == 0) return;
   m_environment_undo_log.push(
       environment_undo_entry{String{name}, os::get_environment_variable(name)});
+}
+
+fn EvalContext::mark_exported(StringView name) throws -> void
+{
+  m_exported_names.add(name);
+}
+
+fn EvalContext::unmark_exported(StringView name) throws -> void
+{
+  m_exported_names.remove(name);
+}
+
+pure fn EvalContext::is_exported(StringView name) const wontthrow -> bool
+{
+  return m_exported_names.contains(name);
+}
+
+fn EvalContext::sync_exported_after_restore(StringView name,
+                                            bool has_value) throws -> void
+{
+  if (has_value)
+    m_exported_names.add(name);
+  else
+    m_exported_names.remove(name);
 }
 
 hot fn EvalContext::get_variable_value(StringView name) const throws
@@ -1273,6 +1303,10 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
                                    entry.previous_value->view());
     else
       os::unset_environment_variable(entry.name.view());
+    /* The exported set follows the rewind, so a name the subshell created is
+       dropped and a name it merely changed stays exported. */
+    sync_exported_after_restore(entry.name.view(),
+                                entry.previous_value.has_value());
     m_environment_undo_log.pop_back();
   }
 

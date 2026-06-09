@@ -16,6 +16,8 @@ public:
 
   void add(StringView key) { m_map.set(key, Nothing{}); }
 
+  void remove(StringView key) { m_map.erase(key); }
+
   mustuse bool contains(StringView key) const
   {
     return m_map.find(key) != nullptr;

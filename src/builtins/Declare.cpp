@@ -167,6 +167,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (do_export) {
         cxt.record_environment_change(name);
         os::set_environment_variable(name, value);
+        cxt.mark_exported(name);
       }
     }
   }

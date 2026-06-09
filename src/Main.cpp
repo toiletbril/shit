@@ -593,6 +593,9 @@ fn main(int argc, char **argv) -> int
   if (shell_level > 999) shell_level = 0;
   shit::os::set_environment_variable("SHLVL",
                                      shit::utils::int_to_text(shell_level + 1));
+  /* SHLVL lives in the environment, so the exported set must know it even on a
+     first shell that did not inherit one. */
+  context.mark_exported("SHLVL");
 
   /* The default prompt lives in PS1 so it is visible and editable, unless the
      environment already supplies one. An interactive unset of PS1 still falls

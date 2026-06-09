@@ -263,6 +263,21 @@ public:
      subshell the write is permanent, so nothing is logged. */
   fn record_environment_change(StringView name) throws -> void;
 
+  /* The names that currently live in the process environment, the exported ones,
+     mirrored so an assignment tests an O(1) set rather than scanning the
+     environment on every write. mark_exported and unmark_exported keep it in
+     step with each environment write, and the set is seeded from the inherited
+     environment at construction. */
+  fn mark_exported(StringView name) throws -> void;
+  fn unmark_exported(StringView name) throws -> void;
+  pure fn is_exported(StringView name) const wontthrow -> bool;
+
+  /* Re-point the exported set after an environment value is restored, adding the
+     name when the restore writes a value and removing it when the restore
+     unsets, the way a subshell exit and a command-prefix teardown both rewind
+     the environment. */
+  fn sync_exported_after_restore(StringView name, bool has_value) throws -> void;
+
   /* Set IFS and refresh the separator table together, so the table never drifts
      from the cached value. A prefix IFS=... for a command applies it for the
      command's duration and restores it after, the way a prefix PATH=... re-aims
@@ -760,6 +775,10 @@ protected:
      top-level export pays nothing and the common command substitution that
      writes no exported name leaves it empty. */
   ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
+  /* The names currently in the process environment, kept in step with every
+     environment write so an assignment tests membership in O(1) rather than
+     scanning the environment. */
+  HashSet m_exported_names{heap_allocator()};
   ArrayList<process_substitution> m_pending_process_substitutions{
       heap_allocator()};
 

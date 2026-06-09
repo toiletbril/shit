@@ -65,6 +65,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     cxt.unset_shell_variable(name);
     cxt.record_environment_change(name);
     os::set_environment_variable(name, value);
+    cxt.mark_exported(name);
     /* The unset above pointed the resolver at the now-removed environment PATH,
        so an export PATH=... refreshes it to the value just placed in the
        environment. */
