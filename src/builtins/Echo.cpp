@@ -74,6 +74,17 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case 'r': buf += '\r'; break;
       case 't': buf += '\t'; break;
       case 'v': buf += '\v'; break;
+      /* \e and \E are the escape character, a bash extension the shit default
+         reads too. dash does not, so POSIX mode leaves them literal. */
+      case 'e':
+      case 'E':
+        if (cxt.is_posix_mode()) {
+          buf += '\\';
+          buf += escaped;
+        } else {
+          buf += '\x1b';
+        }
+        break;
       case '\\': buf += '\\'; break;
       /* \c stops all output and drops the trailing newline. */
       case 'c': should_stop = true; break;
