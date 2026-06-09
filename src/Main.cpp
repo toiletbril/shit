@@ -352,10 +352,16 @@ static fn run_script_contents(const String &script_contents,
   } catch (const ErrorWithLocationAndDetails &e) {
     show_message(e.to_string(script_contents));
     show_message(e.details_to_string(script_contents));
+    /* POSIX mode follows dash, which exits 2 on a fatal expansion or runtime
+       error such as a set -u unset reference, while bash and the default mode
+       keep the status-1 convention. */
+    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
   } catch (const ErrorWithLocation &e) {
     show_message(e.to_string(script_contents));
+    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
   } catch (const Error &e) {
     show_message(e.to_string());
+    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
   } catch (const std::exception &e) {
     show_message(
         "Uncaught exception while executing the AST. Aborting the command.");
