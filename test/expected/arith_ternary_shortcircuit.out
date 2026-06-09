@@ -1,0 +1,123 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign c=1]
+  [CompoundListCondition, None]
+    [Assign x=9]
+  [CompoundListCondition, None]
+    [Assign r=$((c ? 5 : (x=99)))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$r" "$x"]
+  [CompoundListCondition, None]
+    [Assign c=0]
+  [CompoundListCondition, None]
+    [Assign x=9]
+  [CompoundListCondition, None]
+    [Assign r=$((c ? (x=77) : 5))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$r" "$x"]
+  [CompoundListCondition, None]
+    [Assign c=1]
+  [CompoundListCondition, None]
+    [Assign x=9]
+  [CompoundListCondition, None]
+    [Assign r=$((c ? (x=77) : (x=88)))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$r" "$x"]
+  [CompoundListCondition, None]
+    [Assign c=0]
+  [CompoundListCondition, None]
+    [Assign x=9]
+  [CompoundListCondition, None]
+    [Assign r=$((c ? (x=77) : (x=88)))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$r" "$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1 ? 2 ? 3 : 4 : 5))"]
+[Word
+  Unquoted "c=1"
+]
+[Word
+  Unquoted "x=9"
+]
+[Word
+  Unquoted "r="
+  ArithmeticExpansion "c ? 5 : (x=99)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "r"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "c=0"
+]
+[Word
+  Unquoted "x=9"
+]
+[Word
+  Unquoted "r="
+  ArithmeticExpansion "c ? (x=77) : 5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "r"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "c=1"
+]
+[Word
+  Unquoted "x=9"
+]
+[Word
+  Unquoted "r="
+  ArithmeticExpansion "c ? (x=77) : (x=88)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "r"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "c=0"
+]
+[Word
+  Unquoted "x=9"
+]
+[Word
+  Unquoted "r="
+  ArithmeticExpansion "c ? (x=77) : (x=88)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "r"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 ? 2 ? 3 : 4 : 5"
+]
+5 9
+5 9
+77 77
+88 88
+3
+[Code 0]

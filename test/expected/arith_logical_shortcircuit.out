@@ -1,0 +1,162 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1||0))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0&&1))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1||0||0))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0||0||1))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0&&1&&1))"]
+  [CompoundListCondition, None]
+    [Assign x=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1 || (x=9)))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign x=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0 && (x=9)))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign x=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0 || (x=9)))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign x=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1 && (x=9)))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+  [CompoundListCondition, None]
+    [Assign x=5]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1 || (x=9) || (x=10)))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1||0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0&&1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1||0||0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0||0||1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0&&1&&1"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 || (x=9)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0 && (x=9)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0 || (x=9)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "x=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 && (x=9)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "x=5"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 || (x=9) || (x=10)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x"
+]
+1
+0
+1
+1
+0
+1
+1
+0
+1
+1
+9
+1
+9
+1
+5
+[Code 0]

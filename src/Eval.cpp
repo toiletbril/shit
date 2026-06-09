@@ -1833,6 +1833,12 @@ public:
   usize depth{0};
   static constexpr usize MAX_DEPTH = 512;
 
+  /* The dead operand of a short-circuited || or && and the untaken arm of a
+     ternary are still parsed so their tokens are consumed, but an assignment
+     inside them must not take effect. While this flag is set the assignment
+     path skips the store, matching the side-effect semantics dash gives. */
+  bool m_is_skipping{false};
+
   [[noreturn]] cold fn fail(StringView message) throws -> void
   {
     throw Error{"Arithmetic: " + message};
@@ -1942,16 +1948,20 @@ public:
           let const rhs = parse_assignment();
           let const result =
               apply_compound(read_variable_value(name), rhs, kind);
-          ASSERT(context != nullptr);
-          context->set_shell_variable(name, utils::int_to_text(result));
+          if (!m_is_skipping) {
+            ASSERT(context != nullptr);
+            context->set_shell_variable(name, utils::int_to_text(result));
+          }
           return result;
         }
       }
       if (starts_with("=") && !starts_with("==")) {
         consume("=");
         let const rhs = parse_assignment();
-        ASSERT(context != nullptr);
-        context->set_shell_variable(name, utils::int_to_text(rhs));
+        if (!m_is_skipping) {
+          ASSERT(context != nullptr);
+          context->set_shell_variable(name, utils::int_to_text(rhs));
+        }
         return rhs;
       }
       pos = save;
@@ -1959,14 +1969,34 @@ public:
     return parse_ternary();
   }
 
+  /* Parse an operand while suppressing its assignments so its tokens are
+     consumed without taking effect. The flag is saved and restored, so a
+     nested skip region inside an already-skipped one stays skipped. */
+  fn parse_skipped(i64 (ArithmeticParser::*parse_branch)()) throws -> i64
+  {
+    let const was_skipping = m_is_skipping;
+    m_is_skipping = true;
+    defer { m_is_skipping = was_skipping; };
+    return (this->*parse_branch)();
+  }
+
   fn parse_ternary() throws -> i64
   {
     let const condition = parse_logical_or();
     if (consume("?")) {
-      let const if_true = parse_assignment();
+      /* Only the taken arm runs, the other arm is parsed but suppressed so an
+         assignment in the dead arm leaves the variable unchanged. */
+      if (condition != 0) {
+        let const if_true = parse_assignment();
+        if (!consume(":")) fail("expected ':' in a conditional");
+        let const if_false = parse_skipped(&ArithmeticParser::parse_ternary);
+        unused(if_false);
+        return if_true;
+      }
+      let const if_true = parse_skipped(&ArithmeticParser::parse_assignment);
+      unused(if_true);
       if (!consume(":")) fail("expected ':' in a conditional");
-      let const if_false = parse_ternary();
-      return condition != 0 ? if_true : if_false;
+      return parse_ternary();
     }
     return condition;
   }
@@ -1974,16 +2004,31 @@ public:
   fn parse_logical_or() throws -> i64
   {
     let lhs = parse_logical_and();
-    while (consume("||"))
-      lhs = (lhs != 0 || parse_logical_and() != 0) ? 1 : 0;
+    /* The right operand is always parsed so its tokens are consumed, but once
+       the left side is true the result is fixed and the right side is parsed
+       under suppression so its assignments do not fire. */
+    while (consume("||")) {
+      let const lhs_is_true = lhs != 0;
+      let const rhs = lhs_is_true
+                          ? parse_skipped(&ArithmeticParser::parse_logical_and)
+                          : parse_logical_and();
+      lhs = (lhs_is_true || rhs != 0) ? 1 : 0;
+    }
     return lhs;
   }
 
   fn parse_logical_and() throws -> i64
   {
     let lhs = parse_bitwise_or();
-    while (consume("&&"))
-      lhs = (lhs != 0 && parse_bitwise_or() != 0) ? 1 : 0;
+    /* Once the left side is false the result is fixed, so the right operand is
+       parsed under suppression to consume its tokens without side effect. */
+    while (consume("&&")) {
+      let const lhs_is_true = lhs != 0;
+      let const rhs = lhs_is_true
+                          ? parse_bitwise_or()
+                          : parse_skipped(&ArithmeticParser::parse_bitwise_or);
+      lhs = (lhs_is_true && rhs != 0) ? 1 : 0;
+    }
     return lhs;
   }
 
