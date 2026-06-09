@@ -438,6 +438,9 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
     -> String
 {
   if (path.length <= max_length) return String{path};
+  /* The ellipsis is three bytes, so a max below it cannot leave a tail and the
+     whole path is returned rather than read past its end. */
+  if (max_length < 3) return String{path};
   /* The byte cut can land in the middle of a multibyte codepoint, so it
      advances to the next codepoint boundary, the first byte that is not a UTF-8
      continuation byte, before the tail is taken. */
@@ -769,6 +772,9 @@ fn main(int argc, char **argv) -> int
         !parsed.is_error() && parsed.value() > 0)
       shell_level = parsed.value();
   }
+  /* A corrupt or absurd inherited level is clamped so the increment cannot
+     overflow, the way bash bounds SHLVL to a sane range. */
+  if (shell_level > 999) shell_level = 0;
   shit::os::set_environment_variable(
       "SHLVL", shit::utils::int_to_text(shell_level + 1));
 
