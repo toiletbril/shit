@@ -17,6 +17,13 @@ HELP_DESCRIPTION_DECL(
     "function, then a builtin, then the PATH. The status is non-zero when any "
     "name resolves to nothing.");
 
+FLAG(TYPE_WORD, Bool, 't', "",
+     "Print only the word naming the type, such as builtin or file.");
+FLAG(TYPE_PATH, Bool, 'p', "",
+     "Print the disk path, or nothing when the name is not a file.");
+FLAG(TYPE_FORCE_PATH, Bool, 'P', "",
+     "Search the PATH and print the disk path even for a name that is also a "
+     "builtin.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -33,38 +40,94 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ASSERT(!args.is_empty());
 
+  let const want_word = FLAG_TYPE_WORD.is_enabled();
+  let const want_path = FLAG_TYPE_PATH.is_enabled();
+  let const force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
+
   let out = String{};
   bool all_found = true;
 
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
 
+    /* -P forces a PATH lookup and ignores the keyword, alias, function, and
+       builtin classes, so it reports the disk file even when the name also names
+       a builtin. */
+    if (force_path) {
+      if (let const paths = utils::search_program_path(name);
+          paths.count() != 0)
+      {
+        if (want_word)
+          out += "file";
+        else
+          out += paths[0].text();
+        out += "\n";
+      } else {
+        all_found = false;
+      }
+      continue;
+    }
+
+    /* The classification follows the shell's own resolution order. The word the
+       -t form prints names each class, while the default form spells it out. */
+    StringView word{};
+    Maybe<String> alias_value;
     if (utils::is_posix_reserved_word(name.view())) {
-      out += name;
-      out += " is a shell keyword\n";
-    } else if (let const alias = cxt.get_alias(name.view()); alias.has_value())
-    {
-      out += name;
-      out += " is an alias for ";
-      out += *alias;
-      out += "\n";
+      word = "keyword";
+    } else if (let const alias = cxt.get_alias(name.view());
+               alias.has_value()) {
+      word = "alias";
+      alias_value = alias;
     } else if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
-      out += name;
-      out += " is a shell function\n";
+      word = "function";
     } else if (search_builtin(name.view()).has_value()) {
-      out += name;
-      out += " is a shell builtin\n";
-    } else if (let const paths = utils::search_program_path(name);
-               paths.count() != 0)
+      word = "builtin";
+    }
+
+    if (!word.is_empty()) {
+      /* A keyword, alias, function, or builtin is not a disk file, so -p prints
+         nothing for it. */
+      if (want_word) {
+        out += word;
+        out += "\n";
+      } else if (!want_path) {
+        out += name;
+        if (word == "alias") {
+          out += " is an alias for ";
+          out += *alias_value;
+        } else if (word == "keyword") {
+          out += " is a shell keyword";
+        } else if (word == "function") {
+          out += " is a shell function";
+        } else {
+          out += " is a shell builtin";
+        }
+        out += "\n";
+      }
+      continue;
+    }
+
+    if (let const paths = utils::search_program_path(name);
+        paths.count() != 0)
     {
-      ASSERT(paths.count() > 0);
-      out += name;
-      out += " is ";
-      out += paths[0].text();
-      out += "\n";
+      if (want_word) {
+        out += "file\n";
+      } else if (want_path) {
+        out += paths[0].text();
+        out += "\n";
+      } else {
+        out += name;
+        out += " is ";
+        out += paths[0].text();
+        out += "\n";
+      }
     } else {
-      out += name;
-      out += ": not found\n";
+      /* -t and -p stay silent for a name that resolves to nothing, only the
+         status reports it. */
+      if (!want_word && !want_path) {
+        out += name;
+        out += ": not found\n";
+      }
       all_found = false;
     }
   }
