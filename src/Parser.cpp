@@ -403,7 +403,6 @@ hot fn Parser::parse_command_list(
 
       Token *last_pipe_token = token;
 
-      /* Collect a pipe group. */
       for (;;) {
         Command *rhs = parse_simple_command();
 
