@@ -1442,23 +1442,47 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        later assignment to it is rejected the way bash refuses a readonly. The -r
        flag sits in the builtin's arguments, so it is read off them. */
     let is_readonly_request = array_command_name == "readonly";
-    if (!is_readonly_request && is_declare)
+    /* The -A flag declares an associative array, so local -A m=() and declare -A
+       m=([k]=v) route to the string-keyed store rather than the indexed one. */
+    let is_associative_request = false;
+    if (is_declare || is_local)
       for (const Token *arg : m_args) {
         let const text = arg->raw_string();
-        if (text.length() >= 2 && text.view()[0] == '-' &&
-            text.view().find_character('r').has_value())
-        {
-          is_readonly_request = true;
-          break;
+        if (text.length() >= 2 && text.view()[0] == '-') {
+          if (!is_readonly_request && text.view().find_character('r').has_value())
+            is_readonly_request = true;
+          if (text.view().find_character('A').has_value())
+            is_associative_request = true;
         }
       }
     for (const array_builtin_assignment &assignment : m_array_args) {
       if (is_local || is_function_local) cxt.declare_local(assignment.name);
       ArrayList<String> values = cxt.process_args(assignment.elements);
-      if (assignment.is_append)
+      if (is_associative_request) {
+        /* The array is keyed by string, so the declaration registers the name
+           and each [key]=value element fills one entry. A bare element with no
+           bracketed key becomes a key with an empty value. */
+        cxt.declare_associative_array(assignment.name);
+        for (const String &element : values) {
+          const StringView text = element.view();
+          if (!text.is_empty() && text[0] == '[') {
+            if (let const close = text.find_character(']');
+                close.has_value() && *close + 1 < text.length &&
+                text[*close + 1] == '=')
+            {
+              cxt.set_associative_element(
+                  assignment.name, text.substring_of_length(1, *close - 1),
+                  text.substring(*close + 2));
+              continue;
+            }
+          }
+          cxt.set_associative_element(assignment.name, text, StringView{});
+        }
+      } else if (assignment.is_append) {
         cxt.append_indexed_array(assignment.name, steal(values));
-      else
+      } else {
         cxt.set_indexed_array(assignment.name, steal(values));
+      }
       if (is_export) cxt.mark_exported(assignment.name);
       if (is_readonly_request) cxt.mark_readonly(assignment.name);
     }
