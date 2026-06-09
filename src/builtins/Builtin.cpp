@@ -43,6 +43,40 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &name = ec.args()[1];
   if (name == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
+  /* -l prints every registered builtin, sorted and laid out in columns that fit
+     a usual terminal width, so a reader can see at a glance what shit carries. */
+  if (name == "-l") {
+    let sorted = ArrayList<String>{};
+    for (const String &builtin_name : builtin_names())
+      sorted.push(String{heap_allocator(), builtin_name});
+    utils::sort_ascending(sorted);
+
+    usize longest = 0;
+    for (const String &builtin_name : sorted)
+      if (builtin_name.length() > longest) longest = builtin_name.length();
+    let const column_width = longest + 2;
+    let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
+
+    let out = String{};
+    out += "shit has ";
+    out += utils::int_to_text(static_cast<i64>(sorted.count()), heap_allocator());
+    out += " builtins:\n\n";
+    for (usize i = 0; i < sorted.count(); i++) {
+      if (i % columns == 0) out += "  ";
+      out += sorted[i].view();
+      let const last_in_row =
+          i % columns == columns - 1 || i + 1 == sorted.count();
+      if (last_in_row) {
+        out += "\n";
+      } else {
+        for (usize pad = sorted[i].length(); pad < column_width; pad++)
+          out += " ";
+      }
+    }
+    ec.print_to_stdout(out.view());
+    return 0;
+  }
+
   let const target = search_builtin(name.view());
   if (!target.has_value()) {
     show_message("Unable to run '" + name +
