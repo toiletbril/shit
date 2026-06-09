@@ -3,6 +3,7 @@
 
 #include "Arena.hpp"
 #include "Cli.hpp"
+#include "Colors.hpp"
 #include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -192,6 +193,38 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
   }
 }
 
+/* Bridge toiletline's render-time highlight query onto the shell. The shell
+   decides whether the first word of the line resolves to a command and, when it
+   does not, returns the word's span so the editor colors it.
+
+   Toiletline edits in codepoints and renders the highlight span in codepoints,
+   while the shell parses in bytes, so the byte span the highlighter returns is
+   converted back to codepoint indices here, the same conversion the completion
+   bridge performs. Returns 1 when the span should be colored, 0 otherwise. The
+   body is guarded because toiletline calls it through a C function pointer, so a
+   throw must not unwind through the C frames. */
+fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
+{
+  if (COMPLETION_CONTEXT == nullptr) return 0;
+
+  try {
+    const usize byte_length = std::strlen(buffer);
+    shit::StringView line{buffer, byte_length};
+
+    shit::completion::highlight_result result =
+        shit::completion::highlight_first_word(line, *COMPLETION_CONTEXT);
+
+    if (!result.should_color) return 0;
+
+    out->token_start = ::tl_utf8_strnlen(buffer, result.word_start);
+    out->token_end = ::tl_utf8_strnlen(buffer, result.word_end);
+    out->should_color = 1;
+    return 1;
+  } catch (...) {
+    return 0;
+  }
+}
+
 } /* namespace */
 
 namespace toiletline {
@@ -219,12 +252,18 @@ fn enable_completion(shit::EvalContext &context) -> void
 {
   COMPLETION_CONTEXT = &context;
   ::tl_set_complete_callback(shit_completion_callback);
+  /* The highlighter shares the completion context and the same enable path, so
+     the first word is colored only when completion is on, and a non-tty or the
+     -T flag leaves the line plain. */
+  if (shit::colors::stdout_wants_color())
+    ::tl_set_highlight_callback(shit_highlight_callback);
 }
 
 fn disable_completion() -> void
 {
   COMPLETION_CONTEXT = nullptr;
   ::tl_set_complete_callback(nullptr);
+  ::tl_set_highlight_callback(nullptr);
 }
 
 fn utf8_strlen(const String &s, usize count) -> usize

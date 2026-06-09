@@ -2,5 +2,5 @@ echo \*\*;
 echo \~\*\*;
 echo \\\\;
 echo data/\*/\*;
-test -e ~/\* && no such file;
+test -e ~/\* && echo no such file;
 test -d \~ && echo no such dir;

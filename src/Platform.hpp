@@ -246,6 +246,8 @@ fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index;
 
 fn get_current_user() throws -> Maybe<String>;
 
+fn get_hostname() throws -> Maybe<String>;
+
 fn get_home_directory() throws -> Maybe<Path>;
 
 fn set_default_signal_handlers() throws -> void;

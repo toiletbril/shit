@@ -153,6 +153,17 @@ fn get_current_user() throws -> Maybe<String>
   return shit::None;
 }
 
+fn get_hostname() throws -> Maybe<String>
+{
+  /* HOST_NAME_MAX is not portable across every libc, so a fixed buffer holds
+     the name and a trailing NUL guards against a truncated result that some
+     implementations leave unterminated. */
+  char buffer[256];
+  if (gethostname(buffer, sizeof(buffer)) != 0) return shit::None;
+  buffer[sizeof(buffer) - 1] = '\0';
+  return String{StringView{buffer}};
+}
+
 fn get_home_directory() throws -> Maybe<Path>
 {
   if (const Maybe<String> home = get_environment_variable("HOME"))
@@ -1101,6 +1112,17 @@ fn get_current_user() -> Maybe<String>
           StringView{buffer.begin(), size - 1}
       };
   }
+  return shit::None;
+}
+
+fn get_hostname() throws -> Maybe<String>
+{
+  char buffer[MAX_COMPUTERNAME_LENGTH + 1];
+  DWORD size = sizeof(buffer);
+  if (GetComputerNameA(buffer, &size))
+    return String{
+        StringView{buffer, size}
+    };
   return shit::None;
 }
 

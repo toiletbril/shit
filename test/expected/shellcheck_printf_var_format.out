@@ -1,0 +1,24 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "$1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s" "ok"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s"
+]
+[Word
+  Unquoted "ok"
+]
+shit: 1:8: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+     1 |  printf "$1"
+       |         ^~~~ here.
+ok[Code 0]

@@ -49,5 +49,8 @@
 [Word
   Unquoted "}"
 ]
+shit: 1:28: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+     1 |  printf 'x::y\n' | { IFS=:; read a b c; echo "[$a][$b][$c]"; }
+       |                             ^~~~~~~~~~ here.
 [x][][y]
 [Code 0]

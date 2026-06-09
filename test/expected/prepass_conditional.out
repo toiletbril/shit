@@ -17,5 +17,7 @@
 [Word
   Unquoted "done"
 ]
-done
-[Code 0]
+shit: 1:10: error: Command 'nosuchcmd_xyz' was not found.
+     1 |  false && nosuchcmd_xyz
+       |           ^~~~~~~~~~~~~ here.
+[Code 1]

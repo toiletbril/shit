@@ -10,7 +10,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "test" "-e" "~/*"]
   [CompoundListCondition, &&]
-    [SimpleCommand "no" "such" "file"]
+    [SimpleCommand "echo" "no" "such" "file"]
   [CompoundListCondition, None]
     [SimpleCommand "test" "-d" "~"]
   [CompoundListCondition, &&]
@@ -51,6 +51,9 @@
 [Word
   Unquoted "~/"
   Literal "*"
+]
+[Word
+  Unquoted "echo"
 ]
 [Word
   Unquoted "no"

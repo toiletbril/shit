@@ -62,6 +62,12 @@ cold fn AnalysisContext::warn(SourceLocation location,
 cold fn AnalysisContext::fail(SourceLocation location,
                               StringView message) throws -> void
 {
+  /* Under -W the analysis still runs but its errors are reported as warnings and
+     the run proceeds, so the same call reports without stopping. */
+  if (errors_are_warnings) {
+    warn(location, message);
+    return;
+  }
   const ErrorWithLocation located{location, message};
   show_message(located.to_string(source));
   has_fatal = true;
@@ -250,14 +256,12 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool warn_missing_commands, bool suppress_style_warnings) throws
-    -> bool
+               bool errors_are_warnings) throws -> bool
 {
   ASSERT(root != nullptr);
 
   AnalysisContext actx{source};
-  actx.warn_missing_commands = warn_missing_commands;
-  actx.suppress_style_warnings = suppress_style_warnings;
+  actx.errors_are_warnings = errors_are_warnings;
 
   /* A function or alias defined by an earlier command resolves, so seed the
      prepass with the names already registered. */
@@ -2770,11 +2774,11 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   }
 
   /* An unquoted variable inside a test silently breaks when it is empty or
-     splits into several words. Under --posix the split is intended, so the
-     warning is suppressed. */
-  if (!actx.suppress_style_warnings &&
-      (command_literal == "[" || command_literal == "test" ||
-       command_literal == "[["))
+     splits into several words. This stays a warning even at the strict default,
+     since the split may be intended, and --bash-compatible skips the analysis
+     entirely so a POSIX script that relies on it runs quietly. */
+  if (command_literal == "[" || command_literal == "test" ||
+      command_literal == "[[")
   {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
@@ -2791,6 +2795,59 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           break;
         }
       }
+    }
+  }
+
+  /* read without -r lets a backslash in the input escape the next byte, so a
+     path or a line with a backslash is mangled. This is shellcheck SC2162. A
+     combined short flag such as -rs carries the r, a long option or a value does
+     not. */
+  if (command_literal == "read") {
+    bool has_raw_flag = false;
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const literal =
+          static_cast<const tokens::WordToken *>(m_args[i])->word()
+              .to_literal_string();
+      let const view = literal.view();
+      if (view.length >= 2 && view[0] == '-' && view[1] != '-' &&
+          view.find_character('r').has_value())
+      {
+        has_raw_flag = true;
+        break;
+      }
+    }
+    if (!has_raw_flag)
+      actx.warn(source_location(),
+                "read without -r mangles a backslash in the input, add -r to "
+                "read the line literally");
+  }
+
+  /* printf reads its first argument as a format, so a variable or a command
+     substitution there lets the data control the format directives. This is
+     shellcheck SC2059, write printf '%s' \"$var\" instead. A leading option is
+     skipped conservatively rather than risk a wrong format word. */
+  if (command_literal == "printf" && m_args.count() >= 2 &&
+      m_args[1]->kind() == Token::Kind::Word)
+  {
+    let const &format =
+        static_cast<const tokens::WordToken *>(m_args[1])->word();
+    let const literal = format.to_literal_string();
+    let const is_option = literal.length() >= 1 && literal.view()[0] == '-';
+    if (!is_option) {
+      bool format_has_expansion = false;
+      for (const WordSegment &segment : format.segments) {
+        if (segment.kind == WordSegment::Kind::VariableReference ||
+            segment.kind == WordSegment::Kind::CommandSubstitution)
+        {
+          format_has_expansion = true;
+          break;
+        }
+      }
+      if (format_has_expansion)
+        actx.warn(m_args[1]->source_location(),
+                  "printf format comes from a variable, the data can inject "
+                  "format directives, use printf '%s' to print it");
     }
   }
 
@@ -2823,7 +2880,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (actx.warn_missing_commands && name && !command_resolves(actx, *name) &&
+  if (name && !command_resolves(actx, *name) &&
       !actx.defined_functions.contains(
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))
@@ -2831,12 +2888,16 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     let const message = StringView{"Command '"} + StringView{*name} +
                         StringView{"' was not found"};
     /* Point at the command word, not at the whole command. With an assignment
-       prefix the command location is the assignment, not the program name. The
-       prepass only warns, never aborts, since a missing command at runtime is
-       non-fatal under POSIX and yields exit status 127 while evaluation
-       continues. The runtime resolution in SimpleCommand prints the same caret
-       to stderr and sets 127 when the command actually runs. */
-    actx.warn(m_args[0]->source_location(), message);
+       prefix the command location is the assignment, not the program name. A
+       missing command is a fatal analysis error, so the file does not run with a
+       command that cannot resolve. After a dot, source, or eval the command may
+       be defined by code the prepass cannot see, so it is only a warning there.
+       --bash-compatible skips the analysis, so the file runs and the runtime
+       resolution sets 127 per command the way bash does. */
+    if (actx.saw_runtime_definer)
+      actx.warn(m_args[0]->source_location(), message);
+    else
+      actx.fail(m_args[0]->source_location(), message);
   }
 
   /* A command may change a variable out of the prepass's static view, so a

@@ -265,7 +265,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
 
 hot fn Lexer::lex_expression_token() throws -> Token *
 {
-  if (const let ch = chop_character(); ch != lexer::CEOF) {
+  if (const let ch = chop_character(); ch != lexer::CEOF) [[likely]] {
     if (lexer::is_number(ch))
       return lex_number();
     else if (lexer::is_expression_sentinel(ch))
@@ -273,24 +273,24 @@ hot fn Lexer::lex_expression_token() throws -> Token *
     else if (lexer::is_part_of_identifier(ch))
       return lex_identifier();
     else
-      throw ErrorWithLocation{here(m_cursor_position, 1),
-                              "Unexpected character"};
+      [[unlikely]] throw ErrorWithLocation{here(m_cursor_position, 1),
+                                           "Unexpected character"};
   }
 
   return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
 }
 
-hot fn Lexer::lex_shell_token() throws -> Token *
+hot flatten fn Lexer::lex_shell_token() throws -> Token *
 {
   Token *t{};
-  if (const let ch = chop_character(); ch != lexer::CEOF) {
+  if (const let ch = chop_character(); ch != lexer::CEOF) [[likely]] {
     if (lexer::is_shell_sentinel(ch))
       t = lex_sentinel();
-    else if (lexer::is_part_of_identifier(ch))
+    else if (lexer::is_part_of_identifier(ch)) [[likely]]
       t = lex_identifier();
     else
-      throw ErrorWithLocation{here(m_cursor_position, 1),
-                              "Unexpected character"};
+      [[unlikely]] throw ErrorWithLocation{here(m_cursor_position, 1),
+                                           "Unexpected character"};
   } else {
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
@@ -302,7 +302,7 @@ hot fn Lexer::lex_shell_token() throws -> Token *
   return t;
 }
 
-hot fn Lexer::skip_whitespace() wontthrow -> void
+hot flatten forceinline fn Lexer::skip_whitespace() wontthrow -> void
 {
   usize i = 0;
   for (;;) {
@@ -330,14 +330,14 @@ hot fn Lexer::skip_whitespace() wontthrow -> void
   advance_forward(i);
 }
 
-hot fn Lexer::advance_forward(usize offset) wontthrow -> usize
+hot forceinline fn Lexer::advance_forward(usize offset) wontthrow -> usize
 {
   ASSERT(m_cursor_position + offset <= m_source.length());
   m_cursor_position += offset;
   return offset;
 }
 
-hot fn Lexer::chop_character(usize offset) wontthrow -> char
+hot forceinline fn Lexer::chop_character(usize offset) wontthrow -> char
 {
   if (m_cursor_position + offset < m_source.length())
     return m_source[m_cursor_position + offset];
@@ -365,7 +365,8 @@ hot fn Lexer::lex_number() throws -> Token *
   return num;
 }
 
-hot fn Lexer::lex_identifier() throws -> Token *
+/* Hottest function in the entire codebase. */
+flatten hot fn Lexer::lex_identifier() throws -> Token *
 {
   Word word{};
 
@@ -534,7 +535,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
           usize group_depth = 0;
           for (;;) {
             const let c = chop_character(byte_count);
-            if (c == lexer::CEOF) {
+            if (c == lexer::CEOF) [[unlikely]] {
               throw ErrorWithLocationAndDetails{
                   here(m_cursor_position, byte_count),
                   "Unterminated arithmetic expansion",
@@ -567,7 +568,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
         char quote = 0;
         for (;;) {
           const let c = chop_character(byte_count);
-          if (c == lexer::CEOF) {
+          if (c == lexer::CEOF) [[unlikely]] {
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position, byte_count),
                 "Unterminated command substitution",
@@ -619,7 +620,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
         char quote = 0;
         for (;;) {
           const let c = chop_character(byte_count);
-          if (c == lexer::CEOF) {
+          if (c == lexer::CEOF) [[unlikely]] {
             throw ErrorWithLocationAndDetails{
                 here(m_cursor_position + byte_count, 1),
                 "Unterminated variable expansion",
@@ -746,7 +747,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
       String inner{};
       for (;;) {
         const let c = chop_character(byte_count);
-        if (c == lexer::CEOF) {
+        if (c == lexer::CEOF) [[unlikely]] {
           throw ErrorWithLocationAndDetails{
               here(m_cursor_position + relative_open_backtick_pos, 1),
               "Unterminated command substitution",
@@ -778,7 +779,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
     byte_count++;
   }
 
-  if (quote_char) {
+  if (quote_char) [[unlikely]] {
     String expected_quote{};
     expected_quote += "Expected ";
     expected_quote += *quote_char;
@@ -790,7 +791,7 @@ hot fn Lexer::lex_identifier() throws -> Token *
         expected_quote};
   }
 
-  if (should_escape) {
+  if (should_escape) [[unlikely]] {
     throw ErrorWithLocationAndDetails{
         here(m_cursor_position + byte_count - 1, 1), "Nothing to escape",
         here(m_cursor_position + byte_count, 1), "Expected a character here"};

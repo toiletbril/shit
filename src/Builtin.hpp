@@ -228,6 +228,10 @@ public:
 
 Maybe<Builtin::Kind> search_builtin(StringView builtin_name) throws;
 
+/* The builtin command names, recovered once from BUILTIN_ENTRIES and cached,
+   so command completion offers exactly the registered builtins. */
+const ArrayList<String> &builtin_names() throws;
+
 void show_builtin_help_impl(const ExecContext &ec,
                             const ArrayList<StringView> &hs,
                             const ArrayList<Flag *> &fl) throws;

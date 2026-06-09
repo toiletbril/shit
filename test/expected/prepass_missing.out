@@ -12,8 +12,7 @@
 [Word
   Unquoted "after"
 ]
-shit: 1:1: error: Program 'nosuchcmd_xyz' wasn't found.
+shit: 1:1: error: Command 'nosuchcmd_xyz' was not found.
      1 |  nosuchcmd_xyz
        |  ^~~~~~~~~~~~~ here.
-after
-[Code 0]
+[Code 1]

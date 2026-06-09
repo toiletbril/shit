@@ -30,6 +30,17 @@ flatten fn search_builtin(StringView builtin_name) throws
   return BUILTINS.find(builtin_name);
 }
 
+fn builtin_names() throws -> const ArrayList<String> &
+{
+  static ArrayList<String> names = [] throws {
+    ArrayList<String> collected{};
+    for (const StaticStringMap<Builtin::Kind>::entry &entry : BUILTIN_ENTRIES)
+      collected.push(entry.key.to_string());
+    return collected;
+  }();
+  return names;
+}
+
 /* A one-line synopsis and a sentence of explanation for each builtin, shown by
    --help. */
 /* The one-line synopsis and the sentence of explanation a builtin shows. */

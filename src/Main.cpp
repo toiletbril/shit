@@ -1,5 +1,6 @@
 #include "Arena.hpp"
 #include "Cli.hpp"
+#include "Colors.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
@@ -9,6 +10,7 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "Shellcheck.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -42,13 +44,13 @@ FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
 FLAG(NO_EXEC, Bool, 'n', "no-exec",
      "Read and parse commands but do not run them.");
 FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
-FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible",
-     "Make the shell Bash and POSIX compatible. A glob that matches nothing "
-     "stays its literal pattern and the style warnings, such as an unquoted "
-     "variable in a test, are suppressed.");
+FLAG(BASH_COMPATIBLE, Bool, 'P', "bash-compatible",
+     "Make the shell Bash and POSIX compatible. The analysis stage is skipped so "
+     "a file with an analysis error still runs, an unmatched glob stays its "
+     "literal pattern, and the style warnings are off.");
 FLAG(WARNINGS, Bool, 'W', "warnings",
-     "Re-enable the style warnings that --bash-compatible suppresses. The "
-     "behavior stays the same, only the diagnostics return.");
+     "Keep the analysis stage but report every error as a warning and let the "
+     "run proceed, instead of stopping on the first error.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
      "Skip the analysis stage, so no warnings or pre-run diagnostics are "
      "reported and evaluation begins sooner.");
@@ -69,6 +71,10 @@ FLAG(STATS, Bool, 'S', "show-stats",
      "peak.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion",
      "Disable interactive tab completion and ghost-text.");
+FLAG(DUMB, Bool, '\0', "dumb",
+     "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
+FLAG(LIST_CHECKS, Bool, '\0', "list",
+     "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(LOG, Bool, 'X', "enable-debug-logging",
      "Enable verbose internal logging to stderr.");
 
@@ -95,7 +101,8 @@ static bool INVOKED_AS_COMPAT_SHELL = false;
    suppression both read it. */
 pure static fn should_run_in_posix_mode() wontthrow -> bool
 {
-  return FLAG_BASH_COMPATIBLE.is_enabled() || INVOKED_AS_COMPAT_SHELL;
+  return FLAG_BASH_COMPATIBLE.is_enabled() || FLAG_DUMB.is_enabled() ||
+         INVOKED_AS_COMPAT_SHELL;
 }
 
 /* Print the help or version text and return the exit code when one of those
@@ -104,7 +111,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
     String h{};
-    h += "\n  shit, a pedantic, super-fast and awesome posix-compatible "
+    h += "\n  Shit, a pedantic, super-fast and awesome posix-compatible "
          "command line interpreter\n  or a friendly interactive shell for "
          "gigachads.\n\n";
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
@@ -112,6 +119,16 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     h += make_flag_help(FLAG_LIST);
     h += '\n';
     print_error(h);
+    return EXIT_SUCCESS;
+  } else if (FLAG_LIST_CHECKS.is_enabled()) {
+    String l{};
+    for (const shellcheck_check &check : SHELLCHECK_CHECKS) {
+      l += check.code;
+      l += "  ";
+      l += check.summary;
+      l += '\n';
+    }
+    print(l);
     return EXIT_SUCCESS;
   } else if (FLAG_VERSION.is_enabled()) {
     show_version();
@@ -221,16 +238,17 @@ static fn run_script_contents(const String &script_contents,
        problem stops execution, a conditional one only warns. Suppressing
        diagnostics skips the whole stage, so the tree runs without validation or
        constant folding and the prompt reaches evaluation sooner. */
-    let const should_suppress_diagnostics =
-        FLAG_SUPPRESS_DIAGNOSTICS.is_enabled();
-    /* Compatibility mode suppresses the style warnings, but -W brings them
-       back without changing any behavior. */
-    let const should_suppress_style_warnings =
-        should_run_in_posix_mode() && !FLAG_WARNINGS.is_enabled();
-    if (!should_suppress_diagnostics &&
+    /* The analysis runs by default and a found error stops the run, so a script
+       with a command that cannot resolve does not half-run. --bash-compatible,
+       which the sh invocation name also sets, skips the whole stage so the file
+       runs the way bash does. -W keeps the stage but reports every error as a
+       warning and lets the run proceed. --no-diagnostics skips it too. */
+    let const run_analysis =
+        (!should_run_in_posix_mode() || FLAG_WARNINGS.is_enabled()) &&
+        !FLAG_SUPPRESS_DIAGNOSTICS.is_enabled() && !FLAG_DUMB.is_enabled();
+    if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), context.no_exec(),
-                     should_suppress_style_warnings))
+                     context.alias_names(), FLAG_WARNINGS.is_enabled()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
@@ -238,6 +256,7 @@ static fn run_script_contents(const String &script_contents,
       exit_code = EXIT_SUCCESS;
     } else {
       context.set_current_source(&script_contents, "the script");
+      /* Run! */
       exit_code = static_cast<int>(ast->evaluate(context));
       report_escaped_control_flow(context, script_contents);
       /* script_contents is local to this call, so drop the frame before it goes
@@ -304,7 +323,8 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     switch (escaped) {
     case 'u': out += user; break;
     case 'h':
-      out += os::get_environment_variable("HOSTNAME").value_or("localhost");
+      out += os::get_hostname().value_or(
+          os::get_environment_variable("HOSTNAME").value_or("localhost"));
       break;
     case 'w': {
       String shown{working_directory};
@@ -359,6 +379,11 @@ fn main(int argc, char **argv) -> int
        status rather than success, matching dash. */
     return 2;
   }
+
+  /* --dumb turns color off the same as NO_COLOR set in the environment, so the
+     prompt and the diagnostics stay plain on a dumb terminal. */
+  if (FLAG_DUMB.is_enabled())
+    shit::os::set_environment_variable("NO_COLOR", "1");
 
   /* Raise the runtime log level before any helper runs, so the trace covers
      startup. The default stays Warn, so a run without -X pays one comparison
@@ -598,7 +623,7 @@ fn main(int argc, char **argv) -> int
              engine is registered here and never on the script or -c path. The
              -T flag leaves it unregistered, so the editor runs with no
              completion callback and no ghost-text. */
-          if (!FLAG_NO_COMPLETION.is_enabled())
+          if (!FLAG_NO_COMPLETION.is_enabled() && !FLAG_DUMB.is_enabled())
             toiletline::enable_completion(context);
           shit::show_message(shit::should_run_in_posix_mode()
                                  ? "POSIX me harder!"
@@ -649,9 +674,18 @@ fn main(int argc, char **argv) -> int
           prompt =
               expand_prompt_escapes(ps1->view(), u.view(), full_pwd.view());
         } else {
+          shit::String host =
+              shit::os::get_hostname().value_or(shit::os::get_environment_variable(
+                                                    "HOSTNAME")
+                                                    .value_or("localhost"));
+          const bool wants_color = shit::colors::stderr_wants_color();
           prompt += u;
+          prompt += '@';
+          prompt += host;
           prompt += ' ';
+          if (wants_color) prompt += shit::colors::ansi::GREEN;
           prompt += pwd;
+          if (wants_color) prompt += shit::colors::ansi::RESET;
           prompt += (u == "root") ? " # " : " $ ";
         }
 

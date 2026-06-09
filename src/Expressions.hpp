@@ -27,13 +27,12 @@ class AnalysisContext
 public:
   StringView source;
   bool has_fatal{false};
-  /* Only warn about a missing command under -n, where the command never runs.
-     During a real run the runtime resolution prints the same caret and sets
-     127, so warning here too would duplicate the diagnostic. */
-  bool warn_missing_commands{false};
-  /* Under --posix the style warnings, such as an unquoted variable in a test,
-     are suppressed, so a POSIX script that relies on splitting runs quietly. */
-  bool suppress_style_warnings{false};
+  /* The analysis runs by default and a found error is fatal, so a script with a
+     command that cannot resolve does not run. -W keeps the analysis but reports
+     every error as a warning and lets the run proceed, which this flag carries
+     into fail(). --bash-compatible skips the whole stage, so nothing here runs
+     at all and the file executes the way bash does. */
+  bool errors_are_warnings{false};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
      see, so a later unresolved command is a warning rather than a failure. */
   bool saw_runtime_definer{false};
@@ -66,7 +65,7 @@ public:
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool warn_missing_commands, bool suppress_style_warnings) throws
+               bool errors_are_warnings) throws
     -> bool;
 
 class Expression

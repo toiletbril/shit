@@ -31,6 +31,9 @@
 [Word
   Unquoted "alias"
 ]
+shit: 3:1: warning: Command 'greet' was not found.
+     3 |  greet
+       |  ^~~~~ here.
 alias greet='echo hello'
 hello
 [Code 0]

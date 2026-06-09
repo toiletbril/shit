@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.hpp"
+#include "String.hpp"
 #include "StringView.hpp"
 
 #include <cstring>
@@ -49,6 +50,28 @@ public:
   mustuse bool operator==(const PackedStringKey &other) const
   {
     return low_word == other.low_word && high_word == other.high_word;
+  }
+
+  /* Unpack the bytes back into a String, stopping at the first NUL or the
+     sixteen-byte limit. A key built from a name with no embedded NUL and no
+     more than sixteen bytes round-trips exactly, which holds for every builtin
+     name. */
+  mustuse String to_string() const
+  {
+    char buffer[16];
+    usize length = 0;
+    for (; length < 8; length++) {
+      const char byte = static_cast<char>((low_word >> (8 * length)) & 0xFF);
+      if (byte == '\0') return String{StringView{buffer, length}};
+      buffer[length] = byte;
+    }
+    for (; length < 16; length++) {
+      const char byte =
+          static_cast<char>((high_word >> (8 * (length - 8))) & 0xFF);
+      if (byte == '\0') return String{StringView{buffer, length}};
+      buffer[length] = byte;
+    }
+    return String{StringView{buffer, length}};
   }
 };
 

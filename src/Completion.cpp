@@ -3,7 +3,9 @@
 #include "Builtin.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
+#include "Path.hpp"
 #include "Platform.hpp"
+#include "Tokens.hpp"
 #include "Utils.hpp"
 
 namespace shit {
@@ -144,20 +146,8 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
   return prefix;
 }
 
-/* The builtin command names offered in command position. The packed keys in
-   BUILTIN_ENTRIES cannot hand back their bytes, so the names are spelled here
-   as plain literals, kept in step with that table by hand. */
-static constexpr const char *BUILTIN_NAMES[] = {
-    "echo",    "exit",     "cd",     "pwd",     "which",  "whoami", "export",
-    "break",   "continue", "return", ":",       "true",   "false",  "test",
-    "[",       ".",        "source", "eval",    "set",    "shift",  "unset",
-    "read",    "printf",   "umask",  "getopts", "trap",   "exec",   "type",
-    "command", "readonly", "local",  "times",   "ulimit", "hash",   "alias",
-    "unalias", "jobs",     "fg",     "bg",      "wait",   "kill",
-};
-
 /* Collect every command name that matches the typed token. The builtins come
-   from the static name list, the functions and aliases from the context, and
+   from the registry name list, the functions and aliases from the context, and
    the executables from a scan of the PATH directories. A token holding a glob
    metacharacter matches by glob, so a bare glob first word lists the command
    names it matches rather than cwd entries. */
@@ -170,8 +160,8 @@ static fn complete_command(StringView token, bool token_is_glob,
   TRACELN("completing command position for token '%.*s'",
           static_cast<int>(token.length), token.data);
 
-  for (const char *builtin_name : BUILTIN_NAMES) {
-    add_unique_command(candidates, seen, StringView{builtin_name}, token,
+  for (const String &builtin_name : builtin_names()) {
+    add_unique_command(candidates, seen, builtin_name.view(), token,
                        token_is_glob);
   }
 
@@ -468,6 +458,80 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       steal(candidates), steal(longest_common_prefix), token_start, token_end,
       is_command,
   };
+}
+
+/* Whether the byte begins a shell word, used to find the start of the first
+   command word past any leading whitespace. */
+static pure fn is_leading_whitespace(char c) wontthrow -> bool
+{
+  return c == ' ' || c == '\t';
+}
+
+/* Whether the first word names a runnable command. The word resolves when it is
+   a reserved keyword the shell runs as syntax, a builtin, a function, an alias,
+   a PATH executable, or, when it holds a slash, an existing regular file the
+   process may execute. */
+static fn first_word_resolves(StringView word, EvalContext &context) throws
+    -> bool
+{
+  /* A reserved word is valid shell syntax rather than a command name, so it is
+     never colored as unresolvable. */
+  if (KEYWORDS.find(word).has_value()) return true;
+
+  /* A path word resolves against the filesystem the way the evaluator does for
+     a program given by path, rather than the command name sets. */
+  if (word.find_character('/').has_value()) {
+    if (Maybe<Path> canonical = utils::canonicalize_path(word);
+        canonical.has_value())
+    {
+      return canonical->is_regular_file() && canonical->is_executable();
+    }
+    return false;
+  }
+
+  if (search_builtin(word).has_value()) return true;
+  if (context.find_function(word) != nullptr) return true;
+  if (context.get_alias(word).has_value()) return true;
+
+  return utils::search_program_path(word).count() > 0;
+}
+
+fn highlight_first_word(StringView line, EvalContext &context) throws
+    -> highlight_result
+{
+  highlight_result result{0, 0, false};
+
+  usize word_start = 0;
+  while (word_start < line.length && is_leading_whitespace(line[word_start]))
+    word_start++;
+
+  /* An empty line or one that opens a subshell or group has no command word to
+     color, so it stays plain. */
+  if (word_start >= line.length) return result;
+  if (line[word_start] == '(') return result;
+
+  usize word_end = word_start;
+  while (word_end < line.length && !is_token_boundary(line[word_end]))
+    word_end++;
+
+  const StringView word =
+      line.substring_of_length(word_start, word_end - word_start);
+
+  /* A leading assignment such as VAR=value is not a command, so a '=' before any
+     slash leaves the line plain the way the parser treats it as an assignment
+     prefix. */
+  for (usize i = 0; i < word.length; i++) {
+    if (word[i] == '/') break;
+    if (word[i] == '=') return result;
+  }
+
+  TRACELN("highlighting first word '%.*s'", static_cast<int>(word.length),
+          word.data);
+
+  result.word_start = word_start;
+  result.word_end = word_end;
+  result.should_color = !first_word_resolves(word, context);
+  return result;
 }
 
 } /* namespace completion */
