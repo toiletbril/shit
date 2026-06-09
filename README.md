@@ -55,15 +55,10 @@ pedantic off at once.
 ## Additional bull**shit**
 
 Modern interactive mode, heavily inspired by
-[fish](https://github.com/fish-shell/fish-shell), with:
-- Syntax highlighting;
-- Sensible word-jumps and controls;
-- UTF-8 support;
-- Wide character (CJK and emoji) width handling;
-- Multiline editing;
-- Reverse history search;
-- Emacs controls;
-- Persistent history.
+[fish](https://github.com/fish-shell/fish-shell), with syntax highlighting.
+sensible word-jumps and controls, full UTF-8 support, wide character (CJK and
+emoji) width handling, multiline editing, history search and persistent
+history.
 
 **shit** also has more than 50 builtins, each with `--help`. That includes
 every builtin from `bash` and POSIX standard, with the addition of:
@@ -71,6 +66,7 @@ every builtin from `bash` and POSIX standard, with the addition of:
 - `bench` -- built-in benchmark infrastructure inspired by Performance
   Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop) for
   short)
+- and more
 
 # Development
 
