@@ -27,3 +27,7 @@ n=42
 [[ "" ]] || echo 21
 word=Hello
 [[ $word == H* ]] && [[ $word == *o ]] && echo 22
+[[ 2 -eq 1+1 ]] && echo arith-eq
+[[ 5 -gt 2*2 ]] && echo arith-gt
+n=7
+[[ n -eq 7 ]] && echo bare-var-arith

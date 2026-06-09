@@ -2387,12 +2387,18 @@ struct ConditionalEvaluator
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
     if (op == "-ot") return Path{left}.is_older_than(Path{right});
 
-    let const left_parsed = utils::parse_decimal_integer(left);
-    let const right_parsed = utils::parse_decimal_integer(right);
-    if (left_parsed.is_error() || right_parsed.is_error())
-      throw Error{"[[: integer operand expected"};
-    const i64 a = left_parsed.value();
-    const i64 b = right_parsed.value();
+    /* The arithmetic comparison operands are full arithmetic expressions in
+       bash, so 1+1 and a bare variable name evaluate rather than only a literal
+       integer. An empty operand reads as zero the way an arithmetic context
+       treats an unset value. */
+    auto to_number = [&](StringView operand) throws -> i64 {
+      for (usize i = 0; i < operand.length; i++)
+        if (operand[i] != ' ' && operand[i] != '\t')
+          return cxt.evaluate_arithmetic(operand);
+      return 0;
+    };
+    const i64 a = to_number(left);
+    const i64 b = to_number(right);
     if (op == "-eq") return a == b;
     if (op == "-ne") return a != b;
     if (op == "-lt") return a < b;
