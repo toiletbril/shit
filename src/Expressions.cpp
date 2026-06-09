@@ -449,6 +449,15 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
      in every uncertain case, where the table simply forgets the name. */
   let const &name = m_assignment->key();
 
+  /* An element assignment a[i]=v or m[k]=v changes what $a or $((a)) reads
+     without recording a scalar literal, so the base name before the bracket is
+     forgotten rather than recorded under the bracketed key. */
+  if (let const bracket = name.view().find_character('['); bracket.has_value())
+  {
+    actx.constant_variables.erase(name.view().substring_of_length(0, *bracket));
+    return;
+  }
+
   /* A conditional or nested assignment may not run, and a runtime definer such
      as eval or dot may already have changed the name out of view, so neither
      proves the value. The append form NAME+=VALUE depends on the prior value,
@@ -2613,6 +2622,16 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   const i64 status = value != 0 ? 0 : 1;
   cxt.set_last_exit_status(static_cast<i32>(status));
   return status;
+}
+
+cold fn ArithmeticCommand::analyze(AnalysisContext &actx,
+                                   bool is_unconditional) const throws -> void
+{
+  unused(is_unconditional);
+  /* The expression may assign any name, as in (( i = 10 )), and the prepass
+     does not parse it, so every recorded constant is forgotten rather than risk
+     folding a later read to a value this command overwrote. */
+  actx.constant_variables.clear();
 }
 
 cold fn SelectLoop::analyze(AnalysisContext &actx,

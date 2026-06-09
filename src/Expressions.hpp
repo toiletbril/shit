@@ -650,6 +650,9 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
+  fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
+      -> void override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 

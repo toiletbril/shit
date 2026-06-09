@@ -88,8 +88,10 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         buf += static_cast<char>(value);
       } break;
       /* The bare \NNN form is one to three octal digits with no leading zero,
-         so \101 is the byte A the way dash's XSI echo reads it. The first digit
-         is already in hand, so up to two more follow. */
+         so \101 is the byte A the way dash's XSI echo reads it. bash reads
+         octal only in the \0NNN form, so in bash mode a bare \NNN stays
+         literal. The first digit is already in hand, so up to two more follow.
+       */
       case '1':
       case '2':
       case '3':
@@ -97,6 +99,11 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case '5':
       case '6':
       case '7': {
+        if (cxt.is_bash_compatible()) {
+          buf += '\\';
+          buf += escaped;
+          break;
+        }
         i32 value = escaped - '0';
         usize digit_count = 1;
         while (digit_count < 3 && j + 1 < arg.length() && arg[j + 1] >= '0' &&

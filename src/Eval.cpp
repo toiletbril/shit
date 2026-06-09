@@ -212,12 +212,14 @@ fn EvalContext::set_array_element(StringView name, usize index,
     return;
   }
 
-  /* A first write creates the array, which clears any same-named scalar so a
-     later $name reads element zero. A write past the end pads the gap with
-     empty elements, the way bash grows an indexed array up to the assigned
-     subscript.
+  /* A first write creates the array. An existing scalar of the same name
+     becomes element zero, the way bash promotes a=5 to a[0]=5 when a[2]=9 is
+     assigned, then the scalar entry is dropped. A write past the end pads the
+     gap with empty elements, the way bash grows the array up to the subscript.
    */
   let elements = ArrayList<String>{heap_allocator()};
+  if (let const *scalar = m_shell_variables.find(name))
+    elements.push(String{heap_allocator(), scalar->view()});
   while (elements.count() <= index)
     elements.push(String{heap_allocator()});
   elements[index] = String{heap_allocator(), value};
