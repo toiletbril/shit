@@ -732,6 +732,27 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
               emit_literal(static_cast<char>(value));
             }
           } break;
+          case 'c': {
+            /* Control modifier. bash uppercases the letter and clears bit 6, so
+               \cA is 0x01 and \c[ is the escape 0x1b. */
+            const char k = chop_character(byte_count);
+            if (k == lexer::CEOF) {
+              emit_literal('\\');
+              emit_literal('c');
+              break;
+            }
+            byte_count++;
+            /* A control target written as an escaped backslash, \c\\, is
+               ctrl-backslash, so the second backslash is consumed here. */
+            const char target = k;
+            if (k == '\\' && chop_character(byte_count) == '\\') {
+              byte_count++;
+            }
+            const char upper = (target >= 'a' && target <= 'z')
+                                    ? static_cast<char>(target - 'a' + 'A')
+                                    : target;
+            emit_literal(static_cast<char>(static_cast<u8>(upper) ^ 0x40u));
+          } break;
           case 'u':
           case 'U': {
             const i32 max_digits = e == 'u' ? 4 : 8;
