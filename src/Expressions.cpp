@@ -1181,11 +1181,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   {
     let saved_params = cxt.positional_params();
     ArrayList<String> call_params{};
+    call_params.reserve(program_args.count() - 1);
     for (usize i = 1; i < program_args.count(); i++)
-      call_params.push(String{
-          heap_allocator(),
-          StringView{program_args[i].c_str(), program_args[i].count()}
-      });
+      call_params.push(String{heap_allocator(), program_args[i]});
     cxt.set_positional_params(steal(call_params));
     defer { cxt.set_positional_params(steal(saved_params)); };
 

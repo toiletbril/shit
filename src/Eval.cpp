@@ -550,18 +550,16 @@ fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
   if (m_readonly_names.count() == 0) return false;
   for (const String &readonly_name : m_readonly_names)
-    if (StringView{readonly_name.c_str(), readonly_name.count()} == name)
-      return true;
+    if (readonly_name == name) return true;
   return false;
 }
 
 fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{};
+  out.reserve(m_readonly_names.count());
   for (const String &name : m_readonly_names)
-    out.push(String{
-        heap_allocator(), StringView{name.c_str(), name.count()}
-    });
+    out.push(String{heap_allocator(), name});
   utils::sort_ascending(out);
   return out;
 }
@@ -635,7 +633,7 @@ fn EvalContext::alias_definitions() const throws -> ArrayList<String>
   m_aliases.for_each([&out](StringView key, const String &value) {
     let definition = String{heap_allocator(), key};
     definition.append(StringView{"='", 2});
-    definition.append(StringView{value.c_str(), value.count()});
+    definition.append(value);
     definition.push('\'');
     out.push(steal(definition));
   });
@@ -950,7 +948,7 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
   m_shell_variables.for_each([&](StringView name, const String &value) {
     let entry = String{heap_allocator(), name};
     entry.push('=');
-    entry.append(StringView{value.c_str(), value.count()});
+    entry.append(value);
     assignments.push(steal(entry));
   });
   utils::sort_ascending(assignments);

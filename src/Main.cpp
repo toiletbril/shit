@@ -344,7 +344,14 @@ static fn git_branch() throws -> String
         {
           line = line.substring_of_length(0, line.length - 1);
         }
-        git_dir = Path{line};
+        let resolved_gitdir = Path{line};
+        /* A relative gitdir pointer is relative to the directory holding the
+           .git file, not the current directory. */
+        if (!resolved_gitdir.is_absolute()) {
+          resolved_gitdir = dir;
+          resolved_gitdir.push_component(line);
+        }
+        git_dir = steal(resolved_gitdir);
       }
     }
     let git_head = git_dir;
