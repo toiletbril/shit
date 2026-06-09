@@ -3474,6 +3474,22 @@ pure fn arithmetic_multiply(i64 lhs, i64 rhs) wontthrow -> i64
   return static_cast<i64>(static_cast<u64>(lhs) * static_cast<u64>(rhs));
 }
 
+/* Exponentiation by squaring in u64 so the result wraps in 64 bits the way the
+   other operators do. The caller rejects a negative exponent, so the count is
+   non-negative here. */
+pure fn arithmetic_power(i64 base, i64 exponent) wontthrow -> i64
+{
+  let result = static_cast<u64>(1);
+  let factor = static_cast<u64>(base);
+  let remaining = static_cast<u64>(exponent);
+  while (remaining > 0) {
+    if ((remaining & 1u) != 0) result *= factor;
+    factor *= factor;
+    remaining >>= 1;
+  }
+  return static_cast<i64>(result);
+}
+
 /* INT64_MIN / -1 and INT64_MIN % -1 overflow the signed result and trap on
    x86, so the wrapped values are returned directly. Division yields INT64_MIN
    and modulo yields 0, which is the two's-complement wrap. */
@@ -3937,20 +3953,35 @@ public:
 
   fn parse_multiplicative() throws -> i64
   {
-    let lhs = parse_unary();
+    let lhs = parse_power();
     for (;;) {
       if (consume("*"))
-        lhs = arithmetic_multiply(lhs, parse_unary());
+        lhs = arithmetic_multiply(lhs, parse_power());
       else if (consume("/")) {
-        let const divisor = parse_unary();
+        let const divisor = parse_power();
         if (divisor == 0) fail("division by zero");
         lhs = arithmetic_divide(lhs, divisor);
       } else if (consume("%")) {
-        let const divisor = parse_unary();
+        let const divisor = parse_power();
         if (divisor == 0) fail("division by zero");
         lhs = arithmetic_modulo(lhs, divisor);
       } else
         break;
+    }
+    return lhs;
+  }
+
+  /* Exponentiation sits between the multiplicative operators and the unary
+     signs. In bash a unary sign binds tighter than **, so -2**2 is (-2)**2,
+     and ** is right-associative, so 2**3**2 is 2**(3**2). bash rejects a
+     negative exponent in integer arithmetic. */
+  fn parse_power() throws -> i64
+  {
+    let const lhs = parse_unary();
+    if (consume("**")) {
+      let const exponent = parse_power();
+      if (exponent < 0) fail("exponent less than 0");
+      return arithmetic_power(lhs, exponent);
     }
     return lhs;
   }

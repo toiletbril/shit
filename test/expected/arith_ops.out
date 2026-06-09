@@ -71,6 +71,9 @@
 5
 23
 -1
-shit: 5:6: error: Arithmetic: unexpected character.
-     5 |  echo $(( 2 ** 10 ))
-       |       ^~~~~~~~~~~~~~ here.
+1024
+10
+1
+16
+39
+[Code 0]
