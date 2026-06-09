@@ -2733,6 +2733,50 @@ hot pure fn first_active_glob(StringView text,
   return shit::None;
 }
 
+/* The recursion depth cap for a ** walk. A real directory tree is far
+   shallower, so the cap only stops a symlink cycle from looping forever, since
+   the path layer cannot tell a symlinked directory from a real one. */
+constexpr usize GLOBSTAR_MAX_DEPTH = 256;
+
+/* Collect the relative paths a ** component expands to, walking dir and its
+   subdirectories. In directory position only subdirectories are collected and
+   the base is added as the empty path so ** can match zero levels. As a
+   trailing component every file and directory is collected, which are the final
+   matches. A hidden entry is skipped the way bash globstar skips a dotfile. */
+fn collect_globstar_paths(const Path &dir, StringView relative,
+                          bool directories_only, bool include_base, usize depth,
+                          Allocator allocator, ArrayList<String> &out) throws
+    -> void
+{
+  if (directories_only && include_base) out.push(String{allocator, relative});
+  if (depth >= GLOBSTAR_MAX_DEPTH) return;
+
+  let const entries = Path::read_directory(dir);
+  if (!entries.has_value()) return;
+
+  for (const String &entry : *entries) {
+    let const name = entry.view();
+    if (!name.is_empty() && name[0] == '.') continue;
+
+    let child_dir = dir;
+    child_dir.push_component(name);
+    let const is_dir = child_dir.is_directory();
+
+    String child_relative{allocator};
+    if (!relative.is_empty()) {
+      child_relative.append(relative);
+      child_relative += '/';
+    }
+    child_relative.append(name);
+
+    if (!directories_only || is_dir)
+      out.push(String{allocator, child_relative.view()});
+    if (is_dir)
+      collect_globstar_paths(child_dir, child_relative.view(), directories_only,
+                             false, depth + 1, allocator, out);
+  }
+}
+
 } /* namespace */
 
 fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
@@ -2768,6 +2812,85 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
         slash_after = k;
         break;
       }
+    }
+
+    /* A ** component matches across directory levels when globstar is on. The
+       component runs from the slash before the glob to the slash after it, and
+       it is the globstar form only when it is exactly two active stars. */
+    usize component_start = 0;
+    for (usize k = *expand_ch; k > 0; k--)
+      if (text.data[k - 1] == '/') {
+        component_start = k;
+        break;
+      }
+    let const component_end = slash_after.value_or(text.length);
+    let const is_globstar_component = is_shopt_enabled("globstar") &&
+                                      component_end - component_start == 2 &&
+                                      text.data[component_start] == '*' &&
+                                      text.data[component_start + 1] == '*' &&
+                                      field.glob_active[component_start] &&
+                                      field.glob_active[component_start + 1];
+
+    if (is_globstar_component) {
+      let const prefix = text.substring_of_length(0, component_start);
+      let base = Path{StringView{"."}};
+      if (component_start == 1)
+        base = Path{StringView{"/"}};
+      else if (component_start > 1)
+        base = Path{text.substring_of_length(0, component_start - 1)};
+
+      let const directory_position = slash_after.has_value();
+      let relatives = ArrayList<String>{scratch};
+      collect_globstar_paths(base, StringView{""}, directory_position, true, 0,
+                             scratch, relatives);
+
+      /* As a trailing ** each collected file or directory is a final match, the
+         prefix the user wrote joined to the relative path. The base directory
+         itself is the zero-level match, emitted as the bare prefix, and skipped
+         when the prefix is empty so a bare ** does not yield the current
+         directory. */
+      if (!directory_position) {
+        if (!prefix.is_empty()) {
+          let base_field = glob_field{scratch};
+          base_field.text.append(prefix);
+          result.push(steal(base_field));
+        }
+        for (const String &relative : relatives) {
+          let match_field = glob_field{scratch};
+          match_field.text.append(prefix);
+          match_field.text.append(relative.view());
+          result.push(steal(match_field));
+        }
+        continue;
+      }
+
+      /* In a directory position the globstar stands in for zero or more levels,
+         so the suffix after it is matched in the base directory and in every
+         descendant directory. The empty relative is the zero-level case, which
+         collapses the star pair and its slash to nothing rather than inserting
+         a stray slash. */
+      let const suffix = text.substring(*slash_after + 1);
+      let rebuilt = ArrayList<glob_field>{scratch};
+      for (const String &relative : relatives) {
+        let candidate = glob_field{scratch};
+        candidate.text.append(prefix);
+        if (!relative.view().is_empty()) {
+          candidate.text.append(relative.view());
+          candidate.text += '/';
+        }
+        let const literal_length = candidate.text.count();
+        candidate.text.append(suffix);
+        if (candidate.text.is_empty()) continue;
+        for (usize k = 0; k < literal_length; k++)
+          candidate.glob_active.push(false);
+        for (usize k = *slash_after + 1; k < field.glob_active.count(); k++)
+          candidate.glob_active.push(field.glob_active[k]);
+        rebuilt.push(steal(candidate));
+      }
+      let recursed = expand_path_recurse(steal(rebuilt));
+      for (glob_field &f : recursed)
+        result.push(steal(f));
+      continue;
     }
 
     /* The glob is the last component, so expand it against files and emit the
