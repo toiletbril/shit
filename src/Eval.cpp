@@ -2056,9 +2056,11 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (!is_colon_form && rest[0] == '/' && name != "@" && name != "*")
     return apply_pattern_replacement(name, rest);
 
-  /* ${name^}, ${name^^}, ${name,}, ${name,,} are bash case modification. They
-     are the non-colon form whose operator is a caret or a comma. */
-  if (!is_colon_form && (rest[0] == '^' || rest[0] == ',') && name != "@" &&
+  /* ${name^}, ${name^^}, ${name,}, ${name,,}, ${name~}, ${name~~} are bash case
+     modification. They are the non-colon form whose operator is a caret, a
+     comma, or a tilde that toggles. */
+  if (!is_colon_form &&
+      (rest[0] == '^' || rest[0] == ',' || rest[0] == '~') && name != "@" &&
       name != "*")
     return apply_case_modification(name, rest);
 
@@ -2374,8 +2376,18 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
                                         pattern_active, 0, extglob_enabled()))
     {
       const unsigned char byte = static_cast<unsigned char>(c);
-      c = static_cast<char>(op == '^' ? std::toupper(byte)
-                                      : std::tolower(byte));
+      if (op == '^') {
+        c = static_cast<char>(std::toupper(byte));
+      } else if (op == ',') {
+        c = static_cast<char>(std::tolower(byte));
+      } else {
+        /* The tilde toggles, so an upper becomes lower and a lower becomes
+           upper, and a non-letter is left alone. */
+        if (std::islower(byte) != 0)
+          c = static_cast<char>(std::toupper(byte));
+        else if (std::isupper(byte) != 0)
+          c = static_cast<char>(std::tolower(byte));
+      }
     }
     out.push(c);
   }
