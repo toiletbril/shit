@@ -95,11 +95,43 @@ pure fn is_plain_variable_name(StringView name) wontthrow -> bool
   return true;
 }
 
+/* True when a token is a bare unquoted $name reference that field-splits at run
+   time. An unquoted operand splits on IFS, so the recorded value of $name is not
+   the single test argument the run actually sees, and the test verdict must not
+   fold from it. A quoted "$name" carries the same VariableReference segment with
+   is_in_double_quotes set, which is_split_eligible reports as not split, so it
+   still folds. The check mirrors the unquoted-variable test warning. */
+fn is_split_eligible_variable_operand(const Token *token) wontthrow -> bool
+{
+  if (token == nullptr) return false;
+  if (token->kind() != Token::Kind::Word) return false;
+
+  let const &word = static_cast<const tokens::WordToken *>(token)->word();
+  if (word.segments.count() != 1) return false;
+
+  const WordSegment &segment = word.segments[0];
+  return segment.kind == WordSegment::Kind::VariableReference &&
+         segment.is_split_eligible();
+}
+
+/* The constant value of a test operand, declining an unquoted $name reference
+   that field-splits at run time. The fold judges a quoted or literal operand by
+   its propagated value, while an unquoted variable operand keeps its run-time
+   splitting and is left unfolded. */
+fn propagated_test_operand_value(const Token *token,
+                                 const AnalysisContext &actx) throws
+    -> Maybe<String>
+{
+  if (is_split_eligible_variable_operand(token)) return None;
+  return propagated_literal_word_value(token, actx);
+}
+
 /* The constant verdict of a literal test command, the arguments after the test
    or [ word with the trailing ] of the bracket form already removed. Some(true)
    or Some(false) for the simplest forms the fold can prove, None otherwise. The
-   operand value comes through propagated_literal_word_value, so a $name operand
-   recorded as a constant is judged by its recorded value. */
+   operand value comes through propagated_test_operand_value, so a $name operand
+   recorded as a constant is judged by its recorded value unless it field-splits.
+ */
 fn constant_test_verdict(const ArrayList<const Token *> &operands,
                          const AnalysisContext &actx) throws -> Maybe<bool>
 {
@@ -107,14 +139,14 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
   if (operands.is_empty()) return Maybe<bool>{false};
 
   if (operands.count() == 1) {
-    let const value = propagated_literal_word_value(operands[0], actx);
+    let const value = propagated_test_operand_value(operands[0], actx);
     if (!value.has_value()) return None;
     return Maybe<bool>{!value->is_empty()};
   }
 
   if (operands.count() == 2) {
-    let const op = propagated_literal_word_value(operands[0], actx);
-    let const arg = propagated_literal_word_value(operands[1], actx);
+    let const op = propagated_test_operand_value(operands[0], actx);
+    let const arg = propagated_test_operand_value(operands[1], actx);
     if (!op.has_value() || !arg.has_value()) return None;
     if (*op == "-n") return Maybe<bool>{!arg->is_empty()};
     if (*op == "-z") return Maybe<bool>{arg->is_empty()};
@@ -122,9 +154,9 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
   }
 
   if (operands.count() == 3) {
-    let const lhs = propagated_literal_word_value(operands[0], actx);
-    let const op = propagated_literal_word_value(operands[1], actx);
-    let const rhs = propagated_literal_word_value(operands[2], actx);
+    let const lhs = propagated_test_operand_value(operands[0], actx);
+    let const op = propagated_test_operand_value(operands[1], actx);
+    let const rhs = propagated_test_operand_value(operands[2], actx);
     if (!lhs.has_value() || !op.has_value() || !rhs.has_value()) return None;
     if (*op == "=") return Maybe<bool>{*lhs == *rhs};
     if (*op == "!=") return Maybe<bool>{!(*lhs == *rhs)};

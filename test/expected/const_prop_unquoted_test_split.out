@@ -1,0 +1,398 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign k= ]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$k" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "ws_unquoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "ws_unquoted_no"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$k" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "ws_quoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "ws_quoted_no"]
+  [CompoundListCondition, None]
+    [Assign e=]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$e" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "empty_unquoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "empty_unquoted_no"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$e" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "empty_quoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "empty_quoted_no"]
+  [CompoundListCondition, None]
+    [Assign m=a -o b]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$m" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "multi_unquoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "multi_unquoted_no"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$m" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "multi_quoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "multi_quoted_no"]
+  [CompoundListCondition, None]
+    [Assign s=x]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$s" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "single_unquoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "single_unquoted_no"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$s" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "single_quoted_yes"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "single_quoted_no"]
+[Word
+  Unquoted "k="
+  DoubleQuoted " "
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "k"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "ws_unquoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "ws_unquoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "k"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "ws_quoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "ws_quoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "e="
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "e"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "empty_unquoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "empty_unquoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "e"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "empty_quoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "empty_quoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "m="
+  DoubleQuoted "a -o b"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "m"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "multi_unquoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "multi_unquoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "m"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "multi_quoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "multi_quoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "s="
+  DoubleQuoted "x"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "s"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "single_unquoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "single_unquoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "s"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "single_quoted_yes"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "single_quoted_no"
+]
+[Word
+  Unquoted "fi"
+]
+shit: 9:6: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+     9 |  if [ $k ]; then echo ws_unquoted_yes; else echo ws_unquoted_no; fi
+       |       ^~ here.
+shit: 14:6: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+    14 |  if [ $e ]; then echo empty_unquoted_yes; else echo empty_unquoted_no; fi
+       |       ^~ here.
+shit: 20:6: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+    20 |  if [ $m ]; then echo multi_unquoted_yes; else echo multi_unquoted_no; fi
+       |       ^~ here.
+shit: 25:6: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+    25 |  if [ $s ]; then echo single_unquoted_yes; else echo single_unquoted_no; fi
+       |       ^~ here.
+ws_unquoted_no
+ws_quoted_yes
+empty_unquoted_no
+empty_quoted_no
+multi_unquoted_yes
+multi_quoted_yes
+single_unquoted_yes
+single_quoted_yes
+[Code 0]
