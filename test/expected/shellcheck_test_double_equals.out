@@ -19,6 +19,6 @@
 shit: 1:5: warning: == is undefined in POSIX test, use = for string equality.
      1 |  [ a == b ]
        |      ^~ here.
-shit: 1:1: error: Builtin '[': == is not a POSIX test operator, use = for string equality.
+shit: 1:1: error: Builtin '[': Unable to evaluate the test because '==' is a bashism, use = for string equality in POSIX mode.
      1 |  [ a == b ]
        |  ^~~~~~~~~~ here.

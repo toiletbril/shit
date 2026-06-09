@@ -26,6 +26,10 @@ public:
   const ArrayList<String> &args;
   usize pos;
   usize end;
+  /* bash accepts == as a synonym for = in test, while dash and POSIX reject it,
+     so the operator is accepted only in the bash mood and rejected otherwise to
+     keep the default mood matching dash. */
+  bool bash_compatible;
 
   pure const String &current() const wontthrow
   {
@@ -68,22 +72,24 @@ public:
          dups the controlling terminal onto a higher descriptor and tests it. */
       return os::is_fd_a_tty(static_cast<os::descriptor>(file_descriptor));
     }
-    fail(StringView{"unknown unary operator '"} + op +
-         "', expected one of -z -n -e -f -d -s -r -w -x -L -h -b -c -p -S -t");
+    fail(StringView{"Unable to evaluate the test because '"} + op +
+         "' is not a known unary operator, expected one of -z -n -e -f -d -s -r "
+         "-w -x -L -h -b -c -p -S -t");
     return false;
   }
 
   bool evaluate_binary(const String &left, const String &op,
                        const String &right) throws
   {
-    /* == is a bashism, POSIX test compares strings with =. The analysis stage
-       warns on it as SC3014, and at run time the operator is rejected here with
-       the same suggestion rather than mislabeled as an unexpected argument. */
+    /* == is a bashism for string equality. bash accepts it, so the bash mood
+       treats it as =, while the default and POSIX moods reject it the way dash
+       does. The analysis stage also warns on it as SC3014. */
+    if (op == "=" || (op == "==" && bash_compatible)) return left == right;
     if (op == "==") {
-      fail("== is not a POSIX test operator, use = for string equality");
+      fail("Unable to evaluate the test because '==' is a bashism, use = for "
+           "string equality in POSIX mode");
       return false;
     }
-    if (op == "=") return left == right;
     if (op == "!=") return left != right;
     /* < and > compare the two operands byte by byte, the locale-byte order
        POSIX specifies, so the same memcmp order String::operator< gives. */
@@ -105,8 +111,8 @@ public:
       let const right_is_integer = parse_integer(right, b);
       if (!left_is_integer || !right_is_integer) {
         let const &not_a_number = left_is_integer ? right : left;
-        fail(StringView{"integer operand expected for "} + op + ", '" +
-             not_a_number + "' is not a number");
+        fail(StringView{"Unable to compare with '"} + op + "' because '" +
+             not_a_number + "' is not an integer");
         return false;
       }
       if (op == "-eq") return a == b;
@@ -116,8 +122,9 @@ public:
       if (op == "-gt") return a > b;
       return a >= b;
     }
-    fail(StringView{"unknown binary operator '"} + op +
-         "', expected one of = != < > -eq -ne -lt -le -gt -ge -ef -nt -ot");
+    fail(StringView{"Unable to evaluate the test because '"} + op +
+         "' is not a known binary operator, expected one of = != < > -eq -ne "
+         "-lt -le -gt -ge -ef -nt -ot");
     return false;
   }
 
@@ -131,10 +138,10 @@ public:
 
   pure bool is_binary_operator(const String &s) const wontthrow
   {
-    /* == is listed so the bashism routes to evaluate_binary and is rejected
-       there with a suggestion to use =, rather than falling through to the
-       unexpected-argument error. -ef, -nt, and -ot are the file-compare
-       operators evaluate_binary resolves against the two paths. */
+    /* == is listed so the bashism routes to evaluate_binary, where it is
+       accepted as =, rather than falling through to the unexpected-argument
+       error. -ef, -nt, and -ot are the file-compare operators evaluate_binary
+       resolves against the two paths. */
     return s == "=" || s == "==" || s == "!=" || s == "<" || s == ">" ||
            s == "-eq" || s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" ||
            s == "-ge" || s == "-ef" || s == "-nt" || s == "-ot";
@@ -200,7 +207,9 @@ public:
        argument is true when it is non-empty. */
     if (pos + 1 < end && is_binary_operator(args[pos + 1])) {
       if (pos + 2 >= end) {
-        fail(StringView{"argument expected after '"} + args[pos + 1] + "'");
+        fail(StringView{"Unable to evaluate the test because an argument is "
+                        "expected after '"} +
+             args[pos + 1] + "'");
         pos = end;
         return false;
       }
@@ -295,7 +304,6 @@ pure Builtin::Kind Test::kind() const wontthrow { return Kind::Test; }
 
 i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  unused(cxt);
 
   /* Strip the program name, and for the [ form the required trailing ]. The
      last operand index ends the expression, one before the trailing ] in the
@@ -320,15 +328,16 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      arguments. */
   if (operands.is_empty()) return 1;
 
-  let evaluator = TestEvaluator{operands, 0, operands.count()};
+  let evaluator =
+      TestEvaluator{operands, 0, operands.count(), cxt.is_bash_compatible()};
   let const result = evaluator.evaluate_top();
   /* A paren pair the argument-count rules stripped narrowed end past the
      closing paren, so the leftover check runs against the narrowed window
      rather than the original operand count. */
   if (evaluator.pos != evaluator.end) {
     ASSERT(evaluator.pos < evaluator.end);
-    throw Error{StringView{"unexpected argument '"} + operands[evaluator.pos] +
-                "'"};
+    throw Error{StringView{"Unable to evaluate the test because '"} +
+                operands[evaluator.pos] + "' is an unexpected argument"};
   }
   return result ? 0 : 1;
 }
