@@ -9,6 +9,13 @@ endif
 
 BIN_FLAGS := -AEM
 
+# The suite runs cd and z, which write the directory history, so both the
+# command history and the directory history are redirected to ignored in-repo
+# files. Running the suite then never reads or corrupts the developer's global
+# ~/.shit_history or ~/.shit_directory_history.
+export SHIT_HISTORY := $(CURDIR)/.test_history
+export SHIT_DIRECTORY_HISTORY := $(CURDIR)/.test_directory_history
+
 FAILED_LIST := failed.diff
 INPUT_FILES := $(wildcard input/*.shit)
 
@@ -23,7 +30,7 @@ TEST_NAMES := $(INPUT_FILES:input/%.shit=%)
 	printf "	%-42s FAILED :c\n" $@
 
 clean:
-	@rm -f $(FAILED_LIST)
+	@rm -f $(FAILED_LIST) $(SHIT_HISTORY) $(SHIT_DIRECTORY_HISTORY)
 
 test: $(BIN)
 	@$(MAKE) -B clean

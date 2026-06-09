@@ -253,20 +253,17 @@ static constexpr char SHIT_HISTORY_FILE[] = ".shit_history";
    not clobber the real history. None when there is no home and no override. */
 static fn history_file_path() -> shit::Maybe<shit::Path>
 {
-  if (shit::Maybe<shit::String> override_path =
+  if (let const override_path =
           shit::os::get_environment_variable("SHIT_HISTORY");
       override_path.has_value() && !override_path->is_empty())
   {
     return shit::Path{override_path->view()};
   }
-  if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
-      home.has_value())
-  {
-    shit::Path path = *home;
-    path.push_component(SHIT_HISTORY_FILE);
-    return path;
-  }
-  return shit::None;
+  let home = shit::os::get_home_directory();
+  if (!home) return shit::None;
+  let path = *home;
+  path.push_component(SHIT_HISTORY_FILE);
+  return path;
 }
 
 fn set_title(const String &title) -> void

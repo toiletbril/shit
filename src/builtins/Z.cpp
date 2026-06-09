@@ -13,7 +13,8 @@ HELP_SYNOPSIS_DECL("[query ...]");
 
 HELP_DESCRIPTION_DECL(
     "The z builtin changes to a frequently visited directory ranked by a "
-    "frecency store at ~/.shit_dirs, which weights each directory by its visit "
+    "frecency store at ~/.shit_directory_history, which weights each directory "
+    "by its visit "
     "count and how recently it was seen. The operands join into one query that "
     "matches a directory by case insensitive substring, and z prints the path "
     "it jumps to.");
@@ -25,7 +26,8 @@ namespace shit {
 namespace {
 
 /* The store keeps at most this many directories, so a long-lived shell does not
-   grow ~/.shit_dirs without bound and the per-cd rewrite stays cheap. */
+   grow ~/.shit_directory_history without bound and the per-cd rewrite stays
+   cheap. */
 constexpr usize Z_FRECENCY_MAX = 500;
 
 /* One directory in the frecency store, its visit count and the epoch second of

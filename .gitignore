@@ -22,6 +22,8 @@ perf*
 garbage/
 src/o
 test/failed.diff
+test/.test_history
+test/.test_directory_history
 
 shit
 shit.aarch64.elf
