@@ -151,6 +151,33 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   assign_variable(name, value);
 }
 
+fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
+{
+  /* The opposite identity is cleared first, so a mimicked bash does not keep the
+     parent's SH_VERSION and a mimicked sh does not keep BASH_VERSION. At startup
+     nothing is set yet, so the clear is a no-op there. */
+  if (bash_identity) {
+    force_unset_shell_variable("SH_VERSION");
+    force_unset_shell_variable("DASH_VERSION");
+    set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+    /* $BASH is the path the shell records as the executable that started it,
+       which is the SHELL value the shell already holds. */
+    set_shell_variable("BASH", get_variable_value("SHELL").value_or(String{}));
+    return;
+  }
+  force_unset_shell_variable("BASH_VERSION");
+  force_unset_shell_variable("BASH");
+  let version = String{};
+  version += utils::int_to_text(SHIT_VER_MAJOR);
+  version += ".";
+  version += utils::int_to_text(SHIT_VER_MINOR);
+  version += ".";
+  version += utils::int_to_text(SHIT_VER_PATCH);
+  version += "-" SHIT_VER_EXTRA;
+  set_shell_variable("SH_VERSION", version.view());
+  set_shell_variable("DASH_VERSION", version.view());
+}
+
 fn EvalContext::unset_shell_variable(StringView name) throws -> void
 {
   /* A read-only variable rejects removal the same way it rejects assignment,
@@ -4555,8 +4582,7 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
      after the isolated snapshot so the restore drops it. */
   if (!isolated) {
     set_positional_params(steal(params));
-    if (mode == MimicMode::Bash)
-      set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+    seed_shell_identity_variables(mode == MimicMode::Bash);
     std::exception_ptr error;
     try {
       ast->evaluate(*this);
@@ -4576,8 +4602,7 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
      script's cd, exports, functions, and exit do not leak to the parent. */
   let snapshot = snapshot_state();
   set_positional_params(steal(params));
-  if (mode == MimicMode::Bash)
-    set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
+  seed_shell_identity_variables(mode == MimicMode::Bash);
   enter_subshell();
   clear_inherited_exit_trap();
   std::exception_ptr error;

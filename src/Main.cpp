@@ -666,18 +666,11 @@ fn main(int argc, char **argv) -> int
   context.set_shell_variable("SHIT_OS", SHIT_OS_INFO);
 
   /* Shell identity, so a script that probes for its host shell finds a known
-     name and takes a working branch rather than a fragile fallback. A bash
-     invocation advertises BASH_VERSION, every other mode advertises the sh and
-     dash names. The shit version above stays present in every mode. */
-  if (shit::should_run_in_bash_mode() || init_as_bash) {
-    context.set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
-    /* $BASH is the path the shell was invoked with, the way bash records the
-       executable that started it. */
-    context.set_shell_variable("BASH", program_path);
-  } else {
-    context.set_shell_variable("SH_VERSION", version_string);
-    context.set_shell_variable("DASH_VERSION", version_string);
-  }
+     name and takes a working branch rather than a fragile fallback. The mimicry
+     run seeds the same set for the shell it mimics, so the seeding is shared. The
+     shit version above stays present in every mode. */
+  context.seed_shell_identity_variables(shit::should_run_in_bash_mode() ||
+                                        init_as_bash);
 
   /* SHLVL counts shell nesting. It is read from the inherited environment,
      incremented, and exported so a child shell continues the count. */

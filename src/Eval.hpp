@@ -236,6 +236,12 @@ public:
   fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
+
+  /* Seed the shell-identity variables a script probes to find its host shell. A
+     bash identity advertises BASH_VERSION and BASH, every other mode advertises
+     the sh and dash version names. Shared by the startup and the mimicry run so a
+     mimicked shell looks like the real one rather than a half-set environment. */
+  fn seed_shell_identity_variables(bool bash_identity) throws -> void;
   fn unset_shell_variable(StringView name) throws -> void;
 
   /* The bash indexed arrays, a name to an ordered list of element strings. They
