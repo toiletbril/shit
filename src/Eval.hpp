@@ -452,6 +452,22 @@ public:
     return m_bash_compatible;
   }
 
+  /* The bash shopt option states, set and read by the shopt builtin. A name
+     with no entry reads as off. */
+  fn set_shopt_option(StringView name, bool enabled) throws -> void
+  {
+    m_shopt_options.set(name, enabled);
+  }
+  pure fn is_shopt_enabled(StringView name) const wontthrow -> bool
+  {
+    const bool *value = m_shopt_options.find(name);
+    return value != nullptr && *value;
+  }
+  pure fn shopt_options() const wontthrow -> const HashMap<bool> &
+  {
+    return m_shopt_options;
+  }
+
   /* A condition, such as an if test or an && operand, suppresses set -e while
      it runs, since its failure is expected. */
   fn enter_condition() wontthrow -> void;
@@ -627,6 +643,7 @@ protected:
   HashMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   HashSet m_associative_names{heap_allocator()};
   HashMap<String> m_associative_values{heap_allocator()};
+  HashMap<bool> m_shopt_options{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
   String m_field_separators{" \t\n"};
