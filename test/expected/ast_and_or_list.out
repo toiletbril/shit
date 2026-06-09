@@ -1,0 +1,34 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "a"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "b"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "false"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "true"]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+a
+[Code 0]

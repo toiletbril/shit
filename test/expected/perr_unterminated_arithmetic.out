@@ -1,0 +1,6 @@
+shit: 2:6: error: Unterminated arithmetic expansion.
+     2 |  echo $((1 + 2
+       |       ^~~~~~~~ here.
+shit: 2:14: note:
+     2 |  echo $((1 + 2
+       |               ^~ Expected )) here.

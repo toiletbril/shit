@@ -1,0 +1,6 @@
+shit: 2:6: error: Unterminated command substitution.
+     2 |  echo `echo hi
+       |       ^~ here.
+shit: 2:14: note:
+     2 |  echo `echo hi
+       |               ^~ Expected ` here.

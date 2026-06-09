@@ -1,0 +1,70 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [IfClause]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "true"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Subshell]
+              [CompoundList]
+                [CompoundListCondition, None]
+                  [WhileLoop]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "false"]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "echo" "x"]
+                [CompoundListCondition, None]
+                  [BraceGroup]
+                    [CompoundList]
+                      [CompoundListCondition, None]
+                        [SimpleCommand "echo" "y"]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Code 0]

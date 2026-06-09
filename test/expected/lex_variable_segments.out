@@ -1,0 +1,49 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$foo" "$bar"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$foo" "$bar"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre$foo" "lead$bartail"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "a$bc$d"]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "foo"
+]
+[Word
+  Variable "bar"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Variable "foo"
+]
+[Word
+  Variable "bar"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  Variable "foo"
+]
+[Word
+  DoubleQuoted "lead"
+  Variable "bar"
+  DoubleQuoted "tail"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "a"
+  Variable "b"
+  Unquoted "c"
+  Variable "d"
+]
+[Code 0]

@@ -1,0 +1,4 @@
+#!/bin/env shit
+function f { echo f; }
+g() { echo g; }
+f; g

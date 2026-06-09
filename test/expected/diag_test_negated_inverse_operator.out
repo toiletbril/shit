@@ -1,0 +1,43 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "3" "-eq" "4" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "notequal"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "notequal"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:3: warning: a negated -eq is just -ne, drop the ! and use -ne.
+     2 |  [ ! 3 -eq 4 ] && echo notequal
+       |    ^~ here.
+notequal
+after
+[Code 0]

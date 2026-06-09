@@ -1,0 +1,46 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-f" "/a" "-o" "-f" "/b" "]"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "none"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "/a"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "/b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "none"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:9: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
+     2 |  [ -f /a -o -f /b ] || echo none
+       |          ^~ here.
+none
+after
+[Code 0]

@@ -1,0 +1,25 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=10]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x*2+1))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x+x))"]
+[Word
+  Unquoted "x=10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x*2+1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x+x"
+]
+21
+20
+[Code 0]

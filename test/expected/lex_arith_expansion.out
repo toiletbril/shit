@@ -1,0 +1,39 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(( 1 + 2 ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre$(( 3 * 4 ))post"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "val=$(( 5 - 1 ))end"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(( 6 ))$(( 7 ))"]
+[Word
+  Unquoted ":"
+]
+[Word
+  ArithmeticExpansion " 1 + 2 "
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  ArithmeticExpansion " 3 * 4 "
+  Unquoted "post"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  DoubleQuoted "val="
+  ArithmeticExpansion " 5 - 1 "
+  DoubleQuoted "end"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  ArithmeticExpansion " 6 "
+  ArithmeticExpansion " 7 "
+]
+[Code 0]

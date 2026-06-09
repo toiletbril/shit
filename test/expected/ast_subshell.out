@@ -1,0 +1,23 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "a"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "b"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+a
+b
+[Code 0]

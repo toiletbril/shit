@@ -1,0 +1,95 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "true_succeeds"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "false_fails"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand ":"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "colon_succeeds"]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "true_succeeds"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "false_fails"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "colon_succeeds"
+]
+[Word
+  Unquoted "fi"
+]
+true_succeeds
+false_fails
+colon_succeeds
+[Code 0]

@@ -1,0 +1,13 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "EOF"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Code 0]

@@ -1,0 +1,45 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign v=x]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "$v" "=" "x" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "equal"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "v=x"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "v"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "equal"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 3:3: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+     3 |  [ $v = x ] && echo equal
+       |    ^~ here.
+equal
+after
+[Code 0]

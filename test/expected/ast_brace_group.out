@@ -1,0 +1,29 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [BraceGroup]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "a"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "b"]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "}"
+]
+a
+b
+[Code 0]

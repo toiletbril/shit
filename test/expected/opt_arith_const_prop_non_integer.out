@@ -1,0 +1,30 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=12]
+  [CompoundListCondition, None]
+    [Assign y=hello]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x+1))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((y+1))"]
+[Word
+  Unquoted "x=12"
+]
+[Word
+  Unquoted "y=hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x+1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "y+1"
+]
+13
+1
+[Code 0]

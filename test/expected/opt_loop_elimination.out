@@ -1,0 +1,63 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never1"]
+  [CompoundListCondition, None]
+    [UntilLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "loops_skipped"]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "until"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never2"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "loops_skipped"
+]
+loops_skipped
+[Code 0]

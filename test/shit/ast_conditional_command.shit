@@ -1,0 +1,2 @@
+#!/bin/env shit
+[[ -n x && abc == a* ]] && echo yes

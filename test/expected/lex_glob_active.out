@@ -1,0 +1,38 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-f"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "a*b" "c?d" "[a-z]"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "lit*" "lit?" "[abc]"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "a*b"
+]
+[Word
+  Unquoted "c?d"
+]
+[Word
+  Unquoted "[a-z]"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  DoubleQuoted "lit*"
+]
+[Word
+  Literal "lit?"
+]
+[Word
+  DoubleQuoted "[abc]"
+]
+[Code 0]

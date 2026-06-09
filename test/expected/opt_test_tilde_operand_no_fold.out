@@ -1,0 +1,41 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "~" "=" "~" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "tilde_branch"]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "~"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "~"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "tilde_branch"
+]
+[Word
+  Unquoted "fi"
+]
+tilde_branch
+[Code 0]

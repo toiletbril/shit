@@ -1,0 +1,4 @@
+#!/bin/env shit
+set -f
+: a*b c?d [a-z]
+: "lit*" 'lit?' "[abc]"

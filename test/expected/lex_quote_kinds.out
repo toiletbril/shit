@@ -1,0 +1,45 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "bare" "single" "double"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "premidpost"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "outinout"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "onetwothree"]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "bare"
+]
+[Word
+  Literal "single"
+]
+[Word
+  DoubleQuoted "double"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  Literal "mid"
+  Unquoted "post"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "out"
+  DoubleQuoted "in"
+  Unquoted "out"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "onetwo"
+  DoubleQuoted "three"
+]
+[Code 0]

@@ -1,0 +1,12 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1/0))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1/0"
+]
+shit: 2:6: error: Arithmetic: division by zero.
+     2 |  echo $((1/0))
+       |       ^~~~~~~~ here.

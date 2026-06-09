@@ -1,0 +1,4 @@
+#!/bin/env shit
+fmt="%s\n"
+printf $fmt hi
+echo after

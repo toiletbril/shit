@@ -1,0 +1,88 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=5]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$x" "=" "5" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "quoted_folds"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$x" "=" "5" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "unquoted_no_fold"]
+[Word
+  Unquoted "x=5"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "quoted_folds"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "unquoted_no_fold"
+]
+[Word
+  Unquoted "fi"
+]
+shit: 4:6: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+     4 |  if [ $x = 5 ]; then echo unquoted_no_fold; fi
+       |       ^~ here.
+quoted_folds
+unquoted_no_fold
+[Code 0]

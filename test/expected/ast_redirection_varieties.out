@@ -1,0 +1,63 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "exec"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "exec"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "-"
+]
+[Code 0]

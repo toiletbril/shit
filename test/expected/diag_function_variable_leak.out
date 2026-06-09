@@ -1,0 +1,46 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign leaked=1]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "$leaked"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "leaked=1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "leaked"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 3:3: warning: This assignment to 'leaked' in a function has no local, so the value leaks to the global scope, declare it with local to keep it inside the function.
+     3 |    leaked=1
+       |    ^~~~~~~~ here.
+1
+after
+[Code 0]

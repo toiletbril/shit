@@ -1,0 +1,51 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "true"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "shadow_ran"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "after_shadow"]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "shadow_ran"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_shadow"
+]
+[Word
+  Unquoted "fi"
+]
+shadow_ran
+after_shadow
+[Code 0]

@@ -1,0 +1,6 @@
+shit: 2:1: error: Unterminated case.
+     2 |  case x in
+       |  ^~~~ here.
+shit: 2:10: note:
+     2 |  case x in
+       |           ^~ Expected a pattern to start an arm, or 'esac' to end the case.

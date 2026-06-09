@@ -1,0 +1,26 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "before" "$(echo one two)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "before"
+]
+[Word
+  CommandSubstitution "echo one two"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:13: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     2 |  echo before $(echo one two)
+       |              ^~~~~~~~~~~~~~~ here.
+before one two
+after
+[Code 0]

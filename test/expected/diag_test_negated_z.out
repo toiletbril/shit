@@ -1,0 +1,40 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "-z" "x" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "nonempty"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "nonempty"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:3: warning: a negated -z is just -n, test with -n instead.
+     2 |  [ ! -z x ] && echo nonempty
+       |    ^~ here.
+nonempty
+after
+[Code 0]

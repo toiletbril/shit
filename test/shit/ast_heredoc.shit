@@ -1,0 +1,5 @@
+#!/bin/env shit
+cat <<EOF >/dev/null
+line one
+line two
+EOF

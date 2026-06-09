@@ -1,0 +1,5 @@
+#!/bin/env shit
+: "$(:)"
+: pre$(:)post
+: "head$(:)tail"
+: $(:)$(:)

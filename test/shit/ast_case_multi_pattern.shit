@@ -1,0 +1,2 @@
+#!/bin/env shit
+case word in a|b|word) echo m;; *) echo d;; esac

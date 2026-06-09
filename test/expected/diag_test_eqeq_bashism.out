@@ -1,0 +1,48 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "x" "==" "x" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "eq"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "neq"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "eq"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neq"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:5: warning: == is undefined in POSIX test, use = for string equality.
+     2 |  [ x == x ] && echo eq || echo neq
+       |      ^~ here.
+shit: 2:1: error: Builtin '[': Unable to evaluate the test because '==' is a bashism, use = for string equality in POSIX mode.
+     2 |  [ x == x ] && echo eq || echo neq
+       |  ^~~~~~~~~~ here.

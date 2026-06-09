@@ -1,0 +1,34 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "yes"]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "a*"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "yes"
+]
+yes
+[Code 0]

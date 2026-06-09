@@ -1,0 +1,30 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "eval" ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "zzqqxxnonexist_command_4242"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "eval"
+]
+[Word
+  DoubleQuoted ":"
+]
+[Word
+  Unquoted "zzqqxxnonexist_command_4242"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 3:1: warning: Command 'zzqqxxnonexist_command_4242' was not found.
+     3 |  zzqqxxnonexist_command_4242
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+shit: 3:1: error: Program 'zzqqxxnonexist_command_4242' wasn't found.
+     3 |  zzqqxxnonexist_command_4242
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+after
+[Code 0]

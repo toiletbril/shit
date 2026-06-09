@@ -1,0 +1,2 @@
+#!/bin/env shit
+if [ ~ = ~ ]; then echo tilde_branch; fi

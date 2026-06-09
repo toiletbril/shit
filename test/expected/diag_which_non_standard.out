@@ -1,0 +1,31 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "which" "ls"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "which"
+]
+[Word
+  Unquoted "ls"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:1: warning: which is non-standard, use command -v for a portable lookup.
+     2 |  which ls >/dev/null 2>&1
+       |  ^~~~~ here.
+after
+[Code 0]

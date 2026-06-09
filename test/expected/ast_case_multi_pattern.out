@@ -1,0 +1,47 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "m"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "d"]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "word"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "word"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "m"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "esac"
+]
+m
+[Code 0]

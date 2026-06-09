@@ -1,0 +1,45 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(:)"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre$(:)post"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "head$(:)tail"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "$(:)$(:)"]
+[Word
+  Unquoted ":"
+]
+[Word
+  CommandSubstitution ":"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre"
+  CommandSubstitution ":"
+  Unquoted "post"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  DoubleQuoted "head"
+  CommandSubstitution ":"
+  DoubleQuoted "tail"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  CommandSubstitution ":"
+  CommandSubstitution ":"
+]
+shit: 3:3: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     3 |  : pre$(:)post
+       |    ^~~~~~~~~~~ here.
+shit: 5:3: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     5 |  : $(:)$(:)
+       |    ^~~~~~~~ here.
+[Code 0]

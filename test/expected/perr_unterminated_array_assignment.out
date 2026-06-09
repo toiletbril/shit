@@ -1,0 +1,3 @@
+shit: 2:5: error: Unterminated array assignment, expected ')'.
+     2 |  arr=(a b
+       |      ^~ here.

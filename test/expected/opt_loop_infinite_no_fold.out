@@ -1,0 +1,75 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "body_ran"]
+        [CompoundListCondition, None]
+          [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [UntilLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "until_body"]
+        [CompoundListCondition, None]
+          [SimpleCommand "break"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "body_ran"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "until"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "until_body"
+]
+[Word
+  Unquoted "break"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+body_ran
+until_body
+done
+[Code 0]

@@ -1,0 +1,122 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "a"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "true"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "elif_taken"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "c"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "a"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "b"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "else_taken"]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "elif"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "elif_taken"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "elif"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "else_taken"
+]
+[Word
+  Unquoted "fi"
+]
+elif_taken
+else_taken
+[Code 0]

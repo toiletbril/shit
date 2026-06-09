@@ -1,0 +1,23 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "a"]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Code 0]

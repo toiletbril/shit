@@ -1,0 +1,32 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign fmt=%s\n]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "$fmt" "hi"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "fmt="
+  DoubleQuoted "%s\n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Variable "fmt"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 3:8: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+     3 |  printf $fmt hi
+       |         ^~~~ here.
+hi
+after
+[Code 0]

@@ -1,0 +1,2 @@
+#!/bin/env shit
+if true; then ( while false; do echo x; done; { echo y; } ); fi >/dev/null

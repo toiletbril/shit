@@ -1,0 +1,227 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "-n" "abc" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "n_true"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "-z" "" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "z_true"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "a" "=" "a" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "eq_true"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "a" "!=" "b" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "neq_true"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "test" "hello"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "one_op_true"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "zero_op_false"]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "n_true"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "z_true"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "eq_true"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "!="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "neq_true"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "one_op_true"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "else"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "zero_op_false"
+]
+[Word
+  Unquoted "fi"
+]
+shit: 6:9: warning: a one-operand test is the nonempty-string test, write it with -n to read clearer.
+     6 |  if test hello; then echo one_op_true; fi
+       |          ^~~~~ here.
+n_true
+z_true
+eq_true
+neq_true
+one_op_true
+zero_op_false
+[Code 0]

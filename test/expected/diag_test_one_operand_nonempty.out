@@ -1,0 +1,34 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "hello" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "yes"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:3: warning: a one-operand test is the nonempty-string test, write it with -n to read clearer.
+     2 |  [ hello ] && echo yes
+       |    ^~~~~ here.
+yes
+after
+[Code 0]

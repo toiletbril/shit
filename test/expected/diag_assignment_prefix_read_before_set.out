@@ -1,0 +1,26 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$foo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+[Word
+  Unquoted "foo=bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "foo"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+shit: 2:14: warning: The assignment prefix does not affect this command, 'foo' is read before it is set.
+     2 |  foo=bar echo "$foo"
+       |               ^~~~~~ here.
+
+after
+[Code 0]

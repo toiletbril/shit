@@ -1,0 +1,38 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((2+3*4))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(( ((2+3)) * (4-1) ))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((10%3))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1<<4))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "2+3*4"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion " ((2+3)) * (4-1) "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "10%3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1<<4"
+]
+14
+15
+1
+16
+[Code 0]

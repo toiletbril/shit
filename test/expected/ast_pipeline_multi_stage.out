@@ -1,0 +1,22 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "hi"]
+      [SimpleCommand "cat"]
+      [SimpleCommand "cat"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Code 0]

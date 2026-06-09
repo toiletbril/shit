@@ -1,0 +1,30 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "~" "~user" "~/path"]
+  [CompoundListCondition, None]
+    [SimpleCommand ":" "pre~mid" "~quoted" "~raw"]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "~"
+]
+[Word
+  Unquoted "~user"
+]
+[Word
+  Unquoted "~/path"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "pre~mid"
+]
+[Word
+  DoubleQuoted "~quoted"
+]
+[Word
+  Literal "~raw"
+]
+[Code 0]

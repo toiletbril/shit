@@ -1,0 +1,5 @@
+#!/bin/env shit
+: a\*b c\?d
+: \$foo \~home
+: \" \\ \`
+: pre\ space

@@ -1,0 +1,6 @@
+shit: 2:1: error: Unterminated '[['.
+     2 |  [[ a == b
+       |  ^~ here.
+shit: 2:10: note:
+     2 |  [[ a == b
+       |           ^~ Expected ']]'.

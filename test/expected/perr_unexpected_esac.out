@@ -1,0 +1,3 @@
+shit: 2:1: error: 'esac' has no matching 'case'.
+     2 |  esac
+       |  ^~~~ here.

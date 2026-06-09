@@ -1,0 +1,30 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign total=$((6*7))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$total"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printenv" "prefix"]
+[Word
+  Unquoted "total="
+  ArithmeticExpansion "6*7"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "total"
+]
+[Word
+  Unquoted "prefix="
+  ArithmeticExpansion "2+2"
+]
+[Word
+  Unquoted "printenv"
+]
+[Word
+  Unquoted "prefix"
+]
+42
+4
+[Code 0]

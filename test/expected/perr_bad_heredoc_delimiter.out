@@ -1,0 +1,3 @@
+shit: 2:8: error: Expected a heredoc delimiter.
+     2 |  cat << >foo
+       |         ^~ here.

@@ -1,0 +1,12 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((1 2))"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "1 2"
+]
+shit: 2:6: error: Arithmetic: unexpected trailing characters.
+     2 |  echo $((1 2))
+       |       ^~~~~~~~ here.
