@@ -2,8 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-
-#include <cstdio>
+#include "../Utils.hpp"
 
 #if SHIT_PLATFORM_IS POSIX
 #include <sys/times.h>
@@ -21,20 +20,6 @@ HELP_SYNOPSIS_DECL("");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
-
-namespace {
-
-/* Format a count of seconds as the minutes and seconds form times prints. */
-cold String format_time(double seconds) throws
-{
-  let const minutes = static_cast<long>(seconds) / 60;
-  let const remainder = seconds - static_cast<double>(minutes * 60);
-  char buffer[64];
-  std::snprintf(buffer, sizeof(buffer), "%ldm%.3fs", minutes, remainder);
-  return String{buffer};
-}
-
-} /* namespace */
 
 Times::Times() = default;
 
@@ -63,8 +48,10 @@ cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
 #endif
 
   String out{};
-  out += format_time(self_user) + " " + format_time(self_system) + "\n";
-  out += format_time(child_user) + " " + format_time(child_system) + "\n";
+  out += utils::format_minutes_seconds(self_user) + " " +
+         utils::format_minutes_seconds(self_system) + "\n";
+  out += utils::format_minutes_seconds(child_user) + " " +
+         utils::format_minutes_seconds(child_system) + "\n";
   ec.print_to_stdout(out);
 
   return 0;

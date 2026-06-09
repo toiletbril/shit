@@ -85,6 +85,11 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 fn int_to_text(i64 value) throws -> String;
 fn uint_to_text(u64 value) throws -> String;
 
+/* Format a count of seconds as the whole minutes and fractional seconds form
+   the time and times builtins print, such as 0m0.123s. The seconds carry three
+   fractional digits and the minutes are whole. */
+fn format_minutes_seconds(double seconds) throws -> String;
+
 /* The 1-based line number the byte at position falls on in source, counting the
    newlines strictly before it. The lookup is a binary search over a newline
    offset table cached on the source pointer and length, so a script that reads

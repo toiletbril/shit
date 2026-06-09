@@ -4,8 +4,6 @@
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
-#include <cstdio>
-
 #if SHIT_PLATFORM_IS POSIX
 #include <sys/resource.h>
 #include <sys/time.h>
@@ -26,18 +24,6 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 namespace shit {
 
 namespace {
-
-/* Format a count of seconds as the minutes and seconds form bash prints, such
-   as 0m0.123s. The seconds carry three fractional digits and the minutes are
-   whole. */
-cold fn format_duration(double seconds) throws -> String
-{
-  const long minutes = static_cast<long>(seconds) / 60;
-  const double remainder = seconds - static_cast<double>(minutes * 60);
-  char buffer[64];
-  std::snprintf(buffer, sizeof(buffer), "%ldm%.3fs", minutes, remainder);
-  return String{buffer};
-}
 
 #if SHIT_PLATFORM_IS POSIX
 /* The user and system seconds the children of this process have consumed so
@@ -116,9 +102,9 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const double system_seconds = system_after - system_before;
 
   String report{};
-  report += "real\t" + format_duration(real_seconds) + "\n";
-  report += "user\t" + format_duration(user_seconds) + "\n";
-  report += "sys\t" + format_duration(system_seconds) + "\n";
+  report += "real\t" + utils::format_minutes_seconds(real_seconds) + "\n";
+  report += "user\t" + utils::format_minutes_seconds(user_seconds) + "\n";
+  report += "sys\t" + utils::format_minutes_seconds(system_seconds) + "\n";
   shit::print_error(report);
   shit::flush();
 

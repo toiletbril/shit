@@ -13,6 +13,7 @@
 #include <cctype>
 #include <csignal>
 #include <cstdarg>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -290,6 +291,16 @@ fn int_to_text(i64 value) throws -> String
   String result{"-"};
   result.append(uint_to_text(magnitude));
   return result;
+}
+
+fn format_minutes_seconds(double seconds) throws -> String
+{
+  const i64 minutes = static_cast<i64>(seconds) / 60;
+  const double remainder = seconds - static_cast<double>(minutes * 60);
+  char buffer[64];
+  std::snprintf(buffer, sizeof(buffer), "%ldm%.3fs", static_cast<long>(minutes),
+                remainder);
+  return String{buffer};
 }
 
 /* A newline offset table cached on one source, so the line lookup is a binary
