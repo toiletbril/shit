@@ -67,7 +67,7 @@ SCALE ?= 40
 
 bench: $(BIN)
 	@SCALE=$(SCALE) $(DASH) $(BENCH) >/tmp/shit_bench_d 2>&1; \
-	SCALE=$(SCALE) $(BIN) $(BENCH) >/tmp/shit_bench_s 2>&1; \
+	SCALE=$(SCALE) $(BIN) --no-diagnostics $(BENCH) >/tmp/shit_bench_s 2>&1; \
 	if cmp -s /tmp/shit_bench_d /tmp/shit_bench_s; then \
 		echo "output matches dash"; \
 	else \
