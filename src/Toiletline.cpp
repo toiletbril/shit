@@ -280,8 +280,9 @@ static fn history_file_path() -> shit::Maybe<shit::Path>
 
 fn set_title(const String &title) -> void
 {
-  if (::tl_set_title(title.c_str()) != TL_SUCCESS)
-    throw shit::Error{"Toiletline: Could not set the title for the terminal"};
+  /* A terminal that rejects the title escape is cosmetic, not an error worth
+     surfacing, so a failure is ignored rather than thrown into the run. */
+  ::tl_set_title(title.c_str());
 }
 
 fn enable_completion(shit::EvalContext &context) -> void
