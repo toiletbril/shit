@@ -162,7 +162,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
      into a no-completion result that leaves the line unchanged. */
   try {
     const usize byte_length = std::strlen(buffer);
-    shit::StringView line{buffer, byte_length};
+    let line = shit::StringView{buffer, byte_length};
     shit::Path base = shit::Path::current_directory();
 
     const usize byte_cursor =
@@ -217,7 +217,7 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 
   try {
     const usize byte_length = std::strlen(buffer);
-    shit::StringView line{buffer, byte_length};
+    let line = shit::StringView{buffer, byte_length};
 
     shit::ArrayList<shit::completion::highlight_span> result =
         shit::completion::highlight_line(line, *COMPLETION_CONTEXT);
@@ -273,7 +273,7 @@ static fn history_file_path() -> shit::Maybe<shit::Path>
   }
   let home = shit::os::get_home_directory();
   if (!home) return shit::None;
-  let path = *home;
+  let path = home->clone();
   path.push_component(SHIT_HISTORY_FILE);
   return path;
 }
@@ -421,7 +421,7 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
   while (tail_start < path.length &&
          (static_cast<unsigned char>(path[tail_start]) & 0xC0) == 0x80)
     tail_start++;
-  String shortened{};
+  let shortened = String{};
   shortened += "...";
   shortened += StringView{path.data + tail_start, path.length - tail_start};
   return shortened;
@@ -434,12 +434,12 @@ static fn git_branch() throws -> String
 {
   let dir = Path::current_directory();
   for (;;) {
-    let head = dir;
+    let head = dir.clone();
     head.push_component(".git");
     /* A linked worktree or a submodule stores .git as a file holding a
        'gitdir: <path>' pointer rather than a directory, so the real git dir is
        followed before reading HEAD. */
-    let git_dir = head;
+    let git_dir = head.clone();
     if (let const dot_git = utils::read_entire_file(head.text().view())) {
       let const pointer = dot_git->view();
       let const gitdir_prefix = StringView{"gitdir: "};
@@ -460,7 +460,7 @@ static fn git_branch() throws -> String
         git_dir = steal(resolved_gitdir);
       }
     }
-    let git_head = git_dir;
+    let git_head = git_dir.clone();
     git_head.push_component("HEAD");
     if (let const content = utils::read_entire_file(git_head.text().view())) {
       let text = content->view();
@@ -475,7 +475,7 @@ static fn git_branch() throws -> String
       return String{
           text.substring_of_length(0, text.length < 7 ? text.length : 7)};
     }
-    let parent = dir;
+    let parent = dir.clone();
     parent.push_component("..");
     let normalized = parent.to_absolute().normalized();
     if (normalized.text() == dir.text()) break;
@@ -490,7 +490,7 @@ static fn format_prompt_duration(u64 nanos) throws -> String
 {
   const u64 milliseconds = nanos / 1000000ULL;
   if (milliseconds < 5) return String{};
-  String out{};
+  let out = String{};
   if (milliseconds < 1000) {
     out.append(utils::int_to_text(static_cast<i64>(milliseconds)));
     out += "ms";
@@ -536,7 +536,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
                                 StringView working_directory,
                                 EvalContext &context) throws -> String
 {
-  String out{};
+  let out = String{};
   for (usize i = 0; i < prompt.length; i++) {
     if (prompt[i] != '\\' || i + 1 >= prompt.length) {
       out += prompt[i];
@@ -567,7 +567,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case 'h': out += prompt_hostname(false); break;
     case 'H': out += prompt_hostname(true); break;
     case 'w': {
-      String shown{working_directory};
+      let shown = String{working_directory};
       Maybe<Path> home = os::get_home_directory();
       /* The home prefix collapses to ~ only when it ends on a path boundary, so
          HOME=/home/sd and cwd=/home/sderp keeps the full path rather than
@@ -577,7 +577,7 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
           (shown.length() == home->count() ||
            shown.view()[home->count()] == '/'))
       {
-        String collapsed{};
+        let collapsed = String{};
         collapsed += "~";
         collapsed += shown.substring(home->count());
         shown = steal(collapsed);
@@ -662,7 +662,7 @@ static String PROMPT_CACHE_VALUE{};
 
 fn default_prompt_template() -> String
 {
-  String template_string{};
+  let template_string = String{};
   template_string += "\\u@\\h ";
   if (colors::stdout_wants_color()) {
     template_string += colors::ansi::GREEN;
@@ -690,7 +690,7 @@ static constexpr char PROMPT_GUARD_BACKTICK = '\x03';
    and \\. The ${...} and $(...) the user wrote still expand. */
 static fn guard_prompt_backslashes(StringView template_string) throws -> String
 {
-  String out{};
+  let out = String{};
   for (usize i = 0; i < template_string.length; i++) {
     if (template_string[i] == '\\' && i + 1 < template_string.length) {
       switch (template_string[i + 1]) {
@@ -718,7 +718,7 @@ static fn guard_prompt_backslashes(StringView template_string) throws -> String
    \\ the way the user wrote them. */
 static fn unguard_prompt_backslashes(StringView expanded) throws -> String
 {
-  String out{};
+  let out = String{};
   for (usize i = 0; i < expanded.length; i++) {
     switch (expanded[i]) {
     case PROMPT_GUARD_DOLLAR: out += "\\$"; break;
@@ -737,7 +737,7 @@ static fn unguard_prompt_backslashes(StringView expanded) throws -> String
    that ends in a byte other than 'm', is left in place. */
 static fn strip_ansi_color(StringView text) throws -> String
 {
-  String out{};
+  let out = String{};
   usize i = 0;
   while (i < text.length) {
     if (text[i] == '\x1b' && i + 1 < text.length && text[i + 1] == '[') {
@@ -757,7 +757,7 @@ static fn strip_ansi_color(StringView text) throws -> String
 
 fn build_prompt(EvalContext &context) -> String
 {
-  String full_pwd{Path::current_directory().text()};
+  let const full_pwd = Path::current_directory().text().clone();
   set_title("shit @ " + full_pwd);
 
   /* The user is stable for the session, so it is resolved once and reused. The
@@ -881,7 +881,7 @@ fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 
 fn default_prompt_template() -> String
 {
-  String template_string{};
+  let template_string = String{};
   template_string += "\\u@\\h ";
   if (shit::colors::stdout_wants_color()) {
     template_string += shit::colors::ansi::GREEN;

@@ -26,7 +26,7 @@ i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  String p{};
+  let p = String{};
   p.append(Path::current_directory().text());
   p += '\n';
   ec.print_to_stdout(p);

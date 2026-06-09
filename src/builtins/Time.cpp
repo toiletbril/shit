@@ -71,7 +71,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      so the timed command resolves the same way an eval body does. The arguments
      arrive already expanded and split, so a word that carried embedded spaces
      through a quote is re-split here, the same caveat eval carries. */
-  String command{};
+  let command = String{};
   for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) command.push(' ');
     command.append(ec.args()[i].view());
@@ -106,7 +106,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const double user_seconds = user_after - user_before;
   const double system_seconds = system_after - system_before;
 
-  String report{};
+  let report = String{};
   report += "real\t" + utils::format_minutes_seconds(real_seconds) + "\n";
   report += "user\t" + utils::format_minutes_seconds(user_seconds) + "\n";
   report += "sys\t" + utils::format_minutes_seconds(system_seconds) + "\n";

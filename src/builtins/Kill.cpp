@@ -52,9 +52,9 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   for (usize i = first_target; i < args.count(); i++) {
     const String &target = args[i];
-    const String target_text = target;
+    const String target_text = target.clone();
 
-    os::process pid{};
+    let pid = os::process{};
     if (!target.is_empty() && target[0] == '%') {
       const ErrorOr<i64> parsed =
           utils::parse_decimal_integer(StringView{target}.substring(1));

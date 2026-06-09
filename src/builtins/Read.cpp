@@ -95,7 +95,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* read -a NAME splits the line into every field and stores them in the named
      indexed array rather than into separate scalar variables. */
   if (FLAG_READ_ARRAY.is_set()) {
-    ArrayList<String> words{heap_allocator()};
+    let words = ArrayList<String>{heap_allocator()};
     usize c = 0;
     while (c < line.length() && is_ifs_whitespace(line[c]))
       c++;

@@ -142,11 +142,11 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* -a reports every resource, the label left-justified in a twenty-wide field
      and then the value, the layout dash prints. */
   if (FLAG_ALL.is_enabled()) {
-    String out{};
+    let out = String{};
     for (const resource_entry &entry : RESOURCE_TABLE) {
       struct rlimit limit{};
       if (getrlimit(entry.which, &limit) != 0) continue;
-      String label{entry.label};
+      let const label = String{entry.label};
       out += label;
       for (usize pad = label.count(); pad < 20; pad++)
         out.push(' ');

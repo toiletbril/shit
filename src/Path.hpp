@@ -23,6 +23,10 @@ public:
   Path() = default;
   explicit Path(StringView text);
 
+  /* An explicit deep copy, so a caller that means to duplicate the path says so
+     rather than leaning on an implicit copy. */
+  mustuse fn clone() const throws -> Path { return Path{*this}; }
+
   hot mustuse pure fn text() const wontthrow -> const String &;
   hot mustuse pure fn c_str() const wontthrow -> const char *;
   hot mustuse pure fn count() const wontthrow -> usize;

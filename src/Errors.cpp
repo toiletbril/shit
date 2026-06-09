@@ -222,7 +222,7 @@ get_context_pointing_to(StringView source, usize byte_position,
          source[byte_position - start_offset + line_byte_count] == '\n');
 
   /* Add spacer before line number. */
-  String msg{};
+  let msg = String{};
   for (usize i = 0; i < sub_sat(6, number_string_length(line_number + 1)); i++)
   {
     msg += ' ';
@@ -387,7 +387,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 
   let const color = diagnostic_colors_for(severity_word());
 
-  String result{};
+  let result = String{};
   /* A named source prefixes its path before the line and column, so a sourced
      error reads path:line:col rather than a bare line:col. */
   result += color.location;
@@ -490,7 +490,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   let const color = diagnostic_colors_for(StringView{"note"});
 
-  String result{};
+  let result = String{};
   result += color.location;
   result += utils::uint_to_text(details_line_number + 1);
   result += ':';

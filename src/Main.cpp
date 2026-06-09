@@ -152,7 +152,7 @@ pure static fn should_run_in_compat_mode() wontthrow -> bool
 static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
-    String h{};
+    let h = String{};
     h += "\n";
     h += wrap_text(
         "Shit, a pedantic, super-fast and awesome POSIX-compatible command "
@@ -166,7 +166,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     return EXIT_SUCCESS;
   }
   if (FLAG_LIST_CHECKS.is_enabled()) {
-    String l{};
+    let l = String{};
     for (const shellcheck_check &check : SHELLCHECK_CHECKS) {
       l += check.code;
       l += "  ";
@@ -198,7 +198,7 @@ static fn report_escaped_control_flow(EvalContext &context,
   if (!context.has_pending_control_flow()) return;
 
   const control_flow &control = context.pending_control_flow();
-  String what{};
+  let what = String{};
   switch (control.kind) {
   case control_flow::Kind::Break:
     what = "'break' used outside of a loop";
@@ -225,7 +225,7 @@ static fn report_escaped_control_flow(EvalContext &context,
 
   const String *source =
       control.source != nullptr ? control.source : &fallback_source;
-  ErrorWithLocation located{control.location, what};
+  let const located = ErrorWithLocation{control.location, what};
   show_message(located.to_string(*source));
 
   context.clear_control_flow();
@@ -251,7 +251,7 @@ static fn run_script_contents(const String &script_contents,
     ast_arena.reset();
     context.reset_scratch_arena();
 
-    Parser p{
+    let p = Parser{
         Lexer{String{script_contents.view()}, ast_arena,
               context.show_lexed_words(), filename,
               context.is_bash_compatible()}
@@ -260,7 +260,7 @@ static fn run_script_contents(const String &script_contents,
     /* Recover from each parse error so the whole file is reported at once. A
        file with any parse error must not run, so a non-empty error list prints
        every error and fails without evaluating the partial tree. */
-    ArrayList<shit::String> parse_errors{heap_allocator()};
+    let parse_errors = ArrayList<shit::String>{heap_allocator()};
     Expression *ast = p.construct_ast(parse_errors);
 
     if (!parse_errors.is_empty()) {
@@ -381,7 +381,7 @@ static fn source_home_file(StringView name, EvalContext &context,
                            BumpArena &ast_arena) throws -> void
 {
   if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
-    Path path = *home;
+    Path path = home->clone();
     path.push_component(name);
     source_file(path, context, ast_arena);
   }
@@ -406,7 +406,7 @@ static fn source_bash_login_files(EvalContext &context,
   source_file(Path{"/etc/profile"}, context, ast_arena);
   if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
     for (const char *name : {".bash_profile", ".bash_login", ".profile"}) {
-      Path candidate = *home;
+      Path candidate = home->clone();
       candidate.push_component(name);
       if (source_file(candidate, context, ast_arena)) break;
     }
@@ -424,7 +424,7 @@ fn main(int argc, char **argv) -> int
 #endif
 
   bool is_login_shell = false;
-  shit::ArrayList<shit::String> file_names{};
+  let file_names = shit::ArrayList<shit::String>{};
 
   try {
     file_names = shit::parse_flags(FLAG_LIST, argc, argv);
@@ -454,13 +454,13 @@ fn main(int argc, char **argv) -> int
   if (FLAG_LOG.is_enabled()) shit::LOGGER_VERBOSITY = shit::verbosity::All;
 
   /* Program path is the first argument. Pull it out and get rid of it. */
-  shit::String program_path{};
+  let program_path = shit::String{};
 
   if (file_names.count() > 0) {
     program_path = file_names[0];
     /* Drop the program path, the first element. The list has no erase, so the
        rest is rebuilt from the second element on. */
-    shit::ArrayList<shit::String> rest{};
+    let rest = shit::ArrayList<shit::String>{};
     for (usize i = 1; i < file_names.count(); i++)
       rest.push(shit::String{shit::heap_allocator(), file_names[i]});
     file_names = steal(rest);
@@ -524,7 +524,7 @@ fn main(int argc, char **argv) -> int
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
     bool is_tty = shit::os::is_stdin_a_tty();
 
-    shit::String s{};
+    let s = shit::String{};
     s += "Both '-s' and '-i' options were specified. Falling back to ";
     s += is_tty ? "'-i'" : "'-s' because stdin is not a tty.";
     shit::show_message(s);
@@ -578,15 +578,15 @@ fn main(int argc, char **argv) -> int
      are its arguments. Under -c the first operand names $0 and the rest are the
      arguments. An interactive or -s shell keeps the shell name as $0 and takes
      every operand as a positional parameter. The context owns both. */
-  shit::String shell_name{program_path};
-  shit::ArrayList<shit::String> positional_params{};
+  let shell_name = program_path.clone();
+  let positional_params = shit::ArrayList<shit::String>{};
 
   usize first_param_index = 0;
   if (should_read_files && !file_names.is_empty()) {
-    shell_name = shit::String{file_names[0]};
+    shell_name = file_names[0].clone();
     first_param_index = 1;
   } else if (should_execute_commands && !file_names.is_empty()) {
-    shell_name = shit::String{file_names[0]};
+    shell_name = file_names[0].clone();
     first_param_index = 1;
   }
 
@@ -597,13 +597,13 @@ fn main(int argc, char **argv) -> int
         shit::StringView{file_names[i].data(), file_names[i].count()}
     });
 
-  shit::EvalContext context{FLAG_DISABLE_EXPANSION.is_enabled(),
-                            FLAG_VERBOSE.is_enabled(),
-                            FLAG_EXPAND_VERBOSE.is_enabled(),
-                            should_be_interactive,
-                            FLAG_ERROR_EXIT.is_enabled(),
-                            shit::String{shell_name},
-                            steal(positional_params)};
+  let context = shit::EvalContext{FLAG_DISABLE_EXPANSION.is_enabled(),
+                                  FLAG_VERBOSE.is_enabled(),
+                                  FLAG_EXPAND_VERBOSE.is_enabled(),
+                                  should_be_interactive,
+                                  FLAG_ERROR_EXIT.is_enabled(),
+                                  shell_name.clone(),
+                                  steal(positional_params)};
 
   /* quit is a free function with no context in scope, so it is handed a pointer
      to the one context to read the interactive state and the memory-report flag
@@ -647,7 +647,7 @@ fn main(int argc, char **argv) -> int
      version and runtime values come from the build. */
   context.set_shell_variable("SHELL", program_path);
   context.set_shell_variable("PWD", shit::Path::current_directory().text());
-  shit::String version_string{};
+  let version_string = shit::String{};
   version_string += shit::utils::int_to_text(SHIT_VER_MAJOR);
   version_string += ".";
   version_string += shit::utils::int_to_text(SHIT_VER_MINOR);
@@ -713,12 +713,12 @@ fn main(int argc, char **argv) -> int
 
   /* The parse arena holds the AST and its tokens for one command, and is reset
      between commands. It outlives each tree it builds. */
-  shit::BumpArena ast_arena{};
+  let ast_arena = shit::BumpArena{};
   shit::AST_ARENA = &ast_arena;
 
   /* The function arena holds function bodies, which outlive the command that
      defined them, so it is never reset during the run. */
-  shit::BumpArena function_arena{};
+  let function_arena = shit::BumpArena{};
   shit::FUNCTION_ARENA = &function_arena;
 
   if (is_privileged) {
@@ -794,7 +794,7 @@ fn main(int argc, char **argv) -> int
   for (;;) {
     ASSERT(!shit::os::is_child_process());
 
-    shit::String script_contents{};
+    let script_contents = shit::String{};
     /* The named script file flows into the diagnostics so an error reads
        path:line:col. A command string, standard input, or an interactive line
        from the editor carries no path, so a prompt error stays a bare

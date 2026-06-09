@@ -228,7 +228,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
   for (heredoc_pending &pending : m_pending_heredocs) {
     /* The body is written into the lexer-owned String the parsed redirection
        points at, so it accumulates as one. */
-    String collected{};
+    let collected = String{};
     for (;;) {
       if (m_cursor_position >= m_source.length()) break;
 
@@ -352,7 +352,7 @@ hot forceinline fn Lexer::chop_character(usize offset) wontthrow -> char
 hot fn Lexer::lex_number() throws -> Token *
 {
   char ch;
-  String digits{};
+  let digits = String{};
   usize length = 0;
 
   while (lexer::is_number((ch = chop_character(length)))) {
@@ -372,7 +372,7 @@ hot fn Lexer::lex_number() throws -> Token *
 /* Hottest function in the entire codebase. */
 flatten hot fn Lexer::lex_identifier() throws -> Token *
 {
-  Word word{};
+  let word = Word{};
 
   usize byte_count = 0, relative_last_quote_char_pos = 0;
 
@@ -395,7 +395,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     {
       word.segments.back().text += ch;
     } else {
-      String single{};
+      let single = String{};
       single.push(ch);
       word.segments.push(WordSegment{kind, steal(single), false});
     }
@@ -411,7 +411,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     {
       word.segments.back().text.append(run);
     } else {
-      String text{};
+      let text = String{};
       text.append(run);
       word.segments.push(
           WordSegment{WordSegment::Kind::UnquotedText, steal(text), false});
@@ -699,7 +699,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
            space, $( (cmd) ). */
         if (chop_character(byte_count) == '(') {
           byte_count++;
-          String arithmetic{};
+          let arithmetic = String{};
           usize group_depth = 0;
           for (;;) {
             const let c = chop_character(byte_count);
@@ -824,7 +824,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           continue;
         }
 
-        String inner{};
+        let inner = String{};
         usize depth = 1;
         char quote = 0;
         /* Tracks the byte before the current one so an unquoted '#' that starts
@@ -895,7 +895,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
                                        steal(inner), is_in_double_quotes});
       } else if (next == '{') {
         byte_count++;
-        String name{};
+        let name = String{};
         /* The matching close brace lives at brace depth one, so a nested
            ${...} in a default or alternate word does not end the outer
            expansion early. A bare { does not raise the depth, matching dash,
@@ -1022,7 +1022,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        steal(name), is_in_double_quotes});
       } else if (lexer::is_variable_name_start(next)) {
-        String name{};
+        let name = String{};
         while (lexer::is_variable_name(next = chop_character(byte_count))) {
           name += next;
           byte_count++;
@@ -1034,7 +1034,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
                  lexer::is_number(next))
       {
         byte_count++;
-        String special{};
+        let special = String{};
         special.push(next);
         word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
                                        steal(special), is_in_double_quotes});
@@ -1057,7 +1057,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
          and reuse the same CommandSubstitution segment as $(...). */
       const let relative_open_backtick_pos = byte_count;
       byte_count++;
-      String inner{};
+      let inner = String{};
       for (;;) {
         const let c = chop_character(byte_count);
         if (c == lexer::CEOF) [[unlikely]] {
@@ -1093,7 +1093,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
   }
 
   if (quote_char) [[unlikely]] {
-    String expected_quote{};
+    let expected_quote = String{};
     expected_quote += "Expected ";
     expected_quote += *quote_char;
     expected_quote += " here";
@@ -1315,7 +1315,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
     default: unreachable("unhandled operator of type %d", ENUM(*op));
     }
   } else {
-    String s{};
+    let s = String{};
     s += "unknown operator '";
     s += ch;
     s += "'";
@@ -1338,7 +1338,7 @@ hot fn Lexer::lex_process_substitution(char direction) throws -> Token *
 
   /* The direction byte leads the segment text so the evaluator knows which way
      the pipe runs without a second field. */
-  String inner{};
+  let inner = String{};
   inner += direction;
 
   usize depth = 1;
@@ -1385,7 +1385,7 @@ hot fn Lexer::lex_process_substitution(char direction) throws -> Token *
     inner += c;
   }
 
-  Word word{};
+  let word = Word{};
   word.segments.push(
       WordSegment{WordSegment::Kind::ProcessSubstitution, steal(inner), false});
   let t = m_arena->create<tokens::WordToken>(here(open_position, byte_count),

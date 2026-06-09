@@ -36,7 +36,7 @@ namespace {
    bare number maps through the os signal name table the way dash lists it. */
 String normalize_condition(StringView raw) throws
 {
-  String name{};
+  let name = String{};
   for (usize i = 0; i < raw.count(); i++)
     name.push(static_cast<char>(toupper(static_cast<unsigned char>(raw[i]))));
   if (name.starts_with("SIG") && name.count() > 3)
@@ -72,7 +72,7 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (args.count() == 1) {
-    String out{};
+    let out = String{};
     cxt.traps().for_each([&](StringView condition, const String &action) {
       out += "trap -- '";
       out += action;

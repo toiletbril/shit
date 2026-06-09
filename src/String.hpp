@@ -43,6 +43,10 @@ public:
   fn operator=(const String &other) throws->String &;
   fn operator=(String &&other) wontthrow->String &;
 
+  /* An explicit deep copy, so a caller that means to duplicate the string says
+     so rather than leaning on an implicit copy. */
+  mustuse fn clone() const throws -> String { return String{*this}; }
+
   ~String() { free_storage(); }
 
   hot mustuse pure fn count() const wontthrow -> usize { return m_length; }

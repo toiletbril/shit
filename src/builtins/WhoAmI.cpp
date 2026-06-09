@@ -26,7 +26,7 @@ i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  String p{};
+  let p = String{};
 
   if (let const u = os::get_current_user(); u.has_value()) {
     p.append(u->view());

@@ -75,7 +75,7 @@ static fn recency_weight(i64 age_seconds) wontthrow -> double
 
 static fn read_frecency_store() throws -> ArrayList<frecency_entry>
 {
-  ArrayList<frecency_entry> entries{};
+  let entries = ArrayList<frecency_entry>{};
   let path = frecency_store_path();
   if (!path) return entries;
   let content = utils::read_entire_file(path->text().view());
@@ -210,7 +210,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* The query is every operand joined by a space, so z proj src matches a path
      that holds both, the way zoxide takes several keywords. */
-  String query{};
+  let query = String{};
   for (usize i = 1; i < ec.args().count(); i++) {
     if (i > 1) query += ' ';
     query.append(ec.args()[i]);

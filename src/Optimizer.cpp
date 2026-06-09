@@ -171,7 +171,7 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
 
 fn literal_word_value(const Word &word) throws -> Maybe<String>
 {
-  String value{};
+  let value = String{};
   for (const WordSegment &segment : word.segments) {
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
@@ -218,7 +218,7 @@ fn command_word_literal(const Token *token) throws -> Maybe<String>
   if (token->kind() != Token::Kind::Word) return None;
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
-  String name{};
+  let name = String{};
   for (const WordSegment &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText &&
@@ -259,7 +259,7 @@ fn propagated_literal_word_value(const Token *token,
   let const name = plain_variable_reference_name(token);
   if (!name.has_value()) return None;
   if (const String *recorded = actx.constant_variables.find(*name))
-    return String{*recorded};
+    return recorded->clone();
   return None;
 }
 
@@ -295,7 +295,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
      rewritten text holds only constant bytes and feeds the constant evaluator.
    */
   try {
-    String rewritten{};
+    let rewritten = String{};
     usize i = 0;
     while (i < expression.length) {
       const char byte = expression[i];

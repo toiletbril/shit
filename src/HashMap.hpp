@@ -31,6 +31,11 @@ public:
         set_value(other.m_slots[i].key.view(), Value{other.m_slots[i].value});
     }
   }
+
+  /* An explicit deep copy, so a caller that means to duplicate the map says so
+     rather than leaning on an implicit copy. */
+  mustuse cold fn clone() const throws -> HashMap { return HashMap{*this}; }
+
   HashMap(HashMap &&other) noexcept
       : m_allocator(other.m_allocator), m_slots(other.m_slots),
         m_capacity(other.m_capacity), m_count(other.m_count),

@@ -32,7 +32,7 @@ namespace {
    same value the way bash quotes it. */
 String quote_for_declare(StringView value) throws
 {
-  String quoted{};
+  let quoted = String{};
   for (usize i = 0; i < value.length; i++) {
     const char c = value[i];
     if (c == '"' || c == '\\' || c == '$' || c == '`') quoted += '\\';
@@ -84,7 +84,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       case 'f':
       case 't': break;
       default: {
-        String invalid{};
+        let invalid = String{};
         invalid += arg[0];
         invalid += arg[c];
         throw Error{"Unable to run declare because '" + invalid +
@@ -102,7 +102,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     for (; i < args.count(); i++) {
       const StringView name = args[i].view();
       if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name)) {
-        String line{"declare -a "};
+        let line = String{"declare -a "};
         line.append(name);
         line += "=(";
         for (usize e = 0; e < elements->count(); e++) {
@@ -118,7 +118,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       } else if (cxt.is_associative_array(name)) {
         const ArrayList<String> keys = cxt.associative_keys(name);
         const ArrayList<String> values = cxt.associative_values(name);
-        String line{"declare -A "};
+        let line = String{"declare -A "};
         line.append(name);
         line += "=(";
         for (usize e = 0; e < keys.count(); e++) {
@@ -133,7 +133,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       } else if (const Maybe<String> value = cxt.get_variable_value(name)) {
         const StringView attribute =
             os::get_environment_variable(name).has_value() ? "-x" : "--";
-        String line{"declare "};
+        let line = String{"declare "};
         line.append(attribute);
         line += ' ';
         line.append(name);

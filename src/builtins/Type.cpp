@@ -33,7 +33,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ASSERT(!args.is_empty());
 
-  String out{};
+  let out = String{};
   bool all_found = true;
 
   for (usize i = 1; i < args.count(); i++) {

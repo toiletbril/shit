@@ -34,7 +34,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ASSERT(!args.is_empty());
 
-  String buf{};
+  let buf = String{};
 
   for (usize i = 1; i < args.count(); i++) {
     let const &program_name = args[i];

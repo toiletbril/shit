@@ -14,7 +14,7 @@ cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
 {
   ASSERT(!ec.args().is_empty());
 
-  String help_text{};
+  let help_text = String{};
   if (!description.is_empty()) {
     help_text += "DESCRIPTION\n";
     help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
@@ -48,7 +48,7 @@ fn is_special_builtin_name(StringView name) wontthrow -> bool
 fn builtin_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
-    ArrayList<String> collected{};
+    let collected = ArrayList<String>{};
     for (const StaticStringMap<Builtin::Kind>::entry &entry : BUILTIN_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
@@ -82,7 +82,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
      the terminal instead of following the standard output. */
   const bool has_dup_routing = ec.dup_err_to_out || ec.dup_out_to_err;
 
-  ArrayList<os::saved_descriptor> saved_descriptors{};
+  let saved_descriptors = ArrayList<os::saved_descriptor>{};
   if (has_pipe_descriptors || has_dup_routing) {
     if (ec.in_fd)
       saved_descriptors.push(os::save_and_replace_descriptor(0, *ec.in_fd));

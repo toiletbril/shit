@@ -58,6 +58,10 @@ public:
       new (&m_storage) T(steal(other.value_reference()));
   }
 
+  /* An explicit deep copy, so a caller that means to duplicate the result says
+     so rather than leaning on an implicit copy. */
+  mustuse fn clone() const throws -> ErrorOr { return ErrorOr{*this}; }
+
   fn operator=(const ErrorOr &other) throws -> ErrorOr &
   {
     if (this != &other) {

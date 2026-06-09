@@ -150,7 +150,7 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
 
-  String name{};
+  let name = String{};
   for (const WordSegment &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::VariableReference) return shit::None;
     if (segment.kind == WordSegment::Kind::UnquotedText) {
@@ -354,7 +354,7 @@ cold fn IfStatement::to_ast_string(usize layer) const throws -> String
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
 
-  String s{};
+  let s = String{};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[If]\n";
@@ -516,7 +516,8 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* The append form NAME+=VALUE prepends the current value of NAME, treating
        an unset name as empty, so the store receives the concatenation. */
     if (m_assignment->is_append()) {
-      String appended{cxt.get_variable_value(m_assignment->key()).value_or("")};
+      let appended =
+          String{cxt.get_variable_value(m_assignment->key()).value_or("")};
       appended += value;
       value = steal(appended);
     }
@@ -684,7 +685,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     if (redir.kind == Redirection::Kind::Heredoc) {
       ASSERT(redir.heredoc_body != nullptr);
 
-      String body{*redir.heredoc_body};
+      let body = redir.heredoc_body->clone();
       if (redir.heredoc_expand) {
         body = cxt.expand_heredoc_body(body);
       }
@@ -797,8 +798,8 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     /* The alias body replaces the first word, so the split words go in front of
        the remaining arguments. ArrayList has no in-place erase, so the new list
        is built and swapped in. */
-    ArrayList<String> rebuilt{};
-    String current{};
+    let rebuilt = ArrayList<String>{};
+    let current = String{};
     let const &body_value = *body;
     for (usize i = 0; i < body_value.count(); i++) {
       const char c = body_value[i];
@@ -911,10 +912,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (redir.kind == Redirection::Kind::Heredoc ||
           redir.kind == Redirection::Kind::HereString)
       {
-        String body{};
+        let body = String{};
         if (redir.kind == Redirection::Kind::Heredoc) {
           ASSERT(redir.heredoc_body != nullptr);
-          body = String{*redir.heredoc_body};
+          body = redir.heredoc_body->clone();
           if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
         } else {
           ASSERT(redir.target != nullptr);
@@ -1149,7 +1150,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       const StringView name = var.name.view();
       let value = cxt.expand_word_for_assignment(var.value);
       if (var.is_append) {
-        String appended{cxt.get_variable_value(name).value_or("")};
+        let appended = String{cxt.get_variable_value(name).value_or("")};
         appended += value;
         value = steal(appended);
       }
@@ -1198,7 +1199,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     Maybe<String> previous = os::get_environment_variable(name);
     /* The value expansion throws a plain Error, an unset variable under set -u,
        so it is relocated to a caret at the command the prefix leads. */
-    String expanded_value{};
+    let expanded_value = String{};
     try {
       expanded_value = cxt.expand_word_for_assignment(var.value);
     } catch (const Error &e) {
@@ -1208,7 +1209,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        from the shell store before the environment so a non-exported shell
        variable still contributes, treating an unset name as empty. */
     if (var.is_append) {
-      String appended{cxt.get_variable_value(name).value_or("")};
+      let appended = String{cxt.get_variable_value(name).value_or("")};
       appended += expanded_value;
       expanded_value = steal(appended);
     }
@@ -1287,7 +1288,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* The command name is copied for the array-argument application below, since
      the argument vector is moved into the exec context before that point. */
-  String array_command_name{};
+  let array_command_name = String{};
   if (!m_array_args.is_empty())
     array_command_name = String{program_args[0].view()};
 
@@ -1299,7 +1300,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        deep copy of the list is not paid on every call. The store is empty in
        the window between, which the call-param build below does not read. */
     let saved_params = cxt.take_positional_params();
-    ArrayList<String> call_params{};
+    let call_params = ArrayList<String>{};
     call_params.reserve(program_args.count() - 1);
     for (usize i = 1; i < program_args.count(); i++)
       call_params.push(String{heap_allocator(), program_args[i]});
@@ -1490,7 +1491,7 @@ cold fn CompoundList::to_string() const throws -> String
 
 cold fn CompoundList::to_ast_string(usize layer) const throws -> String
 {
-  String s{};
+  let s = String{};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]";
@@ -1616,7 +1617,7 @@ cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
 {
   ASSERT(m_cmd != nullptr);
 
-  String s{};
+  let s = String{};
   let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]\n";
@@ -1695,7 +1696,7 @@ cold fn Pipeline::to_ast_string(usize layer) const throws -> String
 cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     -> i64
 {
-  ArrayList<os::process> children{};
+  let children = ArrayList<os::process>{};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
@@ -1715,9 +1716,9 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       let const is_first = (stage_index == 0);
       let const is_last = (stage_index + 1 == m_commands.count());
 
-      Maybe<os::descriptor> stage_in{};
-      Maybe<os::descriptor> stage_out{};
-      Maybe<os::Pipe> pipe{};
+      let stage_in = Maybe<os::descriptor>{};
+      let stage_out = Maybe<os::descriptor>{};
+      let pipe = Maybe<os::Pipe>{};
 
       if (!is_last) {
         pipe = os::make_pipe();
@@ -1799,7 +1800,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   /* The children are pushed in pipeline order, so their statuses are collected
      in order. pipefail reports the rightmost stage that failed, or zero when all
      succeeded, while the plain case reports the last stage alone. */
-  ArrayList<i32> stage_status{};
+  let stage_status = ArrayList<i32>{};
   stage_status.reserve(children.count());
   for (const os::process child : children)
     stage_status.push(os::wait_and_monitor_process(child));
@@ -2316,7 +2317,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
        them out of the command's captured output. The menu reprints only after
        an empty line. */
     if (reprint_menu) {
-      String menu{};
+      let menu = String{};
       for (usize i = 0; i < values.count(); i++) {
         menu += utils::int_to_text(static_cast<i64>(i + 1));
         menu += ") ";
@@ -2339,7 +2340,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       break;
     }
 
-    const String reply{StringView{*input}};
+    let const reply = String{StringView{*input}};
     cxt.set_shell_variable("REPLY", reply.view());
     if (reply.is_empty()) {
       reprint_menu = true;
@@ -2518,7 +2519,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
          a plain word, such as a reserved word arm, has no quoting structure and
          stays fully active. */
       let pattern_active = ArrayList<bool>{cxt.scratch_allocator()};
-      String pattern{};
+      let pattern = String{};
       if (pattern_token->kind() == Token::Kind::Word) {
         try {
           pattern = cxt.expand_case_pattern_masked(
@@ -2967,7 +2968,7 @@ cold fn Subshell::analyze(AnalysisContext &actx,
      changes a parent variable. The outer constants are saved and restored
      around the body, and the body itself starts from an empty table so it does
      not carry a propagation across the subshell boundary. */
-  HashMap<String> saved_constants = actx.constant_variables;
+  let saved_constants = actx.constant_variables.clone();
   actx.constant_variables.clear();
   m_body->analyze(actx, is_unconditional);
   actx.constant_variables = steal(saved_constants);
@@ -3031,7 +3032,7 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
      the body, and an assignment in the body does not reach the straight-line
      block around the definition. The outer constants are saved and restored
      around the body, and the body starts from an empty table. */
-  HashMap<String> saved_constants = actx.constant_variables;
+  let saved_constants = actx.constant_variables.clone();
   actx.constant_variables.clear();
   m_body->analyze(actx, false);
   actx.constant_variables = steal(saved_constants);
@@ -3139,10 +3140,10 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (redir.kind == Redirection::Kind::Heredoc ||
         redir.kind == Redirection::Kind::HereString)
     {
-      String body{};
+      let body = String{};
       if (redir.kind == Redirection::Kind::Heredoc) {
         ASSERT(redir.heredoc_body != nullptr);
-        body = String{*redir.heredoc_body};
+        body = redir.heredoc_body->clone();
         if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
       } else {
         ASSERT(redir.target != nullptr);
@@ -3798,7 +3799,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   StringView{"' was not found"};
     /* A close function, alias, builtin, or PATH program is offered as a
        did-you-mean hint, so a typo points at the command it resembles. */
-    ArrayList<String> local_names{};
+    let local_names = ArrayList<String>{};
     actx.defined_functions.for_each(
         [&](StringView n) throws { local_names.push(String{n}); });
     actx.known_aliases.for_each([&](StringView n)

@@ -42,7 +42,7 @@ public:
   {
     if (op == "-z") return operand.is_empty();
     if (op == "-n") return !operand.is_empty();
-    const Path operand_path{operand};
+    let const operand_path = Path{operand};
     if (op == "-e") return operand_path.exists();
     if (op == "-f") return operand_path.is_regular_file();
     if (op == "-d") return operand_path.is_directory();
@@ -312,7 +312,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
     expression_end = arguments.count() - 1;
   }
 
-  ArrayList<String> operands{};
+  let operands = ArrayList<String>{};
   operands.reserve(expression_end - 1);
   for (usize i = 1; i < expression_end; i++)
     operands.push(arguments[i]);
@@ -321,7 +321,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      arguments. */
   if (operands.is_empty()) return 1;
 
-  TestEvaluator evaluator{operands, 0, operands.count()};
+  let evaluator = TestEvaluator{operands, 0, operands.count()};
   let const result = evaluator.evaluate_top();
   /* A paren pair the argument-count rules stripped narrowed end past the
      closing paren, so the leftover check runs against the narrowed window

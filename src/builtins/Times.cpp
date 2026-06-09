@@ -52,7 +52,7 @@ cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 #endif
 
-  String out{};
+  let out = String{};
   out += utils::format_minutes_seconds(self_user) + " " +
          utils::format_minutes_seconds(self_system) + "\n";
   out += utils::format_minutes_seconds(child_user) + " " +

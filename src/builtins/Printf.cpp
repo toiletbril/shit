@@ -120,7 +120,7 @@ void append_conversion(String &out, const String &spec, char conv,
 
   switch (conv) {
   case 's': {
-    String with_s = spec;
+    String with_s = spec.clone();
     with_s.push('s');
     /* A %s argument can be arbitrarily long, so a fixed buffer would truncate
        it. The first write into the stack buffer serves the common short string,
@@ -168,7 +168,7 @@ void append_conversion(String &out, const String &spec, char conv,
     /* The float conversions parse the argument as a double through strtod, the
        way the C printf renders it, so the width and the precision in the spec
        are honored. A malformed argument parses as zero. */
-    String with_conv = spec;
+    String with_conv = spec.clone();
     with_conv.push(conv);
     const double value = std::strtod(arg.c_str(), nullptr);
     std::snprintf(buffer, sizeof(buffer), with_conv.c_str(), value);
@@ -208,12 +208,12 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (format_index >= ec.args().count()) return 0;
 
   let const &fmt = ec.args()[format_index];
-  ArrayList<String> operands{};
+  let operands = ArrayList<String>{};
   operands.reserve(ec.args().count() - (format_index + 1));
   for (usize i = format_index + 1; i < ec.args().count(); i++)
     operands.push(ec.args()[i]);
 
-  String out{};
+  let out = String{};
   usize operand_index = 0;
   bool consumed_a_conversion = false;
   bool should_stop = false;

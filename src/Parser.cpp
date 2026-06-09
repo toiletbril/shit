@@ -264,7 +264,7 @@ cold fn Parser::recover_to_next_statement() throws -> void
 cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
 {
   Expression *first_piece = nullptr;
-  SourceLocation last_location{};
+  let last_location = SourceLocation{};
 
   for (;;) {
     Token *token = m_lexer.peek_shell_token();
@@ -668,7 +668,7 @@ mustuse fn Parser::wrap_with_stderr_to_stdout(Command *command) throws
     -> Command *
 {
   ASSERT(command != nullptr);
-  ArrayList<expressions::Redirection> redirections{};
+  let redirections = ArrayList<expressions::Redirection>{};
   redirections.push(stderr_to_stdout_dup());
   return m_lexer.arena().create<RedirectedCommand>(
       command->source_location(), command, steal(redirections));
@@ -838,7 +838,7 @@ mustuse fn Parser::attach_trailing_redirections(Command *compound) throws
 {
   ASSERT(compound != nullptr);
 
-  ArrayList<expressions::Redirection> redirections{};
+  let redirections = ArrayList<expressions::Redirection>{};
   while (try_parse_trailing_redirection(redirections)) {
     /* Keep consuming, so a chain like done >out 2>&1 attaches every one. */
   }
@@ -865,9 +865,9 @@ hot fn Parser::parse_simple_command() throws -> Command *
 {
   Maybe<SourceLocation> source_location;
   ArrayList<Token *> args_accumulator{};
-  ArrayList<prefix_assignment> local_vars{heap_allocator()};
-  ArrayList<array_builtin_assignment> array_args{heap_allocator()};
-  ArrayList<expressions::Redirection> redirections{};
+  let local_vars = ArrayList<prefix_assignment>{heap_allocator()};
+  let array_args = ArrayList<array_builtin_assignment>{heap_allocator()};
+  let redirections = ArrayList<expressions::Redirection>{};
 
   auto build_command = [&]() -> Command * {
     if (!source_location) return nullptr;
@@ -1037,7 +1037,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
           if (is_assignment_builtin_name(command_name.view())) {
             ArrayList<const Token *> elements = consume_bash_array_assignment();
             array_args.push(array_builtin_assignment{
-                String{a->key()}, steal(elements), a->is_append()});
+                a->key().clone(), steal(elements), a->is_append()});
             break;
           }
         }
@@ -1075,7 +1075,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
            The command-less line persists the whole sequence in SimpleCommand.
          */
         local_vars.push(prefix_assignment{
-            String{a->key()}, Word{a->value_word()}, a->is_append()});
+            a->key().clone(), Word{a->value_word()}, a->is_append()});
       }
     } break;
 
@@ -1126,7 +1126,7 @@ hot fn Parser::parse_if() throws -> Command *
   ASSERT(if_token->kind() == Token::Kind::If);
   const let location = if_token->source_location();
 
-  ArrayList<if_branch> branches{};
+  let branches = ArrayList<if_branch>{};
   const Expression *otherwise = nullptr;
 
   for (;;) {
@@ -1404,7 +1404,7 @@ hot fn Parser::parse_case() throws -> Command *
                             "Expected 'in' after the case word"};
   }
 
-  ArrayList<case_item> items{};
+  let items = ArrayList<case_item>{};
 
   for (;;) {
     Token *t = m_lexer.peek_shell_token();
@@ -1667,7 +1667,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
      command parser, so a < or > inside is a string comparison and not a
      redirection, and && and || join primaries. The operand words are kept for
      the evaluator to expand without field splitting. */
-  ArrayList<conditional_element> elements{};
+  let elements = ArrayList<conditional_element>{};
   for (;;) {
     Token *t = m_lexer.next_shell_token();
     ASSERT(t != nullptr);

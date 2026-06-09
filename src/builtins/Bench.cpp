@@ -109,7 +109,7 @@ template <typename Accessor>
 fn compute_stats(const ArrayList<bench_sample> &samples,
                  Accessor accessor) throws -> metric_stats
 {
-  metric_stats stats{};
+  let stats = metric_stats{};
   if (samples.is_empty()) return stats;
 
   double sum = 0;
@@ -137,7 +137,7 @@ fn compute_stats(const ArrayList<bench_sample> &samples,
   stats.std_dev =
       (samples.count() > 1) ? std::sqrt(variance_sum / (count - 1)) : 0.0;
 
-  ArrayList<double> ordered{};
+  let ordered = ArrayList<double>{};
   for (usize i = 0; i < samples.count(); i++)
     ordered.push(accessor(samples[i]));
   utils::sort_ascending(ordered);
@@ -222,7 +222,7 @@ struct metric_row
 fn make_metric_row(StringView name, const metric_stats &stats,
                    metric_unit unit) throws -> metric_row
 {
-  metric_row row{};
+  let row = metric_row{};
   row.name = name;
   row.unit = unit;
   row.mean = format_metric(stats.mean, unit);
@@ -350,7 +350,7 @@ fn progress_is_enabled() throws -> bool { return colors::stderr_wants_color(); }
    duration budget reached so far, clamped to 100. */
 fn draw_progress(StringView command, u64 percent) throws -> void
 {
-  String line{};
+  let line = String{};
   line += "\rBenchmarking '";
   line.append(command);
   line += "' ";
@@ -377,12 +377,12 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
                   bool show_progress, bool &was_interrupted) throws
     -> command_result
 {
-  command_result result{};
+  let result = command_result{};
   result.label = command;
 
   /* The command string is handed to the system shell so a pipeline, a
      redirection, or a shell builtin all run as one real child. */
-  ArrayList<String> child_argv{};
+  let child_argv = ArrayList<String>{};
 #if SHIT_PLATFORM_IS WIN32
   child_argv.push(String{"cmd"});
   child_argv.push(String{"/c"});
@@ -392,7 +392,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
 #endif
   child_argv.push(String{command});
 
-  ArrayList<bench_sample> samples{};
+  let samples = ArrayList<bench_sample>{};
   const u64 duration_nanos = duration_millis * 1000000ULL;
   const u64 start_nanos = os::monotonic_nanos();
   u64 last_progress_nanos = 0;
@@ -441,7 +441,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
       break;
     }
 
-    bench_sample sample{};
+    let sample = bench_sample{};
     sample.wall_nanos = static_cast<double>(measured->wall_nanos);
     sample.peak_rss_bytes = static_cast<double>(measured->peak_rss_bytes);
     if (measured->has_perf) {
@@ -493,7 +493,7 @@ fn append_summary(String &out, const command_result &result,
 
   /* The rows are formatted first so their mean and stddev widths are known
      before any line is rendered, which is what lets the value columns align. */
-  ArrayList<metric_row> rows{};
+  let rows = ArrayList<metric_row>{};
   rows.push(
       make_metric_row("wall time", result.wall_time, metric_unit::Nanoseconds));
   rows.push(make_metric_row("peak rss", result.peak_rss, metric_unit::Bytes));
@@ -583,7 +583,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const bool may_color = colors::stdout_wants_color();
   const bool show_progress = progress_is_enabled();
 
-  ArrayList<command_result> results{};
+  let results = ArrayList<command_result>{};
   for (usize i = 1; i < arguments.count(); i++) {
     bool was_interrupted = false;
     results.push(sample_command(arguments[i].view(), run_limit, duration_millis,
@@ -599,7 +599,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  String out{};
+  let out = String{};
   for (usize i = 0; i < results.count(); i++) {
     if (i > 0) out += "\n";
     append_summary(out, results[i], may_color);

@@ -25,6 +25,10 @@ public:
 
   mustuse pure fn count() const wontthrow -> usize { return m_map.count(); }
 
+  /* An explicit deep copy, so a caller that means to duplicate the set says so
+     rather than leaning on an implicit copy. */
+  mustuse cold fn clone() const throws -> HashSet { return HashSet{*this}; }
+
   template <class Fn>
   fn for_each(Fn callback) const throws -> void
   {

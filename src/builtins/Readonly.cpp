@@ -33,7 +33,7 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* readonly with no operand lists the read-only variables and their values. */
   if (args.count() == 1) {
-    String out{};
+    let out = String{};
     for (let const &name : cxt.readonly_names()) {
       out += "readonly ";
       out += name;

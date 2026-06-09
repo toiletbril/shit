@@ -75,7 +75,7 @@ bool is_known_shopt_option(StringView name) throws
 String shopt_status_line(StringView name, bool on) throws
 {
   constexpr usize NAME_FIELD_WIDTH = 20;
-  String line{name};
+  let line = String{name};
   while (line.count() < NAME_FIELD_WIDTH)
     line += ' ';
   line += on ? "\ton\n" : "\toff\n";
@@ -96,7 +96,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool enable = false;
   bool disable = false;
   bool quiet = false;
-  ArrayList<StringView> names{heap_allocator()};
+  let names = ArrayList<StringView>{heap_allocator()};
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();

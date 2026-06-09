@@ -47,7 +47,7 @@ fn mask_to_symbolic(u32 mask) throws -> String
   const u32 allowed = (~mask) & PERMISSION_BITS;
   const char groups[] = {'u', 'g', 'o'};
   const u32 shifts[] = {6, 3, 0};
-  String out{};
+  let out = String{};
   for (usize g = 0; g < 3; g++) {
     if (g > 0) out.push(',');
     out.push(groups[g]);

@@ -164,7 +164,7 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args) throws -> ArrayList<String>
 {
-  ArrayList<const char *> os_argv{};
+  let os_argv = ArrayList<const char *>{};
   os_argv.reserve(args.count());
 
   for (const String &arg : args)
@@ -175,7 +175,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
 {
-  String name{};
+  let name = String{};
   name += "-";
   if (is_long) {
     name += "-";
@@ -196,7 +196,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
   ASSERT(argv != nullptr);
 
   u32 position = 0;
-  ArrayList<String> args{};
+  let args = ArrayList<String>{};
 
   Flag *prev_flag{};
   bool next_arg_is_value = false;
@@ -329,7 +329,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           throw Error{"Missing space between '-' and other options"};
         } else {
           /* Trim the value before '=' and report unknown flag. */
-          String s{};
+          let s = String{};
           s += "Unknown flag '-";
 
           if (!is_long) {
@@ -375,7 +375,7 @@ fn reset_flags(const ArrayList<Flag *> &flags) throws -> void
 
 cold fn show_version() throws -> void
 {
-  String s{};
+  let s = String{};
   s += "Shit Shell ";
   s += utils::int_to_text(SHIT_VER_MAJOR);
   s += '.';
@@ -416,7 +416,7 @@ cold fn show_version() throws -> void
 
 cold fn show_short_version() throws -> void
 {
-  String s{};
+  let s = String{};
   s += utils::int_to_text(SHIT_VER_MAJOR);
   s += '.';
   s += utils::int_to_text(SHIT_VER_MINOR);
@@ -439,7 +439,7 @@ cold fn show_short_version() throws -> void
 cold fn make_synopsis(StringView program_name,
                       const ArrayList<StringView> &lines) throws -> String
 {
-  String s{};
+  let s = String{};
 
   s += "SYNOPSIS\n";
 
@@ -456,7 +456,7 @@ cold fn make_synopsis(StringView program_name,
 
 cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
 {
-  String out{};
+  let out = String{};
   const usize text_width = width > indent ? width - indent : 1;
   usize line_used = 0;
   usize word_start = 0;
@@ -492,7 +492,7 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
 
 cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 {
-  String s{};
+  let s = String{};
 
   /* The description starts at a fixed column so every flag lines up, and a
      description longer than the line wraps with its continuation indented to
@@ -508,7 +508,7 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 
     /* The whole left part, the short form, the long form, and the value
        placeholder, is built first so its width decides the padding. */
-    String left{};
+    let left = String{};
     if (f->short_name() != '\0') {
       left += "  -";
       left += f->short_name();

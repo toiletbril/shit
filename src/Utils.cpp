@@ -30,7 +30,7 @@ namespace utils {
 
 fn merge_tokens_to_string(const ArrayList<const Token *> &v) throws -> String
 {
-  String r{};
+  let r = String{};
   for (const shit::Token *t : v) {
     ASSERT(t != nullptr);
     r += t->raw_string();
@@ -106,7 +106,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   /* Every external stage is collected so all of them are reaped, not only the
      last. Otherwise a first stage like yes is left a zombie when the last stage
      exits. */
-  ArrayList<os::process> children{};
+  let children = ArrayList<os::process>{};
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
@@ -115,11 +115,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
      A builtin stage yields its status at once and an external one's status
      arrives from the wait below, tracked by the parallel child-to-stage list. */
   let const stage_count = ecs.count();
-  ArrayList<i32> stage_status{};
+  let stage_status = ArrayList<i32>{};
   stage_status.reserve(stage_count);
   for (usize i = 0; i < stage_count; i++)
     stage_status.push(0);
-  ArrayList<usize> child_stage{};
+  let child_stage = ArrayList<usize>{};
 
   bool is_first = true;
   usize stage_index = 0;
@@ -223,7 +223,7 @@ static pure fn find_subview(StringView haystack, StringView needle,
 fn string_replace(String &s, const StringView to_replace,
                   const StringView replace_with) throws -> void
 {
-  String result{};
+  let result = String{};
   result.reserve(s.count());
 
   let const source = s.view();
@@ -248,7 +248,7 @@ fn string_replace(String &s, const StringView to_replace,
 
 fn lowercase_string(StringView s) throws -> String
 {
-  String l{};
+  let l = String{};
   l.reserve(s.count());
   for (usize i = 0; i < s.count(); i++)
     l.push(static_cast<char>(std::tolower(s[i])));
@@ -315,7 +315,7 @@ fn int_to_text(i64 value, Allocator allocator) throws -> String
   if (value >= 0) return uint_to_text(static_cast<u64>(value), allocator);
   /* Negating in u64 avoids the overflow that -INT64_MIN would hit in i64. */
   const u64 magnitude = ~static_cast<u64>(value) + 1;
-  String result{allocator, "-"};
+  let result = String{allocator, "-"};
   result.append(uint_to_text(magnitude, allocator));
   return result;
 }
@@ -553,7 +553,7 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes,
 
 fn canonicalize_path(StringView path) throws -> Maybe<Path>
 {
-  Path candidate{path};
+  let candidate = Path{path};
 
   if (candidate.is_relative() && path.find_character('/').has_value()) {
     candidate = candidate.to_absolute();
@@ -681,7 +681,7 @@ fn extglob_full_match(StringView glob, StringView str,
       const StringView suffix = glob.substring(close + 1);
       const usize suffix_offset = mask_offset + close + 1;
 
-      ArrayList<extglob_alternative> alternatives{heap_allocator()};
+      let alternatives = ArrayList<extglob_alternative>{heap_allocator()};
       usize depth = 0;
       usize start = 0;
       for (usize i = 0; i <= content.count(); i++) {
@@ -1014,7 +1014,7 @@ cold fn print_memory_report() wontthrow -> void
     if (should_goodbye && QUIT_CONTEXT != nullptr &&
         QUIT_CONTEXT->shell_is_interactive())
     {
-      String code_str{};
+      let code_str = String{};
       if (code != 0) {
         code_str += " (Code ";
         code_str += uint_to_text(actual_code);
@@ -1082,8 +1082,8 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void
    never searched. POSIX treats an empty component as the current directory. */
 static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
 {
-  ArrayList<String> dirs{};
-  String current{};
+  let dirs = ArrayList<String>{};
+  let current = String{};
 
   for (usize i = 0; i < path_var.length; i++) {
     const char ch = path_var.data[i];
@@ -1104,7 +1104,7 @@ fn initialize_path_map() throws -> void
   if (!MAYBE_PATH) return;
 
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
-    const Path directory{dir_string.view()};
+    let const directory = Path{dir_string.view()};
 
     /* read_directory returns None for a missing or unreadable directory, so the
        path is skipped without a separate exists check. */
@@ -1114,10 +1114,10 @@ fn initialize_path_map() throws -> void
     /* Cache every file in the directory under its name without an omitted
        extension, pointing at its full path. */
     for (const String &entry_name : *entries) {
-      String name{entry_name};
+      let name = entry_name.clone();
       os::erase_extension_and_get_its_index(name);
 
-      let full_path = directory;
+      let full_path = directory.clone();
       full_path.push_component(entry_name.view());
       cache_resolved_path(name.view(), full_path);
     }
@@ -1138,19 +1138,19 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
      environment does not still drives the order. */
   if (!MAYBE_PATH) return ArrayList<Path>{};
 
-  ArrayList<Path> result{};
+  let result = ArrayList<Path>{};
 
   /* The cache key is the program name without an omitted extension, the same
      key the lookup uses. */
-  String key{program_name};
+  let key = String{program_name};
   os::erase_extension_and_get_its_index(key);
 
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
-    const Path directory{dir_string.view()};
+    let const directory = Path{dir_string.view()};
 
-    let full_path = directory;
+    let full_path = directory.clone();
     full_path.push_component(program_name);
-    String full_path_str{full_path.text()};
+    let full_path_str = full_path.text().clone();
 
     /* This file already has an extesion specified? */
     if (os::ext_index explicit_ext =
@@ -1161,7 +1161,7 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
            ext_index++)
       {
         const String &suffix = os::OMITTED_SUFFIXES[ext_index];
-        const Path try_path{(full_path.text() + suffix.view()).view()};
+        let const try_path = Path{(full_path.text() + suffix.view()).view()};
 
         if (try_path.exists()) {
           result.push(try_path);
@@ -1196,7 +1196,7 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
     PATH_CACHE_IS_STALE = false;
   }
 
-  String sp{program_name};
+  let sp = String{program_name};
 
   const os::ext_index typed_extension =
       os::erase_extension_and_get_its_index(sp);
@@ -1214,7 +1214,7 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
     if (const ArrayList<Path> *const cached = PATH_CACHE.find(sp.view());
         cached != nullptr && cached->count() != 0)
     {
-      ArrayList<Path> result{};
+      let result = ArrayList<Path>{};
       result.push((*cached)[0]);
       return result;
     }
@@ -1286,7 +1286,7 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
   const usize max_distance = name.length <= 3 ? 1 : 2;
   usize best_distance = max_distance + 1;
   bool best_is_anagram = false;
-  String best{};
+  let best = String{};
 
   /* Same length and same character multiset, so the candidate is a pure
      transposition of the typed name, the most likely typo. Used to break a tie
@@ -1339,7 +1339,7 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
   let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
   if (!file) return None;
 
-  String contents{};
+  let contents = String{};
   char buffer[4096];
   for (;;) {
     Maybe<usize> read_count = os::read_fd(*file, buffer, sizeof(buffer));
@@ -1354,7 +1354,7 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
 
 fn read_entire_standard_input() throws -> String
 {
-  String contents{};
+  let contents = String{};
   char buffer[4096];
   for (;;) {
     Maybe<usize> read_count = os::read_fd(SHIT_STDIN, buffer, sizeof(buffer));
@@ -1367,7 +1367,7 @@ fn read_entire_standard_input() throws -> String
 fn read_line_from_fd(os::descriptor fd, bool &was_newline_terminated) throws
     -> Maybe<String>
 {
-  String line{};
+  let line = String{};
   bool read_any_byte = false;
   for (;;) {
     u8 one_byte = 0;

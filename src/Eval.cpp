@@ -235,7 +235,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
 static fn associative_composite_key(StringView name, StringView key) throws
     -> String
 {
-  String composite{heap_allocator(), name};
+  let composite = String{heap_allocator(), name};
   composite.push('\x01');
   composite.append(key);
   return composite;
@@ -248,7 +248,7 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
   if (is_associative_array(name)) {
     const String key = expand_modifier_word(subscript);
     if (is_append) {
-      String combined{
+      let combined = String{
           lookup_associative_element(name, key.view()).value_or(String{})};
       combined += value;
       set_associative_element(name, key.view(), combined.view());
@@ -267,9 +267,9 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     throw Error{"Unable to index '" + name +
                 "' because the array subscript is invalid"};
 
-  String element{heap_allocator(), value};
+  let element = String{heap_allocator(), value};
   if (is_append) {
-    String combined{heap_allocator()};
+    let combined = String{heap_allocator()};
     if (let const *array = lookup_indexed_array(name))
       if (static_cast<usize>(index) < array->count())
         combined = String{(*array)[static_cast<usize>(index)].view()};
@@ -634,7 +634,7 @@ fn EvalContext::notify_done_jobs() throws -> void
     else if (m_jobs.count() >= 2 && i == m_jobs.count() - 2)
       marker = '-';
 
-    String line{};
+    let line = String{};
     line += "[" + utils::int_to_text(job.id) + "]";
     line.push(marker);
     line += " Done  ";
@@ -890,9 +890,9 @@ fn EvalContext::declare_local(StringView name) throws -> void
   /* The indexed array the name held is saved alongside the scalar value, so a
      local array restores the caller's array on return. A copy is taken since the
      body may overwrite the stored array in place. */
-  Maybe<ArrayList<String>> previous_array{};
+  let previous_array = Maybe<ArrayList<String>>{};
   if (let const *array = lookup_indexed_array(name); array != nullptr) {
-    ArrayList<String> copy{heap_allocator()};
+    let copy = ArrayList<String>{heap_allocator()};
     copy.reserve(array->count());
     for (const String &element : *array)
       copy.push(String{heap_allocator(), element.view()});
@@ -1561,7 +1561,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          unescaped backtick. The POSIX backquote unescaping strips a backslash
          that precedes a backtick, a dollar sign, or another backslash, and the
          unescaped bytes are captured the same way $(...) is. */
-      String inner{heap_allocator()};
+      let inner = String{heap_allocator()};
       usize j = i + 1;
       for (; j < word.length; j++) {
         if (word[j] == '\\' && j + 1 < word.length &&
@@ -1596,7 +1596,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          single quote run, a double quote run, and a backslash escape keep their
          bytes literal so a } they contain is never counted. The structure
          mirrors the Lexer brace scanner. */
-      String inner{heap_allocator()};
+      let inner = String{heap_allocator()};
       usize j = i + 2;
       i32 depth = 1;
       char quote = 0;
@@ -1693,7 +1693,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       emit_run(apply_parameter_expansion(inner), !in_double_quote);
       i = j;
     } else if (lexer::is_variable_name_start(next)) {
-      String name{heap_allocator()};
+      let name = String{heap_allocator()};
       usize j = i + 1;
       while (j < word.length && lexer::is_variable_name(word[j]))
         name += word[j++];
@@ -1710,7 +1710,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          backslash escape keep their bytes literal so a ) inside a string is
          text and does not count toward the grouping depth or terminate the
          expansion. */
-      String inner{heap_allocator()};
+      let inner = String{heap_allocator()};
       usize j = i + 3;
       usize depth = 0;
       char quote = 0;
@@ -1750,7 +1750,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       /* Command substitution $(...), scanned to the matching ). A quote run and
          a backslash escape keep their bytes literal so a ) inside a string does
          not decrement the depth and close the substitution early. */
-      String inner{heap_allocator()};
+      let inner = String{heap_allocator()};
       usize j = i + 2;
       usize depth = 1;
       char quote = 0;
@@ -2460,8 +2460,8 @@ struct ConditionalEvaluator
 #if SHIT_PLATFORM_IS POSIX
     /* regcomp and regexec read C strings, so the operands are copied into
        null-terminated buffers first. */
-    const String pattern_text{heap_allocator(), pattern};
-    const String value_text{heap_allocator(), value};
+    let const pattern_text = String{heap_allocator(), pattern};
+    let const value_text = String{heap_allocator(), value};
     regex_t compiled;
     if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
       /* bash returns status 2 for a malformed regex, which the conditional
@@ -2497,7 +2497,7 @@ struct ConditionalEvaluator
     if (op == "-z") return operand.is_empty();
     if (op == "-n") return !operand.is_empty();
     if (op == "-v") return cxt.get_variable_value(operand).has_value();
-    const Path path{operand};
+    let const path = Path{operand};
     if (op == "-e") return path.exists();
     if (op == "-f") return path.is_regular_file();
     if (op == "-d") return path.is_directory();
@@ -2657,7 +2657,7 @@ fn EvalContext::evaluate_conditional(
   if (elements.is_empty())
     throw Error{"Unable to evaluate the [[ ]] because the conditional "
                 "expression is empty"};
-  ConditionalEvaluator evaluator{*this, elements};
+  let evaluator = ConditionalEvaluator{*this, elements};
   const bool result = evaluator.eval_or();
   if (!evaluator.at_end())
     throw Error{"[[: unexpected token after conditional expression"};
@@ -2910,7 +2910,7 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
     child_dir.push_component(name);
     let const is_dir = child_dir.is_directory();
 
-    String child_relative{allocator};
+    let child_relative = String{allocator};
     if (!relative.is_empty()) {
       child_relative.append(relative);
       child_relative += '/';
@@ -3929,7 +3929,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const elements = collect_array_elements(array_name);
           if (segment.is_in_double_quotes && is_star) {
             let const ifs = m_field_separators.view();
-            String joined{heap_allocator()};
+            let joined = String{heap_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
               joined.append(elements[i].view());
@@ -4215,13 +4215,13 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
   os::make_fd_inheritable(shell_fd);
   /* The command currently evaluating is where this substitution was written, so
      its location points a later reap warning at the right word. */
-  const SourceLocation location{m_current_location_position, 1};
+  let const location = SourceLocation{m_current_location_position, 1};
   const StringView source =
       m_current_source != nullptr ? m_current_source->view() : StringView{};
   m_pending_process_substitutions.push(
       process_substitution{shell_fd, child, location, source});
 
-  String path{"/dev/fd/"};
+  let path = String{"/dev/fd/"};
   path += utils::int_to_text(static_cast<i64>(shell_fd));
   return path;
 }
@@ -4665,7 +4665,7 @@ fn parse_brace_sequence(StringView content) throws -> Maybe<ArrayList<String>>
         const bool negative = !number.is_empty() && number.view()[0] == '-';
         const StringView digits = number.view().substring(negative ? 1 : 0);
         if (digits.length < width) {
-          String padded{heap_allocator()};
+          let padded = String{heap_allocator()};
           if (negative) padded.push('-');
           for (usize z = digits.length; z < width; z++)
             padded.push('0');
@@ -4689,7 +4689,7 @@ fn parse_brace_sequence(StringView content) throws -> Maybe<ArrayList<String>>
       const i64 increment = from <= to ? magnitude : -magnitude;
       let elements = ArrayList<String>{heap_allocator()};
       for (i64 c = from; increment > 0 ? c <= to : c >= to; c += increment) {
-        String element{heap_allocator()};
+        let element = String{heap_allocator()};
         element.push(static_cast<char>(c));
         elements.push(steal(element));
       }
@@ -4755,7 +4755,7 @@ fn find_brace_group(StringView text) throws -> Maybe<brace_group>
           let alternatives = brace_group_alternatives(
               text.substring_of_length(open + 1, j - open - 1));
           if (alternatives.has_value()) {
-            brace_group group{open, j, {}};
+            let group = brace_group{open, j, {}};
             group.alternatives = steal(*alternatives);
             return group;
           }
@@ -4830,7 +4830,7 @@ fn expand_braces(const Word &word) throws -> ArrayList<Word>
 
   let words = ArrayList<Word>{heap_allocator()};
   for (const String &produced : expanded) {
-    Word out{};
+    let out = Word{};
     let run = String{heap_allocator()};
     for (usize i = 0; i < produced.count(); i++) {
       const char c = produced[i];

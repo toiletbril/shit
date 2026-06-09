@@ -49,7 +49,7 @@ pure fn Word::is_empty() const wontthrow -> bool { return segments.is_empty(); }
 
 hot fn Word::to_literal_string() const throws -> String
 {
-  String result{};
+  let result = String{};
   for (const WordSegment &segment : segments) {
     if (segment.kind == WordSegment::Kind::CommandSubstitution) {
       result += "$(";
@@ -98,7 +98,7 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
 
 cold fn Word::to_pretty_string() const throws -> String
 {
-  String result{"[Word"};
+  let result = String{"[Word"};
   for (const WordSegment &segment : segments) {
     result += "\n  ";
     switch (segment.kind) {
@@ -159,9 +159,9 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   if (name_cursor != name_length) return shit::None;
 
   const let name_view = first.text.substring_of_length(0, name_length);
-  String name{name_view};
+  let name = String{name_view};
 
-  Word value{};
+  let value = Word{};
   /* The value always begins with an unquoted segment, even when empty, so that
      FOO= produces one empty field rather than no field at all. */
   value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
@@ -266,7 +266,7 @@ fn Assignment::flags() const wontthrow -> Token::Flags
 
 fn Assignment::raw_string() const throws -> String
 {
-  String result{m_key};
+  let result = m_key.clone();
   result += m_is_append ? "+=" : "=";
   result += m_value.to_literal_string();
   return result;

@@ -117,7 +117,7 @@ fn Path::with_extension(StringView new_extension) const throws -> Path
          "extension is a suffix of the path text");
   let const keep = m_text.count() - existing.length;
 
-  Path result{m_text.substring_of_length(0, keep)};
+  let result = Path{m_text.substring_of_length(0, keep)};
   if (new_extension.length > 0 && new_extension.data[0] != '.')
     result.m_text.push('.');
   result.m_text.append(new_extension);
@@ -131,7 +131,7 @@ cold fn Path::normalized() const throws -> Path
 
   /* Each kept component is a view into the original text, valid for the life of
      this function while the result is assembled. */
-  ArrayList<StringView> components{};
+  let components = ArrayList<StringView>{};
   usize i = 0;
   while (i < m_text.count()) {
     if (is_directory_separator(m_text[i])) {
@@ -157,7 +157,7 @@ cold fn Path::normalized() const throws -> Path
     components.push(part);
   }
 
-  String built{};
+  let built = String{};
   if (absolute) built.push(DIRECTORY_SEPARATOR);
   for (usize c = 0; c < components.count(); c++) {
     if (c > 0) built.push(DIRECTORY_SEPARATOR);
@@ -298,7 +298,7 @@ cold fn Path::current_directory() throws -> Path
      returning an empty path for a deep directory. A real failure such as a
      removed working directory carries a different errno and ends the loop with
      an empty path. */
-  ArrayList<char> buffer{};
+  let buffer = ArrayList<char>{};
   usize buffer_size = 4096;
   for (;;) {
     buffer.reserve(buffer_size);
@@ -322,7 +322,7 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   let const handle = ::opendir(dir.c_str());
   if (handle == nullptr) return None;
 
-  ArrayList<String> names{};
+  let names = ArrayList<String>{};
   /* readdir returns NULL on both a clean end of the directory and a read error,
      so errno is cleared before each call. A NULL with a changed errno is a real
      error, which returns None rather than a truncated list the caller would
@@ -477,7 +477,7 @@ fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 
 cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
-  String pattern{dir.text()};
+  let pattern = dir.text().clone();
   pattern.push(DIRECTORY_SEPARATOR);
   pattern.push('*');
 
@@ -485,7 +485,7 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   let const handle = FindFirstFileA(pattern.c_str(), &data);
   if (handle == INVALID_HANDLE_VALUE) return None;
 
-  ArrayList<String> names{};
+  let names = ArrayList<String>{};
   do {
     let const name = StringView{data.cFileName};
     if (name == StringView{"."} || name == StringView{".."}) continue;

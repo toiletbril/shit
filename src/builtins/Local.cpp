@@ -61,7 +61,7 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       case 'u':
       case 'n': break;
       default: {
-        String invalid{};
+        let invalid = String{};
         invalid += arg[c];
         throw Error{"Unable to declare a local because '-" + invalid +
                     "' is not a valid option"};

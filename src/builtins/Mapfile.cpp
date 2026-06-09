@@ -32,13 +32,13 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
       array_name = arg;
   }
 
-  ArrayList<String> lines{heap_allocator()};
+  let lines = ArrayList<String>{heap_allocator()};
   for (;;) {
     bool was_newline_terminated = false;
     let const read = utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN),
                                               was_newline_terminated);
     if (!read) break;
-    String element{StringView{*read}};
+    let element = String{StringView{*read}};
     if (!strip_newline && was_newline_terminated) element += "\n";
     lines.push(steal(element));
   }

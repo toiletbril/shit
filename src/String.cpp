@@ -190,7 +190,7 @@ cold fn String::free_storage() wontthrow -> void
 
 fn operator+(StringView left, StringView right) throws->String
 {
-  String result{heap_allocator()};
+  let result = String{heap_allocator()};
   result.reserve(left.length + right.length);
   result.append(left);
   result.append(right);

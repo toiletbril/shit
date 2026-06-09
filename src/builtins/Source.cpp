@@ -33,7 +33,7 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() < 2)
     throw Error{"Unable to source because a filename argument is required"};
 
-  const String path{ec.args()[1]};
+  let const path = ec.args()[1].clone();
   let const contents = utils::read_entire_file(path);
   if (!contents) throw Error{"Could not open '" + path + "'"};
 

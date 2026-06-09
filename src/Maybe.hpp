@@ -34,6 +34,10 @@ public:
     if (m_has_value) new (&m_storage) T(steal(other.reference()));
   }
 
+  /* An explicit deep copy, so a caller that means to duplicate the optional says
+     so rather than leaning on an implicit copy. */
+  mustuse fn clone() const throws -> Maybe { return Maybe{*this}; }
+
   fn operator=(const Maybe &other) throws -> Maybe &
   {
     if (this != &other) {

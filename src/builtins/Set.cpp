@@ -104,7 +104,7 @@ bool option_is_on(const EvalContext &cxt, const SetOption &option) throws
    non-standard option name. set -p still lists them for discovery. */
 String list_options(const EvalContext &cxt) throws
 {
-  String out{};
+  let out = String{};
   for (const SetOption &option : SET_OPTIONS) {
     if (option.name.starts_with(StringView{"show-"})) continue;
     out += option_is_on(cxt, option) ? "set -o " : "set +o ";
@@ -119,7 +119,7 @@ String list_options(const EvalContext &cxt) throws
    discover what is available without leaving the shell. */
 String list_options_with_help(const EvalContext &cxt) throws
 {
-  String out{};
+  let out = String{};
   for (const SetOption &option : SET_OPTIONS) {
     out += "  ";
     if (option.letter != '\0') {
@@ -154,7 +154,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* set with no arguments lists the shell variables. */
   if (args.count() == 1) {
-    String out{};
+    let out = String{};
     for (let const &assignment : cxt.sorted_variable_assignments()) {
       out += assignment.view();
       out += "\n";
@@ -163,7 +163,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 0;
   }
 
-  ArrayList<String> operands{heap_allocator()};
+  let operands = ArrayList<String>{heap_allocator()};
   bool collecting_operands = false;
   bool should_rebind = false;
 
@@ -214,7 +214,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
         let const letter = arg[c];
         let const option = find_option_by_letter(letter);
         if (option == nullptr) {
-          String invalid_option{};
+          let invalid_option = String{};
           invalid_option += arg[0];
           invalid_option += letter;
           throw Error{"'" + invalid_option + "' is not a valid option"};

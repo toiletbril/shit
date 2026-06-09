@@ -36,6 +36,11 @@ public:
       new (&m_data[i]) T(other.m_data[i]);
     m_length = other.m_length;
   }
+
+  /* An explicit deep copy, so a caller that means to duplicate the list says so
+     rather than leaning on an implicit copy. */
+  mustuse cold fn clone() const throws -> ArrayList { return ArrayList{*this}; }
+
   ArrayList(ArrayList &&other) noexcept
       : m_allocator(other.m_allocator), m_data(other.m_data),
         m_length(other.m_length), m_capacity(other.m_capacity)

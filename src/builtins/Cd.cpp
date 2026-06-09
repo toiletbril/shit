@@ -68,7 +68,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     arg_path.append(p->text());
   }
 
-  Path target{arg_path};
+  let target = Path{arg_path};
 
   /* The first CDPATH entry that yields an existing directory resolves the
      operand. An empty entry, including the one a leading, trailing, or doubled

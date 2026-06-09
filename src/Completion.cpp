@@ -94,7 +94,7 @@ static fn command_name_matches(StringView name, StringView token,
 {
   if (!token_is_glob) return name.starts_with(token);
 
-  ArrayList<bool> glob_active{};
+  let glob_active = ArrayList<bool>{};
   glob_active.reserve(token.length);
   for (usize i = 0; i < token.length; i++)
     glob_active.push(true);
@@ -123,7 +123,7 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
     -> String
 {
   if (candidates.is_empty()) return String{};
-  String prefix{candidates[0].view()};
+  let prefix = String{candidates[0].view()};
   for (usize i = 1; i < candidates.count(); i++) {
     const String &candidate = candidates[i];
     usize shared = 0;
@@ -174,7 +174,7 @@ static fn path_command_names() throws -> const ArrayList<String> &
     let const segment =
         current.substring_of_length(segment_start, i - segment_start);
     segment_start = i + 1;
-    const Path directory{segment.is_empty() ? StringView{"."} : segment};
+    let const directory = Path{segment.is_empty() ? StringView{"."} : segment};
     if (Maybe<ArrayList<String>> entries = Path::read_directory(directory)) {
       for (String &entry : *entries)
         CACHED_PATH_COMMANDS.push(steal(entry));
@@ -188,8 +188,8 @@ static fn path_command_names() throws -> const ArrayList<String> &
 static fn complete_command(StringView token, bool token_is_glob,
                            EvalContext &context) throws -> ArrayList<String>
 {
-  ArrayList<String> candidates{};
-  HashSet seen{heap_allocator()};
+  let candidates = ArrayList<String>{};
+  let seen = HashSet{heap_allocator()};
 
   TRACELN("completing command position for token '%.*s'",
           static_cast<int>(token.length), token.data);
@@ -257,7 +257,7 @@ static fn resolve_listing_directory(StringView directory_part,
     Maybe<Path> home = name.is_empty() ? os::get_home_directory()
                                        : os::get_home_for_user(name);
     if (home.has_value()) {
-      let resolved = *home;
+      let resolved = home->clone();
       /* Drop the name and the separator after it, then append the rest. */
       usize rest_start = name_end;
       if (rest_start < directory_part.length &&
@@ -272,10 +272,10 @@ static fn resolve_listing_directory(StringView directory_part,
     }
   }
 
-  const Path directory{directory_part};
+  let const directory = Path{directory_part};
   if (directory.is_absolute()) return directory;
 
-  let resolved = base_directory;
+  let resolved = base_directory.clone();
   resolved.push_component(directory_part);
   return resolved;
 }
@@ -287,7 +287,7 @@ static fn complete_filesystem(StringView token,
                               const Path &base_directory) throws
     -> ArrayList<String>
 {
-  ArrayList<String> candidates{};
+  let candidates = ArrayList<String>{};
 
   path_token parts = split_path_token(token);
 
@@ -314,13 +314,13 @@ static fn complete_filesystem(StringView token,
       continue;
     }
 
-    String candidate{parts.directory_part};
+    let candidate = String{parts.directory_part};
     candidate += entry.view();
 
     /* Path::read_directory hands back names only, so the trailing slash needs a
        stat per entry. Threading the dirent d_type through read_directory would
        change its signature and the Windows path, so the stat stays. */
-    let full = listing_directory;
+    let full = listing_directory.clone();
     full.push_component(entry.view());
     if (full.is_directory()) candidate += '/';
 
@@ -338,7 +338,7 @@ static fn complete_filesystem(StringView token,
 static fn complete_glob(StringView token, const Path &base_directory) throws
     -> ArrayList<String>
 {
-  ArrayList<String> candidates{};
+  let candidates = ArrayList<String>{};
 
   path_token parts = split_path_token(token);
 
@@ -353,7 +353,7 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
 
   /* Every byte of the basename pattern is an active glob position, since the
      completion token is unquoted. */
-  ArrayList<bool> glob_active{};
+  let glob_active = ArrayList<bool>{};
   glob_active.reserve(parts.basename_part.length);
   for (usize i = 0; i < parts.basename_part.length; i++)
     glob_active.push(true);
@@ -372,10 +372,10 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
       continue;
     }
 
-    String candidate{parts.directory_part};
+    let candidate = String{parts.directory_part};
     candidate += entry.view();
 
-    let full = listing_directory;
+    let full = listing_directory.clone();
     full.push_component(entry.view());
     if (full.is_directory()) candidate += '/';
 
@@ -402,7 +402,7 @@ static pure fn token_is_variable(StringView token) wontthrow -> bool
 static fn complete_variable(StringView token, EvalContext &context) throws
     -> ArrayList<String>
 {
-  ArrayList<String> candidates{};
+  let candidates = ArrayList<String>{};
 
   /* Strip the leading '$' and an optional '{', so the rest is the partial name.
      The brace form is reproduced on every candidate. */
@@ -414,14 +414,14 @@ static fn complete_variable(StringView token, EvalContext &context) throws
           static_cast<int>(token.length), token.data,
           static_cast<int>(prefix.length), prefix.data, has_brace ? 1 : 0);
 
-  HashSet seen{heap_allocator()};
+  let seen = HashSet{heap_allocator()};
 
   let add_name = [&](StringView name) throws -> void {
     if (!name.starts_with(prefix)) return;
     if (seen.contains(name)) return;
     seen.add(name);
 
-    String candidate{};
+    let candidate = String{};
     candidate += has_brace ? "${" : "$";
     candidate.append(name);
     if (has_brace) candidate.push('}');
@@ -449,11 +449,11 @@ static fn token_is_tilde_user_prefix(StringView token) wontthrow -> bool
    as ~name with a trailing / since a home is a directory. */
 static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 {
-  ArrayList<String> candidates{};
+  let candidates = ArrayList<String>{};
   let const prefix = token.substring(1);
   for (const String &user : os::enumerate_users()) {
     if (!user.view().starts_with(prefix)) continue;
-    String candidate{};
+    let candidate = String{};
     candidate.push('~');
     candidate.append(user.view());
     candidate.push('/');
@@ -492,7 +492,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      running a command. */
   const bool inline_glob = token_is_glob && cursor == token_end;
 
-  ArrayList<String> candidates{};
+  let candidates = ArrayList<String>{};
 
   if (token_is_variable(token)) {
     candidates = complete_variable(token, context);
@@ -505,7 +505,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
          trailing slash a directory match carries for the listing UI is dropped
          so the expansion reads as plain names. */
       utils::sort_ascending(candidates);
-      String joined{};
+      let joined = String{};
       for (usize i = 0; i < candidates.count(); i++) {
         if (i > 0) joined += ' ';
         let match = candidates[i].view();
@@ -566,7 +566,7 @@ static fn expand_command_tilde(StringView word) throws -> Maybe<String>
   Maybe<Path> home =
       user.is_empty() ? os::get_home_directory() : os::get_home_for_user(user);
   if (!home.has_value()) return None;
-  let expanded = *home;
+  let expanded = home->clone();
   if (slash.has_value()) expanded.push_component(word.substring(*slash + 1));
   return String{expanded.text().view()};
 }
@@ -582,7 +582,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
      a program given by path, rather than the command name sets. A leading tilde
      is expanded first, so ~/bin/foo is checked at the home directory. */
   if (word.find_character('/').has_value()) {
-    String expanded{word};
+    let expanded = String{word};
     if (!word.is_empty() && word[0] == '~') {
       if (Maybe<String> home_expanded = expand_command_tilde(word))
         expanded = steal(*home_expanded);
@@ -806,7 +806,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (start < stop) spans.push(highlight_span{start, stop, sgr});
   };
 
-  ArrayList<highlight_construct> stack{};
+  let stack = ArrayList<highlight_construct>{};
   bool command_position = true;
   bool expecting_in = false;
   bool for_variable_pending = false;
@@ -865,7 +865,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
        expansion-built command. A plain command or keyword word is colored
        whole below. */
     let const word_start = i;
-    ArrayList<highlight_span> word_spans{};
+    let word_spans = ArrayList<highlight_span>{};
     while (i < end && !is_highlight_word_break(line[i])) {
       let const d = line[i];
       if (d == '\'') {
@@ -1047,12 +1047,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>
 {
-  ArrayList<highlight_span> spans{};
+  let spans = ArrayList<highlight_span>{};
   /* The set of named variables is read once per line so the per-expansion check
      does no allocation and triggers no dynamic-variable side effect. A line
      with no $ never references a variable, so the whole walk over the variable
      store is skipped on the common plain-command keystroke. */
-  HashSet known_vars{heap_allocator()};
+  let known_vars = HashSet{heap_allocator()};
   if (line.find_character('$').has_value()) {
     known_vars = context.variable_names();
     /* The variables the evaluator synthesizes on read are not in the store, so

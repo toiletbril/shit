@@ -119,7 +119,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* A jobspec argument restricts the listing to the named jobs, otherwise every
      job is shown. An unresolved jobspec is a no-such-job error and the exit
      status turns non-zero while the remaining specs still list. */
-  ArrayList<usize> selected{};
+  let selected = ArrayList<usize>{};
   i32 status = 0;
   if (names.count() > 1) {
     for (usize a = 1; a < names.count(); a++) {
