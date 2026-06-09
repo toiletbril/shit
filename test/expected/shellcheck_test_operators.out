@@ -1,0 +1,68 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-f" "a" "-a" "-f" "b" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "-z" "$x" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "-n" "$y" "]"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "y"
+]
+[Word
+  Unquoted "]"
+]
+shit: 1:8: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
+     1 |  [ -f a -a -f b ]
+       |         ^~ here.
+shit: 2:3: warning: a negated -z is just -n, test with -n instead.
+     2 |  [ ! -z "$x" ]
+       |    ^~ here.
+shit: 3:3: warning: a negated -n is just -z, test with -z instead.
+     3 |  [ ! -n "$y" ]
+       |    ^~ here.
+[Code 0]

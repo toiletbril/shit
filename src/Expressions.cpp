@@ -2851,6 +2851,41 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
+  /* Obsolescent or redundant test forms, each a shellcheck check. -a and -o
+     joining two conditions is obsolescent and misparses with some operands, so
+     prefer a separate test joined with && or || (SC2166). The operator is binary
+     only past the first operand, so a unary -a file test does not trip it. A
+     negated -z or -n has a direct operator, -n or -z (SC2236, SC2237). The test
+     commands resolve as builtins, so this never meets the missing-command
+     check. */
+  if (command_literal == "[" || command_literal == "test" ||
+      command_literal == "[[")
+  {
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const literal =
+          static_cast<const tokens::WordToken *>(m_args[i])->word()
+              .to_literal_string();
+      let const view = literal.view();
+      if (i >= 2 && (view == "-a" || view == "-o")) {
+        actx.warn(m_args[i]->source_location(),
+                  "test with -a or -o is obsolescent, join two tests with && or "
+                  "|| instead");
+      } else if (view == "!" && i + 1 < m_args.count() &&
+                 m_args[i + 1]->kind() == Token::Kind::Word) {
+        let const next =
+            static_cast<const tokens::WordToken *>(m_args[i + 1])->word()
+                .to_literal_string();
+        if (next.view() == "-z")
+          actx.warn(m_args[i]->source_location(),
+                    "a negated -z is just -n, test with -n instead");
+        else if (next.view() == "-n")
+          actx.warn(m_args[i]->source_location(),
+                    "a negated -n is just -z, test with -z instead");
+      }
+    }
+  }
+
   /* A prefix assignment does not affect the expansion on the same command, so a
      reference to one of its names reads the old value. */
   if (m_local_vars.count() > 0) {

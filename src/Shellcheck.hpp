@@ -16,6 +16,9 @@ struct shellcheck_check
 inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC2162", "read without -r mangles a backslash in the input"          },
     {"SC2059", "printf format from a variable can inject format directives"},
+    {"SC2166", "test with -a or -o is obsolescent, join with && or ||"     },
+    {"SC2236", "a negated -z is just -n"                                   },
+    {"SC2237", "a negated -n is just -z"                                   },
 };
 
 } /* namespace shit */
