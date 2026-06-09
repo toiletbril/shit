@@ -173,8 +173,13 @@ fn EvalContext::append_indexed_array(StringView name,
                                      ArrayList<String> values) throws -> void
 {
   /* An existing array grows in place, so appending element by element stays
-     linear rather than rebuilding the whole array on each call. */
+     linear rather than rebuilding the whole array on each call. The readonly
+     guard and the scalar clear match set_indexed_array, since the in-place path
+     bypasses it. */
   if (let *existing = m_indexed_arrays.find(name)) {
+    if (is_readonly(name))
+      throw Error{"'" + name + "' is read only and cannot be assigned"};
+    m_shell_variables.erase(name);
     for (String &element : values)
       existing->push(steal(element));
     return;
@@ -194,8 +199,13 @@ fn EvalContext::set_array_element(StringView name, usize index,
   }
 
   /* An existing array is edited in place, so building one element at a time
-     stays linear rather than copying the whole array on each write. */
+     stays linear rather than copying the whole array on each write. The
+     readonly guard and the scalar clear match set_indexed_array, since the
+     in-place path bypasses it. */
   if (let *existing = m_indexed_arrays.find(name)) {
+    if (is_readonly(name))
+      throw Error{"'" + name + "' is read only and cannot be assigned"};
+    m_shell_variables.erase(name);
     while (existing->count() <= index)
       existing->push(String{heap_allocator()});
     (*existing)[index] = String{heap_allocator(), value};

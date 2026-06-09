@@ -19,6 +19,24 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
+namespace {
+
+/* The value a declare -p line wraps in double quotes, with the characters that
+   are special inside double quotes escaped, so the printed line reloads to the
+   same value the way bash quotes it. */
+String quote_for_declare(StringView value) throws
+{
+  String quoted{};
+  for (usize i = 0; i < value.length; i++) {
+    const char c = value[i];
+    if (c == '"' || c == '\\' || c == '$' || c == '`') quoted += '\\';
+    quoted += c;
+  }
+  return quoted;
+}
+
+} /* namespace */
+
 Declare::Declare() = default;
 
 pure Builtin::Kind Declare::kind() const wontthrow { return Kind::Declare; }
@@ -85,7 +103,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
           line += '[';
           line += utils::int_to_text(static_cast<i64>(e));
           line += "]=\"";
-          line.append((*elements)[e].view());
+          line += quote_for_declare((*elements)[e].view());
           line += '"';
         }
         line += ")\n";
@@ -100,7 +118,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
           line += '[';
           line.append(keys[e].view());
           line += "]=\"";
-          if (e < values.count()) line.append(values[e].view());
+          if (e < values.count()) line += quote_for_declare(values[e].view());
           line += "\" ";
         }
         line += ")\n";
@@ -113,7 +131,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         line += ' ';
         line.append(name);
         line += "=\"";
-        line.append(value->view());
+        line += quote_for_declare(value->view());
         line += "\"\n";
         ec.print_to_stdout(line.view());
       } else {
