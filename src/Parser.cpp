@@ -1691,8 +1691,14 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
 hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
 {
   const StringView body = capture_double_paren_body(open);
+  /* The command's location spans the whole (( body )), the two opening and two
+     closing parentheses around the captured body, so a runtime arithmetic error
+     underlines the entire expression rather than only the opening parentheses. */
+  const SourceLocation open_location = open->source_location();
+  const SourceLocation full_location{open_location.position, body.length + 4,
+                                     open_location.filename};
   return m_lexer.arena().create<expressions::ArithmeticCommand>(
-      open->source_location(), String{bump_allocator(m_lexer.arena()), body});
+      full_location, String{bump_allocator(m_lexer.arena()), body});
 }
 
 /* A bash C-style for, for (( init; cond; step )); do BODY; done. The header
