@@ -455,8 +455,9 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
 }
 
 /* The prompt used when PS1 is unset, user@host then the cwd shortened with an
-   ellipsis in green then a $ or a # for root, expressed through the same escapes
-   a user PS1 uses. The color is baked in only when the terminal takes color. */
+   ellipsis in green then a $ or a # for root, expressed through the same
+   escapes a user PS1 uses. The color is baked in only when the terminal takes
+   color. */
 static fn default_prompt_template() throws -> String
 {
   String template_string{};
@@ -775,8 +776,8 @@ fn main(int argc, char **argv) -> int
   /* A corrupt or absurd inherited level is clamped so the increment cannot
      overflow, the way bash bounds SHLVL to a sane range. */
   if (shell_level > 999) shell_level = 0;
-  shit::os::set_environment_variable(
-      "SHLVL", shit::utils::int_to_text(shell_level + 1));
+  shit::os::set_environment_variable("SHLVL",
+                                     shit::utils::int_to_text(shell_level + 1));
 
   /* The default prompt lives in PS1 so it is visible and editable, unless the
      environment already supplies one. An interactive unset of PS1 still falls
@@ -926,10 +927,10 @@ fn main(int argc, char **argv) -> int
 
         shit::String u = shit::os::get_current_user().value_or("???");
 
-        /* The PS1 template, the user's when set, otherwise the built-in default,
-           both run through the same escape pass so the two render identically.
-           The \P escape shortens the cwd with an ellipsis the way the old
-           hardcoded default did. */
+        /* The PS1 template, the user's when set, otherwise the built-in
+           default, both run through the same escape pass so the two render
+           identically. The \P escape shortens the cwd with an ellipsis the way
+           the old hardcoded default did. */
         shit::String ps1_template;
         if (shit::Maybe<shit::String> ps1 = context.get_variable_value("PS1");
             ps1.has_value() && !ps1->is_empty())
@@ -941,7 +942,7 @@ fn main(int argc, char **argv) -> int
 
         /* Ask for input until we get one. */
         for (;;) {
-          let [code, input] = toiletline::get_input(prompt);
+          let[code, input] = toiletline::get_input(prompt);
 
           switch (code) {
           case TL_PRESSED_TAB:

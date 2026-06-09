@@ -307,7 +307,8 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
   usize expression_end = arguments.count();
   if (ec.program() == "[") {
     if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]")
-      throw Error{"Unable to evaluate the test because the closing ']' is missing"};
+      throw Error{
+          "Unable to evaluate the test because the closing ']' is missing"};
     expression_end = arguments.count() - 1;
   }
 

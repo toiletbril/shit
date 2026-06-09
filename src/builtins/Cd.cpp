@@ -52,7 +52,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (is_to_previous) {
     let const old_directory = cxt.get_variable_value("OLDPWD");
     if (!old_directory || old_directory->is_empty())
-      throw Error{"Unable to return to the previous directory because OLDPWD is not set"};
+      throw Error{"Unable to return to the previous directory because OLDPWD "
+                  "is not set"};
     arg_path.append(old_directory->view());
   } else if (ec.args().count() > 1) {
     arg_path.append(ec.args()[1]);

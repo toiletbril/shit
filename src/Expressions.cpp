@@ -36,8 +36,7 @@ cold fn Expression::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
-hot flatten fn Expression::evaluate(EvalContext &cxt) const throws
-    -> i64
+hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
 {
   /* A Ctrl-C sets the interrupt flag, and the check here runs before every
      node, so a running command, including a loop body or condition, stops
@@ -871,7 +870,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      finishes, restored in reverse on every exit path. The standard fds are
      routed here so a later 2>&1 copies the descriptor its source points at now,
      in source order, rather than the one a deferred slot would place last. */
-  ArrayList<os::saved_descriptor> dup_saved_descriptors{cxt.scratch_allocator()};
+  ArrayList<os::saved_descriptor> dup_saved_descriptors{
+      cxt.scratch_allocator()};
   defer
   {
     for (usize i = dup_saved_descriptors.count(); i > 0; i--)
@@ -2445,7 +2445,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
           pattern_active.push(true);
       }
       if (utils::glob_matches(pattern, subject, pattern_active, 0,
-                              cxt.extglob_enabled())) {
+                              cxt.extglob_enabled()))
+      {
         let const ret = item.body->evaluate(cxt);
         cxt.set_last_exit_status(static_cast<i32>(ret));
         return ret;

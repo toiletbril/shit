@@ -46,7 +46,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (first_target >= args.count())
-    throw Error{"Unable to send the signal because a job or a process id is required"};
+    throw Error{
+        "Unable to send the signal because a job or a process id is required"};
 
   i32 status = 0;
   for (usize i = first_target; i < args.count(); i++) {

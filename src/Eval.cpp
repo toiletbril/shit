@@ -2353,7 +2353,8 @@ struct ConditionalEvaluator
     if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
       /* bash returns status 2 for a malformed regex, which the conditional
          turns into an evaluation error. */
-      throw Error{"Unable to evaluate the [[ ]] because the regular expression is invalid"};
+      throw Error{"Unable to evaluate the [[ ]] because the regular expression "
+                  "is invalid"};
     }
     const int match_result =
         regexec(&compiled, value_text.c_str(), 0, nullptr, 0);
@@ -2362,7 +2363,8 @@ struct ConditionalEvaluator
 #else
     unused(value);
     unused(pattern);
-    throw Error{"Unable to use =~ in the [[ ]] because it is not supported on this platform"};
+    throw Error{"Unable to use =~ in the [[ ]] because it is not supported on "
+                "this platform"};
 #endif
   }
 
@@ -2429,10 +2431,13 @@ struct ConditionalEvaluator
 
   bool eval_primary() throws
   {
-    if (at_end()) throw Error{"Unable to evaluate the [[ ]] because the expression ends unexpectedly"};
+    if (at_end())
+      throw Error{"Unable to evaluate the [[ ]] because the expression ends "
+                  "unexpectedly"};
     const conditional_element &first = elements[pos];
     if (first.kind != Kind::Operand)
-      throw Error{"Unable to evaluate the [[ ]] because an operator appears where an operand is expected"};
+      throw Error{"Unable to evaluate the [[ ]] because an operator appears "
+                  "where an operand is expected"};
 
     const String first_literal = operand_literal(first);
 
@@ -2452,7 +2457,8 @@ struct ConditionalEvaluator
       const Kind next = kind_at(pos + 1);
       if (next == Kind::Less || next == Kind::Greater) {
         if (pos + 2 >= elements.count() || kind_at(pos + 2) != Kind::Operand)
-          throw Error{"Unable to evaluate the [[ ]] because an operand is missing after a comparison"};
+          throw Error{"Unable to evaluate the [[ ]] because an operand is "
+                      "missing after a comparison"};
         pos += 3;
         if (is_skipping) return false;
         const String left = operand_value(elements[pos - 3]);
@@ -2535,7 +2541,9 @@ struct ConditionalEvaluator
 fn EvalContext::evaluate_conditional(
     const ArrayList<conditional_element> &elements) throws -> bool
 {
-  if (elements.is_empty()) throw Error{"Unable to evaluate the [[ ]] because the conditional expression is empty"};
+  if (elements.is_empty())
+    throw Error{"Unable to evaluate the [[ ]] because the conditional "
+                "expression is empty"};
   ConditionalEvaluator evaluator{*this, elements};
   const bool result = evaluator.eval_or();
   if (!evaluator.at_end())
@@ -4202,8 +4210,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
   m_source_frames.push(source_frame{
       String{origin},
       call_site ? *call_site : SourceLocation{0, 0},
-      parent_source,
-      filename.has_value() ? String{*filename} : String{}
+      parent_source, filename.has_value() ? String{*filename}
+      : String{}
   });
   defer { m_source_frames.pop_back(); };
 
