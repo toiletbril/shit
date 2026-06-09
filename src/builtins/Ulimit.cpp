@@ -15,14 +15,24 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-f|-n|-t|-u] [limit]");
+HELP_SYNOPSIS_DECL("[-HSacdflmnpstuvw] [limit]");
 
-FLAG(FILE_SIZE, Bool, 'f', "",
-     "The largest file the shell may create, in "
-     "512-byte blocks.");
-FLAG(OPEN_FILES, Bool, 'n', "", "The largest number of open file descriptors.");
 FLAG(CPU_TIME, Bool, 't', "", "The most CPU time in seconds.");
+FLAG(FILE_SIZE, Bool, 'f', "",
+     "The largest file the shell may create, in 512-byte blocks.");
+FLAG(DATA_SIZE, Bool, 'd', "", "The data segment size in kbytes.");
+FLAG(STACK_SIZE, Bool, 's', "", "The stack size in kbytes.");
+FLAG(CORE_SIZE, Bool, 'c', "", "The core dump size in 512-byte blocks.");
+FLAG(RSS_SIZE, Bool, 'm', "", "The resident set size in kbytes.");
+FLAG(LOCKED_MEMORY, Bool, 'l', "", "The locked-in-memory size in kbytes.");
+FLAG(PROCESSES_P, Bool, 'p', "", "The most processes for the user.");
+FLAG(OPEN_FILES, Bool, 'n', "", "The largest number of open file descriptors.");
+FLAG(VIRTUAL_MEMORY, Bool, 'v', "", "The virtual memory size in kbytes.");
+FLAG(FILE_LOCKS, Bool, 'w', "", "The most file locks.");
 FLAG(PROCESSES, Bool, 'u', "", "The most processes for the user.");
+FLAG(ALL, Bool, 'a', "", "Report every limit.");
+FLAG(HARD, Bool, 'H', "", "Read or set the hard limit.");
+FLAG(SOFT, Bool, 'S', "", "Read or set the soft limit.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -31,20 +41,82 @@ namespace shit {
 
 namespace {
 
-/* The resource selected by the flags, with the divisor ulimit reports it in. */
-struct resource
+/* One resource ulimit reports, with the label -a prints, the rlimit selector,
+   and the divisor the value is scaled by. The order matches dash so -a prints
+   the same table. */
+struct resource_entry
 {
+  const char *label;
   int which;
   rlim_t units_per_value;
 };
 
-cold resource selected_resource() throws
+constexpr resource_entry RESOURCE_TABLE[] = {
+    {"time(seconds)", RLIMIT_CPU, 1},
+    {"file(blocks)", RLIMIT_FSIZE, 512},
+    {"data(kbytes)", RLIMIT_DATA, 1024},
+    {"stack(kbytes)", RLIMIT_STACK, 1024},
+    {"coredump(blocks)", RLIMIT_CORE, 512},
+#ifdef RLIMIT_RSS
+    {"memory(kbytes)", RLIMIT_RSS, 1024},
+#endif
+#ifdef RLIMIT_MEMLOCK
+    {"locked memory(kbytes)", RLIMIT_MEMLOCK, 1024},
+#endif
+#ifdef RLIMIT_NPROC
+    {"process", RLIMIT_NPROC, 1},
+#endif
+    {"nofiles", RLIMIT_NOFILE, 1},
+#ifdef RLIMIT_AS
+    {"vmemory(kbytes)", RLIMIT_AS, 1024},
+#endif
+#ifdef RLIMIT_LOCKS
+    {"locks", RLIMIT_LOCKS, 1},
+#endif
+#ifdef RLIMIT_RTPRIO
+    {"rtprio", RLIMIT_RTPRIO, 1},
+#endif
+};
+
+/* The resource the flags select, or None when none of the resource flags is
+   set so the file-size default applies. -u and dash's -p both name the process
+   limit. */
+fn selected_resource() throws -> resource_entry
 {
-  if (FLAG_OPEN_FILES.is_enabled()) return {RLIMIT_NOFILE, 1};
-  if (FLAG_CPU_TIME.is_enabled()) return {RLIMIT_CPU, 1};
-  if (FLAG_PROCESSES.is_enabled()) return {RLIMIT_NPROC, 1};
-  /* The file-size limit is the default, reported in 512-byte blocks. */
-  return {RLIMIT_FSIZE, 512};
+  if (FLAG_CPU_TIME.is_enabled()) return {"time(seconds)", RLIMIT_CPU, 1};
+  if (FLAG_DATA_SIZE.is_enabled()) return {"data(kbytes)", RLIMIT_DATA, 1024};
+  if (FLAG_STACK_SIZE.is_enabled()) return {"stack(kbytes)", RLIMIT_STACK, 1024};
+  if (FLAG_CORE_SIZE.is_enabled())
+    return {"coredump(blocks)", RLIMIT_CORE, 512};
+  if (FLAG_OPEN_FILES.is_enabled()) return {"nofiles", RLIMIT_NOFILE, 1};
+#ifdef RLIMIT_RSS
+  if (FLAG_RSS_SIZE.is_enabled()) return {"memory(kbytes)", RLIMIT_RSS, 1024};
+#endif
+#ifdef RLIMIT_MEMLOCK
+  if (FLAG_LOCKED_MEMORY.is_enabled())
+    return {"locked memory(kbytes)", RLIMIT_MEMLOCK, 1024};
+#endif
+#ifdef RLIMIT_NPROC
+  if (FLAG_PROCESSES.is_enabled() || FLAG_PROCESSES_P.is_enabled())
+    return {"process", RLIMIT_NPROC, 1};
+#endif
+#ifdef RLIMIT_AS
+  if (FLAG_VIRTUAL_MEMORY.is_enabled())
+    return {"vmemory(kbytes)", RLIMIT_AS, 1024};
+#endif
+#ifdef RLIMIT_LOCKS
+  if (FLAG_FILE_LOCKS.is_enabled()) return {"locks", RLIMIT_LOCKS, 1};
+#endif
+  return {"file(blocks)", RLIMIT_FSIZE, 512};
+}
+
+/* The limit value scaled and rendered, or unlimited, with the hard limit read
+   under -H and the soft limit otherwise. */
+fn render_limit(const struct rlimit &limit, rlim_t divisor) throws -> String
+{
+  const rlim_t value = FLAG_HARD.is_enabled() ? limit.rlim_max : limit.rlim_cur;
+  if (value == RLIM_INFINITY) return String{"unlimited"};
+  return utils::uint_to_text(value / divisor);
 }
 
 } /* namespace */
@@ -59,35 +131,47 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ASSERT(!args.is_empty());
 
+  /* -a reports every resource, the label left-justified in a twenty-wide field
+     and then the value, the layout dash prints. */
+  if (FLAG_ALL.is_enabled()) {
+    String out{};
+    for (const resource_entry &entry : RESOURCE_TABLE) {
+      struct rlimit limit{};
+      if (getrlimit(entry.which, &limit) != 0) continue;
+      String label{entry.label};
+      out += label;
+      for (usize pad = label.count(); pad < 20; pad++) out.push(' ');
+      out.push(' ');
+      out += render_limit(limit, entry.units_per_value);
+      out.push('\n');
+    }
+    ec.print_to_stdout(out);
+    return 0;
+  }
+
   let const resource = selected_resource();
 
   struct rlimit limit{};
   if (getrlimit(resource.which, &limit) != 0)
     throw Error{"could not read the limit: " + os::last_system_error_message()};
 
-  /* A bare flag reads the soft limit, an operand sets both the soft and the
-     hard limit. */
+  /* A bare flag reads the limit, an operand sets it. With neither -H nor -S the
+     read reports the soft limit and the set changes both. */
   if (args.count() < 2) {
-    String out{};
-    if (limit.rlim_cur == RLIM_INFINITY)
-      out = String{"unlimited"};
-    else
-      out = utils::uint_to_text(limit.rlim_cur / resource.units_per_value);
-    ec.print_to_stdout(out + "\n");
+    ec.print_to_stdout(render_limit(limit, resource.units_per_value) + "\n");
     return 0;
   }
 
   let const &requested = args[1];
-  if (requested == "unlimited") {
-    limit.rlim_cur = RLIM_INFINITY;
-    limit.rlim_max = RLIM_INFINITY;
-  } else {
-    let const value =
-        static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10)) *
-        resource.units_per_value;
-    limit.rlim_cur = value;
-    limit.rlim_max = value;
+  rlim_t value = RLIM_INFINITY;
+  if (requested != "unlimited") {
+    value = static_cast<rlim_t>(std::strtoull(requested.c_str(), nullptr, 10)) *
+            resource.units_per_value;
   }
+
+  /* -H sets only the hard limit, -S only the soft, and neither sets both. */
+  if (!FLAG_SOFT.is_enabled()) limit.rlim_max = value;
+  if (!FLAG_HARD.is_enabled()) limit.rlim_cur = value;
 
   if (setrlimit(resource.which, &limit) != 0)
     throw Error{"could not set the limit: " + os::last_system_error_message()};

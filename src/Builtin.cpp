@@ -30,6 +30,18 @@ flatten fn search_builtin(StringView builtin_name) throws
   return BUILTINS.find(builtin_name);
 }
 
+fn is_special_builtin_name(StringView name) wontthrow -> bool
+{
+  /* The POSIX special builtin set, matched by name. The colon and the dot are
+     special while their plain-word siblings true and source-as-a-program are
+     not, so the kind cannot decide this. */
+  return name == ":" || name == "." || name == "break" || name == "continue" ||
+         name == "eval" || name == "exec" || name == "exit" ||
+         name == "export" || name == "readonly" || name == "return" ||
+         name == "set" || name == "shift" || name == "times" ||
+         name == "trap" || name == "unset";
+}
+
 fn builtin_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {

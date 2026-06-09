@@ -252,12 +252,14 @@ class Redirection
 public:
   enum class Kind : u8
   {
-    TruncateOutput,  /* >    */
-    AppendOutput,    /* >>   */
-    ReadInput,       /* <    */
-    DuplicateOutput, /* >&   */
-    DuplicateInput,  /* <&   */
-    Heredoc          /* <<   */
+    TruncateOutput,         /* >    */
+    TruncateOutputOverride, /* >|   */
+    AppendOutput,           /* >>   */
+    ReadInput,              /* <    */
+    ReadWrite,              /* <>   */
+    DuplicateOutput,        /* >&   */
+    DuplicateInput,         /* <&   */
+    Heredoc                 /* <<   */
   };
 
   /* The dup_fd value that marks the close-descriptor form, as in 2>&- and <&-,

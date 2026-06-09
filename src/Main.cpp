@@ -258,6 +258,11 @@ static fn run_script_contents(const String &script_contents,
       context.set_current_source(&script_contents, "the script");
       /* Run! */
       exit_code = static_cast<int>(ast->evaluate(context));
+      /* A trapped signal delivered during the last command of the chunk has no
+         following node to trigger its action, so the pending traps drain here
+         before the chunk ends, the way dash runs a pending trap before it reads
+         the next command or exits. */
+      if (shit::os::SIGNAL_PENDING) context.run_pending_traps();
       report_escaped_control_flow(context, script_contents);
       /* script_contents is local to this call, so drop the frame before it goes
          out of scope and leaves a dangling pointer behind. */

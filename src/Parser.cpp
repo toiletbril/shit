@@ -510,6 +510,47 @@ fn Parser::build_file_or_dup_redirection(
     }
   }
 
+  {
+    Token *after = m_lexer.peek_shell_token();
+    ASSERT(after != nullptr);
+    /* The second character must touch the operator, so a real pipe in cmd >file
+       | next and a comparison stay separate from the >| and <> operators. */
+    const bool is_adjacent = after->source_location().position ==
+                             op_location.position + op_location.length;
+
+    /* >| truncates the target even under noclobber, the explicit override. */
+    if (op_kind == Token::Kind::Greater &&
+        after->kind() == Token::Kind::Pipe && is_adjacent)
+    {
+      m_lexer.advance_past_last_peek();
+      Token *target = m_lexer.next_shell_token();
+      if (target->kind() != Token::Kind::Word) {
+        throw ErrorWithLocation{target->source_location(),
+                                "Expected a filename after '>|'"};
+      }
+      redir.kind = expressions::Redirection::Kind::TruncateOutputOverride;
+      redir.target = target;
+      out.push(redir);
+      return;
+    }
+
+    /* <> opens the target for reading and writing, creating it if absent. */
+    if (op_kind == Token::Kind::Less &&
+        after->kind() == Token::Kind::Greater && is_adjacent)
+    {
+      m_lexer.advance_past_last_peek();
+      Token *target = m_lexer.next_shell_token();
+      if (target->kind() != Token::Kind::Word) {
+        throw ErrorWithLocation{target->source_location(),
+                                "Expected a filename after '<>'"};
+      }
+      redir.kind = expressions::Redirection::Kind::ReadWrite;
+      redir.target = target;
+      out.push(redir);
+      return;
+    }
+  }
+
   Token *target = m_lexer.next_shell_token();
   ASSERT(target != nullptr);
   if (target->kind() != Token::Kind::Word) {

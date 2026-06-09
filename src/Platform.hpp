@@ -114,6 +114,7 @@ enum class file_open_mode : u8
   TruncateNoClobber, /* >  under noclobber, fail if the file exists */
   Append,            /* >> create or append for writing */
   Read,              /* <  open an existing file for reading */
+  ReadWrite,         /* <> create or open for reading and writing */
 };
 
 /* Open path for the given mode and return its descriptor, or None on error
@@ -272,6 +273,28 @@ fn reset_signal_handlers() throws -> void;
    aborts the running command, such as a loop that would otherwise spin forever.
    The main loop clears it before each interactive command. */
 extern volatile sig_atomic_t INTERRUPT_REQUESTED;
+
+/* Set to one whenever any trapped signal arrives, so the evaluator's hot poll is
+   a single read. The drain at the command boundary clears it as it consumes the
+   per-signal flags. */
+extern volatile sig_atomic_t SIGNAL_PENDING;
+
+/* Install the shell's async-safe handler for a signal a trap names, so its
+   arrival sets a pending flag the evaluator drains. A signal the startup blocked
+   is unblocked here so the handler can run. */
+fn set_trap_handler(i32 signal_number) throws -> void;
+
+/* Install the ignore disposition for a signal, for a trap with an empty action
+   such as trap "" INT, so the signal is discarded rather than running anything. */
+fn set_trap_ignore(i32 signal_number) throws -> void;
+
+/* Restore a signal's default disposition when its trap is removed. SIGINT
+   returns to the shell's interrupt handler, every other signal to SIG_DFL. */
+fn clear_trap_handler(i32 signal_number) throws -> void;
+
+/* Return the next trapped signal whose flag is set and clear it, or zero when
+   none remain. The evaluator calls it in a loop to run each pending trap. */
+fn take_pending_signal() wontthrow -> i32;
 
 /* A monotonic clock reading in nanoseconds, immune to wall-clock jumps, for
    measuring an elapsed interval. POSIX reads CLOCK_MONOTONIC and Windows reads

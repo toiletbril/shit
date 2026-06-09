@@ -59,6 +59,7 @@ public:
     Kill,
     Time,
     Bench,
+    Newgrp,
   };
 
   void set_fds(os::descriptor in, os::descriptor out) throws;
@@ -117,6 +118,7 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("kill"),     Builtin::Kind::Kill          },
     {PackedStringKey::from_literal("time"),     Builtin::Kind::Time          },
     {PackedStringKey::from_literal("bench"),    Builtin::Kind::Bench         },
+    {PackedStringKey::from_literal("newgrp"),   Builtin::Kind::Newgrp        },
 };
 
 inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
@@ -165,7 +167,8 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Wait);                                                                \
   B_CASE(Kill);                                                                \
   B_CASE(Time);                                                                \
-  B_CASE(Bench)
+  B_CASE(Bench);                                                               \
+  B_CASE(Newgrp)
 
 #define BUILTIN_STRUCT(b)                                                      \
   class b : public Builtin                                                     \
@@ -216,6 +219,7 @@ BUILTIN_STRUCT(Wait);
 BUILTIN_STRUCT(Kill);
 BUILTIN_STRUCT(Time);
 BUILTIN_STRUCT(Bench);
+BUILTIN_STRUCT(Newgrp);
 
 class Exit : public Builtin
 {
@@ -227,6 +231,12 @@ public:
 };
 
 Maybe<Builtin::Kind> search_builtin(StringView builtin_name) throws;
+
+/* True when the name is one of the POSIX special builtins, the set whose prefix
+   assignments persist after the command and whose errors abort a non-interactive
+   shell. The test is by name rather than by kind, since : is special while true
+   is not though both resolve to one kind. */
+fn is_special_builtin_name(StringView name) wontthrow -> bool;
 
 /* The builtin command names, recovered once from BUILTIN_ENTRIES and cached,
    so command completion offers exactly the registered builtins. */

@@ -433,11 +433,58 @@ fn EvalContext::variable_names() const throws -> HashSet
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
   m_traps.set(condition, action);
+  /* EXIT runs at the shell's end and needs no OS handler. A signal condition
+     installs the shell's handler so the action runs on arrival, or the ignore
+     disposition when the action is the empty string, as trap "" SIG asks. */
+  if (condition == "EXIT") return;
+  if (let const number = os::signal_number_from_name(condition)) {
+    if (action.is_empty())
+      os::set_trap_ignore(*number);
+    else
+      os::set_trap_handler(*number);
+  }
 }
 
 fn EvalContext::remove_trap(StringView condition) throws -> void
 {
   m_traps.erase(condition);
+  /* Removing a signal trap returns the signal to its default disposition, so a
+     later arrival acts the way it would without any trap. */
+  if (condition == "EXIT") return;
+  if (let const number = os::signal_number_from_name(condition))
+    os::clear_trap_handler(*number);
+}
+
+fn EvalContext::install_trap_dispositions() throws -> void
+{
+  m_traps.for_each([&](StringView condition, const String &action) {
+    if (condition == "EXIT") return;
+    if (let const number = os::signal_number_from_name(condition)) {
+      if (action.is_empty())
+        os::set_trap_ignore(*number);
+      else
+        os::set_trap_handler(*number);
+    }
+  });
+}
+
+fn EvalContext::run_pending_traps() throws -> void
+{
+  /* A signal delivered while a trap action runs must not nest a second drain, so
+     the guard returns early and the new flag waits for the next boundary. */
+  if (m_running_traps) return;
+  m_running_traps = true;
+  defer { m_running_traps = false; };
+
+  for (i32 number = os::take_pending_signal(); number != 0;
+       number = os::take_pending_signal())
+  {
+    let const name = os::signal_name_from_number(number);
+    if (!name.has_value()) continue;
+    if (let const *action = m_traps.find(name->view()))
+      if (action->count() > 0)
+        run_source(action->view(), "the " + *name + " trap");
+  }
 }
 
 pure fn EvalContext::traps() const wontthrow -> const HashMap<String> &
@@ -935,8 +982,18 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   /* A trap installed inside the subshell stays inside it. The parent's table is
      restored whole, so an EXIT trap the parent set survives and an EXIT trap
      the subshell set is dropped after it has already fired at the subshell's
-     end. */
+     end. A signal the subshell trapped that the parent does not is returned to
+     its default first, then the parent's own signal dispositions are reinstalled
+     from the restored table, so the process matches it. */
+  m_traps.for_each([&](StringView condition, const String &action) {
+    unused(action);
+    if (condition == "EXIT") return;
+    if (snapshot.traps.find(condition) != nullptr) return;
+    if (let const number = os::signal_number_from_name(condition))
+      os::clear_trap_handler(*number);
+  });
   m_traps = steal(snapshot.traps);
+  install_trap_dispositions();
 
   /* set_current_directory reports an error through ErrorOr, ignored here to
      match the prior void call that swallowed a failed chdir. */

@@ -15,6 +15,7 @@
 
 #if SHIT_PLATFORM_IS POSIX
 #include <fcntl.h>
+#include <pwd.h>
 #include <spawn.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -581,6 +582,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
     break;
   case file_open_mode::Append: flags = O_WRONLY | O_CREAT | O_APPEND; break;
   case file_open_mode::Read: flags = O_RDONLY; break;
+  case file_open_mode::ReadWrite: flags = O_RDWR | O_CREAT; break;
   }
 
   /* ::open needs a null-terminated path, so the view is copied into a String
@@ -894,6 +896,75 @@ fn set_default_signal_handlers() throws -> void
   struct sigaction si = {};
   si.sa_handler = handle_interrupt;
   check_syscall(sigaction(SIGINT, &si, nullptr));
+}
+
+volatile sig_atomic_t SIGNAL_PENDING = 0;
+
+/* One pending flag per signal number, set by the trap handler and cleared by the
+   drain. The size covers every real-time and standard signal the platform
+   defines, with a fixed bound so the array stays a flat block the handler may
+   touch async-safely. */
+static constexpr i32 SIGNAL_FLAG_COUNT = 128;
+static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
+
+static fn handle_trapped_signal(int signal_number) wontthrow -> void
+{
+  /* Recording the arrival is the only async-safe action. The evaluator drains
+     the flag at the next command boundary and runs the trap action there. */
+  if (signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT)
+    PENDING_SIGNAL_FLAGS[signal_number] = 1;
+  SIGNAL_PENDING = 1;
+}
+
+fn set_trap_handler(i32 signal_number) throws -> void
+{
+  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+
+  /* A signal the startup blocked, such as SIGTERM, must be unblocked so the
+     handler runs while the shell waits at the prompt or in a loop. */
+  sigset_t sm;
+  sigemptyset(&sm);
+  sigaddset(&sm, signal_number);
+  check_syscall(sigprocmask(SIG_UNBLOCK, &sm, nullptr));
+
+  struct sigaction sa = {};
+  sa.sa_handler = handle_trapped_signal;
+  check_syscall(sigaction(signal_number, &sa, nullptr));
+}
+
+fn set_trap_ignore(i32 signal_number) throws -> void
+{
+  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  struct sigaction sa = {};
+  sa.sa_handler = SIG_IGN;
+  check_syscall(sigaction(signal_number, &sa, nullptr));
+}
+
+fn clear_trap_handler(i32 signal_number) throws -> void
+{
+  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  struct sigaction sa = {};
+  /* SIGINT returns to the shell's own interrupt handler so a Ctrl-C still aborts
+     a shell-internal loop. Every other signal returns to its default action. */
+  if (signal_number == SIGINT)
+    sa.sa_handler = handle_interrupt;
+  else
+    sa.sa_handler = SIG_DFL;
+  check_syscall(sigaction(signal_number, &sa, nullptr));
+}
+
+fn take_pending_signal() wontthrow -> i32
+{
+  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
+    if (PENDING_SIGNAL_FLAGS[number] != 0) {
+      PENDING_SIGNAL_FLAGS[number] = 0;
+      return number;
+    }
+  }
+  /* No flag remained set, so the single fast flag is cleared too. A signal that
+     arrives after this point sets both again and the next boundary drains it. */
+  SIGNAL_PENDING = 0;
+  return 0;
 }
 
 fn monotonic_nanos() wontthrow -> u64
@@ -1469,6 +1540,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
     -> Maybe<descriptor>
 {
   DWORD access = (mode == file_open_mode::Read) ? GENERIC_READ : GENERIC_WRITE;
+  if (mode == file_open_mode::ReadWrite) access = GENERIC_READ | GENERIC_WRITE;
   DWORD disposition = OPEN_EXISTING;
   switch (mode) {
   case file_open_mode::Truncate: disposition = CREATE_ALWAYS; break;
@@ -1476,6 +1548,8 @@ fn open_file_descriptor(StringView path, file_open_mode mode)
   case file_open_mode::TruncateNoClobber: disposition = CREATE_NEW; break;
   case file_open_mode::Append: disposition = OPEN_ALWAYS; break;
   case file_open_mode::Read: disposition = OPEN_EXISTING; break;
+  /* OPEN_ALWAYS opens the file or creates it, the way <> needs. */
+  case file_open_mode::ReadWrite: disposition = OPEN_ALWAYS; break;
   }
 
   /* The handle is created non-inheritable. execute_program marks it inheritable
@@ -1718,6 +1792,55 @@ fn reset_signal_handlers() -> void
      spawn. A stale one would make the evaluator throw Interrupted before the
      child runs, so it is cleared here alongside the handler reset. */
   INTERRUPT_REQUESTED = 0;
+}
+
+volatile sig_atomic_t SIGNAL_PENDING = 0;
+
+static constexpr i32 SIGNAL_FLAG_COUNT = 128;
+static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
+
+static fn handle_trapped_signal(int signal_number) -> void
+{
+  if (signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT)
+    PENDING_SIGNAL_FLAGS[signal_number] = 1;
+  SIGNAL_PENDING = 1;
+  /* The C runtime resets the disposition to default before the handler runs, so
+     it is reinstalled here for the next arrival, the way the interrupt handler
+     reinstalls itself. */
+  signal(signal_number, handle_trapped_signal);
+}
+
+fn set_trap_handler(i32 signal_number) -> void
+{
+  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  signal(signal_number, handle_trapped_signal);
+}
+
+fn set_trap_ignore(i32 signal_number) -> void
+{
+  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  signal(signal_number, SIG_IGN);
+}
+
+fn clear_trap_handler(i32 signal_number) -> void
+{
+  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  if (signal_number == SIGINT)
+    signal(signal_number, handle_interrupt);
+  else
+    signal(signal_number, SIG_DFL);
+}
+
+fn take_pending_signal() wontthrow -> i32
+{
+  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
+    if (PENDING_SIGNAL_FLAGS[number] != 0) {
+      PENDING_SIGNAL_FLAGS[number] = 0;
+      return number;
+    }
+  }
+  SIGNAL_PENDING = 0;
+  return 0;
 }
 
 fn monotonic_nanos() wontthrow -> u64

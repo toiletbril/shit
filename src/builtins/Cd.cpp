@@ -17,6 +17,18 @@ Cd::Cd() = default;
 
 pure fn Cd::kind() const wontthrow -> Builtin::Kind { return Kind::Cd; }
 
+/* CDPATH resolves a relative operand against a list of directories. An operand
+   that is absolute, or whose first component is dot or dot-dot, is taken
+   relative to the current directory and skips the search, the way POSIX
+   specifies. */
+static fn cdpath_search_applies(const String &operand) throws -> bool
+{
+  if (operand.is_empty() || operand[0] == '/') return false;
+  if (operand == "." || operand == "..") return false;
+  if (operand.starts_with("./") || operand.starts_with("../")) return false;
+  return true;
+}
+
 fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
@@ -49,6 +61,38 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   Path target{arg_path};
+
+  /* The first CDPATH entry that yields an existing directory resolves the
+     operand. An empty entry, including the one a leading, trailing, or doubled
+     colon makes, names the current directory. A move reached through a nonempty
+     entry prints the directory it landed in, the way dash announces a CDPATH
+     move. */
+  bool reached_through_cdpath = false;
+  if (!is_to_previous && ec.args().count() > 1 &&
+      cdpath_search_applies(arg_path))
+  {
+    if (let const cdpath = cxt.get_variable_value("CDPATH")) {
+      const StringView entries = cdpath->view();
+      usize start = 0;
+      while (start <= entries.length) {
+        usize end = start;
+        while (end < entries.length && entries.data[end] != ':') end++;
+        const StringView entry = entries.substring_of_length(start, end - start);
+        Path candidate = entry.is_empty()
+                             ? Path{arg_path}
+                             : Path{entry}.push_component(arg_path.view());
+        Path resolved = candidate.to_absolute().normalized();
+        if (resolved.is_directory()) {
+          target = steal(resolved);
+          reached_through_cdpath = !entry.is_empty();
+          break;
+        }
+        if (end >= entries.length) break;
+        start = end + 1;
+      }
+    }
+  }
+
   target = target.to_absolute().normalized();
 
   if (target.exists()) {
@@ -71,9 +115,10 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
-    /* cd - reports the directory it moved to, so a script that toggles between
-       two directories sees where it landed. A plain cd stays silent. */
-    if (is_to_previous) ec.print_to_stdout(target.text() + "\n");
+    /* cd - and a move through a nonempty CDPATH entry report the directory they
+       moved to, so a script sees where it landed. A plain cd stays silent. */
+    if (is_to_previous || reached_through_cdpath)
+      ec.print_to_stdout(target.text() + "\n");
     return 0;
   }
 

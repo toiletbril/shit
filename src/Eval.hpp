@@ -247,11 +247,18 @@ public:
   fn variable_names() const throws -> HashSet;
 
   /* trap stores an action to run for a condition, keyed by the condition name
-     such as EXIT or INT. The EXIT action runs once when the shell ends. */
+     such as EXIT or INT. The EXIT action runs once when the shell ends. A signal
+     condition also installs the shell's signal handler, so the action runs when
+     the signal arrives. */
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
   pure fn traps() const wontthrow -> const HashMap<String> &;
   fn run_exit_trap() throws -> void;
+
+  /* Run the action of every signal whose flag the handler set, called at the
+     command boundary when os::SIGNAL_PENDING is set. A re-entrancy guard keeps a
+     trap action that itself triggers a signal from nesting the drain. */
+  fn run_pending_traps() throws -> void;
   /* True when an EXIT trap action is set, so the run loop keeps the fork for a
      terminal command and lets the trap run before the shell exits. */
   fn has_exit_trap() const wontthrow -> bool;
@@ -597,7 +604,15 @@ protected:
   i64 m_getopts_last_optind{0};
   HashMap<String> m_traps{heap_allocator()};
   bool m_exit_trap_ran{false};
+  /* True while run_pending_traps is draining, so a signal delivered during a
+     trap action does not nest a second drain. */
+  bool m_running_traps{false};
   bool m_terminal_exec_allowed{false};
+
+  /* Install the OS signal disposition for each signal in the trap table, called
+     after a subshell restore brings the parent's table back so the process
+     dispositions match it. */
+  fn install_trap_dispositions() throws -> void;
 
   /* The names marked read-only, scanned by set_shell_variable only when the
      list is not empty. */
