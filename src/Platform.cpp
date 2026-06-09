@@ -175,10 +175,10 @@ fn get_home_directory() throws -> Maybe<Path>
 /* The colon field at index of an /etc/passwd line, empty when the line has too
    few fields. The format is name:passwd:uid:gid:gecos:home:shell, so the name
    is field 0 and the home is field 5. The database is read directly rather than
-   through getpwnam or getpwent, which a static build cannot call without pulling
-   in the runtime glibc NSS modules and which the linker warns about, the same
-   reason get_current_user reads the environment. A user defined only through NSS
-   is not seen, the accepted tradeoff for the static build. */
+   through getpwnam or getpwent, which a static build cannot call without
+   pulling in the runtime glibc NSS modules and which the linker warns about,
+   the same reason get_current_user reads the environment. A user defined only
+   through NSS is not seen, the accepted tradeoff for the static build. */
 static fn passwd_field(StringView line, usize index) wontthrow -> StringView
 {
   usize field_start = 0;
@@ -900,8 +900,8 @@ fn set_default_signal_handlers() throws -> void
 
 volatile sig_atomic_t SIGNAL_PENDING = 0;
 
-/* One pending flag per signal number, set by the trap handler and cleared by the
-   drain. The size covers every real-time and standard signal the platform
+/* One pending flag per signal number, set by the trap handler and cleared by
+   the drain. The size covers every real-time and standard signal the platform
    defines, with a fixed bound so the array stays a flat block the handler may
    touch async-safely. */
 static constexpr i32 SIGNAL_FLAG_COUNT = 128;
@@ -944,8 +944,9 @@ fn clear_trap_handler(i32 signal_number) throws -> void
 {
   if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
   struct sigaction sa = {};
-  /* SIGINT returns to the shell's own interrupt handler so a Ctrl-C still aborts
-     a shell-internal loop. Every other signal returns to its default action. */
+  /* SIGINT returns to the shell's own interrupt handler so a Ctrl-C still
+     aborts a shell-internal loop. Every other signal returns to its default
+     action. */
   if (signal_number == SIGINT)
     sa.sa_handler = handle_interrupt;
   else

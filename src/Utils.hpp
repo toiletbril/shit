@@ -108,9 +108,9 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 fn canonicalize_path(StringView path) throws -> Maybe<Path>;
 
 /* The command name closest to name among the local names passed in, the
-   builtins, and the PATH programs, within a couple of edits counting an adjacent
-   transposition as one, for a did-you-mean hint on a command that was not found.
-   None when nothing is close enough. */
+   builtins, and the PATH programs, within a couple of edits counting an
+   adjacent transposition as one, for a did-you-mean hint on a command that was
+   not found. None when nothing is close enough. */
 fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     -> Maybe<String>;
 

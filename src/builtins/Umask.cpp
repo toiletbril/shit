@@ -6,9 +6,9 @@
 
 #include <cstdio>
 
-/* umask prints the current file-creation mask with no argument, octal by default
-   and symbolic under -S, and sets it from an octal or a symbolic argument such
-   as u=rwx,g=rx,o=. */
+/* umask prints the current file-creation mask with no argument, octal by
+   default and symbolic under -S, and sets it from an octal or a symbolic
+   argument such as u=rwx,g=rx,o=. */
 
 FLAG_LIST_DECL();
 
@@ -70,9 +70,8 @@ fn apply_symbolic_mask(StringView spec, u32 current_mask) throws -> Maybe<u32>
   usize i = 0;
   while (i < spec.length) {
     u32 who = 0;
-    while (i < spec.length &&
-           (spec[i] == 'u' || spec[i] == 'g' || spec[i] == 'o' ||
-            spec[i] == 'a'))
+    while (i < spec.length && (spec[i] == 'u' || spec[i] == 'g' ||
+                               spec[i] == 'o' || spec[i] == 'a'))
     {
       who |= group_mask(spec[i]);
       i++;

@@ -58,8 +58,8 @@ public:
     if (op == "-c") return operand_path.is_character_device();
     if (op == "-p") return operand_path.is_fifo();
     if (op == "-S") return operand_path.is_socket();
-    /* -t takes a file-descriptor number rather than a path and is true when that
-       descriptor is a terminal. The common 0, 1, and 2 map to the standard
+    /* -t takes a file-descriptor number rather than a path and is true when
+       that descriptor is a terminal. The common 0, 1, and 2 map to the standard
        streams, and any other descriptor reads as not a terminal. */
     if (op == "-t") {
       i64 file_descriptor = 0;

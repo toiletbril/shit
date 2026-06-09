@@ -59,29 +59,29 @@ struct resource_entry
 };
 
 constexpr resource_entry RESOURCE_TABLE[] = {
-    {"time(seconds)", RLIMIT_CPU, 1},
-    {"file(blocks)", RLIMIT_FSIZE, 512},
-    {"data(kbytes)", RLIMIT_DATA, 1024},
-    {"stack(kbytes)", RLIMIT_STACK, 1024},
-    {"coredump(blocks)", RLIMIT_CORE, 512},
+    {"time(seconds)",         RLIMIT_CPU,     1   },
+    {"file(blocks)",          RLIMIT_FSIZE,   512 },
+    {"data(kbytes)",          RLIMIT_DATA,    1024},
+    {"stack(kbytes)",         RLIMIT_STACK,   1024},
+    {"coredump(blocks)",      RLIMIT_CORE,    512 },
 #ifdef RLIMIT_RSS
-    {"memory(kbytes)", RLIMIT_RSS, 1024},
+    {"memory(kbytes)",        RLIMIT_RSS,     1024},
 #endif
 #ifdef RLIMIT_MEMLOCK
     {"locked memory(kbytes)", RLIMIT_MEMLOCK, 1024},
 #endif
 #ifdef RLIMIT_NPROC
-    {"process", RLIMIT_NPROC, 1},
+    {"process",               RLIMIT_NPROC,   1   },
 #endif
-    {"nofiles", RLIMIT_NOFILE, 1},
+    {"nofiles",               RLIMIT_NOFILE,  1   },
 #ifdef RLIMIT_AS
-    {"vmemory(kbytes)", RLIMIT_AS, 1024},
+    {"vmemory(kbytes)",       RLIMIT_AS,      1024},
 #endif
 #ifdef RLIMIT_LOCKS
-    {"locks", RLIMIT_LOCKS, 1},
+    {"locks",                 RLIMIT_LOCKS,   1   },
 #endif
 #ifdef RLIMIT_RTPRIO
-    {"rtprio", RLIMIT_RTPRIO, 1},
+    {"rtprio",                RLIMIT_RTPRIO,  1   },
 #endif
 };
 
@@ -92,7 +92,8 @@ fn selected_resource() throws -> resource_entry
 {
   if (FLAG_CPU_TIME.is_enabled()) return {"time(seconds)", RLIMIT_CPU, 1};
   if (FLAG_DATA_SIZE.is_enabled()) return {"data(kbytes)", RLIMIT_DATA, 1024};
-  if (FLAG_STACK_SIZE.is_enabled()) return {"stack(kbytes)", RLIMIT_STACK, 1024};
+  if (FLAG_STACK_SIZE.is_enabled())
+    return {"stack(kbytes)", RLIMIT_STACK, 1024};
   if (FLAG_CORE_SIZE.is_enabled())
     return {"coredump(blocks)", RLIMIT_CORE, 512};
   if (FLAG_OPEN_FILES.is_enabled()) return {"nofiles", RLIMIT_NOFILE, 1};
@@ -147,7 +148,8 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (getrlimit(entry.which, &limit) != 0) continue;
       String label{entry.label};
       out += label;
-      for (usize pad = label.count(); pad < 20; pad++) out.push(' ');
+      for (usize pad = label.count(); pad < 20; pad++)
+        out.push(' ');
       out.push(' ');
       out += render_limit(limit, entry.units_per_value);
       out.push('\n');

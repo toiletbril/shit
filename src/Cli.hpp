@@ -26,6 +26,9 @@
 
 namespace shit {
 
+extern const usize HELP_WRAP_WIDTH;
+extern const usize HELP_INDENT;
+
 class Flag
 {
 public:

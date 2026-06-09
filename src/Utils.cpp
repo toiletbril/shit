@@ -972,7 +972,8 @@ static pure fn bounded_osa_distance(StringView a, StringView b,
   usize previous[OSA_ROW_WIDTH];
   usize current[OSA_ROW_WIDTH];
 
-  for (usize j = 0; j <= lb; j++) previous[j] = j;
+  for (usize j = 0; j <= lb; j++)
+    previous[j] = j;
   for (usize i = 1; i <= la; i++) {
     current[0] = i;
     usize row_best = current[0];
@@ -1037,14 +1038,17 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
     }
   };
 
-  for (const String &local : local_names) consider(local.view());
-  for (const String &builtin : builtin_names()) consider(builtin.view());
+  for (const String &local : local_names)
+    consider(local.view());
+  for (const String &builtin : builtin_names())
+    consider(builtin.view());
   if (MAYBE_PATH) {
     for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
       if (Maybe<ArrayList<String>> entries =
               Path::read_directory(Path{dir_string.view()}))
       {
-        for (const String &entry : *entries) consider(entry.view());
+        for (const String &entry : *entries)
+          consider(entry.view());
       }
     }
   }

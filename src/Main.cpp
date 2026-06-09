@@ -112,8 +112,10 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
   if (FLAG_HELP.is_enabled()) {
     String h{};
     h += "\n";
-    h += "  Shit, a pedantic, super-fast and awesome POSIX-compatible command line\n";
-    h += "  interpreter, or a friendly interactive shell for gigachads.\n\n";
+    h += wrap_text(
+        "Shit, a pedantic, super-fast and awesome POSIX-compatible command "
+        "line interpreter, or a friendly interactive shell for gigachads.\n\n",
+        HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_synopsis(program_path.view(), HELP_SYNOPSIS);
     h += '\n';
     h += make_flag_help(FLAG_LIST);
@@ -322,8 +324,8 @@ static fn source_file(const Path &path, EvalContext &context,
 }
 
 /* The current git branch read from .git/HEAD without forking git, walking up
-   from the working directory to the filesystem root. Empty outside a repository.
-   A detached HEAD shows the short commit hash. */
+   from the working directory to the filesystem root. Empty outside a
+   repository. A detached HEAD shows the short commit hash. */
 static fn git_branch() throws -> String
 {
   let dir = Path::current_directory();
@@ -438,8 +440,8 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
     case 't': out += '\t'; break;
-    /* The last exit status, colored green on success and red on failure when the
-       terminal takes color. */
+    /* The last exit status, colored green on success and red on failure when
+       the terminal takes color. */
     case '?': {
       const i32 status = context.last_exit_status();
       const bool wants_color = colors::stdout_wants_color();
@@ -449,9 +451,13 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       if (wants_color) out += colors::ansi::RESET;
     } break;
     /* The number of background jobs. */
-    case 'j': out += utils::int_to_text(static_cast<i64>(context.jobs().count())); break;
+    case 'j':
+      out += utils::int_to_text(static_cast<i64>(context.jobs().count()));
+      break;
     /* The time the last command took, empty for an instant command. */
-    case 'D': out += format_prompt_duration(context.last_command_duration_ns()); break;
+    case 'D':
+      out += format_prompt_duration(context.last_command_duration_ns());
+      break;
     /* The current git branch, empty outside a repository. */
     case 'g': out += git_branch(); break;
     case '\\': out += '\\'; break;
@@ -628,12 +634,12 @@ fn main(int argc, char **argv) -> int
   context.set_stats_enabled(FLAG_STATS.is_enabled());
   /* An interactive session outside compatibility mode defaults to nounset, so a
      typo in a variable name at the prompt fails loudly rather than expanding to
-     nothing. A script keeps the lax POSIX default so an existing configure-style
-     script that reads unset variables still runs, and an explicit set +u turns
-     it off. */
-  context.set_error_unset(FLAG_NOUNSET.is_enabled() ||
-                          (should_be_interactive &&
-                           !shit::should_run_in_posix_mode()));
+     nothing. A script keeps the lax POSIX default so an existing
+     configure-style script that reads unset variables still runs, and an
+     explicit set +u turns it off. */
+  context.set_error_unset(
+      FLAG_NOUNSET.is_enabled() ||
+      (should_be_interactive && !shit::should_run_in_posix_mode()));
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
@@ -699,8 +705,8 @@ fn main(int argc, char **argv) -> int
 
   /* An interactive shell reads ~/.shitrc, the home for interactive config such
      as aliases, options, and the prompt. A login shell reads it too, after the
-     profiles, so a setting lands in every interactive session. A missing file is
-     silently skipped. */
+     profiles, so a setting lands in every interactive session. A missing file
+     is silently skipped. */
   if (should_be_interactive) {
     if (shit::Maybe<shit::Path> home = shit::os::get_home_directory();
         home.has_value())
@@ -806,8 +812,8 @@ fn main(int argc, char **argv) -> int
         {
           /* A user-set PS1 expands its escape sequences, \u \h \w \W \$ \? \j
              \D \g and the like. */
-          prompt = expand_prompt_escapes(ps1->view(), u.view(),
-                                         full_pwd.view(), context);
+          prompt = expand_prompt_escapes(ps1->view(), u.view(), full_pwd.view(),
+                                         context);
         } else {
           shit::String host = shit::os::get_hostname().value_or(
               shit::os::get_environment_variable("HOSTNAME")

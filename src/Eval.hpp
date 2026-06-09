@@ -142,8 +142,8 @@ struct eval_state_snapshot
   usize environment_undo_mark;
 };
 
-/* Record a visit to a directory in the frecency store at ~/.shit_dirs, for the z
-   smart-cd builtin. Called after a successful cd. */
+/* Record a visit to a directory in the frecency store at ~/.shit_dirs, for the
+   z smart-cd builtin. Called after a successful cd. */
 fn record_directory_access(StringView directory) throws -> void;
 
 class EvalContext
@@ -256,17 +256,17 @@ public:
   fn variable_names() const throws -> HashSet;
 
   /* trap stores an action to run for a condition, keyed by the condition name
-     such as EXIT or INT. The EXIT action runs once when the shell ends. A signal
-     condition also installs the shell's signal handler, so the action runs when
-     the signal arrives. */
+     such as EXIT or INT. The EXIT action runs once when the shell ends. A
+     signal condition also installs the shell's signal handler, so the action
+     runs when the signal arrives. */
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
   pure fn traps() const wontthrow -> const HashMap<String> &;
   fn run_exit_trap() throws -> void;
 
   /* Run the action of every signal whose flag the handler set, called at the
-     command boundary when os::SIGNAL_PENDING is set. A re-entrancy guard keeps a
-     trap action that itself triggers a signal from nesting the drain. */
+     command boundary when os::SIGNAL_PENDING is set. A re-entrancy guard keeps
+     a trap action that itself triggers a signal from nesting the drain. */
   fn run_pending_traps() throws -> void;
   /* True when an EXIT trap action is set, so the run loop keeps the fork for a
      terminal command and lets the trap run before the shell exits. */

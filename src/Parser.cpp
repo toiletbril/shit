@@ -524,8 +524,8 @@ fn Parser::build_file_or_dup_redirection(
                              op_location.position + op_location.length;
 
     /* >| truncates the target even under noclobber, the explicit override. */
-    if (op_kind == Token::Kind::Greater &&
-        after->kind() == Token::Kind::Pipe && is_adjacent)
+    if (op_kind == Token::Kind::Greater && after->kind() == Token::Kind::Pipe &&
+        is_adjacent)
     {
       m_lexer.advance_past_last_peek();
       Token *target = m_lexer.next_shell_token();
@@ -540,8 +540,8 @@ fn Parser::build_file_or_dup_redirection(
     }
 
     /* <> opens the target for reading and writing, creating it if absent. */
-    if (op_kind == Token::Kind::Less &&
-        after->kind() == Token::Kind::Greater && is_adjacent)
+    if (op_kind == Token::Kind::Less && after->kind() == Token::Kind::Greater &&
+        is_adjacent)
     {
       m_lexer.advance_past_last_peek();
       Token *target = m_lexer.next_shell_token();
@@ -1033,8 +1033,8 @@ hot fn Parser::parse_for() throws -> Command *
     };
     name_is_plain = name_text.length > 0 && is_name_start(name_text[0]);
     for (usize i = 1; name_is_plain && i < name_text.length; i++)
-      name_is_plain =
-          is_name_start(name_text[i]) || (name_text[i] >= '0' && name_text[i] <= '9');
+      name_is_plain = is_name_start(name_text[i]) ||
+                      (name_text[i] >= '0' && name_text[i] <= '9');
   }
   if (!name_is_plain) {
     throw ErrorWithLocation{

@@ -274,18 +274,19 @@ fn reset_signal_handlers() throws -> void;
    The main loop clears it before each interactive command. */
 extern volatile sig_atomic_t INTERRUPT_REQUESTED;
 
-/* Set to one whenever any trapped signal arrives, so the evaluator's hot poll is
-   a single read. The drain at the command boundary clears it as it consumes the
-   per-signal flags. */
+/* Set to one whenever any trapped signal arrives, so the evaluator's hot poll
+   is a single read. The drain at the command boundary clears it as it consumes
+   the per-signal flags. */
 extern volatile sig_atomic_t SIGNAL_PENDING;
 
 /* Install the shell's async-safe handler for a signal a trap names, so its
-   arrival sets a pending flag the evaluator drains. A signal the startup blocked
-   is unblocked here so the handler can run. */
+   arrival sets a pending flag the evaluator drains. A signal the startup
+   blocked is unblocked here so the handler can run. */
 fn set_trap_handler(i32 signal_number) throws -> void;
 
 /* Install the ignore disposition for a signal, for a trap with an empty action
-   such as trap "" INT, so the signal is discarded rather than running anything. */
+   such as trap "" INT, so the signal is discarded rather than running anything.
+ */
 fn set_trap_ignore(i32 signal_number) throws -> void;
 
 /* Restore a signal's default disposition when its trap is removed. SIGINT

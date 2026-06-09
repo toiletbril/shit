@@ -10,6 +10,9 @@
 
 namespace shit {
 
+constexpr usize HELP_WRAP_WIDTH = 80;
+constexpr usize HELP_INDENT = 2;
+
 /* TODO: Make CLI tests. */
 
 Flag::Flag(Flag::Kind kind, char short_name, StringView long_name,
@@ -472,7 +475,8 @@ cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
         line_used = 0;
       }
       if (!line_started) {
-        for (usize j = 0; j < indent; j++) out += ' ';
+        for (usize j = 0; j < indent; j++)
+          out += ' ';
         line_started = true;
       } else {
         out += ' ';

@@ -206,8 +206,8 @@ private:
     }
   }
 
-  /* The caller already computed the packed key for its probe, so it is passed in
-     rather than recomputed from the key bytes here. */
+  /* The caller already computed the packed key for its probe, so it is passed
+     in rather than recomputed from the key bytes here. */
   void place(usize index, StringView key, const PackedStringKey &packed,
              Value value)
   {

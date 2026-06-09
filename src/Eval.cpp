@@ -470,20 +470,20 @@ fn EvalContext::install_trap_dispositions() throws -> void
 
 fn EvalContext::run_pending_traps() throws -> void
 {
-  /* A signal delivered while a trap action runs must not nest a second drain, so
-     the guard returns early and the new flag waits for the next boundary. */
+  /* A signal delivered while a trap action runs must not nest a second drain,
+     so the guard returns early and the new flag waits for the next boundary. */
   if (m_running_traps) return;
   m_running_traps = true;
   defer { m_running_traps = false; };
 
   /* The fast flag is cleared before the per-signal flags are consumed, so a
-     signal that arrives during the drain re-sets it and the next boundary drains
-     again rather than dropping the arrival. */
+     signal that arrives during the drain re-sets it and the next boundary
+     drains again rather than dropping the arrival. */
   os::SIGNAL_PENDING = 0;
 
   /* A trap action must not change the $? the interrupted code goes on to read,
-     so the status is saved here and restored after the actions run, the way dash
-     keeps a trap transparent to $?. */
+     so the status is saved here and restored after the actions run, the way
+     dash keeps a trap transparent to $?. */
   const i32 saved_exit_status = m_last_exit_status;
 
   for (i32 number = os::take_pending_signal(); number != 0;
@@ -993,8 +993,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      restored whole, so an EXIT trap the parent set survives and an EXIT trap
      the subshell set is dropped after it has already fired at the subshell's
      end. A signal the subshell trapped that the parent does not is returned to
-     its default first, then the parent's own signal dispositions are reinstalled
-     from the restored table, so the process matches it. */
+     its default first, then the parent's own signal dispositions are
+     reinstalled from the restored table, so the process matches it. */
   /* The common subshell and command substitution traps nothing, so the two
      full table scans below are skipped entirely when neither the inner nor the
      restored table holds an entry. */
@@ -1896,7 +1896,8 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
      so ~ and ~/path carry an empty name while ~user and ~user/path carry the
      name. */
   usize name_end = 1;
-  while (name_end < text.length() && text[name_end] != '/') name_end++;
+  while (name_end < text.length() && text[name_end] != '/')
+    name_end++;
   let const name = text.view().substring_of_length(1, name_end - 1);
 
   /* An empty name is the bare ~, which expands to the current home. A named

@@ -9,7 +9,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("from json | to json | to table | get path");
 
 HELP_DESCRIPTION_DECL(
-    "The from builtin parses the JSON text on its input into a value and prints "
+    "The from builtin parses the JSON text on its input into a value and "
+    "prints "
     "it back as JSON. The to builtin reads JSON on its input and renders it as "
     "JSON or as an aligned table. The get builtin walks a dotted path into the "
     "JSON value and prints the part it reaches. Every stage reads text and "
@@ -21,10 +22,10 @@ namespace shit {
 
 namespace {
 
-/* The structured-data builtins keep pipes plain text. from parses JSON text into
-   a value tree, to renders the tree back to JSON or to an aligned table, and get
-   walks a dotted path into the tree. Every stage reads text and writes text, so
-   it composes with grep and the rest of the POSIX world. */
+/* The structured-data builtins keep pipes plain text. from parses JSON text
+   into a value tree, to renders the tree back to JSON or to an aligned table,
+   and get walks a dotted path into the tree. Every stage reads text and writes
+   text, so it composes with grep and the rest of the POSIX world. */
 
 constexpr usize JSON_MAX_DEPTH = 200;
 
@@ -285,20 +286,23 @@ private:
     if (peek() == '0') {
       m_pos++;
     } else if (at_digit()) {
-      while (at_digit()) m_pos++;
+      while (at_digit())
+        m_pos++;
     } else {
       fail("a number has no integer digits");
     }
     if (peek() == '.') {
       m_pos++;
       if (!at_digit()) fail("a number has no fraction digits");
-      while (at_digit()) m_pos++;
+      while (at_digit())
+        m_pos++;
     }
     if (peek() == 'e' || peek() == 'E') {
       m_pos++;
       if (peek() == '+' || peek() == '-') m_pos++;
       if (!at_digit()) fail("a number has no exponent digits");
-      while (at_digit()) m_pos++;
+      while (at_digit())
+        m_pos++;
     }
     json_value value;
     value.kind = json_value::Kind::Number;
@@ -354,7 +358,9 @@ static fn serialize_json(const json_value &value, String &out) throws -> void
   case json_value::Kind::Null: out += "null"; break;
   case json_value::Kind::Bool: out += value.boolean ? "true" : "false"; break;
   case json_value::Kind::Number: out.append(value.scalar.view()); break;
-  case json_value::Kind::String: json_escape_into(value.scalar.view(), out); break;
+  case json_value::Kind::String:
+    json_escape_into(value.scalar.view(), out);
+    break;
   case json_value::Kind::Array:
     out += '[';
     for (usize i = 0; i < value.items.count(); i++) {
@@ -412,7 +418,8 @@ static fn table_cell_text(const json_value &value) throws -> String
 static fn pad_to(String &out, StringView cell, usize width) throws -> void
 {
   out.append(cell);
-  for (usize i = cell.length; i < width; i++) out += ' ';
+  for (usize i = cell.length; i < width; i++)
+    out += ' ';
 }
 
 /* Render the column headers, a separator, and each row aligned to the widest
@@ -423,7 +430,8 @@ static fn render_aligned(const ArrayList<String> &columns,
 {
   ArrayList<usize> widths{};
   widths.reserve(columns.count());
-  for (const String &column : columns) widths.push(column.view().length);
+  for (const String &column : columns)
+    widths.push(column.view().length);
   for (const ArrayList<String> &row : rows)
     for (usize i = 0; i < row.count() && i < widths.count(); i++)
       if (row[i].view().length > widths[i]) widths[i] = row[i].view().length;
@@ -436,7 +444,8 @@ static fn render_aligned(const ArrayList<String> &columns,
   out += '\n';
   for (usize i = 0; i < columns.count(); i++) {
     if (i > 0) out += "-+-";
-    for (usize j = 0; j < widths[i]; j++) out += '-';
+    for (usize j = 0; j < widths[i]; j++)
+      out += '-';
   }
   out += '\n';
   for (const ArrayList<String> &row : rows) {
@@ -625,7 +634,8 @@ fn Get::execute(ExecContext &ec, EvalContext &) const throws -> i32
           break;
         }
       if (next == nullptr)
-        throw Error{StringView{"get: no field '"} + component + "' in the object"};
+        throw Error{StringView{"get: no field '"} + component +
+                    "' in the object"};
       current = next;
     } else if (current->kind == json_value::Kind::Array) {
       const ErrorOr<i64> index = utils::parse_decimal_integer(component);

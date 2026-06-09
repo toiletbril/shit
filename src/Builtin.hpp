@@ -249,9 +249,9 @@ public:
 Maybe<Builtin::Kind> search_builtin(StringView builtin_name) throws;
 
 /* True when the name is one of the POSIX special builtins, the set whose prefix
-   assignments persist after the command and whose errors abort a non-interactive
-   shell. The test is by name rather than by kind, since : is special while true
-   is not though both resolve to one kind. */
+   assignments persist after the command and whose errors abort a
+   non-interactive shell. The test is by name rather than by kind, since : is
+   special while true is not though both resolve to one kind. */
 fn is_special_builtin_name(StringView name) wontthrow -> bool;
 
 /* The builtin command names, recovered once from BUILTIN_ENTRIES and cached,

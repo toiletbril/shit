@@ -17,7 +17,8 @@ HELP_DESCRIPTION_DECL(
     "The set builtin enables a shell option named by a single letter after a "
     "minus or by its long name after -o, and disables it with a plus, and "
     "rebinds the positional parameters to its operands after a double dash or "
-    "the first non-option word. With no argument it lists the shell variables.");
+    "the first non-option word. With no argument it lists the shell "
+    "variables.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

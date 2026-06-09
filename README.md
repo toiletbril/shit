@@ -2,33 +2,27 @@
 
 Man, my shell is shit™
 
-Revolutionary command-line interpreter, or an interactive shell based on
-[toiletline](https://github.com/toiletbril/toiletline) written in BULLSHIT++23.
+Also the fastest POSIX-compatible shell there is, even faster than `dash`.
 
-This software was made as a late april fools joke and literally everything is
-written from scratch in a heavily macro-modified C++ dialect I can actually
-stand.
+This software initially was made as a late april fools joke and literally
+everything is written from scratch in a heavily macro-modified C++ dialect I
+can actually stand, and is compiled with `-nostdlib++` :3
 
 There's no guarantee that this project will come any close to being finished or
 will not instantly break your computer upon the first start, so use it at your
 own risk. 
 
-The goal is to be a native, interactive, `sh`-compatible shell without any bells
-and whistles, that can be used interchangeably on Windows and Linux and offer a
-good `sh` experience on Windows to avoid having to tolerate PowerShell or some
-other fancy crossplatform shells, preferably while being faster than all of
-them. Later goal is to offer basic replacements of most common coreutils
-commands like `mkdir`, `rm`, `cat` and others as shell builtins (and for the
-moment, `busybox-w32` can be used instead).
+The goal is to be a native, interactive, `bash`-compatible shell ~~without any
+bells and whistles~~, that can be used interchangeably on Windows and Linux and
+offer an amazing shell experience on Windows to avoid having to tolerate
+PowerShell or some other atrocious crossplatform shells, while being fucking
+faster than all of them--and offer basic replacements of most common coreutils
+commands like `mkdir`, `rm`, `cat` and others as shell builtins.
 
 ## Development
 
 `staging` is the development branch. It may be broken at any time. `master` is
 more stable and should usually pass all tests.
-
-There may be unfinished goals, TODOs and FIXMEs scattered around the sources (in
-[toiletline](https://github.com/toiletbril/toiletline) as well). Feel free to
-help :3
 
 You need Clang 18 and later; GNU Make, some coreutils: `rm`, `mkdir` to build
 the executable; `cat`, `diff`, `printf` to run the tests; `clang-format`,
@@ -73,6 +67,8 @@ Is it good?
 
 Is is exceptional? 
 - [ ] `bash`-compatible.
+- [ ] Most of shellcheck built-in as warnings.
 - [ ] Arbitrary precision numeric expressions.
 - [ ] Cross-platform replacement for most common Unix programs which Windows
       does not have.
+- [ ] Own bells and whistles.

@@ -53,8 +53,8 @@ struct highlight_span
 };
 
 /* Color the whole line by token for the interactive editor. A command word is
-   green when it resolves and red when it does not, a reserved word is magenta, a
-   quoted string is yellow, a variable or command substitution is cyan, an
+   green when it resolves and red when it does not, a reserved word is magenta,
+   a quoted string is yellow, a variable or command substitution is cyan, an
    operator or redirection is bold, and a comment is dim. The scan tolerates a
    half-typed line, an unterminated quote or expansion colors to the end rather
    than throwing, so a line is always colored. The context drives the

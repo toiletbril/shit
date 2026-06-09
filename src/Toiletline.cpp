@@ -195,16 +195,16 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 
 /* Bridge toiletline's render-time highlight query onto the shell. The shell
    colors the whole line by token, a command word by whether it resolves, a
-   reserved word, a string, an expansion, an operator, and a comment, and returns
-   the colored spans.
+   reserved word, a string, an expansion, an operator, and a comment, and
+   returns the colored spans.
 
    Toiletline edits in codepoints and renders the spans in codepoints, while the
    shell scans in bytes, so each byte span is converted back to codepoint
    indices here, the same conversion the completion bridge performs. The
-   conversion is monotonic, so the spans stay sorted and non-overlapping. Returns
-   1 when at least one span is filled, 0 otherwise. The body is guarded because
-   toiletline calls it through a C function pointer, so a throw must not unwind
-   through the C frames. */
+   conversion is monotonic, so the spans stay sorted and non-overlapping.
+   Returns 1 when at least one span is filled, 0 otherwise. The body is guarded
+   because toiletline calls it through a C function pointer, so a throw must not
+   unwind through the C frames. */
 fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;

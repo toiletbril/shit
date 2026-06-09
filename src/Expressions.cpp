@@ -47,8 +47,8 @@ hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
     os::INTERRUPT_REQUESTED = 0;
     throw Error{"Interrupted"};
   }
-  /* A trapped signal arrived since the last node, so its action runs here at the
-     command boundary before the next node. The single flag keeps the common
+  /* A trapped signal arrived since the last node, so its action runs here at
+     the command boundary before the next node. The single flag keeps the common
      no-signal path to one read. */
   if (os::SIGNAL_PENDING) cxt.run_pending_traps();
   cxt.add_evaluated_expression();
@@ -802,15 +802,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       program_args.count() == 1 && program_args[0] == "exec" &&
       !(cxt.has_functions() && cxt.find_function(program_args[0]) != nullptr);
 
-  /* Whether the command word resolves to a POSIX special builtin not shadowed by
-     a function. It decides both that a redirection error exits the shell rather
-     than failing the command, and that a prefix assignment persists, so it is
-     computed once here and read on both paths. An empty command word, a bare
-     redirection or assignment line, is not a special builtin. */
+  /* Whether the command word resolves to a POSIX special builtin not shadowed
+     by a function. It decides both that a redirection error exits the shell
+     rather than failing the command, and that a prefix assignment persists, so
+     it is computed once here and read on both paths. An empty command word, a
+     bare redirection or assignment line, is not a special builtin. */
   const bool command_is_special_builtin =
       !program_args.is_empty() &&
-      !(cxt.has_functions() &&
-        cxt.find_function(program_args[0]) != nullptr) &&
+      !(cxt.has_functions() && cxt.find_function(program_args[0]) != nullptr) &&
       is_special_builtin_name(program_args[0].view());
 
   /* Open the redirection targets. A redirection takes effect even when the
@@ -846,90 +845,131 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      expansion error in a target word, which must stay fatal. */
   bool redirection_open_failed = false;
   try {
-  for (const Redirection &redir : m_redirections) {
-    /* A heredoc body becomes the standard input through an anonymous temp
-       file, expanded when the delimiter was unquoted. */
-    if (redir.kind == Redirection::Kind::Heredoc) {
-      ASSERT(redir.heredoc_body != nullptr);
+    for (const Redirection &redir : m_redirections) {
+      /* A heredoc body becomes the standard input through an anonymous temp
+         file, expanded when the delimiter was unquoted. */
+      if (redir.kind == Redirection::Kind::Heredoc) {
+        ASSERT(redir.heredoc_body != nullptr);
 
-      String body{*redir.heredoc_body};
-      if (redir.heredoc_expand) {
-        body = cxt.expand_heredoc_body(body);
-      }
+        String body{*redir.heredoc_body};
+        if (redir.heredoc_expand) {
+          body = cxt.expand_heredoc_body(body);
+        }
 
-      let opened = os::write_to_temp_file(body);
-      if (!opened) {
-        redirection_open_failed = true;
-        throw ErrorWithLocation{source_location(),
-                                "Could not stage the heredoc body: " +
-                                    os::last_system_error_message()};
-      }
+        let opened = os::write_to_temp_file(body);
+        if (!opened) {
+          redirection_open_failed = true;
+          throw ErrorWithLocation{source_location(),
+                                  "Could not stage the heredoc body: " +
+                                      os::last_system_error_message()};
+        }
 
-      /* A bare exec heredoc points the shell's standard input at the staged
-         body for good and drops the temporary descriptor. */
-      if (is_bare_exec) {
-        shit::flush();
-        const os::descriptor body_fd = opened.take();
-        os::replace_descriptor(redir.fd, body_fd);
-        if (body_fd != redir.fd) os::close_fd(body_fd);
-        continue;
-      }
-
-      /* A heredoc on the standard input takes the in_fd slot. A numbered
-         heredoc such as 3<<EOF targets descriptor N instead, which the three
-         standard slots cannot express, so the body descriptor is staged onto
-         the real shell fd N around the command and restored afterward, the same
-         way a duplication onto an arbitrary descriptor is. */
-      if (redir.fd == 0) {
-        if (redirect_in_fd) os::close_fd(*redirect_in_fd);
-        redirect_in_fd = opened.take();
-        continue;
-      }
-
-      const os::descriptor body_fd = opened.take();
-      /* The temp file already lands on fd N when mkstemp handed back that very
-         number, since the standard descriptors took the lower slots. The
-         generic save then dup2 would back up the body itself and leave it open
-         on N after the command, so the collision is handled directly. The
-         restore closes fd N, which fd N was free before mkstemp claimed it
-         makes correct. */
-      if (body_fd == redir.fd) {
-        dup_saved_descriptors.push(
-            os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
-        continue;
-      }
-      dup_saved_descriptors.push(
-          os::save_and_replace_descriptor(redir.fd, body_fd));
-      os::close_fd(body_fd);
-      continue;
-    }
-
-    /* A duplication like 2>&1 routes one descriptor to another without a file.
-       The descriptor may come from a dynamic word such as >&$5, resolved here.
-     */
-    if (redir.kind == Redirection::Kind::DuplicateOutput ||
-        redir.kind == Redirection::Kind::DuplicateInput)
-    {
-      const i32 from_fd = resolve_duplication_fd(redir, cxt);
-
-      /* A bare exec applies a duplication to the shell's own descriptor for
-         good, with no backup, so the copy or the close stays in effect for
-         every later command. The flush keeps buffered output on the original
-         descriptor before it moves. */
-      if (is_bare_exec) {
-        shit::flush();
-
-        if (from_fd == Redirection::DUP_FD_CLOSE) {
-          os::close_shell_fd(redir.fd);
+        /* A bare exec heredoc points the shell's standard input at the staged
+           body for good and drops the temporary descriptor. */
+        if (is_bare_exec) {
+          shit::flush();
+          const os::descriptor body_fd = opened.take();
+          os::replace_descriptor(redir.fd, body_fd);
+          if (body_fd != redir.fd) os::close_fd(body_fd);
           continue;
         }
 
-        /* A duplication onto a closed or invalid descriptor, as in exec 6>&9
-           with fd 9 closed, fails the dup2. The exec fails with a located error
-           and the shell keeps the descriptor unchanged, matching dash. */
-        if (!os::replace_descriptor(redir.fd,
-                                    os::descriptor_for_shell_fd(from_fd)))
-        {
+        /* A heredoc on the standard input takes the in_fd slot. A numbered
+           heredoc such as 3<<EOF targets descriptor N instead, which the three
+           standard slots cannot express, so the body descriptor is staged onto
+           the real shell fd N around the command and restored afterward, the
+           same way a duplication onto an arbitrary descriptor is. */
+        if (redir.fd == 0) {
+          if (redirect_in_fd) os::close_fd(*redirect_in_fd);
+          redirect_in_fd = opened.take();
+          continue;
+        }
+
+        const os::descriptor body_fd = opened.take();
+        /* The temp file already lands on fd N when mkstemp handed back that
+           very number, since the standard descriptors took the lower slots. The
+           generic save then dup2 would back up the body itself and leave it
+           open on N after the command, so the collision is handled directly.
+           The restore closes fd N, which fd N was free before mkstemp claimed
+           it makes correct. */
+        if (body_fd == redir.fd) {
+          dup_saved_descriptors.push(
+              os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
+          continue;
+        }
+        dup_saved_descriptors.push(
+            os::save_and_replace_descriptor(redir.fd, body_fd));
+        os::close_fd(body_fd);
+        continue;
+      }
+
+      /* A duplication like 2>&1 routes one descriptor to another without a
+         file. The descriptor may come from a dynamic word such as >&$5,
+         resolved here.
+       */
+      if (redir.kind == Redirection::Kind::DuplicateOutput ||
+          redir.kind == Redirection::Kind::DuplicateInput)
+      {
+        const i32 from_fd = resolve_duplication_fd(redir, cxt);
+
+        /* A bare exec applies a duplication to the shell's own descriptor for
+           good, with no backup, so the copy or the close stays in effect for
+           every later command. The flush keeps buffered output on the original
+           descriptor before it moves. */
+        if (is_bare_exec) {
+          shit::flush();
+
+          if (from_fd == Redirection::DUP_FD_CLOSE) {
+            os::close_shell_fd(redir.fd);
+            continue;
+          }
+
+          /* A duplication onto a closed or invalid descriptor, as in exec 6>&9
+             with fd 9 closed, fails the dup2. The exec fails with a located
+             error and the shell keeps the descriptor unchanged, matching dash.
+           */
+          if (!os::replace_descriptor(redir.fd,
+                                      os::descriptor_for_shell_fd(from_fd)))
+          {
+            const SourceLocation location =
+                redir.target != nullptr ? redir.target->source_location()
+                                        : source_location();
+            redirection_open_failed = true;
+            throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
+                                                  ": Bad file descriptor"};
+          }
+          continue;
+        }
+
+        /* A descriptor copied onto itself, as in 1>&1, changes nothing. */
+        if (from_fd == redir.fd) {
+          /* Self copy is a no-op. */
+          continue;
+        }
+
+        /* A cross-route between the standard output and error, as in 2>&1,
+           points the real shell descriptor at the target in source order so a
+           later file redirect on the source does not change what the copy
+           already captured. The shell's buffered output is flushed first, so it
+           lands on the original descriptor rather than the duplication target.
+           The arbitrary descriptor and the close form take the same in-order
+           path. */
+        shit::flush();
+
+        if (from_fd == Redirection::DUP_FD_CLOSE) {
+          dup_saved_descriptors.push(os::save_and_replace_descriptor(
+              redir.fd, os::descriptor_for_shell_fd(redir.fd)));
+          os::close_fd(os::descriptor_for_shell_fd(redir.fd));
+          continue;
+        }
+
+        const os::saved_descriptor saved = os::save_and_replace_descriptor(
+            redir.fd, os::descriptor_for_shell_fd(from_fd));
+        dup_saved_descriptors.push(saved);
+        /* A duplication onto a closed or invalid descriptor, as in >&5 with fd
+           5 closed, fails the dup2. The command fails with a located error
+           rather than writing to the original descriptor, matching dash. */
+        if (!saved.dup2_ok) {
           const SourceLocation location = redir.target != nullptr
                                               ? redir.target->source_location()
                                               : source_location();
@@ -940,128 +980,90 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         continue;
       }
 
-      /* A descriptor copied onto itself, as in 1>&1, changes nothing. */
-      if (from_fd == redir.fd) {
-        /* Self copy is a no-op. */
-        continue;
-      }
+      ASSERT(redir.target != nullptr);
 
-      /* A cross-route between the standard output and error, as in 2>&1, points
-         the real shell descriptor at the target in source order so a later file
-         redirect on the source does not change what the copy already captured.
-         The shell's buffered output is flushed first, so it lands on the
-         original descriptor rather than the duplication target. The arbitrary
-         descriptor and the close form take the same in-order path. */
-      shit::flush();
-
-      if (from_fd == Redirection::DUP_FD_CLOSE) {
-        dup_saved_descriptors.push(os::save_and_replace_descriptor(
-            redir.fd, os::descriptor_for_shell_fd(redir.fd)));
-        os::close_fd(os::descriptor_for_shell_fd(redir.fd));
-        continue;
-      }
-
-      const os::saved_descriptor saved = os::save_and_replace_descriptor(
-          redir.fd, os::descriptor_for_shell_fd(from_fd));
-      dup_saved_descriptors.push(saved);
-      /* A duplication onto a closed or invalid descriptor, as in >&5 with fd 5
-         closed, fails the dup2. The command fails with a located error rather
-         than writing to the original descriptor, matching dash. */
-      if (!saved.dup2_ok) {
-        const SourceLocation location = redir.target != nullptr
-                                            ? redir.target->source_location()
-                                            : source_location();
-        redirection_open_failed = true;
-        throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
-                                              ": Bad file descriptor"};
-      }
-      continue;
-    }
-
-    ASSERT(redir.target != nullptr);
-
-    ArrayList<const Token *> target_tokens{heap_allocator()};
-    target_tokens.push(redir.target);
-    const ArrayList<String> target = cxt.process_args(target_tokens);
-    if (target.count() != 1) {
-      /* An ambiguous redirect, the target expanding to more or fewer than one
-         word, fails the command rather than the shell, the way dash does. */
-      redirection_open_failed = true;
-      throw ErrorWithLocation{redir.target->source_location(),
-                              "Redirection target is not a single file"};
-    }
-
-    let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
-
-    const String &target_path = target[0];
-    let opened = os::open_file_descriptor(target_path, mode);
-    if (!opened) {
-      redirection_open_failed = true;
-      throw ErrorWithLocation{redir.target->source_location(),
-                              "Could not open '" + target_path +
-                                  "': " + os::last_system_error_message()};
-    }
-    const os::descriptor file_fd = opened.take();
-
-    /* A bare exec points the shell's own descriptor at the opened file for
-       good, then drops the temporary descriptor the open returned. The dup2
-       onto fd N replaces whatever fd N held before, so a second exec onto the
-       same number closes the earlier file rather than leaking it. The flush
-       keeps buffered output on the original descriptor before it moves. */
-    if (is_bare_exec) {
-      shit::flush();
-      const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
-      if (file_fd != redir.fd) os::close_fd(file_fd);
-      if (!was_replaced) {
+      ArrayList<const Token *> target_tokens{heap_allocator()};
+      target_tokens.push(redir.target);
+      const ArrayList<String> target = cxt.process_args(target_tokens);
+      if (target.count() != 1) {
+        /* An ambiguous redirect, the target expanding to more or fewer than one
+           word, fails the command rather than the shell, the way dash does. */
         redirection_open_failed = true;
         throw ErrorWithLocation{redir.target->source_location(),
-                                utils::int_to_text(redir.fd) +
-                                    ": Bad file descriptor"};
+                                "Redirection target is not a single file"};
       }
-      continue;
-    }
 
-    /* Every file redirect, the standard input, output, and error included, is
-       staged onto the real shell fd N in source order so a later 2>&1 copies
-       the descriptor fd N points at now rather than the one the spawn would
-       place last. A redirect onto fd 1 or fd 2 mutates the shell's own standard
-       output or error in place, so the buffered output is flushed first to land
-       on the original descriptor. open returns the lowest free fd, which is at
-       least three while fds 0, 1, and 2 hold the shell's stdio, so the file
-       never lands on a standard fd itself. The higher fd, such as 3>file, takes
-       the same in-order path the numbered heredoc and the compound redirect
-       path use. */
-    if (redir.fd == 1 || redir.fd == 2) shit::flush();
-    if (file_fd == redir.fd) {
-      /* open returned fd N itself, since fd N was the lowest free descriptor,
-         so the file already sits on its target. The generic save then dup2
-         would back up the file and the close would shut fd N, leaving the child
-         without it, so the collision is recorded for restore without a close,
-         the same way the numbered heredoc handles it. */
-      dup_saved_descriptors.push(
-          os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
-    } else {
-      dup_saved_descriptors.push(
-          os::save_and_replace_descriptor(redir.fd, file_fd));
-      os::close_fd(file_fd);
+      let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
+
+      const String &target_path = target[0];
+      let opened = os::open_file_descriptor(target_path, mode);
+      if (!opened) {
+        redirection_open_failed = true;
+        throw ErrorWithLocation{redir.target->source_location(),
+                                "Could not open '" + target_path +
+                                    "': " + os::last_system_error_message()};
+      }
+      const os::descriptor file_fd = opened.take();
+
+      /* A bare exec points the shell's own descriptor at the opened file for
+         good, then drops the temporary descriptor the open returned. The dup2
+         onto fd N replaces whatever fd N held before, so a second exec onto the
+         same number closes the earlier file rather than leaking it. The flush
+         keeps buffered output on the original descriptor before it moves. */
+      if (is_bare_exec) {
+        shit::flush();
+        const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
+        if (file_fd != redir.fd) os::close_fd(file_fd);
+        if (!was_replaced) {
+          redirection_open_failed = true;
+          throw ErrorWithLocation{redir.target->source_location(),
+                                  utils::int_to_text(redir.fd) +
+                                      ": Bad file descriptor"};
+        }
+        continue;
+      }
+
+      /* Every file redirect, the standard input, output, and error included, is
+         staged onto the real shell fd N in source order so a later 2>&1 copies
+         the descriptor fd N points at now rather than the one the spawn would
+         place last. A redirect onto fd 1 or fd 2 mutates the shell's own
+         standard output or error in place, so the buffered output is flushed
+         first to land on the original descriptor. open returns the lowest free
+         fd, which is at least three while fds 0, 1, and 2 hold the shell's
+         stdio, so the file never lands on a standard fd itself. The higher fd,
+         such as 3>file, takes the same in-order path the numbered heredoc and
+         the compound redirect path use. */
+      if (redir.fd == 1 || redir.fd == 2) shit::flush();
+      if (file_fd == redir.fd) {
+        /* open returned fd N itself, since fd N was the lowest free descriptor,
+           so the file already sits on its target. The generic save then dup2
+           would back up the file and the close would shut fd N, leaving the
+           child without it, so the collision is recorded for restore without a
+           close, the same way the numbered heredoc handles it. */
+        dup_saved_descriptors.push(
+            os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
+      } else {
+        dup_saved_descriptors.push(
+            os::save_and_replace_descriptor(redir.fd, file_fd));
+        os::close_fd(file_fd);
+      }
     }
-  }
   } catch (const ErrorWithLocation &redirection_error) {
     /* An expansion error in a target word, such as ${x?msg} on an unset name or
        a division by zero, is fatal the way it is anywhere else, so only an open
        or dup failure is caught here. */
     if (!redirection_open_failed) throw;
     /* A redirection that cannot open its target, or names a closed descriptor,
-       fails the command rather than the shell, the way dash continues past it. A
-       special builtin is the exception, since its redirection error exits a
+       fails the command rather than the shell, the way dash continues past it.
+       A special builtin is the exception, since its redirection error exits a
        non-interactive shell. The descriptor and heredoc defers above still put
        the partially applied redirections back. */
     if (command_is_special_builtin) throw;
     const String *source = cxt.current_source();
-    show_message(redirection_error.to_string(
-        source != nullptr ? source->view() : StringView{}));
-    /* dash reports a redirection failure with status 2, the value a script reads
-       in $? after the failed command. */
+    show_message(redirection_error.to_string(source != nullptr ? source->view()
+                                                               : StringView{}));
+    /* dash reports a redirection failure with status 2, the value a script
+       reads in $? after the failed command. */
     cxt.set_last_exit_status(2);
     return 2;
   }
@@ -1094,11 +1096,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     return 0;
   }
 
-  /* A prefix assignment before a special builtin persists after the command as a
-     regular shell variable, the way POSIX keeps it. command_is_special_builtin,
-     computed above the redirection loop, already excludes a function-shadowed
-     name. The persisted form commits to the store below rather than the process
-     environment, so it stays unexported, the way dash leaves it. */
+  /* A prefix assignment before a special builtin persists after the command as
+     a regular shell variable, the way POSIX keeps it.
+     command_is_special_builtin, computed above the redirection loop, already
+     excludes a function-shadowed name. The persisted form commits to the store
+     below rather than the process environment, so it stays unexported, the way
+     dash leaves it. */
 
   /* Per-command assignments apply to the environment for this command, a
      function call included, so a child inherits them and a function sees them.
@@ -1709,12 +1712,12 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* A stage whose command word names a user function must run through the
-     per-stage fork path, since a function shadows a builtin and a program inside
-     a pipeline the same way it does outside one. The fast path below builds an
-     ExecContext that resolves only builtins and programs, so a function stage
-     would wrongly run a like-named builtin. The literal command word is checked
-     without expanding, which covers the common name-pipe form, and the whole
-     scan is skipped when no function is defined. */
+     per-stage fork path, since a function shadows a builtin and a program
+     inside a pipeline the same way it does outside one. The fast path below
+     builds an ExecContext that resolves only builtins and programs, so a
+     function stage would wrongly run a like-named builtin. The literal command
+     word is checked without expanding, which covers the common name-pipe form,
+     and the whole scan is skipped when no function is defined. */
   if (!has_compound_stage && cxt.has_functions()) {
     for (const Command *stage : m_commands) {
       const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
@@ -3323,8 +3326,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     ArrayList<String> local_names{};
     actx.defined_functions.for_each(
         [&](StringView n) throws { local_names.push(String{n}); });
-    actx.known_aliases.for_each(
-        [&](StringView n) throws { local_names.push(String{n}); });
+    actx.known_aliases.for_each([&](StringView n)
+                                    throws { local_names.push(String{n}); });
     if (Maybe<String> suggestion =
             utils::suggest_command(StringView{*name}, local_names))
     {

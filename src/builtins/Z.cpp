@@ -92,7 +92,8 @@ static fn read_frecency_store() throws -> ArrayList<frecency_entry>
     let const rank = utils::parse_decimal_integer(rank_field);
     let const last = utils::parse_decimal_integer(time_field);
     if (rank.is_error() || last.is_error()) continue;
-    entries.push(frecency_entry{String{path_field}, rank.value(), last.value()});
+    entries.push(
+        frecency_entry{String{path_field}, rank.value(), last.value()});
   }
   return entries;
 }
@@ -113,15 +114,16 @@ static fn write_frecency_store(const ArrayList<frecency_entry> &entries) throws
     out += '\n';
   }
 
-  let const fd =
-      os::open_file_descriptor(path->text().view(), os::file_open_mode::Truncate);
+  let const fd = os::open_file_descriptor(path->text().view(),
+                                          os::file_open_mode::Truncate);
   if (!fd) return;
-  /* The store was just truncated, so a short write would drop entries. The write
-     loops until the whole buffer lands or the descriptor stops accepting it. */
+  /* The store was just truncated, so a short write would drop entries. The
+     write loops until the whole buffer lands or the descriptor stops accepting
+     it. */
   usize total_written = 0;
   while (total_written < out.count()) {
-    let const written =
-        os::write_fd(*fd, out.c_str() + total_written, out.count() - total_written);
+    let const written = os::write_fd(*fd, out.c_str() + total_written,
+                                     out.count() - total_written);
     if (!written || *written == 0) break;
     total_written += *written;
   }
@@ -209,7 +211,8 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const frecency_entry *best = nullptr;
   let best_score = -1.0;
   for (const frecency_entry &entry : entries) {
-    if (!query.is_empty() && !contains_ignore_case(entry.path.view(), query.view()))
+    if (!query.is_empty() &&
+        !contains_ignore_case(entry.path.view(), query.view()))
       continue;
     let const score = static_cast<double>(entry.rank) *
                       recency_weight(now - entry.last_access);

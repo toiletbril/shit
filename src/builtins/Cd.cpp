@@ -83,8 +83,10 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       usize start = 0;
       while (start <= entries.length) {
         usize end = start;
-        while (end < entries.length && entries.data[end] != ':') end++;
-        const StringView entry = entries.substring_of_length(start, end - start);
+        while (end < entries.length && entries.data[end] != ':')
+          end++;
+        const StringView entry =
+            entries.substring_of_length(start, end - start);
         Path candidate = entry.is_empty()
                              ? Path{arg_path}
                              : Path{entry}.push_component(arg_path.view());

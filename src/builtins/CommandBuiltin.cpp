@@ -17,7 +17,8 @@ HELP_SYNOPSIS_DECL("[-v] [-V] name [argument ...]");
 HELP_DESCRIPTION_DECL(
     "The command builtin runs name with its arguments as a command, resolving "
     "it against a builtin or the PATH while ignoring a shell function of the "
-    "same name. With -v it prints a terse description of how name resolves, and "
+    "same name. With -v it prints a terse description of how name resolves, "
+    "and "
     "with -V it prints a verbose description, in either case without running "
     "the command.");
 
