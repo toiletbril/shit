@@ -1,0 +1,97 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign a=outer]
+  [CompoundListCondition, None]
+    [ForLoop "a"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "in: $a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after restore: [$a]"]
+  [CompoundListCondition, None]
+    [ForLoop "fresh"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand ":"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "fresh leaked: [$fresh:-no]"]
+[Word
+  Unquoted "a=outer"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "in: "
+  Variable "a"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after restore: ["
+  Variable "a"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "fresh"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "fresh leaked: ["
+  Variable "fresh:-no"
+  DoubleQuoted "]"
+]
+in: 1
+in: 2
+in: 3
+after restore: [outer]
+fresh leaked: [no]
+[Code 0]

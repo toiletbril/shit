@@ -2483,6 +2483,22 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
 
+  /* The default mood scopes the loop variable, putting its prior value back
+     once the loop ends so the name does not leak, while the bash and posix moods
+     leave it set the way those shells do. */
+  let const scope_variable =
+      !(cxt.is_bash_compatible() || cxt.is_posix_mode());
+  Maybe<String> saved_value =
+      scope_variable ? cxt.get_variable_value(m_variable_name) : None;
+  defer {
+    if (scope_variable) {
+      if (saved_value.has_value())
+        cxt.set_shell_variable(m_variable_name, saved_value->view());
+      else
+        cxt.unset_shell_variable(m_variable_name);
+    }
+  };
+
   /* The body runs inside one more loop level, so a break or a continue clamps
      its level against the nesting that is actually live. */
   cxt.enter_loop();
