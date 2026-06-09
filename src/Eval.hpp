@@ -699,6 +699,8 @@ protected:
   bool m_export_all{false};
   bool m_no_exec{false};
   bool m_bash_compatible{false};
+  /* The unix time the shell started, the base $SECONDS counts from. */
+  i64 m_shell_start_time{0};
   bool m_failglob{true};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};

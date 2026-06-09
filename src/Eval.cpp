@@ -17,6 +17,7 @@
 #include <cctype>
 #include <cerrno>
 #include <cstdlib>
+#include <ctime>
 #include <exception>
 
 /* POSIX regcomp and regexec back the [[ =~ operator. The release build drops
@@ -42,6 +43,12 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   /* Seed the separator table from the default IFS, since the table starts
      empty while m_field_separators is initialized to whitespace. */
   set_field_separators(m_field_separators.view());
+
+  /* The shell start time anchors $SECONDS, and the random seed mixes the time
+     and the pid the way bash seeds $RANDOM. */
+  m_shell_start_time = static_cast<i64>(std::time(nullptr));
+  std::srand(static_cast<unsigned>(m_shell_start_time) ^
+             static_cast<unsigned>(os::get_shell_process_id()));
 }
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
@@ -417,6 +424,30 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                                                    m_current_location_position)
                            : 1;
     return String{heap_allocator(), utils::uint_to_text(line)};
+  }
+
+  /* The bash dynamic variables are computed on each read. They only apply in
+     bash mode so POSIX behaves like dash, where these names are ordinary. A
+     stored assignment above still wins, so RANDOM=5 reads back 5. The first
+     byte gates each compare so an ordinary name skips them. */
+  if (m_bash_compatible) {
+    if (first_byte == 'R' && name == "RANDOM") {
+      return String{heap_allocator(), utils::uint_to_text(static_cast<usize>(
+                                          std::rand() % 32768))};
+    }
+    if (first_byte == 'S' && name == "SECONDS") {
+      return String{heap_allocator(),
+                    utils::int_to_text(static_cast<i64>(std::time(nullptr)) -
+                                       m_shell_start_time)};
+    }
+    if (first_byte == 'E' && name == "EPOCHSECONDS") {
+      return String{heap_allocator(),
+                    utils::int_to_text(static_cast<i64>(std::time(nullptr)))};
+    }
+    if (first_byte == 'B' && name == "BASHPID") {
+      return String{heap_allocator(),
+                    utils::int_to_text(os::get_shell_process_id())};
+    }
   }
 
   if (let const env = os::get_environment_variable(name))
