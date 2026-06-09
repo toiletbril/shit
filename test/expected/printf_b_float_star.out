@@ -1,0 +1,77 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%.2f\n" "3.5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%b\n" "a\tb\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%*d\n" "4" "7"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%*.*f]\n" "8" "2" "3.5"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%b" "stop\chere"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "%.2f\n"
+]
+[Word
+  Unquoted "3.5"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "%b\n"
+]
+[Word
+  DoubleQuoted "a\tb\n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "%*d\n"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%*.*f]\n"
+]
+[Word
+  Unquoted "8"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3.5"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "%b"
+]
+[Word
+  DoubleQuoted "stop\chere"
+]
+[Word
+  Unquoted "echo"
+]
+3.50
+a	b
+
+   7
+[    3.50]
+stop
+[Code 0]

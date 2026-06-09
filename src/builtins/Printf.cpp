@@ -61,6 +61,56 @@ void append_escape(String &out, const String &fmt, usize &i) throws
   }
 }
 
+/* Expand the backslash escapes in a %b argument, the same set the format string
+   itself takes plus an octal \ooo with an optional leading zero and a \c that
+   stops all further output. Returns true when a \c was seen so the caller can
+   abort the whole printf, matching the POSIX utility. */
+bool append_b_argument(String &out, const String &arg) throws
+{
+  for (usize i = 0; i < arg.length(); i++) {
+    if (arg[i] != '\\' || i + 1 >= arg.length()) {
+      out += arg[i];
+      continue;
+    }
+    let const e = arg[i + 1];
+    if (e == 'c') return true;
+    if (e == '0' || (e >= '1' && e <= '7')) {
+      /* An octal escape takes up to three octal digits, after an optional
+         leading zero that does not count toward the three. */
+      usize digit_index = i + 1;
+      if (arg[digit_index] == '0') digit_index++;
+      i32 value = 0;
+      usize digits_read = 0;
+      while (digits_read < 3 && digit_index < arg.length() &&
+             arg[digit_index] >= '0' && arg[digit_index] <= '7')
+      {
+        value = value * 8 + (arg[digit_index] - '0');
+        digit_index++;
+        digits_read++;
+      }
+      out += static_cast<char>(value);
+      i = digit_index - 1;
+      continue;
+    }
+    i++;
+    switch (e) {
+    case 'n': out += '\n'; break;
+    case 't': out += '\t'; break;
+    case 'r': out += '\r'; break;
+    case 'a': out += '\a'; break;
+    case 'b': out += '\b'; break;
+    case 'f': out += '\f'; break;
+    case 'v': out += '\v'; break;
+    case '\\': out += '\\'; break;
+    default:
+      out += '\\';
+      out += e;
+      break;
+    }
+  }
+  return false;
+}
+
 /* Render one conversion through the C library, so a width or a precision in the
    specification is honored. */
 void append_conversion(String &out, const String &spec, char conv,
@@ -103,6 +153,16 @@ void append_conversion(String &out, const String &spec, char conv,
     std::snprintf(buffer, sizeof(buffer), with_ll.c_str(),
                   static_cast<unsigned long long>(parse_printf_integer(arg)));
     out += buffer;
+  } else if (conv == 'f' || conv == 'e' || conv == 'E' || conv == 'g' ||
+             conv == 'G') {
+    /* The float conversions parse the argument as a double through strtod, the
+       way the C printf renders it, so the width and the precision in the spec
+       are honored. A malformed argument parses as zero. */
+    String with_conv = spec;
+    with_conv.push(conv);
+    const double value = std::strtod(arg.c_str(), nullptr);
+    std::snprintf(buffer, sizeof(buffer), with_conv.c_str(), value);
+    out += buffer;
   } else {
     /* An unknown conversion is emitted verbatim. */
     out += spec;
@@ -132,6 +192,18 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   String out{};
   usize operand_index = 0;
   bool consumed_a_conversion = false;
+  bool should_stop = false;
+
+  /* Read the next operand as the integer value of a * field width or precision,
+     append its decimal text into the spec, and advance the operand cursor. A
+     missing operand reads as zero, like an absent argument elsewhere. */
+  auto consume_star = [&](String &spec) throws {
+    let const star_arg =
+        operand_index < operands.count() ? operands[operand_index] : String{};
+    spec.append(utils::int_to_text(parse_printf_integer(star_arg)).view());
+    operand_index++;
+    consumed_a_conversion = true;
+  };
 
   do {
     consumed_a_conversion = false;
@@ -150,12 +222,22 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
       i++;
       while (i < fmt.length() && std::strchr("-+ 0#", fmt[i]) != nullptr)
         spec.push(fmt[i++]);
-      while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
-        spec.push(fmt[i++]);
-      if (i < fmt.length() && fmt[i] == '.') {
-        spec.push(fmt[i++]);
+      if (i < fmt.length() && fmt[i] == '*') {
+        consume_star(spec);
+        i++;
+      } else {
         while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
           spec.push(fmt[i++]);
+      }
+      if (i < fmt.length() && fmt[i] == '.') {
+        spec.push(fmt[i++]);
+        if (i < fmt.length() && fmt[i] == '*') {
+          consume_star(spec);
+          i++;
+        } else {
+          while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
+            spec.push(fmt[i++]);
+        }
       }
       if (i >= fmt.length()) {
         out += spec;
@@ -170,11 +252,21 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 
       let const arg =
           operand_index < operands.count() ? operands[operand_index] : String{};
+      if (conv == 'b') {
+        /* %b prints the argument with its backslash escapes expanded, and a \c
+           inside it stops the whole printf. */
+        should_stop = append_b_argument(out, arg);
+        operand_index++;
+        consumed_a_conversion = true;
+        if (should_stop) break;
+        continue;
+      }
       append_conversion(out, spec, conv, arg);
       operand_index++;
       consumed_a_conversion = true;
     }
-  } while (operand_index < operands.count() && consumed_a_conversion);
+  } while (!should_stop && operand_index < operands.count() &&
+           consumed_a_conversion);
 
   ec.print_to_stdout(out);
   return 0;
