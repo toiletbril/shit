@@ -1708,6 +1708,28 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
 
+  /* A stage whose command word names a user function must run through the
+     per-stage fork path, since a function shadows a builtin and a program inside
+     a pipeline the same way it does outside one. The fast path below builds an
+     ExecContext that resolves only builtins and programs, so a function stage
+     would wrongly run a like-named builtin. The literal command word is checked
+     without expanding, which covers the common name-pipe form, and the whole
+     scan is skipped when no function is defined. */
+  if (!has_compound_stage && cxt.has_functions()) {
+    for (const Command *stage : m_commands) {
+      const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
+      if (simple->args().is_empty()) continue;
+      const Token *first = simple->args()[0];
+      if (first->kind() != Token::Kind::Word) continue;
+      const Word &word = static_cast<const tokens::WordToken *>(first)->word();
+      if (word.plain_literal_kind() == Word::PlainLiteral::NotPlain) continue;
+      if (cxt.find_function(word.to_literal_string().view()) != nullptr) {
+        has_compound_stage = true;
+        break;
+      }
+    }
+  }
+
   if (has_compound_stage) return evaluate_with_compound_stages(cxt);
 
   let ecs = ArrayList<ExecContext>{heap_allocator()};
