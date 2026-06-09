@@ -9,12 +9,6 @@
 /* Interprets a format string with the common conversions and backslash escapes,
    recycling the format over any remaining arguments, like the POSIX utility. */
 
-FLAG_LIST_DECL();
-
-HELP_SYNOPSIS_DECL("format [arg ...]");
-
-FLAG(HELP, Bool, '\0', "help", "Display help.");
-
 namespace shit {
 
 namespace {
@@ -127,9 +121,6 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   unused(cxt);
 
   ASSERT(!ec.args().is_empty());
-
-  if (ec.args().count() > 1 && ec.args()[1] == "--help")
-    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (ec.args().count() < 2) return 0;
 

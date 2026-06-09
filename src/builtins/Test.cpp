@@ -4,12 +4,6 @@
 #include "../Path.hpp"
 #include "../Utils.hpp"
 
-FLAG_LIST_DECL();
-
-HELP_SYNOPSIS_DECL("expression, or [ expression ]");
-
-FLAG(HELP, Bool, '\0', "help", "Display help.");
-
 namespace shit {
 
 namespace {
@@ -185,9 +179,6 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      bracket form. */
   let const &arguments = ec.args();
   ASSERT(!arguments.is_empty());
-
-  if (arguments.count() > 1 && arguments[1] == "--help")
-    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   usize expression_end = arguments.count();
   if (ec.program() == "[") {

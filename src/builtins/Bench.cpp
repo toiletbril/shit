@@ -22,8 +22,9 @@ FLAG(bench_runs, String, '\0', "runs",
      "the exact number of samples per command");
 FLAG(bench_duration, String, '\0', "duration",
      "the sampling budget per command in milliseconds");
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-HELP_SYNOPSIS_DECL("bench [--runs n] [--duration ms] command [command ...]");
+HELP_SYNOPSIS_DECL("[--runs n] [--duration ms] command [command ...]");
 
 namespace shit {
 
@@ -83,36 +84,6 @@ struct command_result
   metric_stats cache_misses{};
   metric_stats branch_misses{};
 };
-
-/* SGR escapes matching the shell's diagnostic palette, opened only when the
-   output may carry color. */
-namespace sgr {
-static const StringView RESET = "\x1b[0m";
-static const StringView BOLD = "\x1b[1m";
-static const StringView GREEN = "\x1b[1;32m";
-static const StringView CYAN = "\x1b[1;36m";
-static const StringView MAGENTA = "\x1b[1;35m";
-static const StringView RED = "\x1b[1;31m";
-} /* namespace sgr */
-
-/* Whether the benchmark report may carry color. The shell colors only at an
-   interactive prompt whose stdout is a terminal, with NO_COLOR unset or empty
-   and TERM not dumb, so a pipe or a script gets plain text. */
-fn may_color_bench(EvalContext &cxt) throws -> bool
-{
-  if (!cxt.shell_is_interactive()) return false;
-  if (!os::is_stdout_a_tty()) return false;
-
-  if (let const no_color = os::get_environment_variable("NO_COLOR");
-      no_color.has_value() && !no_color->is_empty())
-    return false;
-
-  if (let const term = os::get_environment_variable("TERM");
-      term.has_value() && term->view() == StringView{"dumb"})
-    return false;
-
-  return true;
-}
 
 /* A SGR escape, or an empty view when color is off, so the format strings stay
    the same whether or not color is on. */
@@ -272,25 +243,25 @@ fn append_metric_line(String &out, const metric_row &row, usize mean_width,
   for (usize pad = row.name.length; pad < 18; pad++)
     out.push(' ');
 
-  out.append(colored(sgr::GREEN, may_color));
+  out.append(colored(colors::ansi::BOLD_GREEN, may_color));
   out.append(row.mean.view());
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   append_padding(out, mean_width - row.mean.length());
 
   out += " +/- ";
-  out.append(colored(sgr::GREEN, may_color));
+  out.append(colored(colors::ansi::BOLD_GREEN, may_color));
   out.append(row.std_dev.view());
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   append_padding(out, std_dev_width - row.std_dev.length());
 
   out += "  (";
-  out.append(colored(sgr::CYAN, may_color));
+  out.append(colored(colors::ansi::BOLD_CYAN, may_color));
   out.append(row.min.view());
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   out += " ... ";
-  out.append(colored(sgr::MAGENTA, may_color));
+  out.append(colored(colors::ansi::BOLD_MAGENTA, may_color));
   out.append(row.max.view());
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   out += ")\n";
 }
 
@@ -326,14 +297,14 @@ fn append_relative_line(String &out, StringView name, const metric_stats &first,
   if (ratio > 1.0) {
     std::snprintf(buffer, sizeof(buffer), "%.2fx slower +/- %.2f", ratio,
                   ratio_uncertainty);
-    out.append(colored(sgr::RED, may_color));
+    out.append(colored(colors::ansi::BOLD_RED, may_color));
   } else {
     std::snprintf(buffer, sizeof(buffer), "%.2fx faster +/- %.2f", 1.0 / ratio,
                   ratio_uncertainty / (ratio * ratio));
-    out.append(colored(sgr::GREEN, may_color));
+    out.append(colored(colors::ansi::BOLD_GREEN, may_color));
   }
   out += StringView{buffer};
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   out += "\n";
 }
 
@@ -346,13 +317,13 @@ fn parse_count_flag(StringView text, StringView flag_name) throws -> u64
   for (usize i = 0; i < text.length; i++) {
     const char c = text[i];
     if (c < '0' || c > '9')
-      throw Error{StringView{"bench: --"} + flag_name +
-                  " expects a number, got '" + text + "'"};
+      throw Error{StringView{"--"} + flag_name + " expects a number, got '" +
+                  text + "'"};
     value = value * 10 + static_cast<u64>(c - '0');
     saw_digit = true;
   }
   if (!saw_digit)
-    throw Error{StringView{"bench: --"} + flag_name + " expects a number"};
+    throw Error{StringView{"--"} + flag_name + " expects a number"};
   return value;
 }
 
@@ -451,7 +422,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
 
     let const measured = os::run_measured(child_argv, true);
     if (!measured.has_value())
-      throw Error{StringView{"bench: could not run '"} + command + "'"};
+      throw Error{StringView{"could not run '"} + command + "'"};
 
     /* A Ctrl-C delivered while the measured child held the foreground lands
        here, so the loop breaks before the slow sample is recorded. */
@@ -504,10 +475,10 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
 fn append_summary(String &out, const command_result &result,
                   bool may_color) throws -> void
 {
-  out.append(colored(sgr::BOLD, may_color));
+  out.append(colored(colors::ansi::BOLD, may_color));
   out += "Benchmark: ";
   out += result.label;
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   out += " (" + utils::uint_to_text(result.sample_count) + " runs)\n";
 
   /* The rows are formatted first so their mean and stddev widths are known
@@ -546,14 +517,14 @@ fn append_summary(String &out, const command_result &result,
 fn append_comparison(String &out, const command_result &first,
                      const command_result &other, bool may_color) throws -> void
 {
-  out.append(colored(sgr::BOLD, may_color));
+  out.append(colored(colors::ansi::BOLD, may_color));
   out += "Relative to: ";
   out += first.label;
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   out += "\n  ";
-  out.append(colored(sgr::BOLD, may_color));
+  out.append(colored(colors::ansi::BOLD, may_color));
   out += other.label;
-  out.append(colored(sgr::RESET, may_color));
+  out.append(colored(colors::ansi::RESET, may_color));
   out += "\n";
 
   append_relative_line(out, "wall time", first.wall_time, other.wall_time,
@@ -580,8 +551,10 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      shell parser keeps argv[0], so the commands start at the second operand. */
   let const arguments = PARSE_BUILTIN_ARGS(ec);
 
+  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   if (arguments.count() < 2) {
-    throw Error{StringView{"bench: no command given"}};
+    throw Error{StringView{"no command given"}};
   }
 
   Maybe<u64> run_limit = None;
@@ -593,7 +566,11 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     duration_millis =
         parse_count_flag(FLAG_bench_duration.value(), StringView{"duration"});
 
-  const bool may_color = may_color_bench(cxt);
+  unused(cxt);
+
+  /* The summary table is written to stdout, so its color follows the stdout
+     terminal, the same gate the diagnostics and the prompt use. */
+  const bool may_color = colors::stdout_wants_color();
   const bool show_progress = progress_is_enabled();
 
   ArrayList<command_result> results{};

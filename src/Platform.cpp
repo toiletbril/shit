@@ -902,7 +902,7 @@ fn collect_perf_counts(perf_counts &out, Runner &&runner) wontthrow -> bool
    status_out and the peak resident set into peak_rss_out. Returns false when
    the fork itself failed, since an exec failure surfaces as the child's exit
    127 the way the shell reports a missing command. ru_maxrss is kilobytes on
-   Linux, so it is scaled to bytes. */
+   Linux and bytes on macOS and the BSDs, so it is scaled per platform. */
 fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
                    i64 &status_out, u64 &peak_rss_out) wontthrow -> bool
 {
@@ -943,7 +943,13 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
   else
     status_out = -1;
 
+#if defined __linux__
+  /* Linux reports ru_maxrss in kilobytes, so it is scaled to bytes. */
   peak_rss_out = static_cast<u64>(usage.ru_maxrss) * 1024ULL;
+#else
+  /* macOS and the BSDs already report ru_maxrss in bytes. */
+  peak_rss_out = static_cast<u64>(usage.ru_maxrss);
+#endif
   return true;
 }
 

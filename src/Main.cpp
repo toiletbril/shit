@@ -101,8 +101,7 @@ static bool INVOKED_AS_COMPAT_SHELL = false;
    suppression both read it. */
 pure static fn should_run_in_posix_mode() wontthrow -> bool
 {
-  return FLAG_BASH_COMPATIBLE.is_enabled() || FLAG_DUMB.is_enabled() ||
-         INVOKED_AS_COMPAT_SHELL;
+  return FLAG_BASH_COMPATIBLE.is_enabled() || INVOKED_AS_COMPAT_SHELL;
 }
 
 /* Print the help or version text and return the exit code when one of those
@@ -245,7 +244,7 @@ static fn run_script_contents(const String &script_contents,
        warning and lets the run proceed. --no-diagnostics skips it too. */
     let const run_analysis =
         (!should_run_in_posix_mode() || FLAG_WARNINGS.is_enabled()) &&
-        !FLAG_SUPPRESS_DIAGNOSTICS.is_enabled() && !FLAG_DUMB.is_enabled();
+        !FLAG_SUPPRESS_DIAGNOSTICS.is_enabled();
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
                      context.alias_names(), FLAG_WARNINGS.is_enabled()))
@@ -380,10 +379,18 @@ fn main(int argc, char **argv) -> int
     return 2;
   }
 
-  /* --dumb turns color off the same as NO_COLOR set in the environment, so the
-     prompt and the diagnostics stay plain on a dumb terminal. */
-  if (FLAG_DUMB.is_enabled())
+  /* --dumb is the union of -P, -T, and --no-diagnostics, so it enables those
+     three component flags once here and the rest of the startup reads them
+     directly. It also turns color off the same as NO_COLOR set in the
+     environment, so the prompt and the diagnostics stay plain on a dumb
+     terminal. */
+  if (FLAG_DUMB.is_enabled()) {
+    if (!FLAG_BASH_COMPATIBLE.is_enabled()) FLAG_BASH_COMPATIBLE.toggle();
+    if (!FLAG_NO_COMPLETION.is_enabled()) FLAG_NO_COMPLETION.toggle();
+    if (!FLAG_SUPPRESS_DIAGNOSTICS.is_enabled())
+      FLAG_SUPPRESS_DIAGNOSTICS.toggle();
     shit::os::set_environment_variable("NO_COLOR", "1");
+  }
 
   /* Raise the runtime log level before any helper runs, so the trace covers
      startup. The default stays Warn, so a run without -X pays one comparison
@@ -623,7 +630,7 @@ fn main(int argc, char **argv) -> int
              engine is registered here and never on the script or -c path. The
              -T flag leaves it unregistered, so the editor runs with no
              completion callback and no ghost-text. */
-          if (!FLAG_NO_COMPLETION.is_enabled() && !FLAG_DUMB.is_enabled())
+          if (!FLAG_NO_COMPLETION.is_enabled())
             toiletline::enable_completion(context);
           shit::show_message(shit::should_run_in_posix_mode()
                                  ? "POSIX me harder!"
