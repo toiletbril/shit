@@ -100,6 +100,15 @@ fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
    fractional digits and the minutes are whole. */
 fn format_minutes_seconds(double seconds) throws -> String;
 
+/* The two reports the time keyword prints. The POSIX form matches bash time -p,
+   each label and the plain seconds with two decimals on its own line. The pretty
+   form is the default, an aligned block of the wall time, the user and system
+   cpu, and the cpu busy percent, for a single timed run. */
+fn format_time_report_posix(double real_seconds, double user_seconds,
+                            double system_seconds) throws -> String;
+fn format_time_report_pretty(double real_seconds, double user_seconds,
+                             double system_seconds) throws -> String;
+
 /* The 1-based line number the byte at position falls on in source, counting the
    newlines strictly before it. The lookup is a binary search over a newline
    offset table cached on the source pointer and length, so a script that reads

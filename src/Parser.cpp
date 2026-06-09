@@ -330,9 +330,27 @@ hot fn Parser::parse_command_list(
 
   bool should_parse_command = true;
   bool should_negate_pending = false;
+  bool should_time_pending = false;
+  bool time_posix_format = false;
 
   for (;;) {
     if (should_parse_command) {
+      /* A leading time keyword times the command or pipeline that follows,
+         including a compound command, and bash allows it before the ! negation.
+         Its -p or --posix option selects the plain POSIX report. */
+      Token *maybe_time = m_lexer.peek_shell_token();
+      ASSERT(maybe_time != nullptr);
+      if (maybe_time->kind() == Token::Kind::Time) {
+        m_lexer.advance_past_last_peek();
+        should_time_pending = true;
+        Token *maybe_posix = m_lexer.peek_shell_token();
+        if (is_unquoted_word(maybe_posix, "-p") ||
+            is_unquoted_word(maybe_posix, "--posix"))
+        {
+          m_lexer.advance_past_last_peek();
+          time_posix_format = true;
+        }
+      }
       /* A leading ! negates the pipeline that follows. */
       Token *maybe_negation = m_lexer.peek_shell_token();
       ASSERT(maybe_negation != nullptr);
@@ -355,6 +373,10 @@ hot fn Parser::parse_command_list(
         if (should_negate_pending) {
           lhs->set_negated();
           should_negate_pending = false;
+        }
+        if (should_time_pending) {
+          lhs->set_timed(time_posix_format);
+          should_time_pending = false;
         }
         compound_list->append_node(
             m_lexer.arena().create<CompoundListCondition>(
@@ -397,6 +419,10 @@ hot fn Parser::parse_command_list(
         if (should_negate_pending) {
           lhs->set_negated();
           should_negate_pending = false;
+        }
+        if (should_time_pending) {
+          lhs->set_timed(time_posix_format);
+          should_time_pending = false;
         }
         compound_list->append_node(
             m_lexer.arena().create<CompoundListCondition>(

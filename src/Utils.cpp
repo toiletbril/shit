@@ -372,6 +372,43 @@ fn format_minutes_seconds(double seconds) throws -> String
   return String{buffer};
 }
 
+fn format_time_report_posix(double real_seconds, double user_seconds,
+                            double system_seconds) throws -> String
+{
+  char buffer[64];
+  let report = String{};
+  std::snprintf(buffer, sizeof(buffer), "real %.2f\n",
+                real_seconds < 0.0 ? 0.0 : real_seconds);
+  report += buffer;
+  std::snprintf(buffer, sizeof(buffer), "user %.2f\n",
+                user_seconds < 0.0 ? 0.0 : user_seconds);
+  report += buffer;
+  std::snprintf(buffer, sizeof(buffer), "sys %.2f\n",
+                system_seconds < 0.0 ? 0.0 : system_seconds);
+  report += buffer;
+  return report;
+}
+
+fn format_time_report_pretty(double real_seconds, double user_seconds,
+                             double system_seconds) throws -> String
+{
+  /* The cpu busy percent, the share of the wall time the user and system cpu
+     together account for, the way the bench summary reports it. */
+  const double cpu_percent =
+      real_seconds > 0.0
+          ? (user_seconds + system_seconds) / real_seconds * 100.0
+          : 0.0;
+  char buffer[64];
+  let report = String{};
+  report += "\n";
+  report += "  real   " + format_minutes_seconds(real_seconds) + "\n";
+  report += "  user   " + format_minutes_seconds(user_seconds) + "\n";
+  report += "  sys    " + format_minutes_seconds(system_seconds) + "\n";
+  std::snprintf(buffer, sizeof(buffer), "  cpu    %.0f%%\n", cpu_percent);
+  report += buffer;
+  return report;
+}
+
 /* A newline offset table cached on one source, so the line lookup is a binary
    search over the newlines rather than a scan of the prefix. The shell reads
    $LINENO against a single script source at a time, so one cached entry keyed

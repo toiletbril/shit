@@ -1031,6 +1031,21 @@ fn monotonic_nanos() wontthrow -> u64
          static_cast<u64>(now.tv_nsec);
 }
 
+fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
+    -> void
+{
+  struct rusage usage{};
+  if (getrusage(RUSAGE_CHILDREN, &usage) != 0) {
+    user_seconds = 0;
+    system_seconds = 0;
+    return;
+  }
+  user_seconds = static_cast<double>(usage.ru_utime.tv_sec) +
+                 static_cast<double>(usage.ru_utime.tv_usec) / 1000000.0;
+  system_seconds = static_cast<double>(usage.ru_stime.tv_sec) +
+                   static_cast<double>(usage.ru_stime.tv_usec) / 1000000.0;
+}
+
 namespace {
 
 #if defined __linux__
@@ -1928,6 +1943,15 @@ fn monotonic_nanos() wontthrow -> u64
   const u64 remainder = counter.QuadPart % frequency.QuadPart;
   return whole_seconds * 1000000000ULL +
          (remainder * 1000000000ULL) / static_cast<u64>(frequency.QuadPart);
+}
+
+fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
+    -> void
+{
+  /* Windows carries no RUSAGE_CHILDREN equivalent here, so the cpu split is
+     reported as zero and only the wall time of the timed command is meaningful. */
+  user_seconds = 0;
+  system_seconds = 0;
 }
 
 fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws

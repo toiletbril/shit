@@ -323,6 +323,13 @@ fn take_pending_signal() wontthrow -> i32;
    QueryPerformanceCounter scaled to nanoseconds. */
 fn monotonic_nanos() wontthrow -> u64;
 
+/* The user and system seconds this process's children have consumed so far,
+   read from RUSAGE_CHILDREN. The difference across a command run is the
+   command's own cpu time, the accounting the time report prints. Windows has no
+   equivalent and reports zero. */
+fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
+    -> void;
+
 /* The Linux hardware performance counters a measured run collects. The counts
    are valid only when measured_result::has_perf is true, which happens on Linux
    when perf_event_open succeeded. Every other platform leaves has_perf false.

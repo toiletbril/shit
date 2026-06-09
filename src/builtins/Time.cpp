@@ -4,16 +4,13 @@
 #include "../Platform.hpp"
 #include "../Utils.hpp"
 
-#if SHIT_PLATFORM_IS POSIX
-#include <sys/resource.h>
-#include <sys/time.h>
-#endif
-
 /* time runs a command once and prints how long it took, the real elapsed time
    from a monotonic clock plus the user and system time the children consumed.
    The command runs through the shell so a builtin, a function, or an external
    program all work, and the report goes to standard error so a redirection on
-   the command still steers the command's own output. */
+   the command still steers the command's own output. The leading time keyword
+   handles a command or a compound directly, so this builtin is the form reached
+   through command time or builtin time. */
 
 FLAG_LIST_DECL();
 
@@ -27,30 +24,6 @@ HELP_DESCRIPTION_DECL(
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
-
-namespace {
-
-#if SHIT_PLATFORM_IS POSIX
-/* The user and system seconds the children of this process have consumed so
-   far, read from RUSAGE_CHILDREN. The difference across the command run is the
-   command's own user and system time, the same accounting bash reports. */
-fn children_user_and_system(double &user_out, double &system_out) wontthrow
-    -> void
-{
-  struct rusage usage{};
-  if (getrusage(RUSAGE_CHILDREN, &usage) != 0) {
-    user_out = 0;
-    system_out = 0;
-    return;
-  }
-  user_out = static_cast<double>(usage.ru_utime.tv_sec) +
-             static_cast<double>(usage.ru_utime.tv_usec) / 1000000.0;
-  system_out = static_cast<double>(usage.ru_stime.tv_sec) +
-               static_cast<double>(usage.ru_stime.tv_usec) / 1000000.0;
-}
-#endif
-
-} /* namespace */
 
 Time::Time() = default;
 
@@ -78,9 +51,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   double user_before = 0, system_before = 0;
-#if SHIT_PLATFORM_IS POSIX
-  children_user_and_system(user_before, system_before);
-#endif
+  os::children_cpu_seconds(user_before, system_before);
 
   /* The timed command must run to completion and return here so the report can
      print. When time is the shell's final command the tail-exec optimization
@@ -98,19 +69,11 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
 
   double user_after = 0, system_after = 0;
-#if SHIT_PLATFORM_IS POSIX
-  children_user_and_system(user_after, system_after);
-#endif
+  os::children_cpu_seconds(user_after, system_after);
 
   const double real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;
-  const double user_seconds = user_after - user_before;
-  const double system_seconds = system_after - system_before;
-
-  let report = String{};
-  report += "real\t" + utils::format_minutes_seconds(real_seconds) + "\n";
-  report += "user\t" + utils::format_minutes_seconds(user_seconds) + "\n";
-  report += "sys\t" + utils::format_minutes_seconds(system_seconds) + "\n";
-  shit::print_error(report);
+  shit::print_error(utils::format_time_report_pretty(
+      real_seconds, user_after - user_before, system_after - system_before));
   shit::flush();
 
   return status;

@@ -385,6 +385,19 @@ fn Command::set_negated() wontthrow -> void { m_is_negated = true; }
 
 pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 
+fn Command::set_timed(bool posix_format) wontthrow -> void
+{
+  m_is_timed = true;
+  m_time_uses_posix_format = posix_format;
+}
+
+pure fn Command::is_timed() const wontthrow -> bool { return m_is_timed; }
+
+pure fn Command::time_uses_posix_format() const wontthrow -> bool
+{
+  return m_time_uses_posix_format;
+}
+
 fn Command::set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void
 {
   m_local_vars = steal(vars);
@@ -1650,13 +1663,42 @@ hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
 {
   ASSERT(m_cmd != nullptr);
 
-  /* A negated command reports the inverse of its status, so the shell's exit
-     status differs from what the exec'd program returns. Clear the terminal
-     exec permission here, since an exec in place would let the program's own
-     status escape uninverted. */
-  if (m_cmd->is_negated()) cxt.set_terminal_exec_allowed(false);
+  /* A negated or timed command must run to completion here rather than exec the
+     shell in place, since the inverse has to apply and the report has to print
+     after the command returns, which an exec would skip. */
+  if (m_cmd->is_negated() || m_cmd->is_timed())
+    cxt.set_terminal_exec_allowed(false);
+
+  /* The timed command samples the child cpu and the monotonic clock around its
+     run, so the difference is its own wall and cpu time. */
+  double user_before = 0.0;
+  double system_before = 0.0;
+  u64 start_nanos = 0;
+  if (m_cmd->is_timed()) {
+    os::children_cpu_seconds(user_before, system_before);
+    start_nanos = os::monotonic_nanos();
+  }
 
   let status = m_cmd->evaluate(cxt);
+
+  if (m_cmd->is_timed()) {
+    const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
+    double user_after = 0.0;
+    double system_after = 0.0;
+    os::children_cpu_seconds(user_after, system_after);
+    const double real_seconds =
+        static_cast<double>(elapsed_nanos) / 1000000000.0;
+    let const report =
+        m_cmd->time_uses_posix_format()
+            ? utils::format_time_report_posix(real_seconds,
+                                              user_after - user_before,
+                                              system_after - system_before)
+            : utils::format_time_report_pretty(real_seconds,
+                                               user_after - user_before,
+                                               system_after - system_before);
+    print_error(report);
+    flush();
+  }
 
   /* A pipeline prefixed with ! reports the inverse of its status, and that
      inverse is what $? sees. */

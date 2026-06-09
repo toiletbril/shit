@@ -217,6 +217,14 @@ public:
   fn set_negated() wontthrow -> void;
   pure fn is_negated() const wontthrow -> bool;
 
+  /* The time reserved word in front of a command, including a compound command,
+     reports how long it took on stderr after it runs. The pretty report is the
+     default, and time -p or time --posix selects the plain POSIX three-line
+     form. */
+  fn set_timed(bool posix_format) wontthrow -> void;
+  pure fn is_timed() const wontthrow -> bool;
+  pure fn time_uses_posix_format() const wontthrow -> bool;
+
   virtual fn is_assignment() const wontthrow -> bool;
 
   virtual fn append_to(usize d, String &f, bool duplicate) throws -> void = 0;
@@ -225,6 +233,8 @@ public:
 protected:
   bool m_is_async{false};
   bool m_is_negated{false};
+  bool m_is_timed{false};
+  bool m_time_uses_posix_format{false};
   ArrayList<prefix_assignment> m_local_vars{heap_allocator()};
 };
 
