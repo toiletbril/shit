@@ -386,6 +386,22 @@ static fn scalar_text(const json_value &value) throws -> String
   }
 }
 
+/* A scalar rendered for a table cell, with the control characters flattened to
+   a space so a newline or tab in a string value cannot break the row alignment.
+   get keeps the raw value, only the table view sanitizes. */
+static fn table_cell_text(const json_value &value) throws -> String
+{
+  let const raw = scalar_text(value);
+  String out{};
+  for (usize i = 0; i < raw.count(); i++) {
+    let const character = raw.view()[i];
+    out += (character == '\n' || character == '\t' || character == '\r')
+               ? ' '
+               : character;
+  }
+  return out;
+}
+
 static fn pad_to(String &out, StringView cell, usize width) throws -> void
 {
   out.append(cell);
@@ -458,7 +474,7 @@ static fn render_table(const json_value &value) throws -> String
               cell = &row.values[k];
               break;
             }
-          cells.push(cell != nullptr ? scalar_text(*cell) : String{});
+          cells.push(cell != nullptr ? table_cell_text(*cell) : String{});
         }
         rows.push(steal(cells));
       }
@@ -470,7 +486,7 @@ static fn render_table(const json_value &value) throws -> String
     ArrayList<ArrayList<String>> rows{};
     for (const json_value &item : value.items) {
       ArrayList<String> cells{};
-      cells.push(scalar_text(item));
+      cells.push(table_cell_text(item));
       rows.push(steal(cells));
     }
     return render_aligned(columns, rows);
@@ -484,7 +500,7 @@ static fn render_table(const json_value &value) throws -> String
     for (usize i = 0; i < value.keys.count(); i++) {
       ArrayList<String> cells{};
       cells.push(String{value.keys[i].view()});
-      cells.push(scalar_text(value.values[i]));
+      cells.push(table_cell_text(value.values[i]));
       rows.push(steal(cells));
     }
     return render_aligned(columns, rows);

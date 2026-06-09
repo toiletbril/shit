@@ -378,10 +378,10 @@ fn Path::is_symbolic_link() const -> bool
 
 /* Windows has no POSIX block, character, FIFO, or socket file type, so these
    primaries are always false there. */
-fn Path::is_block_device() const -> bool { return false; }
-fn Path::is_character_device() const -> bool { return false; }
-fn Path::is_fifo() const -> bool { return false; }
-fn Path::is_socket() const -> bool { return false; }
+fn Path::is_block_device() const wontthrow -> bool { return false; }
+fn Path::is_character_device() const wontthrow -> bool { return false; }
+fn Path::is_fifo() const wontthrow -> bool { return false; }
+fn Path::is_socket() const wontthrow -> bool { return false; }
 
 fn Path::file_size() const -> Maybe<u64>
 {
