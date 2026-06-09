@@ -208,11 +208,34 @@ public:
       -> void;
   fn set_array_element(StringView name, usize index, StringView value) throws
       -> void;
+
+  /* Assign one array element from a raw subscript, routing an associative name
+     to a string key and an indexed name to an arithmetic index. The append form
+     concatenates onto the current element. Used by the a[i]=v and m[k]=v
+     parser path so the subscript expansion stays inside the evaluator. */
+  fn assign_array_element(StringView name, StringView subscript,
+                          StringView value, bool is_append) throws -> void;
   pure fn lookup_indexed_array(StringView name) const wontthrow
       -> const ArrayList<String> *
   {
     return m_indexed_arrays.find(name);
   }
+
+  /* The bash associative arrays, a name to string-keyed values. The values are
+     held in one flat map under a composite name-and-key, and the declared names
+     are tracked separately so an empty associative array still routes a string
+     subscript here rather than to the arithmetic indexed path. */
+  fn declare_associative_array(StringView name) throws -> void;
+  pure fn is_associative_array(StringView name) const wontthrow -> bool
+  {
+    return m_associative_names.contains(name);
+  }
+  fn set_associative_element(StringView name, StringView key,
+                             StringView value) throws -> void;
+  fn lookup_associative_element(StringView name, StringView key) const throws
+      -> Maybe<String>;
+  fn associative_keys(StringView name) const throws -> ArrayList<String>;
+  fn associative_values(StringView name) const throws -> ArrayList<String>;
 
   /* Log a name's current process-environment value before a write that outlives
      the current statement, so a subshell restore can revert it. Called before
@@ -602,6 +625,8 @@ protected:
   BumpArena m_scratch_arena{};
   HashMap<String> m_shell_variables{heap_allocator()};
   HashMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
+  HashSet m_associative_names{heap_allocator()};
+  HashMap<String> m_associative_values{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
   String m_field_separators{" \t\n"};

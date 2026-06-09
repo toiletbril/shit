@@ -45,6 +45,7 @@ public:
     CommandBuiltin,
     Readonly,
     Local,
+    Declare,
     Times,
     Ulimit,
     Hash,
@@ -105,6 +106,8 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("command"),  Builtin::Kind::CommandBuiltin},
     {PackedStringKey::from_literal("readonly"), Builtin::Kind::Readonly      },
     {PackedStringKey::from_literal("local"),    Builtin::Kind::Local         },
+    {PackedStringKey::from_literal("declare"),  Builtin::Kind::Declare       },
+    {PackedStringKey::from_literal("typeset"),  Builtin::Kind::Declare       },
     {PackedStringKey::from_literal("times"),    Builtin::Kind::Times         },
     {PackedStringKey::from_literal("ulimit"),   Builtin::Kind::Ulimit        },
     {PackedStringKey::from_literal("hash"),     Builtin::Kind::Hash          },
@@ -156,6 +159,7 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(CommandBuiltin);                                                      \
   B_CASE(Readonly);                                                            \
   B_CASE(Local);                                                               \
+  B_CASE(Declare);                                                             \
   B_CASE(Times);                                                               \
   B_CASE(Ulimit);                                                              \
   B_CASE(Hash);                                                                \
@@ -208,6 +212,7 @@ BUILTIN_STRUCT(Type);
 BUILTIN_STRUCT(CommandBuiltin);
 BUILTIN_STRUCT(Readonly);
 BUILTIN_STRUCT(Local);
+BUILTIN_STRUCT(Declare);
 BUILTIN_STRUCT(Times);
 BUILTIN_STRUCT(Ulimit);
 BUILTIN_STRUCT(Hash);

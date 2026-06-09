@@ -184,6 +184,104 @@ fn EvalContext::set_array_element(StringView name, usize index,
   set_indexed_array(name, steal(elements));
 }
 
+/* The flat-map key for an associative element, the array name and the element
+   key joined by a byte that does not occur in a name. */
+static fn associative_composite_key(StringView name, StringView key) throws
+    -> String
+{
+  String composite{heap_allocator(), name};
+  composite.push('\x01');
+  composite.append(key);
+  return composite;
+}
+
+fn EvalContext::assign_array_element(StringView name, StringView subscript,
+                                     StringView value, bool is_append) throws
+    -> void
+{
+  if (is_associative_array(name)) {
+    const String key = expand_modifier_word(subscript);
+    if (is_append) {
+      String combined{
+          lookup_associative_element(name, key.view()).value_or(String{})};
+      combined += value;
+      set_associative_element(name, key.view(), combined.view());
+    } else {
+      set_associative_element(name, key.view(), value);
+    }
+    return;
+  }
+
+  i64 index = evaluate_arithmetic(subscript);
+  if (index < 0) {
+    if (let const *array = lookup_indexed_array(name))
+      index += static_cast<i64>(array->count());
+  }
+  if (index < 0) throw Error{name + ": bad array subscript"};
+
+  String element{heap_allocator(), value};
+  if (is_append) {
+    String combined{heap_allocator()};
+    if (let const *array = lookup_indexed_array(name))
+      if (static_cast<usize>(index) < array->count())
+        combined = String{(*array)[static_cast<usize>(index)].view()};
+    combined += value;
+    element = steal(combined);
+  }
+  set_array_element(name, static_cast<usize>(index), element.view());
+}
+
+fn EvalContext::declare_associative_array(StringView name) throws -> void
+{
+  m_associative_names.add(name);
+  m_shell_variables.erase(name);
+}
+
+fn EvalContext::set_associative_element(StringView name, StringView key,
+                                        StringView value) throws -> void
+{
+  m_associative_names.add(name);
+  m_shell_variables.erase(name);
+  m_associative_values.set(associative_composite_key(name, key).view(), value);
+}
+
+fn EvalContext::lookup_associative_element(StringView name,
+                                           StringView key) const throws
+    -> Maybe<String>
+{
+  if (let const *value = m_associative_values.find(
+          associative_composite_key(name, key).view()))
+    return *value;
+  return None;
+}
+
+fn EvalContext::associative_keys(StringView name) const throws
+    -> ArrayList<String>
+{
+  let keys = ArrayList<String>{heap_allocator()};
+  const String prefix = associative_composite_key(name, "");
+  m_associative_values.for_each([&](StringView composite, const String &value) {
+    unused(value);
+    if (composite.length >= prefix.count() &&
+        composite.substring_of_length(0, prefix.count()) == prefix.view())
+      keys.push(String{heap_allocator(), composite.substring(prefix.count())});
+  });
+  return keys;
+}
+
+fn EvalContext::associative_values(StringView name) const throws
+    -> ArrayList<String>
+{
+  let values = ArrayList<String>{heap_allocator()};
+  const String prefix = associative_composite_key(name, "");
+  m_associative_values.for_each([&](StringView composite, const String &value) {
+    if (composite.length >= prefix.count() &&
+        composite.substring_of_length(0, prefix.count()) == prefix.view())
+      values.push(String{heap_allocator(), value.view()});
+  });
+  return values;
+}
+
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
   m_shell_variables.erase(name);
@@ -1567,6 +1665,10 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       const StringView subscript =
           name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
       if (subscript == "@" || subscript == "*") {
+        if (is_associative_array(array_name))
+          return String{
+              heap_allocator(),
+              utils::uint_to_text(associative_keys(array_name).count())};
         if (let const *array = lookup_indexed_array(array_name))
           return String{heap_allocator(), utils::uint_to_text(array->count())};
         return String{heap_allocator(),
@@ -1960,6 +2062,25 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
 fn EvalContext::apply_array_subscript(StringView name,
                                       StringView subscript) throws -> String
 {
+  /* An associative array reads by a string key, with @ and * naming every value
+     joined by a space. The values come back in the store's order, which need
+     not match bash for more than one key. */
+  if (is_associative_array(name)) {
+    if (subscript == "@" || subscript == "*") {
+      let out = String{heap_allocator()};
+      let const values = associative_values(name);
+      for (usize i = 0; i < values.count(); i++) {
+        if (i > 0) out.push(' ');
+        out.append(values[i].view());
+      }
+      return out;
+    }
+    const String key = expand_modifier_word(subscript);
+    return String{
+        heap_allocator(),
+        lookup_associative_element(name, key.view()).value_or(String{}).view()};
+  }
+
   const ArrayList<String> *array = lookup_indexed_array(name);
 
   /* @ and * name the whole array, joined with a space. The single-string return
@@ -2002,6 +2123,14 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   {
     const StringView array_name = body.substring_of_length(0, body.length - 3);
     let out = String{heap_allocator()};
+    if (is_associative_array(array_name)) {
+      let const keys = associative_keys(array_name);
+      for (usize i = 0; i < keys.count(); i++) {
+        if (i > 0) out.push(' ');
+        out.append(keys[i].view());
+      }
+      return out;
+    }
     if (let const *array = lookup_indexed_array(array_name)) {
       for (usize i = 0; i < array->count(); i++) {
         if (i > 0) out.push(' ');
