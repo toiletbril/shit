@@ -89,6 +89,10 @@ cold static fn report_command_not_found(EvalContext &cxt,
 {
   const String *source = cxt.current_source();
   show_message(e.to_string(source != nullptr ? source->view() : StringView{}));
+  /* A command not found inside a sourced file prints the source backtrace under
+     the error the way a fatal error does, so the chain of dot or source calls
+     that led here is named. It prints nothing at the top level. */
+  cxt.print_source_backtrace();
 }
 
 cold fn Expression::analyze(AnalysisContext &actx,

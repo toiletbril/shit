@@ -1088,6 +1088,24 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
   return m_current_origin;
 }
 
+fn EvalContext::print_source_backtrace() const throws -> void
+{
+  for (usize i = m_source_frames.count(); i > 0; i--) {
+    const source_frame &frame = m_source_frames[i - 1];
+    if (frame.parent_source != nullptr) {
+      /* A frame is context under the primary error, not an error of its own, so
+         it prints with the Trace severity rather than Error. */
+      let const sourced_here = TraceWithLocation{frame.call_site};
+      show_message(sourced_here.to_string(*frame.parent_source));
+    } else {
+      /* The origin line is context under the primary error, so it carries the
+         note severity word rather than printing bare. */
+      show_message(Note{"This error was raised while running " + frame.origin}
+                       .to_string());
+    }
+  }
+}
+
 fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
 {
   m_current_location_position = location.position;
@@ -4458,22 +4476,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
      when an error is caught, so every nested call site is named, not only the
      one running now. A frame whose parent source is known renders a caret at
      its call site, otherwise it falls back to naming the origin. */
-  let const print_backtrace = [this]() {
-    for (usize i = m_source_frames.count(); i > 0; i--) {
-      const source_frame &frame = m_source_frames[i - 1];
-      if (frame.parent_source != nullptr) {
-        /* A frame is context under the primary error, not an error of its own,
-           so it prints with the Trace severity rather than Error. */
-        let const sourced_here = TraceWithLocation{frame.call_site};
-        show_message(sourced_here.to_string(*frame.parent_source));
-      } else {
-        /* The origin line is context under the primary error, so it carries
-           the note severity word rather than printing bare. */
-        show_message(Note{"This error was raised while running " + frame.origin}
-                         .to_string());
-      }
-    }
-  };
 
   /* Retain an owned copy of the filename, so the views the lexer stamps onto
      every location stay valid after this call returns. The caller passes a view
@@ -4545,15 +4547,15 @@ fn EvalContext::run_source(StringView source, StringView origin,
   } catch (const ErrorWithLocationAndDetails &e) {
     show_message(e.to_string(source));
     show_message(e.details_to_string(source));
-    print_backtrace();
+    print_source_backtrace();
     return 1;
   } catch (const ErrorWithLocation &e) {
     show_message(e.to_string(source));
-    print_backtrace();
+    print_source_backtrace();
     return 1;
   } catch (const Error &e) {
     show_message(e.to_string());
-    print_backtrace();
+    print_source_backtrace();
     return 1;
   }
 }

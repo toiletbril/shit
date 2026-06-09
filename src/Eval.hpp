@@ -463,6 +463,10 @@ public:
   fn set_current_source(const String *source, String origin) wontthrow -> void;
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
+  /* Print the source backtrace, every dot or eval call site from the innermost
+     out, as context under a diagnostic. It prints nothing at the top level where
+     no source is on the stack. */
+  fn print_source_backtrace() const throws -> void;
 
   /* The byte offset in the current source of the command being evaluated, the
      position $LINENO reports the line of. A SimpleCommand and an assignment set
