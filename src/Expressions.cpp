@@ -474,6 +474,19 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
     return;
   }
 
+  /* A plain scalar assignment inside a function body with no prior local for the
+     name leaks the value to the global scope, the footgun shit's own default
+     mood guards against at run time. The append form is left alone since it
+     extends a value the name already holds. This is the shellcheck SC2030-style
+     warning for a leaked variable. */
+  if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
+      !actx.function_local_names.contains(name.view()))
+    actx.warn(source_location(),
+              StringView{"This assignment to '"} + name +
+                  "' in a function has no local, so the value leaks to the "
+                  "global scope, declare it with local to keep it inside the "
+                  "function");
+
   /* A conditional or nested assignment may not run, and a runtime definer such
      as eval or dot may already have changed the name out of view, so neither
      proves the value. The append form NAME+=VALUE depends on the prior value,
@@ -3146,7 +3159,12 @@ cold fn FunctionDefinition::analyze(AnalysisContext &actx,
      around the body, and the body starts from an empty table. */
   let saved_constants = actx.constant_variables.clone();
   actx.constant_variables.clear();
+  let saved_locals = steal(actx.function_local_names);
+  actx.function_local_names = HashSet{heap_allocator()};
+  actx.function_scope_depth++;
   m_body->analyze(actx, false);
+  actx.function_scope_depth--;
+  actx.function_local_names = steal(saved_locals);
   actx.constant_variables = steal(saved_constants);
 }
 
@@ -3575,6 +3593,26 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
   ASSERT(m_args[0] != nullptr);
   let const name = static_command_name(m_args[0]);
+
+  /* local, declare, and typeset name the variables that stay inside the
+     function, so the names they take are recorded and the leak warning stays
+     quiet for a later assignment to one of them. A leading flag such as -A is
+     skipped, and the name ends at an = or a [ subscript. */
+  if (actx.function_scope_depth > 0 &&
+      (name == "local" || name == "declare" || name == "typeset"))
+    for (usize i = 1; i < m_args.count(); i++) {
+      let const word = m_args[i]->kind() == Token::Kind::Word
+                           ? static_cast<const tokens::WordToken *>(m_args[i])
+                                 ->word()
+                                 .to_literal_string()
+                           : m_args[i]->raw_string();
+      const StringView text = word.view();
+      if (text.is_empty() || text[0] == '-') continue;
+      usize end = 0;
+      while (end < text.length && lexer::is_variable_name(text[end]))
+        end++;
+      if (end > 0) actx.function_local_names.add(text.substring_of_length(0, end));
+    }
 
   /* The literal command text, used for the test recognition. A name like [
      holds a glob metacharacter, so static_command_name rejects it, but the test
