@@ -9,7 +9,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("type name [name ...]");
+HELP_SYNOPSIS_DECL("name [name ...]");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 

@@ -11,7 +11,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("kill [-signal] %job|pid [...]");
+HELP_SYNOPSIS_DECL("[-signal] %job|pid [...]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -24,6 +26,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
@@ -31,13 +35,13 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
     let const name = String{args[1].substring(1)};
     let const resolved = os::signal_number_from_name(name);
-    if (!resolved) throw Error{"Kill: '" + name + "' is not a valid signal"};
+    if (!resolved) throw Error{"'" + name + "' is not a valid signal"};
     signal_number = *resolved;
     first_target = 2;
   }
 
   if (first_target >= args.count())
-    throw Error{"Kill: a job or a process id is required"};
+    throw Error{"a job or a process id is required"};
 
   i32 status = 0;
   for (usize i = first_target; i < args.count(); i++) {

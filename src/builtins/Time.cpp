@@ -19,7 +19,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("time command [argument ...]");
+HELP_SYNOPSIS_DECL("command [argument ...]");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -66,6 +68,9 @@ pure fn Time::kind() const wontthrow -> Builtin::Kind { return Kind::Time; }
 cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* time with no command prints nothing and succeeds, the way an empty timed
      command would. */

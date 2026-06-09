@@ -16,7 +16,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("times");
+HELP_SYNOPSIS_DECL("");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -41,6 +43,9 @@ pure Builtin::Kind Times::kind() const wontthrow { return Kind::Times; }
 cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   unused(cxt);
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   double self_user = 0, self_system = 0, child_user = 0, child_system = 0;
 

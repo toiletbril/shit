@@ -12,7 +12,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("command [-v] [-V] name [argument ...]");
+HELP_SYNOPSIS_DECL("[-v] [-V] name [argument ...]");
 
 FLAG(SHOW, Bool, 'v', "", "Print the resolution of the name in a terse form.");
 FLAG(SHOW_VERBOSE, Bool, 'V', "",

@@ -9,7 +9,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("hash [-r] [name ...]");
+HELP_SYNOPSIS_DECL("[-r] [name ...]");
 
 FLAG(RESET, Bool, 'r', "", "Forget remembered command locations.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

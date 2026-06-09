@@ -6,7 +6,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("unalias [-a] name [name ...]");
+HELP_SYNOPSIS_DECL("[-a] name [name ...]");
 
 FLAG(ALL, Bool, 'a', "", "Remove every alias.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");

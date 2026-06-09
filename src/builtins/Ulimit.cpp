@@ -15,7 +15,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("ulimit [-f|-n|-t|-u] [limit]");
+HELP_SYNOPSIS_DECL("[-f|-n|-t|-u] [limit]");
 
 FLAG(FILE_SIZE, Bool, 'f', "",
      "The largest file the shell may create, in "

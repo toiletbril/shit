@@ -9,7 +9,9 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("jobs");
+HELP_SYNOPSIS_DECL("");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -68,7 +70,8 @@ pure fn Jobs::kind() const wontthrow -> Builtin::Kind { return Kind::Jobs; }
 
 fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(ec);
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   cxt.update_jobs();
 

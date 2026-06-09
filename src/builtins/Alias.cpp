@@ -7,7 +7,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("alias [name[=value] ...]");
+HELP_SYNOPSIS_DECL("[name[=value] ...]");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
