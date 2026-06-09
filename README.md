@@ -3,13 +3,9 @@
 Man, my shell is **shit**™ (built on top of
 [toiletline](https://github.com/toiletbril/toiletline))
 
-The fastest _cross-platform_ Bash and POSIX-compatible shell there is, even
+The fastest cross-platform Bash and POSIX-compatible shell there is, even
 faster than `dash`, with the most friendly UX and errors, with opinionated
 interactive experience.
-<sub>
-There's also no guarantee that this project will come any close to being
-finished or will not instantly break your computer upon the first start :^)
-</sub>
 
 The goal is to be a native, interactive, `bash`-compatible shell ~~without any
 bells and whistles~~, that can be used interchangeably on Windows and Linux and
@@ -84,6 +80,7 @@ the executable; `cat`, `diff`, `printf` to run the tests; `clang-format`,
 The `MODE` variable controls build type:
 * `rel` is an optimized build;
 * `prof` is an optimized build with debug symbols for profiling;
+* `coverage` is an optimized build with debug symbols for collecting coverage;
 * `dbg` includes all symbols and Asan with Ubsan;
 * `cosmo` is an optimized build which will try to use `cosmoc++` from the
   Cosmopolitan toolchain.
