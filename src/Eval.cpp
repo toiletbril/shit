@@ -1877,7 +1877,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   case '#': {
     let const value = current.value_or(String{});
-    let pattern_active = ArrayList<bool>{heap_allocator()};
+    let pattern_active = ArrayList<bool>{scratch_allocator()};
     let const pattern = expand_modifier_word_masked(word, pattern_active);
     return trim_matching(value.view(), pattern.view(), pattern_active,
                          TrimEnd::Prefix, is_doubled, extglob_enabled());
@@ -1885,7 +1885,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   case '%': {
     let const value = current.value_or(String{});
-    let pattern_active = ArrayList<bool>{heap_allocator()};
+    let pattern_active = ArrayList<bool>{scratch_allocator()};
     let const pattern = expand_modifier_word_masked(word, pattern_active);
     return trim_matching(value.view(), pattern.view(), pattern_active,
                          TrimEnd::Suffix, is_doubled, extglob_enabled());
@@ -2031,7 +2031,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
   }
 
   const usize separator = find_replacement_separator(remainder);
-  let pattern_active = ArrayList<bool>{heap_allocator()};
+  let pattern_active = ArrayList<bool>{scratch_allocator()};
   let const pattern = expand_modifier_word_masked(
       remainder.substring_of_length(0, separator), pattern_active);
   /* No separator means the replacement is empty, so the matches are deleted. */
@@ -2124,7 +2124,7 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
 
   /* An omitted pattern means every character matches, the way bash defaults the
      glob to ?. */
-  let pattern_active = ArrayList<bool>{heap_allocator()};
+  let pattern_active = ArrayList<bool>{scratch_allocator()};
   String pattern;
   if (pattern_word.is_empty()) {
     pattern = String{heap_allocator(), "?"};
@@ -3824,7 +3824,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
   /* Only copy the segments when a leading tilde must be rewritten, so the
      common assignment reads its segments in place with no per-command copy. */
   let const *segments = &word.segments;
-  let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
+  let tilde_expanded_segments = ArrayList<WordSegment>{scratch_allocator()};
   if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~')
@@ -3858,7 +3858,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
   /* Only copy the segments when a leading tilde must be rewritten, mirroring
      the assignment expansion the case word otherwise shares. */
   let const *segments = &word.segments;
-  let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
+  let tilde_expanded_segments = ArrayList<WordSegment>{scratch_allocator()};
   if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.is_empty() &&
       word.segments.front().text.first_character() == '~')
