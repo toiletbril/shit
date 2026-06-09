@@ -3886,6 +3886,41 @@ public:
          no consumed length, so the run is measured here and the matching parser
          runs on the scanned slice. */
       let const rest = source.substring(pos);
+
+      /* The base#digits form selects an explicit radix from 2 to 64, so 16#ff is
+         255 and 2#101 is 5. The decimal run before the # is the base and the
+         digits after it read in that base, with a-z worth 10 to 35, A-Z worth 36
+         to 61 above base 36 or the same as a-z at or below it, @ worth 62, and _
+         worth 63. */
+      if (const usize base_length = count_leading_digits(rest, 10);
+          base_length > 0 && base_length < rest.length &&
+          rest[base_length] == '#')
+      {
+        const i64 base =
+            parse_arithmetic_operand(rest.substring_of_length(0, base_length));
+        if (base < 2 || base > 64)
+          fail("an arithmetic base must be between 2 and 64");
+        auto digit_value = [base](char c) -> i64 {
+          if (c >= '0' && c <= '9') return c - '0';
+          if (c >= 'a' && c <= 'z') return c - 'a' + 10;
+          if (c >= 'A' && c <= 'Z')
+            return base <= 36 ? c - 'A' + 10 : c - 'A' + 36;
+          if (c == '@') return 62;
+          if (c == '_') return 63;
+          return -1;
+        };
+        i64 value = 0;
+        usize i = base_length + 1;
+        while (i < rest.length) {
+          const i64 digit = digit_value(rest[i]);
+          if (digit < 0 || digit >= base) break;
+          value = value * base + digit;
+          i++;
+        }
+        pos += i;
+        return value;
+      }
+
       usize consumed = 0;
       if (rest.length >= 2 && rest[0] == '0' &&
           (rest[1] == 'x' || rest[1] == 'X'))
