@@ -1,0 +1,22 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "which" "sh"]
+[Word
+  Unquoted "which"
+]
+[Word
+  Unquoted "sh"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+shit: 1:1: warning: which is non-standard, use command -v for a portable lookup.
+     1 |  which sh >/dev/null 2>&1
+       |  ^~~~~ here.
+[Code 0]

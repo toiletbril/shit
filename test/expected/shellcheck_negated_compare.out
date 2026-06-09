@@ -1,0 +1,48 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "1" "-eq" "2" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "!" "a" "=" "b" "]"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+shit: 1:3: warning: a negated -eq is just -ne, drop the ! and use -ne.
+     1 |  [ ! 1 -eq 2 ]
+       |    ^~ here.
+shit: 2:3: warning: a negated = is just !=, drop the ! and use !=.
+     2 |  [ ! a = b ]
+       |    ^~ here.
+[Code 0]

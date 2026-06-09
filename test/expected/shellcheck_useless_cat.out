@@ -1,0 +1,18 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "cat" "/dev/null"]
+      [SimpleCommand "cat"]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "cat"
+]
+shit: 1:1: warning: a useless cat, give the file to the next command directly instead of piping cat.
+     1 |  cat /dev/null | cat
+       |  ^~~ here.
+[Code 0]

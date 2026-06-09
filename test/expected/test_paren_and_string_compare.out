@@ -320,6 +320,12 @@
   DoubleQuoted "group_and="
   Variable "?"
 ]
+shit: 2:3: warning: a one-operand test is the nonempty-string test, write it with -n to read clearer.
+     2 |  [ "(" ]; echo "paren_single=$?"
+       |    ^~~ here.
+shit: 3:3: warning: a one-operand test is the nonempty-string test, write it with -n to read clearer.
+     3 |  [ ")" ]; echo "rparen_single=$?"
+       |    ^~~ here.
 shit: 12:15: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
     12 |  [ \( a = a \) -a -n x ]; echo "group_and=$?"
        |                ^~ here.

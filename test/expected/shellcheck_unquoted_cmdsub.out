@@ -1,0 +1,32 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo hi)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "export" "FOO=$(echo hi)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$(echo hi)"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo hi"
+]
+[Word
+  Unquoted "export"
+]
+[Word
+  Unquoted "FOO="
+  CommandSubstitution "echo hi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  CommandSubstitution "echo hi"
+]
+shit: 1:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     1 |  echo $(echo hi)
+       |       ^~~~~~~~~~ here.
+hi
+hi
+[Code 0]

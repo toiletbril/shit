@@ -13,5 +13,8 @@
 [Word
   Unquoted "c"
 ]
+shit: 1:8: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     1 |  echo a $(echo b) c
+       |         ^~~~~~~~~ here.
 a b c
 [Code 0]

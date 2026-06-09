@@ -1466,11 +1466,13 @@ fn set_file_creation_mask(u32 mask) -> void { _umask(static_cast<int>(mask)); }
 fn wait_and_monitor_process(process p) -> i32
 {
   if (WaitForSingleObject(p, INFINITE) != WAIT_OBJECT_0)
-    throw Error{"WaitForSingleObject() failed: " + last_system_error_message()};
+    throw Error{"could not wait for the process to finish: " +
+                last_system_error_message()};
 
   DWORD code = -1;
   if (GetExitCodeProcess(p, &code) == 0)
-    throw Error{"GetExitCodeProcess() failed: " + last_system_error_message()};
+    throw Error{"could not read the process exit code: " +
+                last_system_error_message()};
 
   return code;
 }
@@ -1628,7 +1630,8 @@ fn set_default_signal_handlers() -> void
   if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||
       signal(SIGINT, handle_interrupt) == SIG_ERR)
   {
-    throw Error{"Signal() failed: " + last_system_error_message()};
+    throw Error{"could not install the signal handlers: " +
+                last_system_error_message()};
   }
 }
 
@@ -1636,7 +1639,8 @@ fn reset_signal_handlers() -> void
 {
   if (signal(SIGTERM, SIG_DFL) == SIG_ERR || signal(SIGINT, SIG_DFL) == SIG_ERR)
   {
-    throw Error{"Signal() failed: " + last_system_error_message()};
+    throw Error{"could not restore the default signal handlers: " +
+                last_system_error_message()};
   }
 
   /* A child started for a compound pipeline stage inherits the flag value at

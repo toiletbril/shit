@@ -53,13 +53,21 @@ public:
     if (op == "-r") return operand_path.is_readable();
     if (op == "-w") return operand_path.is_writable();
     if (op == "-x") return operand_path.is_executable();
-    fail(StringView{"unknown unary operator '"} + op + "'");
+    fail(StringView{"unknown unary operator '"} + op +
+         "', expected one of -z -n -e -f -d -s -r -w -x");
     return false;
   }
 
   bool evaluate_binary(const String &left, const String &op,
                        const String &right) throws
   {
+    /* == is a bashism, POSIX test compares strings with =. The analysis stage
+       warns on it as SC3014, and at run time the operator is rejected here with
+       the same suggestion rather than mislabeled as an unexpected argument. */
+    if (op == "==") {
+      fail("== is not a POSIX test operator, use = for string equality");
+      return false;
+    }
     if (op == "=") return left == right;
     if (op == "!=") return left != right;
     /* < and > compare the two operands byte by byte, the locale-byte order
@@ -71,8 +79,12 @@ public:
     if (op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
         op == "-gt" || op == "-ge")
     {
-      if (!parse_integer(left, a) || !parse_integer(right, b)) {
-        fail("integer expression expected");
+      let const left_is_integer = parse_integer(left, a);
+      let const right_is_integer = parse_integer(right, b);
+      if (!left_is_integer || !right_is_integer) {
+        let const &not_a_number = left_is_integer ? right : left;
+        fail(StringView{"integer operand expected for "} + op + ", '" +
+             not_a_number + "' is not a number");
         return false;
       }
       if (op == "-eq") return a == b;
@@ -82,7 +94,8 @@ public:
       if (op == "-gt") return a > b;
       return a >= b;
     }
-    fail(StringView{"unknown binary operator '"} + op + "'");
+    fail(StringView{"unknown binary operator '"} + op +
+         "', expected one of = != < > -eq -ne -lt -le -gt -ge");
     return false;
   }
 
@@ -94,8 +107,12 @@ public:
 
   pure bool is_binary_operator(const String &s) const wontthrow
   {
-    return s == "=" || s == "!=" || s == "<" || s == ">" || s == "-eq" ||
-           s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" || s == "-ge";
+    /* == is listed so the bashism routes to evaluate_binary and is rejected
+       there with a suggestion to use =, rather than falling through to the
+       unexpected-argument error. */
+    return s == "=" || s == "==" || s == "!=" || s == "<" || s == ">" ||
+           s == "-eq" || s == "-ne" || s == "-lt" || s == "-le" || s == "-gt" ||
+           s == "-ge";
   }
 
   /* A unary operator at index reads as a plain operand rather than an operator

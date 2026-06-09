@@ -48,7 +48,7 @@ commands.
 An example of the excruciatingly complex build process:
 ```bash
 $ export MODE=<rel/prof/dbg/cosmo>
-$ make -j`nproc`
+$ make
 $ ./shit --help
 ```
 

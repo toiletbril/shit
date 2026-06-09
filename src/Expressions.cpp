@@ -2171,6 +2171,32 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
     item.body->analyze(actx, false);
   }
 
+  /* A case with no catch-all *) arm silently does nothing for a value none of
+     the listed patterns match, so a typo or a new input slips through. This is
+     shellcheck SC2249. The catch-all is the literal * pattern, read from each
+     arm's alternative tokens. */
+  bool has_default_arm = false;
+  for (const case_item &item : m_items) {
+    for (const Token *pattern : item.patterns) {
+      if (pattern->kind() != Token::Kind::Word) continue;
+      if (static_cast<const tokens::WordToken *>(pattern)
+              ->word()
+              .to_literal_string()
+              .view() == "*")
+      {
+        has_default_arm = true;
+        break;
+      }
+    }
+    if (has_default_arm) break;
+  }
+  if (!has_default_arm) {
+    ASSERT(m_word != nullptr);
+    actx.warn(m_word->source_location(),
+              "this case has no default *) branch, a value no pattern matches "
+              "is silently ignored");
+  }
+
   /* An arm body runs only when its pattern matches and may reassign a name, so
      a value recorded before the case is no longer proven after it. */
   actx.constant_variables.clear();
@@ -2771,6 +2797,23 @@ cold fn SimpleCommand::register_defined_functions(
   }
 }
 
+/* The direct test operator a leading ! collapses into, so the SC2335 lint can
+   name the shorter form. A negated -eq is -ne, a negated -lt is -ge, and so on
+   down the comparison pairs, with the same for = and !=. None for an operator
+   with no negated shortcut, where the ! stays. */
+cold fn negated_test_operator(StringView op) wontthrow -> Maybe<StringView>
+{
+  if (op == "-eq") return StringView{"-ne"};
+  if (op == "-ne") return StringView{"-eq"};
+  if (op == "-lt") return StringView{"-ge"};
+  if (op == "-ge") return StringView{"-lt"};
+  if (op == "-gt") return StringView{"-le"};
+  if (op == "-le") return StringView{"-gt"};
+  if (op == "=") return StringView{"!="};
+  if (op == "!=") return StringView{"="};
+  return shit::None;
+}
+
 cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
@@ -2929,6 +2972,43 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
+  /* which is not in POSIX and its output and exit status vary across systems,
+     so command -v is the portable lookup. This is shellcheck SC2230. A function
+     or alias named which is the user's own, so the lint is off for it. */
+  if (command_literal == "which" && !command_is_shadowed) {
+    actx.warn(m_args[0]->source_location(),
+              "which is non-standard, use command -v for a portable lookup");
+  }
+
+  /* An unquoted command substitution splits its captured output on IFS and
+     globs each field, so a path with a space or a glob character breaks into
+     several arguments. This is shellcheck SC2046, quote the substitution to
+     keep it one argument. An assignment-builtin operand such as export
+     FOO=$(cmd) does not split in assignment context, so it is left alone. */
+  let const command_is_assignment_builtin =
+      command_literal == "export" || command_literal == "readonly" ||
+      command_literal == "local" || command_literal == "declare" ||
+      command_literal == "typeset";
+  for (usize i = 1; i < m_args.count(); i++) {
+    if (m_args[i]->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
+    if (command_is_assignment_builtin &&
+        word.get_assignment_split().has_value())
+    {
+      continue;
+    }
+    for (const WordSegment &segment : word.segments) {
+      if (segment.kind == WordSegment::Kind::CommandSubstitution &&
+          !segment.is_in_double_quotes)
+      {
+        actx.warn(m_args[i]->source_location(),
+                  "an unquoted command substitution splits its output, quote "
+                  "it to keep one argument");
+        break;
+      }
+    }
+  }
+
   /* Obsolescent or redundant test forms, each a shellcheck check. -a and -o
      joining two conditions is obsolescent and misparses with some operands, so
      prefer a separate test joined with && or || (SC2166). The operator is
@@ -2947,6 +3027,13 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                               ->word()
                               .to_literal_string();
       let const view = literal.view();
+      /* == is a bashism in test, POSIX test compares strings with =. This is
+         shellcheck SC3014, and the test builtin rejects == at run time with the
+         same suggestion. */
+      if (view == "==") {
+        actx.warn(m_args[i]->source_location(),
+                  "== is undefined in POSIX test, use = for string equality");
+      }
       /* The word right before -a or -o, used to tell a negated unary -a file
          test from the binary AND operator. */
       let const previous_is_bang =
@@ -2966,12 +3053,64 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         let const next = static_cast<const tokens::WordToken *>(m_args[i + 1])
                              ->word()
                              .to_literal_string();
-        if (next.view() == "-z")
+        if (next.view() == "-z") {
           actx.warn(m_args[i]->source_location(),
                     "a negated -z is just -n, test with -n instead");
-        else if (next.view() == "-n")
+        } else if (next.view() == "-n") {
           actx.warn(m_args[i]->source_location(),
                     "a negated -n is just -z, test with -z instead");
+        } else if (i + 2 < m_args.count() &&
+                   m_args[i + 2]->kind() == Token::Kind::Word)
+        {
+          /* The ! X OP Y shape, where OP is a comparison with a direct negated
+             form. This is shellcheck SC2335, drop the ! and use the inverse
+             operator so the test reads without the negation. */
+          let const op = static_cast<const tokens::WordToken *>(m_args[i + 2])
+                             ->word()
+                             .to_literal_string();
+          let const inverse = negated_test_operator(op.view());
+          if (inverse.has_value()) {
+            actx.warn(m_args[i]->source_location(),
+                      StringView{"a negated "} + op + " is just " +
+                          inverse.value() + ", drop the ! and use " +
+                          inverse.value());
+          }
+        }
+      }
+    }
+  }
+
+  /* A test with a single operand and no operator is the nonempty-string test,
+     which reads clearer written with -n. This is shellcheck SC2244. The [ form
+     ends at the closing ], the test form runs to the end, and an operand that
+     looks like a flag is left alone so [ -n ] is not told to use -n. A function
+     or alias named test or [ is the user's own, so the lint is off for it. */
+  if ((command_literal == "[" || command_literal == "test" ||
+       command_literal == "[[") &&
+      !command_is_shadowed)
+  {
+    usize operand_end = m_args.count();
+    bool bracket_form_is_closed = true;
+    if (command_literal == "[" || command_literal == "[[") {
+      bracket_form_is_closed =
+          m_args.count() >= 2 &&
+          m_args[m_args.count() - 1]->kind() == Token::Kind::Word &&
+          static_cast<const tokens::WordToken *>(m_args[m_args.count() - 1])
+                  ->word()
+                  .to_literal_string()
+                  .view() == (command_literal == "[" ? "]" : "]]");
+      if (bracket_form_is_closed) operand_end = m_args.count() - 1;
+    }
+    if (bracket_form_is_closed && operand_end - 1 == 1 &&
+        m_args[1]->kind() == Token::Kind::Word)
+    {
+      let const operand = static_cast<const tokens::WordToken *>(m_args[1])
+                              ->word()
+                              .to_literal_string();
+      if (!(operand.view().length >= 1 && operand.view()[0] == '-')) {
+        actx.warn(m_args[1]->source_location(),
+                  "a one-operand test is the nonempty-string test, write it "
+                  "with -n to read clearer");
       }
     }
   }
@@ -3092,6 +3231,34 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
   for (const Command *command : m_commands) {
     ASSERT(command != nullptr);
     command->analyze(actx, stage_is_unconditional);
+  }
+
+  /* cat reading a single named file only to feed it into the next stage runs an
+     extra process for nothing, the next command can open the file itself. This
+     is shellcheck SC2002. The first stage must be cat with one plain file
+     operand and a later stage must follow. A function or alias named cat is the
+     user's own, so the lint is off for it. */
+  if (m_commands.count() > 1) {
+    ASSERT(m_commands[0] != nullptr);
+    const SimpleCommand *first_stage = m_commands[0]->as_simple_command();
+    if (first_stage != nullptr) {
+      let const &cat_args = first_stage->args();
+      if (cat_args.count() == 2) {
+        let const name = static_command_name(cat_args[0]);
+        let const raw_operand = cat_args[1]->raw_string();
+        let const file_is_plain_operand =
+            cat_args[1]->kind() == Token::Kind::Word &&
+            !raw_operand.is_empty() && raw_operand[0] != '-';
+        if (name.has_value() && name->view() == "cat" &&
+            !actx.defined_functions.contains(name->view()) &&
+            !actx.known_aliases.contains(name->view()) && file_is_plain_operand)
+        {
+          actx.warn(cat_args[0]->source_location(),
+                    "a useless cat, give the file to the next command directly "
+                    "instead of piping cat");
+        }
+      }
+    }
   }
 
   /* A multi-stage pipeline reads variables in its children and the table cannot

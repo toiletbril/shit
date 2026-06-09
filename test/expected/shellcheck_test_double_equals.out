@@ -1,0 +1,24 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "a" "==" "b" "]"]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "]"
+]
+shit: 1:5: warning: == is undefined in POSIX test, use = for string equality.
+     1 |  [ a == b ]
+       |      ^~ here.
+shit: 1:1: error: Builtin '[': == is not a POSIX test operator, use = for string equality.
+     1 |  [ a == b ]
+       |  ^~~~~~~~~~ here.

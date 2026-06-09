@@ -1,0 +1,3 @@
+echo $(echo hi)
+export FOO=$(echo hi)
+echo "$(echo hi)"

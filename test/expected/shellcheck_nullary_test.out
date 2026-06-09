@@ -1,25 +1,30 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "[" "!" "]"]
+    [SimpleCommand "[" "$x" "]"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "$?"]
+    [SimpleCommand "[" "-n" "$x" "]"]
 [Word
   Unquoted "["
 ]
 [Word
-  Unquoted "!"
+  Variable "x"
 ]
 [Word
   Unquoted "]"
 ]
 [Word
-  Unquoted "echo"
+  Unquoted "["
 ]
 [Word
-  Variable "?"
+  Unquoted "-n"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "]"
 ]
 shit: 1:3: warning: a one-operand test is the nonempty-string test, write it with -n to read clearer.
-     1 |  [ ! ]
-       |    ^~ here.
-0
-[Code 0]
+     1 |  [ "$x" ]
+       |    ^~~~ here.
+[Code 1]
