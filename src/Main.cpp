@@ -685,7 +685,7 @@ fn main(int argc, char **argv) -> int
               shit::os::get_hostname().value_or(shit::os::get_environment_variable(
                                                     "HOSTNAME")
                                                     .value_or("localhost"));
-          const bool wants_color = shit::colors::stderr_wants_color();
+          const bool wants_color = shit::colors::stdout_wants_color();
           prompt += u;
           prompt += '@';
           prompt += host;

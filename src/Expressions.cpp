@@ -3063,6 +3063,12 @@ cold fn IfStatement::analyze(AnalysisContext &actx,
   m_condition->analyze(actx, is_unconditional);
   m_then->analyze(actx, false);
   if (m_otherwise != nullptr) m_otherwise->analyze(actx, false);
+
+  /* A branch ran conditionally and may have reassigned a name, so a value
+     recorded before this if is no longer proven to hold in the straight-line
+     block after it. Clearing matches IfClause::analyze and keeps the constant
+     propagation to a single straight-line run. */
+  actx.constant_variables.clear();
 }
 
 cold fn IfStatement::register_defined_functions(
