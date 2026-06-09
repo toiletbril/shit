@@ -7,14 +7,14 @@
 [Word
   Unquoted "-l"
 ]
-shit has 54 builtins:
+shit has 55 builtins:
 
   .          :          [          alias      bench      bg         break
   builtin    cd         command    compgen    complete   compopt    continue
   declare    echo       eval       exec       exit       export     false
-  fg         getopts    hash       jobs       kill       local      mapfile
-  newgrp     printf     pwd        read       readarray  readonly   return
-  set        shift      shopt      source     test       time       times
-  trap       true       type       typeset    ulimit     umask      unalias
-  unset      wait       which      whoami     z
+  fg         getopts    hash       jobs       kill       let        local
+  mapfile    newgrp     printf     pwd        read       readarray  readonly
+  return     set        shift      shopt      source     test       time
+  times      trap       true       type       typeset    ulimit     umask
+  unalias    unset      wait       which      whoami     z
 [Code 0]

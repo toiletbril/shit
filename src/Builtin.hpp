@@ -50,6 +50,7 @@ public:
     Mapfile,
     Shopt,
     Times,
+    Let,
     Ulimit,
     Hash,
     Alias,
@@ -119,6 +120,7 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("readarray"), Builtin::Kind::Mapfile       },
     {PackedStringKey::from_literal("shopt"),     Builtin::Kind::Shopt         },
     {PackedStringKey::from_literal("times"),     Builtin::Kind::Times         },
+    {PackedStringKey::from_literal("let"),       Builtin::Kind::Let           },
     {PackedStringKey::from_literal("ulimit"),    Builtin::Kind::Ulimit        },
     {PackedStringKey::from_literal("hash"),      Builtin::Kind::Hash          },
     {PackedStringKey::from_literal("alias"),     Builtin::Kind::Alias         },
@@ -180,6 +182,7 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Mapfile);                                                             \
   B_CASE(Shopt);                                                               \
   B_CASE(Times);                                                               \
+  B_CASE(Let);                                                                 \
   B_CASE(Ulimit);                                                              \
   B_CASE(Hash);                                                                \
   B_CASE(Alias);                                                               \
@@ -239,6 +242,7 @@ BUILTIN_STRUCT(Declare);
 BUILTIN_STRUCT(Mapfile);
 BUILTIN_STRUCT(Shopt);
 BUILTIN_STRUCT(Times);
+BUILTIN_STRUCT(Let);
 BUILTIN_STRUCT(Ulimit);
 BUILTIN_STRUCT(Hash);
 BUILTIN_STRUCT(Alias);
