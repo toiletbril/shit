@@ -2631,6 +2631,26 @@ struct ConditionalEvaluator
     return String{heap_allocator()};
   }
 
+  /* The right side of == or != is a pattern, so it expands with a parallel mask
+     that marks which *, ?, and [ stay active. A quoted or escaped metacharacter
+     is masked off and matches literally, the way bash treats a quoted RHS. */
+  String operand_pattern_masked(const conditional_element &e,
+                                ArrayList<bool> &active) throws
+  {
+    if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
+      try {
+        return cxt.expand_case_pattern_masked(
+            static_cast<const tokens::WordToken *>(e.word)->word(), active);
+      } catch (const Error &err) {
+        throw ErrorWithLocation{e.word->source_location(), err.message()};
+      }
+    }
+    String raw = e.word != nullptr ? e.word->raw_string()
+                                   : String{heap_allocator()};
+    for (usize i = 0; i < raw.count(); i++) active.push(true);
+    return raw;
+  }
+
   static pure bool is_unary_op(StringView s) wontthrow
   {
     return s == "-z" || s == "-n" || s == "-e" || s == "-f" || s == "-d" ||
@@ -2678,17 +2698,6 @@ struct ConditionalEvaluator
 #endif
   }
 
-  /* Glob match the value against the pattern, marking the unescaped *, ?, and [
-     as active so an unquoted pattern globs the way [[ == does. */
-  bool glob_equal(StringView value, StringView pattern) throws
-  {
-    let active = ArrayList<bool>{cxt.scratch_allocator()};
-    for (usize i = 0; i < pattern.length; i++)
-      active.push(pattern[i] == '*' || pattern[i] == '?' || pattern[i] == '[');
-    return utils::glob_matches(pattern, value, active, 0,
-                               cxt.extglob_enabled());
-  }
-
   bool eval_unary(StringView op, StringView operand) throws
   {
     if (op == "-z") return operand.is_empty();
@@ -2728,8 +2737,6 @@ struct ConditionalEvaluator
 
   bool eval_binary(StringView left, StringView op, StringView right) throws
   {
-    if (op == "==" || op == "=") return glob_equal(left, right);
-    if (op == "!=") return !glob_equal(left, right);
     if (op == "=~") return regex_match(left, right);
     if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
@@ -2799,6 +2806,16 @@ struct ConditionalEvaluator
           pos += 3;
           if (is_skipping) return false;
           const String left = operand_value(elements[pos - 3]);
+          /* == and != glob-match with a quoting mask, the other binary
+             operators read a plain string right operand. */
+          if (op == "==" || op == "=" || op == "!=") {
+            let active = ArrayList<bool>{cxt.scratch_allocator()};
+            const String pattern =
+                operand_pattern_masked(elements[pos - 1], active);
+            const bool matched = utils::glob_matches(
+                pattern.view(), left.view(), active, 0, cxt.extglob_enabled());
+            return op == "!=" ? !matched : matched;
+          }
           const String right = operand_value(elements[pos - 1]);
           return eval_binary(left.view(), op.view(), right.view());
         }
