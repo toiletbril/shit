@@ -581,10 +581,8 @@ fn AssignCommand::append_to(usize d, String &f, bool duplicate) throws -> void
 
 SimpleCommand::SimpleCommand(SourceLocation location,
                              ArrayList<const Token *> &&args)
-    : Command(location)
+    : Command(location), m_args(steal(args))
 {
-  for (const Token *arg : args)
-    m_args.push(arg);
 
   /* The command's location spans from its first word to the end of its last,
      so a caret under the whole command, such as a sourced '. file' in a
@@ -604,8 +602,7 @@ SimpleCommand::~SimpleCommand() = default;
 fn SimpleCommand::set_redirections(ArrayList<Redirection> &&redirections) throws
     -> void
 {
-  for (const Redirection &redir : redirections)
-    m_redirections.push(redir);
+  m_redirections = steal(redirections);
 }
 
 fn SimpleCommand::set_array_args(
@@ -2061,13 +2058,9 @@ fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
 
 IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
                    const Expression *otherwise)
-    : CompoundCommand(location), m_otherwise(otherwise)
-{
-  for (const auto &branch : branches)
-    m_branches.push(branch);
-  /* The branch nodes live in the arena. Empty the moved-from source. */
-  branches.clear();
-}
+    : CompoundCommand(location), m_branches(steal(branches)),
+      m_otherwise(otherwise)
+{}
 
 /* The branch conditions, the branch bodies, and the else body live in the
    arena, torn down once on reset. */
@@ -2373,9 +2366,7 @@ SelectLoop::SelectLoop(SourceLocation location, StringView variable_name,
     : CompoundCommand(location), m_variable_name(variable_name),
       m_has_in_clause(has_in_clause), m_body(body)
 {
-  for (const Token *word : words)
-    m_words.push(word);
-  words.clear();
+  m_words = steal(words);
 }
 
 SelectLoop::~SelectLoop() = default;
@@ -2469,10 +2460,7 @@ ForLoop::ForLoop(SourceLocation location, StringView variable_name,
     : CompoundCommand(location), m_variable_name(variable_name),
       m_has_in_clause(has_in_clause), m_body(body)
 {
-  for (const Token *word : words)
-    m_words.push(word);
-  /* The word tokens live in the arena. Empty the moved-from source. */
-  words.clear();
+  m_words = steal(words);
 }
 
 /* The word tokens and the body live in the arena, torn down once on reset. */
@@ -2567,11 +2555,7 @@ CaseClause::CaseClause(SourceLocation location, const Token *word,
                        ArrayList<case_item> &&items)
     : CompoundCommand(location), m_word(word)
 {
-  for (case_item &item : items)
-    m_items.push(steal(item));
-  /* The item tokens and bodies live in the arena. Empty the moved-from source.
-   */
-  items.clear();
+  m_items = steal(items);
 }
 
 /* The subject word, the pattern tokens, and the item bodies live in the arena,
