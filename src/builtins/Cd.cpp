@@ -26,7 +26,16 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let arg_path = String{};
 
-  if (ec.args().count() > 1) {
+  /* A lone dash operand names the previous directory, so cd - moves to OLDPWD
+     and prints the directory it lands in, the way POSIX and dash do. */
+  let const is_to_previous = ec.args().count() == 2 && ec.args()[1] == "-";
+
+  if (is_to_previous) {
+    let const old_directory = cxt.get_variable_value("OLDPWD");
+    if (!old_directory || old_directory->is_empty())
+      throw Error{"OLDPWD not set"};
+    arg_path.append(old_directory->view());
+  } else if (ec.args().count() > 1) {
     arg_path.append(ec.args()[1]);
     for (usize i = 2; i < ec.args().count(); i++) {
       arg_path += ' ';
@@ -62,6 +71,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (!old_directory.is_empty())
       cxt.set_shell_variable("OLDPWD", old_directory.text());
     cxt.set_shell_variable("PWD", target.text());
+    /* cd - reports the directory it moved to, so a script that toggles between
+       two directories sees where it landed. A plain cd stays silent. */
+    if (is_to_previous) ec.print_to_stdout(target.text() + "\n");
     return 0;
   }
 

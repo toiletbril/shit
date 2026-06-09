@@ -1,0 +1,7 @@
+cd /tmp
+cd /
+cd -
+pwd
+echo "PWD=$PWD OLDPWD=$OLDPWD"
+cd -
+pwd

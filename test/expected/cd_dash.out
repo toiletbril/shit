@@ -1,0 +1,60 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/tmp"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "pwd"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "PWD=$PWD OLDPWD=$OLDPWD"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "pwd"]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/tmp"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "pwd"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "PWD="
+  Variable "PWD"
+  DoubleQuoted " OLDPWD="
+  Variable "OLDPWD"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "-"
+]
+[Word
+  Unquoted "pwd"
+]
+/tmp
+/tmp
+PWD=/tmp OLDPWD=/
+/
+/
+[Code 0]
