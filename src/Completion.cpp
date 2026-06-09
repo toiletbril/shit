@@ -807,9 +807,25 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar,
 static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
 {
   if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
-  for (usize i = 1; i < word.length; i++) {
-    if (word[i] == '=') return true;
-    if (!is_highlight_name_char(word[i])) return false;
+  usize i = 1;
+  while (i < word.length && is_highlight_name_char(word[i]))
+    i++;
+  if (i < word.length && word[i] == '=') return true;
+  /* The array-element form NAME[subscript]= is also an assignment, the way the
+     lexer keeps arr[i]=v one assignment word, so the highlighter keeps the next
+     word in command position rather than coloring the array name as a command. */
+  if (i < word.length && word[i] == '[') {
+    usize depth = 1;
+    i++;
+    while (i < word.length && depth > 0) {
+      if (word[i] == '[')
+        depth++;
+      else if (word[i] == ']')
+        depth--;
+      i++;
+    }
+    if (i < word.length && word[i] == '=') return true;
+    if (i + 1 < word.length && word[i] == '+' && word[i + 1] == '=') return true;
   }
   return false;
 }
@@ -1200,7 +1216,12 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
     } else if (Maybe<usize> equals = token.find_character('=');
                equals.has_value() && equals.value() > 0)
     {
-      const StringView name = token.substring_of_length(0, equals.value());
+      StringView name = token.substring_of_length(0, equals.value());
+      /* An array-element assignment binds the base name, so arr[0]=1 makes arr
+         known rather than the invalid name arr[0. */
+      if (Maybe<usize> bracket = name.find_character('[');
+          bracket.has_value())
+        name = name.substring_of_length(0, bracket.value());
       if (is_identifier(name)) known_vars.add(name);
     }
     bind_next = token == "for" || token == "select";
