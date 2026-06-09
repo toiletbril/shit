@@ -1031,6 +1031,14 @@ fn monotonic_nanos() wontthrow -> u64
          static_cast<u64>(now.tv_nsec);
 }
 
+fn realtime_microseconds() wontthrow -> u64
+{
+  struct timespec now{};
+  if (clock_gettime(CLOCK_REALTIME, &now) != 0) return 0;
+  return static_cast<u64>(now.tv_sec) * 1000000ULL +
+         static_cast<u64>(now.tv_nsec) / 1000ULL;
+}
+
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
     -> void
 {
@@ -1943,6 +1951,20 @@ fn monotonic_nanos() wontthrow -> u64
   const u64 remainder = counter.QuadPart % frequency.QuadPart;
   return whole_seconds * 1000000000ULL +
          (remainder * 1000000000ULL) / static_cast<u64>(frequency.QuadPart);
+}
+
+fn realtime_microseconds() wontthrow -> u64
+{
+  FILETIME file_time;
+  GetSystemTimePreciseAsFileTime(&file_time);
+  ULARGE_INTEGER ticks;
+  ticks.LowPart = file_time.dwLowDateTime;
+  ticks.HighPart = file_time.dwHighDateTime;
+  /* The FILETIME counts 100-nanosecond intervals since 1601, so the offset to
+     1970 is removed and the rest scaled from 100ns units down to microseconds. */
+  const u64 epoch_offset_100ns = 116444736000000000ULL;
+  if (ticks.QuadPart < epoch_offset_100ns) return 0;
+  return (ticks.QuadPart - epoch_offset_100ns) / 10ULL;
 }
 
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow

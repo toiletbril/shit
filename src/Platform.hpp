@@ -323,6 +323,10 @@ fn take_pending_signal() wontthrow -> i32;
    QueryPerformanceCounter scaled to nanoseconds. */
 fn monotonic_nanos() wontthrow -> u64;
 
+/* The wall clock in microseconds since the Unix epoch, the source of the bash
+   EPOCHREALTIME variable. */
+fn realtime_microseconds() wontthrow -> u64;
+
 /* The user and system seconds this process's children have consumed so far,
    read from RUSAGE_CHILDREN. The difference across a command run is the
    command's own cpu time, the accounting the time report prints. Windows has no

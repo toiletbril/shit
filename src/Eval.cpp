@@ -556,6 +556,17 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     if (first_byte == 'E' && name == "EPOCHSECONDS") {
       return utils::int_to_text(static_cast<i64>(std::time(nullptr)));
     }
+    /* EPOCHREALTIME is the wall clock as seconds.microseconds, the high
+       resolution form a config such as ble.sh reads to build a clock. The
+       fraction is always six digits so a reader can slice it by a fixed width. */
+    if (first_byte == 'E' && name == "EPOCHREALTIME") {
+      const u64 microseconds = os::realtime_microseconds();
+      char fraction[8];
+      std::snprintf(fraction, sizeof(fraction), "%06llu",
+                    static_cast<unsigned long long>(microseconds % 1000000ULL));
+      return utils::int_to_text(static_cast<i64>(microseconds / 1000000ULL)) +
+             "." + StringView{fraction};
+    }
     if (first_byte == 'B' && name == "BASHPID") {
       return utils::int_to_text(os::get_shell_process_id());
     }

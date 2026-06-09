@@ -1229,6 +1229,7 @@ fn highlight_line(StringView line, EvalContext &context) throws
       known_vars.add(StringView{"RANDOM"});
       known_vars.add(StringView{"SECONDS"});
       known_vars.add(StringView{"EPOCHSECONDS"});
+      known_vars.add(StringView{"EPOCHREALTIME"});
       known_vars.add(StringView{"BASHPID"});
       known_vars.add(StringView{"BASH_SUBSHELL"});
       known_vars.add(StringView{"BASH_SOURCE"});
