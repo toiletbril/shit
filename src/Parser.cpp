@@ -1582,9 +1582,13 @@ hot fn Parser::parse_brace_group() throws -> Command *
   Token *close = m_lexer.next_shell_token();
   ASSERT(close != nullptr);
   if (!is_brace_word(close, '}')) {
-    throw ErrorWithLocationAndDetails{open->source_location(),
-                                      "Unterminated brace group",
-                                      close->source_location(), "Expected '}'"};
+    /* The closing '}' is a reserved word only at the start of a command, so when
+       it lacks a ';' or a newline before it the lexer reads it as an argument to
+       the last command and the group never closes. throw_unterminated finds that
+       stray '}' in the source and points the caret at it, telling the reader to
+       put a ';' before it. */
+    throw_unterminated(open->source_location(), "Unterminated brace group",
+                       m_lexer.source(), "}", close->source_location());
   }
 
   return m_lexer.arena().create<BraceGroup>(open->source_location(), body);
