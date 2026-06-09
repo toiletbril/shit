@@ -1814,7 +1814,13 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       if (m_error_unset && !get_variable_value(name).has_value())
         throw Error{"Unable to expand '" + name +
                     "' because the parameter is not set"};
-      emit_run(expand_variable(name), !in_double_quote);
+      /* An ordinary name appends its stored value straight from the store, so the
+         common reference pays no temporary String the way a synthesized special
+         name would. */
+      if (const String *stored = lookup_shell_variable(name))
+        emit_run(stored->view(), !in_double_quote);
+      else
+        emit_run(expand_variable(name), !in_double_quote);
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
       /* Arithmetic $((...)), scanned to the matching )). A quote run and a
