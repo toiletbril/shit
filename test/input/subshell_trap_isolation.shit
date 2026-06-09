@@ -1,0 +1,10 @@
+trap "echo PARENT" EXIT
+( trap "echo SUB" EXIT; echo in-sub )
+echo after-sub
+( echo plain-sub )
+echo after-plain
+( exit 3 )
+echo exit-rc=$?
+v=$( trap "echo CSUB" EXIT; echo captured )
+echo got=$v
+echo done

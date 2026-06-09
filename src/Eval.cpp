@@ -437,6 +437,21 @@ fn EvalContext::has_exit_trap() const wontthrow -> bool
   return false;
 }
 
+fn EvalContext::clear_inherited_exit_trap() throws -> void
+{
+  m_traps.erase(StringView{"EXIT", 4});
+}
+
+cold fn EvalContext::run_subshell_exit_trap() throws -> void
+{
+  /* Only an EXIT action the subshell itself set is present here, since the
+     boundary cleared the inherited one on entry. The action runs in the
+     subshell's still-current state, before restore_state returns the parent's
+     traps and variables. */
+  if (let const *action = m_traps.find(StringView{"EXIT", 4}))
+    if (action->count() > 0) run_source(action->view(), "the EXIT trap");
+}
+
 fn EvalContext::mark_readonly(StringView name) throws -> void
 {
   if (is_readonly(name)) return;
@@ -858,8 +873,16 @@ fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
 
 fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
-  return eval_state_snapshot{m_shell_variables, m_functions, m_aliases,
-                             m_positional_params, Path::current_directory()};
+  return eval_state_snapshot{m_shell_variables,
+                             m_functions,
+                             m_aliases,
+                             m_positional_params,
+                             Path::current_directory(),
+                             m_traps,
+                             m_error_exit,
+                             m_enable_path_expansion,
+                             m_enable_echo,
+                             m_enable_echo_expanded};
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -870,6 +893,20 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      stays inside it, the way bash isolates an alias change in a subshell. */
   m_aliases = steal(snapshot.aliases);
   m_positional_params = steal(snapshot.positional_params);
+
+  /* A set -e, set -f, or set -x inside a subshell or a command substitution
+     stays inside it, the way dash runs the inner code in a forked child whose
+     option flags die with the child. */
+  m_error_exit = snapshot.error_exit;
+  m_enable_path_expansion = snapshot.enable_path_expansion;
+  m_enable_echo = snapshot.enable_echo;
+  m_enable_echo_expanded = snapshot.enable_echo_expanded;
+
+  /* A trap installed inside the subshell stays inside it. The parent's table is
+     restored whole, so an EXIT trap the parent set survives and an EXIT trap the
+     subshell set is dropped after it has already fired at the subshell's end. */
+  m_traps = steal(snapshot.traps);
+
   /* set_current_directory reports an error through ErrorOr, ignored here to
      match the prior void call that swallowed a failed chdir. */
   (void) Path::set_current_directory(snapshot.working_directory);
@@ -2592,6 +2629,10 @@ fn EvalContext::run_captured_substitution(const Expression *ast) throws
      continue, return, or exit inside a substitution acts only within it and
      must not escape into the enclosing loop, function, or shell. */
   enter_subshell();
+  /* The inherited EXIT action belongs to the parent and does not fire at the
+     substitution's end. An EXIT action the inner code sets survives and fires
+     below, its output captured into the substitution like any other. */
+  clear_inherited_exit_trap();
   std::exception_ptr error;
   try {
     ast->evaluate(*this);
@@ -2604,6 +2645,17 @@ fn EvalContext::run_captured_substitution(const Expression *ast) throws
     if (pending_control_flow().kind == control_flow::Kind::Exit)
       set_last_exit_status(static_cast<i32>(pending_control_flow().value));
     clear_control_flow();
+  }
+  /* The substitution ends here, so its own EXIT action runs while stdout still
+     points at the pipe, so its output joins the captured value. A throw from
+     the action is kept and rethrown after teardown, like a throw from the body.
+   */
+  if (!error) {
+    try {
+      run_subshell_exit_trap();
+    } catch (...) {
+      error = std::current_exception();
+    }
   }
   leave_subshell();
 

@@ -111,7 +111,9 @@ struct job
 };
 
 /* A snapshot of the mutable shell state, taken around a subshell or a command
-   substitution so a cd or an assignment inside does not leak to the parent. */
+   substitution so a cd or an assignment inside does not leak to the parent. The
+   set option flags and the trap table are captured too, so a set -e, a set -f,
+   a set -x, or a trap inside the subshell stays inside it. */
 struct eval_state_snapshot
 {
   HashMap<String> shell_variables;
@@ -119,6 +121,11 @@ struct eval_state_snapshot
   HashMap<String> aliases;
   ArrayList<String> positional_params;
   Path working_directory;
+  HashMap<String> traps;
+  bool error_exit;
+  bool enable_path_expansion;
+  bool enable_echo;
+  bool enable_echo_expanded;
 };
 
 class EvalContext
@@ -222,6 +229,17 @@ public:
   /* True when an EXIT trap action is set, so the run loop keeps the fork for a
      terminal command and lets the trap run before the shell exits. */
   fn has_exit_trap() const wontthrow -> bool;
+
+  /* A real shell process runs its EXIT trap as it exits, so a forked subshell
+     runs its own EXIT trap at its end. This shell isolates a subshell by
+     snapshot rather than a fork, so the boundary clears the inherited EXIT
+     action on entry and fires whatever EXIT action the subshell set on exit.
+     The clear keeps the inherited parent action from firing at the subshell's
+     end, and the run happens before restore_state brings the parent table back.
+     The global one-shot guard run_exit_trap uses is left untouched, so the
+     parent still runs its own EXIT trap once when the shell ends. */
+  fn clear_inherited_exit_trap() throws -> void;
+  fn run_subshell_exit_trap() throws -> void;
 
   /* readonly marks a variable so a later assignment to it fails. The set is
      usually empty, so set_shell_variable only scans it when it is not. */

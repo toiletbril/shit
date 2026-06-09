@@ -1,0 +1,114 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "trap" "echo PARENT" "EXIT"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "trap" "echo SUB" "EXIT"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "in-sub"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-sub"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "plain-sub"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after-plain"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "exit" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "exit-rc=$?"]
+  [CompoundListCondition, None]
+    [Assign v=$( trap "echo CSUB" EXIT; echo captured )]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "got=$v"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "trap"
+]
+[Word
+  DoubleQuoted "echo PARENT"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "trap"
+]
+[Word
+  DoubleQuoted "echo SUB"
+]
+[Word
+  Unquoted "EXIT"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "in-sub"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-sub"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "plain-sub"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after-plain"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "exit-rc="
+  Variable "?"
+]
+[Word
+  Unquoted "v="
+  CommandSubstitution " trap "echo CSUB" EXIT; echo captured "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "got="
+  Variable "v"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+in-sub
+SUB
+after-sub
+plain-sub
+after-plain
+exit-rc=3
+got=captured CSUB
+done
+[Code 0]
+PARENT

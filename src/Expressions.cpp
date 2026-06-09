@@ -2257,6 +2257,10 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   let snapshot = cxt.snapshot_state();
   cxt.enter_subshell();
+  /* The inherited EXIT action belongs to the parent, so it does not fire at the
+     subshell's end. An EXIT action the body sets survives this clear and fires
+     below. */
+  cxt.clear_inherited_exit_trap();
   i64 ret = 0;
   /* A diagnostic thrown by the body, such as a readonly violation or a missing
      command, must still restore the snapshot and leave the subshell, otherwise
@@ -2264,6 +2268,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   try {
     ret = m_body->evaluate(cxt);
   } catch (...) {
+    cxt.run_subshell_exit_trap();
     cxt.leave_subshell();
     cxt.restore_state(steal(snapshot));
     throw;
@@ -2285,6 +2290,9 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
 
+  /* The subshell ends here, so its own EXIT action runs now, in the subshell's
+     state and before the parent's traps return. */
+  cxt.run_subshell_exit_trap();
   cxt.leave_subshell();
   cxt.restore_state(steal(snapshot));
   cxt.set_last_exit_status(static_cast<i32>(ret));

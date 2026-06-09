@@ -1,0 +1,10 @@
+set +e
+( set -e; false; echo never-printed )
+echo e-isolated-parent-survives
+set +f
+( set -f )
+case $- in *f*) echo f-LEAKED;; *) echo f-isolated;; esac
+set -f
+( set +f )
+case $- in *f*) echo f-still-set;; *) echo f-UNSET-LEAK;; esac
+set +f

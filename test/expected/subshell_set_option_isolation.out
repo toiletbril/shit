@@ -1,0 +1,167 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+e"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "-e"]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never-printed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "e-isolated-parent-survives"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+f"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "-f"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-LEAKED"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-isolated"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-f"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "set" "+f"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-still-set"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "f-UNSET-LEAK"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+f"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+e"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never-printed"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "e-isolated-parent-survives"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+f"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "-"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "*f*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-LEAKED"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-isolated"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+f"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Variable "-"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "*f*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-still-set"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "f-UNSET-LEAK"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+f"
+]
+e-isolated-parent-survives
+f-isolated
+f-still-set
+[Code 0]
