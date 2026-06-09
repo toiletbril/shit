@@ -9,6 +9,18 @@
 /* Interprets a format string with the common conversions and backslash escapes,
    recycling the format over any remaining arguments, like the POSIX utility. */
 
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-v var] format [argument ...]");
+
+HELP_DESCRIPTION_DECL(
+    "The printf builtin writes the arguments under the control of a format "
+    "string with the common conversions and backslash escapes, recycling the "
+    "format over any remaining arguments. The -v flag stores the result in the "
+    "named shell variable instead of writing it to the standard output.");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
 namespace shit {
 
 namespace {
@@ -191,6 +203,9 @@ pure Builtin::Kind Printf::kind() const wontthrow { return Kind::Printf; }
 i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
   ASSERT(!ec.args().is_empty());
+
+  if (ec.args().count() > 1 && ec.args()[1] == "--help")
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (ec.args().count() < 2) return 0;
 
