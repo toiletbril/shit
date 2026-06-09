@@ -1166,6 +1166,47 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   }
 }
 
+/* The variable names the line itself introduces, a for or select loop variable
+   and a plain NAME= assignment, so the highlighter does not red a reference to a
+   name the same line binds. */
+static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
+    -> void
+{
+  let const is_separator = [](char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == ';' || c == '|' ||
+           c == '&' || c == '(' || c == ')';
+  };
+  let const is_identifier = [](StringView name) {
+    if (name.is_empty() || !is_highlight_name_start(name[0])) return false;
+    for (usize i = 1; i < name.length; i++)
+      if (!is_highlight_name_char(name[i])) return false;
+    return true;
+  };
+
+  bool bind_next = false;
+  usize i = 0;
+  while (i < line.length) {
+    while (i < line.length && is_separator(line[i]))
+      i++;
+    const usize start = i;
+    while (i < line.length && !is_separator(line[i]))
+      i++;
+    if (i == start) break;
+    const StringView token = line.substring_of_length(start, i - start);
+
+    if (bind_next) {
+      if (is_identifier(token)) known_vars.add(token);
+      bind_next = false;
+    } else if (Maybe<usize> equals = token.find_character('=');
+               equals.has_value() && equals.value() > 0)
+    {
+      const StringView name = token.substring_of_length(0, equals.value());
+      if (is_identifier(name)) known_vars.add(name);
+    }
+    bind_next = token == "for" || token == "select";
+  }
+}
+
 fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>
 {
@@ -1192,6 +1233,7 @@ fn highlight_line(StringView line, EvalContext &context) throws
       known_vars.add(StringView{"BASH_SUBSHELL"});
       known_vars.add(StringView{"BASH_SOURCE"});
     }
+    add_line_bound_variables(line, known_vars);
   }
   scan_highlight_range(line, 0, line.length, context, spans, known_vars);
   return spans;
