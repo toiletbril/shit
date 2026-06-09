@@ -2925,8 +2925,6 @@ pure fn EvalContext::peak_ast_arena_bytes() const wontthrow -> usize
   return m_peak_ast_arena_bytes;
 }
 
-/* TODO: Test symlinks. */
-/* TODO: What the fuck is happening. */
 fn EvalContext::expand_path_once(const glob_field &field,
                                  bool should_expand_files) throws
     -> ArrayList<glob_field>

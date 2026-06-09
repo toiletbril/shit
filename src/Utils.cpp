@@ -21,9 +21,6 @@
 #include <malloc.h>
 #endif
 
-/* TODO: Support background processes. */
-/* TODO: Support setting environment variables. */
-
 namespace shit {
 
 namespace utils {

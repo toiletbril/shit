@@ -9,8 +9,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* TODO: Print proper offset and context for UTF-8. */
-
 namespace shit {
 
 /* The SGR codes wrapping one diagnostic. Each field is empty when color is off,
@@ -355,7 +353,10 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   LOG_VARS(verbosity::Debug, byte_position, byte_count);
   LOG(verbosity::Debug, "formatting located %s", severity_word().c_str());
 
-  /* FIXME: Below are two dirty hacks. */
+  /* A position that lands on a line continuation or a bare newline points at the
+     join rather than at the next real byte, so the caret is nudged past the
+     backslash-newline pair or the lone newline to the start of the following
+     line where the reader expects it. */
   if (byte_position + 2 < source.count() && source[byte_position] == '\\' &&
       source[byte_position + 1] == '\n')
   {
