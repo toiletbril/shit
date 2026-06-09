@@ -997,15 +997,22 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      end. A signal the subshell trapped that the parent does not is returned to
      its default first, then the parent's own signal dispositions are reinstalled
      from the restored table, so the process matches it. */
-  m_traps.for_each([&](StringView condition, const String &action) {
-    unused(action);
-    if (condition == "EXIT") return;
-    if (snapshot.traps.find(condition) != nullptr) return;
-    if (let const number = os::signal_number_from_name(condition))
-      os::clear_trap_handler(*number);
-  });
-  m_traps = steal(snapshot.traps);
-  install_trap_dispositions();
+  /* The common subshell and command substitution traps nothing, so the two
+     full table scans below are skipped entirely when neither the inner nor the
+     restored table holds an entry. */
+  if (m_traps.count() != 0 || snapshot.traps.count() != 0) {
+    m_traps.for_each([&](StringView condition, const String &action) {
+      unused(action);
+      if (condition == "EXIT") return;
+      if (snapshot.traps.find(condition) != nullptr) return;
+      if (let const number = os::signal_number_from_name(condition))
+        os::clear_trap_handler(*number);
+    });
+    m_traps = steal(snapshot.traps);
+    install_trap_dispositions();
+  } else {
+    m_traps = steal(snapshot.traps);
+  }
 
   /* set_current_directory reports an error through ErrorOr, ignored here to
      match the prior void call that swallowed a failed chdir. */

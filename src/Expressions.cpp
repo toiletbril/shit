@@ -597,6 +597,24 @@ fn resolve_duplication_fd(const Redirection &redir, EvalContext &cxt) throws
    cross-route flags the spawn applies after the files, so a `cmd 2>&1 >file`
    stage still snapshots the final file target. The standalone simple-command
    path in evaluate_impl is source-ordered, this one is not yet. */
+/* The file open mode a file redirection opens its target with. A plain > honors
+   noclobber, >| overrides it, >> appends, <> opens read-write, and < and every
+   other kind reads. */
+static fn redirection_open_mode(Redirection::Kind kind,
+                                bool no_clobber) wontthrow -> os::file_open_mode
+{
+  switch (kind) {
+  case Redirection::Kind::TruncateOutput:
+    return no_clobber ? os::file_open_mode::TruncateNoClobber
+                      : os::file_open_mode::Truncate;
+  case Redirection::Kind::TruncateOutputOverride:
+    return os::file_open_mode::Truncate;
+  case Redirection::Kind::AppendOutput: return os::file_open_mode::Append;
+  case Redirection::Kind::ReadWrite: return os::file_open_mode::ReadWrite;
+  default: return os::file_open_mode::Read;
+  }
+}
+
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                                         EvalContext &cxt) const throws -> void
 {
@@ -649,17 +667,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                               "Redirection target is not a single file"};
     }
 
-    let mode = os::file_open_mode::Read;
-    if (redir.kind == Redirection::Kind::TruncateOutput)
-      mode = cxt.no_clobber() ? os::file_open_mode::TruncateNoClobber
-                              : os::file_open_mode::Truncate;
-    else if (redir.kind == Redirection::Kind::TruncateOutputOverride)
-      /* >| truncates even under noclobber, the explicit override POSIX gives. */
-      mode = os::file_open_mode::Truncate;
-    else if (redir.kind == Redirection::Kind::AppendOutput)
-      mode = os::file_open_mode::Append;
-    else if (redir.kind == Redirection::Kind::ReadWrite)
-      mode = os::file_open_mode::ReadWrite;
+    let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
 
     const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
@@ -771,6 +779,17 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       program_args.count() == 1 && program_args[0] == "exec" &&
       !(cxt.has_functions() && cxt.find_function(program_args[0]) != nullptr);
 
+  /* Whether the command word resolves to a POSIX special builtin not shadowed by
+     a function. It decides both that a redirection error exits the shell rather
+     than failing the command, and that a prefix assignment persists, so it is
+     computed once here and read on both paths. An empty command word, a bare
+     redirection or assignment line, is not a special builtin. */
+  const bool command_is_special_builtin =
+      !program_args.is_empty() &&
+      !(cxt.has_functions() &&
+        cxt.find_function(program_args[0]) != nullptr) &&
+      is_special_builtin_name(program_args[0].view());
+
   /* Open the redirection targets. A redirection takes effect even when the
      command expands to None, so > file with no command still creates the
      file. A heredoc on the standard input passes its staged descriptor to the
@@ -816,9 +835,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       }
 
       let opened = os::write_to_temp_file(body);
-      if (!opened)
-        throw Error{"Could not stage the heredoc body: " +
-                    os::last_system_error_message()};
+      if (!opened) {
+        redirection_open_failed = true;
+        throw ErrorWithLocation{source_location(),
+                                "Could not stage the heredoc body: " +
+                                    os::last_system_error_message()};
+      }
 
       /* A bare exec heredoc points the shell's standard input at the staged
          body for good and drops the temporary descriptor. */
@@ -939,21 +961,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     target_tokens.push(redir.target);
     const ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.count() != 1) {
+      /* An ambiguous redirect, the target expanding to more or fewer than one
+         word, fails the command rather than the shell, the way dash does. */
+      redirection_open_failed = true;
       throw ErrorWithLocation{redir.target->source_location(),
                               "Redirection target is not a single file"};
     }
 
-    let mode = os::file_open_mode::Read;
-    if (redir.kind == Redirection::Kind::TruncateOutput)
-      mode = cxt.no_clobber() ? os::file_open_mode::TruncateNoClobber
-                              : os::file_open_mode::Truncate;
-    else if (redir.kind == Redirection::Kind::TruncateOutputOverride)
-      /* >| truncates even under noclobber, the explicit override POSIX gives. */
-      mode = os::file_open_mode::Truncate;
-    else if (redir.kind == Redirection::Kind::AppendOutput)
-      mode = os::file_open_mode::Append;
-    else if (redir.kind == Redirection::Kind::ReadWrite)
-      mode = os::file_open_mode::ReadWrite;
+    let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
 
     const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
@@ -975,6 +990,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
       if (file_fd != redir.fd) os::close_fd(file_fd);
       if (!was_replaced) {
+        redirection_open_failed = true;
         throw ErrorWithLocation{redir.target->source_location(),
                                 utils::int_to_text(redir.fd) +
                                     ": Bad file descriptor"};
@@ -1017,12 +1033,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        special builtin is the exception, since its redirection error exits a
        non-interactive shell. The descriptor and heredoc defers above still put
        the partially applied redirections back. */
-    const bool command_is_special =
-        !program_args.is_empty() &&
-        !(cxt.has_functions() &&
-          cxt.find_function(program_args[0]) != nullptr) &&
-        is_special_builtin_name(program_args[0].view());
-    if (command_is_special) throw;
+    if (command_is_special_builtin) throw;
     const String *source = cxt.current_source();
     show_message(redirection_error.to_string(
         source != nullptr ? source->view() : StringView{}));
@@ -1061,14 +1072,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* A prefix assignment before a special builtin persists after the command as a
-     regular shell variable, the way POSIX keeps it, so a function-shadowed name
-     is excluded since a function takes the temporary form. The persisted form
-     commits to the store below rather than the process environment, so it stays
-     unexported, the way dash leaves it. */
-  const bool command_is_special_builtin =
-      !(cxt.has_functions() &&
-        cxt.find_function(program_args[0]) != nullptr) &&
-      is_special_builtin_name(program_args[0].view());
+     regular shell variable, the way POSIX keeps it. command_is_special_builtin,
+     computed above the redirection loop, already excludes a function-shadowed
+     name. The persisted form commits to the store below rather than the process
+     environment, so it stays unexported, the way dash leaves it. */
 
   /* Per-command assignments apply to the environment for this command, a
      function call included, so a child inherits them and a function sees them.
@@ -2679,17 +2686,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                               "Redirection target is not a single file"};
     }
 
-    let mode = os::file_open_mode::Read;
-    if (redir.kind == Redirection::Kind::TruncateOutput)
-      mode = cxt.no_clobber() ? os::file_open_mode::TruncateNoClobber
-                              : os::file_open_mode::Truncate;
-    else if (redir.kind == Redirection::Kind::TruncateOutputOverride)
-      /* >| truncates even under noclobber, the explicit override POSIX gives. */
-      mode = os::file_open_mode::Truncate;
-    else if (redir.kind == Redirection::Kind::AppendOutput)
-      mode = os::file_open_mode::Append;
-    else if (redir.kind == Redirection::Kind::ReadWrite)
-      mode = os::file_open_mode::ReadWrite;
+    let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
 
     const String &target_path = target[0];
     let opened = os::open_file_descriptor(target_path, mode);
