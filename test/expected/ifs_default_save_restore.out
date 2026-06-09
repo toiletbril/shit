@@ -1,0 +1,56 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign o=$IFS]
+  [CompoundListCondition, None]
+    [Assign IFS=:]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "x:y"]
+  [CompoundListCondition, None]
+    [Assign IFS=$o]
+  [CompoundListCondition, None]
+    [Assign a=p q]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "$a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#"]
+[Word
+  Unquoted "o="
+  Variable "IFS"
+]
+[Word
+  Unquoted "IFS=:"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Unquoted "x:y"
+]
+[Word
+  Unquoted "IFS="
+  Variable "o"
+]
+[Word
+  Unquoted "a="
+  DoubleQuoted "p q"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Variable "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#"
+]
+2
+[Code 0]

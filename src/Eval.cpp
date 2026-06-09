@@ -226,6 +226,15 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
+  /* IFS is held live in m_field_separators rather than the store, so a read with
+     no prior assignment must report the cached separators. The store lookup
+     above wins first, so an explicit IFS= empty value still reads back empty,
+     while the unset default reads back space-tab-newline. This makes the
+     o=$IFS; IFS=:; ...; IFS=$o save and restore idiom round-trip. The first
+     byte gates the compare so an ordinary name skips it. */
+  if (first_byte == 'I' && name == "IFS")
+    return String{heap_allocator(), m_field_separators.view()};
+
   /* $LINENO reports the line of the command currently evaluating. It yields to
      a stored value above, so a script that assigns LINENO reads back what it
      set, matching dash. With no assignment it computes the line from the
