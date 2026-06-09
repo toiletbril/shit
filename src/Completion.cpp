@@ -75,14 +75,33 @@ static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
    word of a command. The scan looks back over whitespace to the previous
    non-space byte and reports command position when that byte ends a command or
    the token is the very first on the line. */
+/* The keyword prefixes that are transparent to command position, so a command
+   word can follow them: ! and time and time's -p and --posix options. */
+static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
+{
+  return word == "!" || word == "time" || word == "-p" || word == "--posix";
+}
+
 static pure fn is_in_command_position(StringView line,
                                       usize token_start) wontthrow -> bool
 {
   usize i = token_start;
-  while (i > 0 && is_word_separator(line[i - 1]))
-    i--;
-  if (i == 0) return true;
-  return is_command_separator(line[i - 1]);
+  for (;;) {
+    while (i > 0 && is_word_separator(line[i - 1]))
+      i--;
+    if (i == 0) return true;
+    if (is_command_separator(line[i - 1])) return true;
+    /* The word right before is examined, and a transparent keyword prefix is
+       stepped over so the word after time or ! is still a command word. */
+    usize word_start = i;
+    while (word_start > 0 && !is_word_separator(line[word_start - 1]) &&
+           !is_command_separator(line[word_start - 1]))
+      word_start--;
+    if (!is_transparent_command_prefix(
+            line.substring_of_length(word_start, i - word_start)))
+      return false;
+    i = word_start;
+  }
 }
 
 /* A command-position token matches a command name either by carrying it as a
@@ -462,17 +481,21 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
   return candidates;
 }
 
-/* The first whitespace-delimited word of the line, the command a registered
-   completion spec is looked up by. */
+/* The command a registered completion spec is looked up by, the first
+   whitespace-delimited word of the line past any transparent keyword prefix such
+   as time or ! so the spec for the real command is found. */
 static fn command_word_of(StringView line) wontthrow -> StringView
 {
   usize i = 0;
-  while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
-    i++;
-  const usize start = i;
-  while (i < line.length && line[i] != ' ' && line[i] != '\t')
-    i++;
-  return line.substring_of_length(start, i - start);
+  for (;;) {
+    while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+      i++;
+    const usize start = i;
+    while (i < line.length && line[i] != ' ' && line[i] != '\t')
+      i++;
+    const StringView word = line.substring_of_length(start, i - start);
+    if (word.is_empty() || !is_transparent_command_prefix(word)) return word;
+  }
 }
 
 /* Split the line into whitespace words for COMP_WORDS, reporting the index of
