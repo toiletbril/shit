@@ -24,6 +24,6 @@
   DoubleQuoted "x="
   Variable "x"
 ]
-unset: x: is read only
+Unable to unset 'x' because it is read only
 x=1
 [Code 0]

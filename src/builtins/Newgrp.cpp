@@ -40,7 +40,8 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      it with the same arguments. */
   let const found = utils::search_program_path("newgrp");
   if (found.count() == 0) {
-    show_message("newgrp: 'newgrp' program not found");
+    show_message(
+        "Unable to run newgrp because the newgrp program was not found");
     return 127;
   }
 

@@ -124,8 +124,8 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   auto reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
     if (!quiet)
-      shit::print_error(StringView{"shopt: "} + name +
-                        ": invalid shell option name\n");
+      shit::print_error(StringView{"Unable to set the shopt option because '"} +
+                        name + "' is not a valid shell option name\n");
     status = 1;
     return true;
   };
@@ -138,8 +138,9 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (enable || disable) {
         if (!apply_shell_option(cxt, name, enable)) {
           if (!quiet)
-            shit::print_error(StringView{"shopt: "} + name +
-                              ": invalid shell option name\n");
+            shit::print_error(
+                StringView{"Unable to set the shopt option because '"} + name +
+                "' is not a valid shell option name\n");
           status = 1;
         }
       } else if (Maybe<bool> on = query_shell_option(cxt, name);
@@ -149,8 +150,9 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
         if (!quiet) ec.print_to_stdout(shopt_status_line(name, *on).view());
       } else {
         if (!quiet)
-          shit::print_error(StringView{"shopt: "} + name +
-                            ": invalid shell option name\n");
+          shit::print_error(
+              StringView{"Unable to query the shopt option because '"} + name +
+              "' is not a valid shell option name\n");
         status = 1;
       }
     }

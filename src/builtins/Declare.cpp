@@ -142,7 +142,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         line += "\"\n";
         ec.print_to_stdout(line.view());
       } else {
-        shit::print_error(StringView{"declare: "} + name + ": not found\n");
+        shit::print_error(StringView{"Unable to print the declaration of '"} +
+                          name + "' because it is not defined\n");
         status = 1;
       }
     }

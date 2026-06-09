@@ -116,7 +116,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        chdir result drives an early throw before either variable is rewritten.
      */
     if (Path::set_current_directory(target).is_error())
-      throw Error{StringView{"Could not cd to '"} + arg_path + "'"};
+      throw Error{StringView{"Unable to change directory to '"} + arg_path +
+                  "' because the change failed"};
     /* A relative PATH entry, or the current directory as an empty entry, now
        names a different directory, so a cached resolution may point at the old
        cwd. The cache is marked stale so the next command re-resolves, the way
@@ -134,7 +135,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  throw Error{StringView{"Path '"} + arg_path + "' does not exist"};
+  throw Error{StringView{"Unable to change directory because the path '"} +
+              arg_path + "' does not exist"};
 }
 
 } /* namespace shit */

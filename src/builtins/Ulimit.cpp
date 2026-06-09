@@ -162,7 +162,8 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   struct rlimit limit{};
   if (getrlimit(resource.which, &limit) != 0)
-    throw Error{"could not read the limit: " + os::last_system_error_message()};
+    throw Error{"Unable to read the resource limit because " +
+                os::last_system_error_message()};
 
   /* A bare flag reads the limit, an operand sets it. With neither -H nor -S the
      read reports the soft limit and the set changes both. */
@@ -184,7 +185,8 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (FLAG_SOFT.is_enabled() || !FLAG_HARD.is_enabled()) limit.rlim_cur = value;
 
   if (setrlimit(resource.which, &limit) != 0)
-    throw Error{"could not set the limit: " + os::last_system_error_message()};
+    throw Error{"Unable to set the resource limit because " +
+                os::last_system_error_message()};
 
   return 0;
 }

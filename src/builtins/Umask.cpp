@@ -158,7 +158,8 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (!requested.is_empty() && requested[0] >= '0' && requested[0] <= '7') {
     let const parsed = utils::parse_octal_integer(requested);
     if (parsed.is_error())
-      throw Error{"'" + requested + "' is not a valid octal mask"};
+      throw Error{"Unable to set the file creation mask because '" + requested +
+                  "' is not a valid octal mask"};
     os::set_file_creation_mask(static_cast<u32>(parsed.value()));
     return 0;
   }
@@ -166,7 +167,8 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const new_mask =
       apply_symbolic_mask(requested.view(), os::get_file_creation_mask());
   if (!new_mask.has_value())
-    throw Error{"'" + requested + "' is not a valid symbolic mask"};
+    throw Error{"Unable to set the file creation mask because '" + requested +
+                "' is not a valid symbolic mask"};
   os::set_file_creation_mask(*new_mask);
 
   return 0;

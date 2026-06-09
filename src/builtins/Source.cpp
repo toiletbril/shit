@@ -35,7 +35,9 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const path = ec.args()[1].clone();
   let const contents = utils::read_entire_file(path);
-  if (!contents) throw Error{"Could not open '" + path + "'"};
+  if (!contents)
+    throw Error{"Unable to source the file '" + path +
+                "' because it cannot be opened"};
 
   return cxt.run_source(*contents, "the file '" + path + "'", true,
                         ec.source_location(), StringView{path});

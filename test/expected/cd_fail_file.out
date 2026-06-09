@@ -56,6 +56,6 @@
 [Word
   Unquoted "/tmp/zz_cd_target_xyz"
 ]
-shit: 3:1: error: Builtin 'cd': Could not cd to 'zz_cd_target_xyz'.
+shit: 3:1: error: Builtin 'cd': Unable to change directory to 'zz_cd_target_xyz' because the change failed.
      3 |  cd zz_cd_target_xyz
        |  ^~~~~~~~~~~~~~~~~~~ here.

@@ -47,7 +47,8 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
       try {
         cxt.unset_shell_variable(name);
       } catch (const Error &e) {
-        shit::print_error(StringView{"unset: "} + name + ": is read only\n");
+        shit::print_error(StringView{"Unable to unset '"} + name +
+                          "' because it is read only\n");
         had_error = true;
       }
     }
