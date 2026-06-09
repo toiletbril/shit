@@ -57,12 +57,12 @@ jobs:
           cd test
           run_min() {
             min=""
-            for i in 1 2 3; do
-              t=$( { TIMEFORMAT=%R; time SCALE=200 "$1" bench/configure.shit \
+            for i in 1 2 3 4 5; do
+              t=$( { TIMEFORMAT=%R; time SCALE=200 "$@" bench/configure.shit \
                      >/dev/null 2>&1; } 2>&1 )
               rc=$?
               if [ "$rc" -ne 0 ] || [ -z "$t" ]; then
-                echo "timing failed for '$1'" >&2
+                echo "timing failed for '$*'" >&2
                 return 1
               fi
               min=$(awk -v a="$t" -v b="$min" \
@@ -70,8 +70,11 @@ jobs:
             done
             echo "$min"
           }
+          # The benchmark measures evaluation speed, and dash has no analysis
+          # prepass, so time shit with --no-diagnostics for an apples-to-apples
+          # comparison, the same flag the make bench parity check uses.
           dash_seconds=$(run_min dash) || exit 1
-          shit_seconds=$(run_min ../shit) || exit 1
+          shit_seconds=$(run_min ../shit --no-diagnostics) || exit 1
           echo "dash=$dash_seconds shit=$shit_seconds"
           case "$dash_seconds" in ''|*[!0-9.]*) echo "bad dash timing"; exit 1;; esac
           case "$shit_seconds" in ''|*[!0-9.]*) echo "bad shit timing"; exit 1;; esac

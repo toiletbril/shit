@@ -78,7 +78,8 @@ bench: $(BIN)
 	$(BASH) -c 'export TIMEFORMAT="  %R"; \
 		for sh in "$(DASH)" "$(BASH)" "$(ZSH)" "$(BIN)"; do \
 			printf "  %-10s" "$$sh"; \
-			( time SCALE=$(SCALE) $$sh $(BENCH) >/dev/null 2>&1 ) 2>&1; \
+			flags=; [ "$$sh" = "$(BIN)" ] && flags=--no-diagnostics; \
+			( time SCALE=$(SCALE) $$sh $$flags $(BENCH) >/dev/null 2>&1 ) 2>&1; \
 		done'; \
 	rm -f /tmp/shit_bench_d /tmp/shit_bench_s
 

@@ -2198,16 +2198,18 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
 
   /* A case with no catch-all *) arm silently does nothing for a value none of
      the listed patterns match, so a typo or a new input slips through. This is
-     shellcheck SC2249. The catch-all is the literal * pattern, read from each
-     arm's alternative tokens. */
+     shellcheck SC2249. The catch-all is an unquoted * glob, a single
+     UnquotedText segment whose text is *. A quoted '*' matches only a literal
+     asterisk, so it is not a default. */
   bool has_default_arm = false;
   for (const case_item &item : m_items) {
     for (const Token *pattern : item.patterns) {
       if (pattern->kind() != Token::Kind::Word) continue;
-      if (static_cast<const tokens::WordToken *>(pattern)
-              ->word()
-              .to_literal_string()
-              .view() == "*")
+      let const &pattern_word =
+          static_cast<const tokens::WordToken *>(pattern)->word();
+      if (pattern_word.segments.count() == 1 &&
+          pattern_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+          pattern_word.segments[0].text.view() == "*")
       {
         has_default_arm = true;
         break;
@@ -3028,21 +3030,28 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   for (usize i = 1; i < m_args.count(); i++) {
     if (m_args[i]->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
+    bool word_has_unquoted_command_substitution = false;
+    for (const WordSegment &segment : word.segments) {
+      if (segment.kind == WordSegment::Kind::CommandSubstitution &&
+          !segment.is_in_double_quotes)
+      {
+        word_has_unquoted_command_substitution = true;
+        break;
+      }
+    }
+    if (!word_has_unquoted_command_substitution) continue;
+    /* An assignment-builtin operand such as export FOO=$(cmd) does not split in
+       assignment context, so the substitution there is left alone. This split
+       check allocates, so it runs only for a word that actually carries an
+       unquoted substitution. */
     if (command_is_assignment_builtin &&
         word.get_assignment_split().has_value())
     {
       continue;
     }
-    for (const WordSegment &segment : word.segments) {
-      if (segment.kind == WordSegment::Kind::CommandSubstitution &&
-          !segment.is_in_double_quotes)
-      {
-        actx.warn(m_args[i]->source_location(),
-                  "an unquoted command substitution splits its output, quote "
-                  "it to keep one argument");
-        break;
-      }
-    }
+    actx.warn(m_args[i]->source_location(),
+              "an unquoted command substitution splits its output, quote "
+              "it to keep one argument");
   }
 
   /* Obsolescent or redundant test forms, each a shellcheck check. -a and -o
