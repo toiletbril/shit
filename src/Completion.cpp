@@ -152,6 +152,38 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
    the executables from a scan of the PATH directories. A token holding a glob
    metacharacter matches by glob, so a bare glob first word lists the command
    names it matches rather than cwd entries. */
+/* The PATH executable names, cached so the per-keystroke ghost does not read
+   every PATH directory on each keystroke. The cache rebuilds only when the PATH
+   value changes, which an interactive session does rarely, so a freeze on a
+   large PATH becomes a one-time cost rather than a per-key one. */
+static String CACHED_COMPLETION_PATH{};
+static ArrayList<String> CACHED_PATH_COMMANDS{};
+static bool CACHED_PATH_COMMANDS_VALID = false;
+
+static fn path_command_names() throws -> const ArrayList<String> &
+{
+  let const path = os::get_environment_variable("PATH");
+  let const current = path.has_value() ? path->view() : StringView{};
+  if (CACHED_PATH_COMMANDS_VALID && CACHED_COMPLETION_PATH.view() == current)
+    return CACHED_PATH_COMMANDS;
+
+  CACHED_PATH_COMMANDS.clear();
+  usize segment_start = 0;
+  for (usize i = 0; i <= current.length; i++) {
+    if (i != current.length && current[i] != os::PATH_DELIMITER) continue;
+    let const segment =
+        current.substring_of_length(segment_start, i - segment_start);
+    segment_start = i + 1;
+    const Path directory{segment.is_empty() ? StringView{"."} : segment};
+    if (Maybe<ArrayList<String>> entries = Path::read_directory(directory)) {
+      for (String &entry : *entries) CACHED_PATH_COMMANDS.push(steal(entry));
+    }
+  }
+  CACHED_COMPLETION_PATH = String{current};
+  CACHED_PATH_COMMANDS_VALID = true;
+  return CACHED_PATH_COMMANDS;
+}
+
 static fn complete_command(StringView token, bool token_is_glob,
                            EvalContext &context) throws -> ArrayList<String>
 {
@@ -174,28 +206,8 @@ static fn complete_command(StringView token, bool token_is_glob,
     add_unique_command(candidates, seen, name, token, token_is_glob);
   });
 
-  if (Maybe<String> path = os::get_environment_variable("PATH");
-      path.has_value())
-  {
-    let path_view = path->view();
-    usize segment_start = 0;
-    for (usize i = 0; i <= path_view.length; i++) {
-      if (i != path_view.length && path_view[i] != os::PATH_DELIMITER) continue;
-
-      StringView segment =
-          path_view.substring_of_length(segment_start, i - segment_start);
-      segment_start = i + 1;
-
-      const Path directory{segment.is_empty() ? StringView{"."} : segment};
-      Maybe<ArrayList<String>> entries = Path::read_directory(directory);
-      if (!entries.has_value()) continue;
-
-      for (const String &entry : *entries) {
-        add_unique_command(candidates, seen, entry.view(), token,
-                           token_is_glob);
-      }
-    }
-  }
+  for (const String &entry : path_command_names())
+    add_unique_command(candidates, seen, entry.view(), token, token_is_glob);
 
   return candidates;
 }
@@ -524,7 +536,6 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   };
 }
 
-
 /* Whether the first word names a runnable command. The word resolves when it is
    a reserved keyword the shell runs as syntax, a builtin, a function, an alias,
    a PATH executable, or, when it holds a slash, an existing regular file the
@@ -564,6 +575,16 @@ static pure fn is_highlight_name_char(char c) wontthrow -> bool
   return is_highlight_name_start(c) || (c >= '0' && c <= '9');
 }
 
+/* A word that is a single plain identifier, the form a for loop variable must
+   take. A leading digit or any non-name character fails the check. */
+static pure fn is_plain_identifier(StringView word) wontthrow -> bool
+{
+  if (word.length == 0 || !is_highlight_name_start(word[0])) return false;
+  for (usize i = 1; i < word.length; i++)
+    if (!is_highlight_name_char(word[i])) return false;
+  return true;
+}
+
 /* A byte that ends a top-level word, whitespace or an operator the scanner
    stops on. '{' and '}' are left out so a brace word such as a{1,2} stays one
    word. */
@@ -577,8 +598,8 @@ static pure fn is_highlight_word_break(char c) wontthrow -> bool
    covering $name, the special and positional parameters, and ${...} with
    balanced braces. The $(...) form is handled by the caller so it can recurse
    into the inner command. */
-static pure fn scan_dollar_expansion(StringView line, usize dollar, usize end)
-    wontthrow -> usize
+static pure fn scan_dollar_expansion(StringView line, usize dollar,
+                                     usize end) wontthrow -> usize
 {
   usize i = dollar + 1;
   if (i >= end) return i;
@@ -587,7 +608,8 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar, usize end)
   if (c == '{') {
     usize depth = 0;
     for (; i < end; i++) {
-      if (line[i] == '{') depth++;
+      if (line[i] == '{')
+        depth++;
       else if (line[i] == '}') {
         i++;
         depth--;
@@ -597,7 +619,8 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar, usize end)
     return i;
   }
   if (c >= '0' && c <= '9') {
-    while (i < end && line[i] >= '0' && line[i] <= '9') i++;
+    while (i < end && line[i] >= '0' && line[i] <= '9')
+      i++;
     return i;
   }
   if (c == '?' || c == '!' || c == '#' || c == '$' || c == '*' || c == '@' ||
@@ -606,7 +629,8 @@ static pure fn scan_dollar_expansion(StringView line, usize dollar, usize end)
     return i + 1;
   }
   if (is_highlight_name_start(c)) {
-    while (i < end && is_highlight_name_char(line[i])) i++;
+    while (i < end && is_highlight_name_char(line[i]))
+      i++;
     return i;
   }
   return i;
@@ -624,8 +648,8 @@ static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
   return false;
 }
 
-/* The open shell constructs, so a continuation or closing keyword can be checked
-   against the construct it belongs to. */
+/* The open shell constructs, so a continuation or closing keyword can be
+   checked against the construct it belongs to. */
 enum class highlight_construct : u8
 {
   If,
@@ -641,17 +665,19 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
 /* Color a $ expansion that begins at i within the window. A $(...) recurses so
    its inner command line colors like any other, while ${...}, $name, and the
-   special parameters are colored cyan as one span. Returns the index past it. */
+   special parameters are colored cyan as one span. Returns the index past it.
+ */
 static fn color_dollar(StringView line, usize i, usize end,
-                       ArrayList<highlight_span> &spans, EvalContext &context)
-    throws -> usize
+                       ArrayList<highlight_span> &spans,
+                       EvalContext &context) throws -> usize
 {
   if (i + 1 < end && line[i + 1] == '(') {
     usize depth = 0;
     usize close = end;
     usize j = i + 1;
     for (; j < end; j++) {
-      if (line[j] == '(') depth++;
+      if (line[j] == '(')
+        depth++;
       else if (line[j] == ')') {
         depth--;
         if (depth == 0) {
@@ -688,6 +714,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   ArrayList<highlight_construct> stack{};
   bool command_position = true;
   bool expecting_in = false;
+  bool for_variable_pending = false;
 
   usize i = begin;
   while (i < end) {
@@ -703,8 +730,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       break;
     }
 
-    /* An operator run, left in the default color. A separator or an opener moves
-       the next word back to command position, a redirection does not. */
+    /* An operator run, left in the default color. A separator or an opener
+       moves the next word back to command position, a redirection does not. */
     if (c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '(' ||
         c == ')' || c == '{' || c == '}')
     {
@@ -748,7 +775,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (d == '\'') {
         let const string_start = i;
         i++;
-        while (i < end && line[i] != '\'') i++;
+        while (i < end && line[i] != '\'')
+          i++;
         if (i < end) i++;
         word_spans.push(highlight_span{string_start, i, colors::ansi::YELLOW});
       } else if (d == '"') {
@@ -779,7 +807,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         /* A backtick substitution recurses the same way $(...) does. */
         let const inner_begin = i + 1;
         i++;
-        while (i < end && line[i] != '`') i++;
+        while (i < end && line[i] != '`')
+          i++;
         let const inner_end = i;
         if (i < end) i++;
         scan_highlight_range(line, inner_begin, inner_end, context, word_spans);
@@ -792,7 +821,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       }
     }
     let const word_end = i;
-    let const word = line.substring_of_length(word_start, word_end - word_start);
+    let const word =
+        line.substring_of_length(word_start, word_end - word_start);
     let const plain = word_spans.is_empty();
     let const is_assignment = word_looks_like_assignment(word);
 
@@ -800,7 +830,20 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (expecting_in && plain && word == "in") {
       push(word_start, word_end, colors::ansi::GREEN);
       expecting_in = false;
+      for_variable_pending = false;
       command_position = false;
+      continue;
+    }
+
+    /* The word right after for is the loop variable, which must be a plain
+       identifier. An expansion, a quoted word, or a non-identifier here is
+       rejected the way the parser rejects for $f, so it is shown in red rather
+       than colored as an ordinary variable. */
+    if (for_variable_pending) {
+      for_variable_pending = false;
+      command_position = false;
+      if (!plain || !is_plain_identifier(word))
+        push(word_start, word_end, colors::ansi::BOLD_RED);
       continue;
     }
 
@@ -809,6 +852,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       bool keyword_ok = true;
       bool next_is_command = true;
       bool opens_in = false;
+      bool opens_for_variable = false;
       if (word == "if") {
         stack.push(highlight_construct::If);
       } else if (word == "while" || word == "until") {
@@ -817,6 +861,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         stack.push(highlight_construct::For);
         next_is_command = false;
         opens_in = true;
+        opens_for_variable = true;
       } else if (word == "case") {
         stack.push(highlight_construct::Case);
         next_is_command = false;
@@ -825,15 +870,18 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         stack.push(highlight_construct::Function);
         next_is_command = false;
       } else if (word == "then") {
-        keyword_ok = !stack.is_empty() && stack.back() == highlight_construct::If;
+        keyword_ok =
+            !stack.is_empty() && stack.back() == highlight_construct::If;
       } else if (word == "do") {
         keyword_ok = !stack.is_empty() &&
                      (stack.back() == highlight_construct::WhileUntil ||
                       stack.back() == highlight_construct::For);
       } else if (word == "else" || word == "elif") {
-        keyword_ok = !stack.is_empty() && stack.back() == highlight_construct::If;
+        keyword_ok =
+            !stack.is_empty() && stack.back() == highlight_construct::If;
       } else if (word == "fi") {
-        keyword_ok = !stack.is_empty() && stack.back() == highlight_construct::If;
+        keyword_ok =
+            !stack.is_empty() && stack.back() == highlight_construct::If;
         if (keyword_ok) stack.pop_back();
       } else if (word == "done") {
         keyword_ok = !stack.is_empty() &&
@@ -859,6 +907,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
              keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
         command_position = next_is_command;
         if (opens_in) expecting_in = true;
+        if (opens_for_variable) for_variable_pending = true;
         continue;
       }
 
