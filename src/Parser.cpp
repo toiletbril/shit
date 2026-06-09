@@ -1408,6 +1408,29 @@ hot fn Parser::parse_select() throws -> Command *
                                             steal(words), has_in_clause, body);
 }
 
+/* A NAME=VALUE token lexes as an assignment, but in a case word or a case
+   pattern it is a plain word, so it is rebuilt into a word token that keeps the
+   value's expansion segments after the NAME= prefix. */
+static fn word_token_from_assignment(BumpArena &arena,
+                                     const Assignment *a) throws
+    -> tokens::WordToken *
+{
+  Word word{};
+  String prefix = a->key().clone();
+  prefix += a->is_append() ? "+=" : "=";
+  word.segments.push(
+      WordSegment{WordSegment::Kind::UnquotedText, steal(prefix), false});
+  for (const WordSegment &segment : a->value_word().segments) {
+    WordSegment copy{segment.kind, segment.text.clone(),
+                     segment.is_in_double_quotes};
+    copy.folded_arithmetic_result = segment.folded_arithmetic_result;
+    copy.cached_substitution_ast = segment.cached_substitution_ast;
+    copy.cached_substitution_generation = segment.cached_substitution_generation;
+    word.segments.push(steal(copy));
+  }
+  return arena.create<tokens::WordToken>(a->source_location(), steal(word));
+}
+
 hot fn Parser::parse_case() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
@@ -1416,7 +1439,10 @@ hot fn Parser::parse_case() throws -> Command *
 
   Token *word = m_lexer.next_shell_token();
   ASSERT(word != nullptr);
-  if (word->kind() != Token::Kind::Word) {
+  if (word->kind() == Token::Kind::Assignment) {
+    word = word_token_from_assignment(m_lexer.arena(),
+                                      static_cast<Assignment *>(word));
+  } else if (word->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{word->source_location(),
                             "Expected a word to match on after 'case'"};
   }
@@ -1456,7 +1482,10 @@ hot fn Parser::parse_case() throws -> Command *
       Token *pattern = m_lexer.next_shell_token();
       ASSERT(pattern != nullptr);
 
-      if (pattern->kind() != Token::Kind::Word) {
+      if (pattern->kind() == Token::Kind::Assignment) {
+        pattern = word_token_from_assignment(
+            m_lexer.arena(), static_cast<Assignment *>(pattern));
+      } else if (pattern->kind() != Token::Kind::Word) {
         throw ErrorWithLocationAndDetails{
             location, "Unterminated case", pattern->source_location(),
             "Expected a pattern to start an arm, or 'esac' to end the case"};
