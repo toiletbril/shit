@@ -1,0 +1,36 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$y:-${z:-"a}b"}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]" "$y:-${z:-$(echo "}")}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]"
+]
+[Word
+  Variable "y:-${z:-"a}b"}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  DoubleQuoted "[%s]"
+]
+[Word
+  Variable "y:-${z:-$(echo "}")}"
+]
+[Word
+  Unquoted "echo"
+]
+[a}b]
+[}]
+[Code 0]

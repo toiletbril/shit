@@ -1153,17 +1153,104 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
 
     let const next = word[i + 1];
     if (next == '{') {
+      /* Scan the ${...} body to the matching } at brace depth one. A nested
+         ${...} bumps the depth, a nested $(...) or $((...)) is copied by
+         quote-aware paren balance, a backtick run is copied to its close, and a
+         single quote run, a double quote run, and a backslash escape keep their
+         bytes literal so a } they contain is never counted. The structure
+         mirrors the Lexer brace scanner. */
       String inner{heap_allocator()};
       usize j = i + 2;
       i32 depth = 1;
+      char quote = 0;
       while (j < word.length) {
-        if (word[j] == '{') {
+        const char ch = word[j];
+        if (quote != 0) {
+          inner += ch;
+          if (quote == '"' && ch == '\\' && j + 1 < word.length) {
+            inner += word[++j];
+            j++;
+            continue;
+          }
+          if (ch == quote) quote = 0;
+          j++;
+          continue;
+        }
+        if (ch == '\\' && j + 1 < word.length) {
+          inner += ch;
+          inner += word[++j];
+          j++;
+          continue;
+        }
+        if (ch == '\'' || ch == '"') {
+          quote = ch;
+          inner += ch;
+          j++;
+          continue;
+        }
+        if (ch == '`') {
+          inner += ch;
+          j++;
+          while (j < word.length) {
+            const char b = word[j];
+            inner += b;
+            j++;
+            if (b == '\\' && j < word.length) {
+              inner += word[j++];
+              continue;
+            }
+            if (b == '`') break;
+          }
+          continue;
+        }
+        if (ch == '$' && j + 1 < word.length && word[j + 1] == '(') {
+          inner += ch;
+          inner += word[++j];
+          j++;
+          usize paren_depth = 1;
+          char nested_quote = 0;
+          while (j < word.length) {
+            const char p = word[j];
+            inner += p;
+            j++;
+            if (nested_quote != 0) {
+              if (nested_quote == '"' && p == '\\' && j < word.length) {
+                inner += word[j++];
+                continue;
+              }
+              if (p == nested_quote) nested_quote = 0;
+              continue;
+            }
+            if (p == '\\' && j < word.length) {
+              inner += word[j++];
+              continue;
+            }
+            if (p == '\'' || p == '"') {
+              nested_quote = p;
+            } else if (p == '(') {
+              paren_depth++;
+            } else if (p == ')') {
+              paren_depth--;
+              if (paren_depth == 0) break;
+            }
+          }
+          continue;
+        }
+        if (ch == '$' && j + 1 < word.length && word[j + 1] == '{') {
           depth++;
-        } else if (word[j] == '}') {
+          inner += ch;
+          inner += word[++j];
+          j++;
+          continue;
+        }
+        if (ch == '}') {
           depth--;
           if (depth == 0) break;
+          inner += ch;
+          j++;
+          continue;
         }
-        inner += word[j];
+        inner += ch;
         j++;
       }
       emit_run(apply_parameter_expansion(inner), !in_double_quote);
