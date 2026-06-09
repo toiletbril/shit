@@ -601,7 +601,14 @@ fn main(int argc, char **argv) -> int
 
   /* Apply the remaining option flags that the constructor does not take. */
   context.set_stats_enabled(FLAG_STATS.is_enabled());
-  context.set_error_unset(FLAG_NOUNSET.is_enabled());
+  /* An interactive session outside compatibility mode defaults to nounset, so a
+     typo in a variable name at the prompt fails loudly rather than expanding to
+     nothing. A script keeps the lax POSIX default so an existing configure-style
+     script that reads unset variables still runs, and an explicit set +u turns
+     it off. */
+  context.set_error_unset(FLAG_NOUNSET.is_enabled() ||
+                          (should_be_interactive &&
+                           !shit::should_run_in_posix_mode()));
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
