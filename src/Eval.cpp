@@ -2488,6 +2488,25 @@ fn EvalContext::collect_array_elements(StringView name) const throws
   return out;
 }
 
+fn EvalContext::array_element_is_set(StringView name,
+                                     StringView subscript) throws -> bool
+{
+  if (subscript == "@" || subscript == "*")
+    return !collect_array_elements(name).is_empty();
+  if (is_associative_array(name))
+    return lookup_associative_element(name, subscript).has_value();
+  /* An indexed subscript is an arithmetic expression, so arr[1+1] resolves the
+     way an indexed read would. A negative index counts from the end. */
+  const i64 index = evaluate_arithmetic(subscript);
+  if (const ArrayList<String> *array = lookup_indexed_array(name)) {
+    const i64 count = static_cast<i64>(array->count());
+    const i64 resolved = index < 0 ? index + count : index;
+    return resolved >= 0 && resolved < count;
+  }
+  /* A scalar answers for its sole index zero. */
+  return index == 0 && get_variable_value(name).has_value();
+}
+
 fn EvalContext::matching_prefix_names(StringView prefix) const throws
     -> ArrayList<String>
 {
@@ -2720,7 +2739,20 @@ struct ConditionalEvaluator
   {
     if (op == "-z") return operand.is_empty();
     if (op == "-n") return !operand.is_empty();
-    if (op == "-v") return cxt.get_variable_value(operand).has_value();
+    if (op == "-v") {
+      /* -v name[subscript] tests an array element or key, every other -v form
+         tests a plain variable. */
+      if (let const bracket = operand.find_character('[');
+          bracket.has_value() && operand.length > 0 &&
+          operand[operand.length - 1] == ']')
+      {
+        const StringView name = operand.substring_of_length(0, *bracket);
+        const StringView subscript = operand.substring_of_length(
+            *bracket + 1, operand.length - *bracket - 2);
+        return cxt.array_element_is_set(name, subscript);
+      }
+      return cxt.get_variable_value(operand).has_value();
+    }
     let const path = Path{operand};
     if (op == "-e") return path.exists();
     if (op == "-f") return path.is_regular_file();

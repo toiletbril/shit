@@ -325,6 +325,12 @@ public:
      yields an empty list. */
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
+  /* Whether an array element or key is set, backing the [[ -v name[subscript] ]]
+     test. A @ or * subscript asks whether the array holds any element, an
+     associative subscript checks the key, and an indexed subscript checks that
+     the arithmetic index is within the stored elements. */
+  fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
+
   /* Log a name's current process-environment value before a write that outlives
      the current statement, so a subshell restore can revert it. Called before
      an export or an allexport assignment writes the environment. Outside a
