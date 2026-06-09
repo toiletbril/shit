@@ -31,8 +31,7 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() > 1 && !args[1].is_empty() && args[1][0] == '%') {
     let const parsed =
         utils::parse_decimal_integer(StringView{args[1]}.substring(1));
-    if (parsed.is_error())
-      throw Error{"'" + args[1] + "' is not a valid job"};
+    if (parsed.is_error()) throw Error{"'" + args[1] + "' is not a valid job"};
     job = cxt.find_job(static_cast<int>(parsed.value()));
   } else
     job = cxt.most_recent_job();

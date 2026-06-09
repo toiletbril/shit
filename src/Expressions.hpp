@@ -65,8 +65,7 @@ public:
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool errors_are_warnings) throws
-    -> bool;
+               bool errors_are_warnings) throws -> bool;
 
 class Expression
 {

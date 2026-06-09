@@ -47,8 +47,8 @@ cold static fn diagnostic_colors_for(StringView severity_word) throws
 
 /* The line a byte falls on and the offset of the newline that starts it. The
    has_preceding_newline flag tells the two apart from a byte on the first line,
-   since a newline at offset zero starts line two yet shares the zero offset with
-   the no-newline case. */
+   since a newline at offset zero starts line two yet shares the zero offset
+   with the no-newline case. */
 struct precise_location
 {
   usize line_number;
@@ -193,17 +193,19 @@ cold static fn number_string_length(T n) throws -> usize
   return len;
 }
 
-cold static fn get_context_pointing_to(
-    StringView source, usize byte_position, usize byte_count, usize line_number,
-    usize last_newline_location, bool has_preceding_newline,
-    usize unicode_position, Maybe<StringView> message,
-    const diagnostic_color &color) throws -> String
+cold static fn
+get_context_pointing_to(StringView source, usize byte_position,
+                        usize byte_count, usize line_number,
+                        usize last_newline_location, bool has_preceding_newline,
+                        usize unicode_position, Maybe<StringView> message,
+                        const diagnostic_color &color) throws -> String
 {
   usize start_offset = byte_position - last_newline_location;
 
   /* A preceding newline puts start_offset on that newline, so it steps one past
      to the first byte of the line. A newline at offset zero starts line two and
-     must step too, which the flag captures where the bare offset zero could not.
+     must step too, which the flag captures where the bare offset zero could
+     not.
    */
   if (has_preceding_newline && start_offset > 0) start_offset--;
 
@@ -471,8 +473,8 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
 
   /* The column counts code points from the line start to the caret, so both
      terms stay in code points. See ErrorWithLocation::to_string for why a byte
-     offset here would underflow on a multibyte preceding line, and why a newline
-     at offset zero needs the flag rather than the bare offset. */
+     offset here would underflow on a multibyte preceding line, and why a
+     newline at offset zero needs the flag rather than the bare offset. */
   const usize codepoints_before_details_line =
       details_has_preceding_newline
           ? SOURCE_LINE_INDEX.codepoints_before(

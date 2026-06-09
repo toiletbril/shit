@@ -45,7 +45,8 @@ FLAG(NO_EXEC, Bool, 'n', "no-exec",
      "Read and parse commands but do not run them.");
 FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
 FLAG(BASH_COMPATIBLE, Bool, 'P', "bash-compatible",
-     "Make the shell Bash and POSIX compatible. The analysis stage is skipped so "
+     "Make the shell Bash and POSIX compatible. The analysis stage is skipped "
+     "so "
      "a file with an analysis error still runs, an unmatched glob stays its "
      "literal pattern, and the style warnings are off.");
 FLAG(WARNINGS, Bool, 'W', "warnings",
@@ -681,10 +682,9 @@ fn main(int argc, char **argv) -> int
           prompt =
               expand_prompt_escapes(ps1->view(), u.view(), full_pwd.view());
         } else {
-          shit::String host =
-              shit::os::get_hostname().value_or(shit::os::get_environment_variable(
-                                                    "HOSTNAME")
-                                                    .value_or("localhost"));
+          shit::String host = shit::os::get_hostname().value_or(
+              shit::os::get_environment_variable("HOSTNAME")
+                  .value_or("localhost"));
           const bool wants_color = shit::colors::stdout_wants_color();
           prompt += u;
           prompt += '@';

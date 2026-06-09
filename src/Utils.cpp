@@ -313,9 +313,9 @@ fn format_minutes_seconds(double seconds) throws -> String
 {
   /* A time report subtracts two child rusage samples, so a sample that goes
      backwards yields a small negative duration. bash never prints a negative
-     time, so a negative input clamps to zero rather than printing a doubled sign
-     like -0m-0.001s, which the separate minutes and remainder would otherwise
-     produce. */
+     time, so a negative input clamps to zero rather than printing a doubled
+     sign like -0m-0.001s, which the separate minutes and remainder would
+     otherwise produce. */
   if (seconds < 0.0) seconds = 0.0;
   const i64 minutes = static_cast<i64>(seconds) / 60;
   const double remainder = seconds - static_cast<double>(minutes * 60);
@@ -610,8 +610,9 @@ fn glob_matches(StringView glob, StringView str,
       /* A bracket member, a class terminator ], a negating ! or ^, and a range
          '-' carry their special meaning only when the byte is an active glob
          character. A quoted or escaped ] inside the class is a literal member,
-         not the terminator, and a quoted member byte never opens a range, so the
-         scan consults the same per-byte mask the rest of the matcher reads. */
+         not the terminator, and a quoted member byte never opens a range, so
+         the scan consults the same per-byte mask the rest of the matcher reads.
+       */
       let const is_active = [&](usize index) wontthrow -> bool {
         return is_glob_char_active(glob_active, mask_offset + index);
       };
@@ -674,8 +675,8 @@ fn glob_matches(StringView glob, StringView str,
           if (is_close_at(g)) {
             is_matched |= ('-' == byte_at(str, s));
           } else {
-            is_matched |=
-                (prev_glob_ch <= byte_at(str, s) && byte_at(str, s) <= byte_at(glob, g));
+            is_matched |= (prev_glob_ch <= byte_at(str, s) &&
+                           byte_at(str, s) <= byte_at(glob, g));
             prev_glob_ch = byte_at(glob, g);
             g++;
           }

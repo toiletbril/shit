@@ -41,11 +41,9 @@ fn builtin_names() throws -> const ArrayList<String> &
   return names;
 }
 
-
 fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
 {
   ASSERT(!ec.args().is_empty());
-
 
   std::unique_ptr<Builtin> b{};
 
@@ -71,11 +69,10 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
   const bool has_pipe_descriptors =
       ec.in_fd.has_value() || ec.out_fd.has_value() || ec.err_fd.has_value();
   /* A bare 2>&1 or 1>&2 on a builtin carries no file descriptor, only a routing
-     flag, so the placement runs whenever either a descriptor or a cross-route is
-     present. Otherwise `cd /bad 2>&1` would leave the builtin's stderr on the
-     terminal instead of following the standard output. */
-  const bool has_dup_routing =
-      ec.dup_err_to_out || ec.dup_out_to_err;
+     flag, so the placement runs whenever either a descriptor or a cross-route
+     is present. Otherwise `cd /bad 2>&1` would leave the builtin's stderr on
+     the terminal instead of following the standard output. */
+  const bool has_dup_routing = ec.dup_err_to_out || ec.dup_out_to_err;
 
   ArrayList<os::saved_descriptor> saved_descriptors{};
   if (has_pipe_descriptors || has_dup_routing) {

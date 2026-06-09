@@ -62,16 +62,24 @@ public:
     usize length = 0;
     for (; length < 8; length++) {
       const char byte = static_cast<char>((low_word >> (8 * length)) & 0xFF);
-      if (byte == '\0') return String{StringView{buffer, length}};
+      if (byte == '\0')
+        return String{
+            StringView{buffer, length}
+        };
       buffer[length] = byte;
     }
     for (; length < 16; length++) {
       const char byte =
           static_cast<char>((high_word >> (8 * (length - 8))) & 0xFF);
-      if (byte == '\0') return String{StringView{buffer, length}};
+      if (byte == '\0')
+        return String{
+            StringView{buffer, length}
+        };
       buffer[length] = byte;
     }
-    return String{StringView{buffer, length}};
+    return String{
+        StringView{buffer, length}
+    };
   }
 };
 

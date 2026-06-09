@@ -517,9 +517,9 @@ fn highlight_first_word(StringView line, EvalContext &context) throws
   const StringView word =
       line.substring_of_length(word_start, word_end - word_start);
 
-  /* A leading assignment such as VAR=value is not a command, so a '=' before any
-     slash leaves the line plain the way the parser treats it as an assignment
-     prefix. */
+  /* A leading assignment such as VAR=value is not a command, so a '=' before
+     any slash leaves the line plain the way the parser treats it as an
+     assignment prefix. */
   for (usize i = 0; i < word.length; i++) {
     if (word[i] == '/') break;
     if (word[i] == '=') return result;

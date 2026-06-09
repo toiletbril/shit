@@ -410,7 +410,8 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
        count toward an explicit run limit, otherwise the elapsed fraction of the
        duration budget. */
     if (show_progress &&
-        (elapsed_nanos - last_progress_nanos) >= PROGRESS_INTERVAL_NANOS) {
+        (elapsed_nanos - last_progress_nanos) >= PROGRESS_INTERVAL_NANOS)
+    {
       last_progress_nanos = elapsed_nanos;
       u64 percent = 0;
       if (run_limit.has_value() && *run_limit > 0)
@@ -484,8 +485,8 @@ fn append_summary(String &out, const command_result &result,
   /* The rows are formatted first so their mean and stddev widths are known
      before any line is rendered, which is what lets the value columns align. */
   ArrayList<metric_row> rows{};
-  rows.push(make_metric_row("wall time", result.wall_time,
-                            metric_unit::Nanoseconds));
+  rows.push(
+      make_metric_row("wall time", result.wall_time, metric_unit::Nanoseconds));
   rows.push(make_metric_row("peak rss", result.peak_rss, metric_unit::Bytes));
   if (result.has_perf) {
     rows.push(

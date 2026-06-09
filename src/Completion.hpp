@@ -43,11 +43,11 @@ fn complete(StringView line, usize cursor, EvalContext &context,
 
 /* The first word of the line and whether it names a runnable command. The byte
    span runs from word_start to word_end, the command word the interactive
-   highlighter colors. should_color is true when the word is a plain command name
-   that resolves to nothing, a builtin, a function, an alias, a PATH executable,
-   or, when it holds a slash, an existing executable path. A leading assignment,
-   a reserved word, an opening parenthesis, or an empty line leave should_color
-   false so the line stays plain. */
+   highlighter colors. should_color is true when the word is a plain command
+   name that resolves to nothing, a builtin, a function, an alias, a PATH
+   executable, or, when it holds a slash, an existing executable path. A leading
+   assignment, a reserved word, an opening parenthesis, or an empty line leave
+   should_color false so the line stays plain. */
 struct highlight_result
 {
   usize word_start;

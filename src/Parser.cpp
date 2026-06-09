@@ -650,8 +650,8 @@ mustuse fn Parser::try_parse_trailing_redirection(
     if (!word_token->word().is_all_ascii_digits()) return false;
 
     const let word_location = token->source_location();
-    if (try_parse_descriptor_prefixed_redirection(
-            word_token, word_location, ignored_first_location, out))
+    if (try_parse_descriptor_prefixed_redirection(word_token, word_location,
+                                                  ignored_first_location, out))
     {
       return true;
     }

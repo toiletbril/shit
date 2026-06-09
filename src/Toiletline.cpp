@@ -201,8 +201,8 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
    while the shell parses in bytes, so the byte span the highlighter returns is
    converted back to codepoint indices here, the same conversion the completion
    bridge performs. Returns 1 when the span should be colored, 0 otherwise. The
-   body is guarded because toiletline calls it through a C function pointer, so a
-   throw must not unwind through the C frames. */
+   body is guarded because toiletline calls it through a C function pointer, so
+   a throw must not unwind through the C frames. */
 fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
 {
   if (COMPLETION_CONTEXT == nullptr) return 0;

@@ -99,8 +99,8 @@ public:
   }
 
   /* A unary operator at index reads as a plain operand rather than an operator
-     when nothing follows it, or when two or more tokens follow and the next is a
-     binary operator, mirroring dash's isoperand. With exactly one token after
+     when nothing follows it, or when two or more tokens follow and the next is
+     a binary operator, mirroring dash's isoperand. With exactly one token after
      it the operator is a real unary primary. */
   pure bool is_unary_in_operand_position(usize index) const wontthrow
   {
@@ -109,8 +109,9 @@ public:
     return is_binary_operator(args[index + 1]);
   }
 
-  /* A bare ( reads as a plain operand rather than a grouping paren when no token
-     follows it, mirroring dash's t_lex special case for a trailing paren. */
+  /* A bare ( reads as a plain operand rather than a grouping paren when no
+     token follows it, mirroring dash's t_lex special case for a trailing paren.
+   */
   pure bool is_open_paren_token(usize index) const wontthrow
   {
     return args[index] == "(" && index + 1 < end;
@@ -277,9 +278,9 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   TestEvaluator evaluator{operands, 0, operands.count()};
   let const result = evaluator.evaluate_top();
-  /* A paren pair the argument-count rules stripped narrowed end past the closing
-     paren, so the leftover check runs against the narrowed window rather than
-     the original operand count. */
+  /* A paren pair the argument-count rules stripped narrowed end past the
+     closing paren, so the leftover check runs against the narrowed window
+     rather than the original operand count. */
   if (evaluator.pos != evaluator.end) {
     ASSERT(evaluator.pos < evaluator.end);
     throw Error{StringView{"unexpected argument '"} + operands[evaluator.pos] +

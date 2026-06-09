@@ -214,8 +214,8 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
 {
   /* The body lives in the same arena as the parsed nodes that point at it, so
      its lifetime matches the AST. A command substitution caches its parsed tree
-     past the temporary lexer that built it, and a lexer-owned heap body freed in
-     ~Lexer would dangle behind the cached Redirection. */
+     past the temporary lexer that built it, and a lexer-owned heap body freed
+     in ~Lexer would dangle behind the cached Redirection. */
   let body = m_arena->create<String>();
   ASSERT(body != nullptr);
 
@@ -271,9 +271,9 @@ hot fn Lexer::lex_expression_token() throws -> Token *
       return lex_sentinel();
     else if (lexer::is_part_of_identifier(ch))
       return lex_identifier();
-    else
-      [[unlikely]] throw ErrorWithLocation{here(m_cursor_position, 1),
-                                           "Unexpected character"};
+    else [[unlikely]]
+      throw ErrorWithLocation{here(m_cursor_position, 1),
+                              "Unexpected character"};
   }
 
   return m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
@@ -287,9 +287,9 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
       t = lex_sentinel();
     else if (lexer::is_part_of_identifier(ch)) [[likely]]
       t = lex_identifier();
-    else
-      [[unlikely]] throw ErrorWithLocation{here(m_cursor_position, 1),
-                                           "Unexpected character"};
+    else [[unlikely]]
+      throw ErrorWithLocation{here(m_cursor_position, 1),
+                              "Unexpected character"};
   } else {
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
@@ -446,8 +446,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
          continues the line and leaves None behind, so the newline byte is
          consumed without appending anything. */
       should_escape = false;
-      if (ch != '\n')
-        append_char(WordSegment::Kind::LiteralText, ch);
+      if (ch != '\n') append_char(WordSegment::Kind::LiteralText, ch);
       byte_count++;
       continue;
     }
@@ -589,8 +588,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
               }
             } else if (c == '$' && chop_character(byte_count + 1) == '(') {
               /* Copy a nested $(...) or $((...)) by paren balance, honoring
-                 quotes inside it so an inner ) within a string does not unbalance
-                 the count. */
+                 quotes inside it so an inner ) within a string does not
+                 unbalance the count. */
               arithmetic += c;
               byte_count++;
               arithmetic += chop_character(byte_count);
@@ -692,14 +691,14 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             previous_char = c;
             continue;
           }
-          /* An unquoted '#' at a word boundary begins a comment that runs to the
-             next newline, the same as the main lexer's skip_whitespace. A ')'
-             inside the comment is text, so it must not close the substitution.
-             The comment bytes are kept in inner since the inner lexer skips them
-             again when it re-lexes the captured source. */
-          if (c == '#' && (previous_char == 0 ||
-                           lexer::is_whitespace(previous_char) ||
-                           previous_char == '\n'))
+          /* An unquoted '#' at a word boundary begins a comment that runs to
+             the next newline, the same as the main lexer's skip_whitespace. A
+             ')' inside the comment is text, so it must not close the
+             substitution. The comment bytes are kept in inner since the inner
+             lexer skips them again when it re-lexes the captured source. */
+          if (c == '#' &&
+              (previous_char == 0 || lexer::is_whitespace(previous_char) ||
+               previous_char == '\n'))
           {
             inner += c;
             for (;;) {
@@ -941,10 +940,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
 
   /* The token spans from the word's first byte over byte_count bytes, the
      continuation backslash and newline included, so the location starts at the
-     cursor rather than past the continuations. An earlier form shifted the start
-     by the continuation count, which moved a continued word's caret off its
-     first byte onto a later line. The keyword token macro reads this name too,
-     so it stays a local. */
+     cursor rather than past the continuations. An earlier form shifted the
+     start by the continuation count, which moved a continued word's caret off
+     its first byte onto a later line. The keyword token macro reads this name
+     too, so it stays a local. */
   const let actual_cursor_position = m_cursor_position;
   ASSERT(actual_cursor_position <= m_source.length());
 

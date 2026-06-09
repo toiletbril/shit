@@ -96,11 +96,11 @@ pure fn is_plain_variable_name(StringView name) wontthrow -> bool
 }
 
 /* True when a token is a bare unquoted $name reference that field-splits at run
-   time. An unquoted operand splits on IFS, so the recorded value of $name is not
-   the single test argument the run actually sees, and the test verdict must not
-   fold from it. A quoted "$name" carries the same VariableReference segment with
-   is_in_double_quotes set, which is_split_eligible reports as not split, so it
-   still folds. The check mirrors the unquoted-variable test warning. */
+   time. An unquoted operand splits on IFS, so the recorded value of $name is
+   not the single test argument the run actually sees, and the test verdict must
+   not fold from it. A quoted "$name" carries the same VariableReference segment
+   with is_in_double_quotes set, which is_split_eligible reports as not split,
+   so it still folds. The check mirrors the unquoted-variable test warning. */
 fn is_split_eligible_variable_operand(const Token *token) wontthrow -> bool
 {
   if (token == nullptr) return false;
@@ -130,7 +130,8 @@ fn propagated_test_operand_value(const Token *token,
    or [ word with the trailing ] of the bracket form already removed. Some(true)
    or Some(false) for the simplest forms the fold can prove, None otherwise. The
    operand value comes through propagated_test_operand_value, so a $name operand
-   recorded as a constant is judged by its recorded value unless it field-splits.
+   recorded as a constant is judged by its recorded value unless it
+   field-splits.
  */
 fn constant_test_verdict(const ArrayList<const Token *> &operands,
                          const AnalysisContext &actx) throws -> Maybe<bool>

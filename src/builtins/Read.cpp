@@ -109,9 +109,9 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
   }
 
-  /* A final line that end of input ended rather than a newline yields a non-zero
-     status, while the variables above are still assigned, the way dash reports a
-     short read. */
+  /* A final line that end of input ended rather than a newline yields a
+     non-zero status, while the variables above are still assigned, the way dash
+     reports a short read. */
   return was_newline_terminated ? 0 : 1;
 }
 

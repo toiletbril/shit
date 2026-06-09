@@ -154,7 +154,8 @@ void append_conversion(String &out, const String &spec, char conv,
                   static_cast<unsigned long long>(parse_printf_integer(arg)));
     out += buffer;
   } else if (conv == 'f' || conv == 'e' || conv == 'E' || conv == 'g' ||
-             conv == 'G') {
+             conv == 'G')
+  {
     /* The float conversions parse the argument as a double through strtod, the
        way the C printf renders it, so the width and the precision in the spec
        are honored. A malformed argument parses as zero. */

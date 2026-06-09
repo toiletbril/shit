@@ -13,8 +13,8 @@ class BumpArena;
 /* A heredoc whose body is collected when the line that introduced it ends. The
    body buffer has a stable address, so a parsed redirection points at it and
    reads it once the lexer fills it. The body is a String allocated in the
-   lexer's arena, so it outlives the lexer and matches the lifetime of the parsed
-   nodes that point at it. */
+   lexer's arena, so it outlives the lexer and matches the lifetime of the
+   parsed nodes that point at it. */
 struct heredoc_pending
 {
   String delimiter;

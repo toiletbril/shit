@@ -37,8 +37,8 @@ String normalize_condition(StringView raw) throws
     name = String{name.substring(3)};
   if (name == "0") return String{"EXIT"};
 
-  /* A condition written as a bare number names a signal, so it folds to the same
-     name the name form yields. The number 0 already became EXIT above. */
+  /* A condition written as a bare number names a signal, so it folds to the
+     same name the name form yields. The number 0 already became EXIT above. */
   let is_all_digits = !name.is_empty();
   for (usize i = 0; i < name.count(); i++)
     if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {

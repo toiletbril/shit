@@ -67,8 +67,8 @@ cold fn AnalysisContext::warn(SourceLocation location,
 cold fn AnalysisContext::fail(SourceLocation location,
                               StringView message) throws -> void
 {
-  /* Under -W the analysis still runs but its errors are reported as warnings and
-     the run proceeds, so the same call reports without stopping. */
+  /* Under -W the analysis still runs but its errors are reported as warnings
+     and the run proceeds, so the same call reports without stopping. */
   if (errors_are_warnings) {
     warn(location, message);
     return;
@@ -239,9 +239,9 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
        no further ']' closes the class, falls back to a literal '[' rather than
        throwing. The prepass keeps that leading ']' in view rather than skipping
        past it, so it both opens and closes the degenerate class and [^] and [!]
-       are accepted the way the matcher accepts them. A '[' with no reachable ']'
-       at all, such as [abc, stays the unterminated class the matcher's caller
-       rejects. */
+       are accepted the way the matcher accepts them. A '[' with no reachable
+       ']' at all, such as [abc, stays the unterminated class the matcher's
+       caller rejects. */
     bool has_closing_bracket = false;
     for (; scan < bytes.count(); scan++) {
       if (bytes[scan].ch == ']') {
@@ -771,12 +771,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   Maybe<os::descriptor> redirect_in_fd;
   bool redirect_in_fd_handed_off = false;
   /* A redirect that points a real shell descriptor at its target around this
-     command, a file on fd 1 or fd 2, a cross-route like 2>&1, a duplication onto
-     an arbitrary descriptor like >&5, the close form >&-, and a numbered heredoc
-     among them. The backups put the descriptors back once the command finishes,
-     restored in reverse on every exit path. The standard fds are routed here so
-     a later 2>&1 copies the descriptor its source points at now, in source
-     order, rather than the one a deferred slot would place last. */
+     command, a file on fd 1 or fd 2, a cross-route like 2>&1, a duplication
+     onto an arbitrary descriptor like >&5, the close form >&-, and a numbered
+     heredoc among them. The backups put the descriptors back once the command
+     finishes, restored in reverse on every exit path. The standard fds are
+     routed here so a later 2>&1 copies the descriptor its source points at now,
+     in source order, rather than the one a deferred slot would place last. */
   ArrayList<os::saved_descriptor> dup_saved_descriptors{heap_allocator()};
   defer
   {
@@ -971,9 +971,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        path use. */
     if (redir.fd == 1 || redir.fd == 2) shit::flush();
     if (file_fd == redir.fd) {
-      /* open returned fd N itself, since fd N was the lowest free descriptor, so
-         the file already sits on its target. The generic save then dup2 would
-         back up the file and the close would shut fd N, leaving the child
+      /* open returned fd N itself, since fd N was the lowest free descriptor,
+         so the file already sits on its target. The generic save then dup2
+         would back up the file and the close would shut fd N, leaving the child
          without it, so the collision is recorded for restore without a close,
          the same way the numbered heredoc handles it. */
       dup_saved_descriptors.push(
@@ -1316,11 +1316,11 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     /* POSIX exempts set -e for a command that is an operand of && or || and not
        the last command of the and-or list, and for a command the ! reserved
-       word negates. So the exit fires only when the node that ran is the last of
-       its chain, the next node starts a fresh chain or the list ends, and the
-       command carries no leading !. A short-circuited node did not run and so
-       cannot trigger the exit, which is what keeps a failing non-last operand
-       such as the false in `false && cmd` from exiting the shell. */
+       word negates. So the exit fires only when the node that ran is the last
+       of its chain, the next node starts a fresh chain or the list ends, and
+       the command carries no leading !. A short-circuited node did not run and
+       so cannot trigger the exit, which is what keeps a failing non-last
+       operand such as the false in `false && cmd` from exiting the shell. */
     const bool ends_and_or_chain =
         index + 1 >= m_nodes.count() ||
         m_nodes[index + 1]->kind() == CompoundListCondition::Kind::None;
@@ -1640,10 +1640,12 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   /* The pipeline status is the last stage's, and $? reads it from the store, so
-     the result is committed here the way the compound-stage path commits it. The
-     all-simple fast path otherwise returned the status without recording it, so
-     `false | read x; echo $?` read the stale status from before the pipeline. */
-  const i64 ret = utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
+     the result is committed here the way the compound-stage path commits it.
+     The all-simple fast path otherwise returned the status without recording
+     it, so `false | read x; echo $?` read the stale status from before the
+     pipeline. */
+  const i64 ret =
+      utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
 }
@@ -2134,8 +2136,8 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (const Token *pattern_token : item.patterns) {
       /* A pattern keeps its glob metacharacters for matching, yet a quoted or
          escaped metacharacter in the pattern is a literal, so the expansion
-         carries a parallel mask the matcher reads. A pattern token that is not a
-         plain word, such as a reserved word arm, has no quoting structure and
+         carries a parallel mask the matcher reads. A pattern token that is not
+         a plain word, such as a reserved word arm, has no quoting structure and
          stays fully active. */
       let pattern_active = ArrayList<bool>{heap_allocator()};
       String pattern{};
@@ -2751,16 +2753,16 @@ BINARY_EXPRESSION_DECLS(Xor, ^);
 BINARY_EXPRESSION_DECLS(Equal, ==);
 BINARY_EXPRESSION_DECLS(NotEqual, !=);
 
-cold fn SimpleCommand::register_defined_functions(AnalysisContext &actx)
-    const throws -> void
+cold fn SimpleCommand::register_defined_functions(
+    AnalysisContext &actx) const throws -> void
 {
   if (m_args.is_empty() || m_args[0]->raw_string() != "alias") return;
 
-  /* An alias defined anywhere in the input resolves a later use of its name, the
-     same way a function does, so the prepass records each alias name before the
-     resolution check runs and an in-chunk alias is not flagged as missing. The
-     NAME=value operand lexes as an assignment token rather than a word, so the
-     name is taken from the raw token text up to the '='. */
+  /* An alias defined anywhere in the input resolves a later use of its name,
+     the same way a function does, so the prepass records each alias name before
+     the resolution check runs and an in-chunk alias is not flagged as missing.
+     The NAME=value operand lexes as an assignment token rather than a word, so
+     the name is taken from the raw token text up to the '='. */
   for (usize i = 1; i < m_args.count(); i++) {
     let const text = m_args[i]->raw_string();
     let const equals_position = text.find_character('=');
@@ -2852,16 +2854,16 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* read without -r lets a backslash in the input escape the next byte, so a
      path or a line with a backslash is mangled. This is shellcheck SC2162. A
-     combined short flag such as -rs carries the r, a long option or a value does
-     not. A function or alias named read is the user's own, so the lint is off
-     for it. */
+     combined short flag such as -rs carries the r, a long option or a value
+     does not. A function or alias named read is the user's own, so the lint is
+     off for it. */
   if (command_literal == "read" && !command_is_shadowed) {
     bool has_raw_flag = false;
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
-      let const literal =
-          static_cast<const tokens::WordToken *>(m_args[i])->word()
-              .to_literal_string();
+      let const literal = static_cast<const tokens::WordToken *>(m_args[i])
+                              ->word()
+                              .to_literal_string();
       let const view = literal.view();
       if (view.length >= 2 && view[0] == '-' && view[1] != '-' &&
           view.find_character('r').has_value())
@@ -2876,13 +2878,13 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 "read the line literally");
   }
 
-  /* printf reads its format argument as the template, so a variable or a command
-     substitution there lets the data control the format directives. This is
-     shellcheck SC2059, write printf '%s' \"$var\" instead. The format is the
-     first non-option word, so a leading -v or other dash run is skipped and a --
-     ends the options and forces the next word as the format, which keeps
-     printf -- "$fmt" inspected. A function or alias named printf is the user's
-     own, so the lint is off for it. */
+  /* printf reads its format argument as the template, so a variable or a
+     command substitution there lets the data control the format directives.
+     This is shellcheck SC2059, write printf '%s' \"$var\" instead. The format
+     is the first non-option word, so a leading -v or other dash run is skipped
+     and a -- ends the options and forces the next word as the format, which
+     keeps printf -- "$fmt" inspected. A function or alias named printf is the
+     user's own, so the lint is off for it. */
   if (command_literal == "printf" && !command_is_shadowed) {
     usize format_index = 0;
     for (usize i = 1; i < m_args.count(); i++) {
@@ -2892,9 +2894,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         format_index = i;
         break;
       }
-      let const literal =
-          static_cast<const tokens::WordToken *>(m_args[i])->word()
-              .to_literal_string();
+      let const literal = static_cast<const tokens::WordToken *>(m_args[i])
+                              ->word()
+                              .to_literal_string();
       let const view = literal.view();
       if (view == "--") {
         /* The options end here, so the word after -- is the format. */
@@ -2907,8 +2909,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       }
     }
 
-    if (format_index != 0 &&
-        m_args[format_index]->kind() == Token::Kind::Word)
+    if (format_index != 0 && m_args[format_index]->kind() == Token::Kind::Word)
     {
       let const &format =
           static_cast<const tokens::WordToken *>(m_args[format_index])->word();
@@ -2930,38 +2931,41 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
 
   /* Obsolescent or redundant test forms, each a shellcheck check. -a and -o
      joining two conditions is obsolescent and misparses with some operands, so
-     prefer a separate test joined with && or || (SC2166). The operator is binary
-     only past the first operand, so a unary -a file test does not trip it, and a
-     -a right after a ! is the negated unary file test rather than the binary
-     AND. A negated -z or -n has a direct operator, -n or -z (SC2236, SC2237). A
-     function or alias named test or [ is the user's own, so the lint is off for
-     it. */
+     prefer a separate test joined with && or || (SC2166). The operator is
+     binary only past the first operand, so a unary -a file test does not trip
+     it, and a -a right after a ! is the negated unary file test rather than the
+     binary AND. A negated -z or -n has a direct operator, -n or -z (SC2236,
+     SC2237). A function or alias named test or [ is the user's own, so the lint
+     is off for it. */
   if ((command_literal == "[" || command_literal == "test" ||
        command_literal == "[[") &&
       !command_is_shadowed)
   {
     for (usize i = 1; i < m_args.count(); i++) {
       if (m_args[i]->kind() != Token::Kind::Word) continue;
-      let const literal =
-          static_cast<const tokens::WordToken *>(m_args[i])->word()
-              .to_literal_string();
+      let const literal = static_cast<const tokens::WordToken *>(m_args[i])
+                              ->word()
+                              .to_literal_string();
       let const view = literal.view();
       /* The word right before -a or -o, used to tell a negated unary -a file
          test from the binary AND operator. */
       let const previous_is_bang =
           m_args[i - 1]->kind() == Token::Kind::Word &&
-          static_cast<const tokens::WordToken *>(m_args[i - 1])->word()
+          static_cast<const tokens::WordToken *>(m_args[i - 1])
+                  ->word()
                   .to_literal_string()
                   .view() == "!";
       if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
-        actx.warn(m_args[i]->source_location(),
-                  "test with -a or -o is obsolescent, join two tests with && or "
-                  "|| instead");
+        actx.warn(
+            m_args[i]->source_location(),
+            "test with -a or -o is obsolescent, join two tests with && or "
+            "|| instead");
       } else if (view == "!" && i + 1 < m_args.count() &&
-                 m_args[i + 1]->kind() == Token::Kind::Word) {
-        let const next =
-            static_cast<const tokens::WordToken *>(m_args[i + 1])->word()
-                .to_literal_string();
+                 m_args[i + 1]->kind() == Token::Kind::Word)
+      {
+        let const next = static_cast<const tokens::WordToken *>(m_args[i + 1])
+                             ->word()
+                             .to_literal_string();
         if (next.view() == "-z")
           actx.warn(m_args[i]->source_location(),
                     "a negated -z is just -n, test with -n instead");
@@ -3010,9 +3014,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                         StringView{"' was not found"};
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. A
-       missing command is a fatal analysis error, so the file does not run with a
-       command that cannot resolve. After a dot, source, or eval the command may
-       be defined by code the prepass cannot see, so it is only a warning there.
+       missing command is a fatal analysis error, so the file does not run with
+       a command that cannot resolve. After a dot, source, or eval the command
+       may be defined by code the prepass cannot see, so it is only a warning
+       there.
        --bash-compatible skips the analysis, so the file runs and the runtime
        resolution sets 127 per command the way bash does. */
     if (actx.saw_runtime_definer)

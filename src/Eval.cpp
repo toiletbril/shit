@@ -78,12 +78,12 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
      re-resolves. */
   if (name == "PATH") utils::set_path_for_resolution(String{value});
   m_shell_variables.set(name, value);
-  /* An exported name lives in the process environment, where export moved it and
-     cleared the shell copy. A plain reassignment writes the shell store above,
-     so an in-process read sees the new value, but a child still inherits the
-     stale environment entry. The environment is refreshed here when the name is
-     already present there, so a child of `export FOO=1; FOO=2` sees 2. A
-     non-exported name is absent from the environment, so the common case only
+  /* An exported name lives in the process environment, where export moved it
+     and cleared the shell copy. A plain reassignment writes the shell store
+     above, so an in-process read sees the new value, but a child still inherits
+     the stale environment entry. The environment is refreshed here when the
+     name is already present there, so a child of `export FOO=1; FOO=2` sees 2.
+     A non-exported name is absent from the environment, so the common case only
      pays the getenv scan the read miss already pays. */
   if (os::get_environment_variable(name).has_value())
     os::set_environment_variable(name, value);
@@ -226,10 +226,10 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
-  /* IFS is held live in m_field_separators rather than the store, so a read with
-     no prior assignment must report the cached separators. The store lookup
-     above wins first, so an explicit IFS= empty value still reads back empty,
-     while the unset default reads back space-tab-newline. This makes the
+  /* IFS is held live in m_field_separators rather than the store, so a read
+     with no prior assignment must report the cached separators. The store
+     lookup above wins first, so an explicit IFS= empty value still reads back
+     empty, while the unset default reads back space-tab-newline. This makes the
      o=$IFS; IFS=:; ...; IFS=$o save and restore idiom round-trip. The first
      byte gates the compare so an ordinary name skips it. */
   if (first_byte == 'I' && name == "IFS")
@@ -912,8 +912,9 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_enable_echo_expanded = snapshot.enable_echo_expanded;
 
   /* A trap installed inside the subshell stays inside it. The parent's table is
-     restored whole, so an EXIT trap the parent set survives and an EXIT trap the
-     subshell set is dropped after it has already fired at the subshell's end. */
+     restored whole, so an EXIT trap the parent set survives and an EXIT trap
+     the subshell set is dropped after it has already fired at the subshell's
+     end. */
   m_traps = steal(snapshot.traps);
 
   /* set_current_directory reports an error through ErrorOr, ignored here to
@@ -1031,7 +1032,8 @@ fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
      backslash that sits before an ordinary character, so the pattern-only
      unescape stays off. */
   let discarded_mask = ArrayList<bool>{heap_allocator()};
-  return expand_modifier_word_worker(word, discarded_mask, remove_quotes, false);
+  return expand_modifier_word_worker(word, discarded_mask, remove_quotes,
+                                     false);
 }
 
 fn EvalContext::expand_modifier_word_masked(StringView word,
@@ -1046,7 +1048,8 @@ fn EvalContext::expand_modifier_word_masked(StringView word,
 fn EvalContext::expand_modifier_word_worker(StringView word,
                                             ArrayList<bool> &active_out,
                                             bool remove_quotes,
-                                            bool is_pattern_word) throws -> String
+                                            bool is_pattern_word) throws
+    -> String
 {
   let out = String{heap_allocator()};
 
@@ -1092,9 +1095,9 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
        and a parameter word. */
     if (word[i] == '\\') {
       /* In a # or % pattern word a backslash quotes whatever byte follows, so
-         the byte is emitted literally and inactive and the backslash is dropped,
-         which makes a quoted glob character such as \* match itself. A trailing
-         backslash with no following byte is kept literally. */
+         the byte is emitted literally and inactive and the backslash is
+         dropped, which makes a quoted glob character such as \* match itself. A
+         trailing backslash with no following byte is kept literally. */
       if (is_pattern_word && i + 1 < word.length) {
         emit_byte(word[i + 1], false);
         i++;
@@ -1269,8 +1272,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
       /* Arithmetic $((...)), scanned to the matching )). A quote run and a
-         backslash escape keep their bytes literal so a ) inside a string is text
-         and does not count toward the grouping depth or terminate the
+         backslash escape keep their bytes literal so a ) inside a string is
+         text and does not count toward the grouping depth or terminate the
          expansion. */
       String inner{heap_allocator()};
       usize j = i + 3;
@@ -2567,8 +2570,8 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
                                            ArrayList<bool> &active_out) throws
     -> String
 {
-  /* Only copy the segments when a leading tilde must be rewritten, mirroring the
-     assignment expansion the case word otherwise shares. */
+  /* Only copy the segments when a leading tilde must be rewritten, mirroring
+     the assignment expansion the case word otherwise shares. */
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{heap_allocator()};
   if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
@@ -2599,9 +2602,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
          metacharacters never act as wildcards. */
       emit_run(segment_text, false);
       break;
-    case WordSegment::Kind::UnquotedText:
-      emit_run(segment_text, true);
-      break;
+    case WordSegment::Kind::UnquotedText: emit_run(segment_text, true); break;
     case WordSegment::Kind::VariableReference: {
       let const value =
           String{heap_allocator(), apply_parameter_expansion(segment_text)};
@@ -2613,8 +2614,8 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
-      /* An arithmetic result is decimal digits and a sign, so it carries no glob
-         metacharacter and stays inactive. */
+      /* An arithmetic result is decimal digits and a sign, so it carries no
+         glob metacharacter and stays inactive. */
       let const number = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
                              : evaluate_arithmetic(segment_text);
