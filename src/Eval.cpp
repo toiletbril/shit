@@ -2538,7 +2538,7 @@ struct ConditionalEvaluator
            s == "-r" || s == "-w" || s == "-x" || s == "-s" || s == "-h" ||
            s == "-L" || s == "-b" || s == "-c" || s == "-p" || s == "-S" ||
            s == "-g" || s == "-u" || s == "-k" || s == "-O" || s == "-G" ||
-           s == "-v" || s == "-t";
+           s == "-v" || s == "-t" || s == "-o";
   }
 
   static pure bool is_binary_word_op(StringView s) wontthrow
@@ -2617,6 +2617,11 @@ struct ConditionalEvaluator
             static_cast<os::descriptor>(descriptor.value()));
       return false;
     }
+    /* -o tests a shell option by name. Only the emacs line-editing option is
+       reported, as on, since shit's interactive editing is emacs style. Every
+       other option name reads as off for now, so a config that gates on the
+       editing mode such as ble.sh sees emacs and proceeds. */
+    if (op == "-o") return operand == "emacs";
     /* The remaining file-type tests fall back to existence, which covers the
        common scripts without a full stat-mode surface. */
     return path.exists();
