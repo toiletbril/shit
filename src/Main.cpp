@@ -755,6 +755,18 @@ fn main(int argc, char **argv) -> int
   if (!shit::os::get_environment_variable("PS1").has_value())
     context.set_shell_variable("PS1", toiletline::default_prompt_template());
 
+  /* COLUMNS and LINES carry the terminal size the way bash sets them in an
+     interactive shell, so a config that divides by COLUMNS, such as ble.sh, sees
+     a non-zero width. They are seeded once here and not tracked across a later
+     resize. */
+  if (should_be_interactive) {
+    u32 columns = 0, rows = 0;
+    if (shit::os::terminal_size(columns, rows)) {
+      context.set_shell_variable("COLUMNS", shit::utils::uint_to_text(columns));
+      context.set_shell_variable("LINES", shit::utils::uint_to_text(rows));
+    }
+  }
+
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
   i32 exit_code = EXIT_SUCCESS;
 

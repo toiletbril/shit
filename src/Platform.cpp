@@ -276,6 +276,16 @@ fn is_stdout_a_tty() wontthrow -> bool { return isatty(SHIT_STDOUT); }
 fn is_stderr_a_tty() wontthrow -> bool { return isatty(SHIT_STDERR); }
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
 
+fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
+{
+  struct winsize window{};
+  if (ioctl(SHIT_STDOUT, TIOCGWINSZ, &window) != 0) return false;
+  if (window.ws_col == 0 || window.ws_row == 0) return false;
+  columns = window.ws_col;
+  rows = window.ws_row;
+  return true;
+}
+
 fn make_fd_inheritable(descriptor fd) wontthrow -> void
 {
   const int flags = fcntl(fd, F_GETFD);
@@ -1414,6 +1424,19 @@ fn is_stdout_a_tty() -> bool { return _isatty(_fileno(stdout)); }
 
 fn is_stderr_a_tty() -> bool { return _isatty(_fileno(stderr)); }
 fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return _isatty(fd); }
+
+fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
+{
+  CONSOLE_SCREEN_BUFFER_INFO info;
+  if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) == 0)
+    return false;
+  const i32 width = info.srWindow.Right - info.srWindow.Left + 1;
+  const i32 height = info.srWindow.Bottom - info.srWindow.Top + 1;
+  if (width <= 0 || height <= 0) return false;
+  columns = static_cast<u32>(width);
+  rows = static_cast<u32>(height);
+  return true;
+}
 
 constexpr static usize WIN32_MAX_ENV_SIZE = 32767;
 

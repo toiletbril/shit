@@ -327,6 +327,11 @@ fn monotonic_nanos() wontthrow -> u64;
    EPOCHREALTIME variable. */
 fn realtime_microseconds() wontthrow -> u64;
 
+/* The terminal's column and row count, the source of COLUMNS and LINES. False
+   when there is no terminal or the size is unknown, leaving the outputs
+   untouched. */
+fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool;
+
 /* The user and system seconds this process's children have consumed so far,
    read from RUSAGE_CHILDREN. The difference across a command run is the
    command's own cpu time, the accounting the time report prints. Windows has no
