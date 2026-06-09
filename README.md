@@ -34,6 +34,36 @@ and each command fails at runtime with 127. `-W` keeps the stage but turns
 every error into a warning and lets the run continue. `--no-diagnostics` turns
 it off, and `--dumb` turns everything pedantic off at once.
 
+## Three shells in a trenchcoat
+
+shit runs in three moods. The default mood is shit being itself, strict and
+loud, with the analysis stage on and an unmatched glob treated as an error. `-P`
+makes it dash, POSIX to the letter. `--bash-compatible` makes it bash, with
+`[[ ]]`, arrays, and brace expansion. Name the binary `sh`, `dash`, or `bash`
+and it reads its own name and picks the matching mood, the way a symlink decides
+who it is today.
+
+`-L` boots from your existing bash setup. It sources the bash profiles and
+`~/.bashrc` in bash mode so an `sdkman` or an `nvm` loads clean, then snaps back
+to the strict default at the first prompt. `--rcfile FILE` reads a named rc
+instead of `~/.bashrc`, the way bash does. The startup files always source
+lenient, so an unset variable or an unmatched glob in a profile never aborts the
+login.
+
+`-I` is mimicry. With it on, a script whose shebang names `sh`, `dash`, `bash`,
+or `shit` runs inside shit in the matching mood rather than launching the real
+shell, so a script-heavy run skips the fork and the shell startup. The script
+stays sealed in a subshell, so its `cd` and its `exit` never touch the parent. A
+`zsh`, a `python`, or anything shit cannot speak still launches the real
+program.
+
+`SHIT_FLAGS` sets your defaults once. Put `-ahmu --bash-compatible -I` in it and
+every shit starts that way, while a flag on the command line still wins. `-p` is
+privileged mode, it reads no config at all the way a setuid shell refuses a file
+a lesser user controls, and it turns on by itself when the effective and the
+real user differ. `z` jumps to a directory you visit often by a fragment of its
+name, and skips one that has since been removed.
+
 ## Development
 
 `staging` is the development branch. It may be broken at any time. `master` is
