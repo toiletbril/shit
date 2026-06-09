@@ -563,6 +563,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         String inner{};
         usize depth = 1;
         char quote = 0;
+        /* Tracks the byte before the current one so an unquoted '#' that starts
+           a word can be told from one inside a word. A zero sentinel marks the
+           start of the substitution, where a '#' also starts a word. */
+        char previous_char = 0;
         for (;;) {
           const let c = chop_character(byte_count);
           if (c == lexer::CEOF) [[unlikely]] {
@@ -576,6 +580,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           if (quote != 0) {
             if (c == quote) quote = 0;
             inner += c;
+            previous_char = c;
             continue;
           }
           if (c == '\\') {
@@ -585,11 +590,32 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
               byte_count++;
               inner += escaped;
             }
+            previous_char = c;
             continue;
           }
           if (c == '\'' || c == '"') {
             quote = c;
             inner += c;
+            previous_char = c;
+            continue;
+          }
+          /* An unquoted '#' at a word boundary begins a comment that runs to the
+             next newline, the same as the main lexer's skip_whitespace. A ')'
+             inside the comment is text, so it must not close the substitution.
+             The comment bytes are kept in inner since the inner lexer skips them
+             again when it re-lexes the captured source. */
+          if (c == '#' && (previous_char == 0 ||
+                           lexer::is_whitespace(previous_char) ||
+                           previous_char == '\n'))
+          {
+            inner += c;
+            for (;;) {
+              const let comment_char = chop_character(byte_count);
+              if (comment_char == lexer::CEOF || comment_char == '\n') break;
+              byte_count++;
+              inner += comment_char;
+            }
+            previous_char = '#';
             continue;
           }
           if (c == '(') {
@@ -599,6 +625,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             if (depth == 0) break;
           }
           inner += c;
+          previous_char = c;
         }
         word.segments.push(WordSegment{WordSegment::Kind::CommandSubstitution,
                                        steal(inner), is_in_double_quotes});

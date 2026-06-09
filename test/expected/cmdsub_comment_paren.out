@@ -1,0 +1,66 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign result=$(echo hello  # a ) comment
+)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$result"]
+  [CompoundListCondition, None]
+    [Assign mid=$(echo foo#bar)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$mid"]
+  [CompoundListCondition, None]
+    [Assign quoted=$(echo "a # ) b")]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$quoted"]
+  [CompoundListCondition, None]
+    [Assign nested=$(echo $(echo inner # ) cmt
+))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$nested"]
+[Word
+  Unquoted "result="
+  CommandSubstitution "echo hello  # a ) comment
+"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "result"
+]
+[Word
+  Unquoted "mid="
+  CommandSubstitution "echo foo#bar"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "mid"
+]
+[Word
+  Unquoted "quoted="
+  CommandSubstitution "echo "a # ) b""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "quoted"
+]
+[Word
+  Unquoted "nested="
+  CommandSubstitution "echo $(echo inner # ) cmt
+)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "nested"
+]
+hello
+foo#bar
+a # ) b
+inner
+[Code 0]
