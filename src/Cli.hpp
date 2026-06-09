@@ -125,6 +125,12 @@ fn make_synopsis(StringView program_name,
                  const ArrayList<StringView> &lines) throws -> String;
 fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String;
 
+/* Word-wrap text so no line exceeds width columns, with every line indented by
+   indent spaces. The text breaks only at a space, so a word is never split, and
+   a single word longer than the available room is emitted whole. The result has
+   no trailing newline. */
+fn wrap_text(StringView text, usize indent, usize width) throws -> String;
+
 fn show_message(StringView err) throws -> void;
 
 /* Write bytes to the standard streams without going through the iostream

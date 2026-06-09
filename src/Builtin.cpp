@@ -16,10 +16,13 @@ cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
 {
   ASSERT(!ec.args().is_empty());
 
+  static constexpr usize HELP_WRAP_WIDTH = 80;
+  static constexpr usize HELP_INDENT = 2;
+
   String help_text{};
   if (!description.is_empty()) {
-    help_text += "DESCRIPTION\n  ";
-    help_text += description;
+    help_text += "DESCRIPTION\n";
+    help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
     help_text += "\n\n";
   }
   help_text += make_synopsis(ec.args()[0].view(), hs);

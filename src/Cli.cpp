@@ -451,6 +451,41 @@ cold fn make_synopsis(StringView program_name,
   return s;
 }
 
+cold fn wrap_text(StringView text, usize indent, usize width) throws -> String
+{
+  String out{};
+  const usize text_width = width > indent ? width - indent : 1;
+  usize line_used = 0;
+  usize word_start = 0;
+  bool line_started = false;
+  /* Each space, and the end of the text, closes a word. A word is placed on the
+     current line when it still fits, otherwise a new indented line begins. A
+     word wider than the line is emitted whole rather than split. */
+  for (usize i = 0; i <= text.length; i++) {
+    const bool at_end = i == text.length;
+    if (!at_end && text[i] != ' ') continue;
+    const usize word_length = i - word_start;
+    if (word_length > 0) {
+      if (line_started && line_used + 1 + word_length > text_width) {
+        out += '\n';
+        line_started = false;
+        line_used = 0;
+      }
+      if (!line_started) {
+        for (usize j = 0; j < indent; j++) out += ' ';
+        line_started = true;
+      } else {
+        out += ' ';
+        line_used++;
+      }
+      out += text.substring_of_length(word_start, word_length);
+      line_used += word_length;
+    }
+    word_start = i + 1;
+  }
+  return out;
+}
+
 cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
 {
   String s{};
