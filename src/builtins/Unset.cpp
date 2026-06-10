@@ -27,7 +27,8 @@ pure Builtin::Kind Unset::kind() const wontthrow { return Kind::Unset; }
 
 i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-  let const names = parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);
+  let const names =
+      parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);
   defer { reset_flags(FLAG_LIST); };
 
   ASSERT(!names.is_empty());

@@ -2098,7 +2098,20 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
           ExecContext::make_from(e->source_location(), steal(stage_args));
     } catch (const CommandNotFound &not_found) {
       report_command_not_found(cxt, not_found);
-      ecs.push(ExecContext::make_unresolved(e->source_location()));
+      /* The stage still applies its own redirections, the way bash and dash open
+         a > target even for a command that was not found, then runs nothing. The
+         opened descriptors close with the stage, and a > onto its standard
+         output takes the slot ahead of the pipe, so the next stage still sees
+         EOF. */
+      let unresolved = ExecContext::make_unresolved(e->source_location());
+      bool unresolved_handed_off = false;
+      defer
+      {
+        if (!unresolved_handed_off) unresolved.close_fds();
+      };
+      e->redirect_exec_context(unresolved, cxt);
+      unresolved_handed_off = true;
+      ecs.push(steal(unresolved));
       continue;
     }
     let ec = stage_ec.take();
