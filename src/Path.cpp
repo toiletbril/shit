@@ -189,18 +189,25 @@ cold fn Path::exists() const wontthrow -> bool
   return ::stat(m_text.c_str(), &info) == 0;
 }
 
-cold fn Path::is_directory() const wontthrow -> bool
+/* The stat-and-check the type predicates share. A failed stat reads as the type
+   not matching rather than an error, matching every caller. The lstat-based
+   symbolic-link test keeps its own body since it must not follow the link. */
+static fn stat_matches_type(const char *path, mode_t expected_type) wontthrow
+    -> bool
 {
   struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return S_ISDIR(info.st_mode);
+  if (::stat(path, &info) != 0) return false;
+  return (info.st_mode & S_IFMT) == expected_type;
+}
+
+cold fn Path::is_directory() const wontthrow -> bool
+{
+  return stat_matches_type(m_text.c_str(), S_IFDIR);
 }
 
 fn Path::is_regular_file() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return S_ISREG(info.st_mode);
+  return stat_matches_type(m_text.c_str(), S_IFREG);
 }
 
 fn Path::is_symbolic_link() const wontthrow -> bool
@@ -212,30 +219,22 @@ fn Path::is_symbolic_link() const wontthrow -> bool
 
 fn Path::is_block_device() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return S_ISBLK(info.st_mode);
+  return stat_matches_type(m_text.c_str(), S_IFBLK);
 }
 
 fn Path::is_character_device() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return S_ISCHR(info.st_mode);
+  return stat_matches_type(m_text.c_str(), S_IFCHR);
 }
 
 fn Path::is_fifo() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return S_ISFIFO(info.st_mode);
+  return stat_matches_type(m_text.c_str(), S_IFIFO);
 }
 
 fn Path::is_socket() const wontthrow -> bool
 {
-  struct stat info{};
-  if (::stat(m_text.c_str(), &info) != 0) return false;
-  return S_ISSOCK(info.st_mode);
+  return stat_matches_type(m_text.c_str(), S_IFSOCK);
 }
 
 fn Path::file_size() const wontthrow -> Maybe<u64>
