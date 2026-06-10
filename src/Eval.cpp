@@ -3290,6 +3290,10 @@ static constexpr usize REGEX_CACHE_CAP = 128;
 
 fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
 {
+  /* The key is the pattern text alone, which is sound only because compilation
+     depends on nothing else, the flags are always REG_EXTENDED. A future option
+     that changes compilation, such as REG_ICASE for nocasematch, must fold into
+     the key so two intended compilations of one pattern do not collide. */
   if (CompiledRegex *cached = m_regex_cache.find(pattern))
     return cached->get();
 

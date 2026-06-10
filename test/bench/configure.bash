@@ -75,7 +75,7 @@ ordinal_sum() {
     for ((i = 0; i < ${#s}; i++)); do
         ch=${s:i:1}
         case $ch in
-        [a-z]) acc=$((acc + 97 + 0)) ;;
+        [a-z]) acc=$((acc + 97)) ;;
         [A-Z]) acc=$((acc + 65)) ;;
         [0-9]) acc=$((acc + 48)) ;;
         *) acc=$((acc + 32)) ;;
@@ -196,7 +196,7 @@ probe_arithmetic() {
     check "hex base" "$((0xff + 16#10))" "271"
     check "octal base" "$((010 + 2#101))" "13"
     check "base 36" "$((36#z))" "35"
-    check "ternary chain" "$((SCALE > 0 ? SCALE < 100000 ? 1 : 2 : 3))" "1"
+    check "ternary chain" "$((5 > 3 ? 5 < 100000 ? 1 : 2 : 3))" "1"
     check "bitwise mix" "$((6 & 3 | 8 ^ 1))" "11"
 
     local n=5
