@@ -5735,9 +5735,9 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
 
 /* Split a sequence body on its .. separators into two or three parts, the
    start, the end, and an optional step. */
-fn split_sequence_parts(StringView content) throws -> ArrayList<StringView>
+fn split_sequence_parts(StringView content, Allocator alloc) throws -> ArrayList<StringView>
 {
-  let parts = ArrayList<StringView>{heap_allocator()};
+  let parts = ArrayList<StringView>{alloc};
   usize start = 0;
   usize i = 0;
   while (i + 1 < content.length) {
@@ -5755,9 +5755,9 @@ fn split_sequence_parts(StringView content) throws -> ArrayList<StringView>
 
 /* The elements of a {start..end} or {start..end..step} sequence, numeric or
    single-letter, or None when the body is not a sequence. */
-fn parse_brace_sequence(StringView content) throws -> Maybe<ArrayList<String>>
+fn parse_brace_sequence(StringView content, Allocator alloc) throws -> Maybe<ArrayList<String>>
 {
-  let const parts = split_sequence_parts(content);
+  let const parts = split_sequence_parts(content, alloc);
   if (parts.count() != 2 && parts.count() != 3) return None;
 
   i64 step = 1;
@@ -5780,14 +5780,14 @@ fn parse_brace_sequence(StringView content) throws -> Maybe<ArrayList<String>>
                                    ? start_int->digit_width
                                    : end_int->digit_width)
                             : 0;
-    let elements = ArrayList<String>{heap_allocator()};
+    let elements = ArrayList<String>{alloc};
     for (i64 v = from; increment > 0 ? v <= to : v >= to; v += increment) {
       String number = utils::int_to_text(v);
       if (pad) {
         const bool negative = !number.is_empty() && number.view()[0] == '-';
         const StringView digits = number.view().substring(negative ? 1 : 0);
         if (digits.length < width) {
-          let padded = String{heap_allocator()};
+          let padded = String{alloc};
           if (negative) padded.push('-');
           for (usize z = digits.length; z < width; z++)
             padded.push('0');
@@ -5809,9 +5809,9 @@ fn parse_brace_sequence(StringView content) throws -> Maybe<ArrayList<String>>
     const bool to_alpha = (to >= 'a' && to <= 'z') || (to >= 'A' && to <= 'Z');
     if (from_alpha && to_alpha) {
       const i64 increment = from <= to ? magnitude : -magnitude;
-      let elements = ArrayList<String>{heap_allocator()};
+      let elements = ArrayList<String>{alloc};
       for (i64 c = from; increment > 0 ? c <= to : c >= to; c += increment) {
-        let element = String{heap_allocator()};
+        let element = String{alloc};
         element.push(static_cast<char>(c));
         elements.push(steal(element));
       }
@@ -5824,11 +5824,11 @@ fn parse_brace_sequence(StringView content) throws -> Maybe<ArrayList<String>>
 /* The alternatives of a brace group body, the comma-separated list or the
    sequence it spells, or None when the body is neither and the braces are
    literal. */
-fn brace_group_alternatives(StringView content) throws
+fn brace_group_alternatives(StringView content, Allocator alloc) throws
     -> Maybe<ArrayList<String>>
 {
   usize depth = 0;
-  let comma_positions = ArrayList<usize>{heap_allocator()};
+  let comma_positions = ArrayList<usize>{alloc};
   for (usize i = 0; i < content.length; i++) {
     const char c = content[i];
     if (c == '{') {
@@ -5841,18 +5841,18 @@ fn brace_group_alternatives(StringView content) throws
   }
 
   if (!comma_positions.is_empty()) {
-    let alternatives = ArrayList<String>{heap_allocator()};
+    let alternatives = ArrayList<String>{alloc};
     usize start = 0;
     for (const usize comma : comma_positions) {
       alternatives.push(String{
-          heap_allocator(), content.substring_of_length(start, comma - start)});
+          alloc, content.substring_of_length(start, comma - start)});
       start = comma + 1;
     }
     alternatives.push_managed(content.substring(start));
     return alternatives;
   }
 
-  return parse_brace_sequence(content);
+  return parse_brace_sequence(content, alloc);
 }
 
 struct brace_group
@@ -5862,7 +5862,7 @@ struct brace_group
   ArrayList<String> alternatives{heap_allocator()};
 };
 
-fn find_brace_group(StringView text) throws -> Maybe<brace_group>
+fn find_brace_group(StringView text, Allocator alloc) throws -> Maybe<brace_group>
 {
   for (usize open = 0; open < text.length; open++) {
     if (text[open] != '{') continue;
@@ -5875,7 +5875,7 @@ fn find_brace_group(StringView text) throws -> Maybe<brace_group>
         depth--;
         if (depth == 0) {
           let alternatives = brace_group_alternatives(
-              text.substring_of_length(open + 1, j - open - 1));
+              text.substring_of_length(open + 1, j - open - 1), alloc);
           if (alternatives.has_value()) {
             let group = brace_group{open, j, {}};
             group.alternatives = steal(*alternatives);
@@ -5900,11 +5900,11 @@ constexpr usize MAX_BRACE_DEPTH = 256;
    further group after the close, so the result is the cartesian product. A
    nesting past the cap leaves the remaining text literal rather than recursing
    further, the way a runaway expansion is bounded instead of crashing. */
-fn brace_expand_text(StringView text, usize depth = 0) throws
+fn brace_expand_text(StringView text, Allocator alloc, usize depth = 0) throws
     -> ArrayList<String>
 {
-  let results = ArrayList<String>{heap_allocator()};
-  let const group = find_brace_group(text);
+  let results = ArrayList<String>{alloc};
+  let const group = find_brace_group(text, alloc);
   if (!group.has_value() || depth >= MAX_BRACE_DEPTH) {
     results.push_managed(text);
     return results;
@@ -5912,14 +5912,14 @@ fn brace_expand_text(StringView text, usize depth = 0) throws
 
   const StringView preamble = text.substring_of_length(0, group->open);
   const StringView postamble = text.substring(group->close + 1);
-  let const post_expansions = brace_expand_text(postamble, depth + 1);
+  let const post_expansions = brace_expand_text(postamble, alloc, depth + 1);
 
   for (const String &alternative : group->alternatives) {
     for (const String &expanded_alt :
-         brace_expand_text(alternative.view(), depth + 1))
+         brace_expand_text(alternative.view(), alloc, depth + 1))
     {
       for (const String &expanded_post : post_expansions) {
-        let combined = String{heap_allocator(), preamble};
+        let combined = String{alloc, preamble};
         combined.append(expanded_alt.view());
         combined.append(expanded_post.view());
         results.push(steal(combined));
@@ -5933,10 +5933,10 @@ fn brace_expand_text(StringView text, usize depth = 0) throws
    segments contribute their text to a template while every other segment is
    recorded as an opaque marker, so a quoted brace or a variable stays intact.
    Each expanded template is rebuilt into a word. */
-fn expand_braces(const Word &word) throws -> ArrayList<Word>
+fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
 {
-  let opaque_segments = ArrayList<const WordSegment *>{heap_allocator()};
-  let word_template = String{heap_allocator()};
+  let opaque_segments = ArrayList<const WordSegment *>{alloc};
+  let word_template = String{alloc};
   for (const WordSegment &segment : word.segments) {
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       word_template.append(segment.text.view());
@@ -5948,12 +5948,12 @@ fn expand_braces(const Word &word) throws -> ArrayList<Word>
     }
   }
 
-  let const expanded = brace_expand_text(word_template.view());
+  let const expanded = brace_expand_text(word_template.view(), alloc);
 
-  let words = ArrayList<Word>{heap_allocator()};
+  let words = ArrayList<Word>{alloc};
   for (const String &produced : expanded) {
     let out = Word{};
-    let run = String{heap_allocator()};
+    let run = String{alloc};
     for (usize i = 0; i < produced.count(); i++) {
       const char c = produced[i];
       /* The marker is followed by an in-range segment index only when this
@@ -5968,7 +5968,7 @@ fn expand_braces(const Word &word) throws -> ArrayList<Word>
         if (!run.is_empty()) {
           out.segments.push(
               WordSegment{WordSegment::Kind::UnquotedText, steal(run), false});
-          run = String{heap_allocator()};
+          run = String{alloc};
         }
         const u8 index = static_cast<u8>(produced[++i]);
         out.segments.push(*opaque_segments[index]);
@@ -6081,7 +6081,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
          scan is skipped when no { is present, so a brace-free word pays nothing
          beyond the cheap check. */
       if (is_bash_compatible() && word_has_brace_candidate(*word)) {
-        for (const Word &brace_word : expand_braces(*word))
+        for (const Word &brace_word : expand_braces(*word, scratch_allocator()))
           expand_one_word(brace_word);
       } else {
         expand_one_word(*word);
