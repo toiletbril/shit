@@ -2061,7 +2061,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
 
 hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 {
-  if (spec.is_empty()) return String{heap_allocator()};
+  if (spec.is_empty()) return String{scratch_allocator()};
 
   /* ${!name} reads the value of the variable that name names, or lists the
      variable names that start with a prefix when it ends with * or @. The
@@ -2075,7 +2075,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
     if (name == "@" || name == "*")
-      return String{heap_allocator(),
+      return String{scratch_allocator(),
                     utils::uint_to_text(m_positional_params.count())};
 
     /* ${#a[@]} is the number of elements, while ${#a[i]} is the length of one
@@ -2094,11 +2094,11 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
               utils::uint_to_text(associative_keys(array_name).count())};
         if (lookup_indexed_array(array_name) != nullptr)
           return utils::uint_to_text(collect_array_elements(array_name).count());
-        return String{heap_allocator(),
+        return String{scratch_allocator(),
                       utils::uint_to_text(
                           get_variable_value(array_name).has_value() ? 1 : 0)};
       }
-      return String{heap_allocator(),
+      return String{scratch_allocator(),
                     utils::uint_to_text(
                         apply_array_subscript(array_name, subscript).length())};
     }
@@ -2107,7 +2107,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     if (m_error_unset && !value.has_value())
       throw Error{"Unable to expand '" + name +
                   "' because the parameter is not set"};
-    return String{heap_allocator(),
+    return String{scratch_allocator(),
                   utils::uint_to_text(value.value_or(String{}).length())};
   }
 
@@ -2208,7 +2208,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   case '-':
     if (treat_as_unset) return expand_modifier_word(word);
     ASSERT(current.has_value());
-    return String{heap_allocator(), current->view()};
+    return String{scratch_allocator(), current->view()};
   case '=':
     if (treat_as_unset) {
       let const assigned = expand_modifier_word(word);
@@ -2216,9 +2216,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       return assigned;
     }
     ASSERT(current.has_value());
-    return String{heap_allocator(), current->view()};
+    return String{scratch_allocator(), current->view()};
   case '+':
-    if (treat_as_unset) return String{heap_allocator()};
+    if (treat_as_unset) return String{scratch_allocator()};
     return expand_modifier_word(word);
   case '?':
     if (treat_as_unset) {
@@ -2228,7 +2228,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       throw Error{expand_modifier_word(word)};
     }
     ASSERT(current.has_value());
-    return String{heap_allocator(), current->view()};
+    return String{scratch_allocator(), current->view()};
 
   case '#': {
     return trim_value_with_modifier(*this, current.value_or(String{}).view(),
@@ -2291,7 +2291,7 @@ fn EvalContext::apply_substring_expansion(StringView name,
      than clamping to the whole value. A positive offset past the end clamps to
      the end so the result is empty too. */
   i64 start = offset < 0 ? value_length + offset : offset;
-  if (start < 0) return String{heap_allocator()};
+  if (start < 0) return String{scratch_allocator()};
   if (start > value_length) start = value_length;
 
   i64 end = value_length;
@@ -2315,7 +2315,7 @@ fn EvalContext::apply_substring_expansion(StringView name,
      "substring expression < 0" error, fatal the way bash makes it. */
   if (end < start) throw Error{"substring expression < 0"};
 
-  return String{heap_allocator(), value.view().substring_of_length(
+  return String{scratch_allocator(), value.view().substring_of_length(
                                       static_cast<usize>(start),
                                       static_cast<usize>(end - start))};
 }
@@ -2533,7 +2533,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
 fn EvalContext::apply_value_modifier(StringView value, StringView modifier) throws
     -> String
 {
-  if (modifier.is_empty()) return String{heap_allocator(), value};
+  if (modifier.is_empty()) return String{scratch_allocator(), value};
   const char op = modifier[0];
   if (op == '/') return pattern_replace_value(String{heap_allocator(), value},
                                               modifier);
@@ -2546,7 +2546,7 @@ fn EvalContext::apply_value_modifier(StringView value, StringView modifier) thro
         *this, value, pattern_word,
         op == '#' ? TrimEnd::Prefix : TrimEnd::Suffix, is_doubled);
   }
-  return String{heap_allocator(), value};
+  return String{scratch_allocator(), value};
 }
 
 fn EvalContext::apply_array_subscript(StringView name,
@@ -2593,7 +2593,7 @@ fn EvalContext::apply_array_subscript(StringView name,
     /* A scalar reads as a one-element array, so ${name[0]} is the value and any
        other index is empty. */
     if (index == 0) return get_variable_value(name).value_or(String{});
-    return String{heap_allocator()};
+    return String{scratch_allocator()};
   }
   const i64 count = static_cast<i64>(array->count());
   if (index < 0) index += count;
@@ -2604,11 +2604,11 @@ fn EvalContext::apply_array_subscript(StringView name,
       probe.push('\x01');
       probe.append(utils::uint_to_text(static_cast<usize>(index)).view());
       if (let const *sparse = m_sparse_array_values.find(probe.view()))
-        return String{heap_allocator(), sparse->view()};
+        return String{scratch_allocator(), sparse->view()};
     }
-    return String{heap_allocator()};
+    return String{scratch_allocator()};
   }
-  return String{heap_allocator(), (*array)[static_cast<usize>(index)].view()};
+  return String{scratch_allocator(), (*array)[static_cast<usize>(index)].view()};
 }
 
 fn EvalContext::collect_array_elements(StringView name) const throws
@@ -2705,7 +2705,7 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
 
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 {
-  if (body.is_empty()) return String{heap_allocator()};
+  if (body.is_empty()) return String{scratch_allocator()};
 
   /* ${!a[@]} and ${!a[*]} list the subscripts of an array, zero through the
      last index, the way bash enumerates its keys. */
@@ -2746,7 +2746,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
     if (m_error_unset)
       throw Error{"Unable to expand '" + body +
                   "' because the parameter is not set"};
-    return String{heap_allocator()};
+    return String{scratch_allocator()};
   }
   if (m_error_unset && !get_variable_value(target->view()).has_value())
     throw Error{"Unable to expand '" + *target +
@@ -4525,7 +4525,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const names = matching_prefix_names(prefix);
         if (segment.is_in_double_quotes && is_star) {
           let const ifs = m_field_separators.view();
-          let joined = String{heap_allocator()};
+          let joined = String{scratch_allocator()};
           for (usize i = 0; i < names.count(); i++) {
             if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
             joined.append(names[i].view());
@@ -4561,7 +4561,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const subscripts = collect_array_subscripts(array_name);
         if (segment.is_in_double_quotes && is_star) {
           let const ifs = m_field_separators.view();
-          let joined = String{heap_allocator()};
+          let joined = String{scratch_allocator()};
           for (usize i = 0; i < subscripts.count(); i++) {
             if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
             joined.append(subscripts[i].view());
@@ -4607,7 +4607,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const elements = collect_array_elements(array_name);
           if (segment.is_in_double_quotes && is_star) {
             let const ifs = m_field_separators.view();
-            let joined = String{heap_allocator()};
+            let joined = String{scratch_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
               joined.append(elements[i].view());
@@ -4672,7 +4672,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
           if (segment.is_in_double_quotes && is_star) {
             let const ifs = m_field_separators.view();
-            let joined = String{heap_allocator()};
+            let joined = String{scratch_allocator()};
             for (i64 j = start; j < end; j++) {
               if (j > start && !ifs.is_empty()) joined.push(ifs[0]);
               joined.append(elements[static_cast<usize>(j)].view());
@@ -4720,7 +4720,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const elements = collect_array_elements(array_name);
           if (segment.is_in_double_quotes && is_star) {
             let const ifs = m_field_separators.view();
-            let joined = String{heap_allocator()};
+            let joined = String{scratch_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
               joined.append(
