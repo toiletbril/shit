@@ -124,6 +124,10 @@ struct local_binding
   bool previous_was_associative{false};
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
+  /* The integer mark the name carried in the caller. declare_local drops the
+     mark so a fresh local starts with no attributes the way bash localizes,
+     and leaving the scope puts the caller's mark back. */
+  bool previous_was_integer{false};
 };
 
 /* A background job, one entry in the job table. The id is the number jobs and
@@ -212,7 +216,7 @@ fn record_directory_access(StringView directory) throws -> void;
 /* The mode a mimicked script runs in, chosen from its shebang. A sh or dash
    shebang gives Posix, a bash shebang gives Bash, and a shit shebang gives
    Default. */
-enum class MimicMode : u8
+enum class mimic_mode : u8
 {
   Default,
   Posix,
@@ -253,8 +257,10 @@ public:
                   bool args_are_transient = false) throws -> ArrayList<String>;
 
   /* The allocator for transient expansion data, which a bump arena hands out
-     and reclaims whole when the command ends. */
-  fn scratch_allocator() wontthrow -> Allocator
+     and reclaims whole when the command ends. The accessor is const so a
+     read-only query can still build its temporaries on the scratch arena,
+     which is mutable the way a cache is. */
+  fn scratch_allocator() const wontthrow -> Allocator
   {
     return bump_allocator(m_scratch_arena);
   }
@@ -666,7 +672,7 @@ public:
      isolated is true the run is contained in a snapshotted subshell so its cd,
      exports, and exit do not leak, and when false the run is the terminal command
      that the shell exits with, so the snapshot is skipped. */
-  fn run_mimicked_script(ExecContext &ec, MimicMode mode, bool isolated)
+  fn run_mimicked_script(ExecContext &ec, mimic_mode mode, bool isolated)
       throws -> i32;
   /* The extended globs are on everywhere except POSIX mode, the way bash treats
      a feature that POSIX rejects anyway as a pure addition. */
@@ -922,7 +928,7 @@ protected:
      stats path samples the arena once per command, off the hot path. */
   usize m_peak_ast_arena_bytes{0};
 
-  BumpArena m_scratch_arena{};
+  mutable BumpArena m_scratch_arena{};
   HashMap<String> m_shell_variables{heap_allocator()};
   HashMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   /* The completion specs the complete builtin registered, keyed by command. */

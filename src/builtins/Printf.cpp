@@ -357,11 +357,17 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (format_index >= ec.args().count()) return 0;
 
-  let const &fmt = ec.args()[format_index];
-  let operands = ArrayList<String>{};
-  operands.reserve(ec.args().count() - (format_index + 1));
-  for (usize i = format_index + 1; i < ec.args().count(); i++)
-    operands.push(ec.args()[i]);
+  /* The operands are read in place from the argument list, so no copy of the
+     argument strings is made. A missing operand reads as the shared empty
+     string, like an absent argument elsewhere. */
+  let const &args = ec.args();
+  let const &fmt = args[format_index];
+  let const operand_base = format_index + 1;
+  let const operand_count = args.count() - operand_base;
+  let const empty_operand = String{};
+  auto operand_at = [&](usize index) wontthrow -> const String & {
+    return index < operand_count ? args[operand_base + index] : empty_operand;
+  };
 
   let out = String{};
   usize operand_index = 0;
@@ -369,12 +375,11 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool should_stop = false;
 
   /* Read the next operand as the integer value of a * field width or precision,
-     append its decimal text into the spec, and advance the operand cursor. A
-     missing operand reads as zero, like an absent argument elsewhere. */
+     append its decimal text into the spec, and advance the operand cursor. */
   auto consume_star = [&](String &spec) throws {
-    let const star_arg =
-        operand_index < operands.count() ? operands[operand_index] : String{};
-    spec.append(utils::int_to_text(parse_printf_integer(star_arg)).view());
+    spec.append(
+        utils::int_to_text(parse_printf_integer(operand_at(operand_index)))
+            .view());
     operand_index++;
     consumed_a_conversion = true;
   };
@@ -424,8 +429,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
         continue;
       }
 
-      let const arg =
-          operand_index < operands.count() ? operands[operand_index] : String{};
+      let const &arg = operand_at(operand_index);
       if (conv == 'b') {
         /* %b prints the argument with its backslash escapes expanded, and a \c
            inside it stops the whole printf. */
@@ -439,7 +443,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
       operand_index++;
       consumed_a_conversion = true;
     }
-  } while (!should_stop && operand_index < operands.count() &&
+  } while (!should_stop && operand_index < operand_count &&
            consumed_a_conversion);
 
   if (store_variable.has_value()) {

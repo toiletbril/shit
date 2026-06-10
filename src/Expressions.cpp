@@ -1240,9 +1240,24 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       const StringView name = var.name.view();
       let value = cxt.expand_word_for_assignment(var.value);
       if (var.is_append) {
-        let appended = String{cxt.get_variable_value(name).value_or("")};
-        appended += value;
-        value = steal(appended);
+        /* The joined text is transient, copied by the store and the
+           environment write, so it lives on the per-command scratch arena. An
+           integer name evaluates the join to its decimal here, since the
+           environment write takes the value verbatim. */
+        let appended = String{cxt.scratch_allocator()};
+        if (let const existing = cxt.get_variable_value(name))
+          appended.append(existing->view());
+        if (cxt.is_integer_variable(name)) {
+          cxt.append_integer_expression(appended, value.view());
+          char decimal[24];
+          value = String{cxt.scratch_allocator(),
+                         utils::int_to_text_into(
+                             cxt.evaluate_arithmetic(appended.view()), decimal,
+                             sizeof(decimal))};
+        } else {
+          appended += value;
+          value = steal(appended);
+        }
       }
       cxt.set_shell_variable(name, value);
       if (cxt.export_all()) {
@@ -1305,11 +1320,26 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     /* The append form prepends the current value of NAME, which a prefix reads
        from the shell store before the environment so a non-exported shell
-       variable still contributes, treating an unset name as empty. */
+       variable still contributes, treating an unset name as empty. The joined
+       text is transient, copied by the store and the environment write, so it
+       lives on the per-command scratch arena. An integer name evaluates the
+       join to its decimal here, since the environment write takes the value
+       verbatim. */
     if (var.is_append) {
-      let appended = String{cxt.get_variable_value(name).value_or("")};
-      appended += expanded_value;
-      expanded_value = steal(appended);
+      let appended = String{cxt.scratch_allocator()};
+      if (let const existing = cxt.get_variable_value(name))
+        appended.append(existing->view());
+      if (cxt.is_integer_variable(name)) {
+        cxt.append_integer_expression(appended, expanded_value.view());
+        char decimal[24];
+        expanded_value = String{cxt.scratch_allocator(),
+                                utils::int_to_text_into(
+                                    cxt.evaluate_arithmetic(appended.view()),
+                                    decimal, sizeof(decimal))};
+      } else {
+        appended += expanded_value;
+        expanded_value = steal(appended);
+      }
     }
 
     /* A special builtin keeps the assignment, so it commits to the store and
@@ -2357,7 +2387,7 @@ cold fn WhileLoop::to_ast_string(usize layer) const throws -> String
 namespace {
 
 /* What a loop does with the control flow pending after its body ran. */
-enum class LoopDisposition
+enum class loop_disposition
 {
   /* No jump, or a continue aimed here, so run the next iteration. */
   RunNext,
@@ -2366,9 +2396,9 @@ enum class LoopDisposition
   StopLoop,
 };
 
-fn resolve_loop_control(EvalContext &cxt) throws -> LoopDisposition
+fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
 {
-  if (!cxt.has_pending_control_flow()) return LoopDisposition::RunNext;
+  if (!cxt.has_pending_control_flow()) return loop_disposition::RunNext;
 
   let &control = cxt.pending_control_flow();
   if (control.kind != control_flow::Kind::Break &&
@@ -2376,21 +2406,21 @@ fn resolve_loop_control(EvalContext &cxt) throws -> LoopDisposition
   {
     /* A return or an exit is not a loop's to consume, so this loop stops and
        leaves it pending for the function or the shell. */
-    return LoopDisposition::StopLoop;
+    return loop_disposition::StopLoop;
   }
 
   /* A jump aimed at an outer loop decrements and stays pending, stopping this
      loop so the outer one consumes it. */
   if (control.value > 1) {
     control.value -= 1;
-    return LoopDisposition::StopLoop;
+    return loop_disposition::StopLoop;
   }
 
   /* The jump targets this loop. A break stops it, a continue runs the next
      iteration. Either way the request is consumed here. */
   let const is_break = control.kind == control_flow::Kind::Break;
   cxt.clear_control_flow();
-  return is_break ? LoopDisposition::StopLoop : LoopDisposition::RunNext;
+  return is_break ? loop_disposition::StopLoop : loop_disposition::RunNext;
 }
 
 } /* namespace */
@@ -2433,7 +2463,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (!should_run_body) break;
 
     ret = m_body->evaluate(cxt);
-    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
+    if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -2581,7 +2611,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     ret = m_body->evaluate(cxt);
-    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
+    if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -2653,7 +2683,7 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   for (const String &value : values) {
     cxt.set_shell_variable(m_variable_name, value);
     ret = m_body->evaluate(cxt);
-    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
+    if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
   }
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
@@ -2787,13 +2817,13 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       did_run_a_body = true;
 
       let const terminator = m_items[i].terminator;
-      if (terminator == CaseTerminator::FallThrough &&
+      if (terminator == case_terminator::FallThrough &&
           i + 1 < m_items.count())
       {
         i++;
         continue;
       }
-      if (terminator == CaseTerminator::ContinueMatch) {
+      if (terminator == case_terminator::ContinueMatch) {
         i++;
         should_resume_matching = true;
       }
@@ -3124,7 +3154,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
          cxt.evaluate_arithmetic(m_condition.view()) != 0)
   {
     ret = m_body->evaluate(cxt);
-    if (resolve_loop_control(cxt) == LoopDisposition::StopLoop) break;
+    if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
        continue, the way bash advances the counter. */
     if (!is_blank_clause(m_step.view())) cxt.evaluate_arithmetic(m_step.view());

@@ -1607,18 +1607,18 @@ hot fn Parser::parse_case() throws -> Command *
 
     Token *after = m_lexer.peek_shell_token();
     ASSERT(after != nullptr);
-    CaseTerminator terminator = CaseTerminator::Break;
+    case_terminator terminator = case_terminator::Break;
     bool is_last_arm = false;
     switch (after->kind()) {
     case Token::Kind::DoubleSemicolon:
       m_lexer.advance_past_last_peek();
       break;
     case Token::Kind::SemicolonAmpersand:
-      terminator = CaseTerminator::FallThrough;
+      terminator = case_terminator::FallThrough;
       m_lexer.advance_past_last_peek();
       break;
     case Token::Kind::DoubleSemicolonAmpersand:
-      terminator = CaseTerminator::ContinueMatch;
+      terminator = case_terminator::ContinueMatch;
       m_lexer.advance_past_last_peek();
       break;
     case Token::Kind::Esac:

@@ -79,7 +79,8 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const line = String{StringView{*read_line}};
 
   let const field_separators =
-      cxt.get_variable_value("IFS").value_or(String{heap_allocator(), " \t\n"});
+      cxt.get_variable_value("IFS").value_or(
+          String{cxt.scratch_allocator(), " \t\n"});
   auto is_separator = [&field_separators](char c) {
     return field_separators.find_character(c).has_value();
   };

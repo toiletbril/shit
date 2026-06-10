@@ -42,6 +42,7 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
      script that sets them keeps running. */
   bool make_indexed = false;
   bool make_associative = false;
+  bool mark_integer_attribute = false;
   usize first_name = 1;
   for (; first_name < args.count(); first_name++) {
     const StringView arg = args[first_name].view();
@@ -54,7 +55,7 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       switch (arg[c]) {
       case 'a': make_indexed = true; break;
       case 'A': make_associative = true; break;
-      case 'i':
+      case 'i': mark_integer_attribute = true; break;
       case 'r':
       case 'x':
       case 'l':
@@ -78,9 +79,9 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
        function restores it. A bare name declares the local without touching the
        value, so the currently-visible binding from the caller stays readable
        until the body assigns the name, matching dash. */
-    StringView name = equals_position.has_value()
-                          ? arg.substring_of_length(0, *equals_position)
-                          : arg.view();
+    let name = equals_position.has_value()
+                   ? arg.substring_of_length(0, *equals_position)
+                   : arg.view();
     /* process_args passes a local append through as name+=value, so a trailing
        plus on the name marks the append and is stripped before the binding. */
     let const is_append = !name.is_empty() && name[name.count() - 1] == '+';
@@ -92,6 +93,9 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const was_already_local =
         is_append && cxt.is_local_in_current_scope(name);
     cxt.declare_local(name);
+    /* declare_local dropped any inherited integer mark, so -i marks the fresh
+       local here and leaving the scope removes it with the binding. */
+    if (mark_integer_attribute) cxt.mark_integer(name);
 
     if (make_associative) {
       cxt.declare_associative_array(name);
@@ -102,12 +106,17 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const value = arg.substring(*equals_position + 1);
       if (is_append) {
         /* The appended value is transient, copied into the variable store by
-           set_shell_variable, so it lives on the per-command scratch arena. */
+           set_shell_variable, so it lives on the per-command scratch arena. An
+           integer name joins the appended expression for the arithmetic in
+           the store rather than concatenating it. */
         let appended = String{cxt.scratch_allocator()};
         if (was_already_local)
           if (let const existing = cxt.get_variable_value(name))
             appended.append(existing->view());
-        appended.append(value);
+        if (cxt.is_integer_variable(name))
+          cxt.append_integer_expression(appended, value);
+        else
+          appended.append(value);
         cxt.set_shell_variable(name, appended.view());
       } else {
         cxt.set_shell_variable(name, value);

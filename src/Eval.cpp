@@ -238,10 +238,12 @@ fn EvalContext::append_indexed_array(StringView name,
 }
 
 /* The flat-map key for one sparse indexed element, the array name and the
-   decimal index joined by a byte that cannot occur in a name. */
-static fn sparse_array_key(StringView name, usize index) throws -> String
+   decimal index joined by a byte that cannot occur in a name. The map copies a
+   key it stores, so the callers build this on the per-command scratch arena. */
+static fn sparse_array_key(StringView name, usize index,
+                           Allocator allocator) throws -> String
 {
-  let key = String{heap_allocator(), name};
+  let key = String{allocator, name};
   key.push('\x01');
   key.append(utils::uint_to_text(index).view());
   return key;
@@ -259,11 +261,12 @@ struct sparse_array_entry
    sparse indices always sit beyond the dense run, so appending these after the
    dense elements yields the whole array in index order. */
 static fn collect_sparse_array_entries(const HashMap<String> &sparse,
-                                       StringView name) throws
+                                       StringView name,
+                                       Allocator allocator) throws
     -> ArrayList<sparse_array_entry>
 {
-  let out = ArrayList<sparse_array_entry>{heap_allocator()};
-  let const prefix = sparse_array_key(name, 0);
+  let out = ArrayList<sparse_array_entry>{allocator};
+  let const prefix = sparse_array_key(name, 0, allocator);
   /* The prefix is name plus the separator byte, so the leading "0" of the key
      for index zero is dropped to leave just the name and separator. */
   let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
@@ -275,7 +278,7 @@ static fn collect_sparse_array_entries(const HashMap<String> &sparse,
     if (let const parsed = utils::parse_decimal_integer(index_text);
         !parsed.is_error() && parsed.value() >= 0)
       out.push(sparse_array_entry{static_cast<usize>(parsed.value()),
-                                  String{heap_allocator(), value.view()}});
+                                  String{allocator, value.view()}});
   });
   /* An insertion sort keeps it simple, since a sparse array holds few far
      elements. */
@@ -293,9 +296,11 @@ static fn collect_sparse_array_entries(const HashMap<String> &sparse,
 
 fn EvalContext::clear_sparse_array(StringView name) throws -> void
 {
-  let const entries = collect_sparse_array_entries(m_sparse_array_values, name);
+  let const entries = collect_sparse_array_entries(m_sparse_array_values, name,
+                                   scratch_allocator());
   for (const sparse_array_entry &entry : entries)
-    m_sparse_array_values.erase(sparse_array_key(name, entry.index).view());
+    m_sparse_array_values.erase(
+        sparse_array_key(name, entry.index, scratch_allocator()).view());
 }
 
 /* Whether an array-literal element is the explicit [index]=value form, and if
@@ -326,7 +331,8 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
        last sparse element, whichever is larger. */
     if (let const *array = lookup_indexed_array(name))
       running_index = array->count();
-    let const sparse = collect_sparse_array_entries(m_sparse_array_values, name);
+    let const sparse = collect_sparse_array_entries(m_sparse_array_values, name,
+                                   scratch_allocator());
     if (!sparse.is_empty()) {
       let const next_after_sparse = sparse[sparse.count() - 1].index + 1;
       if (next_after_sparse > running_index) running_index = next_after_sparse;
@@ -384,7 +390,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
        the sparse map into the dense run. */
     dense->push(String{heap_allocator(), value});
     for (;;) {
-      let const key = sparse_array_key(name, dense->count());
+      let const key =
+          sparse_array_key(name, dense->count(), scratch_allocator());
       let const *migrated = m_sparse_array_values.find(key.view());
       if (migrated == nullptr) break;
       dense->push(String{heap_allocator(), migrated->view()});
@@ -393,15 +400,17 @@ fn EvalContext::set_array_element(StringView name, usize index,
     return;
   }
   /* A write past the run's end leaves a gap, so it is held sparsely. */
-  m_sparse_array_values.set(sparse_array_key(name, index).view(), value);
+  m_sparse_array_values.set(
+      sparse_array_key(name, index, scratch_allocator()).view(), value);
 }
 
 /* The flat-map key for an associative element, the array name and the element
-   key joined by a byte that does not occur in a name. */
-static fn associative_composite_key(StringView name, StringView key) throws
-    -> String
+   key joined by a byte that does not occur in a name. The map copies a key it
+   stores, so the callers build this on the per-command scratch arena. */
+static fn associative_composite_key(StringView name, StringView key,
+                                    Allocator allocator) throws -> String
 {
-  let composite = String{heap_allocator(), name};
+  let composite = String{allocator, name};
   composite.push('\x01');
   composite.append(key);
   return composite;
@@ -413,8 +422,34 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
+
+  /* An integer-marked name evaluates the element text as arithmetic and an
+     append adds the prior element's evaluation, the same treatment
+     set_shell_variable gives a scalar. The joined text lives on the scratch
+     arena and the stores below copy the decimal result. */
+  char integer_result[24];
+  auto integer_element_value = [&](Maybe<String> existing) throws
+      -> StringView {
+    let joined = String{scratch_allocator()};
+    if (is_append) {
+      if (existing.has_value()) joined.append(existing->view());
+      append_integer_expression(joined, value);
+    } else {
+      joined.append(value);
+    }
+    return utils::int_to_text_into(
+        joined.is_empty() ? 0 : evaluate_arithmetic(joined.view()),
+        integer_result, sizeof(integer_result));
+  };
+
   if (is_associative_array(name)) {
     const String key = expand_modifier_word(subscript);
+    if (is_integer_variable(name)) [[unlikely]] {
+      set_associative_element(
+          name, key.view(),
+          integer_element_value(lookup_associative_element(name, key.view())));
+      return;
+    }
     if (is_append) {
       let combined = String{
           lookup_associative_element(name, key.view()).value_or(String{})};
@@ -435,9 +470,22 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     throw Error{"Unable to index '" + name +
                 "' because the array subscript is invalid"};
 
-  let element = String{heap_allocator(), value};
+  if (is_integer_variable(name)) [[unlikely]] {
+    let existing = Maybe<String>{};
+    if (is_append)
+      if (let const *array = lookup_indexed_array(name))
+        if (static_cast<usize>(index) < array->count())
+          existing = String{(*array)[static_cast<usize>(index)].view()};
+    set_array_element(name, static_cast<usize>(index),
+                      integer_element_value(steal(existing)));
+    return;
+  }
+
+  /* The element text is transient, copied by set_array_element, so it lives
+     on the per-command scratch arena. */
+  let element = String{scratch_allocator(), value};
   if (is_append) {
-    let combined = String{heap_allocator()};
+    let combined = String{scratch_allocator()};
     if (let const *array = lookup_indexed_array(name))
       if (static_cast<usize>(index) < array->count())
         combined = String{(*array)[static_cast<usize>(index)].view()};
@@ -458,7 +506,7 @@ fn EvalContext::set_associative_element(StringView name, StringView key,
 {
   m_associative_names.add(name);
   m_shell_variables.erase(name);
-  m_associative_values.set(associative_composite_key(name, key).view(), value);
+  m_associative_values.set(associative_composite_key(name, key, scratch_allocator()).view(), value);
 }
 
 fn EvalContext::lookup_associative_element(StringView name,
@@ -466,7 +514,7 @@ fn EvalContext::lookup_associative_element(StringView name,
     -> Maybe<String>
 {
   if (let const *value = m_associative_values.find(
-          associative_composite_key(name, key).view()))
+          associative_composite_key(name, key, scratch_allocator()).view()))
     return *value;
   return None;
 }
@@ -475,7 +523,7 @@ fn EvalContext::associative_keys(StringView name) const throws
     -> ArrayList<String>
 {
   let keys = ArrayList<String>{heap_allocator()};
-  const String prefix = associative_composite_key(name, "");
+  const String prefix = associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
     unused(value);
     if (composite.length >= prefix.count() &&
@@ -489,7 +537,7 @@ fn EvalContext::associative_values(StringView name) const throws
     -> ArrayList<String>
 {
   let values = ArrayList<String>{heap_allocator()};
-  const String prefix = associative_composite_key(name, "");
+  const String prefix = associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
@@ -503,7 +551,7 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
   if (!is_associative_array(name)) return;
   /* The composite keys are collected before erasing, since removing entries
      while iterating the value map would be unsafe. */
-  const String prefix = associative_composite_key(name, "");
+  const String prefix = associative_composite_key(name, "", scratch_allocator());
   let to_erase = ArrayList<String>{heap_allocator()};
   m_associative_values.for_each([&](StringView composite, const String &) {
     if (composite.length >= prefix.count() &&
@@ -523,7 +571,8 @@ fn EvalContext::unset_array_element(StringView name,
 
   if (is_associative_array(name)) {
     m_associative_values.erase(
-        associative_composite_key(name, subscript).view());
+        associative_composite_key(name, subscript, scratch_allocator())
+            .view());
     return;
   }
 
@@ -542,13 +591,14 @@ fn EvalContext::unset_array_element(StringView name,
     if (resolved < count) {
       for (usize i = static_cast<usize>(resolved) + 1;
            i < static_cast<usize>(count); i++)
-        m_sparse_array_values.set(sparse_array_key(name, i).view(),
+        m_sparse_array_values.set(sparse_array_key(name, i, scratch_allocator()).view(),
                                   (*array)[i].view());
       while (array->count() > static_cast<usize>(resolved))
         array->remove(array->count() - 1);
     } else {
       m_sparse_array_values.erase(
-          sparse_array_key(name, static_cast<usize>(resolved)).view());
+          sparse_array_key(name, static_cast<usize>(resolved),
+                           scratch_allocator()).view());
     }
   }
 }
@@ -1095,7 +1145,7 @@ fn EvalContext::append_integer_expression(String &joined,
     let const c = expression[i];
     if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
       joined += '(';
-      joined.append(expression);
+      joined.append(expression.substring(i));
       joined += ')';
       return;
     }
@@ -1147,6 +1197,12 @@ fn EvalContext::leave_function_scope() throws -> void
         set_associative_element(binding.name.view(),
                                 binding.previous_associative_keys[k].view(),
                                 binding.previous_associative_values[k].view());
+    /* The integer mark is scoped with the binding, so a local -i mark drops
+       here and a caller's mark that declare_local suppressed comes back. */
+    if (binding.previous_was_integer)
+      m_integer_names.add(binding.name.view());
+    else
+      m_integer_names.remove(binding.name.view());
   }
   /* The innermost scope is the one just restored, so it is dropped in place
      rather than rebuilding the whole stack into a fresh list on every return.
@@ -1189,9 +1245,16 @@ fn EvalContext::declare_local(StringView name) throws -> void
     previous_values = associative_values(name);
   }
 
+  /* A local starts with no attributes the way bash localizes a name fresh, so
+     the caller's integer mark is dropped here and the saved flag puts it back
+     when the scope ends. */
+  let const previous_was_integer = is_integer_variable(name);
+  if (previous_was_integer) unmark_integer(name);
+
   m_local_scopes.back().push(local_binding{
       String{name}, get_variable_value(name), steal(previous_array),
-      previous_was_associative, steal(previous_keys), steal(previous_values)});
+      previous_was_associative, steal(previous_keys), steal(previous_values),
+      previous_was_integer});
 }
 
 fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
@@ -1721,7 +1784,7 @@ hot fn EvalContext::expand_variable(StringView name) const throws -> String
 
 namespace {
 
-enum class TrimEnd
+enum class trim_end
 {
   Prefix,
   Suffix,
@@ -1733,12 +1796,12 @@ enum class TrimEnd
    parallel to pattern and marks which pattern bytes may act as glob
    metacharacters, so a quoted or escaped * or ? matches itself. */
 fn trim_matching(Allocator result_allocator, StringView value,
-                 StringView pattern, const ArrayList<bool> &active, TrimEnd end,
+                 StringView pattern, const ArrayList<bool> &active, trim_end end,
                  bool longest, bool extglob_enabled) throws -> String
 {
   ASSERT(active.count() == pattern.length);
 
-  if (end == TrimEnd::Prefix) {
+  if (end == trim_end::Prefix) {
     /* The longest match scans down from the whole string and the shortest
        scans up from the empty prefix, so the first hit is the wanted length. */
     if (longest) {
@@ -1781,7 +1844,7 @@ fn trim_matching(Allocator result_allocator, StringView value,
    ${v#pat} and ${v%pat} cases and the array-element path expand the pattern with
    its glob mask and run trim_matching through one place. */
 static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
-                                   StringView word, TrimEnd end,
+                                   StringView word, trim_end end,
                                    bool longest) throws -> String
 {
   let active = ArrayList<bool>{cxt.scratch_allocator()};
@@ -1895,7 +1958,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          unescaped backtick. The POSIX backquote unescaping strips a backslash
          that precedes a backtick, a dollar sign, or another backslash, and the
          unescaped bytes are captured the same way $(...) is. */
-      let inner = String{heap_allocator()};
+      let inner = String{scratch_allocator()};
       usize j = i + 1;
       for (; j < word.length; j++) {
         if (word[j] == '\\' && j + 1 < word.length &&
@@ -1930,7 +1993,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          single quote run, a double quote run, and a backslash escape keep their
          bytes literal so a } they contain is never counted. The structure
          mirrors the Lexer brace scanner. */
-      let inner = String{heap_allocator()};
+      let inner = String{scratch_allocator()};
       usize j = i + 2;
       i32 depth = 1;
       char quote = 0;
@@ -2027,7 +2090,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       emit_run(apply_parameter_expansion(inner), !in_double_quote);
       i = j;
     } else if (lexer::is_variable_name_start(next)) {
-      let name = String{heap_allocator()};
+      let name = String{scratch_allocator()};
       usize j = i + 1;
       while (j < word.length && lexer::is_variable_name(word[j]))
         name += word[j++];
@@ -2050,7 +2113,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          backslash escape keep their bytes literal so a ) inside a string is
          text and does not count toward the grouping depth or terminate the
          expansion. */
-      let inner = String{heap_allocator()};
+      let inner = String{scratch_allocator()};
       usize j = i + 3;
       usize depth = 0;
       char quote = 0;
@@ -2090,7 +2153,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       /* Command substitution $(...), scanned to the matching ). A quote run and
          a backslash escape keep their bytes literal so a ) inside a string does
          not decrement the depth and close the substitution early. */
-      let inner = String{heap_allocator()};
+      let inner = String{scratch_allocator()};
       usize j = i + 2;
       usize depth = 1;
       char quote = 0;
@@ -2312,12 +2375,12 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
   case '#': {
     return trim_value_with_modifier(*this, current.value_or(String{}).view(),
-                                    word, TrimEnd::Prefix, is_doubled);
+                                    word, trim_end::Prefix, is_doubled);
   }
 
   case '%': {
     return trim_value_with_modifier(*this, current.value_or(String{}).view(),
-                                    word, TrimEnd::Suffix, is_doubled);
+                                    word, trim_end::Suffix, is_doubled);
   }
 
   default: return expand_variable(name);
@@ -2571,7 +2634,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   let pattern_active = ArrayList<bool>{scratch_allocator()};
   String pattern;
   if (pattern_word.is_empty()) {
-    pattern = String{heap_allocator(), "?"};
+    pattern = String{scratch_allocator(), "?"};
     pattern_active.push(true);
   } else {
     pattern = expand_modifier_word_masked(pattern_word, pattern_active);
@@ -2615,7 +2678,7 @@ fn EvalContext::apply_value_modifier(StringView value, StringView modifier) thro
 {
   if (modifier.is_empty()) return String{scratch_allocator(), value};
   const char op = modifier[0];
-  if (op == '/') return pattern_replace_value(String{heap_allocator(), value},
+  if (op == '/') return pattern_replace_value(String{scratch_allocator(), value},
                                               modifier);
   if (op == '^' || op == ',')
     return apply_case_modification_to_value(value, modifier);
@@ -2624,7 +2687,7 @@ fn EvalContext::apply_value_modifier(StringView value, StringView modifier) thro
     const StringView pattern_word = modifier.substring(is_doubled ? 2 : 1);
     return trim_value_with_modifier(
         *this, value, pattern_word,
-        op == '#' ? TrimEnd::Prefix : TrimEnd::Suffix, is_doubled);
+        op == '#' ? trim_end::Prefix : trim_end::Suffix, is_doubled);
   }
   return String{scratch_allocator(), value};
 }
@@ -2680,7 +2743,7 @@ fn EvalContext::apply_array_subscript(StringView name,
   if (index < 0 || index >= count) {
     /* A subscript past the dense end may name a sparsely-held far element. */
     if (index >= 0) {
-      let probe = String{heap_allocator(), name};
+      let probe = String{scratch_allocator(), name};
       probe.push('\x01');
       probe.append(utils::uint_to_text(static_cast<usize>(index)).view());
       if (let const *sparse = m_sparse_array_values.find(probe.view()))
@@ -2704,7 +2767,8 @@ fn EvalContext::collect_array_elements(StringView name) const throws
     /* The sparse elements sit past the dense run, so appending them in index
        order yields the whole array in order. */
     for (sparse_array_entry &entry :
-         collect_sparse_array_entries(m_sparse_array_values, name))
+         collect_sparse_array_entries(m_sparse_array_values, name,
+                                   scratch_allocator()))
       out.push(steal(entry.value));
     return out;
   }
@@ -2732,7 +2796,8 @@ fn EvalContext::array_element_is_set(StringView name,
     /* An index past the dense run may name a sparsely-held element. */
     return resolved >= 0 &&
            m_sparse_array_values.find(
-               sparse_array_key(name, static_cast<usize>(resolved)).view()) !=
+               sparse_array_key(name, static_cast<usize>(resolved),
+                           scratch_allocator()).view()) !=
                nullptr;
   }
   /* A scalar answers for its sole index zero. */
@@ -2773,7 +2838,8 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
     for (usize i = 0; i < array->count(); i++)
       out.push(utils::uint_to_text(i));
     for (const sparse_array_entry &entry :
-         collect_sparse_array_entries(m_sparse_array_values, name))
+         collect_sparse_array_entries(m_sparse_array_values, name,
+                                   scratch_allocator()))
       out.push(utils::uint_to_text(entry.index));
     return out;
   }
@@ -2952,14 +3018,14 @@ struct ConditionalEvaluator
        match itself, the way bash matches a quoted portion of the operand
        literally. An active byte stays live regex. regcomp reads a C string, so
        the escaped pattern is built null-terminated. */
-    let escaped_pattern = String{heap_allocator()};
+    let escaped_pattern = String{cxt.scratch_allocator()};
     for (usize i = 0; i < pattern.length; i++) {
       const bool is_literal = i < active.count() && !active[i];
       if (is_literal && is_regex_metacharacter(pattern[i]))
         escaped_pattern += '\\';
       escaped_pattern += pattern[i];
     }
-    let const value_text = String{heap_allocator(), value};
+    let const value_text = String{cxt.scratch_allocator(), value};
     regex_t compiled;
     if (regcomp(&compiled, escaped_pattern.c_str(), REG_EXTENDED) != 0) {
       /* bash returns status 2 for a malformed regex, which the conditional
@@ -2968,7 +3034,7 @@ struct ConditionalEvaluator
                   "is invalid"};
     }
     let const group_count = compiled.re_nsub + 1;
-    let matches = ArrayList<regmatch_t>{heap_allocator()};
+    let matches = ArrayList<regmatch_t>{cxt.scratch_allocator()};
     for (usize i = 0; i < group_count; i++) matches.push(regmatch_t{});
     const int match_result =
         regexec(&compiled, value_text.c_str(), group_count, matches.begin(), 0);
@@ -5375,7 +5441,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   return captured;
 }
 
-fn EvalContext::run_mimicked_script(ExecContext &ec, MimicMode mode,
+fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mode mode,
                                     bool isolated) throws -> i32
 {
   if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
@@ -5410,8 +5476,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, MimicMode mode,
      terminal run leaves it since the shell exits next. */
   let const previous_bash = m_bash_compatible;
   let const previous_posix = m_posix_mode;
-  m_bash_compatible = mode == MimicMode::Bash;
-  m_posix_mode = mode == MimicMode::Posix;
+  m_bash_compatible = mode == mimic_mode::Bash;
+  m_posix_mode = mode == mimic_mode::Posix;
 
   /* The strict interactive defaults shit turns on at its own prompt, nounset and
      pipefail and failglob, do not belong to a real bash or sh running a file, so
@@ -5490,7 +5556,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, MimicMode mode,
      after the isolated snapshot so the restore drops it. */
   if (!isolated) {
     set_positional_params(steal(params));
-    seed_shell_identity_variables(mode == MimicMode::Bash);
+    seed_shell_identity_variables(mode == mimic_mode::Bash);
     std::exception_ptr error;
     try {
       ast->evaluate(*this);
@@ -5510,7 +5576,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, MimicMode mode,
      script's cd, exports, functions, and exit do not leak to the parent. */
   let snapshot = snapshot_state();
   set_positional_params(steal(params));
-  seed_shell_identity_variables(mode == MimicMode::Bash);
+  seed_shell_identity_variables(mode == mimic_mode::Bash);
   enter_subshell();
   clear_inherited_exit_trap();
   std::exception_ptr error;
@@ -6170,10 +6236,17 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
     const Word &command_word =
         static_cast<const tokens::WordToken *>(args[0])->word();
     if (command_word.plain_literal_kind() != Word::PlainLiteral::NotPlain) {
-      let command_name = String{scratch_allocator()};
-      for (const WordSegment &segment : command_word.segments)
-        command_name.append(segment.text.view());
-      let const name = command_name.view();
+      /* Nearly every command word is one literal segment, so its view serves
+         directly and the joined copy is built only for the rare split word. */
+      let joined_name = String{scratch_allocator()};
+      StringView name;
+      if (command_word.segments.count() == 1) {
+        name = command_word.segments[0].text.view();
+      } else {
+        for (const WordSegment &segment : command_word.segments)
+          joined_name.append(segment.text.view());
+        name = joined_name.view();
+      }
       is_local_command = name == "local";
       is_declare_command = name == "declare" || name == "typeset";
       is_declaration_command = is_local_command || is_declare_command ||

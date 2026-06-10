@@ -150,7 +150,7 @@ fn read_entire_file(StringView path) throws -> Maybe<String>;
    resolved program is not a script shit can emulate. Only the first line is read.
    A sh or dash interpreter maps to POSIX mode, bash to bash mode, and shit to the
    default mode, including the /usr/bin/env form. */
-fn detect_mimic_shell(const Path &program) throws -> Maybe<MimicMode>;
+fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mode>;
 
 /* Read everything still available on standard input into a string. */
 fn read_entire_standard_input() throws -> String;

@@ -115,7 +115,9 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     for (; i < args.count(); i++) {
       const StringView name = args[i].view();
       if (const ArrayList<String> *elements = cxt.lookup_indexed_array(name)) {
-        let line = String{"declare -a "};
+        let line = String{"declare -a"};
+        if (cxt.is_integer_variable(name)) line += 'i';
+        line += ' ';
         line.append(name);
         line += "=(";
         for (usize e = 0; e < elements->count(); e++) {
@@ -131,7 +133,9 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       } else if (cxt.is_associative_array(name)) {
         const ArrayList<String> keys = cxt.associative_keys(name);
         const ArrayList<String> values = cxt.associative_values(name);
-        let line = String{"declare -A "};
+        let line = String{"declare -A"};
+        if (cxt.is_integer_variable(name)) line += 'i';
+        line += ' ';
         line.append(name);
         line += "=(";
         for (usize e = 0; e < keys.count(); e++) {
@@ -158,6 +162,15 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         line += quote_for_declare(value->view());
         line += "\"\n";
         ec.print_to_stdout(line.view());
+      } else if (cxt.is_integer_variable(name)) {
+        /* An integer-marked name with no value yet still has the attribute, so
+           it prints without the =value tail the way bash does. */
+        let line = String{"declare -i"};
+        if (os::get_environment_variable(name).has_value()) line += 'x';
+        line += ' ';
+        line.append(name);
+        line += '\n';
+        ec.print_to_stdout(line.view());
       } else {
         report_soft_builtin_error(ec, cxt, StringView{"'"} + name +
                                                "' is not defined");
@@ -170,7 +183,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
   for (; i < args.count(); i++) {
     const StringView operand = args[i].view();
     let const equals = operand.find_character('=');
-    StringView name =
+    let name =
         equals.has_value() ? operand.substring_of_length(0, *equals) : operand;
     const StringView value =
         equals.has_value() ? operand.substring(*equals + 1) : StringView{};
@@ -182,12 +195,26 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
                           name[name.count() - 1] == '+';
     if (is_append) name = name.substring_of_length(0, name.count() - 1);
 
+    /* A subscripted operand such as a[0]=5 declares the base name's array and
+       assigns the element, the way bash treats declare a[i]=v, so the
+       attribute marks land on the base name rather than the bracketed text. */
+    let const bracket = name.find_character('[');
+    let const has_subscript = bracket.has_value() && !name.is_empty() &&
+                              name[name.count() - 1] == ']';
+    const StringView subscript =
+        has_subscript ? name.substring_of_length(*bracket + 1,
+                                                 name.count() - *bracket - 2)
+                      : StringView{};
+    if (has_subscript) name = name.substring_of_length(0, *bracket);
+
     /* The attribute applies before the assignment, so declare -i x+=3 already
        adds on this command the way bash applies the integer mark first. */
     if (mark_integer_attribute) cxt.mark_integer(name);
     if (unmark_integer_attribute) cxt.unmark_integer(name);
 
-    if (make_associative) {
+    if (has_subscript && equals.has_value()) {
+      cxt.assign_array_element(name, subscript, value, is_append);
+    } else if (make_associative) {
       cxt.declare_associative_array(name);
     } else if (make_indexed) {
       if (cxt.lookup_indexed_array(name) == nullptr)

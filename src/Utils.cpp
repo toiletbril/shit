@@ -46,7 +46,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        launching the shell. A background command keeps its fork, since an
        in-process subshell cannot run in the background. */
     if (cxt.mimicry() && !is_async) {
-      if (Maybe<MimicMode> mode = detect_mimic_shell(ec.program_path());
+      if (Maybe<mimic_mode> mode = detect_mimic_shell(ec.program_path());
           mode.has_value())
       {
         LOG(verbosity::Debug, "execute_context mimicking the shell for '%s'",
@@ -91,8 +91,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
         ec.in_fd.reset();
         ec.out_fd.reset();
         ec.err_fd.reset();
-        const MimicMode mode =
-            cxt.is_bash_compatible() ? MimicMode::Bash : MimicMode::Posix;
+        const mimic_mode mode =
+            cxt.is_bash_compatible() ? mimic_mode::Bash : mimic_mode::Posix;
         const bool isolated = !(cxt.terminal_exec_allowed() &&
                                 !cxt.in_subshell() && !cxt.has_exit_trap());
         quit(cxt.run_mimicked_script(ec, mode, isolated), false);
@@ -122,8 +122,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       /* The file has no shebang and is not a binary, so a foreground command
          runs it as a shell script in this process instead of as a child, the
          POSIX fallback. */
-      const MimicMode mode =
-          cxt.is_bash_compatible() ? MimicMode::Bash : MimicMode::Posix;
+      const mimic_mode mode =
+          cxt.is_bash_compatible() ? mimic_mode::Bash : mimic_mode::Posix;
       const bool isolated = !(cxt.terminal_exec_allowed() &&
                               !cxt.in_subshell() && !cxt.has_exit_trap());
       return cxt.run_mimicked_script(ec, mode, isolated);
@@ -1454,7 +1454,7 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
   return contents;
 }
 
-fn detect_mimic_shell(const Path &program) throws -> Maybe<MimicMode>
+fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mode>
 {
   let const file =
       os::open_file_descriptor(program.text().view(), os::file_open_mode::Read);
@@ -1505,9 +1505,9 @@ fn detect_mimic_shell(const Path &program) throws -> Maybe<MimicMode>
     }
   }
 
-  if (shell == "sh" || shell == "dash") return MimicMode::Posix;
-  if (shell == "bash") return MimicMode::Bash;
-  if (shell == "shit") return MimicMode::Default;
+  if (shell == "sh" || shell == "dash") return mimic_mode::Posix;
+  if (shell == "bash") return mimic_mode::Bash;
+  if (shell == "shit") return mimic_mode::Default;
   return None;
 }
 

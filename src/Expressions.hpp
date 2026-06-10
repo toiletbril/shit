@@ -602,7 +602,7 @@ protected:
 
 /* How an arm ends. ;; stops the case, ;& falls into the next arm body without
    matching it, and ;;& resumes matching at the following arms. */
-enum class CaseTerminator
+enum class case_terminator
 {
   Break,
   FallThrough,
@@ -615,7 +615,7 @@ struct case_item
 {
   ArrayList<const Token *> patterns;
   const Expression *body;
-  CaseTerminator terminator;
+  case_terminator terminator;
 };
 
 class CaseClause : public CompoundCommand
