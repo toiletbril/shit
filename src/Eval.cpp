@@ -1739,7 +1739,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
                                             bool is_pattern_word) throws
     -> String
 {
-  let out = String{heap_allocator()};
+  let out = String{scratch_allocator()};
 
   /* Append one byte and record whether it may act as a glob metacharacter, so
      the mask stays parallel to out. */
@@ -2400,7 +2400,7 @@ fn EvalContext::pattern_replace_value(const String &value, StringView spec) thro
      character. The anchored forms still splice at the start or the end. */
   if (pattern.is_empty() && !anchor_start && !anchor_end) return value;
 
-  let out = String{heap_allocator()};
+  let out = String{scratch_allocator()};
 
   /* The start anchor only matches a prefix, so a single longest match at the
      front is replaced and the rest is kept. */
@@ -2497,7 +2497,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
     pattern = expand_modifier_word_masked(pattern_word, pattern_active);
   }
 
-  let out = String{heap_allocator()};
+  let out = String{scratch_allocator()};
   for (usize i = 0; i < value.length; i++) {
     char c = value[i];
     const bool affected = modify_all || i == 0;
@@ -2557,7 +2557,7 @@ fn EvalContext::apply_array_subscript(StringView name,
      not match bash for more than one key. */
   if (is_associative_array(name)) {
     if (subscript == "@" || subscript == "*") {
-      let out = String{heap_allocator()};
+      let out = String{scratch_allocator()};
       let const values = associative_values(name);
       for (usize i = 0; i < values.count(); i++) {
         if (i > 0) out.push(' ');
@@ -2578,7 +2578,7 @@ fn EvalContext::apply_array_subscript(StringView name,
      limitation the positional "$@" has here. */
   if (subscript == "@" || subscript == "*") {
     if (array == nullptr) return get_variable_value(name).value_or(String{});
-    let out = String{heap_allocator()};
+    let out = String{scratch_allocator()};
     for (usize i = 0; i < array->count(); i++) {
       if (i > 0) out.push(' ');
       out.append((*array)[i].view());
@@ -2715,7 +2715,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   {
     const StringView array_name = body.substring_of_length(0, body.length - 3);
     let const subscripts = collect_array_subscripts(array_name);
-    let out = String{heap_allocator()};
+    let out = String{scratch_allocator()};
     for (usize i = 0; i < subscripts.count(); i++) {
       if (i > 0) out.push(' ');
       out.append(subscripts[i].view());
@@ -2731,7 +2731,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
        instead, since this string return cannot carry the field boundaries. */
     const StringView prefix = body.substring_of_length(0, body.length - 1);
     let const names = matching_prefix_names(prefix);
-    let out = String{heap_allocator()};
+    let out = String{scratch_allocator()};
     for (usize i = 0; i < names.count(); i++) {
       if (i > 0) out.push(' ');
       out.append(names[i].view());
