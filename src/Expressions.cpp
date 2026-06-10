@@ -872,7 +872,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     shit::flush();
   }
 
-  let program_args = cxt.process_args(m_args);
+  /* A simple command consumes its argument words and discards them when it
+     returns, so they are built on the scratch arena and reclaimed here rather
+     than heap-allocated per argument. The mark is taken before the expansion and
+     released on every exit from this command, so a loop body does not accumulate
+     a vector per iteration. A builtin that keeps a word past the command copies
+     it into the heap-backed store, so nothing the release frees is still read. */
+  let const args_mark = cxt.scratch_mark();
+  defer { cxt.scratch_release(args_mark); };
+  let program_args = cxt.process_args(m_args, /*args_are_transient=*/true);
   /* A <(...) or >(...) in the words opened a pipe and forked a child during the
      expansion above. The descriptors stay open while the command runs and are
      closed and the children reaped when this command returns, on every path. */

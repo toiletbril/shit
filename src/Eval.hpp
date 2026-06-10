@@ -233,15 +233,30 @@ public:
 
   fn end_command() wontthrow -> void;
 
-  /* Variable expand, tilde expand, field split, and glob each token. */
-  fn process_args(const ArrayList<const Token *> &args) throws
-      -> ArrayList<String>;
+  /* Variable expand, tilde expand, field split, and glob each token. When
+     args_are_transient is set the returned vector lives on the scratch arena and
+     the caller owns its lifetime through a scratch mark and release, so a simple
+     command pays no per-argument heap allocation. The default builds the vector
+     on the heap, which a caller that keeps the words past the command, such as a
+     for loop or an array assignment, needs. */
+  fn process_args(const ArrayList<const Token *> &args,
+                  bool args_are_transient = false) throws -> ArrayList<String>;
 
   /* The allocator for transient expansion data, which a bump arena hands out
      and reclaims whole when the command ends. */
   fn scratch_allocator() wontthrow -> Allocator
   {
     return bump_allocator(m_scratch_arena);
+  }
+  /* A scratch mark and its release, so a caller can scope a transient argument
+     vector to one command and reclaim it before the next loop iteration. */
+  mustuse fn scratch_mark() const wontthrow -> BumpArena::Mark
+  {
+    return m_scratch_arena.mark();
+  }
+  fn scratch_release(BumpArena::Mark saved) wontthrow -> void
+  {
+    m_scratch_arena.release(saved);
   }
   /* Reclaim the scratch arena, called between top-level commands. */
   fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }

@@ -5594,18 +5594,25 @@ fn expand_braces(const Word &word) throws -> ArrayList<Word>
 
 } /* namespace */
 
-hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
+hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
+                                 bool args_are_transient) throws
     -> ArrayList<String>
 {
-  /* The expansion fields live on the scratch arena only until the heap argument
-     vector is built, so the arena is released back to here on return. The mark
-     nests, so a command substitution inside one of these words reclaims only
-     its own fields and leaves this word's in-progress fields alone. */
-  let const scratch_mark = m_scratch_arena.mark();
-  defer { m_scratch_arena.release(scratch_mark); };
-
-  let expanded_args = ArrayList<String>{};
+  /* The argument vector is built first, on the scratch arena for a transient
+     request the caller scopes and frees, or on the heap otherwise. The per-word
+     expansion fields are reclaimed on return only for the heap form, since the
+     transient form leaves the fields on the caller's scratch region to be freed
+     with the vector after the command. The mark nests, so a command
+     substitution inside one of these words reclaims only its own fields. */
+  let expanded_args = args_are_transient
+                          ? ArrayList<String>{scratch_allocator()}
+                          : ArrayList<String>{};
   expanded_args.reserve(args.count());
+
+  let const fields_mark = m_scratch_arena.mark();
+  defer {
+    if (!args_are_transient) m_scratch_arena.release(fields_mark);
+  };
 
   for (const Token *t : args) {
     let const l = t->source_location();
@@ -5646,7 +5653,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
         let const plain_kind = expandable.plain_literal_kind();
         let took_fast_path = false;
         if (plain_kind != Word::PlainLiteral::NotPlain) {
-          let literal = String{heap_allocator()};
+          let literal = String{expanded_args.allocator()};
           for (const WordSegment &segment : expandable.segments)
             literal.append(segment.text.view());
 
@@ -5671,9 +5678,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args) throws
         if (!took_fast_path) {
           for (glob_field &field : expand_word(expandable)) {
             for (String &g : expand_path(steal(field), l))
-              expanded_args.push(String{
-                  heap_allocator(), StringView{g.c_str(), g.count()}
-              });
+              expanded_args.push_managed(StringView{g.c_str(), g.count()});
           }
         }
       };
