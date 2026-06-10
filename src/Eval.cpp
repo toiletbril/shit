@@ -2848,21 +2848,40 @@ struct ConditionalEvaluator
            s == "-ef" || s == "-nt" || s == "-ot";
   }
 
+  /* The extended-regex metacharacters, escaped to a literal when a quoted byte
+     of the pattern must match itself. */
+  static pure bool is_regex_metacharacter(char c) wontthrow
+  {
+    return c == '.' || c == '^' || c == '$' || c == '*' || c == '+' ||
+           c == '?' || c == '(' || c == ')' || c == '[' || c == ']' ||
+           c == '{' || c == '}' || c == '|' || c == '\\';
+  }
+
   /* The =~ operator matches the value against an extended regular expression. A
      POSIX regcomp with the extended grammar mirrors the ERE bash uses, and a
      search rather than a full match finds the pattern anywhere in the value,
      the way [[ =~ does. On a match BASH_REMATCH is filled with the whole match
      at index 0 and each capture group after it, an unmatched group reading as
      an empty string the way bash leaves it. */
-  bool regex_match(StringView value, StringView pattern) throws
+  bool regex_match(StringView value, StringView pattern,
+                   const ArrayList<bool> &active) throws
   {
 #if SHIT_PLATFORM_IS POSIX
-    /* regcomp and regexec read C strings, so the operands are copied into
-       null-terminated buffers first. */
-    let const pattern_text = String{heap_allocator(), pattern};
+    /* A byte the mask marks inactive came from a quoted or escaped part of the
+       right operand, so a regex metacharacter there is backslash-escaped to
+       match itself, the way bash matches a quoted portion of the operand
+       literally. An active byte stays live regex. regcomp reads a C string, so
+       the escaped pattern is built null-terminated. */
+    let escaped_pattern = String{heap_allocator()};
+    for (usize i = 0; i < pattern.length; i++) {
+      const bool is_literal = i < active.count() && !active[i];
+      if (is_literal && is_regex_metacharacter(pattern[i]))
+        escaped_pattern += '\\';
+      escaped_pattern += pattern[i];
+    }
     let const value_text = String{heap_allocator(), value};
     regex_t compiled;
-    if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
+    if (regcomp(&compiled, escaped_pattern.c_str(), REG_EXTENDED) != 0) {
       /* bash returns status 2 for a malformed regex, which the conditional
          turns into an evaluation error. */
       throw Error{"Unable to evaluate the [[ ]] because the regular expression "
@@ -2874,7 +2893,12 @@ struct ConditionalEvaluator
     const int match_result =
         regexec(&compiled, value_text.c_str(), group_count, matches.begin(), 0);
     regfree(&compiled);
-    if (match_result != 0) return false;
+    if (match_result != 0) {
+      /* bash clears BASH_REMATCH on a non-match, so a later read does not see a
+         prior match's captures. */
+      cxt.set_indexed_array("BASH_REMATCH", ArrayList<String>{heap_allocator()});
+      return false;
+    }
 
     let rematch = ArrayList<String>{heap_allocator()};
     for (usize i = 0; i < group_count; i++) {
@@ -2892,6 +2916,7 @@ struct ConditionalEvaluator
 #else
     unused(value);
     unused(pattern);
+    unused(active);
     throw Error{"Unable to use =~ in the [[ ]] because it is not supported on "
                 "this platform"};
 #endif
@@ -2949,7 +2974,6 @@ struct ConditionalEvaluator
 
   bool eval_binary(StringView left, StringView op, StringView right) throws
   {
-    if (op == "=~") return regex_match(left, right);
     if (op == "-ef") return Path{left}.is_same_file_as(Path{right});
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
     if (op == "-ot") return Path{left}.is_older_than(Path{right});
@@ -3018,8 +3042,9 @@ struct ConditionalEvaluator
           pos += 3;
           if (is_skipping) return false;
           const String left = operand_value(elements[pos - 3]);
-          /* == and != glob-match with a quoting mask, the other binary
-             operators read a plain string right operand. */
+          /* == and != glob-match, and =~ regex-matches, with a quoting mask, so
+             a quoted metacharacter of the right operand matches literally. The
+             other binary operators read a plain string right operand. */
           if (op == "==" || op == "=" || op == "!=") {
             let active = ArrayList<bool>{cxt.scratch_allocator()};
             const String pattern =
@@ -3027,6 +3052,12 @@ struct ConditionalEvaluator
             const bool matched = utils::glob_matches(
                 pattern.view(), left.view(), active, 0, cxt.extglob_enabled());
             return op == "!=" ? !matched : matched;
+          }
+          if (op == "=~") {
+            let active = ArrayList<bool>{cxt.scratch_allocator()};
+            const String pattern =
+                operand_pattern_masked(elements[pos - 1], active);
+            return regex_match(left.view(), pattern.view(), active);
           }
           const String right = operand_value(elements[pos - 1]);
           return eval_binary(left.view(), op.view(), right.view());
