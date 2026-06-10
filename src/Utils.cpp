@@ -473,11 +473,18 @@ fn invalidate_line_number_cache() wontthrow -> void
   LINE_NUMBER_CACHE.invalidate();
 }
 
+/* Advance offset past any leading ASCII whitespace, shared by the integer
+   parsers which trim before and after the digit run. */
+static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow -> void
+{
+  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
+    offset++;
+}
+
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
-  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
-    offset++;
+  skip_ascii_whitespace(text, offset);
 
   bool is_negative = false;
   if (offset < text.length &&
@@ -502,8 +509,7 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
     offset++;
   }
 
-  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
-    offset++;
+  skip_ascii_whitespace(text, offset);
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
@@ -511,8 +517,7 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
 fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
-  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
-    offset++;
+  skip_ascii_whitespace(text, offset);
 
   bool is_negative = false;
   if (offset < text.length &&
@@ -537,8 +542,7 @@ fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>
     offset++;
   }
 
-  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
-    offset++;
+  skip_ascii_whitespace(text, offset);
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
@@ -546,8 +550,7 @@ fn parse_octal_integer(StringView text) throws -> ErrorOr<i64>
 fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;
-  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
-    offset++;
+  skip_ascii_whitespace(text, offset);
 
   bool is_negative = false;
   if (offset < text.length &&
@@ -587,8 +590,7 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>
       magnitude = magnitude * 16 + digit;
   }
 
-  while (offset < text.length && is_ascii_whitespace(text.data[offset]))
-    offset++;
+  skip_ascii_whitespace(text, offset);
   if (!has_digits || offset != text.length) return not_an_integer_error(text);
   return saturate_signed_magnitude(magnitude, is_negative, has_overflowed);
 }
