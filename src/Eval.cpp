@@ -5015,6 +5015,23 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
   const char direction = text[0];
   const bool command_writes_the_pipe = direction == '<';
 
+#if SHIT_PLATFORM_IS WIN32
+  /* Windows has no fork, so the substitution runs in a fresh shell that writes
+     its output to a temp file the consuming command reads by path. The <(cmd)
+     form is supported. The >(cmd) form would need the inner shell to run after
+     the outer command writes the file, an ordering the synchronous spawn here
+     cannot provide. */
+  if (!command_writes_the_pipe)
+    throw Error{"Unable to run a >(cmd) process substitution because it is not "
+                "supported on this platform"};
+  if (Maybe<String> substitution_path = os::run_substitution_to_temp(
+          text.substring(1), is_bash_compatible());
+      substitution_path.has_value())
+    return steal(*substitution_path);
+  throw Error{"Unable to run the process substitution because the inner shell "
+              "could not be spawned: " +
+              os::last_system_error_message()};
+#else
   let parser = Parser{
       Lexer{String{text.substring(1)}, *AST_ARENA, false, None,
             is_bash_compatible()}
@@ -5065,17 +5082,9 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
       process_substitution{shell_fd, child, location, source});
 
   let path = String{"/dev/fd/"};
-#if SHIT_PLATFORM_IS WIN32
-  /* A Windows descriptor is a HANDLE, so its pointer value is widened through an
-     integer of pointer width before it names the /dev/fd entry. This path is
-     unreachable on Windows since fork_compound_stage above throws first, but it
-     must still compile. */
-  path += utils::int_to_text(
-      static_cast<i64>(reinterpret_cast<intptr_t>(shell_fd)));
-#else
   path += utils::int_to_text(static_cast<i64>(shell_fd));
-#endif
   return path;
+#endif
 }
 
 fn EvalContext::cleanup_process_substitutions() wontthrow -> void

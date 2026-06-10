@@ -1564,6 +1564,73 @@ fn execute_program(ExecContext &&ec) -> process
   return process_info.hProcess;
 }
 
+fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
+    -> Maybe<String>
+{
+  /* Windows has no fork, so a <(cmd) substitution spawns a fresh shell that
+     re-parses the inner command and writes its standard output into a temporary
+     file. The consuming command then reads that file by path, the way it reads
+     /dev/fd on POSIX. The whole output is written before the path returns, so a
+     reader such as diff that wants its complete input sees all of it. The fresh
+     shell inherits the environment but not the parent's functions or unexported
+     variables, the unavoidable cost of running a separate process with no fork
+     to clone the in-memory state. */
+  char module_path[MAX_PATH];
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0) return shit::None;
+
+  char temp_dir[MAX_PATH];
+  if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
+  char temp_path[MAX_PATH];
+  if (GetTempFileNameA(temp_dir, "sht", 0, temp_path) == 0) return shit::None;
+
+  SECURITY_ATTRIBUTES inheritable{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+  const HANDLE temp_file =
+      CreateFileA(temp_path, GENERIC_WRITE, FILE_SHARE_READ, &inheritable,
+                  CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+  if (temp_file == INVALID_HANDLE_VALUE) return shit::None;
+
+  let arguments = ArrayList<String>{heap_allocator()};
+  arguments.push(String{heap_allocator(), StringView{module_path}});
+  if (bash_compatible)
+    arguments.push(String{heap_allocator(), StringView{"--bash-compatible"}});
+  arguments.push(String{heap_allocator(), StringView{"-c"}});
+  arguments.push(String{heap_allocator(), source});
+  let command_line = make_os_args(arguments);
+
+  STARTUPINFOA startup_info{};
+  startup_info.cb = sizeof(startup_info);
+  startup_info.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  startup_info.hStdOutput = temp_file;
+  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  SetHandleInformation(startup_info.hStdInput, HANDLE_FLAG_INHERIT,
+                       HANDLE_FLAG_INHERIT);
+  SetHandleInformation(startup_info.hStdError, HANDLE_FLAG_INHERIT,
+                       HANDLE_FLAG_INHERIT);
+
+  PROCESS_INFORMATION process_info{};
+  if (CreateProcessA(module_path, const_cast<LPSTR>(command_line.data()),
+                     nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup_info,
+                     &process_info) == 0)
+  {
+    CloseHandle(temp_file);
+    return shit::None;
+  }
+  WaitForSingleObject(process_info.hProcess, INFINITE);
+  CloseHandle(process_info.hProcess);
+  CloseHandle(process_info.hThread);
+  CloseHandle(temp_file);
+
+  /* The shell hands this path back as a literal field, but a backslash in it
+     would read as an escape when the redirection target word is processed, so
+     the separators are returned as forward slashes, which CreateFile accepts
+     the same as backslashes. */
+  let result = String{heap_allocator()};
+  for (const char *byte = temp_path; *byte != '\0'; byte++)
+    result += *byte == '\\' ? '/' : *byte;
+  return result;
+}
+
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                        Maybe<descriptor> err_fd) -> process
 {

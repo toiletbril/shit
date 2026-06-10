@@ -126,6 +126,14 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
    positioned at its start, for feeding a heredoc body to a command's input. */
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>;
 
+#if SHIT_PLATFORM_IS WIN32
+/* Run a <(cmd) process substitution on a platform with no fork by spawning a
+   fresh shell whose standard output is captured into a temporary file, and
+   return that file's path for the consuming command to read. Windows only. */
+fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
+    -> Maybe<String>;
+#endif
+
 /* Read the file-creation mask without changing it, and set a new one. The umask
    builtin reads and writes the process mask through these. */
 fn get_file_creation_mask() wontthrow -> u32;
