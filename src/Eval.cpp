@@ -1652,9 +1652,9 @@ enum class TrimEnd
    over value, so only the returned remainder allocates. The active mask runs
    parallel to pattern and marks which pattern bytes may act as glob
    metacharacters, so a quoted or escaped * or ? matches itself. */
-fn trim_matching(StringView value, StringView pattern,
-                 const ArrayList<bool> &active, TrimEnd end, bool longest,
-                 bool extglob_enabled) throws -> String
+fn trim_matching(Allocator result_allocator, StringView value,
+                 StringView pattern, const ArrayList<bool> &active, TrimEnd end,
+                 bool longest, bool extglob_enabled) throws -> String
 {
   ASSERT(active.count() == pattern.length);
 
@@ -1665,14 +1665,14 @@ fn trim_matching(StringView value, StringView pattern,
       for (usize length = value.length;; length--) {
         if (utils::glob_matches(pattern, value.substring_of_length(0, length),
                                 active, 0, extglob_enabled))
-          return String{heap_allocator(), value.substring(length)};
+          return String{result_allocator, value.substring(length)};
         if (length == 0) break;
       }
     } else {
       for (usize length = 0; length <= value.length; length++) {
         if (utils::glob_matches(pattern, value.substring_of_length(0, length),
                                 active, 0, extglob_enabled))
-          return String{heap_allocator(), value.substring(length)};
+          return String{result_allocator, value.substring(length)};
       }
     }
   } else {
@@ -1683,18 +1683,18 @@ fn trim_matching(StringView value, StringView pattern,
       for (usize start = 0; start <= value.length; start++) {
         if (utils::glob_matches(pattern, value.substring(start), active, 0,
                                 extglob_enabled))
-          return String{heap_allocator(), value.substring_of_length(0, start)};
+          return String{result_allocator, value.substring_of_length(0, start)};
       }
     } else {
       for (usize start = value.length;; start--) {
         if (utils::glob_matches(pattern, value.substring(start), active, 0,
                                 extglob_enabled))
-          return String{heap_allocator(), value.substring_of_length(0, start)};
+          return String{result_allocator, value.substring_of_length(0, start)};
         if (start == 0) break;
       }
     }
   }
-  return String{heap_allocator(), value};
+  return String{result_allocator, value};
 }
 
 /* The shared core of the # and % prefix and suffix trims, so the scalar
@@ -1706,8 +1706,8 @@ static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
 {
   let active = ArrayList<bool>{cxt.scratch_allocator()};
   let const pattern = cxt.expand_modifier_word_masked(word, active);
-  return trim_matching(value, pattern.view(), active, end, longest,
-                       cxt.extglob_enabled());
+  return trim_matching(cxt.scratch_allocator(), value, pattern.view(), active,
+                       end, longest, cxt.extglob_enabled());
 }
 
 } /* namespace */
