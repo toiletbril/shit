@@ -1362,6 +1362,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.set_loop_depth(0);
     defer { cxt.set_loop_depth(saved_loop_depth); };
 
+    /* The function body's transient scratch is reclaimed when the call returns,
+       so a recursive function or a call in a loop does not grow the arena across
+       frames. The status is an integer and the scope pop restores the locals
+       into the heap-backed store, so nothing the release frees is still read.
+       The release is registered first, so it runs last, after the scope pop. */
+    let const call_mark = cxt.scratch_mark();
+    defer { cxt.scratch_release(call_mark); };
+
     /* Open a local scope so a local builtin in the body shadows a variable and
        the old value returns when the call ends. */
     cxt.enter_function_scope();
