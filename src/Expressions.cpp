@@ -662,7 +662,7 @@ fn resolve_duplication_fd(const Redirection &redir, EvalContext &cxt) throws
 {
   if (redir.target == nullptr) return redir.dup_fd;
 
-  ArrayList<const Token *> target_tokens{heap_allocator()};
+  ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
   target_tokens.push(redir.target);
   const ArrayList<String> fields = cxt.process_args(target_tokens);
   if (fields.count() != 1) {
@@ -765,7 +765,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
 
     ASSERT(redir.target != nullptr);
 
-    ArrayList<const Token *> target_tokens{heap_allocator()};
+    ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
     target_tokens.push(redir.target);
     const ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.count() != 1) {
@@ -1085,7 +1085,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
       ASSERT(redir.target != nullptr);
 
-      ArrayList<const Token *> target_tokens{heap_allocator()};
+      ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
       target_tokens.push(redir.target);
       const ArrayList<String> target = cxt.process_args(target_tokens);
       if (target.count() != 1) {
@@ -1974,7 +1974,19 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   if (has_compound_stage) return evaluate_with_compound_stages(cxt);
 
-  let ecs = ArrayList<ExecContext>{heap_allocator()};
+  /* The stage exec contexts and their argument words live only until the
+     pipeline is wired and run, so they are built on the scratch arena under one
+     pipeline-scoped mark. The arena rewind runs no destructor, so any stage
+     still holding open descriptors on an early exit, a non-resolving command or
+     an empty stage, is closed by the defer before the release. The normal path
+     moves ecs into execute, leaving the defer's loop empty. */
+  let const pipeline_mark = cxt.scratch_mark();
+  let ecs = ArrayList<ExecContext>{cxt.scratch_allocator()};
+  defer
+  {
+    for (ExecContext &leftover : ecs) leftover.close_fds();
+    cxt.scratch_release(pipeline_mark);
+  };
   ecs.reserve(m_commands.count());
 
   for (const Command *stage : m_commands) {
@@ -1984,7 +1996,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     cxt.add_evaluated_expression();
 
-    let stage_args = cxt.process_args(e->args());
+    let stage_args = cxt.process_args(e->args(), /*args_are_transient=*/true);
 
     /* A stage that expands to no command word, such as a bare assignment or an
        unset variable, has no program to run. Report it instead of building an
@@ -3363,7 +3375,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     ASSERT(redir.target != nullptr);
 
-    ArrayList<const Token *> target_tokens{heap_allocator()};
+    ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
     target_tokens.push(redir.target);
     const ArrayList<String> target = cxt.process_args(target_tokens);
     if (target.count() != 1) {
