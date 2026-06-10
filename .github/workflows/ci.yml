@@ -47,7 +47,7 @@ jobs:
           run_min() {
             min=""
             for i in 1 2 3 4 5; do
-              t=$( { TIMEFORMAT=%R; time SCALE=200 "$@" bench/configure.shit \
+              t=$( { TIMEFORMAT=%R; time SCALE=200 "$@" bench/configure.sh \
                      >/dev/null 2>&1; } 2>&1 )
               rc=$?
               if [ "$rc" -ne 0 ] || [ -z "$t" ]; then
@@ -67,6 +67,33 @@ jobs:
           awk -v s="$shit_seconds" -v d="$dash_seconds" \
               'BEGIN { exit !(s + 0 > 0 && s + 0 < d + 0) }' \
             || { echo "shit is not faster than dash"; exit 1; }
+
+      - name: Assert that Shit is faster than Bash
+        run: |
+          cd test
+          run_min() {
+            min=""
+            for i in 1 2 3 4 5; do
+              t=$( { TIMEFORMAT=%R; time SCALE=200 "$@" bench/configure.bash \
+                     >/dev/null 2>&1; } 2>&1 )
+              rc=$?
+              if [ "$rc" -ne 0 ] || [ -z "$t" ]; then
+                echo "timing failed for '$*'" >&2
+                return 1
+              fi
+              min=$(awk -v a="$t" -v b="$min" \
+                    'BEGIN { if (b == "" || a < b) print a; else print b }')
+            done
+            echo "$min"
+          }
+          bash_seconds=$(run_min bash) || exit 1
+          shit_seconds=$(run_min ../shit --bash-compatible) || exit 1
+          echo "bash=$bash_seconds shit=$shit_seconds"
+          case "$bash_seconds" in ''|*[!0-9.]*) echo "bad bash timing"; exit 1;; esac
+          case "$shit_seconds" in ''|*[!0-9.]*) echo "bad shit timing"; exit 1;; esac
+          awk -v s="$shit_seconds" -v b="$bash_seconds" \
+              'BEGIN { exit !(s + 0 > 0 && s + 0 < b + 0) }' \
+            || { echo "shit is not faster than bash"; exit 1; }
 
       - name: Build coverage binary
         run: rm -f shit && make MODE=cov shit

@@ -131,25 +131,34 @@ mimicrydiff: $(BIN)
 ZSH ?= zsh
 GOSH ?= gosh
 
-BENCH := bench/configure.shit
+BENCH := bench/configure.sh
+BENCH_BASH := bench/configure.bash
 SCALE ?= 100
 
+# Each shell runs exactly once. The single timed pass redirects its output to a
+# per-shell temp file, so the captured wall-clock and the captured output both
+# come from that one run rather than running the shell again for the comparison.
+# The POSIX script is checked against dash and the bash script against bash. cmp
+# runs without -s so a mismatch names the first differing byte and line, then a
+# diff shows the differing lines.
 bench:
-	@SCALE=$(SCALE) $(DASH) $(BENCH) >/tmp/shit_bench_d 2>&1; \
-	SCALE=$(SCALE) $(BIN) --no-diagnostics $(BENCH) >/tmp/shit_bench_s 2>&1; \
-	if cmp -s /tmp/shit_bench_d /tmp/shit_bench_s; then \
-		echo "output matches dash"; \
-	else \
-		echo "output differs from dash:"; \
-		diff /tmp/shit_bench_d /tmp/shit_bench_s | head -20; \
-	fi; \
-	echo "wall-clock seconds at SCALE=$(SCALE), lower is better:"; \
-	$(BASH) -c 'export TIMEFORMAT="  %R"; \
-		for sh in "$(DASH)" "$(BASH)" "$(ZSH)" "$(GOSH)" "$(BIN)"; do \
-			printf "  %-10s" "$$sh"; \
-			flags=; [ "$$sh" = "$(BIN)" ] && flags=--no-diagnostics; \
-			( time SCALE=$(SCALE) $$sh $$flags $(BENCH) >/dev/null 2>&1 ) 2>&1; \
-		done'; \
-	rm -f /tmp/shit_bench_d /tmp/shit_bench_s
+	@$(BASH) -c 'export TIMEFORMAT="  %R"; scale="$(SCALE)"; \
+		d=/tmp/shit_bench_d; b=/tmp/shit_bench_b; z=/tmp/shit_bench_z; \
+		g=/tmp/shit_bench_g; s=/tmp/shit_bench_s; \
+		bb=/tmp/shit_bench_bb; sb=/tmp/shit_bench_sb; \
+		echo "configure.sh, wall-clock seconds at SCALE=$$scale, lower is better:"; \
+		printf "  %-10s" "$(DASH)"; ( time SCALE=$$scale $(DASH) $(BENCH) >"$$d" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(BASH)"; ( time SCALE=$$scale $(BASH) $(BENCH) >"$$b" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(ZSH)";  ( time SCALE=$$scale $(ZSH)  $(BENCH) >"$$z" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(GOSH)"; ( time SCALE=$$scale $(GOSH) $(BENCH) >"$$g" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --posix $(BENCH) >"$$s" 2>&1 ) 2>&1; \
+		if cmp "$$d" "$$s"; then echo "output matches dash"; \
+		else echo "output differs from dash:"; diff "$$d" "$$s" | head -20; fi; \
+		echo "configure.bash, wall-clock seconds at SCALE=$$scale, lower is better:"; \
+		printf "  %-10s" "$(BASH)"; ( time SCALE=$$scale $(BASH) $(BENCH_BASH) >"$$bb" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --bash-compatible $(BENCH_BASH) >"$$sb" 2>&1 ) 2>&1; \
+		if cmp "$$bb" "$$sb"; then echo "output matches bash"; \
+		else echo "output differs from bash:"; diff "$$bb" "$$sb" | head -20; fi; \
+		rm -f "$$d" "$$b" "$$z" "$$g" "$$s" "$$bb" "$$sb"'
 
 .PHONY: test clean run_tests refill dashdiff bashdiff mimicrydiff bench
