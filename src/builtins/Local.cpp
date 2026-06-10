@@ -78,9 +78,19 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
        function restores it. A bare name declares the local without touching the
        value, so the currently-visible binding from the caller stays readable
        until the body assigns the name, matching dash. */
-    let const name = equals_position.has_value()
-                         ? arg.substring_of_length(0, *equals_position)
-                         : arg.view();
+    StringView name = equals_position.has_value()
+                          ? arg.substring_of_length(0, *equals_position)
+                          : arg.view();
+    /* process_args passes a local append through as name+=value, so a trailing
+       plus on the name marks the append and is stripped before the binding. */
+    let const is_append = !name.is_empty() && name[name.count() - 1] == '+';
+    if (is_append) name = name.substring_of_length(0, name.count() - 1);
+
+    /* The append reads the name's own value only when it is already local in
+       this scope, so a first local += starts from empty the way bash localizes
+       it fresh, not from the outer value the new local shadows. */
+    let const was_already_local =
+        is_append && cxt.is_local_in_current_scope(name);
     cxt.declare_local(name);
 
     if (make_associative) {
@@ -89,7 +99,19 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (cxt.lookup_indexed_array(name) == nullptr)
         cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
     } else if (equals_position.has_value()) {
-      cxt.set_shell_variable(name, arg.substring(*equals_position + 1));
+      let const value = arg.substring(*equals_position + 1);
+      if (is_append) {
+        /* The appended value is transient, copied into the variable store by
+           set_shell_variable, so it lives on the per-command scratch arena. */
+        let appended = String{cxt.scratch_allocator()};
+        if (was_already_local)
+          if (let const existing = cxt.get_variable_value(name))
+            appended.append(existing->view());
+        appended.append(value);
+        cxt.set_shell_variable(name, appended.view());
+      } else {
+        cxt.set_shell_variable(name, value);
+      }
     }
   }
 

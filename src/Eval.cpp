@@ -1146,6 +1146,15 @@ fn EvalContext::declare_local(StringView name) throws -> void
       previous_was_associative, steal(previous_keys), steal(previous_values)});
 }
 
+fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
+    -> bool
+{
+  if (m_local_scopes.is_empty()) return false;
+  for (const local_binding &binding : m_local_scopes.back())
+    if (binding.name.view() == name) return true;
+  return false;
+}
+
 fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 {
   m_aliases.set(name, value);
@@ -6107,6 +6116,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
      literal form is treated this way, the same form bash decides on before any
      expansion. */
   let is_declaration_command = false;
+  let is_local_command = false;
   if (!args.is_empty() && args[0]->kind() == Token::Kind::Word) {
     const Word &command_word =
         static_cast<const tokens::WordToken *>(args[0])->word();
@@ -6115,7 +6125,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
       for (const WordSegment &segment : command_word.segments)
         command_name.append(segment.text.view());
       let const name = command_name.view();
-      is_declaration_command = name == "local" || name == "declare" ||
+      is_local_command = name == "local";
+      is_declaration_command = is_local_command || name == "declare" ||
                                name == "typeset" || name == "export" ||
                                name == "readonly";
     }
@@ -6140,15 +6151,28 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
              x=$1 does, rather than splitting into several arguments. */
           let assignment = String{expanded_args.allocator()};
           assignment.append(a->key().view());
-          assignment += '=';
-          /* The append form name+=value concatenates onto the name's current
-             value, so the string the builtin stores already carries it, the way
-             a plain x+=y assignment prepends the prior value. */
-          if (a->is_append())
+          if (a->is_append() && is_local_command) {
+            /* local creates a fresh local that shadows an outer name, so the
+               name+=value form passes through literally and the builtin computes
+               the append after the local exists, against the new value rather
+               than the shadowed outer one. */
+            assignment += '+';
+            assignment += '=';
             assignment.append(
-                get_variable_value(a->key()).value_or(String{}).view());
-          assignment.append(
-              expand_word_for_assignment(a->value_word()).view());
+                expand_word_for_assignment(a->value_word()).view());
+          } else {
+            assignment += '=';
+            /* The append form name+=value concatenates onto the name's current
+               value, so the string the builtin stores already carries it, the
+               way a plain x+=y assignment prepends the prior value. declare,
+               export, and readonly do not shadow, so the current value is read
+               here correctly. */
+            if (a->is_append())
+              assignment.append(
+                  get_variable_value(a->key()).value_or(String{}).view());
+            assignment.append(
+                expand_word_for_assignment(a->value_word()).view());
+          }
           expanded_args.push(steal(assignment));
           continue;
         }

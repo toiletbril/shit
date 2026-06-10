@@ -531,6 +531,9 @@ public:
   fn leave_function_scope() throws -> void;
   pure fn in_function_scope() const wontthrow -> bool;
   fn declare_local(StringView name) throws -> void;
+  /* True when the name already has a local binding in the innermost scope, so a
+     re-declared local appends to its value while a first one starts fresh. */
+  mustuse fn is_local_in_current_scope(StringView name) const wontthrow -> bool;
 
   /* alias maps a command word to its replacement text, consulted by the parser
      before a simple command. */
