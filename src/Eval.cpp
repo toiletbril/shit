@@ -517,14 +517,23 @@ fn EvalContext::unset_array_element(StringView name,
     const i64 resolved = index < 0 ? index + count : index;
     if (resolved < 0)
       return;
-    /* An element inside the dense run is removed there, while one past it lives
-       in the sparse store and is erased by its key. Erasing an absent key is a
+    /* An element inside the dense run leaves a hole at its index the way bash
+       does, rather than renumbering the tail. The elements after it move to the
+       sparse store under their original indices and the dense run is dropped
+       from the removed index on. An element past the dense run already lives in
+       the sparse store and is erased by its key. Erasing an absent key is a
        no-op, matching bash unsetting a missing element silently. */
-    if (resolved < count)
-      array->remove(static_cast<usize>(resolved));
-    else
+    if (resolved < count) {
+      for (usize i = static_cast<usize>(resolved) + 1;
+           i < static_cast<usize>(count); i++)
+        m_sparse_array_values.set(sparse_array_key(name, i).view(),
+                                  (*array)[i].view());
+      while (array->count() > static_cast<usize>(resolved))
+        array->remove(array->count() - 1);
+    } else {
       m_sparse_array_values.erase(
           sparse_array_key(name, static_cast<usize>(resolved)).view());
+    }
   }
 }
 
@@ -5305,6 +5314,15 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
     throw Error{"Unable to mimic '" + ec.program() +
                 "' because the script could not be read"};
 
+  /* A NUL byte marks a binary file rather than a text script, so it is reported
+     the way bash does for an unrunnable binary, with status 126, instead of
+     being parsed as shell source and spewing garbage commands. */
+  if (contents->view().find_character('\0').has_value()) {
+    shit::print_error("shit: " + ec.program_path().text() +
+                      ": cannot execute binary file\n");
+    return 126;
+  }
+
   /* The mimic mode decides the lexing and the evaluation, so it is set before
      the parse. The parent's mode is put back when the run is isolated, while the
      terminal run leaves it since the shell exits next. */
@@ -6093,6 +6111,12 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
           let assignment = String{expanded_args.allocator()};
           assignment.append(a->key().view());
           assignment += '=';
+          /* The append form name+=value concatenates onto the name's current
+             value, so the string the builtin stores already carries it, the way
+             a plain x+=y assignment prepends the prior value. */
+          if (a->is_append())
+            assignment.append(
+                get_variable_value(a->key()).value_or(String{}).view());
           assignment.append(
               expand_word_for_assignment(a->value_word()).view());
           expanded_args.push(steal(assignment));
@@ -6103,6 +6127,9 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
            value segments, so the value still expands instead of staying
            literal. */
         let key_literal = String{StringView{a->key()}};
+        /* A non-declaration command keeps the literal text, so an append form
+           such as echo k+=v stays k+=v rather than losing the plus. */
+        if (a->is_append()) key_literal += "+";
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
                                                 steal(key_literal), false});
