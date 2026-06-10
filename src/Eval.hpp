@@ -476,7 +476,8 @@ public:
   /* The names of every shell variable, so variable completion can offer them
      after a '$'. The environment names are added by the caller, since they live
      in the process rather than the store. */
-  fn variable_names() const throws -> HashSet;
+  fn variable_names(Allocator result_allocator = heap_allocator()) const throws
+      -> HashSet;
 
   /* trap stores an action to run for a condition, keyed by the condition name
      such as EXIT or INT. The EXIT action runs once when the shell ends. A

@@ -882,9 +882,10 @@ fn EvalContext::function_names() const throws -> HashSet
   return names;
 }
 
-fn EvalContext::variable_names() const throws -> HashSet
+fn EvalContext::variable_names(Allocator result_allocator) const throws
+    -> HashSet
 {
-  let names = HashSet{heap_allocator()};
+  let names = HashSet{result_allocator};
   m_shell_variables.for_each([&](StringView name, const String &value) {
     unused(value);
     names.add(name);

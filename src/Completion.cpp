@@ -1,5 +1,6 @@
 #include "Completion.hpp"
 
+#include "Arena.hpp"
 #include "Builtin.hpp"
 #include "Colors.hpp"
 #include "Debug.hpp"
@@ -13,6 +14,13 @@
 namespace shit {
 
 namespace completion {
+
+/* The syntax highlighter rebuilds its spans, its per-word and per-construct
+   lists, and the set of known variable names on every keystroke, all of which
+   die when the next keystroke redraws. They live on this arena, reset at the top
+   of highlight_line so the previous render's spans stay valid until the line
+   editor has drained them into its own buffer. */
+static BumpArena HIGHLIGHT_ARENA{};
 
 /* True for a byte that separates one shell word from the next at the top level.
    The completion tokenizer is deliberately coarse, it does not parse quotes or
@@ -976,7 +984,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (start < stop) spans.push(highlight_span{start, stop, sgr});
   };
 
-  let stack = ArrayList<highlight_construct>{};
+  let stack = ArrayList<highlight_construct>{bump_allocator(HIGHLIGHT_ARENA)};
   bool command_position = true;
   bool expecting_in = false;
   bool for_variable_pending = false;
@@ -1043,7 +1051,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
        expansion-built command. A plain command or keyword word is colored
        whole below. */
     let const word_start = i;
-    let word_spans = ArrayList<highlight_span>{};
+    let word_spans = ArrayList<highlight_span>{bump_allocator(HIGHLIGHT_ARENA)};
     while (i < end && !is_highlight_word_break(line[i])) {
       let const d = line[i];
       if (d == '\'') {
@@ -1279,14 +1287,18 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
 fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>
 {
-  let spans = ArrayList<highlight_span>{};
+  /* Reclaim the previous keystroke's highlight allocations. The spans it
+     returned have been drained into the line editor's own buffer by now. */
+  HIGHLIGHT_ARENA.reset();
+  let const arena = bump_allocator(HIGHLIGHT_ARENA);
+  let spans = ArrayList<highlight_span>{arena};
   /* The set of named variables is read once per line so the per-expansion check
      does no allocation and triggers no dynamic-variable side effect. A line
      with no $ never references a variable, so the whole walk over the variable
      store is skipped on the common plain-command keystroke. */
-  let known_vars = HashSet{heap_allocator()};
+  let known_vars = HashSet{arena};
   if (line.find_character('$').has_value()) {
-    known_vars = context.variable_names();
+    known_vars = context.variable_names(arena);
     /* The variables the evaluator synthesizes on read are not in the store, so
        they are added here as set rather than computed, which would advance
        RANDOM or read the clock on a keystroke. IFS and LINENO exist in every
