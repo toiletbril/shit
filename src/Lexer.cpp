@@ -733,8 +733,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             }
           } break;
           case 'c': {
-            /* Control modifier. bash uppercases the letter and clears bit 6, so
-               \cA is 0x01 and \c[ is the escape 0x1b. */
+            /* Control modifier. bash uppercases the letter then takes the low
+               five bits, so \cA is 0x01 and \c[ is the escape 0x1b, while \c? is
+               the delete 0x7f. The earlier xor with 0x40 only matched this for
+               the bytes 0x40 to 0x5f and was wrong for a digit or punctuation. */
             const char k = chop_character(byte_count);
             if (k == lexer::CEOF) {
               emit_literal('\\');
@@ -751,7 +753,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             const char upper = (target >= 'a' && target <= 'z')
                                     ? static_cast<char>(target - 'a' + 'A')
                                     : target;
-            emit_literal(static_cast<char>(static_cast<u8>(upper) ^ 0x40u));
+            const u8 control =
+                upper == '?' ? static_cast<u8>(0x7fu)
+                             : static_cast<u8>(static_cast<u8>(upper) & 0x1fu);
+            emit_literal(static_cast<char>(control));
           } break;
           case 'u':
           case 'U': {
