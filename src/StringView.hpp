@@ -50,6 +50,16 @@ public:
 };
 
 /* A growable hash of a byte range, FNV-1a over the short keys a shell uses. */
-pure fn hash_bytes(StringView view) wontthrow -> u64;
+/* FNV-1a over the view's bytes, inline since the hash sits inside every map
+   probe on the hot variable-lookup path. */
+pure forceinline fn hash_bytes(StringView view) wontthrow -> u64
+{
+  u64 hash = 14695981039346656037ull;
+  for (usize i = 0; i < view.length; i++) {
+    hash ^= static_cast<unsigned char>(view.data[i]);
+    hash *= 1099511628211ull;
+  }
+  return hash;
+}
 
 } /* namespace shit */

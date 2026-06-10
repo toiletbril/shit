@@ -4327,8 +4327,13 @@ public:
   fn starts_with(StringView op) wontthrow -> bool
   {
     skip_spaces();
-    return pos + op.length <= source.length &&
-           source.substring_of_length(pos, op.length) == op;
+    if (pos + op.length > source.length) return false;
+    /* The operator probes run hot with one to three bytes each, so the
+       compare is an unrolled byte loop the compiler keeps inline rather than
+       a memcmp call per probe. */
+    for (usize k = 0; k < op.length; k++)
+      if (source[pos + k] != op[k]) return false;
+    return true;
   }
 
   fn consume(StringView op) wontthrow -> bool
@@ -4541,13 +4546,24 @@ public:
           {"|=",  '|'},
           {"^=",  '^'},
       };
-      for (const auto &[op, kind] : compound_operators) {
-        if (consume(op)) {
-          let const rhs = parse_assignment();
-          let const result =
-              apply_compound(read_lvalue_value(target), rhs, kind);
-          write_lvalue(target, result);
-          return result;
+      /* The probe loop runs only when the next byte can open a compound
+         operator, so the common plain assignment and the bare-name read skip
+         the ten probes. */
+      skip_spaces();
+      let const next_byte = pos < source.length ? source[pos] : '\0';
+      if (next_byte == '<' || next_byte == '>' || next_byte == '+' ||
+          next_byte == '-' || next_byte == '*' || next_byte == '/' ||
+          next_byte == '%' || next_byte == '&' || next_byte == '|' ||
+          next_byte == '^')
+      {
+        for (const auto &[op, kind] : compound_operators) {
+          if (consume(op)) {
+            let const rhs = parse_assignment();
+            let const result =
+                apply_compound(read_lvalue_value(target), rhs, kind);
+            write_lvalue(target, result);
+            return result;
+          }
         }
       }
       if (starts_with("=") && !starts_with("==")) {
@@ -4574,7 +4590,7 @@ public:
 
   fn parse_ternary() throws -> i64
   {
-    let const condition = parse_logical_or();
+    let const condition = parse_binary(1);
     if (consume("?")) {
       /* Only the taken arm runs, the other arm is parsed but suppressed so an
          assignment in the dead arm leaves the variable unchanged. */
@@ -4593,172 +4609,158 @@ public:
     return condition;
   }
 
-  fn parse_logical_or() throws -> i64
+  /* One binary operator at the cursor, its dispatch tag, its precedence with
+     11 the tightest ** and 1 the loosest ||, and its token length. Precedence
+     0 means no binary operator opens here. */
+  struct binary_operator
   {
-    let lhs = parse_logical_and();
-    /* The right operand is always parsed so its tokens are consumed, but once
-       the left side is true the result is fixed and the right side is parsed
-       under suppression so its assignments do not fire. */
-    while (consume("||")) {
-      let const lhs_is_true = lhs != 0;
-      let const rhs = lhs_is_true
-                          ? parse_skipped(&ArithmeticParser::parse_logical_and)
-                          : parse_logical_and();
-      lhs = (lhs_is_true || rhs != 0) ? 1 : 0;
+    char kind;
+    u8 precedence;
+    u8 length;
+  };
+
+  /* Reads the operator at the cursor without consuming it. The byte pair
+     decides the doubled forms, so | against || and < against << need no
+     rescans, and a compound assignment suffix such as += or <<= answers no
+     operator since the assignment level above the ladder owns those. */
+  fn peek_binary_operator() wontthrow -> binary_operator
+  {
+    skip_spaces();
+    if (pos >= source.length) return {0, 0, 0};
+    let const a = source[pos];
+    let const b = pos + 1 < source.length ? source[pos + 1] : '\0';
+    let const c = pos + 2 < source.length ? source[pos + 2] : '\0';
+    switch (a) {
+    case '*':
+      if (b == '*') return {'P', 11, 2};
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'*', 10, 1};
+    case '/':
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'/', 10, 1};
+    case '%':
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'%', 10, 1};
+    case '+':
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'+', 9, 1};
+    case '-':
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'-', 9, 1};
+    case '<':
+      if (b == '<')
+        return c == '=' ? binary_operator{0, 0, 0} : binary_operator{'L', 8, 2};
+      if (b == '=') return {'l', 7, 2};
+      return {'<', 7, 1};
+    case '>':
+      if (b == '>')
+        return c == '=' ? binary_operator{0, 0, 0} : binary_operator{'R', 8, 2};
+      if (b == '=') return {'g', 7, 2};
+      return {'>', 7, 1};
+    case '=': return b == '=' ? binary_operator{'e', 6, 2}
+                              : binary_operator{0, 0, 0};
+    case '!': return b == '=' ? binary_operator{'n', 6, 2}
+                              : binary_operator{0, 0, 0};
+    case '&':
+      if (b == '&') return {'A', 2, 2};
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'&', 5, 1};
+    case '^':
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'^', 4, 1};
+    case '|':
+      if (b == '|') return {'O', 1, 2};
+      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'|', 3, 1};
+    default: return {0, 0, 0};
     }
-    return lhs;
   }
 
-  fn parse_logical_and() throws -> i64
+  /* The binary ladder as one precedence-climbing loop, one frame for a whole
+     run of operators instead of a call per precedence level, since the chain
+     of nine cascade levels showed up whole in the profile. ** climbs right
+     associatively by re-entering at its own precedence, the logical pair
+     short-circuits by parsing the dead side under suppression the way the
+     cascade did, and the ternary, assignment, and comma levels stay above. */
+  fn parse_binary(u8 min_precedence) throws -> i64
   {
-    let lhs = parse_bitwise_or();
-    /* Once the left side is false the result is fixed, so the right operand is
-       parsed under suppression to consume its tokens without side effect. */
-    while (consume("&&")) {
-      let const lhs_is_true = lhs != 0;
-      let const rhs = lhs_is_true
-                          ? parse_bitwise_or()
-                          : parse_skipped(&ArithmeticParser::parse_bitwise_or);
-      lhs = (lhs_is_true && rhs != 0) ? 1 : 0;
-    }
-    return lhs;
-  }
-
-  fn parse_bitwise_or() throws -> i64
-  {
-    let lhs = parse_bitwise_xor();
-    while (starts_with("|") && !starts_with("||")) {
-      consume("|");
-      lhs |= parse_bitwise_xor();
-    }
-    return lhs;
-  }
-
-  fn parse_bitwise_xor() throws -> i64
-  {
-    let lhs = parse_bitwise_and();
-    while (consume("^"))
-      lhs ^= parse_bitwise_and();
-    return lhs;
-  }
-
-  fn parse_bitwise_and() throws -> i64
-  {
-    let lhs = parse_equality();
-    while (starts_with("&") && !starts_with("&&")) {
-      consume("&");
-      lhs &= parse_equality();
-    }
-    return lhs;
-  }
-
-  fn parse_equality() throws -> i64
-  {
-    let lhs = parse_relational();
+    let lhs = parse_unary();
     for (;;) {
-      if (consume("=="))
-        lhs = (lhs == parse_relational()) ? 1 : 0;
-      else if (consume("!="))
-        lhs = (lhs != parse_relational()) ? 1 : 0;
-      else
-        break;
-    }
-    return lhs;
-  }
+      let const op = peek_binary_operator();
+      if (op.precedence < min_precedence) return lhs;
+      pos += op.length;
 
-  fn parse_relational() throws -> i64
-  {
-    let lhs = parse_shift();
-    for (;;) {
-      if (consume("<="))
-        lhs = (lhs <= parse_shift()) ? 1 : 0;
-      else if (consume(">="))
-        lhs = (lhs >= parse_shift()) ? 1 : 0;
-      else if (starts_with("<") && !starts_with("<<")) {
-        consume("<");
-        lhs = (lhs < parse_shift()) ? 1 : 0;
-      } else if (starts_with(">") && !starts_with(">>")) {
-        consume(">");
-        lhs = (lhs > parse_shift()) ? 1 : 0;
-      } else
-        break;
-    }
-    return lhs;
-  }
+      if (op.kind == 'A' || op.kind == 'O') {
+        /* The dead side is parsed under suppression so its tokens are
+           consumed without its assignments taking effect. */
+        let const lhs_decides = (op.kind == 'A') == (lhs == 0);
+        i64 rhs = 0;
+        if (lhs_decides) {
+          let const was_skipping = m_is_skipping;
+          m_is_skipping = true;
+          defer { m_is_skipping = was_skipping; };
+          rhs = parse_binary(op.precedence + 1);
+        } else {
+          rhs = parse_binary(op.precedence + 1);
+        }
+        lhs = op.kind == 'A' ? ((lhs != 0 && rhs != 0) ? 1 : 0)
+                             : ((lhs != 0 || rhs != 0) ? 1 : 0);
+        continue;
+      }
 
-  fn parse_shift() throws -> i64
-  {
-    let lhs = parse_additive();
-    for (;;) {
-      if (consume("<<"))
-        lhs = arithmetic_shift_left(lhs, parse_additive());
-      else if (consume(">>"))
-        lhs = arithmetic_shift_right(lhs, parse_additive());
-      else
+      /* ** is right-associative, so it re-enters at its own precedence, and
+         bash rejects a negative exponent in integer arithmetic. */
+      let const rhs = parse_binary(op.kind == 'P' ? op.precedence
+                                                  : op.precedence + 1);
+      switch (op.kind) {
+      case 'P':
+        if (rhs < 0) fail("exponent less than 0");
+        lhs = arithmetic_power(lhs, rhs);
         break;
-    }
-    return lhs;
-  }
-
-  fn parse_additive() throws -> i64
-  {
-    let lhs = parse_multiplicative();
-    for (;;) {
-      if (consume("+"))
-        lhs = arithmetic_add(lhs, parse_multiplicative());
-      else if (consume("-"))
-        lhs = arithmetic_subtract(lhs, parse_multiplicative());
-      else
+      case '*': lhs = arithmetic_multiply(lhs, rhs); break;
+      case '/':
+        if (rhs == 0) fail("division by zero");
+        lhs = arithmetic_divide(lhs, rhs);
         break;
-    }
-    return lhs;
-  }
-
-  fn parse_multiplicative() throws -> i64
-  {
-    let lhs = parse_power();
-    for (;;) {
-      if (consume("*"))
-        lhs = arithmetic_multiply(lhs, parse_power());
-      else if (consume("/")) {
-        let const divisor = parse_power();
-        if (divisor == 0) fail("division by zero");
-        lhs = arithmetic_divide(lhs, divisor);
-      } else if (consume("%")) {
-        let const divisor = parse_power();
-        if (divisor == 0) fail("division by zero");
-        lhs = arithmetic_modulo(lhs, divisor);
-      } else
+      case '%':
+        if (rhs == 0) fail("division by zero");
+        lhs = arithmetic_modulo(lhs, rhs);
         break;
+      case '+': lhs = arithmetic_add(lhs, rhs); break;
+      case '-': lhs = arithmetic_subtract(lhs, rhs); break;
+      case 'L': lhs = arithmetic_shift_left(lhs, rhs); break;
+      case 'R': lhs = arithmetic_shift_right(lhs, rhs); break;
+      case '<': lhs = lhs < rhs ? 1 : 0; break;
+      case 'l': lhs = lhs <= rhs ? 1 : 0; break;
+      case '>': lhs = lhs > rhs ? 1 : 0; break;
+      case 'g': lhs = lhs >= rhs ? 1 : 0; break;
+      case 'e': lhs = lhs == rhs ? 1 : 0; break;
+      case 'n': lhs = lhs != rhs ? 1 : 0; break;
+      case '&': lhs = lhs & rhs; break;
+      case '^': lhs = lhs ^ rhs; break;
+      case '|': lhs = lhs | rhs; break;
+      default: unreachable();
+      }
     }
-    return lhs;
-  }
-
-  /* Exponentiation sits between the multiplicative operators and the unary
-     signs. In bash a unary sign binds tighter than **, so -2**2 is (-2)**2,
-     and ** is right-associative, so 2**3**2 is 2**(3**2). bash rejects a
-     negative exponent in integer arithmetic. */
-  fn parse_power() throws -> i64
-  {
-    let const lhs = parse_unary();
-    if (consume("**")) {
-      let const exponent = parse_power();
-      if (exponent < 0) fail("exponent less than 0");
-      return arithmetic_power(lhs, exponent);
-    }
-    return lhs;
   }
 
   fn parse_unary() throws -> i64
   {
     /* The doubled operators are checked before the single + and - so a leading
-       ++ or -- is read as one prefix step rather than two unary signs. */
-    if (consume("++")) return prefix_step(1);
-    if (consume("--")) return prefix_step(-1);
-    if (consume("!")) return parse_unary() == 0 ? 1 : 0;
-    if (consume("~")) return ~parse_unary();
-    if (consume("-")) return arithmetic_subtract(0, parse_unary());
-    if (consume("+")) return parse_unary();
+       ++ or -- is read as one prefix step rather than two unary signs. The
+       first byte gates the probes, so the common operand pays one read. */
+    skip_spaces();
+    let const first = pos < source.length ? source[pos] : '\0';
+    if (first == '+') {
+      if (consume("++")) return prefix_step(1);
+      pos++;
+      return parse_unary();
+    }
+    if (first == '-') {
+      if (consume("--")) return prefix_step(-1);
+      pos++;
+      return arithmetic_subtract(0, parse_unary());
+    }
+    if (first == '!') {
+      pos++;
+      return parse_unary() == 0 ? 1 : 0;
+    }
+    if (first == '~') {
+      pos++;
+      return ~parse_unary();
+    }
     return parse_primary();
   }
 

@@ -47,14 +47,5 @@ fn StringView::starts_with(StringView prefix) const wontthrow -> bool
          std::memcmp(data, prefix.data, prefix.length) == 0;
 }
 
-fn hash_bytes(StringView view) wontthrow -> u64
-{
-  u64 hash = 14695981039346656037ull;
-  for (usize i = 0; i < view.length; i++) {
-    hash ^= static_cast<unsigned char>(view.data[i]);
-    hash *= 1099511628211ull;
-  }
-  return hash;
-}
 
 } /* namespace shit */
