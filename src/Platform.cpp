@@ -1329,7 +1329,20 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
 
   result.saved = GetStdHandle(*slot);
   result.was_open = result.saved != INVALID_HANDLE_VALUE;
-  SetStdHandle(*slot, target);
+
+  /* SetStdHandle only stores the handle, it does not make an independent copy
+     the way the POSIX dup2 makes a new descriptor, so the target is duplicated
+     here. The caller closes the original target after this returns, and the
+     duplicate stays valid in the slot until restore_descriptor closes it. */
+  HANDLE duplicate = INVALID_HANDLE_VALUE;
+  if (DuplicateHandle(GetCurrentProcess(), target, GetCurrentProcess(),
+                      &duplicate, 0, TRUE, DUPLICATE_SAME_ACCESS) == 0)
+  {
+    result.dup2_ok = false;
+    return result;
+  }
+  SetStdHandle(*slot, duplicate);
+  result.dup2_ok = true;
   return result;
 }
 
@@ -1337,6 +1350,13 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
+  /* The slot holds the duplicate this redirection placed there, so it is closed
+     before the saved original returns, the way the POSIX restore closes the
+     backup descriptor it kept. */
+  if (saved.dup2_ok) {
+    const HANDLE duplicate = GetStdHandle(*slot);
+    if (duplicate != INVALID_HANDLE_VALUE) CloseHandle(duplicate);
+  }
   if (saved.was_open) SetStdHandle(*slot, saved.saved);
 }
 
