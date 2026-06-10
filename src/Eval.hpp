@@ -939,6 +939,10 @@ protected:
   HashSet m_exported_names{heap_allocator()};
   ArrayList<process_substitution> m_pending_process_substitutions{
       heap_allocator()};
+  /* The temp files a process substitution leaves for the consuming command to
+     read by path, deleted once that command finishes. Empty and free on a
+     platform that reaps a child and a pipe instead, such as POSIX. */
+  os::TempFileSet m_substitution_temp_files{};
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each
      bounded so a runaway recursion errors with a located message rather than

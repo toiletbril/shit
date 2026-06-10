@@ -69,6 +69,9 @@ hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow
 
 fn close_fd(os::descriptor fd) wontthrow -> bool { return close(fd) != -1; }
 
+fn TempFileSet::track(Path path) throws -> void { unused(path); }
+fn TempFileSet::cleanup() wontthrow -> void {}
+
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
   /* The saved copy of the real stdout is close-on-exec, so a forked command
@@ -1298,6 +1301,14 @@ fn close_fd(os::descriptor fd) wontthrow -> bool
   return CloseHandle(fd) != FALSE;
 }
 
+fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
+fn TempFileSet::cleanup() wontthrow -> void
+{
+  for (const Path &path : m_paths)
+    DeleteFileA(path.c_str());
+  m_paths.clear();
+}
+
 /* A Windows handle is inherited per CreateProcess through the bInheritHandles
    flag and the handle's own inherit bit set at creation, not per descriptor the
    way the POSIX close-on-exec bit is cleared, so this is a no-op that keeps the
@@ -1364,6 +1375,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     return result;
   }
   SetStdHandle(*slot, duplicate);
+  result.replacement = duplicate;
   result.dup2_ok = true;
   return result;
 }
@@ -1372,13 +1384,12 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
-  /* The slot holds the duplicate this redirection placed there, so it is closed
-     before the saved original returns, the way the POSIX restore closes the
-     backup descriptor it kept. */
-  if (saved.dup2_ok) {
-    const HANDLE duplicate = GetStdHandle(*slot);
-    if (duplicate != INVALID_HANDLE_VALUE) CloseHandle(duplicate);
-  }
+  /* Close the exact duplicate this redirection installed, not whatever the slot
+     holds now, since a later redirection inside the run may have replaced it.
+     The saved original then returns to the slot, the way the POSIX restore
+     closes the backup descriptor it kept. */
+  if (saved.dup2_ok && saved.replacement != INVALID_HANDLE_VALUE)
+    CloseHandle(saved.replacement);
   if (saved.was_open) SetStdHandle(*slot, saved.saved);
 }
 

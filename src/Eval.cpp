@@ -5043,8 +5043,13 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
                 "supported on this platform"};
   if (Maybe<String> substitution_path = os::run_substitution_to_temp(
           text.substring(1), is_bash_compatible());
-      substitution_path.has_value())
+      substitution_path.has_value()) {
+    /* The temp file is read by the consuming command after this returns, so it
+       is tracked for deletion once that command finishes rather than removed
+       now. */
+    m_substitution_temp_files.track(Path{substitution_path->view()});
     return steal(*substitution_path);
+  }
   throw Error{"Unable to run the process substitution because the inner shell "
               "could not be spawned: " +
               os::last_system_error_message()};
@@ -5143,6 +5148,7 @@ fn EvalContext::cleanup_process_substitutions() wontthrow -> void
     }
   }
   m_pending_process_substitutions.clear();
+  m_substitution_temp_files.cleanup();
 }
 
 fn EvalContext::capture_command_substitution(const WordSegment &segment) throws

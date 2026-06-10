@@ -126,6 +126,24 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
    positioned at its start, for feeding a heredoc body to a command's input. */
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>;
 
+/* Tracks the temporary files a process substitution leaves for the consuming
+   command to read by path, and deletes them once that command finishes. On a
+   platform that leaves no temp file, such as POSIX with its child and pipe, it
+   holds nothing and does nothing, so it costs nothing there. */
+class TempFileSet
+{
+public:
+  /* Remember a temp file to delete on the next cleanup. */
+  fn track(Path path) throws -> void;
+  /* Delete every tracked file on a best-effort basis and forget them. */
+  fn cleanup() wontthrow -> void;
+
+private:
+#if SHIT_PLATFORM_IS WIN32
+  ArrayList<Path> m_paths{heap_allocator()};
+#endif
+};
+
 #if SHIT_PLATFORM_IS WIN32
 /* Run a <(cmd) process substitution on a platform with no fork by spawning a
    fresh shell whose standard output is captured into a temporary file, and
@@ -217,6 +235,11 @@ struct saved_descriptor
      closed in a duplication like >&5 with fd 5 closed. The caller throws a
      located error and the restore puts shell_fd back unchanged. */
   bool dup2_ok{true};
+  /* On Windows, the handle this redirection installed in the standard-handle
+     slot, so restore closes that exact handle rather than whatever the slot
+     holds at restore time, which a later redirection inside the run may have
+     replaced. Unused on POSIX, which restores by dup2. */
+  descriptor replacement{SHIT_INVALID_FD};
 };
 
 /* Save shell_fd, then point it at target. The returned backup feeds
