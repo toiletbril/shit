@@ -126,8 +126,8 @@ struct local_binding
   Maybe<String> previous_value;
   Maybe<ArrayList<String>> previous_indexed_array;
   /* The associative array the name held, as parallel key and value lists, with
-     the flag set when the name was an associative array. A local -A restores the
-     caller's map on return and clears it when the caller had none. */
+     the flag set when the name was an associative array. A local -A restores
+     the caller's map on return and clears it when the caller had none. */
   bool previous_was_associative{false};
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
@@ -185,7 +185,8 @@ struct process_substitution
 /* A mark a command takes at entry, the count of pending substitutions and temp
    files before it ran, so its own cleanup reaps only the substitutions it
    opened and not an outer command's, as when a while loop reads done < <(cmd)
-   and its body, a simple command, must not reap the loop's producer mid-read. */
+   and its body, a simple command, must not reap the loop's producer mid-read.
+ */
 struct process_substitution_mark
 {
   usize pending{0};
@@ -233,7 +234,8 @@ enum class mimic_mood : u8
 /* A programmable-completion spec the complete builtin registers for a command.
    The interactive engine consults it when completing an argument to that
    command. function_name is the -F function, word_list is the -W word list, and
-   use_default falls back to filename completion when the spec yields nothing. */
+   use_default falls back to filename completion when the spec yields nothing.
+ */
 struct completion_spec
 {
   String function_name{};
@@ -294,11 +296,11 @@ public:
   fn end_command() wontthrow -> void;
 
   /* Variable expand, tilde expand, field split, and glob each token. When
-     args_are_transient is set the returned vector lives on the scratch arena and
-     the caller owns its lifetime through a scratch mark and release, so a simple
-     command pays no per-argument heap allocation. The default builds the vector
-     on the heap, which a caller that keeps the words past the command, such as a
-     for loop or an array assignment, needs. */
+     args_are_transient is set the returned vector lives on the scratch arena
+     and the caller owns its lifetime through a scratch mark and release, so a
+     simple command pays no per-argument heap allocation. The default builds the
+     vector on the heap, which a caller that keeps the words past the command,
+     such as a for loop or an array assignment, needs. */
   fn process_args(const ArrayList<const Token *> &args,
                   bool args_are_transient = false) throws -> ArrayList<String>;
 
@@ -327,8 +329,9 @@ public:
 
   /* Seed the shell-identity variables a script probes to find its host shell. A
      bash identity advertises BASH_VERSION and BASH, every other mode advertises
-     the sh and dash version names. Shared by the startup and the mimicry run so a
-     mimicked shell looks like the real one rather than a half-set environment. */
+     the sh and dash version names. Shared by the startup and the mimicry run so
+     a mimicked shell looks like the real one rather than a half-set
+     environment. */
   fn seed_shell_identity_variables(bool bash_identity) throws -> void;
   fn unset_shell_variable(StringView name) throws -> void;
 
@@ -381,8 +384,8 @@ public:
       -> Maybe<String>;
   fn associative_keys(StringView name) const throws -> ArrayList<String>;
   fn associative_values(StringView name) const throws -> ArrayList<String>;
-  /* Forget every element of an associative array and the name's membership, so a
-     local -A leaving its scope drops its entries before the caller's are put
+  /* Forget every element of an associative array and the name's membership, so
+     a local -A leaving its scope drops its entries before the caller's are put
      back. */
   fn clear_associative_array(StringView name) throws -> void;
 
@@ -393,8 +396,8 @@ public:
      yields an empty list. */
   fn collect_array_elements(StringView name) const throws -> ArrayList<String>;
 
-  /* Whether an array element or key is set, backing the [[ -v name[subscript] ]]
-     test. A @ or * subscript asks whether the array holds any element, an
+  /* Whether an array element or key is set, backing the [[ -v name[subscript]
+     ]] test. A @ or * subscript asks whether the array holds any element, an
      associative subscript checks the key, and an indexed subscript checks that
      the arithmetic index is within the stored elements. */
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
@@ -521,17 +524,17 @@ public:
 
   /* Programmable completion. register_completion_spec records what the complete
      builtin registers for a command, lookup returns it for the engine, and
-     run_completion_function calls a -F function with the COMP_ variables set and
-     returns the COMPREPLY entries it produced. */
+     run_completion_function calls a -F function with the COMP_ variables set
+     and returns the COMPREPLY entries it produced. */
   fn register_completion_spec(StringView command, completion_spec spec) throws
       -> void;
   pure fn lookup_completion_spec(StringView command) const wontthrow
       -> const completion_spec *;
   /* The default completion that complete -D registers, used when no command
-     specific spec exists. bash-completion registers its dynamic loader this way,
-     so the engine runs it on an unknown command, the loader sources the per
-     command file and returns 124 to ask for a retry against the now registered
-     spec. */
+     specific spec exists. bash-completion registers its dynamic loader this
+     way, so the engine runs it on an unknown command, the loader sources the
+     per command file and returns 124 to ask for a retry against the now
+     registered spec. */
   fn register_default_completion_spec(completion_spec spec) throws -> void;
   pure fn default_completion_spec() const wontthrow -> const completion_spec *;
   /* out_exit_status, when given, receives the function's return status, so the
@@ -652,8 +655,8 @@ public:
   pure fn current_source() const wontthrow -> const String *;
   pure fn current_origin() const wontthrow -> const String &;
   /* Print the source backtrace, every dot or eval call site from the innermost
-     out, as context under a diagnostic. It prints nothing at the top level where
-     no source is on the stack. */
+     out, as context under a diagnostic. It prints nothing at the top level
+     where no source is on the stack. */
   fn print_source_backtrace() const throws -> void;
 
   /* The byte offset in the current source of the command being evaluated, the
@@ -731,7 +734,8 @@ public:
     return m_mood == mimic_mood::Posix;
   }
 
-  /* The mood the lexer reads, the single source of truth for the three modes. */
+  /* The mood the lexer reads, the single source of truth for the three modes.
+   */
   fn set_mood(mimic_mood mood) wontthrow -> void { m_mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
 
@@ -740,12 +744,12 @@ public:
      context. */
   fn set_mimicry(bool enabled) wontthrow -> void { m_mimicry = enabled; }
   pure fn mimicry() const wontthrow -> bool { return m_mimicry; }
-  /* Run the script at the resolved program in-process in the matching mode. When
-     isolated is true the run is contained in a snapshotted subshell so its cd,
-     exports, and exit do not leak, and when false the run is the terminal command
-     that the shell exits with, so the snapshot is skipped. */
-  fn run_mimicked_script(ExecContext &ec, mimic_mood mode, bool isolated)
-      throws -> i32;
+  /* Run the script at the resolved program in-process in the matching mode.
+     When isolated is true the run is contained in a snapshotted subshell so its
+     cd, exports, and exit do not leak, and when false the run is the terminal
+     command that the shell exits with, so the snapshot is skipped. */
+  fn run_mimicked_script(ExecContext &ec, mimic_mood mode, bool isolated) throws
+      -> i32;
   /* The extended globs are on everywhere except POSIX mode, the way bash treats
      a feature that POSIX rejects anyway as a pure addition. */
   pure fn extglob_enabled() const wontthrow -> bool
@@ -837,9 +841,9 @@ public:
   fn capture_command_substitution(const WordSegment &segment) throws -> String;
 
   /* The $(< file) shorthand reads the named file directly the way bash does,
-     when the substitution body is only an input redirection naming one word with
-     no command. None when the body is anything else, so the caller parses and
-     runs it normally. */
+     when the substitution body is only an input redirection naming one word
+     with no command. None when the body is anything else, so the caller parses
+     and runs it normally. */
   fn read_redirect_substitution(StringView source) throws -> Maybe<String>;
 
   /* Run a <(...) or >(...) process substitution. The text leads with the
@@ -1225,8 +1229,9 @@ protected:
   fn apply_indirect_or_name_listing(StringView body) throws -> String;
 
   /* The set variable names that start with the prefix, gathered from the shell
-     store and the environment, deduplicated and sorted. Shared by the ${!prefix*}
-     string listing and the "${!prefix@}" per-name field expansion. */
+     store and the environment, deduplicated and sorted. Shared by the
+     ${!prefix*} string listing and the "${!prefix@}" per-name field expansion.
+   */
   fn matching_prefix_names(StringView prefix) const throws -> ArrayList<String>;
 
   /* Turn a word into fields, applying tilde, variable expansion, command

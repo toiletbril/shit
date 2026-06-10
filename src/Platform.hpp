@@ -139,7 +139,8 @@ public:
      cleanup deletes only the files tracked after it, not an outer command's. */
   mustuse fn count() const wontthrow -> usize;
   /* Delete every file tracked at or after the mark on a best-effort basis, and
-     keep one still held open by a reader for a later retry rather than leak it. */
+     keep one still held open by a reader for a later retry rather than leak it.
+   */
   fn cleanup_from(usize mark) wontthrow -> void;
 
 private:
@@ -412,9 +413,9 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
     -> Maybe<measured_result>;
 
 /* allow_script_fallback lets a single foreground command report an ENOEXEC file
-   to the caller through ExecFormatError, so the caller runs it as a shell script
-   in place. A pipeline stage or a background command leaves it false and an
-   unrunnable file fails the stage at runtime instead. */
+   to the caller through ExecFormatError, so the caller runs it as a shell
+   script in place. A pipeline stage or a background command leaves it false and
+   an unrunnable file fails the stage at runtime instead. */
 fn execute_program(ExecContext &&ec, bool allow_script_fallback = false) throws
     -> process;
 

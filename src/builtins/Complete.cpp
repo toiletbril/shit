@@ -6,10 +6,10 @@
 /* complete registers a programmable-completion spec for a command, the bash
    builtin a completion script calls, such as complete -o default -F _name name.
    The spec is stored on the context, and the interactive completion engine
-   consults it when an argument to that command is completed. The -F function and
-   the -W word list drive the candidates, and -o default falls back to filename
-   completion when the spec yields nothing. The remaining options are accepted so
-   a config sources cleanly. */
+   consults it when an argument to that command is completed. The -F function
+   and the -W word list drive the candidates, and -o default falls back to
+   filename completion when the spec yields nothing. The remaining options are
+   accepted so a config sources cleanly. */
 
 FLAG_LIST_DECL();
 

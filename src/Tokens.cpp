@@ -124,9 +124,9 @@ cold fn Word::to_pretty_string() const throws -> String
   return result;
 }
 
-/* Rebuild an expansion segment back into source form so a subscript that carries
-   one, the $k of v[$k]=1, survives as text the evaluator expands again. A
-   literal segment contributes its bytes directly. A form the subscript never
+/* Rebuild an expansion segment back into source form so a subscript that
+   carries one, the $k of v[$k]=1, survives as text the evaluator expands again.
+   A literal segment contributes its bytes directly. A form the subscript never
    takes returns false so the caller abandons the split. */
 static fn append_subscript_segment_source(const WordSegment &segment,
                                           String &out) throws -> bool
@@ -147,18 +147,18 @@ static fn append_subscript_segment_source(const WordSegment &segment,
     out.append(segment.text.view());
     out.push(')');
     return true;
-  default:
-    return false;
+  default: return false;
   }
 }
 
 /* An array element assignment whose subscript holds an expansion, the $k in
    v[$k]=1, splits across segments since the = lands after the ] in a later
    segment. The subscript is rebuilt into source form and folded back into the
-   key, so the evaluator's existing a[i]=v path expands it. None when the word is
-   not this shape. */
-static fn array_element_assignment_split(const ArrayList<WordSegment> &segments)
-    throws -> Maybe<word_assignment_split>
+   key, so the evaluator's existing a[i]=v path expands it. None when the word
+   is not this shape. */
+static fn
+array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
+    -> Maybe<word_assignment_split>
 {
   const WordSegment &first = segments[0];
   if (first.text.is_empty() || !lexer::is_variable_name_start(first.text[0]))
@@ -185,7 +185,8 @@ static fn array_element_assignment_split(const ArrayList<WordSegment> &segments)
                          segment.kind == WordSegment::Kind::DoubleQuotedText ||
                          segment.kind == WordSegment::Kind::LiteralText;
     if (!is_text) {
-      if (!append_subscript_segment_source(segment, subscript)) return shit::None;
+      if (!append_subscript_segment_source(segment, subscript))
+        return shit::None;
       continue;
     }
 
@@ -237,9 +238,9 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   const let equals_position = first.text.find_character('=');
   if (!equals_position.has_value()) {
-    /* The open bracket is the cheap gate that keeps a plain command word off the
-       array-element scan, since only a NAME[ word can be an element assignment
-       whose subscript pushed the = into a later segment. */
+    /* The open bracket is the cheap gate that keeps a plain command word off
+       the array-element scan, since only a NAME[ word can be an element
+       assignment whose subscript pushed the = into a later segment. */
     if (first.text.find_character('[').has_value())
       return array_element_assignment_split(segments);
     return shit::None;

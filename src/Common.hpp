@@ -49,8 +49,8 @@
 #define SHIT_STRINGIFY(x)       SHIT_STRINGIFY_INNER(x)
 #define SHIT_VERSION_STRING                                                    \
   SHIT_STRINGIFY(SHIT_VER_MAJOR)                                               \
-  "." SHIT_STRINGIFY(SHIT_VER_MINOR) "." SHIT_STRINGIFY(SHIT_VER_PATCH)        \
-  "-" SHIT_VER_EXTRA
+  "." SHIT_STRINGIFY(SHIT_VER_MINOR) "." SHIT_STRINGIFY(                       \
+      SHIT_VER_PATCH) "-" SHIT_VER_EXTRA
 
 #define SHIT_SHORT_LICENSE                                                     \
   "Licensed under the 3-Clause BSD License.\n"                                 \

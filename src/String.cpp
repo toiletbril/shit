@@ -98,7 +98,8 @@ hot fn String::append(StringView other) throws -> void
 
 cold fn String::reserve(usize needed) throws -> void
 {
-  if (needed + 1 <= m_capacity) [[likely]] return;
+  if (needed + 1 <= m_capacity) [[likely]]
+    return;
   /* A small buffer quadruples so a string built one append at a time leaves the
      inline size in one realloc rather than several, while a large buffer
      doubles to keep the overshoot bounded. */

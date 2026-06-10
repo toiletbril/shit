@@ -80,7 +80,8 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool;
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>;
 
 /* An argument split at its first '=', for the assignment builtins. The value is
-   absent when no '=' is present, so a bare name reads differently from name=. */
+   absent when no '=' is present, so a bare name reads differently from name=.
+ */
 struct name_value_arg
 {
   StringView name;
@@ -110,9 +111,9 @@ fn int_to_text_into(i64 value, char *buffer, usize buffer_size) wontthrow
 fn format_minutes_seconds(double seconds) throws -> String;
 
 /* The two reports the time keyword prints. The POSIX form matches bash time -p,
-   each label and the plain seconds with two decimals on its own line. The pretty
-   form is the default, an aligned block of the wall time, the user and system
-   cpu, and the cpu busy percent, for a single timed run. */
+   each label and the plain seconds with two decimals on its own line. The
+   pretty form is the default, an aligned block of the wall time, the user and
+   system cpu, and the cpu busy percent, for a single timed run. */
 fn format_time_report_posix(double real_seconds, double user_seconds,
                             double system_seconds) throws -> String;
 fn format_time_report_pretty(double real_seconds, double user_seconds,
@@ -147,9 +148,9 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
 fn read_entire_file(StringView path) throws -> Maybe<String>;
 
 /* The shell a script's shebang names, for the mimicry feature, or None when the
-   resolved program is not a script shit can emulate. Only the first line is read.
-   A sh or dash interpreter maps to POSIX mode, bash to bash mode, and shit to the
-   default mode, including the /usr/bin/env form. */
+   resolved program is not a script shit can emulate. Only the first line is
+   read. A sh or dash interpreter maps to POSIX mode, bash to bash mode, and
+   shit to the default mode, including the /usr/bin/env form. */
 fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>;
 
 /* Read everything still available on standard input into a string. */

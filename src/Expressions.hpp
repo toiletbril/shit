@@ -54,13 +54,14 @@ public:
   HashMap<String> constant_variables{heap_allocator()};
 
   /* The depth of function bodies the prepass is inside, raised on entry to a
-     function body and lowered on exit. A plain scalar assignment at a depth above
-     zero leaks to the global scope, which a warning flags. */
+     function body and lowered on exit. A plain scalar assignment at a depth
+     above zero leaks to the global scope, which a warning flags. */
   usize function_scope_depth{0};
 
   /* The names the current function body declared with local, declare, or
-     typeset, so an assignment to one of them does not warn about a leak. The set
-     is saved and cleared on entry to a function body and restored on exit. */
+     typeset, so an assignment to one of them does not warn about a leak. The
+     set is saved and cleared on entry to a function body and restored on exit.
+   */
   HashSet function_local_names{heap_allocator()};
 
   explicit AnalysisContext(StringView source_view) : source(source_view) {}

@@ -43,10 +43,12 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
       cxt.unset_function(name);
     } else if (let const bracket = name.view().find_character('[');
                bracket.has_value() && name.count() > 0 &&
-               name.view()[name.count() - 1] == ']') {
+               name.view()[name.count() - 1] == ']')
+    {
       /* A name[subscript] operand removes one array element or key rather than
          the whole variable. */
-      const StringView array_name = name.view().substring_of_length(0, *bracket);
+      const StringView array_name =
+          name.view().substring_of_length(0, *bracket);
       const StringView subscript = name.view().substring_of_length(
           *bracket + 1, name.count() - *bracket - 2);
       try {

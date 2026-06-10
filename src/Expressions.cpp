@@ -487,11 +487,11 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
     return;
   }
 
-  /* A plain scalar assignment inside a function body with no prior local for the
-     name leaks the value to the global scope, the footgun shit's own default
-     mood guards against at run time. The append form is left alone since it
-     extends a value the name already holds. This is the shellcheck SC2030-style
-     warning for a leaked variable. */
+  /* A plain scalar assignment inside a function body with no prior local for
+     the name leaks the value to the global scope, the footgun shit's own
+     default mood guards against at run time. The append form is left alone
+     since it extends a value the name already holds. This is the shellcheck
+     SC2030-style warning for a leaked variable. */
   if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
       !actx.function_local_names.contains(name.view()))
     actx.warn(source_location(),
@@ -537,7 +537,8 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      under set -u or a readonly name. The assignment has a source location, so
      the error is relocated to a caret at it the way process_args does for a
      command argument. An already located error from a deeper command
-     substitution rides through, since it is a separate branch under ErrorBase. */
+     substitution rides through, since it is a separate branch under ErrorBase.
+   */
   try {
     let value = cxt.expand_word_for_assignment(m_assignment->value_word());
 
@@ -892,10 +893,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* A simple command consumes its argument words and discards them when it
      returns, so they are built on the scratch arena and reclaimed here rather
-     than heap-allocated per argument. The mark is taken before the expansion and
-     released on every exit from this command, so a loop body does not accumulate
-     a vector per iteration. A builtin that keeps a word past the command copies
-     it into the heap-backed store, so nothing the release frees is still read. */
+     than heap-allocated per argument. The mark is taken before the expansion
+     and released on every exit from this command, so a loop body does not
+     accumulate a vector per iteration. A builtin that keeps a word past the
+     command copies it into the heap-backed store, so nothing the release frees
+     is still read. */
   let const args_mark = cxt.scratch_mark();
   defer { cxt.scratch_release(args_mark); };
   /* A <(...) or >(...) in the words below opens a pipe and forks a child or
@@ -1250,10 +1252,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (cxt.is_integer_variable(name)) {
           cxt.append_integer_expression(appended, value.view());
           char decimal[24];
-          value = String{cxt.scratch_allocator(),
-                         utils::int_to_text_into(
-                             cxt.evaluate_arithmetic(appended.view()), decimal,
-                             sizeof(decimal))};
+          value = String{
+              cxt.scratch_allocator(),
+              utils::int_to_text_into(cxt.evaluate_arithmetic(appended.view()),
+                                      decimal, sizeof(decimal))};
         } else {
           appended += value;
           value = steal(appended);
@@ -1332,9 +1334,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (cxt.is_integer_variable(name)) {
         cxt.append_integer_expression(appended, expanded_value.view());
         char decimal[24];
-        expanded_value = String{cxt.scratch_allocator(),
-                                utils::int_to_text_into(
-                                    cxt.evaluate_arithmetic(appended.view()),
+        expanded_value = String{
+            cxt.scratch_allocator(),
+            utils::int_to_text_into(cxt.evaluate_arithmetic(appended.view()),
                                     decimal, sizeof(decimal))};
       } else {
         appended += expanded_value;
@@ -1448,10 +1450,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     defer { cxt.set_loop_depth(saved_loop_depth); };
 
     /* The function body's transient scratch is reclaimed when the call returns,
-       so a recursive function or a call in a loop does not grow the arena across
-       frames. The status is an integer and the scope pop restores the locals
-       into the heap-backed store, so nothing the release frees is still read.
-       The release is registered first, so it runs last, after the scope pop. */
+       so a recursive function or a call in a loop does not grow the arena
+       across frames. The status is an integer and the scope pop restores the
+       locals into the heap-backed store, so nothing the release frees is still
+       read. The release is registered first, so it runs last, after the scope
+       pop. */
     let const call_mark = cxt.scratch_mark();
     defer { cxt.scratch_release(call_mark); };
 
@@ -1548,17 +1551,19 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     let const is_function_local = is_declare && cxt.in_function_scope();
     let const is_export = array_command_name == "export";
     /* readonly NAME=(...), and declare -r NAME=(...), mark the array name so a
-       later assignment to it is rejected the way bash refuses a readonly. The -r
-       flag sits in the builtin's arguments, so it is read off them. */
+       later assignment to it is rejected the way bash refuses a readonly. The
+       -r flag sits in the builtin's arguments, so it is read off them. */
     let is_readonly_request = array_command_name == "readonly";
-    /* The -A flag declares an associative array, so local -A m=() and declare -A
-       m=([k]=v) route to the string-keyed store rather than the indexed one. */
+    /* The -A flag declares an associative array, so local -A m=() and declare
+       -A m=([k]=v) route to the string-keyed store rather than the indexed one.
+     */
     let is_associative_request = false;
     if (is_declare || is_local)
       for (const Token *arg : m_args) {
         let const text = arg->raw_string();
         if (text.length() >= 2 && text.view()[0] == '-') {
-          if (!is_readonly_request && text.view().find_character('r').has_value())
+          if (!is_readonly_request &&
+              text.view().find_character('r').has_value())
             is_readonly_request = true;
           if (text.view().find_character('A').has_value())
             is_associative_request = true;
@@ -1951,8 +1956,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         Maybe<os::process> spawned_stage = os::spawn_subshell_stage(
             stage_text, stage_in, stage_out, cxt.is_bash_compatible());
         if (!spawned_stage.has_value())
-          throw ErrorWithLocation{stage_location,
-                                  "Could not spawn the compound pipeline stage"};
+          throw ErrorWithLocation{
+              stage_location, "Could not spawn the compound pipeline stage"};
         child = *spawned_stage;
       } else {
         child = os::fork_compound_stage(stage_in, stage_out, {});
@@ -2027,8 +2032,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   }
 
   /* The children are pushed in pipeline order, so their statuses are collected
-     in order. pipefail reports the rightmost stage that failed, or zero when all
-     succeeded, while the plain case reports the last stage alone. */
+     in order. pipefail reports the rightmost stage that failed, or zero when
+     all succeeded, while the plain case reports the last stage alone. */
   let stage_status = ArrayList<i32>{};
   stage_status.reserve(children.count());
   for (const os::process child : children)
@@ -2114,7 +2119,8 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
   let ecs = ArrayList<ExecContext>{cxt.scratch_allocator()};
   defer
   {
-    for (ExecContext &leftover : ecs) leftover.close_fds();
+    for (ExecContext &leftover : ecs)
+      leftover.close_fds();
     cxt.scratch_release(pipeline_mark);
   };
   ecs.reserve(m_commands.count());
@@ -2138,9 +2144,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     /* A stage whose command does not resolve is non-fatal. Bash reports it,
-       runs the rest of the pipeline, and reports the last stage's status, so the
-       unresolved stage becomes a no-op context that closes its pipe to give the
-       next stage EOF and contributes 127 only under pipefail. Aborting here
+       runs the rest of the pipeline, and reports the last stage's status, so
+       the unresolved stage becomes a no-op context that closes its pipe to give
+       the next stage EOF and contributes 127 only under pipefail. Aborting here
        instead would wrongly make the not-found stage govern the pipeline. */
     Maybe<ExecContext> stage_ec;
     try {
@@ -2148,11 +2154,11 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
           ExecContext::make_from(e->source_location(), steal(stage_args));
     } catch (const CommandNotFound &not_found) {
       report_command_not_found(cxt, not_found);
-      /* The stage still applies its own redirections, the way bash and dash open
-         a > target even for a command that was not found, then runs nothing. The
-         opened descriptors close with the stage, and a > onto its standard
-         output takes the slot ahead of the pipe, so the next stage still sees
-         EOF. */
+      /* The stage still applies its own redirections, the way bash and dash
+         open a > target even for a command that was not found, then runs
+         nothing. The opened descriptors close with the stage, and a > onto its
+         standard output takes the slot ahead of the pipe, so the next stage
+         still sees EOF. */
       let unresolved = ExecContext::make_unresolved(e->source_location());
       bool unresolved_handed_off = false;
       defer
@@ -2670,13 +2676,13 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
 
   /* The default mood scopes the loop variable, putting its prior value back
-     once the loop ends so the name does not leak, while the bash and posix moods
-     leave it set the way those shells do. */
-  let const scope_variable =
-      !(cxt.is_bash_compatible() || cxt.is_posix_mode());
+     once the loop ends so the name does not leak, while the bash and posix
+     moods leave it set the way those shells do. */
+  let const scope_variable = !(cxt.is_bash_compatible() || cxt.is_posix_mode());
   Maybe<String> saved_value =
       scope_variable ? cxt.get_variable_value(m_variable_name) : None;
-  defer {
+  defer
+  {
     if (scope_variable) {
       if (saved_value.has_value())
         cxt.set_shell_variable(m_variable_name, saved_value->view());
@@ -2828,8 +2834,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       did_run_a_body = true;
 
       let const terminator = m_items[i].terminator;
-      if (terminator == case_terminator::FallThrough &&
-          i + 1 < m_items.count())
+      if (terminator == case_terminator::FallThrough && i + 1 < m_items.count())
       {
         i++;
         continue;
@@ -3023,8 +3028,8 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   /* A non-zero arithmetic value is success, a zero value is failure, the
      opposite of the value-to-status convention of the rest of the shell. The
-     arithmetic evaluator reports a malformed expression or a division by zero as
-     a plain error, so it is relocated to this command's position to carry a
+     arithmetic evaluator reports a malformed expression or a division by zero
+     as a plain error, so it is relocated to this command's position to carry a
      caret at the (( in the source, including the source an eval runs. */
   i64 value;
   try {
@@ -3439,9 +3444,9 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_child != nullptr);
 
   /* A <(...) or >(...) in a redirection target, as in done < <(cmd), opens a
-     pipe and forks a child or leaves a temp file during the expansion below. The
-     mark is taken before it so this command reaps only the substitution its own
-     redirection opens, reaped and its temp file deleted once the redirected
+     pipe and forks a child or leaves a temp file during the expansion below.
+     The mark is taken before it so this command reaps only the substitution its
+     own redirection opens, reaped and its temp file deleted once the redirected
      command returns. Registered first so it runs last, after the descriptor
      backups restore. */
   let const substitution_mark = cxt.mark_process_substitutions();
@@ -3817,7 +3822,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       usize end = 0;
       while (end < text.length && lexer::is_variable_name(text[end]))
         end++;
-      if (end > 0) actx.function_local_names.add(text.substring_of_length(0, end));
+      if (end > 0)
+        actx.function_local_names.add(text.substring_of_length(0, end));
     }
 
   /* The literal command text, used for the test recognition. A name like [

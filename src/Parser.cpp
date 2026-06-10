@@ -927,7 +927,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
        the command is not empty and a following terminator must build it rather
        than be read as a leading keyword. */
     if (args_accumulator.is_empty() && local_vars.count() == 0 &&
-        array_args.is_empty()) {
+        array_args.is_empty())
+    {
       /* A standalone '{' in command position opens a brace group, and a
          standalone '}' closes the enclosing one. Both arrive as words, so they
          are matched on the text before the kind switch. A '}' with no open
@@ -1084,9 +1085,8 @@ hot fn Parser::parse_simple_command() throws -> Command *
          one keeps sourcing. */
       if (is_array_assignment) {
         ArrayList<const Token *> elements = consume_bash_array_assignment();
-        array_args.push(array_builtin_assignment{a->key().clone(),
-                                                 steal(elements),
-                                                 a->is_append()});
+        array_args.push(array_builtin_assignment{
+            a->key().clone(), steal(elements), a->is_append()});
         break;
       }
 
@@ -1233,8 +1233,9 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   return loop;
 }
 
-static fn word_token_from_assignment(BumpArena &arena, const Assignment *a)
-    throws -> tokens::WordToken *;
+static fn word_token_from_assignment(BumpArena &arena,
+                                     const Assignment *a) throws
+    -> tokens::WordToken *;
 
 static fn word_token_from_raw(BumpArena &arena, StringView text,
                               SourceLocation location) throws
@@ -1498,7 +1499,8 @@ static fn word_token_from_assignment(BumpArena &arena,
                      segment.is_in_double_quotes};
     copy.folded_arithmetic_result = segment.folded_arithmetic_result;
     copy.cached_substitution_ast = segment.cached_substitution_ast;
-    copy.cached_substitution_generation = segment.cached_substitution_generation;
+    copy.cached_substitution_generation =
+        segment.cached_substitution_generation;
     word.segments.push(steal(copy));
   }
   return arena.create<tokens::WordToken>(a->source_location(), steal(word));
@@ -1607,9 +1609,7 @@ hot fn Parser::parse_case() throws -> Command *
     case_terminator terminator = case_terminator::Break;
     bool is_last_arm = false;
     switch (after->kind()) {
-    case Token::Kind::DoubleSemicolon:
-      m_lexer.advance_past_last_peek();
-      break;
+    case Token::Kind::DoubleSemicolon: m_lexer.advance_past_last_peek(); break;
     case Token::Kind::SemicolonAmpersand:
       terminator = case_terminator::FallThrough;
       m_lexer.advance_past_last_peek();
@@ -1645,11 +1645,11 @@ hot fn Parser::parse_brace_group() throws -> Command *
   Token *close = m_lexer.next_shell_token();
   ASSERT(close != nullptr);
   if (!is_brace_word(close, '}')) {
-    /* The closing '}' is a reserved word only at the start of a command, so when
-       it lacks a ';' or a newline before it the lexer reads it as an argument to
-       the last command and the group never closes. throw_unterminated finds that
-       stray '}' in the source and points the caret at it, telling the reader to
-       put a ';' before it. */
+    /* The closing '}' is a reserved word only at the start of a command, so
+       when it lacks a ';' or a newline before it the lexer reads it as an
+       argument to the last command and the group never closes.
+       throw_unterminated finds that stray '}' in the source and points the
+       caret at it, telling the reader to put a ';' before it. */
     throw_unterminated(open->source_location(), "Unterminated brace group",
                        m_lexer.source(), "}", close->source_location());
   }
@@ -1766,7 +1766,8 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
   const StringView body = capture_double_paren_body(open);
   /* The command's location spans the whole (( body )), the two opening and two
      closing parentheses around the captured body, so a runtime arithmetic error
-     underlines the entire expression rather than only the opening parentheses. */
+     underlines the entire expression rather than only the opening parentheses.
+   */
   const SourceLocation open_location = open->source_location();
   const SourceLocation full_location{open_location.position, body.length + 4,
                                      open_location.filename};
@@ -1893,10 +1894,10 @@ hot fn Parser::parse_conditional_command() throws -> Command *
 
       /* The right side of =~ is a regular expression where (, ), and | are
          ordinary characters, so the lexer's split into separate paren and word
-         tokens is rejoined here. Tokens with no whitespace between them form one
-         regex operand, taken from the source span so the metacharacters survive.
-         A single token, such as a variable or a quoted regex, is left alone so
-         its expansion still happens. */
+         tokens is rejoined here. Tokens with no whitespace between them form
+         one regex operand, taken from the source span so the metacharacters
+         survive. A single token, such as a variable or a quoted regex, is left
+         alone so its expansion still happens. */
       if (word_literal == "=~") {
         Token *peek = m_lexer.peek_shell_token();
         if (peek != nullptr && !is_unquoted_word(peek, "]]") &&

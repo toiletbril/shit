@@ -48,7 +48,8 @@ class Lexer
 public:
   Lexer(String source, BumpArena &arena,
         bool should_collect_debug_words = false,
-        Maybe<StringView> filename = None, mimic_mood mood = mimic_mood::Default);
+        Maybe<StringView> filename = None,
+        mimic_mood mood = mimic_mood::Default);
   ~Lexer();
 
   /* The mood the source is lexed in, the same three-way mimic_mood the mimicry
@@ -64,8 +65,8 @@ public:
   }
 
   /* Whether strict POSIX lexing is active. The default mood is neither bash nor
-     POSIX, so a dash-rejected pure addition such as the NAME=(...) array literal
-     stays on in the default mood and is suppressed only here. */
+     POSIX, so a dash-rejected pure addition such as the NAME=(...) array
+     literal stays on in the default mood and is suppressed only here. */
   pure fn is_posix_mode() const wontthrow -> bool
   {
     return m_mood == mimic_mood::Posix;
@@ -119,10 +120,10 @@ protected:
 
   /* The parser peeks the next token many times before it consumes one, and each
      peek would otherwise re-lex from the same position, the hottest cost in a
-     parse-heavy run. The last peeked token is cached and reused while the cursor
-     has not moved and the lexing mode, shell versus expression, is the same. A
-     consumed token advances the cursor, so the stored position no longer matches
-     and the next peek lexes afresh. */
+     parse-heavy run. The last peeked token is cached and reused while the
+     cursor has not moved and the lexing mode, shell versus expression, is the
+     same. A consumed token advances the cursor, so the stored position no
+     longer matches and the next peek lexes afresh. */
   Token *m_peek_cache{nullptr};
   usize m_peek_cache_position{0};
   bool m_peek_cache_is_shell{false};

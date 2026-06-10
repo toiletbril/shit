@@ -60,7 +60,8 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
     let out = String{};
     out += "shit has ";
-    out += utils::int_to_text(static_cast<i64>(sorted.count()), heap_allocator());
+    out +=
+        utils::int_to_text(static_cast<i64>(sorted.count()), heap_allocator());
     out += " builtins:\n\n";
     for (usize i = 0; i < sorted.count(); i++) {
       if (i % columns == 0) out += "  ";

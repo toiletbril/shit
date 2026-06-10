@@ -17,9 +17,9 @@ namespace completion {
 
 /* The syntax highlighter rebuilds its spans, its per-word and per-construct
    lists, and the set of known variable names on every keystroke, all of which
-   die when the next keystroke redraws. They live on this arena, reset at the top
-   of highlight_line so the previous render's spans stay valid until the line
-   editor has drained them into its own buffer. */
+   die when the next keystroke redraws. They live on this arena, reset at the
+   top of highlight_line so the previous render's spans stay valid until the
+   line editor has drained them into its own buffer. */
 static BumpArena HIGHLIGHT_ARENA{};
 
 /* True for a byte that separates one shell word from the next at the top level.
@@ -496,8 +496,8 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 }
 
 /* The command a registered completion spec is looked up by, the first
-   whitespace-delimited word of the line past any transparent keyword prefix such
-   as time or ! so the spec for the real command is found. */
+   whitespace-delimited word of the line past any transparent keyword prefix
+   such as time or ! so the spec for the real command is found. */
 static fn command_word_of(StringView line) wontthrow -> StringView
 {
   usize i = 0;
@@ -554,12 +554,12 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
   if (command.is_empty()) return None;
   const completion_spec *spec = context.lookup_completion_spec(command);
 
-  /* No command-specific spec. On an explicit tab, consult the default completion
-     the way bash-completion's complete -D dynamic loader does. The loader sources
-     the per-command file and returns 124 to ask for a retry, so the now
-     registered command spec is looked up and run. A non-124 return means the
-     default itself produced the candidates. The ghost path never runs this since
-     sourcing a file on every keystroke would be wrong. */
+  /* No command-specific spec. On an explicit tab, consult the default
+     completion the way bash-completion's complete -D dynamic loader does. The
+     loader sources the per-command file and returns 124 to ask for a retry, so
+     the now registered command spec is looked up and run. A non-124 return
+     means the default itself produced the candidates. The ghost path never runs
+     this since sourcing a file on every keystroke would be wrong. */
   if (spec == nullptr) {
     if (!for_listing) return None;
     const completion_spec *def = context.default_completion_spec();
@@ -569,11 +569,12 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
        names, so the flag is captured rather than read back through def. */
     let const default_falls_back = def->use_default;
     usize default_cword = 0;
-    let const default_words = split_completion_words(line, cursor, default_cword);
+    let const default_words =
+        split_completion_words(line, cursor, default_cword);
     i32 status = 0;
-    let const reply =
-        context.run_completion_function(def->function_name.view(), default_words,
-                                        default_cword, line, cursor, &status);
+    let const reply = context.run_completion_function(
+        def->function_name.view(), default_words, default_cword, line, cursor,
+        &status);
     if (status != 124) {
       let loaded = ArrayList<String>{};
       for (const String &entry : reply)
@@ -603,13 +604,13 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     }
   }
 
-  /* The function returns the final candidate list in COMPREPLY, already filtered
-     to the current word, so its entries are taken as they are. */
+  /* The function returns the final candidate list in COMPREPLY, already
+     filtered to the current word, so its entries are taken as they are. */
   if (for_listing && !spec->function_name.is_empty()) {
     usize cword = 0;
     let const words = split_completion_words(line, cursor, cword);
-    let const reply = context.run_completion_function(spec->function_name.view(),
-                                                      words, cword, line, cursor);
+    let const reply = context.run_completion_function(
+        spec->function_name.view(), words, cword, line, cursor);
     for (const String &entry : reply)
       candidates.push_managed(entry.view());
   }
@@ -689,8 +690,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
     candidates = complete_glob(token, base_directory);
   } else {
     /* An argument to a command that registered a completion spec consults the
-       spec first, the way bash runs a programmable completion, and falls back to
-       filenames when no spec applies or a -o default spec found nothing. */
+       spec first, the way bash runs a programmable completion, and falls back
+       to filenames when no spec applies or a -o default spec found nothing. */
     if (Maybe<ArrayList<String>> from_spec =
             complete_from_spec(line, token, cursor, for_listing, context);
         from_spec.has_value())
@@ -853,7 +854,8 @@ static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
   if (i < word.length && word[i] == '=') return true;
   /* The array-element form NAME[subscript]= is also an assignment, the way the
      lexer keeps arr[i]=v one assignment word, so the highlighter keeps the next
-     word in command position rather than coloring the array name as a command. */
+     word in command position rather than coloring the array name as a command.
+   */
   if (i < word.length && word[i] == '[') {
     usize depth = 1;
     i++;
@@ -865,7 +867,8 @@ static pure fn word_looks_like_assignment(StringView word) wontthrow -> bool
       i++;
     }
     if (i < word.length && word[i] == '=') return true;
-    if (i + 1 < word.length && word[i] == '+' && word[i + 1] == '=') return true;
+    if (i + 1 < word.length && word[i] == '+' && word[i + 1] == '=')
+      return true;
   }
   return false;
 }
@@ -1239,8 +1242,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 }
 
 /* The variable names the line itself introduces, a for or select loop variable
-   and a plain NAME= assignment, so the highlighter does not red a reference to a
-   name the same line binds. */
+   and a plain NAME= assignment, so the highlighter does not red a reference to
+   a name the same line binds. */
 static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
     -> void
 {
@@ -1275,8 +1278,7 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
       StringView name = token.substring_of_length(0, equals.value());
       /* An array-element assignment binds the base name, so arr[0]=1 makes arr
          known rather than the invalid name arr[0. */
-      if (Maybe<usize> bracket = name.find_character('[');
-          bracket.has_value())
+      if (Maybe<usize> bracket = name.find_character('['); bracket.has_value())
         name = name.substring_of_length(0, bracket.value());
       if (is_identifier(name)) known_vars.add(name);
     }

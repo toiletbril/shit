@@ -117,8 +117,9 @@ private:
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
                    const ArrayList<String> &args,
                    usize base_position = 0) throws -> ArrayList<String>;
-fn parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv,
-               usize base_position = 0) throws -> ArrayList<String>;
+fn parse_flags(const ArrayList<Flag *> &flags, int argc,
+               const char *const *argv, usize base_position = 0) throws
+    -> ArrayList<String>;
 
 /* Join the arguments into one space-separated line, the source a located flag
    error renders its caret against. The caller rebuilds the same line the parser

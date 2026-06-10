@@ -67,8 +67,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       job *const job = cxt.find_job(static_cast<int>(parsed.value()));
       if (job == nullptr) {
-        report_soft_builtin_error(ec, cxt, StringView{"'"} + target_text +
-                                               "' is not a known job");
+        report_soft_builtin_error(
+            ec, cxt, StringView{"'"} + target_text + "' is not a known job");
         status = 1;
         continue;
       }

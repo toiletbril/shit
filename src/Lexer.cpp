@@ -140,8 +140,7 @@ pure fn is_special_parameter_char(char ch) wontthrow -> bool
 Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
              Maybe<StringView> filename, mimic_mood mood)
     : m_source(steal(source)), m_arena(&arena), m_filename(filename),
-      m_mood(mood),
-      m_should_collect_debug_words(should_collect_debug_words)
+      m_mood(mood), m_should_collect_debug_words(should_collect_debug_words)
 {}
 
 Lexer::~Lexer() = default;
@@ -217,7 +216,8 @@ pure fn Lexer::arena() const wontthrow -> BumpArena & { return *m_arena; }
 fn Lexer::set_arena(BumpArena &arena) wontthrow -> void
 {
   m_arena = &arena;
-  /* The cached token lives in the old arena, so it must not survive the swap. */
+  /* The cached token lives in the old arena, so it must not survive the swap.
+   */
   m_peek_cache = nullptr;
 }
 
@@ -464,7 +464,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
 
   /* A balanced [ ... ] starting at the offset closes on a ] that is followed by
      = or +=, the shape of an array element assignment. The lookahead consumes
-     nothing, it only decides whether the bracket run is a protected subscript. */
+     nothing, it only decides whether the bracket run is a protected subscript.
+   */
   auto subscript_closes_with_assignment = [this](usize start) -> bool {
     usize offset = start + 1;
     usize depth = 1;
@@ -512,9 +513,9 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     /* A NAME[subscript]= assignment protects the subscript's operators, so the
        |, &, ;, and parentheses a bitmask subscript such as key[a|b]=1 carries
        stay in the word rather than ending it. The capture runs only when the
-       word so far is a bare array name and a balanced ] followed by = or += marks
-       this an assignment, so a glob like x[1|2] in argument position is left to
-       split the way bash does. */
+       word so far is a bare array name and a balanced ] followed by = or +=
+       marks this an assignment, so a glob like x[1|2] in argument position is
+       left to split the way bash does. */
     if (!is_inside_quote_or_escape && ch == '[' && word_is_plain_array_name() &&
         subscript_closes_with_assignment(byte_count))
     {
@@ -734,9 +735,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           } break;
           case 'c': {
             /* Control modifier. bash uppercases the letter then takes the low
-               five bits, so \cA is 0x01 and \c[ is the escape 0x1b, while \c? is
-               the delete 0x7f. The earlier xor with 0x40 only matched this for
-               the bytes 0x40 to 0x5f and was wrong for a digit or punctuation. */
+               five bits, so \cA is 0x01 and \c[ is the escape 0x1b, while \c?
+               is the delete 0x7f. The earlier xor with 0x40 only matched this
+               for the bytes 0x40 to 0x5f and was wrong for a digit or
+               punctuation. */
             const char k = chop_character(byte_count);
             if (k == lexer::CEOF) {
               emit_literal('\\');
@@ -751,8 +753,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
               byte_count++;
             }
             const char upper = (target >= 'a' && target <= 'z')
-                                    ? static_cast<char>(target - 'a' + 'A')
-                                    : target;
+                                   ? static_cast<char>(target - 'a' + 'A')
+                                   : target;
             const u8 control =
                 upper == '?' ? static_cast<u8>(0x7fu)
                              : static_cast<u8>(static_cast<u8>(upper) & 0x1fu);

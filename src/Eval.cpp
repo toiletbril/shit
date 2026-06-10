@@ -27,7 +27,8 @@
 #include <regex.h>
 #endif
 
-/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test. */
+/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test.
+ */
 #if SHIT_PLATFORM_IS WIN32
 #include <io.h>
 #endif
@@ -155,9 +156,8 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   if (is_integer_variable(name)) [[unlikely]] {
     let const result = value.length == 0 ? 0 : evaluate_arithmetic(value);
     char result_text[24];
-    assign_variable(name,
-                    utils::int_to_text_into(result, result_text,
-                                            sizeof(result_text)));
+    assign_variable(name, utils::int_to_text_into(result, result_text,
+                                                  sizeof(result_text)));
     return;
   }
 
@@ -277,8 +277,9 @@ static fn collect_sparse_array_entries(const HashMap<String> &sparse,
     let const index_text = key.substring(name_prefix.length);
     if (let const parsed = utils::parse_decimal_integer(index_text);
         !parsed.is_error() && parsed.value() >= 0)
-      out.push(sparse_array_entry{static_cast<usize>(parsed.value()),
-                                  String{allocator, value.view()}});
+      out.push(sparse_array_entry{
+          static_cast<usize>(parsed.value()), String{allocator, value.view()}
+      });
   });
   /* An insertion sort keeps it simple, since a sparse array holds few far
      elements. */
@@ -297,7 +298,7 @@ static fn collect_sparse_array_entries(const HashMap<String> &sparse,
 fn EvalContext::clear_sparse_array(StringView name) throws -> void
 {
   let const entries = collect_sparse_array_entries(m_sparse_array_values, name,
-                                   scratch_allocator());
+                                                   scratch_allocator());
   for (const sparse_array_entry &entry : entries)
     m_sparse_array_values.erase(
         sparse_array_key(name, entry.index, scratch_allocator()).view());
@@ -341,7 +342,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
     if (let const *array = lookup_indexed_array(name))
       running_index = array->count();
     let const sparse = collect_sparse_array_entries(m_sparse_array_values, name,
-                                   scratch_allocator());
+                                                    scratch_allocator());
     if (!sparse.is_empty()) {
       let const next_after_sparse = sparse[sparse.count() - 1].index + 1;
       if (next_after_sparse > running_index) running_index = next_after_sparse;
@@ -437,8 +438,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
      set_shell_variable gives a scalar. The joined text lives on the scratch
      arena and the stores below copy the decimal result. */
   char integer_result[24];
-  auto integer_element_value = [&](Maybe<String> existing) throws
-      -> StringView {
+  auto integer_element_value = [&](Maybe<String> existing)
+                                   throws -> StringView {
     let joined = String{scratch_allocator()};
     if (is_append) {
       if (existing.has_value()) joined.append(existing->view());
@@ -515,7 +516,8 @@ fn EvalContext::set_associative_element(StringView name, StringView key,
 {
   m_associative_names.add(name);
   m_shell_variables.erase(name);
-  m_associative_values.set(associative_composite_key(name, key, scratch_allocator()).view(), value);
+  m_associative_values.set(
+      associative_composite_key(name, key, scratch_allocator()).view(), value);
 }
 
 fn EvalContext::lookup_associative_element(StringView name,
@@ -532,7 +534,8 @@ fn EvalContext::associative_keys(StringView name) const throws
     -> ArrayList<String>
 {
   let keys = ArrayList<String>{heap_allocator()};
-  const String prefix = associative_composite_key(name, "", scratch_allocator());
+  const String prefix =
+      associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
     unused(value);
     if (composite.length >= prefix.count() &&
@@ -546,7 +549,8 @@ fn EvalContext::associative_values(StringView name) const throws
     -> ArrayList<String>
 {
   let values = ArrayList<String>{heap_allocator()};
-  const String prefix = associative_composite_key(name, "", scratch_allocator());
+  const String prefix =
+      associative_composite_key(name, "", scratch_allocator());
   m_associative_values.for_each([&](StringView composite, const String &value) {
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
@@ -560,7 +564,8 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
   if (!is_associative_array(name)) return;
   /* The composite keys are collected before erasing, since removing entries
      while iterating the value map would be unsafe. */
-  const String prefix = associative_composite_key(name, "", scratch_allocator());
+  const String prefix =
+      associative_composite_key(name, "", scratch_allocator());
   let to_erase = ArrayList<String>{heap_allocator()};
   m_associative_values.for_each([&](StringView composite, const String &) {
     if (composite.length >= prefix.count() &&
@@ -580,8 +585,7 @@ fn EvalContext::unset_array_element(StringView name,
 
   if (is_associative_array(name)) {
     m_associative_values.erase(
-        associative_composite_key(name, subscript, scratch_allocator())
-            .view());
+        associative_composite_key(name, subscript, scratch_allocator()).view());
     return;
   }
 
@@ -589,8 +593,7 @@ fn EvalContext::unset_array_element(StringView name,
     const i64 index = evaluate_arithmetic(subscript);
     const i64 count = static_cast<i64>(array->count());
     const i64 resolved = index < 0 ? index + count : index;
-    if (resolved < 0)
-      return;
+    if (resolved < 0) return;
     /* An element inside the dense run leaves a hole at its index the way bash
        does, rather than renumbering the tail. The elements after it move to the
        sparse store under their original indices and the dense run is dropped
@@ -600,14 +603,16 @@ fn EvalContext::unset_array_element(StringView name,
     if (resolved < count) {
       for (usize i = static_cast<usize>(resolved) + 1;
            i < static_cast<usize>(count); i++)
-        m_sparse_array_values.set(sparse_array_key(name, i, scratch_allocator()).view(),
-                                  (*array)[i].view());
+        m_sparse_array_values.set(
+            sparse_array_key(name, i, scratch_allocator()).view(),
+            (*array)[i].view());
       while (array->count() > static_cast<usize>(resolved))
         array->remove(array->count() - 1);
     } else {
-      m_sparse_array_values.erase(
-          sparse_array_key(name, static_cast<usize>(resolved),
-                           scratch_allocator()).view());
+      m_sparse_array_values.erase(sparse_array_key(name,
+                                                   static_cast<usize>(resolved),
+                                                   scratch_allocator())
+                                      .view());
     }
   }
 }
@@ -794,7 +799,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
     /* EPOCHREALTIME is the wall clock as seconds.microseconds, the high
        resolution form a config such as ble.sh reads to build a clock. The
-       fraction is always six digits so a reader can slice it by a fixed width. */
+       fraction is always six digits so a reader can slice it by a fixed width.
+     */
     if (first_byte == 'E' && name == "EPOCHREALTIME") {
       const u64 microseconds = os::realtime_microseconds();
       char fraction[8];
@@ -1124,8 +1130,7 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{};
   out.reserve(m_readonly_names.count());
-  m_readonly_names.for_each(
-      [&](StringView name) { out.push_managed(name); });
+  m_readonly_names.for_each([&](StringView name) { out.push_managed(name); });
   utils::sort_ascending(out);
   return out;
 }
@@ -1196,10 +1201,10 @@ fn EvalContext::leave_function_scope() throws -> void
                            steal(*binding.previous_indexed_array));
     else
       m_indexed_arrays.erase(binding.name.view());
-    /* Restore the associative array the name held, dropping the local one first,
-       then re-adding the saved pairs, or leaving it cleared when the caller had
-       none. set_associative_element does no readonly check, so it cannot throw a
-       located error from this noexcept defer. */
+    /* Restore the associative array the name held, dropping the local one
+       first, then re-adding the saved pairs, or leaving it cleared when the
+       caller had none. set_associative_element does no readonly check, so it
+       cannot throw a located error from this noexcept defer. */
     clear_associative_array(binding.name.view());
     if (binding.previous_was_associative)
       for (usize k = 0; k < binding.previous_associative_keys.count(); k++)
@@ -1230,10 +1235,10 @@ fn EvalContext::declare_local(StringView name) throws -> void
   ASSERT(!m_local_scopes.is_empty());
 
   /* The indexed array the name held is saved alongside the scalar value, so a
-     local array restores the caller's array on return. A copy is taken since the
-     body may overwrite the stored array in place. The lookup is skipped when no
-     array exists at all, so a scalar local in an array-free script pays nothing
-     on the function-call path. */
+     local array restores the caller's array on return. A copy is taken since
+     the body may overwrite the stored array in place. The lookup is skipped
+     when no array exists at all, so a scalar local in an array-free script pays
+     nothing on the function-call path. */
   let previous_array = Maybe<ArrayList<String>>{};
   if (m_indexed_arrays.count() != 0)
     if (let const *array = lookup_indexed_array(name); array != nullptr) {
@@ -1519,10 +1524,7 @@ fn EvalContext::set_pipefail(bool enabled) wontthrow -> void
   m_pipefail = enabled;
 }
 
-pure fn EvalContext::pipefail() const wontthrow -> bool
-{
-  return m_pipefail;
-}
+pure fn EvalContext::pipefail() const wontthrow -> bool { return m_pipefail; }
 
 fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
 {
@@ -1805,8 +1807,9 @@ enum class trim_end
    parallel to pattern and marks which pattern bytes may act as glob
    metacharacters, so a quoted or escaped * or ? matches itself. */
 fn trim_matching(Allocator result_allocator, StringView value,
-                 StringView pattern, const ArrayList<bool> &active, trim_end end,
-                 bool longest, bool extglob_enabled) throws -> String
+                 StringView pattern, const ArrayList<bool> &active,
+                 trim_end end, bool longest, bool extglob_enabled) throws
+    -> String
 {
   ASSERT(active.count() == pattern.length);
 
@@ -1850,8 +1853,8 @@ fn trim_matching(Allocator result_allocator, StringView value,
 }
 
 /* The shared core of the # and % prefix and suffix trims, so the scalar
-   ${v#pat} and ${v%pat} cases and the array-element path expand the pattern with
-   its glob mask and run trim_matching through one place. */
+   ${v#pat} and ${v%pat} cases and the array-element path expand the pattern
+   with its glob mask and run trim_matching through one place. */
 static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
                                    StringView word, trim_end end,
                                    bool longest) throws -> String
@@ -2109,9 +2112,9 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       if (m_error_unset && !get_variable_value(name).has_value())
         throw Error{"Unable to expand '" + name +
                     "' because the parameter is not set"};
-      /* An ordinary name appends its stored value straight from the store, so the
-         common reference pays no temporary String the way a synthesized special
-         name would. */
+      /* An ordinary name appends its stored value straight from the store, so
+         the common reference pays no temporary String the way a synthesized
+         special name would. */
       if (const String *stored = lookup_shell_variable(name))
         emit_run(stored->view(), !in_double_quote);
       else
@@ -2245,7 +2248,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
               heap_allocator(),
               utils::uint_to_text(associative_keys(array_name).count())};
         if (lookup_indexed_array(array_name) != nullptr)
-          return utils::uint_to_text(collect_array_elements(array_name).count());
+          return utils::uint_to_text(
+              collect_array_elements(array_name).count());
         return String{scratch_allocator(),
                       utils::uint_to_text(
                           get_variable_value(array_name).has_value() ? 1 : 0)};
@@ -2341,9 +2345,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   /* ${name^}, ${name^^}, ${name,}, ${name,,}, ${name~}, ${name~~} are bash case
      modification. They are the non-colon form whose operator is a caret, a
      comma, or a tilde that toggles. */
-  if (!is_colon_form &&
-      (rest[0] == '^' || rest[0] == ',' || rest[0] == '~') && name != "@" &&
-      name != "*")
+  if (!is_colon_form && (rest[0] == '^' || rest[0] == ',' || rest[0] == '~') &&
+      name != "@" && name != "*")
     return apply_case_modification(name, rest);
 
   let const op = rest[op_index];
@@ -2468,8 +2471,8 @@ fn EvalContext::apply_substring_expansion(StringView name,
   if (end < start) throw Error{"substring expression < 0"};
 
   return String{scratch_allocator(), value.view().substring_of_length(
-                                      static_cast<usize>(start),
-                                      static_cast<usize>(end - start))};
+                                         static_cast<usize>(start),
+                                         static_cast<usize>(end - start))};
 }
 
 /* The index of the unescaped slash that separates the pattern from the
@@ -2516,8 +2519,8 @@ fn EvalContext::apply_pattern_replacement(StringView name,
   return pattern_replace_value(current.value_or(String{}), spec);
 }
 
-fn EvalContext::pattern_replace_value(const String &value, StringView spec) throws
-    -> String
+fn EvalContext::pattern_replace_value(const String &value,
+                                      StringView spec) throws -> String
 {
   /* The spec opens with the slash operator. A doubled slash replaces every
      match, and a # or % after the first slash anchors the pattern to the start
@@ -2653,9 +2656,9 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   for (usize i = 0; i < value.length; i++) {
     char c = value[i];
     const bool affected = modify_all || i == 0;
-    if (affected && utils::glob_matches(pattern.view(),
-                                        value.substring_of_length(i, 1),
-                                        pattern_active, 0, extglob_enabled()))
+    if (affected &&
+        utils::glob_matches(pattern.view(), value.substring_of_length(i, 1),
+                            pattern_active, 0, extglob_enabled()))
     {
       const unsigned char byte = static_cast<unsigned char>(c);
       if (op == '^') {
@@ -2676,19 +2679,19 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   return out;
 }
 
-/* Apply a trailing parameter-expansion modifier to a single value, the / pattern
-   replacement, the # and % prefix and suffix trims, and the ^ and , case
-   changes. An array element and an element of the [@]/[*] field path share this
-   so each modifier maps over the element the way bash does. A modifier byte that
-   is not a value transform leaves the value unchanged, since the caller only
-   routes the transform modifiers here. */
-fn EvalContext::apply_value_modifier(StringView value, StringView modifier) throws
-    -> String
+/* Apply a trailing parameter-expansion modifier to a single value, the /
+   pattern replacement, the # and % prefix and suffix trims, and the ^ and ,
+   case changes. An array element and an element of the [@]/[*] field path share
+   this so each modifier maps over the element the way bash does. A modifier
+   byte that is not a value transform leaves the value unchanged, since the
+   caller only routes the transform modifiers here. */
+fn EvalContext::apply_value_modifier(StringView value,
+                                     StringView modifier) throws -> String
 {
   if (modifier.is_empty()) return String{scratch_allocator(), value};
   const char op = modifier[0];
-  if (op == '/') return pattern_replace_value(String{scratch_allocator(), value},
-                                              modifier);
+  if (op == '/')
+    return pattern_replace_value(String{scratch_allocator(), value}, modifier);
   if (op == '^' || op == ',')
     return apply_case_modification_to_value(value, modifier);
   if (op == '#' || op == '%') {
@@ -2760,7 +2763,8 @@ fn EvalContext::apply_array_subscript(StringView name,
     }
     return String{scratch_allocator()};
   }
-  return String{scratch_allocator(), (*array)[static_cast<usize>(index)].view()};
+  return String{scratch_allocator(),
+                (*array)[static_cast<usize>(index)].view()};
 }
 
 fn EvalContext::collect_array_elements(StringView name) const throws
@@ -2775,9 +2779,8 @@ fn EvalContext::collect_array_elements(StringView name) const throws
       out.push_managed(element.view());
     /* The sparse elements sit past the dense run, so appending them in index
        order yields the whole array in order. */
-    for (sparse_array_entry &entry :
-         collect_sparse_array_entries(m_sparse_array_values, name,
-                                   scratch_allocator()))
+    for (sparse_array_entry &entry : collect_sparse_array_entries(
+             m_sparse_array_values, name, scratch_allocator()))
       out.push(steal(entry.value));
     return out;
   }
@@ -2806,8 +2809,8 @@ fn EvalContext::array_element_is_set(StringView name,
     return resolved >= 0 &&
            m_sparse_array_values.find(
                sparse_array_key(name, static_cast<usize>(resolved),
-                           scratch_allocator()).view()) !=
-               nullptr;
+                                scratch_allocator())
+                   .view()) != nullptr;
   }
   /* A scalar answers for its sole index zero. */
   return index == 0 && get_variable_value(name).has_value();
@@ -2846,9 +2849,8 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
   if (let const *array = lookup_indexed_array(name)) {
     for (usize i = 0; i < array->count(); i++)
       out.push(utils::uint_to_text(i));
-    for (const sparse_array_entry &entry :
-         collect_sparse_array_entries(m_sparse_array_values, name,
-                                   scratch_allocator()))
+    for (const sparse_array_entry &entry : collect_sparse_array_entries(
+             m_sparse_array_values, name, scratch_allocator()))
       out.push(utils::uint_to_text(entry.index));
     return out;
   }
@@ -2981,9 +2983,10 @@ struct ConditionalEvaluator
         throw ErrorWithLocation{e.word->source_location(), err.message()};
       }
     }
-    String raw = e.word != nullptr ? e.word->raw_string()
-                                   : String{heap_allocator()};
-    for (usize i = 0; i < raw.count(); i++) active.push(true);
+    String raw =
+        e.word != nullptr ? e.word->raw_string() : String{heap_allocator()};
+    for (usize i = 0; i < raw.count(); i++)
+      active.push(true);
     return raw;
   }
 
@@ -3036,18 +3039,21 @@ struct ConditionalEvaluator
     }
     /* The pattern compiles once and is reused on later matches through the
        context cache, so a hot =~ loop pays regcomp only the first time. regexec
-       reads a C string, so the value is copied into a null-terminated buffer. */
+       reads a C string, so the value is copied into a null-terminated buffer.
+     */
     regex_t *compiled = cxt.cached_compiled_regex(escaped_pattern.view());
     let const value_text = String{cxt.scratch_allocator(), value};
     let const group_count = compiled->re_nsub + 1;
     let matches = ArrayList<regmatch_t>{cxt.scratch_allocator()};
-    for (usize i = 0; i < group_count; i++) matches.push(regmatch_t{});
+    for (usize i = 0; i < group_count; i++)
+      matches.push(regmatch_t{});
     const int match_result =
         regexec(compiled, value_text.c_str(), group_count, matches.begin(), 0);
     if (match_result != 0) {
       /* bash clears BASH_REMATCH on a non-match, so a later read does not see a
          prior match's captures. */
-      cxt.set_indexed_array("BASH_REMATCH", ArrayList<String>{heap_allocator()});
+      cxt.set_indexed_array("BASH_REMATCH",
+                            ArrayList<String>{heap_allocator()});
       return false;
     }
 
@@ -3059,8 +3065,8 @@ struct ConditionalEvaluator
       }
       let const start = static_cast<usize>(matches[i].rm_so);
       let const end = static_cast<usize>(matches[i].rm_eo);
-      rematch.push(
-          String{heap_allocator(), value.substring_of_length(start, end - start)});
+      rematch.push(String{heap_allocator(),
+                          value.substring_of_length(start, end - start)});
     }
     cxt.set_indexed_array("BASH_REMATCH", steal(rematch));
     return true;
@@ -3103,9 +3109,9 @@ struct ConditionalEvaluator
       return size.has_value() && size.value() > 0;
     }
     /* -t tests whether a file descriptor is an open terminal, the way a script
-       gates an interactive feature on a real tty. Any descriptor is checked, not
-       only the standard three, since a config such as ble.sh dups the controlling
-       terminal onto a higher descriptor and tests that. */
+       gates an interactive feature on a real tty. Any descriptor is checked,
+       not only the standard three, since a config such as ble.sh dups the
+       controlling terminal onto a higher descriptor and tests that. */
     if (op == "-t") {
       if (ErrorOr<i64> descriptor = utils::parse_decimal_integer(operand);
           !descriptor.is_error())
@@ -3115,8 +3121,7 @@ struct ConditionalEvaluator
         return os::is_fd_a_tty(reinterpret_cast<os::descriptor>(
             _get_osfhandle(static_cast<int>(descriptor.value()))));
 #else
-        return os::is_fd_a_tty(
-            static_cast<os::descriptor>(descriptor.value()));
+        return os::is_fd_a_tty(static_cast<os::descriptor>(descriptor.value()));
 #endif
       return false;
     }
@@ -3294,11 +3299,10 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
      depends on nothing else, the flags are always REG_EXTENDED. A future option
      that changes compilation, such as REG_ICASE for nocasematch, must fold into
      the key so two intended compilations of one pattern do not collide. */
-  if (CompiledRegex *cached = m_regex_cache.find(pattern))
-    return cached->get();
+  if (CompiledRegex *cached = m_regex_cache.find(pattern)) return cached->get();
 
-  /* A bounded miss path. When the cache is full it is cleared whole, which frees
-     every compiled entry, rather than tracking a per-entry age. */
+  /* A bounded miss path. When the cache is full it is cleared whole, which
+     frees every compiled entry, rather than tracking a per-entry age. */
   if (m_regex_cache.count() >= REGEX_CACHE_CAP) m_regex_cache.clear();
 
   let const pattern_text = String{scratch_allocator(), pattern};
@@ -4469,11 +4473,11 @@ public:
          runs on the scanned slice. */
       let const rest = source.substring(pos);
 
-      /* The base#digits form selects an explicit radix from 2 to 64, so 16#ff is
-         255 and 2#101 is 5. The decimal run before the # is the base and the
-         digits after it read in that base, with a-z worth 10 to 35, A-Z worth 36
-         to 61 above base 36 or the same as a-z at or below it, @ worth 62, and _
-         worth 63. */
+      /* The base#digits form selects an explicit radix from 2 to 64, so 16#ff
+         is 255 and 2#101 is 5. The decimal run before the # is the base and the
+         digits after it read in that base, with a-z worth 10 to 35, A-Z worth
+         36 to 61 above base 36 or the same as a-z at or below it, @ worth 62,
+         and _ worth 63. */
       if (const usize base_length = count_leading_digits(rest, 10);
           base_length > 0 && base_length < rest.length &&
           rest[base_length] == '#')
@@ -4535,7 +4539,8 @@ public:
 fn EvalContext::read_array_element_integer(StringView name,
                                            StringView subscript) throws -> i64
 {
-  return parse_arithmetic_operand(apply_array_subscript(name, subscript).view());
+  return parse_arithmetic_operand(
+      apply_array_subscript(name, subscript).view());
 }
 
 fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
@@ -4701,10 +4706,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
       }
       /* "${!prefix@}" emits one field per matching variable name, the way "$@"
          and "${a[@]}" do, while "${!prefix*}" joins them by the first IFS
-         character into one field. The general path returns a single space-joined
-         string, which loses the per-name boundary, so the name listing is
-         emitted here. The form is a leading '!' and a trailing '@' or '*', which
-         the indirect ${!ref} and the array-key ${!a[@]} do not take. */
+         character into one field. The general path returns a single
+         space-joined string, which loses the per-name boundary, so the name
+         listing is emitted here. The form is a leading '!' and a trailing '@'
+         or '*', which the indirect ${!ref} and the array-key ${!a[@]} do not
+         take. */
       if (segment_text.length >= 2 && segment_text[0] == '!' &&
           (segment_text[segment_text.length - 1] == '@' ||
            segment_text[segment_text.length - 1] == '*'))
@@ -4735,9 +4741,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
         break;
       }
       /* "${!a[@]}" emits one field per subscript, the way "${a[@]}" emits one
-         per element, while "${!a[*]}" joins them by the first IFS character. The
-         joined string path loses the per-subscript boundary, so the field form
-         is produced here. The body is a leading '!' and a trailing [@] or [*]. */
+         per element, while "${!a[*]}" joins them by the first IFS character.
+         The joined string path loses the per-subscript boundary, so the field
+         form is produced here. The body is a leading '!' and a trailing [@] or
+         [*]. */
       if (segment_text.length >= 5 && segment_text[0] == '!' &&
           segment_text[segment_text.length - 1] == ']' &&
           segment_text[segment_text.length - 3] == '[' &&
@@ -4745,8 +4752,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
            segment_text[segment_text.length - 2] == '*') &&
           lexer::is_variable_name_start(segment_text[1]))
       {
-        const StringView array_name = segment_text.substring_of_length(
-            1, segment_text.length - 4);
+        const StringView array_name =
+            segment_text.substring_of_length(1, segment_text.length - 4);
         let const is_star = segment_text[segment_text.length - 2] == '*';
         let const subscripts = collect_array_subscripts(array_name);
         if (segment.is_in_double_quotes && is_star) {
@@ -4884,17 +4891,17 @@ hot fn EvalContext::expand_word(const Word &word) throws
       }
       /* "${a[@]MOD}" maps a value-transform modifier over each element, one
          field per element the way "${a[@]}" does, while "${a[*]MOD}" joins the
-         modified elements. The / replacement, the # and % trims, and the ^ and ,
-         case changes all map here, a different modifier falls through to the
+         modified elements. The / replacement, the # and % trims, and the ^ and
+         , case changes all map here, a different modifier falls through to the
          general scalar path. */
       if (lexer::is_variable_name_start(segment_text[0])) {
         usize name_end = 1;
         while (name_end < segment_text.length &&
                lexer::is_variable_name(segment_text[name_end]))
           name_end++;
-        const char field_modifier_op =
-            name_end + 3 < segment_text.length ? segment_text[name_end + 3]
-                                               : '\0';
+        const char field_modifier_op = name_end + 3 < segment_text.length
+                                           ? segment_text[name_end + 3]
+                                           : '\0';
         if (name_end + 3 < segment_text.length &&
             segment_text[name_end] == '[' &&
             (segment_text[name_end + 1] == '@' ||
@@ -5172,8 +5179,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
     throw Error{"Command substitution outside of a parse"};
 
   let parser = Parser{
-      Lexer{String{source.view()}, *AST_ARENA, false, None,
-            mood()}
+      Lexer{String{source.view()}, *AST_ARENA, false, None, mood()}
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
@@ -5201,9 +5207,10 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
   if (!command_writes_the_pipe)
     throw Error{"Unable to run a >(cmd) process substitution because it is not "
                 "supported on this platform"};
-  if (Maybe<String> substitution_path = os::run_substitution_to_temp(
-          text.substring(1), is_bash_compatible());
-      substitution_path.has_value()) {
+  if (Maybe<String> substitution_path =
+          os::run_substitution_to_temp(text.substring(1), is_bash_compatible());
+      substitution_path.has_value())
+  {
     /* The temp file is read by the consuming command after this returns, so it
        is tracked for deletion once that command finishes rather than removed
        now. */
@@ -5215,8 +5222,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
               os::last_system_error_message()};
 #else
   let parser = Parser{
-      Lexer{String{text.substring(1)}, *AST_ARENA, false, None,
-            mood()}
+      Lexer{String{text.substring(1)}, *AST_ARENA, false, None, mood()}
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
@@ -5276,8 +5282,8 @@ fn EvalContext::mark_process_substitutions() const wontthrow
           m_substitution_temp_files.count()};
 }
 
-fn EvalContext::cleanup_process_substitutions(process_substitution_mark mark)
-    wontthrow -> void
+fn EvalContext::cleanup_process_substitutions(
+    process_substitution_mark mark) wontthrow -> void
 {
   for (usize i = mark.pending; i < m_pending_process_substitutions.count(); i++)
   {
@@ -5342,8 +5348,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
       segment.cached_substitution_generation != generation)
   {
     let parser = Parser{
-        Lexer{String{segment.text.view()}, *AST_ARENA, false, None,
-              mood()}
+        Lexer{String{segment.text.view()}, *AST_ARENA, false, None, mood()}
     };
     segment.cached_substitution_ast = parser.construct_ast();
     segment.cached_substitution_generation = generation;
@@ -5372,8 +5377,8 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
   /* The substitution body is its own source, so a located error inside it
      carries an offset into that text. The current source is pointed at it for
-     the run, so an error rendered inline, such as a command not found, marks the
-     right byte, and the error caught below is formatted against it too. */
+     the run, so an error rendered inline, such as a command not found, marks
+     the right byte, and the error caught below is formatted against it too. */
   let const previous_source = m_current_source;
   let const previous_origin = m_current_origin;
   let const previous_location_position = m_current_location_position;
@@ -5509,17 +5514,17 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   }
 
   /* The mimic mode decides the lexing and the evaluation, so it is set before
-     the parse. The parent's mode is put back when the run is isolated, while the
-     terminal run leaves it since the shell exits next. */
+     the parse. The parent's mode is put back when the run is isolated, while
+     the terminal run leaves it since the shell exits next. */
   let const previous_mood = m_mood;
   m_mood = mode;
 
-  /* The strict interactive defaults shit turns on at its own prompt, nounset and
-     pipefail and failglob, do not belong to a real bash or sh running a file, so
-     a mimicked script clears them for its run and the isolated case puts them
-     back. This is why a mimicked declare -A array literal does not abort on the
-     unmatched [k]=v glob, and an unset parameter expands empty rather than
-     tripping nounset, the way the named shell runs the script. */
+  /* The strict interactive defaults shit turns on at its own prompt, nounset
+     and pipefail and failglob, do not belong to a real bash or sh running a
+     file, so a mimicked script clears them for its run and the isolated case
+     puts them back. This is why a mimicked declare -A array literal does not
+     abort on the unmatched [k]=v glob, and an unset parameter expands empty
+     rather than tripping nounset, the way the named shell runs the script. */
   let const previous_error_unset = error_unset();
   let const previous_pipefail = pipefail();
   let const previous_failglob = failglob();
@@ -5527,12 +5532,14 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   set_pipefail(false);
   set_failglob(false);
 
-  let parser = Parser{Lexer{String{contents->view()}, *AST_ARENA, false, None,
-                            mood()}};
+  let parser = Parser{
+      Lexer{String{contents->view()}, *AST_ARENA, false, None, mood()}
+  };
   const Expression *ast = parser.construct_ast();
   ASSERT(ast != nullptr);
 
-  /* The script reads $0 as its path and $1 upward as the rest of the command. */
+  /* The script reads $0 as its path and $1 upward as the rest of the command.
+   */
   let previous_shell_name = String{m_shell_name};
   let params = ArrayList<String>{};
   for (usize i = 1; i < ec.args().count(); i++)
@@ -5545,9 +5552,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const previous_location_position = m_current_location_position;
 
   /* The redirections the spawn would have applied are applied to the standard
-     descriptors for the in-process run, then put back. A file redirect to stdout
-     or stderr is already staged on the real shell fd by the simple command, so
-     only the descriptors carried on the context are applied here. */
+     descriptors for the in-process run, then put back. A file redirect to
+     stdout or stderr is already staged on the real shell fd by the simple
+     command, so only the descriptors carried on the context are applied here.
+   */
   let saved_fds = ArrayList<os::saved_descriptor>{};
   if (ec.in_fd.has_value())
     saved_fds.push(os::save_and_replace_descriptor(0, *ec.in_fd));
@@ -5562,7 +5570,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   /* The descriptors carried on the context were dup'd onto the standard fds
      above, so the originals are closed when this run ends. Nothing else owns
      them, since this path replaces the fork-and-exec that would otherwise have
-     closed them, and close_fds resets each Maybe so a later close is a no-op. */
+     closed them, and close_fds resets each Maybe so a later close is a no-op.
+   */
   defer { ec.close_fds(); };
 
   let const render_error = [&](std::exception_ptr error) {
@@ -5583,11 +5592,11 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_mimicry_depth++;
 
   /* The terminal command the shell exits with needs no isolation, so the script
-     runs against the current state with no snapshot and the shell exits with its
-     status, the way exec'ing the shell would. A return, break, or exit inside it
-     propagates the way it would from a real script. */
-  /* A mimicked bash advertises BASH_VERSION the way the bash invocation does, so
-     a script that detects bash through it takes its bash path. The set lands
+     runs against the current state with no snapshot and the shell exits with
+     its status, the way exec'ing the shell would. A return, break, or exit
+     inside it propagates the way it would from a real script. */
+  /* A mimicked bash advertises BASH_VERSION the way the bash invocation does,
+     so a script that detects bash through it takes its bash path. The set lands
      after the isolated snapshot so the restore drops it. */
   if (!isolated) {
     set_positional_params(steal(params));
@@ -5710,8 +5719,8 @@ fn EvalContext::run_completion_function(StringView function_name,
   /* bash invokes the function with the command, the current word, and the
      previous word as its first three positional parameters. */
   let call_params = ArrayList<String>{};
-  call_params.push(words.is_empty() ? String{}
-                                    : String{heap_allocator(), words[0].view()});
+  call_params.push(
+      words.is_empty() ? String{} : String{heap_allocator(), words[0].view()});
   call_params.push(cword < words.count()
                        ? String{heap_allocator(), words[cword].view()}
                        : String{});
@@ -5734,13 +5743,12 @@ fn EvalContext::run_completion_function(StringView function_name,
   set_terminal_exec_allowed(false);
   defer { set_terminal_exec_allowed(saved_terminal_exec); };
 
-  /* A completion function that errors must not abort the prompt, so any error is
-     swallowed and yields no candidates, and a stray break or return is consumed
-     so it does not escape into the line editor. */
+  /* A completion function that errors must not abort the prompt, so any error
+     is swallowed and yields no candidates, and a stray break or return is
+     consumed so it does not escape into the line editor. */
   try {
     body->evaluate(*this);
-  } catch (const ErrorBase &) {
-  }
+  } catch (const ErrorBase &) {}
   /* The function's return status is read before the control flow is cleared, so
      a dynamic loader that returns 124 to request a retry is seen by the caller.
    */
@@ -5819,8 +5827,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      the wrong line. */
   try {
     let parser = Parser{
-        Lexer{String{source}, *AST_ARENA, false, stable_filename,
-              mood()}
+        Lexer{String{source}, *AST_ARENA, false, stable_filename, mood()}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this
@@ -5981,7 +5988,8 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
 
 /* Split a sequence body on its .. separators into two or three parts, the
    start, the end, and an optional step. */
-fn split_sequence_parts(StringView content, Allocator alloc) throws -> ArrayList<StringView>
+fn split_sequence_parts(StringView content, Allocator alloc) throws
+    -> ArrayList<StringView>
 {
   let parts = ArrayList<StringView>{alloc};
   usize start = 0;
@@ -6001,7 +6009,8 @@ fn split_sequence_parts(StringView content, Allocator alloc) throws -> ArrayList
 
 /* The elements of a {start..end} or {start..end..step} sequence, numeric or
    single-letter, or None when the body is not a sequence. */
-fn parse_brace_sequence(StringView content, Allocator alloc) throws -> Maybe<ArrayList<String>>
+fn parse_brace_sequence(StringView content, Allocator alloc) throws
+    -> Maybe<ArrayList<String>>
 {
   let const parts = split_sequence_parts(content, alloc);
   if (parts.count() != 2 && parts.count() != 3) return None;
@@ -6090,8 +6099,8 @@ fn brace_group_alternatives(StringView content, Allocator alloc) throws
     let alternatives = ArrayList<String>{alloc};
     usize start = 0;
     for (const usize comma : comma_positions) {
-      alternatives.push(String{
-          alloc, content.substring_of_length(start, comma - start)});
+      alternatives.push(
+          String{alloc, content.substring_of_length(start, comma - start)});
       start = comma + 1;
     }
     alternatives.push_managed(content.substring(start));
@@ -6108,7 +6117,8 @@ struct brace_group
   ArrayList<String> alternatives{heap_allocator()};
 };
 
-fn find_brace_group(StringView text, Allocator alloc) throws -> Maybe<brace_group>
+fn find_brace_group(StringView text, Allocator alloc) throws
+    -> Maybe<brace_group>
 {
   for (usize open = 0; open < text.length; open++) {
     if (text[open] != '{') continue;
@@ -6249,7 +6259,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   expanded_args.reserve(args.count());
 
   let const fields_mark = m_scratch_arena.mark();
-  defer {
+  defer
+  {
     if (!args_are_transient) m_scratch_arena.release(fields_mark);
   };
 

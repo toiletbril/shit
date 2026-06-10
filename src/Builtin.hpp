@@ -293,7 +293,7 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
 
 /* TODO: More granular error location for flags? */
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
-  parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);                                       \
+  parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);        \
   defer { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;
@@ -307,10 +307,10 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool;
 
 /* Report a builtin error that must not abort the run, such as one bad name in a
-   loop that still processes the rest, with the same located caret in the default
-   and posix moods and the same soft unlocated line in the bash mood that the
-   dispatch gives a thrown error. A builtin that throws gets a fatal located
-   error instead, so this is for the keep-going case. */
+   loop that still processes the rest, with the same located caret in the
+   default and posix moods and the same soft unlocated line in the bash mood
+   that the dispatch gives a thrown error. A builtin that throws gets a fatal
+   located error instead, so this is for the keep-going case. */
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void;
 

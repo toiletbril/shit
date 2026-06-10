@@ -40,52 +40,52 @@ public:
 
 const SetOption SET_OPTIONS[] = {
     {'e',  "errexit",          &EvalContext::set_error_exit,       &EvalContext::error_exit,
-     "Exit on the first command that fails."                                                                                           },
+     "Exit on the first command that fails."                                                                                             },
     {'x',  "xtrace",           &EvalContext::set_echo_expanded,
      &EvalContext::should_echo_expanded,
-     "Print each command after expansion before it runs."                                                                              },
+     "Print each command after expansion before it runs."                                                                                },
     {'u',  "nounset",          &EvalContext::set_error_unset,      &EvalContext::error_unset,
-     "Treat an unset variable as an error."                                                                                            },
+     "Treat an unset variable as an error."                                                                                              },
     {'\0', "pipefail",         &EvalContext::set_pipefail,         &EvalContext::pipefail,
-     "Report a pipeline's status as the rightmost stage that failed."                                                                  },
+     "Report a pipeline's status as the rightmost stage that failed."                                                                    },
     {'\0', "posix",            &EvalContext::set_posix_mode,       &EvalContext::is_posix_mode,
-     "Behave like dash, the POSIX mode."                                                                                               },
+     "Behave like dash, the POSIX mode."                                                                                                 },
     {'a',  "allexport",        &EvalContext::set_export_all,       &EvalContext::export_all,
-     "Mark every assigned variable for the environment."                                                                               },
+     "Mark every assigned variable for the environment."                                                                                 },
     {'C',  "noclobber",        &EvalContext::set_no_clobber,       &EvalContext::no_clobber,
-     "Refuse to overwrite an existing file through '>'."                                                                               },
+     "Refuse to overwrite an existing file through '>'."                                                                                 },
     {'f',  "noglob",           &EvalContext::set_no_glob,          &EvalContext::no_glob,
-     "Disable pathname expansion."                                                                                                     },
+     "Disable pathname expansion."                                                                                                       },
     {'n',  "noexec",           &EvalContext::set_no_exec,          &EvalContext::no_exec,
-     "Read and parse commands but do not run them."                                                                                    },
+     "Read and parse commands but do not run them."                                                                                      },
     {'m',  "monitor",          &EvalContext::set_monitor,          &EvalContext::monitor,
-     "Run background jobs in their own process group with notifications."                                                              },
+     "Run background jobs in their own process group with notifications."                                                                },
     /* failglob has no short letter, so '\0' keeps find_option_by_letter from
        ever matching a parsed option character. */
     {'\0', "failglob",         &EvalContext::set_failglob,         &EvalContext::failglob,
-     "Fail a command whose glob matches nothing."                                                                                      },
-    {'b',  "notify",           nullptr,                            nullptr,                   "Accepted without effect."               },
-    {'h',  "hashall",          nullptr,                            nullptr,                   "Accepted without effect."               },
-    {'v',  "verbose",          nullptr,                            nullptr,                   "Accepted without effect."               },
+     "Fail a command whose glob matches nothing."                                                                                        },
+    {'b',  "notify",           nullptr,                            nullptr,                     "Accepted without effect."               },
+    {'h',  "hashall",          nullptr,                            nullptr,                     "Accepted without effect."               },
+    {'v',  "verbose",          nullptr,                            nullptr,                     "Accepted without effect."               },
     /* The keyword-assignment and the DEBUG/RETURN trace toggles are accepted so
        a bash config that sets them keeps sourcing. Brace expansion is always on
        in shit, so -B is already the behavior and +B is accepted without turning
        it off. */
-    {'k',  "keyword",          nullptr,                            nullptr,                   "Accepted without effect."               },
-    {'T',  "functrace",        nullptr,                            nullptr,                   "Accepted without effect."               },
-    {'B',  "braceexpand",      nullptr,                            nullptr,                   "Accepted without effect."               },
+    {'k',  "keyword",          nullptr,                            nullptr,                     "Accepted without effect."               },
+    {'T',  "functrace",        nullptr,                            nullptr,                     "Accepted without effect."               },
+    {'B',  "braceexpand",      nullptr,                            nullptr,                     "Accepted without effect."               },
     /* The shell's own debug toggles, so set -A turns the AST dump on at runtime
        the same way the -A flag does at startup. */
     {'A',  "show-ast",         &EvalContext::set_show_ast,         &EvalContext::show_ast,
-     "Print the AST before each command runs."                                                                                         },
+     "Print the AST before each command runs."                                                                                           },
     {'M',  "show-lexed-words", &EvalContext::set_show_lexed_words,
      &EvalContext::show_lexed_words,
-     "Print the escape bitmap after each parse."                                                                                       },
+     "Print the escape bitmap after each parse."                                                                                         },
     {'E',  "show-exit-code",   &EvalContext::set_show_exit_code,
-     &EvalContext::show_exit_code,                                                            "Print the exit code after each command."},
+     &EvalContext::show_exit_code,                                                              "Print the exit code after each command."},
     {'S',  "show-stats",       &EvalContext::set_stats_enabled,
      &EvalContext::stats_enabled,
-     "Print evaluation statistics after each run."                                                                                     },
+     "Print evaluation statistics after each run."                                                                                       },
 };
 
 const SetOption *find_option_by_letter(char letter) throws

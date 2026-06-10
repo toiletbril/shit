@@ -14,7 +14,8 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[-W wordlist] [-A action] [options] [word]");
 HELP_DESCRIPTION_DECL(
-    "The compgen builtin writes the completion candidates for the given options "
+    "The compgen builtin writes the completion candidates for the given "
+    "options "
     "and word to standard output. The -W word list is split on whitespace and "
     "filtered to the entries that start with the word, each on its own line. "
     "The other options are accepted so a completion script runs, though only "
@@ -26,7 +27,10 @@ namespace shit {
 
 Compgen::Compgen() = default;
 
-pure fn Compgen::kind() const wontthrow -> Builtin::Kind { return Kind::Compgen; }
+pure fn Compgen::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Compgen;
+}
 
 fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
@@ -69,8 +73,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     i++;
   }
 
-  /* An unsupported action produces nothing rather than an error, so a completion
-     script that asks for one keeps running with an empty result. */
+  /* An unsupported action produces nothing rather than an error, so a
+     completion script that asks for one keeps running with an empty result. */
   if (!have_wordlist) return 1;
 
   let out = String{};

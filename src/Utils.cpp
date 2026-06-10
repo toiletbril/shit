@@ -51,8 +51,9 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       {
         LOG(verbosity::Debug, "execute_context mimicking the shell for '%s'",
             ec.program().c_str());
-        /* The terminal command the shell exits with needs no isolation, the same
-           condition the replace path below uses, so its run skips the snapshot. */
+        /* The terminal command the shell exits with needs no isolation, the
+           same condition the replace path below uses, so its run skips the
+           snapshot. */
         let const isolated = !(cxt.terminal_exec_allowed() &&
                                !cxt.in_subshell() && !cxt.has_exit_trap());
         return cxt.run_mimicked_script(ec, *mode, isolated);
@@ -97,12 +98,12 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
                                 !cxt.in_subshell() && !cxt.has_exit_trap());
         quit(cxt.run_mimicked_script(ec, mode, isolated), false);
       } catch (const ErrorWithLocation &error) {
-        /* The program resolved but could not be executed, so the caret points at
-           the command and the shell exits 126, the way bash distinguishes a file
-           it found but could not run from one it never found. */
+        /* The program resolved but could not be executed, so the caret points
+           at the command and the shell exits 126, the way bash distinguishes a
+           file it found but could not run from one it never found. */
         const String *source = cxt.current_source();
-        show_message(error.to_string(source != nullptr ? source->view()
-                                                       : StringView{}));
+        show_message(
+            error.to_string(source != nullptr ? source->view() : StringView{}));
         quit(126, false);
       } catch (const Error &error) {
         print_error(error.message() + "\n");
@@ -158,10 +159,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   os::process last_child = SHIT_INVALID_PROCESS;
   os::descriptor last_stdin = SHIT_INVALID_FD;
 
-  /* Each stage's status is recorded against its position, so pipefail can report
-     the rightmost stage that failed and the plain case can read the last stage.
-     A builtin stage yields its status at once and an external one's status
-     arrives from the wait below, tracked by the parallel child-to-stage list. */
+  /* Each stage's status is recorded against its position, so pipefail can
+     report the rightmost stage that failed and the plain case can read the last
+     stage. A builtin stage yields its status at once and an external one's
+     status arrives from the wait below, tracked by the parallel child-to-stage
+     list. */
   let const stage_count = ecs.count();
   let stage_status = ArrayList<i32>{};
   stage_status.reserve(stage_count);
@@ -245,8 +247,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
      succeeded. Otherwise the pipeline reports the last stage alone. */
   if (cxt.pipefail()) {
     for (usize i = stage_count; i > 0; i--)
-      if (stage_status[i - 1] != 0)
-        return stage_status[i - 1];
+      if (stage_status[i - 1] != 0) return stage_status[i - 1];
     return 0;
   }
 
@@ -516,7 +517,8 @@ fn invalidate_line_number_cache() wontthrow -> void
 
 /* Advance offset past any leading ASCII whitespace, shared by the integer
    parsers which trim before and after the digit run. */
-static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow -> void
+static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow
+    -> void
 {
   while (offset < text.length && is_ascii_whitespace(text.data[offset]))
     offset++;
@@ -1473,13 +1475,13 @@ fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
     line_end++;
   let const line = head.substring_of_length(2, line_end - 2);
 
-  /* The basename of a whitespace-delimited token, dropping any directory path. */
+  /* The basename of a whitespace-delimited token, dropping any directory path.
+   */
   let const basename_of = [](StringView token) -> StringView {
     usize slash = token.length;
     for (usize i = 0; i < token.length; i++)
       if (token[i] == '/') slash = i;
-    return slash == token.length ? token
-                                 : token.substring(slash + 1);
+    return slash == token.length ? token : token.substring(slash + 1);
   };
   /* Walk the line token by token, splitting on spaces and tabs. */
   usize i = 0;

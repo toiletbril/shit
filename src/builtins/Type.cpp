@@ -54,8 +54,8 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const &name = args[i];
 
     /* -P forces a PATH lookup and ignores the keyword, alias, function, and
-       builtin classes, so it reports the disk file even when the name also names
-       a builtin. */
+       builtin classes, so it reports the disk file even when the name also
+       names a builtin. */
     if (force_path) {
       if (let const paths = utils::search_program_path(name);
           paths.count() != 0)
@@ -75,7 +75,8 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
        -t form prints names each class, while the default form spells it out. */
     StringView word{};
     Maybe<String> alias_value;
-    /* The POSIX reserved words plus the bash reserved words shit recognizes, the
+    /* The POSIX reserved words plus the bash reserved words shit recognizes,
+       the
        [[ ]] conditional brackets and the time and function keywords, all
        classify as a keyword the way bash reports them. */
     if (utils::is_posix_reserved_word(name.view()) || name.view() == "[[" ||
@@ -83,8 +84,8 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
         name.view() == "time")
     {
       word = "keyword";
-    } else if (let const alias = cxt.get_alias(name.view());
-               alias.has_value()) {
+    } else if (let const alias = cxt.get_alias(name.view()); alias.has_value())
+    {
       word = "alias";
       alias_value = alias;
     } else if (cxt.has_functions() && cxt.find_function(name) != nullptr) {
@@ -164,8 +165,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
       continue;
     }
 
-    if (let const paths = utils::search_program_path(name);
-        paths.count() != 0)
+    if (let const paths = utils::search_program_path(name); paths.count() != 0)
     {
       if (want_word) {
         out += "file\n";

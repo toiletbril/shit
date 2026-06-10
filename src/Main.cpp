@@ -75,15 +75,20 @@ FLAG(
     "on automatically when the effective and the real user or group id differ, "
     "the setuid or setgid case.");
 FLAG(RCFILE, String, '\0', "rcfile",
-     "Source FILE as the interactive rc instead of ~/.bashrc, the way bash reads "
-     "a named rc. The shit rc still runs, and a non-interactive run reads no rc.");
-FLAG(MIMICRY, Bool, 'I', "mimicry",
-     "Mimic the shell a script's shebang names, for speed. A program whose "
-     "shebang is a shell shit can emulate runs in-process in the matching mode "
-     "rather than launching the shell, so a script-heavy run skips the fork and "
-     "the shell startup, where sh and dash run in POSIX mode, bash in bash mode, "
-     "and shit in the default mode. A zsh, ksh, fish, or non-shell shebang still "
-     "launches the real program.");
+     "Source FILE as the interactive rc instead of ~/.bashrc, the way bash "
+     "reads "
+     "a named rc. The shit rc still runs, and a non-interactive run reads no "
+     "rc.");
+FLAG(
+    MIMICRY, Bool, 'I', "mimicry",
+    "Mimic the shell a script's shebang names, for speed. A program whose "
+    "shebang is a shell shit can emulate runs in-process in the matching mode "
+    "rather than launching the shell, so a script-heavy run skips the fork and "
+    "the shell startup, where sh and dash run in POSIX mode, bash in bash "
+    "mode, "
+    "and shit in the default mode. A zsh, ksh, fish, or non-shell shebang "
+    "still "
+    "launches the real program.");
 
 FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
 FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
@@ -172,7 +177,8 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     h += '\n';
     h += wrap_text(
         "Options are also read from the SHIT_FLAGS environment variable, so a "
-        "flag set there is inherited by every invocation, while a flag given on "
+        "flag set there is inherited by every invocation, while a flag given "
+        "on "
         "the command line still has the final say.\n\n",
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_flag_help(FLAG_LIST);
@@ -447,11 +453,12 @@ fn main(int argc, char **argv) -> int
   let file_names = shit::ArrayList<shit::String>{};
 
   /* SHIT_FLAGS supplies command line options through the environment, such as
-     SHIT_FLAGS='-ahmu --bash-compatible -I', so a user sets the shell's defaults
-     once rather than on every invocation. The tokens are split on whitespace and
-     spliced in right after the program name, before the real arguments, so a flag
-     given on the command line still has the final say. The token strings and the
-     spliced pointer array outlive the parse below, so the views stay valid. */
+     SHIT_FLAGS='-ahmu --bash-compatible -I', so a user sets the shell's
+     defaults once rather than on every invocation. The tokens are split on
+     whitespace and spliced in right after the program name, before the real
+     arguments, so a flag given on the command line still has the final say. The
+     token strings and the spliced pointer array outlive the parse below, so the
+     views stay valid. */
   shit::ArrayList<shit::String> shit_flags_tokens{};
   shit::ArrayList<const char *> spliced_argv{};
   if (shit::Maybe<shit::String> shit_flags =
@@ -464,8 +471,8 @@ fn main(int argc, char **argv) -> int
       let const c = i < view.length ? view[i] : ' ';
       if (c == ' ' || c == '\t' || c == '\n') {
         if (i > token_start)
-          shit_flags_tokens.push(
-              shit::String{view.substring_of_length(token_start, i - token_start)});
+          shit_flags_tokens.push(shit::String{
+              view.substring_of_length(token_start, i - token_start)});
         token_start = i + 1;
       }
     }
@@ -679,23 +686,22 @@ fn main(int argc, char **argv) -> int
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
   /* The startup config files, the profiles and the rc, source with nounset and
      pipefail off the way a script does, since they are written for a lax shell
-     and read unset variables such as $BASH_VERSION on the /etc/profile path. The
-     strict interactive defaults are applied at the seam below once the config
-     has loaded, so a typo in a variable name and a failing pipeline stage both
-     fail loudly at the prompt. An explicit set -u or set -o pipefail is honored
-     throughout. */
+     and read unset variables such as $BASH_VERSION on the /etc/profile path.
+     The strict interactive defaults are applied at the seam below once the
+     config has loaded, so a typo in a variable name and a failing pipeline
+     stage both fail loudly at the prompt. An explicit set -u or set -o pipefail
+     is honored throughout. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
   context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
-  /* An interactive shell sources its profiles and rc with failglob off the way a
-     lax shell does, since a profile globs script directories that need not match
-     any file. The strict default returns at the prompt seam below. A
+  /* An interactive shell sources its profiles and rc with failglob off the way
+     a lax shell does, since a profile globs script directories that need not
+     match any file. The strict default returns at the prompt seam below. A
      non-interactive run sources no profiles, so it keeps its mode default. */
-  context.set_failglob(should_be_interactive
-                           ? false
-                           : !shit::should_run_in_compat_mode());
+  context.set_failglob(
+      should_be_interactive ? false : !shit::should_run_in_compat_mode());
   context.set_bash_compatible(shit::should_run_in_bash_mode());
   context.set_posix_mode(shit::should_run_in_posix_mode());
   /* Mimicry is mirrored onto the context, since the execution path in Utils
@@ -721,8 +727,8 @@ fn main(int argc, char **argv) -> int
 
   /* Shell identity, so a script that probes for its host shell finds a known
      name and takes a working branch rather than a fragile fallback. The mimicry
-     run seeds the same set for the shell it mimics, so the seeding is shared. The
-     shit version above stays present in every mode. */
+     run seeds the same set for the shell it mimics, so the seeding is shared.
+     The shit version above stays present in every mode. */
   context.seed_shell_identity_variables(shit::should_run_in_bash_mode() ||
                                         init_as_bash);
 
@@ -754,9 +760,9 @@ fn main(int argc, char **argv) -> int
     context.set_shell_variable("PS1", toiletline::default_prompt_template());
 
   /* COLUMNS and LINES carry the terminal size the way bash sets them in an
-     interactive shell, so a config that divides by COLUMNS, such as ble.sh, sees
-     a non-zero width. They are seeded once here and not tracked across a later
-     resize. */
+     interactive shell, so a config that divides by COLUMNS, such as ble.sh,
+     sees a non-zero width. They are seeded once here and not tracked across a
+     later resize. */
   if (should_be_interactive) {
     u32 columns = 0, rows = 0;
     if (shit::os::terminal_size(columns, rows)) {
@@ -851,12 +857,12 @@ fn main(int argc, char **argv) -> int
   context.set_startup_finished();
 
   /* The startup config has loaded, so the strict interactive defaults take over
-     for the session. An interactive shit-native shell turns nounset and pipefail
-     on so a typo or a failing pipeline stage fails loudly at the prompt, while a
-     compatibility mode keeps the lax bash or dash defaults. init-as-bash also
-     leaves bash mode here, so the strict parser and the analysis stage take over
-     from the first prompt. A non-interactive run has no prompt, so it keeps the
-     lenient sourcing defaults for the whole run. */
+     for the session. An interactive shit-native shell turns nounset and
+     pipefail on so a typo or a failing pipeline stage fails loudly at the
+     prompt, while a compatibility mode keeps the lax bash or dash defaults.
+     init-as-bash also leaves bash mode here, so the strict parser and the
+     analysis stage take over from the first prompt. A non-interactive run has
+     no prompt, so it keeps the lenient sourcing defaults for the whole run. */
   if (should_be_interactive) {
     if (init_as_bash) context.set_bash_compatible(false);
     let const strict = !shit::should_run_in_compat_mode();

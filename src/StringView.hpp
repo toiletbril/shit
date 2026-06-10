@@ -20,10 +20,7 @@ public:
   StringView(const char *cstr) wontthrow;
 
   hot mustuse pure fn count() const wontthrow -> usize { return length; }
-  hot mustuse pure fn is_empty() const wontthrow -> bool
-  {
-    return length == 0;
-  }
+  hot mustuse pure fn is_empty() const wontthrow -> bool { return length == 0; }
   hot mustuse pure fn operator[](usize i) const wontthrow->char
   {
     return data[i];

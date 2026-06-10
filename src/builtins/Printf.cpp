@@ -73,12 +73,14 @@ void append_escape(String &out, const String &fmt, usize &i) throws
 
   /* A format-string octal escape is the byte for up to three octal digits, so
      \0 is a NUL and \101 is an A, the way bash and POSIX printf read it. The
-     index is left on the last digit consumed since the caller advances past it. */
+     index is left on the last digit consumed since the caller advances past it.
+   */
   if (e >= '0' && e <= '7') {
     i32 value = e - '0';
     usize digits_read = 1;
     while (digits_read < 3 && i + 1 < fmt.length() && fmt[i + 1] >= '0' &&
-           fmt[i + 1] <= '7') {
+           fmt[i + 1] <= '7')
+    {
       i++;
       value = value * 8 + (fmt[i] - '0');
       digits_read++;
@@ -92,7 +94,8 @@ void append_escape(String &out, const String &fmt, usize &i) throws
   if (e == 'x' && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1])) {
     i32 value = 0;
     usize digits_read = 0;
-    while (digits_read < 2 && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1])) {
+    while (digits_read < 2 && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1]))
+    {
       i++;
       value = value * 16 + hex_digit_value(fmt[i]);
       digits_read++;
@@ -132,7 +135,8 @@ bool append_b_argument(String &out, const String &arg) throws
     let const e = arg[i + 1];
     if (e == 'c') return true;
     if (e == 'x' && i + 2 < arg.length() && is_hex_digit(arg[i + 2])) {
-      /* A \xHH escape takes up to two hexadecimal digits, the bash extension. */
+      /* A \xHH escape takes up to two hexadecimal digits, the bash extension.
+       */
       usize digit_index = i + 2;
       i32 value = 0;
       usize digits_read = 0;
@@ -232,8 +236,9 @@ void append_q_argument(String &out, const String &arg) throws
             static_cast<unsigned char>(c) == 0x7f)
         {
           char octal[8];
-          std::snprintf(octal, sizeof(octal), "\\%03o",
-                        static_cast<unsigned int>(static_cast<unsigned char>(c)));
+          std::snprintf(
+              octal, sizeof(octal), "\\%03o",
+              static_cast<unsigned int>(static_cast<unsigned char>(c)));
           out += octal;
         } else {
           out += c;

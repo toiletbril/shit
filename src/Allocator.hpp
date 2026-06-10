@@ -48,8 +48,8 @@ public:
   {
     return vtable->resize(context, pointer, old_length, new_length, alignment);
   }
-  flatten fn raw_free(void *pointer, usize length, usize alignment) const
-      wontthrow -> void
+  flatten fn raw_free(void *pointer, usize length,
+                      usize alignment) const wontthrow -> void
   {
     vtable->free(context, pointer, length, alignment);
   }

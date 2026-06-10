@@ -19,10 +19,10 @@ public:
   {
     Builtin,
     Program,
-    /* A command that did not resolve to a builtin or a program. It is built only
-       for a pipeline stage whose command was not found, so the stage runs
-       nothing and yields 127 while the rest of the pipeline still runs, matching
-       bash. The single-command path throws CommandNotFound instead. */
+    /* A command that did not resolve to a builtin or a program. It is built
+       only for a pipeline stage whose command was not found, so the stage runs
+       nothing and yields 127 while the rest of the pipeline still runs,
+       matching bash. The single-command path throws CommandNotFound instead. */
     Unresolved,
   };
 

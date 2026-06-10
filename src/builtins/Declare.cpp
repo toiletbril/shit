@@ -172,8 +172,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         line += '\n';
         ec.print_to_stdout(line.view());
       } else {
-        report_soft_builtin_error(ec, cxt, StringView{"'"} + name +
-                                               "' is not defined");
+        report_soft_builtin_error(ec, cxt,
+                                  StringView{"'"} + name + "' is not defined");
         status = 1;
       }
     }
@@ -191,8 +191,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     /* process_args passes a declare append through as name+=value, so a
        trailing plus on the name marks the append and is stripped before the
        attributes apply. */
-    let const is_append = equals.has_value() && !name.is_empty() &&
-                          name[name.count() - 1] == '+';
+    let const is_append =
+        equals.has_value() && !name.is_empty() && name[name.count() - 1] == '+';
     if (is_append) name = name.substring_of_length(0, name.count() - 1);
 
     /* A subscripted operand such as a[0]=5 declares the base name's array and

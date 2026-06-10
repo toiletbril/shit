@@ -531,8 +531,7 @@ static fn collapse_home_prefix(StringView path) throws -> String
   let shown = String{path};
   Maybe<Path> home = os::get_home_directory();
   if (home && shown.starts_with(home->text()) &&
-      (shown.length() == home->count() ||
-       shown.view()[home->count()] == '/'))
+      (shown.length() == home->count() || shown.view()[home->count()] == '/'))
   {
     let collapsed = String{};
     collapsed += "~";
@@ -578,9 +577,9 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case 'H': out += prompt_hostname(true); break;
     case 'w': out += collapse_home_prefix(working_directory); break;
     case 'W': out += Path{working_directory}.filename(); break;
-    /* The working directory with the home collapsed to ~ and then shortened from
-       the front with an ellipsis, the form the default prompt uses so a deep path
-       stays short. */
+    /* The working directory with the home collapsed to ~ and then shortened
+       from the front with an ellipsis, the form the default prompt uses so a
+       deep path stays short. */
     case 'P':
       out += shorten_path_with_ellipsis(
           collapse_home_prefix(working_directory).view(), PROMPT_PWD_LENGTH);

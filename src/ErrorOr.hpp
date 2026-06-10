@@ -62,7 +62,7 @@ public:
      so rather than leaning on an implicit copy. */
   mustuse fn clone() const throws -> ErrorOr { return ErrorOr{*this}; }
 
-  fn operator=(const ErrorOr &other) throws -> ErrorOr &
+  fn operator=(const ErrorOr &other) throws->ErrorOr &
   {
     if (this != &other) {
       destroy();

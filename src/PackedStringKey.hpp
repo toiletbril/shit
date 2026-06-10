@@ -48,8 +48,8 @@ public:
     return key;
   }
 
-  hot mustuse pure fn operator==(const PackedStringKey &other) const wontthrow
-      -> bool
+  hot mustuse pure fn
+  operator==(const PackedStringKey &other) const wontthrow->bool
   {
     return low_word == other.low_word && high_word == other.high_word;
   }

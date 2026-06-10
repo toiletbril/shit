@@ -36,8 +36,7 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* A leading -- ends option parsing, the form source -- file that ble.sh uses,
      so it is skipped before the filename is read rather than taken as one. */
   usize path_index = 1;
-  if (ec.args()[1] == "--")
-    path_index = 2;
+  if (ec.args()[1] == "--") path_index = 2;
   if (path_index >= ec.args().count())
     throw Error{"Unable to source because a filename argument is required"};
 

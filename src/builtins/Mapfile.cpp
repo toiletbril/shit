@@ -16,7 +16,8 @@ HELP_SYNOPSIS_DECL("[-t] [array]");
 HELP_DESCRIPTION_DECL(
     "The mapfile builtin, also named readarray, reads lines from the standard "
     "input into an indexed array, one line per element. The -t flag strips the "
-    "trailing newline from each line. The default array name is MAPFILE when no "
+    "trailing newline from each line. The default array name is MAPFILE when "
+    "no "
     "name operand is given.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -32,8 +33,7 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help")
-    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   bool strip_newline = false;
   StringView array_name = "MAPFILE";
@@ -52,8 +52,7 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
       }
     } else if (arg.length > 2 && arg[0] == '-' && arg[1] == 'n') {
       /* The attached form -nN carries the count in the same argument. */
-      if (let const count =
-              utils::parse_decimal_integer(arg.substring(2));
+      if (let const count = utils::parse_decimal_integer(arg.substring(2));
           !count.is_error() && count.value() >= 0)
         max_lines = count.value();
     } else if (!arg.is_empty() && arg[0] == '-') {

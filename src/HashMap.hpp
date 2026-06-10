@@ -110,7 +110,10 @@ public:
   pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
 
   /* Store a value the table owns by move. */
-  hot fn set(StringView key, Value value) throws -> void { set_value(key, steal(value)); }
+  hot fn set(StringView key, Value value) throws -> void
+  {
+    set_value(key, steal(value));
+  }
 
   /* The value for a key, inserting the supplied default when the key is absent,
      then returning a mutable reference. The caller passes the default already

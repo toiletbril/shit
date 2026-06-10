@@ -16,8 +16,8 @@ fn is_arena_pointer(const void *pointer) wontthrow -> bool
          (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
 }
 
-hot fn bump_arena_allocate(BumpArena *arena, usize length, usize alignment)
-    throws -> void *
+hot fn bump_arena_allocate(BumpArena *arena, usize length,
+                           usize alignment) throws -> void *
 {
   return arena->allocate(length, alignment);
 }

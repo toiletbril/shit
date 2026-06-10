@@ -5,8 +5,8 @@
 
 /* compopt changes the completion options of a command from inside a completion
    function, such as compopt -o nospace. The shell accepts the call so a
-   completion function runs, while the interactive completion engine does not yet
-   consult these options, so it is a no-op. */
+   completion function runs, while the interactive completion engine does not
+   yet consult these options, so it is a no-op. */
 
 FLAG_LIST_DECL();
 
@@ -23,7 +23,10 @@ namespace shit {
 
 Compopt::Compopt() = default;
 
-pure fn Compopt::kind() const wontthrow -> Builtin::Kind { return Kind::Compopt; }
+pure fn Compopt::kind() const wontthrow -> Builtin::Kind
+{
+  return Kind::Compopt;
+}
 
 fn Compopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {

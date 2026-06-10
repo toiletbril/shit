@@ -4,7 +4,8 @@
 #include "../Path.hpp"
 #include "../Utils.hpp"
 
-/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test. */
+/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test.
+ */
 #if SHIT_PLATFORM_IS WIN32
 #include <io.h>
 #endif
@@ -84,9 +85,10 @@ public:
       return os::is_fd_a_tty(static_cast<os::descriptor>(file_descriptor));
 #endif
     }
-    fail(StringView{"Unable to evaluate the test because '"} + op +
-         "' is not a known unary operator, expected one of -z -n -e -f -d -s -r "
-         "-w -x -L -h -b -c -p -S -t");
+    fail(
+        StringView{"Unable to evaluate the test because '"} + op +
+        "' is not a known unary operator, expected one of -z -n -e -f -d -s -r "
+        "-w -x -L -h -b -c -p -S -t");
     return false;
   }
 
@@ -326,8 +328,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
   usize expression_end = arguments.count();
   if (ec.program() == "[") {
     if (arguments.count() < 2 || arguments[arguments.count() - 1] != "]")
-      throw Error{
-          "The closing ']' is missing"};
+      throw Error{"The closing ']' is missing"};
     expression_end = arguments.count() - 1;
   }
 

@@ -480,10 +480,10 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback) throws
                   const_cast<char *const *>(child_args.begin()), environ);
 
   /* An ENOEXEC file is executable but carries no shebang and is not a binary.
-     When the caller can fall back, this is signalled so the file runs as a shell
-     script in place, the POSIX behavior, rather than failing 127. The check runs
-     before the descriptors are closed, so the script run still sees the
-     command's redirections on the context. */
+     When the caller can fall back, this is signalled so the file runs as a
+     shell script in place, the POSIX behavior, rather than failing 127. The
+     check runs before the descriptors are closed, so the script run still sees
+     the command's redirections on the context. */
   if (spawn_error == ENOEXEC && allow_script_fallback) {
     fds_handed_to_fallback = true;
     throw shit::ExecFormatError{};
@@ -575,15 +575,13 @@ fn replace_process(ExecContext &&ec) throws -> void
      file is executable but carries no shebang and is not a binary, so it is run
      as a shell script instead, the POSIX fallback, signalled to the caller by
      ExecFormatError. */
-  if (errno == ENOEXEC)
-    throw shit::ExecFormatError{};
+  if (errno == ENOEXEC) throw shit::ExecFormatError{};
   /* The program resolved but could not be executed, so the error carries the
      command's location for a caret and the caller exits 126 the way bash does
      for a file it found but could not run. */
-  throw shit::ErrorWithLocation{ec.source_location(),
-                                "Unable to execute '" +
-                                    ec.program_path().text() + "' because " +
-                                    last_system_error_message()};
+  throw shit::ErrorWithLocation{
+      ec.source_location(), "Unable to execute '" + ec.program_path().text() +
+                                "' because " + last_system_error_message()};
 }
 
 fn redirect_self(const ExecContext &ec) throws -> void
@@ -1314,16 +1312,14 @@ fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
 fn TempFileSet::count() const wontthrow -> usize { return m_paths.count(); }
 fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
 {
-  /* A file the consuming command still holds open cannot be deleted yet, as when
-     a while loop reads it across iterations, so a failed delete keeps the path
-     and retries on the next cleanup once that descriptor closes, rather than
-     dropping it and leaking the file. */
+  /* A file the consuming command still holds open cannot be deleted yet, as
+     when a while loop reads it across iterations, so a failed delete keeps the
+     path and retries on the next cleanup once that descriptor closes, rather
+     than dropping it and leaking the file. */
   usize kept = mark;
   for (usize i = mark; i < m_paths.count(); i++) {
-    if (DeleteFileA(m_paths[i].c_str()) != FALSE)
-      continue;
-    if (kept != i)
-      m_paths[kept] = steal(m_paths[i]);
+    if (DeleteFileA(m_paths[i].c_str()) != FALSE) continue;
+    if (kept != i) m_paths[kept] = steal(m_paths[i]);
     kept++;
   }
   while (m_paths.count() > kept)
@@ -1653,7 +1649,8 @@ fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
      variables, the unavoidable cost of running a separate process with no fork
      to clone the in-memory state. */
   char module_path[MAX_PATH];
-  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0) return shit::None;
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
+    return shit::None;
 
   char temp_dir[MAX_PATH];
   if (GetTempPathA(MAX_PATH, temp_dir) == 0) return shit::None;
@@ -1719,7 +1716,8 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
      pipeline reaps it the way it reaps a forked stage. The fresh shell inherits
      the environment but not the parent's functions or unexported variables. */
   char module_path[MAX_PATH];
-  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0) return shit::None;
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0)
+    return shit::None;
 
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), StringView{module_path}});
@@ -1758,9 +1756,9 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   unused(out_fd);
   unused(err_fd);
   /* Windows has no fork. A compound stage whose source span is known re-execs
-     through spawn_subshell_stage, so this throw is reached only for a stage type
-     whose end position the parser does not yet record, such as an if or case
-     used as a pipeline stage. */
+     through spawn_subshell_stage, so this throw is reached only for a stage
+     type whose end position the parser does not yet record, such as an if or
+     case used as a pipeline stage. */
   throw shit::Error{
       "A compound command in a pipeline is not supported on this platform"};
 }
@@ -1841,8 +1839,7 @@ fn thread_trampoline(LPVOID raw_context) -> DWORD
   return 0;
 }
 
-fn start_thread(void (*entry)(void *), void *context) wontthrow
-    -> Maybe<thread>
+fn start_thread(void (*entry)(void *), void *context) wontthrow -> Maybe<thread>
 {
   let const start = new thread_start_context{entry, context};
   HANDLE handle =
@@ -2020,12 +2017,12 @@ fn signal_name_from_number(i32 number) -> Maybe<String>
 }
 
 /* Append one argument to a Windows command line, quoted and escaped the way
-   CommandLineToArgvW parses it back, so an argument that carries a space, a tab,
-   or a quote cannot break out of its slot and inject further arguments. The
-   rules are the Microsoft ones, a run of backslashes is doubled only when it
-   precedes a quote or the closing quote, and an embedded quote is escaped with a
-   backslash. An argument with no space, tab, or quote is emitted bare, and an
-   empty argument is quoted so it is not dropped. */
+   CommandLineToArgvW parses it back, so an argument that carries a space, a
+   tab, or a quote cannot break out of its slot and inject further arguments.
+   The rules are the Microsoft ones, a run of backslashes is doubled only when
+   it precedes a quote or the closing quote, and an embedded quote is escaped
+   with a backslash. An argument with no space, tab, or quote is emitted bare,
+   and an empty argument is quoted so it is not dropped. */
 static fn append_windows_quoted_arg(String &out, StringView arg) -> void
 {
   bool needs_quotes = arg.count() == 0;
@@ -2246,7 +2243,8 @@ fn realtime_microseconds() wontthrow -> u64
   ticks.LowPart = file_time.dwLowDateTime;
   ticks.HighPart = file_time.dwHighDateTime;
   /* The FILETIME counts 100-nanosecond intervals since 1601, so the offset to
-     1970 is removed and the rest scaled from 100ns units down to microseconds. */
+     1970 is removed and the rest scaled from 100ns units down to microseconds.
+   */
   const u64 epoch_offset_100ns = 116444736000000000ULL;
   if (ticks.QuadPart < epoch_offset_100ns) return 0;
   return (ticks.QuadPart - epoch_offset_100ns) / 10ULL;
@@ -2256,7 +2254,8 @@ fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
     -> void
 {
   /* Windows carries no RUSAGE_CHILDREN equivalent here, so the cpu split is
-     reported as zero and only the wall time of the timed command is meaningful. */
+     reported as zero and only the wall time of the timed command is meaningful.
+   */
   user_seconds = 0;
   system_seconds = 0;
 }

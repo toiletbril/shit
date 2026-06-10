@@ -51,7 +51,10 @@ public:
 
   /* The allocator this string was built with, so a container can hand its own
      allocator down to a string it stores. */
-  mustuse pure fn allocator() const wontthrow -> Allocator { return m_allocator; }
+  mustuse pure fn allocator() const wontthrow -> Allocator
+  {
+    return m_allocator;
+  }
 
   hot mustuse pure fn count() const wontthrow -> usize { return m_length; }
   hot mustuse pure fn is_empty() const wontthrow -> bool

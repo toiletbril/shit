@@ -34,11 +34,11 @@ public:
     if (m_has_value) new (&m_storage) T(steal(other.reference()));
   }
 
-  /* An explicit deep copy, so a caller that means to duplicate the optional says
-     so rather than leaning on an implicit copy. */
+  /* An explicit deep copy, so a caller that means to duplicate the optional
+     says so rather than leaning on an implicit copy. */
   mustuse fn clone() const throws -> Maybe { return Maybe{*this}; }
 
-  fn operator=(const Maybe &other) throws -> Maybe &
+  fn operator=(const Maybe &other) throws->Maybe &
   {
     if (this != &other) {
       reset();
@@ -78,16 +78,16 @@ public:
     ASSERT(m_has_value);
     return reference();
   }
-  hot flatten mustuse pure fn operator*() wontthrow -> T & { return value(); }
-  hot flatten mustuse pure fn operator*() const wontthrow -> const T &
+  hot flatten mustuse pure fn operator*() wontthrow->T & { return value(); }
+  hot flatten mustuse pure fn operator*() const wontthrow->const T &
   {
     return value();
   }
-  hot flatten mustuse pure fn operator->() wontthrow -> T *
+  hot flatten mustuse pure fn operator->() wontthrow->T *
   {
     return &reference();
   }
-  hot flatten mustuse pure fn operator->() const wontthrow -> const T *
+  hot flatten mustuse pure fn operator->() const wontthrow->const T *
   {
     return &reference();
   }
@@ -109,11 +109,11 @@ public:
 
   /* Equal to a bare value only when present and that value matches, so a
      comparison reads like the one against a std::optional. */
-  mustuse fn operator==(const T &other) const throws -> bool
+  mustuse fn operator==(const T &other) const throws->bool
   {
     return m_has_value && reference() == other;
   }
-  mustuse fn operator!=(const T &other) const throws -> bool
+  mustuse fn operator!=(const T &other) const throws->bool
   {
     return !(*this == other);
   }

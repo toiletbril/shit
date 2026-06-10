@@ -11,10 +11,12 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-suqo] [optname ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The shopt builtin sets, unsets, and queries the bash shell options such as "
+    "The shopt builtin sets, unsets, and queries the bash shell options such "
+    "as "
     "extglob, globstar, nullglob, and dotglob. The -s flag enables an option, "
     "-u disables it, -q suppresses the status output for a scripted probe, and "
-    "-o operates on the set -o options instead of the shopt names. With no flag "
+    "-o operates on the set -o options instead of the shopt names. With no "
+    "flag "
     "a named option is queried, and with no name every option that has a "
     "recorded state is listed.");
 
@@ -107,8 +109,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help")
-    SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   bool enable = false;
   bool disable = false;
@@ -118,9 +119,9 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
-    /* The options combine into one argument, such as the -qo of shopt -qo posix,
-       so each letter is read in turn. A -p or any other letter is accepted
-       without effect. */
+    /* The options combine into one argument, such as the -qo of shopt -qo
+       posix, so each letter is read in turn. A -p or any other letter is
+       accepted without effect. */
     if (arg.length >= 2 && arg[0] == '-') {
       for (usize k = 1; k < arg.length; k++) {
         if (arg[k] == 's')
@@ -142,7 +143,8 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (is_known_shopt_option(name)) return false;
     /* A -q probe wants the status without the message, so it stays silent. Any
        other invocation throws a located error the dispatch renders with a caret
-       at the command, kept short rather than the long Unable-to-because form. */
+       at the command, kept short rather than the long Unable-to-because form.
+     */
     if (quiet) {
       status = 1;
       return true;
@@ -162,8 +164,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
           else
             throw Error{StringView{"unknown shopt option '"} + name + "'"};
         }
-      } else if (Maybe<bool> on = query_shell_option(cxt, name);
-                 on.has_value())
+      } else if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
       {
         if (!*on) status = 1;
         if (!quiet) ec.print_to_stdout(shopt_status_line(name, *on).view());
