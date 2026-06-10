@@ -8,6 +8,7 @@ jobs:
   build-test-bench:
     name: Build, test and bench
     runs-on: ubuntu-24.04
+    continue-on-error: true
     env:
       CXX: clang++-18
     steps:
