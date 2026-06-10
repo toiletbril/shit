@@ -893,11 +893,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      it into the heap-backed store, so nothing the release frees is still read. */
   let const args_mark = cxt.scratch_mark();
   defer { cxt.scratch_release(args_mark); };
+  /* A <(...) or >(...) in the words below opens a pipe and forks a child or
+     leaves a temp file. The mark is taken before the expansion so this command
+     reaps only what it opens, leaving a substitution from an enclosing command,
+     such as a while loop's producer, for that command to reap. */
+  let const substitution_mark = cxt.mark_process_substitutions();
   let program_args = cxt.process_args(m_args, /*args_are_transient=*/true);
-  /* A <(...) or >(...) in the words opened a pipe and forked a child during the
-     expansion above. The descriptors stay open while the command runs and are
-     closed and the children reaped when this command returns, on every path. */
-  defer { cxt.cleanup_process_substitutions(); };
+  /* The descriptors stay open while the command runs and are closed and the
+     children reaped when this command returns, on every path. */
+  defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args);
 
   /* A bare exec, the word exec with no further argument, applies its
@@ -3389,11 +3393,13 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_child != nullptr);
 
   /* A <(...) or >(...) in a redirection target, as in done < <(cmd), opens a
-     pipe and forks a child or leaves a temp file during the expansion below. It
-     is reaped and its temp file deleted once the redirected command returns,
-     the way the simple command path does for a substitution in its words.
-     Registered first so it runs last, after the descriptor backups restore. */
-  defer { cxt.cleanup_process_substitutions(); };
+     pipe and forks a child or leaves a temp file during the expansion below. The
+     mark is taken before it so this command reaps only the substitution its own
+     redirection opens, reaped and its temp file deleted once the redirected
+     command returns. Registered first so it runs last, after the descriptor
+     backups restore. */
+  let const substitution_mark = cxt.mark_process_substitutions();
+  defer { cxt.cleanup_process_substitutions(substitution_mark); };
 
   /* The child runs around saved descriptor backups that restore afterward, so
      it forks rather than replacing the shell. */

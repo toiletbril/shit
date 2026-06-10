@@ -5109,9 +5109,19 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 #endif
 }
 
-fn EvalContext::cleanup_process_substitutions() wontthrow -> void
+fn EvalContext::mark_process_substitutions() const wontthrow
+    -> process_substitution_mark
 {
-  for (process_substitution &sub : m_pending_process_substitutions) {
+  return {m_pending_process_substitutions.count(),
+          m_substitution_temp_files.count()};
+}
+
+fn EvalContext::cleanup_process_substitutions(process_substitution_mark mark)
+    wontthrow -> void
+{
+  for (usize i = mark.pending; i < m_pending_process_substitutions.count(); i++)
+  {
+    process_substitution &sub = m_pending_process_substitutions[i];
     /* Closing the shell end first sends SIGPIPE to a producer that still has
        output queued, so it ends rather than blocking the wait below. */
     os::close_fd(sub.shell_fd);
@@ -5147,8 +5157,10 @@ fn EvalContext::cleanup_process_substitutions() wontthrow -> void
       }
     }
   }
-  m_pending_process_substitutions.clear();
-  m_substitution_temp_files.cleanup();
+  while (m_pending_process_substitutions.count() > mark.pending)
+    m_pending_process_substitutions.remove(
+        m_pending_process_substitutions.count() - 1);
+  m_substitution_temp_files.cleanup_from(mark.temp);
 }
 
 fn EvalContext::capture_command_substitution(const WordSegment &segment) throws

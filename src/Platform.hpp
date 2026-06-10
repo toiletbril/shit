@@ -133,10 +133,14 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>;
 class TempFileSet
 {
 public:
-  /* Remember a temp file to delete on the next cleanup. */
+  /* Remember a temp file to delete on a later cleanup. */
   fn track(Path path) throws -> void;
-  /* Delete every tracked file on a best-effort basis and forget them. */
-  fn cleanup() wontthrow -> void;
+  /* The number of tracked files, a mark a command takes at entry so its own
+     cleanup deletes only the files tracked after it, not an outer command's. */
+  mustuse fn count() const wontthrow -> usize;
+  /* Delete every file tracked at or after the mark on a best-effort basis, and
+     keep one still held open by a reader for a later retry rather than leak it. */
+  fn cleanup_from(usize mark) wontthrow -> void;
 
 private:
 #if SHIT_PLATFORM_IS WIN32

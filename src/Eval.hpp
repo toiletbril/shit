@@ -171,6 +171,16 @@ struct process_substitution
   StringView source;
 };
 
+/* A mark a command takes at entry, the count of pending substitutions and temp
+   files before it ran, so its own cleanup reaps only the substitutions it
+   opened and not an outer command's, as when a while loop reads done < <(cmd)
+   and its body, a simple command, must not reap the loop's producer mid-read. */
+struct process_substitution_mark
+{
+  usize pending{0};
+  usize temp{0};
+};
+
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. The
    set option flags and the trap table are captured too, so a set -e, a set -f,
@@ -742,7 +752,10 @@ public:
   /* Close the descriptors and reap the children of the process substitutions a
      command opened. Closing first sends SIGPIPE to a producer that has more to
      write, so it ends rather than blocking the reap. */
-  fn cleanup_process_substitutions() wontthrow -> void;
+  mustuse fn mark_process_substitutions() const wontthrow
+      -> process_substitution_mark;
+  fn cleanup_process_substitutions(process_substitution_mark mark) wontthrow
+      -> void;
 
   /* Run a parsed inner command under the substitution machinery, capturing its
      stdout and snapshotting state so a cd or an assignment inside does not

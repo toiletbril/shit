@@ -70,7 +70,8 @@ hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow
 fn close_fd(os::descriptor fd) wontthrow -> bool { return close(fd) != -1; }
 
 fn TempFileSet::track(Path path) throws -> void { unused(path); }
-fn TempFileSet::cleanup() wontthrow -> void {}
+fn TempFileSet::count() const wontthrow -> usize { return 0; }
+fn TempFileSet::cleanup_from(usize mark) wontthrow -> void { unused(mark); }
 
 fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
@@ -1310,14 +1311,15 @@ fn close_fd(os::descriptor fd) wontthrow -> bool
 }
 
 fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
-fn TempFileSet::cleanup() wontthrow -> void
+fn TempFileSet::count() const wontthrow -> usize { return m_paths.count(); }
+fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
 {
   /* A file the consuming command still holds open cannot be deleted yet, as when
      a while loop reads it across iterations, so a failed delete keeps the path
      and retries on the next cleanup once that descriptor closes, rather than
      dropping it and leaking the file. */
-  usize kept = 0;
-  for (usize i = 0; i < m_paths.count(); i++) {
+  usize kept = mark;
+  for (usize i = mark; i < m_paths.count(); i++) {
     if (DeleteFileA(m_paths[i].c_str()) != FALSE)
       continue;
     if (kept != i)
