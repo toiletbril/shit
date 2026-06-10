@@ -50,6 +50,7 @@ test: $(BIN)
 	@$(MAKE) -B dashdiff
 	@$(MAKE) -B bashdiff
 	@$(MAKE) -B mimicrydiff
+	@touch $(FAILED_LIST)
 	@cat $(FAILED_LIST)
 	@test ! -s $(FAILED_LIST)
 
