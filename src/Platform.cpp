@@ -380,7 +380,10 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
     msg += String{StringView{strerror(spawn_error)}};
     msg += '\n';
     (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
-    _exit(127);
+    /* The program was resolved but could not be executed, so bash exits 126,
+       reserving 127 for a missing file, as when a shebang names an interpreter
+       that does not exist. */
+    _exit(spawn_error == ENOENT ? 127 : 126);
   }
 
   return child_pid;
@@ -573,8 +576,13 @@ fn replace_process(ExecContext &&ec) throws -> void
      ExecFormatError. */
   if (errno == ENOEXEC)
     throw shit::ExecFormatError{};
-  throw shit::Error{ec.program_path().text() + ": " +
-                    last_system_error_message()};
+  /* The program resolved but could not be executed, so the error carries the
+     command's location for a caret and the caller exits 126 the way bash does
+     for a file it found but could not run. */
+  throw shit::ErrorWithLocation{ec.source_location(),
+                                "Unable to execute '" +
+                                    ec.program_path().text() + "' because " +
+                                    last_system_error_message()};
 }
 
 fn redirect_self(const ExecContext &ec) throws -> void

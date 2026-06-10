@@ -96,6 +96,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
         const bool isolated = !(cxt.terminal_exec_allowed() &&
                                 !cxt.in_subshell() && !cxt.has_exit_trap());
         quit(cxt.run_mimicked_script(ec, mode, isolated), false);
+      } catch (const ErrorWithLocation &error) {
+        /* The program resolved but could not be executed, so the caret points at
+           the command and the shell exits 126, the way bash distinguishes a file
+           it found but could not run from one it never found. */
+        const String *source = cxt.current_source();
+        show_message(error.to_string(source != nullptr ? source->view()
+                                                       : StringView{}));
+        quit(126, false);
       } catch (const Error &error) {
         print_error(error.message() + "\n");
         quit(127, false);
