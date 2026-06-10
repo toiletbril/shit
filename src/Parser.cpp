@@ -1247,10 +1247,11 @@ hot fn Parser::parse_for() throws -> Command *
   ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
-  /* A for header that opens with (( is the bash C-style loop, distinct from the
-     for name in words form. It is gated to bash mode since a bare for needs a
-     name in POSIX. */
-  if (m_lexer.is_bash_compatible()) {
+  /* A for header that opens with (( is the bash C-style loop, distinct from
+     the for name in words form. POSIX keeps the bare-name reading dash
+     requires, while the bash and the default mood take the C-style header,
+     the same mood policy the (( )) arithmetic command follows. */
+  if (!m_lexer.is_posix_mode()) {
     Token *peeked = m_lexer.peek_shell_token();
     ASSERT(peeked != nullptr);
     if (peeked->kind() == Token::Kind::LeftParen) {
@@ -1672,11 +1673,13 @@ hot fn Parser::parse_paren_command() throws -> Command *
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
   /* A (( )) arithmetic command changes the POSIX meaning of two opening
-     parentheses, which is a nested subshell, so it is taken only in bash mode.
-     POSIX and the default mode keep the nested-subshell reading. */
+     parentheses, which is a nested subshell, so POSIX mode keeps the
+     nested-subshell reading the way dash parses it, while the bash and the
+     default mood take the arithmetic command, the same mood policy the array
+     literal follows. */
   Token *next = m_lexer.peek_shell_token();
   ASSERT(next != nullptr);
-  if (m_lexer.is_bash_compatible() && next->kind() == Token::Kind::LeftParen &&
+  if (!m_lexer.is_posix_mode() && next->kind() == Token::Kind::LeftParen &&
       next->source_location().position == open->source_location().position + 1)
   {
     return parse_arithmetic_command(open);

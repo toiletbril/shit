@@ -1,30 +1,245 @@
-shit: 18:5: error: Expected a variable name after 'for'.
-    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
-       |      ^~ here.
-shit: 18:16: error: expected a command, found '<='.
-    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
-       |                 ^~ here.
-shit: 18:25: error: ')' has no matching '('.
-    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
-       |                          ^~ here.
-shit: 18:29: error: 'do' has no matching 'while', 'until', or 'for'.
-    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
-       |                              ^~ here.
-shit: 18:50: error: 'done' has no matching 'while', 'until', or 'for'.
-    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
-       |                                                   ^~~~ here.
-shit: 22:5: error: Expected a variable name after 'for'.
-    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
-       |      ^~ here.
-shit: 22:16: error: expected a command, found '<='.
-    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
-       |                 ^~ here.
-shit: 22:25: error: ')' has no matching '('.
-    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
-       |                          ^~ here.
-shit: 22:29: error: 'do' has no matching 'while', 'until', or 'for'.
-    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
-       |                              ^~ here.
-shit: 22:49: error: 'done' has no matching 'while', 'until', or 'for'.
-    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
-       |                                                  ^~~~ here.
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((2 ** 10))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((-2 ** 2))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((2 ** 3 ** 2))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0xff + 16#10))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((010 + 2#101))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((36#z))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((6 & 3 | 8 ^ 1))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((5 > 3 ? 10 : 20))"]
+  [CompoundListCondition, None]
+    [Assign n=5]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "n += 3, n *= 2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "n=$n"]
+  [CompoundListCondition, None]
+    [Assign status=ok]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "0"]
+  [CompoundListCondition, ||]
+    [Assign status=zero-false]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$status"]
+  [CompoundListCondition, None]
+    [Assign sum=0]
+  [CompoundListCondition, None]
+    [CStyleForLoop "i = 1; i <= 5; i++"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign sum=$((sum + i))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "sum=$sum"]
+  [CompoundListCondition, None]
+    [Assign fact=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "let" "fact = 1"]
+  [CompoundListCondition, None]
+    [CStyleForLoop "i = 1; i <= 5; i++"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "let" "fact *= i"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "fact=$fact"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "2 ** 10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "-2 ** 2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "2 ** 3 ** 2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0xff + 16#10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "010 + 2#101"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "36#z"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "6 & 3 | 8 ^ 1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "5 > 3 ? 10 : 20"
+]
+[Word
+  Unquoted "n=5"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "+="
+]
+[Word
+  Unquoted "3,"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "*="
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "n="
+  Variable "n"
+]
+[Word
+  Unquoted "status=ok"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "status=zero-false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "status"
+]
+[Word
+  Unquoted "sum=0"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "i++"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "sum="
+  ArithmeticExpansion "sum + i"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "sum="
+  Variable "sum"
+]
+[Word
+  Unquoted "fact=1"
+]
+[Word
+  Unquoted "let"
+]
+[Word
+  DoubleQuoted "fact = 1"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "i++"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "let"
+]
+[Word
+  DoubleQuoted "fact *= i"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "fact="
+  Variable "fact"
+]
+1024
+4
+512
+271
+13
+35
+11
+10
+n=16
+zero-false
+sum=15
+fact=120
+[Code 0]

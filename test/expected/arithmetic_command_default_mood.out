@@ -1,0 +1,144 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=5]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ArithmeticCommand "x>=4"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "ge=yes"]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "x+=2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "x=$x"]
+  [CompoundListCondition, None]
+    [CStyleForLoop "i=0;i<3;i++"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "i=$i"]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ArithmeticCommand "x-->6"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "w=$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "status_true=$?"]
+  [CompoundListCondition, None]
+    [ArithmeticCommand "0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "status_false=$?"]
+[Word
+  Unquoted "x=5"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ge=yes"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "x+=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "x="
+  Variable "x"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i=0"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "i++"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "i="
+  Variable "i"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "x--"
+]
+[Word
+  Unquoted "6"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "w="
+  Variable "x"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "status_true="
+  Variable "?"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "status_false="
+  Variable "?"
+]
+ge=yes
+x=7
+i=0
+i=1
+i=2
+w=6
+status_true=0
+status_false=1
+[Code 0]

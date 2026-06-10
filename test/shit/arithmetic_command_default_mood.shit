@@ -1,0 +1,10 @@
+# The (( )) arithmetic command and the C-style for parse in the default mood
+# the way the array literal does, while POSIX mode keeps the subshell reading.
+x=5
+if ((x>=4)); then echo "ge=yes"; fi
+((x+=2))
+echo "x=$x"
+for ((i=0;i<3;i++)); do echo "i=$i"; done
+while ((x-->6)); do echo "w=$x"; done
+echo "status_true=$?"
+((0)); echo "status_false=$?"
