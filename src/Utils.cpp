@@ -166,7 +166,14 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       last_stdin = pipe->in;
     }
 
-    if (!ec.is_builtin()) {
+    if (ec.is_unresolved()) {
+      /* The stage's command did not resolve, already reported. It runs nothing
+         and closes its descriptors, so the pipe it owns gives the next stage
+         EOF, and its slot carries 127 for pipefail while the last stage still
+         governs the plain pipeline status. */
+      stage_status[stage_index] = 127;
+      ec.close_fds();
+    } else if (!ec.is_builtin()) {
       let const child = os::execute_program(steal(ec));
       children.push(child);
       child_stage.push(stage_index);

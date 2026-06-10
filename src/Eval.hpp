@@ -1131,6 +1131,11 @@ public:
   static fn from_resolved(SourceLocation location, ResolvedCommand kind,
                           ArrayList<String> &&args) throws -> ExecContext;
 
+  /* Build a stage whose command did not resolve, so it runs nothing in the
+     pipeline, closes its descriptors to give the next stage EOF, and reports
+     127. The single-command path throws CommandNotFound instead. */
+  static fn make_unresolved(SourceLocation location) throws -> ExecContext;
+
   Maybe<os::descriptor> in_fd{};
   Maybe<os::descriptor> out_fd{};
   Maybe<os::descriptor> err_fd{};
@@ -1145,6 +1150,7 @@ public:
   bool dup_out_to_err_came_last{false};
 
   pure fn is_builtin() const wontthrow -> bool;
+  pure fn is_unresolved() const wontthrow -> bool;
 
   pure fn args() const wontthrow -> const ArrayList<String> &;
   pure fn program() const wontthrow -> const String &;

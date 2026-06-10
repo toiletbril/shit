@@ -6212,6 +6212,11 @@ pure fn ExecContext::is_builtin() const wontthrow -> bool
   return m_kind.is_builtin();
 }
 
+pure fn ExecContext::is_unresolved() const wontthrow -> bool
+{
+  return m_kind.is_unresolved();
+}
+
 pure fn ExecContext::program_path() const wontthrow -> const Path &
 {
   ASSERT(!is_builtin());
@@ -6299,6 +6304,15 @@ fn ExecContext::from_resolved(SourceLocation location, ResolvedCommand kind,
 {
   ASSERT(args.count() > 0);
   return {location, steal(kind), steal(args)};
+}
+
+fn ExecContext::make_unresolved(SourceLocation location) throws -> ExecContext
+{
+  /* The stage never runs, so one placeholder argument satisfies the
+     constructor's invariant that a context carries at least argv[0]. */
+  let args = ArrayList<String>{};
+  args.push(String{});
+  return {location, ResolvedCommand::from_unresolved(), steal(args)};
 }
 
 } /* namespace shit */

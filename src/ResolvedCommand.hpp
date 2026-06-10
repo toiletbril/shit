@@ -19,6 +19,11 @@ public:
   {
     Builtin,
     Program,
+    /* A command that did not resolve to a builtin or a program. It is built only
+       for a pipeline stage whose command was not found, so the stage runs
+       nothing and yields 127 while the rest of the pipeline still runs, matching
+       bash. The single-command path throws CommandNotFound instead. */
+    Unresolved,
   };
 
   Kind kind{Kind::Program};
@@ -41,7 +46,15 @@ public:
     return resolved;
   }
 
+  mustuse static ResolvedCommand from_unresolved()
+  {
+    ResolvedCommand resolved{};
+    resolved.kind = Kind::Unresolved;
+    return resolved;
+  }
+
   mustuse bool is_builtin() const { return kind == Kind::Builtin; }
+  mustuse bool is_unresolved() const { return kind == Kind::Unresolved; }
 };
 
 } /* namespace shit */

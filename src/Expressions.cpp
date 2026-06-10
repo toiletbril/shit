@@ -2087,18 +2087,19 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
                               "A pipeline stage expanded to no command to run"};
     }
 
-    /* A stage whose command does not resolve is non-fatal. Report it to stderr
-       and yield 127 for the pipeline rather than aborting the shell. The
-       expansions of the earlier stages already ran, so the build is not
-       retried. */
+    /* A stage whose command does not resolve is non-fatal. Bash reports it,
+       runs the rest of the pipeline, and reports the last stage's status, so the
+       unresolved stage becomes a no-op context that closes its pipe to give the
+       next stage EOF and contributes 127 only under pipefail. Aborting here
+       instead would wrongly make the not-found stage govern the pipeline. */
     Maybe<ExecContext> stage_ec;
     try {
       stage_ec =
           ExecContext::make_from(e->source_location(), steal(stage_args));
     } catch (const CommandNotFound &not_found) {
       report_command_not_found(cxt, not_found);
-      cxt.set_last_exit_status(127);
-      return 127;
+      ecs.push(ExecContext::make_unresolved(e->source_location()));
+      continue;
     }
     let ec = stage_ec.take();
     /* Apply this stage's own redirections, such as 2>&1, before the pipe wires
