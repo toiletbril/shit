@@ -384,7 +384,12 @@ struct measured_result
 fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
     -> Maybe<measured_result>;
 
-fn execute_program(ExecContext &&ec) throws -> process;
+/* allow_script_fallback lets a single foreground command report an ENOEXEC file
+   to the caller through ExecFormatError, so the caller runs it as a shell script
+   in place. A pipeline stage or a background command leaves it false and an
+   unrunnable file fails the stage at runtime instead. */
+fn execute_program(ExecContext &&ec, bool allow_script_fallback = false) throws
+    -> process;
 
 /* Fork a child for a compound command used as a pipeline stage. In the child it
    places the pipe ends onto the standard descriptors, resets the signal

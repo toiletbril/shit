@@ -336,6 +336,10 @@ Note::Note(StringView message) : Error(message) {}
 
 cold fn Note::severity_word() const wontthrow -> String { return "note"; }
 
+ExecFormatError::ExecFormatError()
+    : Error("the file is not an executable and has no interpreter")
+{}
+
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
     : ErrorBase(message), m_location(steal(location))

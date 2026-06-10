@@ -82,6 +82,20 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       flush();
       try {
         os::replace_process(steal(ec));
+      } catch (const ExecFormatError &) {
+        /* The file has no shebang and is not a binary, so it runs as a shell
+           script in place, the POSIX fallback. replace_process already placed
+           any redirections onto the standard descriptors and closed the
+           originals, so the context's own descriptors are cleared to keep the
+           run from reapplying the now-closed ones. */
+        ec.in_fd.reset();
+        ec.out_fd.reset();
+        ec.err_fd.reset();
+        const MimicMode mode =
+            cxt.is_bash_compatible() ? MimicMode::Bash : MimicMode::Posix;
+        const bool isolated = !(cxt.terminal_exec_allowed() &&
+                                !cxt.in_subshell() && !cxt.has_exit_trap());
+        quit(cxt.run_mimicked_script(ec, mode, isolated), false);
       } catch (const Error &error) {
         print_error(error.message() + "\n");
         quit(127, false);
@@ -93,7 +107,19 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        into the spawn. */
     let const command = is_async ? String{ec.program().view()} : String{};
 
-    let const p = os::execute_program(steal(ec));
+    os::process p = SHIT_INVALID_PROCESS;
+    try {
+      p = os::execute_program(steal(ec), !is_async);
+    } catch (const ExecFormatError &) {
+      /* The file has no shebang and is not a binary, so a foreground command
+         runs it as a shell script in this process instead of as a child, the
+         POSIX fallback. */
+      const MimicMode mode =
+          cxt.is_bash_compatible() ? MimicMode::Bash : MimicMode::Posix;
+      const bool isolated = !(cxt.terminal_exec_allowed() &&
+                              !cxt.in_subshell() && !cxt.has_exit_trap());
+      return cxt.run_mimicked_script(ec, mode, isolated);
+    }
     if (is_async) {
       cxt.set_last_background_pid(os::process_id_of(p));
       const i32 id = cxt.register_job(p, command);

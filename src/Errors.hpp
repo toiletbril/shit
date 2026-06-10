@@ -81,6 +81,16 @@ public:
   fn severity_word() const wontthrow -> String override;
 };
 
+/* Thrown when an exec fails with ENOEXEC, where the file is executable but is
+   not a valid binary and carries no shebang. It signals the runtime to run the
+   file as a shell script, the POSIX fallback, rather than reporting a failure,
+   so it is always caught and never shown. */
+class ExecFormatError : public Error
+{
+public:
+  ExecFormatError();
+};
+
 /**
  * An error with location in the source code. The source must be supplied to
  * resolve context.

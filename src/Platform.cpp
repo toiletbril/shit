@@ -383,7 +383,8 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
   return child_pid;
 }
 
-hot fn execute_program(ExecContext &&ec) throws -> process
+hot fn execute_program(ExecContext &&ec, bool allow_script_fallback) throws
+    -> process
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
@@ -467,6 +468,11 @@ hot fn execute_program(ExecContext &&ec) throws -> process
   ec.close_fds();
 
   if (spawn_error != 0) {
+    /* An ENOEXEC file is executable but carries no shebang and is not a binary.
+       When the caller can fall back, this is signalled so the file runs as a
+       shell script in place, the POSIX behavior, rather than failing 127. */
+    if (allow_script_fallback && spawn_error == ENOEXEC)
+      throw shit::ExecFormatError{};
     return spawn_failure_child(ec.program_path(), spawn_error);
   }
 
@@ -547,7 +553,12 @@ fn replace_process(ExecContext &&ec) throws -> void
   execv(ec.program_path().c_str(),
         const_cast<char *const *>(child_args.begin()));
 
-  /* execv returns only when it fails to replace the process. */
+  /* execv returns only when it fails to replace the process. ENOEXEC means the
+     file is executable but carries no shebang and is not a binary, so it is run
+     as a shell script instead, the POSIX fallback, signalled to the caller by
+     ExecFormatError. */
+  if (errno == ENOEXEC)
+    throw shit::ExecFormatError{};
   throw shit::Error{ec.program_path().text() + ": " +
                     last_system_error_message()};
 }
@@ -1526,8 +1537,11 @@ fn environment_names() -> ArrayList<String>
   return names;
 }
 
-fn execute_program(ExecContext &&ec) -> process
+fn execute_program(ExecContext &&ec, bool allow_script_fallback) -> process
 {
+  /* Windows has no ENOEXEC interpreter convention, so the script fallback the
+     POSIX path offers does not apply here. */
+  unused(allow_script_fallback);
   String command_line = make_os_args(ec.args());
 
   PROCESS_INFORMATION process_info{};
