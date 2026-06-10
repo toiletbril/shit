@@ -29,12 +29,7 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  i64 count = 1;
-  if (ec.args().count() > 1) {
-    let const parsed = utils::parse_decimal_integer(ec.args()[1]);
-    if (parsed.is_error()) throw parsed.error();
-    count = parsed.value();
-  }
+  let const count = parse_optional_integer_arg(ec, 1);
 
   let const &params = cxt.positional_params();
   if (count < 0 || static_cast<usize>(count) > params.count()) return 1;

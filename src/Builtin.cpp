@@ -161,6 +161,15 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                 "\n");
 }
 
+fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
+    -> i64
+{
+  if (ec.args().count() <= 1) return default_value;
+  let const parsed = utils::parse_decimal_integer(ec.args()[1]);
+  if (parsed.is_error()) throw parsed.error();
+  return parsed.value();
+}
+
 Builtin::Builtin() = default;
 
 } /* namespace shit */

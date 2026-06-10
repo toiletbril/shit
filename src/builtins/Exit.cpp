@@ -28,12 +28,7 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* exit with no argument uses the status of the last command. */
-  i64 status = cxt.last_exit_status();
-  if (ec.args().count() > 1) {
-    let const parsed = utils::parse_decimal_integer(ec.args()[1]);
-    if (parsed.is_error()) throw parsed.error();
-    status = parsed.value();
-  }
+  let const status = parse_optional_integer_arg(ec, cxt.last_exit_status());
 
   /* Inside a subshell or a command substitution, exit ends only that scope. */
   if (cxt.in_subshell()) {

@@ -314,4 +314,10 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void;
 
+/* The optional first integer argument of a builtin such as exit, return, break,
+   continue, and shift, or default_value when no argument is given. A malformed
+   argument propagates its parse error to the caller. */
+fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
+    -> i64;
+
 } /* namespace shit */
