@@ -61,10 +61,24 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
+    /* An integer name evaluates its new value as arithmetic the way the
+       variable store does, so the environment receives the decimal result
+       rather than the raw expression text. */
+    let const is_integer_name = cxt.is_integer_variable(name.view());
+    if (has_new_value && is_integer_name) {
+      char result_text[24];
+      value = String{utils::int_to_text_into(
+          value.is_empty() ? 0 : cxt.evaluate_arithmetic(value.view()),
+          result_text, sizeof(result_text))};
+    }
+
     /* The variable moves into the environment, so the bare shell copy is
        removed and child processes inherit it. Inside a subshell the prior
-       environment value is logged so the export does not leak past it. */
+       environment value is logged so the export does not leak past it. The
+       unset is this move, not a user unset, so the integer mark it clears is
+       put back. */
     cxt.unset_shell_variable(name);
+    if (is_integer_name) cxt.mark_integer(name.view());
     cxt.record_environment_change(name);
     os::set_environment_variable(name, value);
     cxt.mark_exported(name);

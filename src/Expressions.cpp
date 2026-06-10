@@ -557,11 +557,16 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     /* The append form NAME+=VALUE prepends the current value of NAME, treating
-       an unset name as empty, so the store receives the concatenation. */
+       an unset name as empty, so the store receives the concatenation. An
+       integer name adds rather than concatenates, so the join wraps the
+       appended expression for the arithmetic in the store. */
     if (m_assignment->is_append()) {
       let appended =
           String{cxt.get_variable_value(m_assignment->key()).value_or("")};
-      appended += value;
+      if (cxt.is_integer_variable(m_assignment->key()))
+        cxt.append_integer_expression(appended, value.view());
+      else
+        appended += value;
       value = steal(appended);
     }
 

@@ -523,6 +523,21 @@ public:
   fn is_readonly(StringView name) const wontthrow -> bool;
   fn readonly_names() const throws -> ArrayList<String>;
 
+  /* declare -i marks a variable so every assignment to it evaluates the value
+     as an arithmetic expression and stores the decimal result. declare +i and
+     unset clear the mark. The set is usually empty, the same way the readonly
+     set is. */
+  fn mark_integer(StringView name) throws -> void;
+  fn unmark_integer(StringView name) throws -> void;
+  fn is_integer_variable(StringView name) const wontthrow -> bool;
+  /* Joins an appended arithmetic expression onto the prior value already in
+     joined, a plus then the expression in parentheses so its own precedence
+     and commas stay self-contained, the way bash adds the two evaluations. A
+     blank expression joins as a plus zero, the way bash leaves the value
+     unchanged. */
+  fn append_integer_expression(String &joined,
+                               StringView expression) const throws -> void;
+
   /* A function call pushes a local scope so a local builtin inside it can
      shadow a variable and have the old value restored when the call returns.
      declare_local records the current binding of a name in the innermost scope
@@ -1036,6 +1051,9 @@ protected:
   /* The names marked read-only, checked by set_shell_variable on every
      assignment, so a set gives the membership test in O(1). */
   HashSet m_readonly_names{heap_allocator()};
+  /* The names declare -i marked as integers, checked by set_shell_variable so
+     an assignment to one evaluates its value as arithmetic. */
+  HashSet m_integer_names{heap_allocator()};
   /* The alias name to replacement table. */
   HashMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed

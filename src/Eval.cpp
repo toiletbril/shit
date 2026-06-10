@@ -148,6 +148,19 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
 
+  /* An integer-marked name evaluates its value as arithmetic on every
+     assignment, the way bash applies declare -i, so the store receives the
+     decimal result rather than the raw text. An empty value stores zero the
+     way bash does. */
+  if (is_integer_variable(name)) [[unlikely]] {
+    let const result = value.length == 0 ? 0 : evaluate_arithmetic(value);
+    char result_text[24];
+    assign_variable(name,
+                    utils::int_to_text_into(result, result_text,
+                                            sizeof(result_text)));
+    return;
+  }
+
   assign_variable(name, value);
 }
 
@@ -188,6 +201,9 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
+  /* unset drops the integer mark with the value, the way bash clears the
+     declare -i attribute, so a later assignment stores raw text again. */
+  m_integer_names.remove(name);
 }
 
 fn EvalContext::set_indexed_array(StringView name,
@@ -1053,6 +1069,38 @@ fn EvalContext::readonly_names() const throws -> ArrayList<String>
       [&](StringView name) { out.push_managed(name); });
   utils::sort_ascending(out);
   return out;
+}
+
+fn EvalContext::mark_integer(StringView name) throws -> void
+{
+  m_integer_names.add(name);
+}
+
+fn EvalContext::unmark_integer(StringView name) throws -> void
+{
+  m_integer_names.remove(name);
+}
+
+fn EvalContext::is_integer_variable(StringView name) const wontthrow -> bool
+{
+  return m_integer_names.contains(name);
+}
+
+fn EvalContext::append_integer_expression(String &joined,
+                                          StringView expression) const throws
+    -> void
+{
+  joined += '+';
+  for (usize i = 0; i < expression.length; i++) {
+    let const c = expression[i];
+    if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+      joined += '(';
+      joined.append(expression);
+      joined += ')';
+      return;
+    }
+  }
+  joined += '0';
 }
 
 fn EvalContext::enter_function_scope() throws -> void
@@ -6117,6 +6165,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
      expansion. */
   let is_declaration_command = false;
   let is_local_command = false;
+  let is_declare_command = false;
   if (!args.is_empty() && args[0]->kind() == Token::Kind::Word) {
     const Word &command_word =
         static_cast<const tokens::WordToken *>(args[0])->word();
@@ -6126,9 +6175,9 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         command_name.append(segment.text.view());
       let const name = command_name.view();
       is_local_command = name == "local";
-      is_declaration_command = is_local_command || name == "declare" ||
-                               name == "typeset" || name == "export" ||
-                               name == "readonly";
+      is_declare_command = name == "declare" || name == "typeset";
+      is_declaration_command = is_local_command || is_declare_command ||
+                               name == "export" || name == "readonly";
     }
   }
 
@@ -6151,11 +6200,11 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
              x=$1 does, rather than splitting into several arguments. */
           let assignment = String{expanded_args.allocator()};
           assignment.append(a->key().view());
-          if (a->is_append() && is_local_command) {
-            /* local creates a fresh local that shadows an outer name, so the
-               name+=value form passes through literally and the builtin computes
-               the append after the local exists, against the new value rather
-               than the shadowed outer one. */
+          if (a->is_append() && (is_local_command || is_declare_command)) {
+            /* local creates a fresh local that shadows an outer name, and
+               declare may apply the -i attribute on the same command, so the
+               name+=value form passes through literally and the builtin
+               computes the append after its own effects exist. */
             assignment += '+';
             assignment += '=';
             assignment.append(
@@ -6164,14 +6213,20 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
             assignment += '=';
             /* The append form name+=value concatenates onto the name's current
                value, so the string the builtin stores already carries it, the
-               way a plain x+=y assignment prepends the prior value. declare,
-               export, and readonly do not shadow, so the current value is read
-               here correctly. */
+               way a plain x+=y assignment prepends the prior value. export and
+               readonly do not shadow, so the current value is read here
+               correctly. */
             if (a->is_append())
               assignment.append(
                   get_variable_value(a->key()).value_or(String{}).view());
-            assignment.append(
-                expand_word_for_assignment(a->value_word()).view());
+            let const expanded_value =
+                expand_word_for_assignment(a->value_word());
+            /* An integer name adds rather than concatenates, so the join wraps
+               the appended expression for the arithmetic in the store. */
+            if (a->is_append() && is_integer_variable(a->key()))
+              append_integer_expression(assignment, expanded_value.view());
+            else
+              assignment.append(expanded_value.view());
           }
           expanded_args.push(steal(assignment));
           continue;
