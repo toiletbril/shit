@@ -776,7 +776,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      bash mode so POSIX behaves like dash, where these names are ordinary. A
      stored assignment above still wins, so RANDOM=5 reads back 5. The first
      byte gates each compare so an ordinary name skips them. */
-  if (m_bash_compatible) {
+  if (is_bash_compatible()) {
     if (first_byte == 'R' && name == "RANDOM") {
       if (!m_random_seeded) {
         std::srand(static_cast<unsigned>(m_shell_start_time) ^
@@ -5109,7 +5109,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
 
   if (AST_ARENA == nullptr) return None;
   let lexer = Lexer{String{source.substring_of_length(i, source.length - i)},
-                    *AST_ARENA, false, None, is_bash_compatible()};
+                    *AST_ARENA, false, None, mood()};
   Token *name = lexer.next_shell_token();
   if (name == nullptr || name->kind() != Token::Kind::Word) return None;
   /* Anything after the single filename means this is not the bare read form, so
@@ -5145,7 +5145,7 @@ fn EvalContext::capture_command_substitution(const String &source) throws
 
   let parser = Parser{
       Lexer{String{source.view()}, *AST_ARENA, false, None,
-            is_bash_compatible()}
+            mood()}
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
@@ -5188,7 +5188,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 #else
   let parser = Parser{
       Lexer{String{text.substring(1)}, *AST_ARENA, false, None,
-            is_bash_compatible()}
+            mood()}
   };
   let const ast = parser.construct_ast();
   ASSERT(ast != nullptr);
@@ -5315,7 +5315,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   {
     let parser = Parser{
         Lexer{String{segment.text.view()}, *AST_ARENA, false, None,
-              is_bash_compatible()}
+              mood()}
     };
     segment.cached_substitution_ast = parser.construct_ast();
     segment.cached_substitution_generation = generation;
@@ -5450,7 +5450,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   return captured;
 }
 
-fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mode mode,
+fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
                                     bool isolated) throws -> i32
 {
   if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
@@ -5483,10 +5483,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mode mode,
   /* The mimic mode decides the lexing and the evaluation, so it is set before
      the parse. The parent's mode is put back when the run is isolated, while the
      terminal run leaves it since the shell exits next. */
-  let const previous_bash = m_bash_compatible;
-  let const previous_posix = m_posix_mode;
-  m_bash_compatible = mode == mimic_mode::Bash;
-  m_posix_mode = mode == mimic_mode::Posix;
+  let const previous_mood = m_mood;
+  m_mood = mode;
 
   /* The strict interactive defaults shit turns on at its own prompt, nounset and
      pipefail and failglob, do not belong to a real bash or sh running a file, so
@@ -5502,7 +5500,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mode mode,
   set_failglob(false);
 
   let parser = Parser{Lexer{String{contents->view()}, *AST_ARENA, false, None,
-                            is_bash_compatible()}};
+                            mood()}};
   const Expression *ast = parser.construct_ast();
   ASSERT(ast != nullptr);
 
@@ -5565,7 +5563,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mode mode,
      after the isolated snapshot so the restore drops it. */
   if (!isolated) {
     set_positional_params(steal(params));
-    seed_shell_identity_variables(mode == mimic_mode::Bash);
+    seed_shell_identity_variables(mode == mimic_mood::Bash);
     std::exception_ptr error;
     try {
       ast->evaluate(*this);
@@ -5585,7 +5583,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mode mode,
      script's cd, exports, functions, and exit do not leak to the parent. */
   let snapshot = snapshot_state();
   set_positional_params(steal(params));
-  seed_shell_identity_variables(mode == mimic_mode::Bash);
+  seed_shell_identity_variables(mode == mimic_mood::Bash);
   enter_subshell();
   clear_inherited_exit_trap();
   std::exception_ptr error;
@@ -5614,8 +5612,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mode mode,
   restore_state(steal(snapshot));
   set_current_source(previous_source, previous_origin);
   m_current_location_position = previous_location_position;
-  m_bash_compatible = previous_bash;
-  m_posix_mode = previous_posix;
+  m_mood = previous_mood;
   set_error_unset(previous_error_unset);
   set_pipefail(previous_pipefail);
   set_failglob(previous_failglob);
@@ -5667,14 +5664,9 @@ fn EvalContext::run_completion_function(StringView function_name,
   /* A completion function is bash code that reads and writes arrays, COMP_WORDS
      and COMPREPLY above all, so the call evaluates in bash mode whatever the
      interactive session's mode, then the mode is put back. */
-  let const saved_bash_compatible = m_bash_compatible;
-  let const saved_posix_mode = m_posix_mode;
-  m_bash_compatible = true;
-  m_posix_mode = false;
-  defer {
-    m_bash_compatible = saved_bash_compatible;
-    m_posix_mode = saved_posix_mode;
-  };
+  let const saved_mood = m_mood;
+  m_mood = mimic_mood::Bash;
+  defer { m_mood = saved_mood; };
 
   /* The completion variables bash exposes to the function, the words of the
      line, the index of the word under the cursor, and the raw line and byte. */
@@ -5800,7 +5792,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
   try {
     let parser = Parser{
         Lexer{String{source}, *AST_ARENA, false, stable_filename,
-              is_bash_compatible()}
+              mood()}
     };
 
     /* Retain the AST before evaluating, so a function it defines outlives this

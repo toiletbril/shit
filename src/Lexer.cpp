@@ -138,9 +138,9 @@ pure fn is_special_parameter_char(char ch) wontthrow -> bool
 } /* namespace lexer */
 
 Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
-             Maybe<StringView> filename, bool bash_compatible)
+             Maybe<StringView> filename, mimic_mood mood)
     : m_source(steal(source)), m_arena(&arena), m_filename(filename),
-      m_bash_compatible(bash_compatible),
+      m_mood(mood),
       m_should_collect_debug_words(should_collect_debug_words)
 {}
 
@@ -652,7 +652,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       /* $'...' is bash ANSI-C quoting. The backslash escapes are decoded here
          and the result is a final literal segment that neither expands nor
          globs, the way single quotes produce a literal but with escapes. */
-      if (next == '\'' && m_bash_compatible) {
+      if (next == '\'' && is_bash_compatible()) {
         byte_count++;
         bool did_emit_any = false;
         auto emit_literal = [&](char byte) {
@@ -811,7 +811,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
          quote lexes as an ordinary double quote, with expansions inside still
          active. Inside an existing double quote a $" is a dollar then the close
          quote, so this only fires at the top level. */
-      if (next == '"' && m_bash_compatible && !is_in_double_quotes) {
+      if (next == '"' && is_bash_compatible() && !is_in_double_quotes) {
         continue;
       }
 
@@ -1401,7 +1401,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
        redirect both standard streams to a file, so they are recognized here
        before the plain & since they change the POSIX meaning. */
     case Token::Kind::Ampersand: {
-      if (m_bash_compatible && chop_character(1) == '>') {
+      if (is_bash_compatible() && chop_character(1) == '>') {
         if (chop_character(2) == '>') {
           tok = m_arena->create<tokens::AmpersandDoubleGreater>(
               here(m_cursor_position, 3));
@@ -1426,7 +1426,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
       if (chop_character(1) == '|') {
         tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
         extra_length++;
-      } else if (m_bash_compatible && chop_character(1) == '&') {
+      } else if (is_bash_compatible() && chop_character(1) == '&') {
         tok =
             m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
         extra_length++;
@@ -1444,7 +1444,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
        mode only and POSIX mode keeps tokenizing << then <. */
     case Token::Kind::Less: {
       if (chop_character(1) == '<') {
-        if (chop_character(2) == '<' && m_bash_compatible) {
+        if (chop_character(2) == '<' && is_bash_compatible()) {
           tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
           extra_length += 2;
         } else {

@@ -216,7 +216,7 @@ fn record_directory_access(StringView directory) throws -> void;
 /* The mode a mimicked script runs in, chosen from its shebang. A sh or dash
    shebang gives Posix, a bash shebang gives Bash, and a shit shebang gives
    Default. */
-enum class mimic_mode : u8
+enum class mimic_mood : u8
 {
   Default,
   Posix,
@@ -648,20 +648,39 @@ public:
      valid POSIX syntax, such as the (( )) arithmetic command and brace
      expansion. The evaluator reads it for brace expansion and the parser is
      handed it at construction for the (( )) and C-style for syntax. */
+  /* Each setter touches only its own mood, so disabling bash leaves an active
+     POSIX mood in place and the reverse, the way the two mode flags behaved.
+     The shell sits in exactly one mood at a time, held as m_mood. */
   fn set_bash_compatible(bool enabled) wontthrow -> void
   {
-    m_bash_compatible = enabled;
+    if (enabled)
+      m_mood = mimic_mood::Bash;
+    else if (m_mood == mimic_mood::Bash)
+      m_mood = mimic_mood::Default;
   }
   pure fn is_bash_compatible() const wontthrow -> bool
   {
-    return m_bash_compatible;
+    return m_mood == mimic_mood::Bash;
   }
 
   /* POSIX mode behaves like dash. The non-posix-breaking bash additions that
      are on in the default mode too, such as the extended globs, read this to
      stay off only here. */
-  fn set_posix_mode(bool enabled) wontthrow -> void { m_posix_mode = enabled; }
-  pure fn is_posix_mode() const wontthrow -> bool { return m_posix_mode; }
+  fn set_posix_mode(bool enabled) wontthrow -> void
+  {
+    if (enabled)
+      m_mood = mimic_mood::Posix;
+    else if (m_mood == mimic_mood::Posix)
+      m_mood = mimic_mood::Default;
+  }
+  pure fn is_posix_mode() const wontthrow -> bool
+  {
+    return m_mood == mimic_mood::Posix;
+  }
+
+  /* The mood the lexer reads, the single source of truth for the three modes. */
+  fn set_mood(mimic_mood mood) wontthrow -> void { m_mood = mood; }
+  pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
 
   /* Mimicry runs a shell script in-process in the matching mode rather than
      launching the shell, mirrored here so the execution path reads it off the
@@ -672,11 +691,14 @@ public:
      isolated is true the run is contained in a snapshotted subshell so its cd,
      exports, and exit do not leak, and when false the run is the terminal command
      that the shell exits with, so the snapshot is skipped. */
-  fn run_mimicked_script(ExecContext &ec, mimic_mode mode, bool isolated)
+  fn run_mimicked_script(ExecContext &ec, mimic_mood mode, bool isolated)
       throws -> i32;
   /* The extended globs are on everywhere except POSIX mode, the way bash treats
      a feature that POSIX rejects anyway as a pure addition. */
-  pure fn extglob_enabled() const wontthrow -> bool { return !m_posix_mode; }
+  pure fn extglob_enabled() const wontthrow -> bool
+  {
+    return m_mood != mimic_mood::Posix;
+  }
 
   /* The bash shopt option states, set and read by the shopt builtin. A name
      with no entry reads as off. */
@@ -1032,8 +1054,9 @@ protected:
   /* The nesting of mimicked scripts, bounded so a script that mimics another
      cannot recurse without limit. */
   usize m_mimicry_depth{0};
-  bool m_bash_compatible{false};
-  bool m_posix_mode{false};
+  /* The single shell mood, bash, POSIX, or the default strict mood, the one
+     source of truth the lexer and the evaluator read. */
+  mimic_mood m_mood{mimic_mood::Default};
   /* The unix time the shell started, the base $SECONDS counts from. */
   i64 m_shell_start_time{0};
   /* Whether the $RANDOM generator has been seeded, set on the first read so a

@@ -268,8 +268,7 @@ static fn run_script_contents(const String &script_contents,
 
     let p = Parser{
         Lexer{String{script_contents.view()}, ast_arena,
-              context.show_lexed_words(), filename,
-              context.is_bash_compatible()}
+              context.show_lexed_words(), filename, context.mood()}
     };
 
     /* Recover from each parse error so the whole file is reported at once. A

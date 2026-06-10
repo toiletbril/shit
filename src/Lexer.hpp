@@ -48,14 +48,27 @@ class Lexer
 public:
   Lexer(String source, BumpArena &arena,
         bool should_collect_debug_words = false,
-        Maybe<StringView> filename = None, bool bash_compatible = false);
+        Maybe<StringView> filename = None, mimic_mood mood = mimic_mood::Default);
   ~Lexer();
 
+  /* The mood the source is lexed in, the same three-way mimic_mood the mimicry
+     feature picks from a shebang. Handed in at construction from the
+     EvalContext mode. */
+  pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
+
   /* Whether bash-compatible lexing is active, which the $'...' ANSI-C quoting
-     reads. Handed in at construction from the EvalContext mode. */
+     reads. */
   pure fn is_bash_compatible() const wontthrow -> bool
   {
-    return m_bash_compatible;
+    return m_mood == mimic_mood::Bash;
+  }
+
+  /* Whether strict POSIX lexing is active. The default mood is neither bash nor
+     POSIX, so a dash-rejected pure addition such as the NAME=(...) array literal
+     stays on in the default mood and is suppressed only here. */
+  pure fn is_posix_mode() const wontthrow -> bool
+  {
+    return m_mood == mimic_mood::Posix;
   }
 
   /* A lexer holds the pending-heredoc state and the source, so a copy would
@@ -100,7 +113,7 @@ protected:
      such as an interactive line. It travels into every SourceLocation the lexer
      stamps. */
   Maybe<StringView> m_filename{};
-  bool m_bash_compatible{false};
+  mimic_mood m_mood{mimic_mood::Default};
   usize m_cursor_position{0};
   usize m_cached_offset{0};
 
