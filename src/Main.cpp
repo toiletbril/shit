@@ -903,6 +903,9 @@ fn main(int argc, char **argv) -> int
           }
           script_contents = steal(*contents);
           source_filename = file_name.view();
+          /* A script-file run bottoms FUNCNAME out at "main" the way bash
+             marks it, while -c and stdin runs leave it off. */
+          context.set_script_run(true);
         }
 
         should_quit = true;

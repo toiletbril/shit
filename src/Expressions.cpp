@@ -1459,9 +1459,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     defer { cxt.scratch_release(call_mark); };
 
     /* Open a local scope so a local builtin in the body shadows a variable and
-       the old value returns when the call ends. */
+       the old value returns when the call ends. The call name rides the same
+       lifetime, the frame FUNCNAME reads. */
     cxt.enter_function_scope();
-    defer { cxt.leave_function_scope(); };
+    cxt.push_function_call_name(program_name.view());
+    defer
+    {
+      cxt.pop_function_call_name();
+      cxt.leave_function_scope();
+    };
 
     /* A command at the tail of the body must not exec the shell in place even
        when the call itself is the terminal command, since the call's cleanup,
@@ -3341,7 +3347,26 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_body != nullptr);
 
-  cxt.register_function(m_name, m_body);
+  /* The recorded definition is the bare name, a "name () " line, then the
+     body's source span, the shape bash prints from declare -f. A consumer
+     such as ble.sh clones a function by replacing the leading name in this
+     text and re-evaling it, and greps the "name ()" line, so both properties
+     matter. The source string dies with its frame while the function lives
+     on, so the store keeps its own copy. An unrecorded body span stores empty
+     text and declare -f prints nothing for the name. */
+  let definition_text = String{cxt.scratch_allocator()};
+  if (const String *source = cxt.current_source();
+      source != nullptr &&
+      m_body->source_end_position() > m_body->source_location().position &&
+      m_body->source_end_position() <= source->count())
+  {
+    definition_text.append(m_name.view());
+    definition_text.append(StringView{" () \n"});
+    definition_text.append(source->view().substring_of_length(
+        m_body->source_location().position,
+        m_body->source_end_position() - m_body->source_location().position));
+  }
+  cxt.register_function(m_name, m_body, definition_text.view());
   cxt.set_last_exit_status(0);
   return 0;
 }

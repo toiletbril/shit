@@ -1980,8 +1980,12 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
                             "Expected a compound command as the function body"};
   }
 
-  return m_lexer.arena().create<FunctionDefinition>(location, name.view(),
-                                                    body);
+  /* The definition's span ends where its body ends, recorded so declare -f
+     can print the definition text from the source. */
+  let definition = m_lexer.arena().create<FunctionDefinition>(location,
+                                                              name.view(), body);
+  definition->set_source_end_position(body->source_end_position());
+  return definition;
 }
 
 fn Parser::parse_keyword_function_definition() throws -> Command *
@@ -2030,8 +2034,12 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
                             "Expected a compound command as the function body"};
   }
 
-  return m_lexer.arena().create<FunctionDefinition>(location, name.view(),
-                                                    body);
+  /* The definition's span ends where its body ends, recorded so declare -f
+     can print the definition text from the source. */
+  let definition = m_lexer.arena().create<FunctionDefinition>(location,
+                                                              name.view(), body);
+  definition->set_source_end_position(body->source_end_position());
+  return definition;
 }
 
 fn Parser::consume_bash_array_assignment() throws -> ArrayList<const Token *>

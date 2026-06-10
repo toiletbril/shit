@@ -201,6 +201,7 @@ struct eval_state_snapshot
 {
   HashMap<String> shell_variables;
   HashMap<const Expression *> functions;
+  HashMap<String> function_sources;
   HashMap<String> aliases;
   ArrayList<String> positional_params;
   Path working_directory;
@@ -512,7 +513,15 @@ public:
   /* Shell functions live in the parse arena, so the table is cleared before
      each top-level parse to avoid pointing at freed storage. A function shadows
      a builtin and a program of the same name. */
-  fn register_function(StringView name, const Expression *body) throws -> void;
+  /* Registers a function and keeps a copy of its definition text, the source
+     span from the name to the body's close, which declare -f prints back. */
+  fn register_function(StringView name, const Expression *body,
+                       StringView definition_text) throws -> void;
+  /* The recorded definition text of a function, or null when the name is not
+     a function or its span was not recorded. */
+  fn find_function_source(StringView name) const wontthrow -> const String *;
+  /* Every defined function name, sorted, the list declare -F prints. */
+  mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
   pure fn has_functions() const wontthrow -> bool;
   fn unset_function(StringView name) throws -> void;
@@ -606,6 +615,21 @@ public:
      before the caller overwrites it. */
   fn enter_function_scope() throws -> void;
   fn leave_function_scope() throws -> void;
+  /* The function-call name stack behind FUNCNAME, pushed by the call and
+     popped with its scope, innermost last. */
+  fn push_function_call_name(StringView name) throws -> void;
+  fn pop_function_call_name() wontthrow -> void;
+  /* The FUNCNAME frame list bash exposes, the function calls innermost first,
+     one "source" per sourced file in the chain, and "main" at the bottom of a
+     script run. The frames exist only while a function call is active. */
+  mustuse fn funcname_frame_count() const wontthrow -> usize;
+  mustuse fn funcname_frame_at(usize index) const wontthrow -> StringView;
+  /* Marks the run as a script file, the invocation whose FUNCNAME bottoms out
+     at "main" the way bash marks it. */
+  fn set_script_run(bool is_script_run) wontthrow -> void
+  {
+    m_is_script_run = is_script_run;
+  }
   pure fn in_function_scope() const wontthrow -> bool;
   fn declare_local(StringView name) throws -> void;
   /* True when the name already has a local binding in the innermost scope, so a
@@ -1045,6 +1069,9 @@ protected:
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   HashMap<const Expression *> m_functions{heap_allocator()};
+  /* The definition text of each function, kept on the heap since a function
+     outlives the command and the source string it was parsed from. */
+  HashMap<String> m_function_sources{heap_allocator()};
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
   usize m_loop_depth{0};
@@ -1151,6 +1178,10 @@ protected:
   /* One entry per active function call, holding the bindings a local shadowed
      so leaving the call restores them. */
   ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
+  /* The active function-call names, innermost last, the stack FUNCNAME reads
+     with ${FUNCNAME[0]} as the top. */
+  ArrayList<String> m_function_call_names{heap_allocator()};
+  bool m_is_script_run{false};
 
   /* The background jobs and the id to give the next one. */
   ArrayList<job> m_jobs{heap_allocator()};
@@ -1185,6 +1216,8 @@ protected:
      length. A negative offset counts from the end, and a negative length leaves
      that many characters off the end. */
   fn apply_substring_expansion(StringView name, StringView body) throws
+      -> String;
+  fn apply_substring_to_value(StringView value, StringView body) throws
       -> String;
 
   /* Expand the bash pattern-replacement forms ${name/pat/rep},

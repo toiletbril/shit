@@ -745,12 +745,13 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   if (let const *stored = m_shell_variables.find(name)) return *stored;
 
   /* A read of an array name with no scalar yields element zero, the way bash
-     treats $a as ${a[0]}. An existing but empty array still reads as set. The
-     empty-map guard keeps an ordinary shell with no arrays from hashing the
-     name a second time on every variable read. */
+     treats $a as ${a[0]}. An array with no element zero, empty or sparse,
+     reads as unset the way bash answers ${a+set} for it. The empty-map guard
+     keeps an ordinary shell with no arrays from hashing the name a second
+     time on every variable read. */
   if (m_indexed_arrays.count() != 0)
     if (let const *array = m_indexed_arrays.find(name)) {
-      if (array->is_empty()) return String{};
+      if (array->is_empty()) return shit::None;
       return array->front();
     }
 
@@ -820,6 +821,14 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     /* The path of the file being sourced, the scalar form of BASH_SOURCE[0].
        The array form is backed by m_source_paths so ${BASH_SOURCE[0]} resolves
        through the ordinary subscript path. */
+    /* The innermost function-call name, the scalar form of FUNCNAME[0]. The
+       array forms route through the subscript and length specials. Outside a
+       function the name is unset the way bash leaves it. */
+    if (first_byte == 'F' && name == "FUNCNAME") {
+      if (funcname_frame_count() > 0)
+        return String{heap_allocator(), funcname_frame_at(0)};
+      return shit::None;
+    }
     if (first_byte == 'B' && name == "BASH_SOURCE") {
       if (!m_source_frames.is_empty())
         return String{
@@ -952,10 +961,27 @@ fn EvalContext::set_monitor(bool enabled) wontthrow -> void
 
 pure fn EvalContext::monitor() const wontthrow -> bool { return m_monitor; }
 
-fn EvalContext::register_function(StringView name,
-                                  const Expression *body) throws -> void
+fn EvalContext::register_function(StringView name, const Expression *body,
+                                  StringView definition_text) throws -> void
 {
   m_functions.set(name, body);
+  m_function_sources.set(name, definition_text);
+}
+
+fn EvalContext::find_function_source(StringView name) const wontthrow
+    -> const String *
+{
+  return m_function_sources.find(name);
+}
+
+fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
+{
+  let out = ArrayList<String>{};
+  out.reserve(m_functions.count());
+  m_functions.for_each(
+      [&](StringView name, const Expression *) { out.push_managed(name); });
+  utils::sort_ascending(out);
+  return out;
 }
 
 fn EvalContext::find_function(StringView name) const wontthrow
@@ -973,6 +999,7 @@ pure fn EvalContext::has_functions() const wontthrow -> bool
 fn EvalContext::unset_function(StringView name) throws -> void
 {
   m_functions.erase(name);
+  m_function_sources.erase(name);
 }
 
 fn EvalContext::function_names() const throws -> HashSet
@@ -1222,6 +1249,40 @@ fn EvalContext::leave_function_scope() throws -> void
      rather than rebuilding the whole stack into a fresh list on every return.
    */
   m_local_scopes.pop_back();
+}
+
+fn EvalContext::push_function_call_name(StringView name) throws -> void
+{
+  m_function_call_names.push(String{heap_allocator(), name});
+}
+
+fn EvalContext::pop_function_call_name() wontthrow -> void
+{
+  if (!m_function_call_names.is_empty())
+    m_function_call_names.remove(m_function_call_names.count() - 1);
+}
+
+fn EvalContext::funcname_frame_count() const wontthrow -> usize
+{
+  if (m_function_call_names.is_empty()) return 0;
+  let count = m_function_call_names.count();
+  /* A frame per sourced file, recognized by its recorded path, since an eval
+     frame carries none and bash counts only source. */
+  for (const source_frame &frame : m_source_frames)
+    if (!frame.source_path.is_empty()) count++;
+  if (m_is_script_run) count++;
+  return count;
+}
+
+fn EvalContext::funcname_frame_at(usize index) const wontthrow -> StringView
+{
+  let const calls = m_function_call_names.count();
+  if (index < calls) return m_function_call_names[calls - 1 - index].view();
+  let source_frames = usize{0};
+  for (const source_frame &frame : m_source_frames)
+    if (!frame.source_path.is_empty()) source_frames++;
+  if (index < calls + source_frames) return StringView{"source"};
+  return StringView{"main"};
 }
 
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
@@ -1661,6 +1722,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
   return eval_state_snapshot{m_shell_variables,
                              m_functions,
+                             m_function_sources,
                              m_aliases,
                              m_positional_params,
                              Path::current_directory(),
@@ -1676,6 +1738,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
   m_shell_variables = steal(snapshot.shell_variables);
   m_functions = steal(snapshot.functions);
+  m_function_sources = steal(snapshot.function_sources);
   /* An alias defined or removed inside a subshell or a command substitution
      stays inside it, the way bash isolates an alias change in a subshell. */
   m_aliases = steal(snapshot.aliases);
@@ -2222,8 +2285,38 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
      variable names that start with a prefix when it ends with * or @. The
      length form ${#name} below begins with the same kind of sigil, so this is
      checked first. */
-  if (spec.length > 1 && spec[0] == '!')
-    return apply_indirect_or_name_listing(spec.substring(1));
+  if (spec.length > 1 && spec[0] == '!') {
+    let const body = spec.substring(1);
+    /* A modifier after the name, such as ${!v+set} or ${!v:-fb}, applies to
+       the indirected value, so the name splits off and the rewritten spec,
+       the target name followed by the original modifier, runs through this
+       same dispatch. The bare trailing * and @ stay with the body since those
+       are the prefix-listing forms, and a [subscript] stays glued to the
+       name. */
+    usize name_end = 0;
+    while (name_end < body.length && lexer::is_variable_name(body[name_end]))
+      name_end++;
+    if (name_end > 0 && name_end < body.length && body[name_end] == '[')
+      if (let const close = body.substring(name_end).find_character(']'))
+        name_end += *close + 1;
+    if (name_end > 0 && name_end < body.length &&
+        !(name_end == body.length - 1 &&
+          (body[name_end] == '*' || body[name_end] == '@')))
+    {
+      let const name = body.substring_of_length(0, name_end);
+      let const target = get_variable_value(name);
+      let rewritten = String{scratch_allocator()};
+      /* bash makes an unset indirection name with a modifier a command-level
+         "invalid indirect expansion" failure. An expansion error here is
+         fatal to the whole run, which would be harsher than bash, so the
+         unset name stands in for the target instead, it is unset right here,
+         and the modifier sees the unset state. */
+      rewritten.append(target.has_value() ? StringView{target->view()} : name);
+      rewritten.append(body.substring(name_end));
+      return apply_parameter_expansion(rewritten.view());
+    }
+    return apply_indirect_or_name_listing(body);
+  }
 
   /* ${#name} is the length of the value, distinct from $# which is the count of
      positional parameters. */
@@ -2243,6 +2336,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       const StringView subscript =
           name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
       if (subscript == "@" || subscript == "*") {
+        if (array_name == "FUNCNAME" && is_bash_compatible()) [[unlikely]]
+          return String{scratch_allocator(),
+                        utils::uint_to_text(funcname_frame_count())};
         if (is_associative_array(array_name))
           return String{
               heap_allocator(),
@@ -2306,6 +2402,52 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
            modifier_op == '^' || modifier_op == ','))
         return apply_value_modifier(
             apply_array_subscript(name, subscript).view(), modifier);
+      /* The test and substring modifiers run against the element with its own
+         setness, the way bash answers ${a[i]:-x} and ${a[i]:1:2}, and the =
+         form assigns the element back. */
+      if (subscript != "@" && subscript != "*" && !modifier.is_empty()) {
+        let const is_colon = modifier_op == ':';
+        let const after =
+            is_colon && modifier.length > 1 ? modifier[1] : modifier_op;
+        let const is_test_form = after == '-' || after == '+' ||
+                                 after == '=' || after == '?';
+        if (is_colon && !is_test_form)
+          return apply_substring_to_value(
+              apply_array_subscript(name, subscript).view(),
+              modifier.substring(1));
+        if (is_test_form) {
+          let const element_is_set = array_element_is_set(name, subscript);
+          let const value = element_is_set
+                                ? apply_array_subscript(name, subscript)
+                                : String{scratch_allocator()};
+          let const treat_as_unset =
+              is_colon ? value.is_empty() : !element_is_set;
+          let const word = modifier.substring(is_colon ? 2 : 1);
+          switch (after) {
+          case '-':
+            if (treat_as_unset) return expand_modifier_word(word);
+            return value;
+          case '+':
+            if (treat_as_unset) return String{scratch_allocator()};
+            return expand_modifier_word(word);
+          case '=': {
+            if (!treat_as_unset) return value;
+            let const assigned = expand_modifier_word(word);
+            assign_array_element(name, subscript, assigned.view(), false);
+            return assigned;
+          }
+          case '?':
+            if (treat_as_unset) {
+              if (word.is_empty())
+                throw Error{"Unable to expand '" + name + "[" + subscript +
+                            "]' because the element is not set or is empty"};
+              throw Error{expand_modifier_word(word)};
+            }
+            return value;
+          default: break;
+          }
+        }
+      }
     }
   }
 
@@ -2354,7 +2496,21 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
                           rest[op_index + 1] == op && (op == '#' || op == '%'));
   let const word = rest.substring(op_index + (is_doubled ? 2 : 1));
 
-  let const current = get_variable_value(name);
+  /* A subscripted name tests and reads its element, the way bash answers
+     ${a[i]+set}, while a bare name reads element zero through the ordinary
+     lookup. */
+  let current = Maybe<String>{};
+  if (let const bracket = name.find_character('[');
+      bracket.has_value() && name[name.length - 1] == ']')
+  {
+    let const array_name = name.substring_of_length(0, *bracket);
+    let const subscript =
+        name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
+    if (array_element_is_set(array_name, subscript))
+      current = apply_array_subscript(array_name, subscript);
+  } else {
+    current = get_variable_value(name);
+  }
   let const is_set = current.has_value();
   let const is_empty = !is_set || current->is_empty();
   let const treat_as_unset = is_colon_form ? is_empty : !is_set;
@@ -2432,8 +2588,13 @@ fn EvalContext::apply_substring_expansion(StringView name,
   if (m_error_unset && !current.has_value())
     throw Error{"Unable to expand '" + name +
                 "' because the parameter is not set"};
-  let const value = current.value_or(String{});
-  const i64 value_length = static_cast<i64>(value.length());
+  return apply_substring_to_value(current.value_or(String{}).view(), body);
+}
+
+fn EvalContext::apply_substring_to_value(StringView value,
+                                         StringView body) throws -> String
+{
+  const i64 value_length = static_cast<i64>(value.length);
 
   const usize separator = find_substring_length_separator(body);
   const StringView offset_text = body.substring_of_length(0, separator);
@@ -2470,9 +2631,9 @@ fn EvalContext::apply_substring_expansion(StringView name,
      "substring expression < 0" error, fatal the way bash makes it. */
   if (end < start) throw Error{"substring expression < 0"};
 
-  return String{scratch_allocator(), value.view().substring_of_length(
-                                         static_cast<usize>(start),
-                                         static_cast<usize>(end - start))};
+  return String{scratch_allocator(),
+                value.substring_of_length(static_cast<usize>(start),
+                                          static_cast<usize>(end - start))};
 }
 
 /* The index of the unescaped slash that separates the pattern from the
@@ -2480,12 +2641,29 @@ fn EvalContext::apply_substring_expansion(StringView name,
    following byte so a literal slash inside the pattern is not the separator. */
 static fn find_replacement_separator(StringView body) wontthrow -> usize
 {
+  /* A slash inside a quote run or behind a backslash belongs to the pattern,
+     the way bash reads ${var/#"a/b"/c}, so the scan tracks the quote state the
+     expansion itself will read. */
+  char quote = 0;
   for (usize i = 0; i < body.length; i++) {
-    if (body[i] == '\\') {
+    let const c = body[i];
+    if (quote == '\'') {
+      if (c == '\'') quote = 0;
+      continue;
+    }
+    if (c == '\\') {
       i++;
       continue;
     }
-    if (body[i] == '/') return i;
+    if (quote == '"') {
+      if (c == '"') quote = 0;
+      continue;
+    }
+    if (c == '\'' || c == '"') {
+      quote = c;
+      continue;
+    }
+    if (c == '/') return i;
   }
   return body.length;
 }
@@ -2707,15 +2885,52 @@ fn EvalContext::apply_value_modifier(StringView value,
 fn EvalContext::apply_array_subscript(StringView name,
                                       StringView subscript) throws -> String
 {
+  /* FUNCNAME reads the call-name stack, index zero the innermost frame the
+     way bash exposes it, @ and * the whole stack outward. */
+  if (name == "FUNCNAME" && is_bash_compatible()) [[unlikely]] {
+    let const depth = funcname_frame_count();
+    if (subscript == "@" || subscript == "*") {
+      /* The * form joins with the first IFS byte the way "${a[*]}" does in
+         bash, and an empty IFS joins with nothing. The @ form keeps the
+         space. */
+      let separator = ' ';
+      let has_separator = true;
+      if (subscript == "*") {
+        has_separator = !m_field_separators.is_empty();
+        if (has_separator) separator = m_field_separators.first_character();
+      }
+      let out = String{scratch_allocator()};
+      for (usize i = 0; i < depth; i++) {
+        if (i > 0 && has_separator) out.push(separator);
+        out.append(funcname_frame_at(i));
+      }
+      return out;
+    }
+    let const index = evaluate_arithmetic(subscript);
+    if (index >= 0 && static_cast<usize>(index) < depth)
+      return String{scratch_allocator(),
+                    funcname_frame_at(static_cast<usize>(index))};
+    return String{scratch_allocator()};
+  }
+
   /* An associative array reads by a string key, with @ and * naming every value
      joined by a space. The values come back in the store's order, which need
      not match bash for more than one key. */
   if (is_associative_array(name)) {
     if (subscript == "@" || subscript == "*") {
+      /* The * form joins with the first IFS byte the way "${a[*]}" does in
+         bash, and an empty IFS joins with nothing. The @ form keeps the
+         space. */
+      let separator = ' ';
+      let has_separator = true;
+      if (subscript == "*") {
+        has_separator = !m_field_separators.is_empty();
+        if (has_separator) separator = m_field_separators.first_character();
+      }
       let out = String{scratch_allocator()};
       let const values = associative_values(name);
       for (usize i = 0; i < values.count(); i++) {
-        if (i > 0) out.push(' ');
+        if (i > 0 && has_separator) out.push(separator);
         out.append(values[i].view());
       }
       return out;
@@ -2733,9 +2948,18 @@ fn EvalContext::apply_array_subscript(StringView name,
      limitation the positional "$@" has here. */
   if (subscript == "@" || subscript == "*") {
     if (array == nullptr) return get_variable_value(name).value_or(String{});
+    /* The * form joins with the first IFS byte the way "${a[*]}" does in
+       bash, and an empty IFS joins with nothing. The @ form keeps the
+       space. */
+    let separator = ' ';
+    let has_separator = true;
+    if (subscript == "*") {
+      has_separator = !m_field_separators.is_empty();
+      if (has_separator) separator = m_field_separators.first_character();
+    }
     let out = String{scratch_allocator()};
     for (usize i = 0; i < array->count(); i++) {
-      if (i > 0) out.push(' ');
+      if (i > 0 && has_separator) out.push(separator);
       out.append((*array)[i].view());
     }
     return out;
@@ -2770,6 +2994,18 @@ fn EvalContext::apply_array_subscript(StringView name,
 fn EvalContext::collect_array_elements(StringView name) const throws
     -> ArrayList<String>
 {
+  /* FUNCNAME enumerates the call-name stack, innermost first the way bash
+     orders it, so "${FUNCNAME[@]}" yields one frame per field. */
+  if (name == "FUNCNAME" && is_bash_compatible() &&
+      funcname_frame_count() > 0) [[unlikely]]
+  {
+    let const depth = funcname_frame_count();
+    let frames = ArrayList<String>{heap_allocator()};
+    frames.reserve(depth);
+    for (usize i = 0; i < depth; i++) frames.push_managed(funcname_frame_at(i));
+    return frames;
+  }
+
   if (is_associative_array(name)) return associative_values(name);
 
   let out = ArrayList<String>{heap_allocator()};
@@ -4824,6 +5060,62 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
+      /* "${@:off:len}" and "${*:off:len}" slice the positional parameters the
+         way the array slice below slices elements, with index zero naming the
+         shell itself the way bash counts $0 into the slice. The @ form keeps
+         each parameter its own field, the * form joins them. */
+      if ((segment_text[0] == '@' || segment_text[0] == '*') &&
+          segment_text.length > 1 && segment_text[1] == ':')
+      {
+        let const is_star = segment_text[0] == '*';
+        let const slice = segment_text.substring(2);
+        let const param_count = m_positional_params.count();
+        const i64 total = static_cast<i64>(param_count) + 1;
+        auto positional_at = [&](i64 index) wontthrow -> StringView {
+          return index == 0
+                     ? m_shell_name.view()
+                     : m_positional_params[static_cast<usize>(index - 1)].view();
+        };
+
+        const usize sep = find_substring_length_separator(slice);
+        const StringView offset_text = slice.substring_of_length(0, sep);
+        const i64 offset =
+            offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
+        i64 start = offset < 0 ? total + offset : offset;
+        if (start < 0) start = 0;
+        if (start > total) start = total;
+        i64 end = total;
+        if (sep < slice.length) {
+          const StringView length_text = slice.substring(sep + 1);
+          const i64 length =
+              length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
+          if (length < 0) throw Error{"substring expression < 0"};
+          end = start + length;
+        }
+        if (end > total) end = total;
+        if (end < start) end = start;
+
+        if (segment.is_in_double_quotes && is_star) {
+          let const ifs = m_field_separators.view();
+          let joined = String{scratch_allocator()};
+          for (i64 j = start; j < end; j++) {
+            if (j > start && !ifs.is_empty()) joined.push(ifs[0]);
+            joined.append(positional_at(j));
+          }
+          append_run(joined, false);
+        } else if (segment.is_in_double_quotes) {
+          for (i64 j = start; j < end; j++) {
+            if (j > start) flush();
+            append_run(positional_at(j), false);
+          }
+        } else {
+          for (i64 j = start; j < end; j++) {
+            if (j > start) flush();
+            append_split_run(positional_at(j), true);
+          }
+        }
+        break;
+      }
       /* "${a[@]:off:len}" and "${a[*]:off:len}" slice the element list, off
          naming the first element and len the count, with a negative off counted
          from the end. The @ form keeps each sliced element its own field, the *
@@ -5518,6 +5810,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
      the terminal run leaves it since the shell exits next. */
   let const previous_mood = m_mood;
   m_mood = mode;
+  /* A mimicked script is a script-file run, so its FUNCNAME bottoms out at
+     "main" the way the direct file invocation marks it. */
+  let const previous_script_run = m_is_script_run;
+  m_is_script_run = true;
 
   /* The strict interactive defaults shit turns on at its own prompt, nounset
      and pipefail and failglob, do not belong to a real bash or sh running a
@@ -5650,6 +5946,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   set_current_source(previous_source, previous_origin);
   m_current_location_position = previous_location_position;
   m_mood = previous_mood;
+  m_is_script_run = previous_script_run;
   set_error_unset(previous_error_unset);
   set_pipefail(previous_pipefail);
   set_failglob(previous_failglob);

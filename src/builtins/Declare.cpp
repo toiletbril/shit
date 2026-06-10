@@ -14,15 +14,16 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-aAirxp] [name[=value] ...]");
+HELP_SYNOPSIS_DECL("[-aAfFirxp] [name[=value] ...]");
 
 HELP_DESCRIPTION_DECL(
     "The declare builtin, also spelled typeset, declares variables and sets "
     "their attributes. -a declares an indexed array, -A an associative array, "
     "-i an integer whose assignments evaluate as arithmetic, -r a readonly, "
-    "-x an exported variable, and -p prints the declarations. +i removes the "
-    "integer attribute. In bash mode it backs the array and associative "
-    "types.");
+    "-x an exported variable, and -p prints the declarations. -F prints the "
+    "names of defined functions and -f their recorded definitions, both "
+    "answering existence by status. +i removes the integer attribute. In bash "
+    "mode it backs the array and associative types.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -63,6 +64,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool do_print = false;
   bool mark_integer_attribute = false;
   bool unmark_integer_attribute = false;
+  bool restrict_to_functions = false;
+  bool function_names_only = false;
 
   usize i = 1;
   for (; i < args.count(); i++) {
@@ -87,6 +90,11 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         else
           mark_integer_attribute = true;
         break;
+      case 'f': restrict_to_functions = true; break;
+      case 'F':
+        restrict_to_functions = true;
+        function_names_only = true;
+        break;
       /* The remaining attribute letters carry no backing behavior yet and are
          accepted so a script that sets them keeps running. */
       case 'r':
@@ -94,7 +102,6 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       case 'l':
       case 'u':
       case 'n':
-      case 'f':
       case 't': break;
       default: {
         let invalid = String{};
@@ -105,6 +112,53 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       }
       }
     }
+  }
+
+  /* declare -f and -F query and list functions. With names, -F prints each
+     defined name bare and -f prints its recorded definition text, and any
+     missing name turns the status to 1, silently for -F the way bash answers
+     an existence probe, with a message for -f. Without names, -F lists every
+     function as "declare -f NAME" sorted and -f prints every recorded
+     definition. */
+  if (restrict_to_functions) {
+    i32 status = 0;
+    if (i >= args.count()) {
+      for (const String &name : cxt.sorted_function_names()) {
+        let line = String{};
+        if (function_names_only) {
+          line += "declare -f ";
+          line.append(name.view());
+        } else if (const String *source = cxt.find_function_source(name.view()))
+        {
+          line.append(source->view());
+        }
+        line += '\n';
+        ec.print_to_stdout(line.view());
+      }
+      return 0;
+    }
+    for (; i < args.count(); i++) {
+      const StringView name = args[i].view();
+      if (cxt.find_function(name) == nullptr) {
+        if (!function_names_only)
+          report_soft_builtin_error(ec, cxt, StringView{"'"} + name +
+                                                 "' is not a function");
+        status = 1;
+        continue;
+      }
+      if (function_names_only) {
+        let line = String{name};
+        line += '\n';
+        ec.print_to_stdout(line.view());
+      } else if (const String *source = cxt.find_function_source(name)) {
+        if (!source->is_empty()) {
+          let line = String{source->view()};
+          line += '\n';
+          ec.print_to_stdout(line.view());
+        }
+      }
+    }
+    return status;
   }
 
   /* declare -p NAME prints the current declaration of each name in the bash
