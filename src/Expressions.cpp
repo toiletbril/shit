@@ -3086,6 +3086,14 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.set_loop_depth(saved_loop_depth); };
 
   let snapshot = cxt.snapshot_state();
+
+  /* The subshell body's transient scratch is reclaimed at the boundary, so a
+     ( ... ) inside a loop does not grow the arena across iterations. The status
+     is an integer and restore_state reverts the inner state, so nothing the
+     release frees is still read. The defer runs after restore_state on both the
+     normal and the thrown path. */
+  let const subshell_mark = cxt.scratch_mark();
+  defer { cxt.scratch_release(subshell_mark); };
   cxt.enter_subshell();
   /* The inherited EXIT action belongs to the parent, so it does not fire at the
      subshell's end. An EXIT action the body sets survives this clear and fires

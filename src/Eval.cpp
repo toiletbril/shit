@@ -5137,6 +5137,14 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   /* A cd or an assignment inside the substitution must not leak. */
   let snapshot = snapshot_state();
 
+  /* The inner evaluation's transient scratch is reclaimed at the substitution
+     boundary, so a $(...) inside a loop does not grow the arena across
+     iterations. The captured output is heap and escapes, and restore_state
+     reverts every inner side effect, so nothing the release frees is still
+     read. */
+  let const substitution_mark = m_scratch_arena.mark();
+  defer { m_scratch_arena.release(substitution_mark); };
+
   /* The substitution body is its own source, so a located error inside it
      carries an offset into that text. The current source is pointed at it for
      the run, so an error rendered inline, such as a command not found, marks the
