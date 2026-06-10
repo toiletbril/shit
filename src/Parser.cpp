@@ -1578,7 +1578,7 @@ hot fn Parser::parse_case() throws -> Command *
     /* A keyword such as esac is the matched word when it sits in the word
        slot, rebuilt from its source text the way the for and select names
        take one. */
-    const String raw = word->raw_string();
+    let const raw = word->raw_string();
     if (KEYWORDS.find(raw.view()).has_value())
       word = word_token_from_raw(m_lexer.arena(), raw.view(),
                                  word->source_location());

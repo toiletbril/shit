@@ -2822,8 +2822,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
               static_cast<const tokens::WordToken *>(pattern_token)->word(),
               pattern_active);
         } catch (const Error &e) {
-          throw ErrorWithLocation{pattern_token->source_location(),
-                                  e.message()};
+          throw relocate_error(e, pattern_token->source_location());
         }
       } else {
         pattern = pattern_token->raw_string();

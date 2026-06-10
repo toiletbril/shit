@@ -1275,23 +1275,15 @@ fn EvalContext::pop_function_call_name() wontthrow -> void
 fn EvalContext::funcname_frame_count() const wontthrow -> usize
 {
   if (m_function_call_names.is_empty()) return 0;
-  let count = m_function_call_names.count();
-  /* A frame per sourced file, recognized by its recorded path, since an eval
-     frame carries none and bash counts only source. */
-  for (const source_frame &frame : m_source_frames)
-    if (!frame.source_path.is_empty()) count++;
-  if (m_is_script_run) count++;
-  return count;
+  return m_function_call_names.count() + m_sourced_file_frames +
+         (m_is_script_run ? 1 : 0);
 }
 
 fn EvalContext::funcname_frame_at(usize index) const wontthrow -> StringView
 {
   let const calls = m_function_call_names.count();
   if (index < calls) return m_function_call_names[calls - 1 - index].view();
-  let source_frames = usize{0};
-  for (const source_frame &frame : m_source_frames)
-    if (!frame.source_path.is_empty()) source_frames++;
-  if (index < calls + source_frames) return StringView{"source"};
+  if (index < calls + m_sourced_file_frames) return StringView{"source"};
   return StringView{"main"};
 }
 
@@ -2606,8 +2598,8 @@ fn EvalContext::apply_substring_to_value(StringView value,
 {
   const i64 value_length = static_cast<i64>(value.length);
 
-  const usize separator = find_substring_length_separator(body);
-  const StringView offset_text = body.substring_of_length(0, separator);
+  let const separator = find_substring_length_separator(body);
+  let const offset_text = body.substring_of_length(0, separator);
   /* An empty offset reads as zero, the way bash treats ${v::length}. */
   const i64 offset =
       offset_text.is_empty() ? 0 : evaluate_arithmetic(offset_text);
@@ -2622,7 +2614,7 @@ fn EvalContext::apply_substring_to_value(StringView value,
 
   i64 end = value_length;
   if (separator < body.length) {
-    const StringView length_text = body.substring(separator + 1);
+    let const length_text = body.substring(separator + 1);
     /* An empty length reads as zero, so ${v:start:} is empty. */
     i64 length = length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
     if (length < 0) {
@@ -2639,7 +2631,8 @@ fn EvalContext::apply_substring_to_value(StringView value,
   if (end > value_length) end = value_length;
   /* A length that resolves to a point before the offset is the bash
      "substring expression < 0" error, fatal the way bash makes it. */
-  if (end < start) throw Error{"substring expression < 0"};
+  if (end < start) throw Error{"Unable to take the substring because the length names "
+                  "a point before the offset"};
 
   return String{scratch_allocator(),
                 value.substring_of_length(static_cast<usize>(start),
@@ -3151,10 +3144,20 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
                   "' because the parameter is not set");
     return String{scratch_allocator()};
   }
-  if (m_error_unset && !get_variable_value(target->view()).has_value())
+  /* A target naming an array element, the a[1] a reference variable holds,
+     routes through the subscript read the way bash dereferences it. */
+  let const target_view = target->view();
+  if (let const bracket = target_view.find_character('[');
+      bracket.has_value() && !target_view.is_empty() &&
+      target_view[target_view.length - 1] == ']')
+    return apply_array_subscript(
+        target_view.substring_of_length(0, *bracket),
+        target_view.substring_of_length(*bracket + 1,
+                                        target_view.length - *bracket - 2));
+  if (m_error_unset && !get_variable_value(target_view).has_value())
     throw_script_fatal("Unable to expand '" + *target +
                 "' because the parameter is not set");
-  return expand_variable(target->view());
+  return expand_variable(target_view);
 }
 
 namespace {
@@ -3208,7 +3211,7 @@ struct ConditionalEvaluator
         return cxt.expand_word_for_assignment(
             static_cast<const tokens::WordToken *>(e.word)->word());
       } catch (const Error &err) {
-        throw ErrorWithLocation{e.word->source_location(), err.message()};
+        throw relocate_error(err, e.word->source_location());
       }
     }
     if (e.word != nullptr) return e.word->raw_string();
@@ -3226,7 +3229,7 @@ struct ConditionalEvaluator
         return cxt.expand_case_pattern_masked(
             static_cast<const tokens::WordToken *>(e.word)->word(), active);
       } catch (const Error &err) {
-        throw ErrorWithLocation{e.word->source_location(), err.message()};
+        throw relocate_error(err, e.word->source_location());
       }
     }
     String raw =
@@ -4037,35 +4040,68 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment,
      stay as written. */
   if (name_end == text.length() && word_continues) return;
 
-  /* ~+ is PWD and ~- is OLDPWD the way bash reads them, with an unset OLDPWD
-     leaving ~- literal. */
-  if (name == "+" || name == "-") {
-    let const directory =
-        get_variable_value(name == "+" ? StringView{"PWD"}
-                                       : StringView{"OLDPWD"});
-    if (!directory.has_value()) return;
-    let expanded_directory = String{heap_allocator()};
-    expanded_directory.append(directory->view());
-    expanded_directory.append(text.view().substring(name_end));
-    text = steal(expanded_directory);
-    return;
-  }
-
-  /* An empty name is the bare ~, which expands to the current home. A named
-     user resolves through the system database, and an unknown name leaves the
-     word untouched the way bash leaves ~baduser literal. */
-  let const home =
-      name.is_empty() ? os::get_home_directory() : os::get_home_for_user(name);
-  if (name.is_empty() && !home)
+  let const directory = resolve_tilde_prefix(name);
+  if (name.is_empty() && !directory)
     throw Error{"Could not figure out home directory"};
-  if (!home) return;
+  if (!directory) return;
 
-  /* String has no in-place erase or insert, so the home path and the remainder
-     after the name are joined into a fresh buffer and moved back. */
+  /* String has no in-place erase or insert, so the directory and the
+     remainder after the name are joined into a fresh buffer and moved back. */
   let expanded = String{heap_allocator()};
-  expanded.append(home->text().view());
+  expanded.append(directory->view());
   expanded.append(text.view().substring(name_end));
   text = steal(expanded);
+}
+
+fn EvalContext::resolve_tilde_prefix(StringView name) const throws
+    -> Maybe<String>
+{
+  /* ~+ is PWD and ~- is OLDPWD the way bash reads them, with an unset name
+     leaving the prefix literal. */
+  if (name == "+" || name == "-")
+    return get_variable_value(name == "+" ? StringView{"PWD"}
+                                          : StringView{"OLDPWD"});
+  /* An empty name is the bare ~, which resolves to the current home. A named
+     user resolves through the system database, and an unknown name yields
+     nothing the way bash leaves ~baduser literal. */
+  let const home =
+      name.is_empty() ? os::get_home_directory() : os::get_home_for_user(name);
+  if (!home) return shit::None;
+  return String{heap_allocator(), home->text().view()};
+}
+
+fn EvalContext::expand_colon_tildes(WordSegment &segment,
+                                    bool word_continues) const throws -> void
+{
+  if (!segment.is_tilde_candidate()) return;
+  let const view = segment.text.view();
+  let rewritten = String{heap_allocator()};
+  let changed = false;
+  usize i = 0;
+  while (i < view.length) {
+    if (view[i] == ':' && i + 1 < view.length && view[i + 1] == '~') {
+      usize prefix_end = i + 2;
+      while (prefix_end < view.length && view[prefix_end] != '/' &&
+             view[prefix_end] != ':')
+        prefix_end++;
+      /* A prefix that runs to the segment's end while the word goes on in a
+         later segment carries a quoted character, so it stays literal the way
+         the leading prefix does. */
+      if (!(prefix_end == view.length && word_continues)) {
+        let const name = view.substring_of_length(i + 2, prefix_end - i - 2);
+        if (let const directory = resolve_tilde_prefix(name)) {
+          rewritten += ':';
+          rewritten.append(directory->view());
+          i = prefix_end;
+          changed = true;
+          continue;
+        }
+      }
+    }
+    rewritten += view[i];
+    i++;
+  }
+  if (changed) segment.text = steal(rewritten);
 }
 
 hot fn EvalContext::expand_path(glob_field field,
@@ -5127,7 +5163,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
           const StringView length_text = slice.substring(sep + 1);
           const i64 length =
               length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
-          if (length < 0) throw Error{"substring expression < 0"};
+          if (length < 0) throw Error{"Unable to take the substring because the length names "
+                  "a point before the offset"};
           end = start + length;
         }
         if (end > total) end = total;
@@ -5191,7 +5228,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
                 length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
             /* Unlike a string substring, an array slice rejects a negative
                length the way bash does rather than counting from the end. */
-            if (length < 0) throw Error{"substring expression < 0"};
+            if (length < 0) throw Error{"Unable to take the substring because the length names "
+                  "a point before the offset"};
             end = start + length;
           }
           if (end > total) end = total;
@@ -5342,17 +5380,36 @@ hot fn EvalContext::expand_word(const Word &word) throws
 hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     -> String
 {
-  /* Only copy the segments when a leading tilde must be rewritten, so the
-     common assignment reads its segments in place with no per-command copy. */
+  /* Only copy the segments when a tilde must be rewritten, the leading one or
+     one after an unquoted colon, the assignment-only rule bash applies to
+     PATH=~/bin:~/tmp. The common assignment reads its segments in place with
+     no per-command copy. */
   let const *segments = &word.segments;
   let tilde_expanded_segments = ArrayList<WordSegment>{scratch_allocator()};
-  if (!word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
+  let const has_leading_tilde =
+      !word.segments.is_empty() && word.segments.front().is_tilde_candidate() &&
       !word.segments.front().text.is_empty() &&
-      word.segments.front().text.first_character() == '~')
-  {
+      word.segments.front().text.first_character() == '~';
+  let has_colon_tilde = false;
+  for (const WordSegment &segment : word.segments) {
+    if (!segment.is_tilde_candidate()) continue;
+    let const view = segment.text.view();
+    for (usize i = 0; i + 1 < view.length; i++)
+      if (view[i] == ':' && view[i + 1] == '~') {
+        has_colon_tilde = true;
+        break;
+      }
+    if (has_colon_tilde) break;
+  }
+  if (has_leading_tilde || has_colon_tilde) {
     tilde_expanded_segments = word.segments;
-    expand_tilde(tilde_expanded_segments.front(),
-                 tilde_expanded_segments.count() > 1);
+    if (has_leading_tilde)
+      expand_tilde(tilde_expanded_segments.front(),
+                   tilde_expanded_segments.count() > 1);
+    if (has_colon_tilde)
+      for (usize i = 0; i < tilde_expanded_segments.count(); i++)
+        expand_colon_tildes(tilde_expanded_segments[i],
+                            i + 1 < tilde_expanded_segments.count());
     segments = &tilde_expanded_segments;
   }
 
@@ -6075,7 +6132,14 @@ fn EvalContext::run_completion_function(StringView function_name,
   set_loop_depth(0);
   defer { set_loop_depth(saved_loop_depth); };
   enter_function_scope();
-  defer { leave_function_scope(); };
+  /* The completion function reads its own name through FUNCNAME the way any
+     called function does, so the call name rides the scope. */
+  push_function_call_name(function_name);
+  defer
+  {
+    pop_function_call_name();
+    leave_function_scope();
+  };
   let const saved_terminal_exec = terminal_exec_allowed();
   set_terminal_exec_allowed(false);
   defer { set_terminal_exec_allowed(saved_terminal_exec); };
@@ -6138,7 +6202,17 @@ fn EvalContext::run_source(StringView source, StringView origin,
       parent_source, filename.has_value() ? String{*filename}
       : String{}
   });
-  defer { m_source_frames.pop_back(); };
+  /* The sourced-file counter rides the frame stack, a file frame carries its
+     path while an eval frame carries none, so the FUNCNAME classification
+     stays a constant-time read. */
+  let const frame_is_sourced_file =
+      filename.has_value() && !filename->is_empty();
+  if (frame_is_sourced_file) m_sourced_file_frames++;
+  defer
+  {
+    if (frame_is_sourced_file) m_sourced_file_frames--;
+    m_source_frames.pop_back();
+  };
 
   /* The whole chain from the innermost source out to the outermost is printed
      when an error is caught, so every nested call site is named, not only the

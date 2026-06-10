@@ -1182,6 +1182,10 @@ protected:
      with ${FUNCNAME[0]} as the top. */
   ArrayList<String> m_function_call_names{heap_allocator()};
   bool m_is_script_run{false};
+  /* The count of source frames that carry a file path, kept in step by the
+     frame push and pop so the FUNCNAME classification reads it in constant
+     time. */
+  usize m_sourced_file_frames{0};
 
   /* The background jobs and the id to give the next one. */
   ArrayList<job> m_jobs{heap_allocator()};
@@ -1279,6 +1283,14 @@ protected:
       -> ArrayList<String>;
 
   fn expand_tilde(WordSegment &leading_segment, bool word_continues) const
+      throws -> void;
+  /* The directory a tilde prefix names, the home for an empty or user name
+     and PWD or OLDPWD for + and -, or None when the name resolves to
+     nothing and the word stays literal. */
+  fn resolve_tilde_prefix(StringView name) const throws -> Maybe<String>;
+  /* Expands a tilde after each unquoted colon inside one segment, the
+     assignment-only rule bash applies to PATH=~/bin:~/tmp. */
+  fn expand_colon_tildes(WordSegment &segment, bool word_continues) const
       throws -> void;
 };
 
