@@ -52,11 +52,55 @@ i64 parse_printf_integer(const String &arg) throws
   return parsed.is_error() ? 0 : parsed.value();
 }
 
+pure fn is_hex_digit(char c) wontthrow -> bool
+{
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+         (c >= 'A' && c <= 'F');
+}
+
+pure fn hex_digit_value(char c) wontthrow -> i32
+{
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  return c - 'A' + 10;
+}
+
 void append_escape(String &out, const String &fmt, usize &i) throws
 {
   ASSERT(i < fmt.length());
 
   let const e = fmt[i];
+
+  /* A format-string octal escape is the byte for up to three octal digits, so
+     \0 is a NUL and \101 is an A, the way bash and POSIX printf read it. The
+     index is left on the last digit consumed since the caller advances past it. */
+  if (e >= '0' && e <= '7') {
+    i32 value = e - '0';
+    usize digits_read = 1;
+    while (digits_read < 3 && i + 1 < fmt.length() && fmt[i + 1] >= '0' &&
+           fmt[i + 1] <= '7') {
+      i++;
+      value = value * 8 + (fmt[i] - '0');
+      digits_read++;
+    }
+    out += static_cast<char>(value);
+    return;
+  }
+
+  /* A \xHH escape is the byte for up to two hexadecimal digits, the bash
+     extension over POSIX. */
+  if (e == 'x' && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1])) {
+    i32 value = 0;
+    usize digits_read = 0;
+    while (digits_read < 2 && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1])) {
+      i++;
+      value = value * 16 + hex_digit_value(fmt[i]);
+      digits_read++;
+    }
+    out += static_cast<char>(value);
+    return;
+  }
+
   switch (e) {
   case 'n': out += '\n'; break;
   case 't': out += '\t'; break;
@@ -74,9 +118,10 @@ void append_escape(String &out, const String &fmt, usize &i) throws
 }
 
 /* Expand the backslash escapes in a %b argument, the same set the format string
-   itself takes plus an octal \ooo with an optional leading zero and a \c that
-   stops all further output. Returns true when a \c was seen so the caller can
-   abort the whole printf, matching the POSIX utility. */
+   itself takes plus a \c that stops all further output. The octal form here
+   allows an optional leading zero that does not count toward the three digits.
+   Returns true when a \c was seen so the caller can abort the whole printf,
+   matching the POSIX utility. */
 bool append_b_argument(String &out, const String &arg) throws
 {
   for (usize i = 0; i < arg.length(); i++) {
@@ -86,6 +131,22 @@ bool append_b_argument(String &out, const String &arg) throws
     }
     let const e = arg[i + 1];
     if (e == 'c') return true;
+    if (e == 'x' && i + 2 < arg.length() && is_hex_digit(arg[i + 2])) {
+      /* A \xHH escape takes up to two hexadecimal digits, the bash extension. */
+      usize digit_index = i + 2;
+      i32 value = 0;
+      usize digits_read = 0;
+      while (digits_read < 2 && digit_index < arg.length() &&
+             is_hex_digit(arg[digit_index]))
+      {
+        value = value * 16 + hex_digit_value(arg[digit_index]);
+        digit_index++;
+        digits_read++;
+      }
+      out += static_cast<char>(value);
+      i = digit_index - 1;
+      continue;
+    }
     if (e == '0' || (e >= '1' && e <= '7')) {
       /* An octal escape takes up to three octal digits, after an optional
          leading zero that does not count toward the three. */
