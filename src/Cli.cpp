@@ -162,7 +162,8 @@ static fn find_flag(const ArrayList<Flag *> &flags, const char *flag_start,
 }
 
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
-                   const ArrayList<String> &args) throws -> ArrayList<String>
+                   const ArrayList<String> &args,
+                   usize base_position) throws -> ArrayList<String>
 {
   let os_argv = ArrayList<const char *>{};
   os_argv.reserve(args.count());
@@ -170,7 +171,8 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
   for (const String &arg : args)
     os_argv.push(arg.c_str());
 
-  return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin());
+  return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin(),
+                     base_position);
 }
 
 static fn flag_name(const Flag *f, bool is_long) throws -> String
@@ -186,8 +188,8 @@ static fn flag_name(const Flag *f, bool is_long) throws -> String
   return name;
 }
 
-fn parse_flags(const ArrayList<Flag *> &flags, int argc,
-               const char *const *argv) throws -> ArrayList<String>
+fn parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv,
+               usize base_position) throws -> ArrayList<String>
 {
   ASSERT(argc >= 0);
 
@@ -354,7 +356,9 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           for (int k = 0; k < i; k++)
             caret_offset += std::strlen(argv[k]) + 1;
           throw ErrorWithLocation{
-              SourceLocation{caret_offset, std::strlen(argv[i])}, s};
+              SourceLocation{base_position + caret_offset,
+                             std::strlen(argv[i])},
+              s};
         }
       }
     }

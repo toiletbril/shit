@@ -115,9 +115,10 @@ private:
 /* These return arguments which are not flags. */
 
 fn parse_flags_vec(const ArrayList<Flag *> &flags,
-                   const ArrayList<String> &args) throws -> ArrayList<String>;
-fn parse_flags(const ArrayList<Flag *> &flags, int argc,
-               const char *const *argv) throws -> ArrayList<String>;
+                   const ArrayList<String> &args,
+                   usize base_position = 0) throws -> ArrayList<String>;
+fn parse_flags(const ArrayList<Flag *> &flags, int argc, const char *const *argv,
+               usize base_position = 0) throws -> ArrayList<String>;
 
 /* Join the arguments into one space-separated line, the source a located flag
    error renders its caret against. The caller rebuilds the same line the parser

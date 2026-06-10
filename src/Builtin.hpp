@@ -293,7 +293,7 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
 
 /* TODO: More granular error location for flags? */
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
-  parse_flags_vec(FLAG_LIST, ec.args());                                       \
+  parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);                                       \
   defer { reset_flags(FLAG_LIST); }
 
 i32 execute_builtin(ExecContext &&ec, EvalContext &cxt) throws;
