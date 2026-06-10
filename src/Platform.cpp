@@ -1799,24 +1799,66 @@ fn signal_name_from_number(i32 number) -> Maybe<String>
   return None;
 }
 
+/* Append one argument to a Windows command line, quoted and escaped the way
+   CommandLineToArgvW parses it back, so an argument that carries a space, a tab,
+   or a quote cannot break out of its slot and inject further arguments. The
+   rules are the Microsoft ones, a run of backslashes is doubled only when it
+   precedes a quote or the closing quote, and an embedded quote is escaped with a
+   backslash. An argument with no space, tab, or quote is emitted bare, and an
+   empty argument is quoted so it is not dropped. */
+static fn append_windows_quoted_arg(String &out, StringView arg) -> void
+{
+  bool needs_quotes = arg.count() == 0;
+  for (usize i = 0; i < arg.count() && !needs_quotes; i++) {
+    const char c = arg[i];
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '"')
+      needs_quotes = true;
+  }
+  if (!needs_quotes) {
+    out.append(arg);
+    return;
+  }
+
+  out += '"';
+  for (usize i = 0; i < arg.count();) {
+    usize backslashes = 0;
+    while (i < arg.count() && arg[i] == '\\') {
+      i++;
+      backslashes++;
+    }
+    if (i == arg.count()) {
+      /* Trailing backslashes precede the closing quote, so they are doubled to
+         stay literal rather than escaping the quote. */
+      for (usize k = 0; k < backslashes * 2; k++)
+        out += '\\';
+      break;
+    }
+    if (arg[i] == '"') {
+      /* The backslashes before a quote are doubled and the quote is escaped. */
+      for (usize k = 0; k < backslashes * 2 + 1; k++)
+        out += '\\';
+      out += '"';
+      i++;
+    } else {
+      /* Backslashes that do not precede a quote stay literal. */
+      for (usize k = 0; k < backslashes; k++)
+        out += '\\';
+      out += arg[i];
+      i++;
+    }
+  }
+  out += '"';
+}
+
 fn make_os_args(const ArrayList<String> &args) -> os_args
 {
   ASSERT(args.count() > 0);
 
   String s{};
-
-  s += '"';
-  s.append(args[0].view());
-  s += '"';
-
-  /* TODO: Remove CVE and escape quotes. */
-  if (args.count() > 1) {
-    for (usize i = 1; i < args.count(); i++) {
-      s += ' ';
-      s += '"';
-      s.append(args[i].view());
-      s += '"';
-    }
+  append_windows_quoted_arg(s, args[0].view());
+  for (usize i = 1; i < args.count(); i++) {
+    s += ' ';
+    append_windows_quoted_arg(s, args[i].view());
   }
 
   return s;
