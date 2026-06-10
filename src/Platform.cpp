@@ -1658,7 +1658,10 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
   unused(out_fd);
   unused(err_fd);
   /* Windows has no fork, so a compound command cannot run as a separate process
-     stage of a pipeline. */
+     stage of a pipeline. A re-exec of the stage's source would work the way the
+     process substitution does, but it needs the stage's full source span, which
+     the AST tracks only as the opening token, so the stage stays unsupported
+     until a compound node carries its end position. */
   throw shit::Error{
       "A compound command in a pipeline is not supported on this platform"};
 }
