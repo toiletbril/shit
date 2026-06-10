@@ -515,8 +515,16 @@ fn EvalContext::unset_array_element(StringView name,
     const i64 index = evaluate_arithmetic(subscript);
     const i64 count = static_cast<i64>(array->count());
     const i64 resolved = index < 0 ? index + count : index;
-    if (resolved >= 0 && resolved < count)
+    if (resolved < 0)
+      return;
+    /* An element inside the dense run is removed there, while one past it lives
+       in the sparse store and is erased by its key. Erasing an absent key is a
+       no-op, matching bash unsetting a missing element silently. */
+    if (resolved < count)
       array->remove(static_cast<usize>(resolved));
+    else
+      m_sparse_array_values.erase(
+          sparse_array_key(name, static_cast<usize>(resolved)).view());
   }
 }
 
@@ -6045,6 +6053,26 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
     if (!args_are_transient) m_scratch_arena.release(fields_mark);
   };
 
+  /* A declaration builtin, such as local or export, treats a name=value
+     argument as an assignment, so its value expands with no field splitting or
+     globbing. The command word is the first argument, and only its plain
+     literal form is treated this way, the same form bash decides on before any
+     expansion. */
+  let is_declaration_command = false;
+  if (!args.is_empty() && args[0]->kind() == Token::Kind::Word) {
+    const Word &command_word =
+        static_cast<const tokens::WordToken *>(args[0])->word();
+    if (command_word.plain_literal_kind() != Word::PlainLiteral::NotPlain) {
+      let command_name = String{scratch_allocator()};
+      for (const WordSegment &segment : command_word.segments)
+        command_name.append(segment.text.view());
+      let const name = command_name.view();
+      is_declaration_command = name == "local" || name == "declare" ||
+                               name == "typeset" || name == "export" ||
+                               name == "readonly";
+    }
+  }
+
   for (const Token *t : args) {
     let const l = t->source_location();
     try {
@@ -6056,12 +6084,24 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
       if (t->kind() == Token::Kind::Word) {
         word = &static_cast<const tokens::WordToken *>(t)->word();
       } else if (t->kind() == Token::Kind::Assignment) {
+        let const a = static_cast<const tokens::Assignment *>(t);
+        ASSERT(a != nullptr);
+        if (is_declaration_command) {
+          /* A declaration builtin treats name=value as an assignment, so the
+             value expands with no field splitting or globbing, the way a plain
+             x=$1 does, rather than splitting into several arguments. */
+          let assignment = String{expanded_args.allocator()};
+          assignment.append(a->key().view());
+          assignment += '=';
+          assignment.append(
+              expand_word_for_assignment(a->value_word()).view());
+          expanded_args.push(steal(assignment));
+          continue;
+        }
         /* An assignment that appears as an argument, like echo k=$v, is an
            ordinary word. Rebuild it as the literal key, an equals sign, and the
            value segments, so the value still expands instead of staying
            literal. */
-        let const a = static_cast<const tokens::Assignment *>(t);
-        ASSERT(a != nullptr);
         let key_literal = String{StringView{a->key()}};
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
