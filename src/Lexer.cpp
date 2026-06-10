@@ -481,6 +481,23 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     return after == '=' || (after == '+' && chop_character(offset + 1) == '=');
   };
 
+  /* Advance offset past a balanced open and close pair, the one nested inside a
+     subscript or an extended-glob group, stopping at the matching close or at
+     the end of the source. */
+  auto scan_to_matched_close = [this](usize &offset, char open,
+                                      char close) -> void {
+    usize depth = 1;
+    while (depth > 0) {
+      const char c = chop_character(offset);
+      if (c == lexer::CEOF) break;
+      offset++;
+      if (c == open)
+        depth++;
+      else if (c == close)
+        depth--;
+    }
+  };
+
   for (;;) {
     const let ch = chop_character(byte_count);
 
@@ -503,16 +520,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     {
       const let subscript_start = byte_count;
       byte_count++; /* the [ */
-      usize depth = 1;
-      while (depth > 0) {
-        const char c = chop_character(byte_count);
-        if (c == lexer::CEOF) break;
-        byte_count++;
-        if (c == '[')
-          depth++;
-        else if (c == ']')
-          depth--;
-      }
+      scan_to_matched_close(byte_count, '[', ']');
       append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + subscript_start, byte_count - subscript_start));
       continue;
@@ -529,16 +537,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     {
       const let group_start = byte_count;
       byte_count += 2; /* the opener and the ( */
-      usize depth = 1;
-      while (depth > 0) {
-        const char c = chop_character(byte_count);
-        if (c == lexer::CEOF) break;
-        byte_count++;
-        if (c == '(')
-          depth++;
-        else if (c == ')')
-          depth--;
-      }
+      scan_to_matched_close(byte_count, '(', ')');
       append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + group_start, byte_count - group_start));
       continue;
