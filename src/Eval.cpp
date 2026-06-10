@@ -6254,6 +6254,15 @@ fn ExecContext::print_to_stdout(StringView s) const throws -> void
   }
 }
 
+fn ExecContext::print_to_stderr(StringView s) const throws -> void
+{
+  if (!os::write_fd(err_fd.value_or(SHIT_STDERR), s.data, s.length).has_value())
+  {
+    throw Error{"Unable to write to stderr: " +
+                os::last_system_error_message()};
+  }
+}
+
 fn ExecContext::make_from(SourceLocation location,
                           ArrayList<String> &&args) throws -> ExecContext
 {

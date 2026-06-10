@@ -1158,6 +1158,7 @@ public:
 
   fn close_fds() throws -> void;
   fn print_to_stdout(StringView s) const throws -> void;
+  fn print_to_stderr(StringView s) const throws -> void;
 
   fn execute(bool is_async) throws -> i32;
 

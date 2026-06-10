@@ -99,7 +99,7 @@
   Variable "?"
 ]
 rm=0
-missing: not found
+unalias: missing: not found
 miss=1
 all=0
 hash=0

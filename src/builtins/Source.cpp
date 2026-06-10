@@ -33,7 +33,15 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() < 2)
     throw Error{"Unable to source because a filename argument is required"};
 
-  let const path = ec.args()[1].clone();
+  /* A leading -- ends option parsing, the form source -- file that ble.sh uses,
+     so it is skipped before the filename is read rather than taken as one. */
+  usize path_index = 1;
+  if (ec.args()[1] == "--")
+    path_index = 2;
+  if (path_index >= ec.args().count())
+    throw Error{"Unable to source because a filename argument is required"};
+
+  let const path = ec.args()[path_index].clone();
   let const contents = utils::read_entire_file(path);
   if (!contents)
     throw Error{"Unable to source the file '" + path +

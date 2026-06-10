@@ -45,7 +45,10 @@ i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
     if (!cxt.remove_alias(name)) {
-      ec.print_to_stdout(name + ": not found\n");
+      /* The diagnostic goes to stderr the way bash reports it, so a caller that
+         strips aliases off a list of names, as ble.sh does, neither floods the
+         terminal nor pollutes a captured standard output. */
+      ec.print_to_stderr("unalias: " + name + ": not found\n");
       status = 1;
     }
   }
