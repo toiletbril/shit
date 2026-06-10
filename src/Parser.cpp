@@ -1062,7 +1062,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
          builtin such as local. That is captured so the builtin sets the array,
          rather than the ( being read as a stray command. */
       if (!args_accumulator.is_empty()) {
-        if (is_array_assignment && m_lexer.is_bash_compatible()) {
+        if (is_array_assignment) {
           let const command_name = args_accumulator[0]->raw_string();
           if (is_assignment_builtin_name(command_name.view())) {
             ArrayList<const Token *> elements = consume_bash_array_assignment();
@@ -1075,22 +1075,19 @@ hot fn Parser::parse_simple_command() throws -> Command *
         break;
       }
 
-      /* NAME=(...) leading the command is a bash array assignment. In bash mode
-         the element words are captured into an array assignment, otherwise the
-         group is consumed and a scalar assignment of the empty value word stands
-         in so a POSIX login profile that uses one keeps sourcing. */
+      /* NAME=(...) leading the command is a bash array assignment. The element
+         words are captured in every mood and join the prefix sequence the way
+         a scalar assignment does, so a command-less line of several
+         assignments, some of them arrays such as flags= pvars=() specs=(),
+         applies them all in order. POSIX mode downgrades the assignment to an
+         empty scalar at evaluation, so a sourced login profile that carries
+         one keeps sourcing. */
       if (is_array_assignment) {
         ArrayList<const Token *> elements = consume_bash_array_assignment();
-        if (m_lexer.is_bash_compatible()) {
-          /* A bare array assignment joins the prefix sequence the way a scalar
-             one does, so a command-less line of several assignments, some of
-             them arrays such as flags= pvars=() specs=(), applies them all in
-             order rather than the first array assignment standing alone. */
-          array_args.push(array_builtin_assignment{
-              a->key().clone(), steal(elements), a->is_append()});
-          break;
-        }
-        return m_lexer.arena().create<AssignCommand>(*source_location, a);
+        array_args.push(array_builtin_assignment{a->key().clone(),
+                                                 steal(elements),
+                                                 a->is_append()});
+        break;
       }
 
       if (local_vars.count() == 0 &&

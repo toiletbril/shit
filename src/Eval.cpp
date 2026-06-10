@@ -325,6 +325,15 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
                                               ArrayList<String> elements,
                                               bool is_append) throws -> void
 {
+  /* POSIX mode has no arrays, but a sourced profile that carries a bash array
+     literal should keep sourcing, so the assignment stands in as an empty
+     scalar rather than a syntax error, the shim the parser used to apply at
+     parse time for every non-bash mood. */
+  if (is_posix_mode()) [[unlikely]] {
+    set_shell_variable(name, "");
+    return;
+  }
+
   usize running_index = 0;
   if (is_append) {
     /* An append continues after the highest set index, the dense end or the

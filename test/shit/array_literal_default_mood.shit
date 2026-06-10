@@ -1,0 +1,13 @@
+# The bash array literal works in the default mood the way the subscript and
+# declare forms already do, including the empty, the append, and the prefix
+# sequence forms.
+e=(a b)
+echo "n=${#e[@]} all=${e[@]}"
+e+=(c)
+echo "appended=${e[2]}"
+g=()
+echo "empty_n=${#g[@]}"
+flags= pvars=(p) specs=(s1 s2)
+echo "seq=$pvars ${specs[1]}"
+f() { local a=(1 2); echo "local_arr=${a[1]}"; }
+f

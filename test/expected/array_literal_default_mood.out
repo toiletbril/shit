@@ -1,0 +1,132 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "n=$#e[@] all=$e[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "appended=$e[2]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty_n=$#g[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "seq=$pvars $specs[1]"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "f"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "local"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "local_arr=$a[1]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "f"]
+[Word
+  Unquoted "e="
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "n="
+  Variable "#e[@]"
+  DoubleQuoted " all="
+  Variable "e[@]"
+]
+[Word
+  Unquoted "e+="
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "appended="
+  Variable "e[2]"
+]
+[Word
+  Unquoted "g="
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty_n="
+  Variable "#g[@]"
+]
+[Word
+  Unquoted "flags="
+]
+[Word
+  Unquoted "pvars="
+]
+[Word
+  Unquoted "p"
+]
+[Word
+  Unquoted "specs="
+]
+[Word
+  Unquoted "s1"
+]
+[Word
+  Unquoted "s2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "seq="
+  Variable "pvars"
+  DoubleQuoted " "
+  Variable "specs[1]"
+]
+[Word
+  Unquoted "f"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "local"
+]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "local_arr="
+  Variable "a[1]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "f"
+]
+n=2 all=a b
+appended=c
+empty_n=0
+seq=p s2
+local_arr=2
+[Code 0]
