@@ -388,7 +388,14 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback) throws
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
-  defer { ec.close_fds(); };
+  /* On the ENOEXEC fallback the context's descriptors are handed to the script
+     run, which reapplies the command's redirections, so they are not closed
+     here. */
+  bool fds_handed_to_fallback = false;
+  defer
+  {
+    if (!fds_handed_to_fallback) ec.close_fds();
+  };
 
   let const child_args = make_os_args(ec.args());
 
@@ -465,16 +472,20 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback) throws
       posix_spawn(&child_pid, ec.program_path().c_str(), &file_actions, &attr,
                   const_cast<char *const *>(child_args.begin()), environ);
 
+  /* An ENOEXEC file is executable but carries no shebang and is not a binary.
+     When the caller can fall back, this is signalled so the file runs as a shell
+     script in place, the POSIX behavior, rather than failing 127. The check runs
+     before the descriptors are closed, so the script run still sees the
+     command's redirections on the context. */
+  if (spawn_error == ENOEXEC && allow_script_fallback) {
+    fds_handed_to_fallback = true;
+    throw shit::ExecFormatError{};
+  }
+
   ec.close_fds();
 
-  if (spawn_error != 0) {
-    /* An ENOEXEC file is executable but carries no shebang and is not a binary.
-       When the caller can fall back, this is signalled so the file runs as a
-       shell script in place, the POSIX behavior, rather than failing 127. */
-    if (allow_script_fallback && spawn_error == ENOEXEC)
-      throw shit::ExecFormatError{};
+  if (spawn_error != 0)
     return spawn_failure_child(ec.program_path(), spawn_error);
-  }
 
   return child_pid;
 }
