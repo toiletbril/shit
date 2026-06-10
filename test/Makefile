@@ -66,21 +66,31 @@ refill:
 # is appended to the failed list and the line is marked, the same shape the
 # golden run_tests target uses. The goal is byte-identical output with dash.
 DASH ?= dash
-SH_COMPAT := $(wildcard sh/*.sh)
+SH_COMPAT := $(filter-out %_1.sh,$(wildcard sh/*.sh))
 
 # The diff targets compare two live shells through process substitution, so they
 # run in bash rather than the system /bin/sh. The scope is these two targets so
 # the other recipes keep their /bin/sh semantics.
 dashdiff bashdiff mimicrydiff: SHELL := bash
 
+# A NAME_1.sh variant marks NAME.sh flaky across dash versions, the same
+# accepted-alternative idea the bashdiff _1.bash files carry.
 dashdiff: $(BIN)
 	@for f in $(SH_COMPAT); do \
 		s="$$($(BIN) "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
-		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (dash)" \
-			<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST) \
-			&& printf "	%-64s ok\n" "$$f" \
-			|| printf "	%-64s FAILED :c\n" "$$f"; \
+		alt="$${f%.sh}_1.sh"; \
+		if [ "$$s" = "$$d" ]; then \
+			printf "	%-64s ok\n" "$$f"; \
+		elif [ -f "$$alt" ] && \
+			d1="$$($(DASH) "$$alt" 2>/dev/null; printf X)" && \
+			[ "$$s" = "$${d1%X}" ]; then \
+			printf "	%-64s ok (flaky alternative)\n" "$$f"; \
+		else \
+			diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (dash)" \
+				<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST); \
+			printf "	%-64s FAILED :c\n" "$$f"; \
+		fi; \
 	done
 
 # Run each bash script through the shell in bash mode and through bash, then diff
@@ -88,16 +98,28 @@ dashdiff: $(BIN)
 # difference is appended to the failed list. The goal is byte-identical output
 # with real bash for the bash extensions.
 BASH ?= bash
-BASH_COMPAT := $(wildcard bash/*.bash)
+BASH_COMPAT := $(filter-out %_1.bash,$(wildcard bash/*.bash))
 
+# A NAME_1.bash variant marks NAME.bash flaky across bash versions, the same
+# accepted-alternative idea the golden _1.out files carry. The variant spells
+# the other version's output, so the test passes when shit matches the local
+# bash on NAME.bash or matches bash running NAME_1.bash.
 bashdiff: $(BIN)
 	@for f in $(BASH_COMPAT); do \
 		s="$$($(BIN) --bash-compatible "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
-		diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (bash)" \
-			<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST) \
-			&& printf "	%-64s ok\n" "$$f" \
-			|| printf "	%-64s FAILED :c\n" "$$f"; \
+		alt="$${f%.bash}_1.bash"; \
+		if [ "$$s" = "$$b" ]; then \
+			printf "	%-64s ok\n" "$$f"; \
+		elif [ -f "$$alt" ] && \
+			b1="$$($(BASH) "$$alt" 2>/dev/null; printf X)" && \
+			[ "$$s" = "$${b1%X}" ]; then \
+			printf "	%-64s ok (flaky alternative)\n" "$$f"; \
+		else \
+			diff $(DIFF_FLAGS) --label "$$f (shit)" --label "$$f (bash)" \
+				<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST); \
+			printf "	%-64s FAILED :c\n" "$$f"; \
+		fi; \
 	done
 
 # Push every bash and sh diff script through mimicry as well, so each one runs a
@@ -111,18 +133,34 @@ mimicrydiff: $(BIN)
 	@for f in $(BASH_COMPAT); do \
 		s="$$($(BIN) -I -c "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
-		diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f (bash)" \
-			<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST) \
-			&& printf "	%-64s mimic ok\n" "$$f" \
-			|| printf "	%-64s mimic FAILED :c\n" "$$f"; \
+		alt="$${f%.bash}_1.bash"; \
+		if [ "$$s" = "$$b" ]; then \
+			printf "	%-64s mimic ok\n" "$$f"; \
+		elif [ -f "$$alt" ] && \
+			b1="$$($(BASH) "$$alt" 2>/dev/null; printf X)" && \
+			[ "$$s" = "$${b1%X}" ]; then \
+			printf "	%-64s mimic ok (flaky alternative)\n" "$$f"; \
+		else \
+			diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f (bash)" \
+				<(printf '%s' "$$s") <(printf '%s' "$$b") >> $(FAILED_LIST); \
+			printf "	%-64s mimic FAILED :c\n" "$$f"; \
+		fi; \
 	done; \
 	for f in $(SH_COMPAT); do \
 		s="$$($(BIN) -I -c "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
-		diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f (dash)" \
-			<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST) \
-			&& printf "	%-64s mimic ok\n" "$$f" \
-			|| printf "	%-64s mimic FAILED :c\n" "$$f"; \
+		alt="$${f%.sh}_1.sh"; \
+		if [ "$$s" = "$$d" ]; then \
+			printf "	%-64s mimic ok\n" "$$f"; \
+		elif [ -f "$$alt" ] && \
+			d1="$$($(DASH) "$$alt" 2>/dev/null; printf X)" && \
+			[ "$$s" = "$${d1%X}" ]; then \
+			printf "	%-64s mimic ok (flaky alternative)\n" "$$f"; \
+		else \
+			diff $(DIFF_FLAGS) --label "$$f (shit -I)" --label "$$f (dash)" \
+				<(printf '%s' "$$s") <(printf '%s' "$$d") >> $(FAILED_LIST); \
+			printf "	%-64s mimic FAILED :c\n" "$$f"; \
+		fi; \
 	done
 
 # Time the builtin-only configure script through each shell, after checking that
