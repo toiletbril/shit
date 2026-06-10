@@ -8,3 +8,5 @@ for ((i=0;i<3;i++)); do echo "i=$i"; done
 while ((x-->6)); do echo "w=$x"; done
 echo "status_true=$?"
 ((0)); echo "status_false=$?"
+((echo sub1; echo sub2;); echo sub3)
+echo "backoff=$?"

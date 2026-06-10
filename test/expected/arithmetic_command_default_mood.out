@@ -32,6 +32,20 @@
     [ArithmeticCommand "0"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "status_false=$?"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Subshell]
+            [CompoundList]
+              [CompoundListCondition, None]
+                [SimpleCommand "echo" "sub1"]
+              [CompoundListCondition, None]
+                [SimpleCommand "echo" "sub2"]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "sub3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "backoff=$?"]
 [Word
   Unquoted "x=5"
 ]
@@ -133,6 +147,31 @@
   DoubleQuoted "status_false="
   Variable "?"
 ]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "sub1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "sub2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "sub3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "backoff="
+  Variable "?"
+]
 ge=yes
 x=7
 i=0
@@ -141,4 +180,8 @@ i=2
 w=6
 status_true=0
 status_false=1
+sub1
+sub2
+sub3
+backoff=0
 [Code 0]

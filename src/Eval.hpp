@@ -1278,7 +1278,8 @@ protected:
   fn expand_path(glob_field field, SourceLocation location) throws
       -> ArrayList<String>;
 
-  fn expand_tilde(WordSegment &leading_segment) const throws -> void;
+  fn expand_tilde(WordSegment &leading_segment, bool word_continues) const
+      throws -> void;
 };
 
 /* Lower-level execution context. Path is the program path to execute, expanded

@@ -319,7 +319,15 @@ cold fn ErrorBase::severity_word() const wontthrow -> String { return "error"; }
 
 Error::Error(StringView message) : ErrorBase(message) {}
 
-cold fn Error::to_string() const throws -> String
+cold fn ErrorBase::to_string(StringView source) const throws -> String
+{
+  unused(source);
+  let const color = diagnostic_colors_for(severity_word());
+  return color.severity + severity_word() + color.reset + ": " + color.message +
+         message() + "." + color.reset;
+}
+
+fn Error::to_string() const throws -> String
 {
   let const color = diagnostic_colors_for(severity_word());
   return color.severity + severity_word() + color.reset + ": " + color.message +

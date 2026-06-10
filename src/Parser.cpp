@@ -1237,6 +1237,50 @@ static fn word_token_from_assignment(BumpArena &arena,
                                      const Assignment *a) throws
     -> tokens::WordToken *;
 
+/* Whether the (( construct opening just before body_start closes with two
+   adjacent right parentheses at depth zero, the test that separates an
+   arithmetic command from a subshell whose first child is a subshell. The
+   scan tracks quote runs and backslash escapes so a parenthesis inside a
+   string stays text. An unterminated construct answers no and the subshell
+   parser reports it. */
+static fn double_paren_closes_adjacent(StringView source,
+                                       usize body_start) wontthrow -> bool
+{
+  usize depth = 0;
+  char quote = 0;
+  for (usize i = body_start; i < source.length; i++) {
+    let const c = source[i];
+    if (quote == '\'') {
+      if (c == '\'') quote = 0;
+      continue;
+    }
+    if (c == '\\') {
+      i++;
+      continue;
+    }
+    if (quote == '"') {
+      if (c == '"') quote = 0;
+      continue;
+    }
+    if (c == '\'' || c == '"') {
+      quote = c;
+      continue;
+    }
+    if (c == '(') {
+      depth++;
+      continue;
+    }
+    if (c == ')') {
+      if (depth > 0) {
+        depth--;
+        continue;
+      }
+      return i + 1 < source.length && source[i + 1] == ')';
+    }
+  }
+  return false;
+}
+
 static fn word_token_from_raw(BumpArena &arena, StringView text,
                               SourceLocation location) throws
     -> tokens::WordToken *;
@@ -1531,8 +1575,16 @@ hot fn Parser::parse_case() throws -> Command *
     word = word_token_from_assignment(m_lexer.arena(),
                                       static_cast<Assignment *>(word));
   } else if (word->kind() != Token::Kind::Word) {
-    throw ErrorWithLocation{word->source_location(),
-                            "Expected a word to match on after 'case'"};
+    /* A keyword such as esac is the matched word when it sits in the word
+       slot, rebuilt from its source text the way the for and select names
+       take one. */
+    const String raw = word->raw_string();
+    if (KEYWORDS.find(raw.view()).has_value())
+      word = word_token_from_raw(m_lexer.arena(), raw.view(),
+                                 word->source_location());
+    else
+      throw ErrorWithLocation{word->source_location(),
+                              "Expected a word to match on after 'case'"};
   }
 
   Token *in_token = m_lexer.next_shell_token();
@@ -1676,11 +1728,16 @@ hot fn Parser::parse_paren_command() throws -> Command *
      parentheses, which is a nested subshell, so POSIX mode keeps the
      nested-subshell reading the way dash parses it, while the bash and the
      default mood take the arithmetic command, the same mood policy the array
-     literal follows. */
+     literal follows. A (( that closes with a lone ) at depth zero, such as
+     ((cmd; cmd); cmd), is a subshell whose first child is a subshell, the
+     same backoff bash performs, decided by a quote-aware scan of the raw
+     source before the arithmetic reading commits. */
   Token *next = m_lexer.peek_shell_token();
   ASSERT(next != nullptr);
   if (!m_lexer.is_posix_mode() && next->kind() == Token::Kind::LeftParen &&
-      next->source_location().position == open->source_location().position + 1)
+      next->source_location().position == open->source_location().position + 1 &&
+      double_paren_closes_adjacent(m_lexer.source(),
+                                   next->source_location().position + 1))
   {
     return parse_arithmetic_command(open);
   }

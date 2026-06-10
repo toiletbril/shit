@@ -237,6 +237,16 @@ fn EvalContext::append_indexed_array(StringView name,
   set_indexed_array(name, steal(values));
 }
 
+/* The set -u read and the ${name:?} report abort the whole run in bash too,
+   unlike the command-level errors the bash mood continues past, so their
+   throws carry the script-fatal mark. */
+[[noreturn]] static fn throw_script_fatal(String message) throws -> void
+{
+  let error = Error{message.view()};
+  error.set_script_fatal();
+  throw error;
+}
+
 /* The flat-map key for one sparse indexed element, the array name and the
    decimal index joined by a byte that cannot occur in a name. The map copies a
    key it stores, so the callers build this on the per-command scratch arena. */
@@ -2173,8 +2183,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          body, obeys set -u the same way a top level reference does, so an unset
          name here aborts rather than expanding to nothing. */
       if (m_error_unset && !get_variable_value(name).has_value())
-        throw Error{"Unable to expand '" + name +
-                    "' because the parameter is not set"};
+        throw_script_fatal("Unable to expand '" + name +
+                    "' because the parameter is not set");
       /* An ordinary name appends its stored value straight from the store, so
          the common reference pays no temporary String the way a synthesized
          special name would. */
@@ -2266,8 +2276,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
     {
       let const special_name = StringView{&next, 1};
       if (m_error_unset && !get_variable_value(special_name).has_value())
-        throw Error{"Unable to expand '" + special_name +
-                    "' because the parameter is not set"};
+        throw_script_fatal("Unable to expand '" + special_name +
+                    "' because the parameter is not set");
       emit_run(expand_variable(special_name), !in_double_quote);
       i++;
     } else {
@@ -2357,8 +2367,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 
     let const value = get_variable_value(name);
     if (m_error_unset && !value.has_value())
-      throw Error{"Unable to expand '" + name +
-                  "' because the parameter is not set"};
+      throw_script_fatal("Unable to expand '" + name +
+                  "' because the parameter is not set");
     return String{scratch_allocator(),
                   utils::uint_to_text(value.value_or(String{}).length())};
   }
@@ -2439,9 +2449,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
           case '?':
             if (treat_as_unset) {
               if (word.is_empty())
-                throw Error{"Unable to expand '" + name + "[" + subscript +
-                            "]' because the element is not set or is empty"};
-              throw Error{expand_modifier_word(word)};
+                throw_script_fatal("Unable to expand '" + name + "[" + subscript +
+                            "]' because the element is not set or is empty");
+              throw_script_fatal(expand_modifier_word(word));
             }
             return value;
           default: break;
@@ -2456,8 +2466,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
        while a form with a modifier such as ${x:-w} handles the unset case
        itself. */
     if (m_error_unset && !get_variable_value(name).has_value())
-      throw Error{"Unable to expand '" + name +
-                  "' because the parameter is not set"};
+      throw_script_fatal("Unable to expand '" + name +
+                  "' because the parameter is not set");
     return expand_variable(name);
   }
 
@@ -2534,9 +2544,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
   case '?':
     if (treat_as_unset) {
       if (word.is_empty())
-        throw Error{"Unable to expand '" + name +
-                    "' because the parameter is not set or is empty"};
-      throw Error{expand_modifier_word(word)};
+        throw_script_fatal("Unable to expand '" + name +
+                    "' because the parameter is not set or is empty");
+      throw_script_fatal(expand_modifier_word(word));
     }
     ASSERT(current.has_value());
     return String{scratch_allocator(), current->view()};
@@ -2586,8 +2596,8 @@ fn EvalContext::apply_substring_expansion(StringView name,
 {
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
-    throw Error{"Unable to expand '" + name +
-                "' because the parameter is not set"};
+    throw_script_fatal("Unable to expand '" + name +
+                "' because the parameter is not set");
   return apply_substring_to_value(current.value_or(String{}).view(), body);
 }
 
@@ -2692,8 +2702,8 @@ fn EvalContext::apply_pattern_replacement(StringView name,
 {
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
-    throw Error{"Unable to expand '" + name +
-                "' because the parameter is not set"};
+    throw_script_fatal("Unable to expand '" + name +
+                "' because the parameter is not set");
   return pattern_replace_value(current.value_or(String{}), spec);
 }
 
@@ -2801,8 +2811,8 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
 {
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
-    throw Error{"Unable to expand '" + name +
-                "' because the parameter is not set"};
+    throw_script_fatal("Unable to expand '" + name +
+                "' because the parameter is not set");
   return apply_case_modification_to_value(current.value_or(String{}).view(),
                                           spec);
 }
@@ -3137,13 +3147,13 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   const Maybe<String> target = get_variable_value(body);
   if (!target.has_value()) {
     if (m_error_unset)
-      throw Error{"Unable to expand '" + body +
-                  "' because the parameter is not set"};
+      throw_script_fatal("Unable to expand '" + body +
+                  "' because the parameter is not set");
     return String{scratch_allocator()};
   }
   if (m_error_unset && !get_variable_value(target->view()).has_value())
-    throw Error{"Unable to expand '" + *target +
-                "' because the parameter is not set"};
+    throw_script_fatal("Unable to expand '" + *target +
+                "' because the parameter is not set");
   return expand_variable(target->view());
 }
 
@@ -3359,7 +3369,13 @@ struct ConditionalEvaluator
 #else
         return os::is_fd_a_tty(static_cast<os::descriptor>(descriptor.value()));
 #endif
-      return false;
+      /* bash reports a non-integer -t operand as an error with status 2 and
+         goes on, so the throw carries that status for the command-level
+         catch. */
+      let error = Error{"Unable to test '-t " + operand +
+                        "' because the operand is not an integer"};
+      error.set_command_status(2);
+      throw error;
     }
     /* -o tests a shell option by name. Only the emacs line-editing option is
        reported, as on, since shit's interactive editing is emacs style. Every
@@ -3997,7 +4013,8 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
   return result;
 }
 
-fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
+fn EvalContext::expand_tilde(WordSegment &leading_segment,
+                             bool word_continues) const throws -> void
 {
   /* A tilde only expands when it is unquoted. An escaped or quoted tilde is a
      literal segment and stays as is. */
@@ -4013,6 +4030,26 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment) const throws -> void
   while (name_end < text.length() && text[name_end] != '/')
     name_end++;
   let const name = text.view().substring_of_length(1, name_end - 1);
+
+  /* A tilde prefix that runs to the segment's end while the word goes on in a
+     later segment carries a quoted or escaped character inside the prefix, so
+     bash leaves the whole word literal, the way ~ch\et and ~chet""/bar
+     stay as written. */
+  if (name_end == text.length() && word_continues) return;
+
+  /* ~+ is PWD and ~- is OLDPWD the way bash reads them, with an unset OLDPWD
+     leaving ~- literal. */
+  if (name == "+" || name == "-") {
+    let const directory =
+        get_variable_value(name == "+" ? StringView{"PWD"}
+                                       : StringView{"OLDPWD"});
+    if (!directory.has_value()) return;
+    let expanded_directory = String{heap_allocator()};
+    expanded_directory.append(directory->view());
+    expanded_directory.append(text.view().substring(name_end));
+    text = steal(expanded_directory);
+    return;
+  }
 
   /* An empty name is the bare ~, which expands to the current home. A named
      user resolves through the system database, and an unknown name leaves the
@@ -4825,7 +4862,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
       word.segments.front().text.first_character() == '~')
   {
     tilde_expanded_segments = word.segments;
-    expand_tilde(tilde_expanded_segments.front());
+    expand_tilde(tilde_expanded_segments.front(),
+                 tilde_expanded_segments.count() > 1);
     segments = &tilde_expanded_segments;
   }
 
@@ -5313,7 +5351,8 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
       word.segments.front().text.first_character() == '~')
   {
     tilde_expanded_segments = word.segments;
-    expand_tilde(tilde_expanded_segments.front());
+    expand_tilde(tilde_expanded_segments.front(),
+                 tilde_expanded_segments.count() > 1);
     segments = &tilde_expanded_segments;
   }
 
@@ -5351,7 +5390,8 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       word.segments.front().text.first_character() == '~')
   {
     tilde_expanded_segments = word.segments;
-    expand_tilde(tilde_expanded_segments.front());
+    expand_tilde(tilde_expanded_segments.front(),
+                 tilde_expanded_segments.count() > 1);
     segments = &tilde_expanded_segments;
   }
 
@@ -6711,7 +6751,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         expand_one_word(*word);
       }
     } catch (const Error &e) {
-      throw ErrorWithLocation{l, e.message()};
+      throw relocate_error(e, l);
     }
   }
 

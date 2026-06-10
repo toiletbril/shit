@@ -44,8 +44,32 @@ public:
      object rather than taking it as an argument. */
   virtual fn severity_word() const wontthrow -> String;
 
+  /* Renders the formatted message against the source the location indexes. The
+     base render ignores the source since a plain error carries no location, and
+     the located branch overrides it with the caret form, so a handler that
+     caught any ErrorBase prints the right shape without RTTI. */
+  virtual fn to_string(StringView source) const throws -> String;
+
+  /* bash fails the current command and goes on after most evaluation errors,
+     while a set -u read and a ${name:?} keep aborting the whole run. The flag
+     marks the aborting kind, and the status is what the failed command
+     reports, 1 for most errors and 2 for a [[ ]] operand error. A relocation
+     that rewraps an error must carry both over. */
+  fn set_script_fatal() wontthrow -> void { m_is_script_fatal = true; }
+  pure fn is_script_fatal() const wontthrow -> bool
+  {
+    return m_is_script_fatal;
+  }
+  fn set_command_status(i64 status) wontthrow -> void
+  {
+    m_command_status = status;
+  }
+  pure fn command_status() const wontthrow -> i64 { return m_command_status; }
+
 protected:
   bool m_is_active{false};
+  bool m_is_script_fatal{false};
+  i64 m_command_status{1};
   String m_message;
 };
 
@@ -56,6 +80,7 @@ public:
   Error(StringView message);
 
   fn to_string() const throws -> String;
+  using ErrorBase::to_string;
 
   /* Convert to the formatted message, so a call site passes an Error where a
      string is expected without spelling out to_string. */
@@ -141,6 +166,18 @@ public:
 
   fn severity_word() const wontthrow -> String override;
 };
+
+/* Rewraps a plain error at a source location, carrying the script-fatal mark
+   and the command status over, so a relocated set -u read still aborts and a
+   relocated [[ ]] operand error still reports its status. */
+inline fn relocate_error(const Error &error, SourceLocation location) throws
+    -> ErrorWithLocation
+{
+  let relocated = ErrorWithLocation{location, error.message().view()};
+  if (error.is_script_fatal()) relocated.set_script_fatal();
+  relocated.set_command_status(error.command_status());
+  return relocated;
+}
 
 class ErrorWithLocationAndDetails : public ErrorWithLocation
 {

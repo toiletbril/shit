@@ -363,10 +363,18 @@ static fn run_script_contents(const String &script_contents,
     exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
   } catch (const ErrorWithLocation &e) {
     show_message(e.to_string(script_contents));
-    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
+    /* bash exits 127 on the script-fatal expansion aborts, the set -u read
+       and the ${name:?} report, while POSIX follows dash with 2. */
+    exit_code = context.is_posix_mode() ? 2
+                : context.is_bash_compatible() && e.is_script_fatal()
+                    ? 127
+                    : EXIT_FAILURE;
   } catch (const Error &e) {
     show_message(e.to_string());
-    exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
+    exit_code = context.is_posix_mode() ? 2
+                : context.is_bash_compatible() && e.is_script_fatal()
+                    ? 127
+                    : EXIT_FAILURE;
   } catch (const std::exception &e) {
     show_message(
         "Uncaught exception while executing the AST. Aborting the command.");

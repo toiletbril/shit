@@ -584,7 +584,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
     return cxt.last_exit_status();
   } catch (const Error &e) {
-    throw ErrorWithLocation{source_location(), e.message()};
+    throw relocate_error(e, source_location());
   }
 }
 
@@ -1318,7 +1318,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     try {
       expanded_value = cxt.expand_word_for_assignment(var.value);
     } catch (const Error &e) {
-      throw ErrorWithLocation{source_location(), e.message()};
+      throw relocate_error(e, source_location());
     }
     /* The append form prepends the current value of NAME, which a prefix reads
        from the shell store before the environment so a non-exported shell
@@ -1717,22 +1717,39 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
        produced the status, not a status carried over from a short-circuited
        sibling. */
     bool did_execute = false;
+    /* In bash mood an evaluation error fails the command and the list goes
+       on, the way bash continues after a readonly assignment or a [[ ]]
+       operand error, while a script-fatal error, the set -u read and the
+       ${name:?} report, still aborts the run. The error renders to stderr
+       here since nothing above will see it. */
+    auto run_node = [&]() throws -> i64 {
+      try {
+        return n->evaluate(cxt);
+      } catch (const ErrorBase &error) {
+        if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
+        const String *source = cxt.current_source();
+        show_message(
+            error.to_string(source != nullptr ? source->view() : StringView{}));
+        cxt.set_last_exit_status(static_cast<i32>(error.command_status()));
+        return error.command_status();
+      }
+    };
     switch (n->kind()) {
     case CompoundListCondition::Kind::None:
-      ret = n->evaluate(cxt);
+      ret = run_node();
       did_execute = true;
       break;
 
     case CompoundListCondition::Kind::Or:
       if (ret != 0) {
-        ret = n->evaluate(cxt);
+        ret = run_node();
         did_execute = true;
       }
       break;
 
     case CompoundListCondition::Kind::And:
       if (ret == 0) {
-        ret = n->evaluate(cxt);
+        ret = run_node();
         did_execute = true;
       }
       break;
@@ -2782,7 +2799,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
         return cxt.expand_word_for_assignment(
             static_cast<const tokens::WordToken *>(t)->word());
       } catch (const Error &e) {
-        throw ErrorWithLocation{t->source_location(), e.message()};
+        throw relocate_error(e, t->source_location());
       }
     }
     return t->raw_string();
@@ -2990,7 +3007,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      */
     status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
   } catch (const Error &e) {
-    throw ErrorWithLocation{source_location(), e.message()};
+    throw relocate_error(e, source_location());
   }
   cxt.set_last_exit_status(static_cast<i32>(status));
   return status;
@@ -3041,7 +3058,7 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   try {
     value = cxt.evaluate_arithmetic(m_expression.view());
   } catch (const Error &e) {
-    throw ErrorWithLocation{source_location(), e.message()};
+    throw relocate_error(e, source_location());
   }
   const i64 status = value != 0 ? 0 : 1;
   cxt.set_last_exit_status(static_cast<i32>(status));
@@ -3257,9 +3274,30 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   i64 ret = 0;
   /* A diagnostic thrown by the body, such as a readonly violation or a missing
      command, must still restore the snapshot and leave the subshell, otherwise
-     the parent stays stuck in subshell mode with the inner state leaked. */
+     the parent stays stuck in subshell mode with the inner state leaked. In
+     bash mood a script-fatal error, the set -u read and the ${name:?} report,
+     ends only the subshell the way bash confines the abort to the child
+     process, reported here as status 1 the way bash answers it. */
   try {
     ret = m_body->evaluate(cxt);
+  } catch (const ErrorBase &error) {
+    /* A forked subshell would confine the abort to the child, so the snapshot
+       subshell confines a script-fatal error the same way in every mood,
+       status 1 the way bash answers it and 2 the way dash does, which the
+       default mood follows. */
+    if (error.is_script_fatal()) {
+      const String *source = cxt.current_source();
+      show_message(
+          error.to_string(source != nullptr ? source->view() : StringView{}));
+      ret = cxt.is_bash_compatible() ? 1 : 2;
+      cxt.set_last_exit_status(static_cast<i32>(ret));
+      cxt.clear_control_flow();
+    } else {
+      cxt.run_subshell_exit_trap();
+      cxt.leave_subshell();
+      cxt.restore_state(steal(snapshot));
+      throw;
+    }
   } catch (...) {
     cxt.run_subshell_exit_trap();
     cxt.leave_subshell();
