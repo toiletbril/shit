@@ -1235,6 +1235,10 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
 static fn word_token_from_assignment(BumpArena &arena, const Assignment *a)
     throws -> tokens::WordToken *;
 
+static fn word_token_from_raw(BumpArena &arena, StringView text,
+                              SourceLocation location) throws
+    -> tokens::WordToken *;
+
 hot fn Parser::parse_for() throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
@@ -1264,6 +1268,15 @@ hot fn Parser::parse_for() throws -> Command *
 
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
+  /* A keyword such as for names the loop variable when it sits in the name
+     slot, rebuilt into a word from its source text the way a case pattern takes
+     a keyword as a literal. */
+  if (name_token->kind() != Token::Kind::Word) {
+    const String raw = name_token->raw_string();
+    if (KEYWORDS.find(raw.view()).has_value())
+      name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
+                                       name_token->source_location());
+  }
   if (name_token->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
@@ -1316,7 +1329,17 @@ hot fn Parser::parse_for() throws -> Command *
                                               static_cast<Assignment *>(word)));
         continue;
       }
-      if (word->kind() != Token::Kind::Word) break;
+      if (word->kind() != Token::Kind::Word) {
+        /* A keyword such as function or time is an ordinary word in the list,
+           rebuilt from its source text the way a case pattern takes one. A
+           separator or operator that is not a keyword ends the list. */
+        const String raw = word->raw_string();
+        if (!KEYWORDS.find(raw.view()).has_value()) break;
+        m_lexer.advance_past_last_peek();
+        words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
+                                       word->source_location()));
+        continue;
+      }
       m_lexer.advance_past_last_peek();
       words.push(word);
     }
@@ -1372,6 +1395,15 @@ hot fn Parser::parse_select() throws -> Command *
 
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
+  /* A keyword such as for names the loop variable when it sits in the name
+     slot, rebuilt into a word from its source text the way a case pattern takes
+     a keyword as a literal. */
+  if (name_token->kind() != Token::Kind::Word) {
+    const String raw = name_token->raw_string();
+    if (KEYWORDS.find(raw.view()).has_value())
+      name_token = word_token_from_raw(m_lexer.arena(), raw.view(),
+                                       name_token->source_location());
+  }
   if (name_token->kind() != Token::Kind::Word) {
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'select'"};
@@ -1396,7 +1428,17 @@ hot fn Parser::parse_select() throws -> Command *
                                               static_cast<Assignment *>(word)));
         continue;
       }
-      if (word->kind() != Token::Kind::Word) break;
+      if (word->kind() != Token::Kind::Word) {
+        /* A keyword such as function or time is an ordinary word in the list,
+           rebuilt from its source text the way a case pattern takes one. A
+           separator or operator that is not a keyword ends the list. */
+        const String raw = word->raw_string();
+        if (!KEYWORDS.find(raw.view()).has_value()) break;
+        m_lexer.advance_past_last_peek();
+        words.push(word_token_from_raw(m_lexer.arena(), raw.view(),
+                                       word->source_location()));
+        continue;
+      }
       m_lexer.advance_past_last_peek();
       words.push(word);
     }
