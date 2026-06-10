@@ -2060,10 +2060,21 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A pipeline of only simple commands keeps the fast path, which wires the
      pipes once and forks each external directly with no extra subshell. A
      compound stage cannot run that way, so a pipeline that holds one takes the
-     fork-per-stage path. */
+     fork-per-stage path. A simple stage that carries a prefix assignment, such
+     as x=v cmd | cmd2, takes the fork path too, since the fast path builds the
+     stage from its argument words alone and the prefix must reach only that
+     stage's environment, which the per-stage fork applies in the child. */
   bool has_compound_stage = false;
   for (const Command *stage : m_commands) {
     if (!stage->is_simple_command()) {
+      has_compound_stage = true;
+      break;
+    }
+    /* A command-less stage of bare assignments keeps the fast path, whose
+       empty-expansion check reports it, so the strict diagnostic for x=1 | cat
+       is preserved. */
+    const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
+    if (!simple->local_vars().is_empty() && !simple->args().is_empty()) {
       has_compound_stage = true;
       break;
     }
