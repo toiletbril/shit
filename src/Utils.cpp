@@ -481,6 +481,14 @@ static fn skip_ascii_whitespace(StringView text, usize &offset) wontthrow -> voi
     offset++;
 }
 
+pure fn split_name_value_arg(StringView arg) wontthrow -> name_value_arg
+{
+  let const equals = arg.find_character('=');
+  if (!equals.has_value()) return name_value_arg{arg, None};
+  return name_value_arg{arg.substring_of_length(0, *equals),
+                        arg.substring(*equals + 1)};
+}
+
 fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
 {
   usize offset = 0;

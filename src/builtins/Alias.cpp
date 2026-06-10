@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 /* alias defines a command word replacement, or with no operand lists the
    replacements already defined. */
@@ -48,11 +49,10 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
-    let const equals_position = arg.find_character('=');
+    let const parts = utils::split_name_value_arg(arg);
 
-    if (equals_position.has_value()) {
-      cxt.set_alias(arg.substring_of_length(0, *equals_position),
-                    arg.substring(*equals_position + 1));
+    if (parts.value.has_value()) {
+      cxt.set_alias(parts.name, *parts.value);
     } else if (const Maybe<String> value = cxt.get_alias(arg)) {
       String message = "alias ";
       message += arg;

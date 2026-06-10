@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Utils.hpp"
 
 /* readonly marks a variable so a later assignment to it fails, or with no
    operand lists the variables already marked. */
@@ -50,15 +51,13 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
-    let const equals_position = arg.find_character('=');
+    let const parts = utils::split_name_value_arg(arg);
 
     /* An operand with an equals sign assigns the value first, then marks the
        name. A bare name marks whatever it currently holds. */
-    if (equals_position.has_value()) {
-      let const name = arg.substring_of_length(0, *equals_position);
-      let const value = arg.substring(*equals_position + 1);
-      cxt.set_shell_variable(name, value);
-      cxt.mark_readonly(name);
+    if (parts.value.has_value()) {
+      cxt.set_shell_variable(parts.name, *parts.value);
+      cxt.mark_readonly(parts.name);
     } else {
       cxt.mark_readonly(arg);
     }
