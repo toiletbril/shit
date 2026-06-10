@@ -638,7 +638,7 @@ public:
      isolated is true the run is contained in a snapshotted subshell so its cd,
      exports, and exit do not leak, and when false the run is the terminal command
      that the shell exits with, so the snapshot is skipped. */
-  fn run_mimicked_script(const ExecContext &ec, MimicMode mode, bool isolated)
+  fn run_mimicked_script(ExecContext &ec, MimicMode mode, bool isolated)
       throws -> i32;
   /* The extended globs are on everywhere except POSIX mode, the way bash treats
      a feature that POSIX rejects anyway as a pure addition. */

@@ -5306,7 +5306,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   return captured;
 }
 
-fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
+fn EvalContext::run_mimicked_script(ExecContext &ec, MimicMode mode,
                                     bool isolated) throws -> i32
 {
   if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
@@ -5320,10 +5320,17 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
     throw Error{"Unable to mimic '" + ec.program() +
                 "' because the script could not be read"};
 
-  /* A NUL byte marks a binary file rather than a text script, so it is reported
-     the way bash does for an unrunnable binary, with status 126, instead of
-     being parsed as shell source and spewing garbage commands. */
-  if (contents->view().find_character('\0').has_value()) {
+  /* A NUL byte in the leading bytes marks a binary file rather than a text
+     script, so it is reported the way bash does for an unrunnable binary, with
+     status 126, instead of being parsed as shell source and spewing garbage
+     commands. bash samples only the head, so a script carrying a NUL on a later
+     line still runs, and a binary's header NUL sits well inside this window. */
+  const usize binary_scan_limit = 128;
+  let const head = contents->view();
+  let const scan_length =
+      head.length < binary_scan_limit ? head.length : binary_scan_limit;
+  if (head.substring_of_length(0, scan_length).find_character('\0').has_value())
+  {
     shit::print_error("shit: " + ec.program_path().text() +
                       ": cannot execute binary file\n");
     return 126;
@@ -5382,6 +5389,11 @@ fn EvalContext::run_mimicked_script(const ExecContext &ec, MimicMode mode,
     for (usize i = saved_fds.count(); i > 0; i--)
       os::restore_descriptor(saved_fds[i - 1]);
   };
+  /* The descriptors carried on the context were dup'd onto the standard fds
+     above, so the originals are closed when this run ends. Nothing else owns
+     them, since this path replaces the fork-and-exec that would otherwise have
+     closed them, and close_fds resets each Maybe so a later close is a no-op. */
+  defer { ec.close_fds(); };
 
   let const render_error = [&](std::exception_ptr error) {
     try {
