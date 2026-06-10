@@ -1567,6 +1567,19 @@ fn trim_matching(StringView value, StringView pattern,
   return String{heap_allocator(), value};
 }
 
+/* The shared core of the # and % prefix and suffix trims, so the scalar
+   ${v#pat} and ${v%pat} cases and the array-element path expand the pattern with
+   its glob mask and run trim_matching through one place. */
+static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
+                                   StringView word, TrimEnd end,
+                                   bool longest) throws -> String
+{
+  let active = ArrayList<bool>{cxt.scratch_allocator()};
+  let const pattern = cxt.expand_modifier_word_masked(word, active);
+  return trim_matching(value, pattern.view(), active, end, longest,
+                       cxt.extglob_enabled());
+}
+
 } /* namespace */
 
 fn EvalContext::expand_modifier_word(StringView word, bool remove_quotes) throws
@@ -2086,19 +2099,13 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     return String{heap_allocator(), current->view()};
 
   case '#': {
-    let const value = current.value_or(String{});
-    let pattern_active = ArrayList<bool>{scratch_allocator()};
-    let const pattern = expand_modifier_word_masked(word, pattern_active);
-    return trim_matching(value.view(), pattern.view(), pattern_active,
-                         TrimEnd::Prefix, is_doubled, extglob_enabled());
+    return trim_value_with_modifier(*this, current.value_or(String{}).view(),
+                                    word, TrimEnd::Prefix, is_doubled);
   }
 
   case '%': {
-    let const value = current.value_or(String{});
-    let pattern_active = ArrayList<bool>{scratch_allocator()};
-    let const pattern = expand_modifier_word_masked(word, pattern_active);
-    return trim_matching(value.view(), pattern.view(), pattern_active,
-                         TrimEnd::Suffix, is_doubled, extglob_enabled());
+    return trim_value_with_modifier(*this, current.value_or(String{}).view(),
+                                    word, TrimEnd::Suffix, is_doubled);
   }
 
   default: return expand_variable(name);
@@ -2393,11 +2400,9 @@ fn EvalContext::apply_value_modifier(StringView value, StringView modifier) thro
   if (op == '#' || op == '%') {
     const bool is_doubled = modifier.length > 1 && modifier[1] == op;
     const StringView pattern_word = modifier.substring(is_doubled ? 2 : 1);
-    let pattern_active = ArrayList<bool>{scratch_allocator()};
-    let const pattern = expand_modifier_word_masked(pattern_word, pattern_active);
-    return trim_matching(value, pattern.view(), pattern_active,
-                         op == '#' ? TrimEnd::Prefix : TrimEnd::Suffix,
-                         is_doubled, extglob_enabled());
+    return trim_value_with_modifier(
+        *this, value, pattern_word,
+        op == '#' ? TrimEnd::Prefix : TrimEnd::Suffix, is_doubled);
   }
   return String{heap_allocator(), value};
 }
