@@ -3388,6 +3388,13 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_child != nullptr);
 
+  /* A <(...) or >(...) in a redirection target, as in done < <(cmd), opens a
+     pipe and forks a child or leaves a temp file during the expansion below. It
+     is reaped and its temp file deleted once the redirected command returns,
+     the way the simple command path does for a substitution in its words.
+     Registered first so it runs last, after the descriptor backups restore. */
+  defer { cxt.cleanup_process_substitutions(); };
+
   /* The child runs around saved descriptor backups that restore afterward, so
      it forks rather than replacing the shell. */
   cxt.set_terminal_exec_allowed(false);

@@ -1304,9 +1304,20 @@ fn close_fd(os::descriptor fd) wontthrow -> bool
 fn TempFileSet::track(Path path) throws -> void { m_paths.push(steal(path)); }
 fn TempFileSet::cleanup() wontthrow -> void
 {
-  for (const Path &path : m_paths)
-    DeleteFileA(path.c_str());
-  m_paths.clear();
+  /* A file the consuming command still holds open cannot be deleted yet, as when
+     a while loop reads it across iterations, so a failed delete keeps the path
+     and retries on the next cleanup once that descriptor closes, rather than
+     dropping it and leaking the file. */
+  usize kept = 0;
+  for (usize i = 0; i < m_paths.count(); i++) {
+    if (DeleteFileA(m_paths[i].c_str()) != FALSE)
+      continue;
+    if (kept != i)
+      m_paths[kept] = steal(m_paths[i]);
+    kept++;
+  }
+  while (m_paths.count() > kept)
+    m_paths.remove(m_paths.count() - 1);
 }
 
 /* A Windows handle is inherited per CreateProcess through the bInheritHandles
