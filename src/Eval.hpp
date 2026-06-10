@@ -9,6 +9,13 @@
 #include "Path.hpp"
 #include "ResolvedCommand.hpp"
 
+/* The [[ =~ ]] operator compiles its pattern with the POSIX regex API, so the
+   compiled-regex cache holds a regex_t. Windows has no regcomp, so the operator
+   and the cache are POSIX-only. */
+#if SHIT_PLATFORM_IS POSIX
+#include <regex.h>
+#endif
+
 namespace shit {
 
 /* A field is a candidate argument after variable expansion and field splitting.
@@ -234,6 +241,45 @@ struct completion_spec
   bool use_default{false};
 };
 
+#if SHIT_PLATFORM_IS POSIX
+/* Owns one compiled regex and frees it on destruction, so the regex cache
+   reclaims every entry when the table rehashes, clears, or is torn down. It is
+   move-only, since two owners would each regfree the same compiled buffer. */
+class CompiledRegex
+{
+public:
+  CompiledRegex() = default;
+  explicit CompiledRegex(regex_t compiled) : m_re(compiled), m_owns(true) {}
+  ~CompiledRegex()
+  {
+    if (m_owns) regfree(&m_re);
+  }
+  CompiledRegex(CompiledRegex &&other) noexcept
+      : m_re(other.m_re), m_owns(other.m_owns)
+  {
+    other.m_owns = false;
+  }
+  fn operator=(CompiledRegex &&other) noexcept -> CompiledRegex &
+  {
+    if (this != &other) {
+      if (m_owns) regfree(&m_re);
+      m_re = other.m_re;
+      m_owns = other.m_owns;
+      other.m_owns = false;
+    }
+    return *this;
+  }
+  CompiledRegex(const CompiledRegex &) = delete;
+  CompiledRegex &operator=(const CompiledRegex &) = delete;
+
+  fn get() wontthrow -> regex_t * { return &m_re; }
+
+private:
+  regex_t m_re{};
+  bool m_owns{false};
+};
+#endif
+
 class EvalContext
 {
 public:
@@ -352,6 +398,13 @@ public:
      associative subscript checks the key, and an indexed subscript checks that
      the arithmetic index is within the stored elements. */
   fn array_element_is_set(StringView name, StringView subscript) throws -> bool;
+
+#if SHIT_PLATFORM_IS POSIX
+  /* The compiled form of an extended regex, reused across matches so a hot =~
+     loop compiles each distinct pattern once. A bad pattern throws the same
+     invalid-regex error the inline regcomp raised. */
+  fn cached_compiled_regex(StringView pattern) throws -> regex_t *;
+#endif
 
   /* The subscripts of an array as a list, the indices of an indexed array or
      the keys of an associative one, backing both the joined ${!a[@]} string and
@@ -964,6 +1017,12 @@ protected:
      does not pad a huge dense gap. The name still reads as indexed. */
   HashMap<String> m_sparse_array_values{heap_allocator()};
   HashMap<bool> m_shopt_options{heap_allocator()};
+#if SHIT_PLATFORM_IS POSIX
+  /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
+     hot loop with a constant regex compiles it once and reuses it. The owning
+     wrapper frees each entry on teardown or eviction. */
+  HashMap<CompiledRegex> m_regex_cache{heap_allocator()};
+#endif
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
   String m_field_separators{" \t\n"};

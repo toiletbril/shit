@@ -3025,8 +3025,8 @@ struct ConditionalEvaluator
     /* A byte the mask marks inactive came from a quoted or escaped part of the
        right operand, so a regex metacharacter there is backslash-escaped to
        match itself, the way bash matches a quoted portion of the operand
-       literally. An active byte stays live regex. regcomp reads a C string, so
-       the escaped pattern is built null-terminated. */
+       literally. An active byte stays live regex. The escaped pattern is the
+       cache key, built null-terminated for the regcomp a miss runs. */
     let escaped_pattern = String{cxt.scratch_allocator()};
     for (usize i = 0; i < pattern.length; i++) {
       const bool is_literal = i < active.count() && !active[i];
@@ -3034,20 +3034,16 @@ struct ConditionalEvaluator
         escaped_pattern += '\\';
       escaped_pattern += pattern[i];
     }
+    /* The pattern compiles once and is reused on later matches through the
+       context cache, so a hot =~ loop pays regcomp only the first time. regexec
+       reads a C string, so the value is copied into a null-terminated buffer. */
+    regex_t *compiled = cxt.cached_compiled_regex(escaped_pattern.view());
     let const value_text = String{cxt.scratch_allocator(), value};
-    regex_t compiled;
-    if (regcomp(&compiled, escaped_pattern.c_str(), REG_EXTENDED) != 0) {
-      /* bash returns status 2 for a malformed regex, which the conditional
-         turns into an evaluation error. */
-      throw Error{"Unable to evaluate the [[ ]] because the regular expression "
-                  "is invalid"};
-    }
-    let const group_count = compiled.re_nsub + 1;
+    let const group_count = compiled->re_nsub + 1;
     let matches = ArrayList<regmatch_t>{cxt.scratch_allocator()};
     for (usize i = 0; i < group_count; i++) matches.push(regmatch_t{});
     const int match_result =
-        regexec(&compiled, value_text.c_str(), group_count, matches.begin(), 0);
-    regfree(&compiled);
+        regexec(compiled, value_text.c_str(), group_count, matches.begin(), 0);
     if (match_result != 0) {
       /* bash clears BASH_REMATCH on a non-match, so a later read does not see a
          prior match's captures. */
@@ -3285,6 +3281,34 @@ struct ConditionalEvaluator
 };
 
 } /* namespace */
+
+#if SHIT_PLATFORM_IS POSIX
+/* The most distinct regex patterns the cache holds before it is cleared, so a
+   pathological loop that builds a fresh pattern every iteration stays bounded
+   rather than growing the table without end. A real script reuses a handful. */
+static constexpr usize REGEX_CACHE_CAP = 128;
+
+fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
+{
+  if (CompiledRegex *cached = m_regex_cache.find(pattern))
+    return cached->get();
+
+  /* A bounded miss path. When the cache is full it is cleared whole, which frees
+     every compiled entry, rather than tracking a per-entry age. */
+  if (m_regex_cache.count() >= REGEX_CACHE_CAP) m_regex_cache.clear();
+
+  let const pattern_text = String{scratch_allocator(), pattern};
+  regex_t compiled;
+  if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
+    /* bash returns status 2 for a malformed regex, which the conditional turns
+       into an evaluation error. */
+    throw Error{"Unable to evaluate the [[ ]] because the regular expression "
+                "is invalid"};
+  }
+  m_regex_cache.set(pattern, CompiledRegex{compiled});
+  return m_regex_cache.find(pattern)->get();
+}
+#endif
 
 fn EvalContext::evaluate_conditional(
     const ArrayList<conditional_element> &elements) throws -> bool
