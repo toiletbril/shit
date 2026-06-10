@@ -1254,7 +1254,8 @@ namespace shit {
 
 namespace os {
 
-fn write_fd(os::descriptor fd, const void *buf, usize size) -> Maybe<usize>
+fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow
+    -> Maybe<usize>
 {
   DWORD w = -1;
   if (WriteFile(fd, buf, size, &w, 0) == FALSE) /* NOLINT */
@@ -1262,7 +1263,7 @@ fn write_fd(os::descriptor fd, const void *buf, usize size) -> Maybe<usize>
   return static_cast<usize>(w);
 }
 
-fn read_fd(os::descriptor fd, void *buf, usize size) -> Maybe<usize>
+fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow -> Maybe<usize>
 {
   DWORD r = -1;
   if (ReadFile(fd, buf, size, &r, 0) == FALSE) /* NOLINT */
@@ -1270,16 +1271,25 @@ fn read_fd(os::descriptor fd, void *buf, usize size) -> Maybe<usize>
   return static_cast<usize>(r);
 }
 
-fn close_fd(os::descriptor fd) -> bool { return CloseHandle(fd); }
+fn close_fd(os::descriptor fd) wontthrow -> bool
+{
+  return CloseHandle(fd) != FALSE;
+}
 
-fn redirect_stdout(os::descriptor target) -> os::descriptor
+/* A Windows handle is inherited per CreateProcess through the bInheritHandles
+   flag and the handle's own inherit bit set at creation, not per descriptor the
+   way the POSIX close-on-exec bit is cleared, so this is a no-op that keeps the
+   one call site in the expansion path portable. */
+fn make_fd_inheritable(os::descriptor fd) wontthrow -> void { unused(fd); }
+
+fn redirect_stdout(os::descriptor target) wontthrow -> os::descriptor
 {
   os::descriptor saved = GetStdHandle(STD_OUTPUT_HANDLE);
   SetStdHandle(STD_OUTPUT_HANDLE, target);
   return saved;
 }
 
-fn restore_stdout(os::descriptor saved) -> void
+fn restore_stdout(os::descriptor saved) wontthrow -> void
 {
   SetStdHandle(STD_OUTPUT_HANDLE, saved);
 }
@@ -1297,7 +1307,7 @@ static fn std_handle_slot_for_shell_fd(i32 shell_fd) -> Maybe<DWORD>
   }
 }
 
-fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target)
+fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     -> saved_descriptor
 {
   saved_descriptor result{};
@@ -1323,21 +1333,21 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target)
   return result;
 }
 
-fn restore_descriptor(const saved_descriptor &saved) -> void
+fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(saved.shell_fd);
   if (!slot.has_value()) return;
   if (saved.was_open) SetStdHandle(*slot, saved.saved);
 }
 
-fn descriptor_for_shell_fd(i32 shell_fd) -> os::descriptor
+fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return SHIT_INVALID_FD;
   return GetStdHandle(*slot);
 }
 
-fn replace_descriptor(i32 shell_fd, os::descriptor target) -> bool
+fn replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow -> bool
 {
   /* Windows addresses only the three standard streams, so a higher descriptor
      number has no slot to point at target. */
@@ -1348,14 +1358,14 @@ fn replace_descriptor(i32 shell_fd, os::descriptor target) -> bool
   return true;
 }
 
-fn close_shell_fd(i32 shell_fd) -> bool
+fn close_shell_fd(i32 shell_fd) wontthrow -> bool
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) return false;
   const os::descriptor handle = GetStdHandle(*slot);
   SetStdHandle(*slot, INVALID_HANDLE_VALUE);
   if (handle == INVALID_HANDLE_VALUE) return false;
-  return CloseHandle(handle);
+  return CloseHandle(handle) != FALSE;
 }
 
 fn get_current_user() -> Maybe<String>
@@ -1405,25 +1415,39 @@ fn enumerate_users() throws -> ArrayList<String> { return ArrayList<String>{}; }
 
 static const DWORD PARENT_SHELL_PID = GetCurrentProcessId();
 
-fn is_child_process() -> bool
+fn is_child_process() wontthrow -> bool
 {
   return GetCurrentProcessId() != PARENT_SHELL_PID;
 }
 
-fn get_shell_process_id() -> i64 { return static_cast<i64>(PARENT_SHELL_PID); }
+fn get_shell_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(PARENT_SHELL_PID);
+}
 
 /* Windows has no setuid or setgid notion, so the shell is never privileged in
    this sense and always reads its config. */
 fn is_running_setuid() wontthrow -> bool { return false; }
 
-fn process_id_of(process p) -> i64 { return static_cast<i64>(GetProcessId(p)); }
+fn process_id_of(process p) wontthrow -> i64
+{
+  return static_cast<i64>(GetProcessId(p));
+}
 
-fn is_stdin_a_tty() -> bool { return _isatty(_fileno(stdin)); }
+fn is_stdin_a_tty() wontthrow -> bool { return _isatty(_fileno(stdin)) != 0; }
 
-fn is_stdout_a_tty() -> bool { return _isatty(_fileno(stdout)); }
+fn is_stdout_a_tty() wontthrow -> bool { return _isatty(_fileno(stdout)) != 0; }
 
-fn is_stderr_a_tty() -> bool { return _isatty(_fileno(stderr)); }
-fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return _isatty(fd); }
+fn is_stderr_a_tty() wontthrow -> bool { return _isatty(_fileno(stderr)) != 0; }
+
+/* A Windows descriptor is a HANDLE, so the C runtime descriptor number that
+   _isatty wants is recovered from it before the tty check. */
+fn is_fd_a_tty(descriptor fd) wontthrow -> bool
+{
+  const int crt_fd = _open_osfhandle(reinterpret_cast<intptr_t>(fd), 0);
+  if (crt_fd == -1) return false;
+  return _isatty(crt_fd) != 0;
+}
 
 fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
 {
@@ -1527,8 +1551,11 @@ fn execute_program(ExecContext &&ec) -> process
                          HANDLE_FLAG_INHERIT);
   }
 
-  if (CreateProcessA(ec.program_path().c_str(), command_line.data(), nullptr,
-                     nullptr, needs_handles, 0, nullptr, nullptr, &startup_info,
+  /* CreateProcessA may rewrite lpCommandLine in place, so the owned buffer is
+     handed over as a mutable pointer rather than a const view. */
+  if (CreateProcessA(ec.program_path().c_str(),
+                     const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
+                     needs_handles, 0, nullptr, nullptr, &startup_info,
                      &process_info) == 0)
   {
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
@@ -1549,7 +1576,7 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
       "A compound command in a pipeline is not supported on this platform"};
 }
 
-[[noreturn]] fn exit_process_immediately(i32 status) -> void
+[[noreturn]] fn exit_process_immediately(i32 status) wontthrow -> void
 {
   ExitProcess(static_cast<UINT>(status));
   unreachable();
@@ -1584,7 +1611,7 @@ fn redirect_self(const ExecContext &ec) -> void
     SetStdHandle(STD_ERROR_HANDLE, duplicate);
 }
 
-fn make_pipe() -> Maybe<Pipe>
+fn make_pipe() wontthrow -> Maybe<Pipe>
 {
   SECURITY_ATTRIBUTES att{};
 
@@ -1625,7 +1652,8 @@ fn thread_trampoline(LPVOID raw_context) -> DWORD
   return 0;
 }
 
-fn start_thread(void (*entry)(void *), void *context) -> Maybe<thread>
+fn start_thread(void (*entry)(void *), void *context) wontthrow
+    -> Maybe<thread>
 {
   let const start = new thread_start_context{entry, context};
   HANDLE handle =
@@ -1637,7 +1665,7 @@ fn start_thread(void (*entry)(void *), void *context) -> Maybe<thread>
   return thread{handle};
 }
 
-fn join_thread(thread t) -> void
+fn join_thread(thread t) wontthrow -> void
 {
   WaitForSingleObject(t.handle, INFINITE);
   CloseHandle(t.handle);
@@ -1706,14 +1734,17 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   return handle;
 }
 
-fn get_file_creation_mask() -> u32
+fn get_file_creation_mask() wontthrow -> u32
 {
   int old = _umask(0);
   _umask(old);
   return static_cast<u32>(old);
 }
 
-fn set_file_creation_mask(u32 mask) -> void { _umask(static_cast<int>(mask)); }
+fn set_file_creation_mask(u32 mask) wontthrow -> void
+{
+  _umask(static_cast<int>(mask));
+}
 
 fn wait_and_monitor_process(process p) -> i32
 {
@@ -1739,7 +1770,7 @@ fn reap_process_quietly(process p) -> i32
   return static_cast<i32>(code);
 }
 
-fn poll_process(process p, i32 &status_out) -> process_state
+fn poll_process(process p, i32 &status_out) wontthrow -> process_state
 {
   /* Windows has no stopped state, so a process is either alive or finished. */
   DWORD code = 0;
@@ -1752,7 +1783,7 @@ fn poll_process(process p, i32 &status_out) -> process_state
   return process_state::Exited;
 }
 
-fn signal_process(process p, i32 signal_number) -> bool
+fn signal_process(process p, i32 signal_number) wontthrow -> bool
 {
   /* Windows cannot deliver a POSIX signal, so only a terminate is honored and a
      resume or a stop is a no-op the caller treats as unsupported. */
@@ -1761,7 +1792,7 @@ fn signal_process(process p, i32 signal_number) -> bool
   return false;
 }
 
-fn process_from_pid(i64 pid) -> process
+fn process_from_pid(i64 pid) wontthrow -> process
 {
   return OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE |
                          PROCESS_QUERY_INFORMATION,
@@ -2085,8 +2116,11 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 
   const u64 start_nanos = monotonic_nanos();
 
-  if (CreateProcessA(nullptr, mutable_command_line.data(), nullptr, nullptr,
-                     TRUE, 0, nullptr, nullptr, &startup, &process_info) == 0)
+  /* CreateProcessA may rewrite lpCommandLine in place, so the owned buffer is
+     handed over as a mutable pointer rather than a const view. */
+  if (CreateProcessA(nullptr, const_cast<LPSTR>(mutable_command_line.data()),
+                     nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
+                     &process_info) == 0)
     return None;
 
   WaitForSingleObject(process_info.hProcess, INFINITE);

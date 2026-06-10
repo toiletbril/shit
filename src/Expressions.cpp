@@ -973,7 +973,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           shit::flush();
           const os::descriptor body_fd = opened.take();
           os::replace_descriptor(redir.fd, body_fd);
+#if SHIT_PLATFORM_IS WIN32
+          /* A Windows descriptor is a HANDLE, so the staged body is compared
+             against the handle that already occupies the shell slot rather than
+             against the bare fd number. */
+          if (body_fd != os::descriptor_for_shell_fd(redir.fd))
+            os::close_fd(body_fd);
+#else
           if (body_fd != redir.fd) os::close_fd(body_fd);
+#endif
           continue;
         }
 
@@ -995,7 +1003,16 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            open on N after the command, so the collision is handled directly.
            The restore closes fd N, which fd N was free before mkstemp claimed
            it makes correct. */
-        if (body_fd == redir.fd) {
+#if SHIT_PLATFORM_IS WIN32
+        /* A Windows descriptor is a HANDLE, so the staged body never shares the
+           identity of a bare fd number the way a POSIX mkstemp descriptor can,
+           and the save then replace path always runs. */
+        const bool body_is_target_fd =
+            body_fd == os::descriptor_for_shell_fd(redir.fd);
+#else
+        const bool body_is_target_fd = body_fd == redir.fd;
+#endif
+        if (body_is_target_fd) {
           dup_saved_descriptors.push(
               os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
           continue;
@@ -1116,7 +1133,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (is_bare_exec) {
         shit::flush();
         const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
+#if SHIT_PLATFORM_IS WIN32
+        /* A Windows descriptor is a HANDLE, so the opened file is compared
+           against the handle that now occupies the shell slot rather than
+           against the bare fd number. */
+        if (file_fd != os::descriptor_for_shell_fd(redir.fd))
+          os::close_fd(file_fd);
+#else
         if (file_fd != redir.fd) os::close_fd(file_fd);
+#endif
         if (!was_replaced) {
           redirection_open_failed = true;
           throw ErrorWithLocation{redir.target->source_location(),
@@ -1137,7 +1162,15 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
          such as 3>file, takes the same in-order path the numbered heredoc and
          the compound redirect path use. */
       if (redir.fd == 1 || redir.fd == 2) shit::flush();
-      if (file_fd == redir.fd) {
+#if SHIT_PLATFORM_IS WIN32
+      /* A Windows descriptor is a HANDLE, so the opened file never shares the
+         identity of a bare fd number and the save then replace path runs. */
+      const bool file_is_target_fd =
+          file_fd == os::descriptor_for_shell_fd(redir.fd);
+#else
+      const bool file_is_target_fd = file_fd == redir.fd;
+#endif
+      if (file_is_target_fd) {
         /* open returned fd N itself, since fd N was the lowest free descriptor,
            so the file already sits on its target. The generic save then dup2
            would back up the file and the close would shut fd N, leaving the

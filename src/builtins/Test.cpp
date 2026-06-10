@@ -4,6 +4,11 @@
 #include "../Path.hpp"
 #include "../Utils.hpp"
 
+/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test. */
+#if SHIT_PLATFORM_IS WIN32
+#include <io.h>
+#endif
+
 namespace shit {
 
 namespace {
@@ -70,7 +75,14 @@ public:
       if (!parse_integer(operand.view(), file_descriptor)) return false;
       /* Any descriptor is checked, not only the standard three, since a config
          dups the controlling terminal onto a higher descriptor and tests it. */
+#if SHIT_PLATFORM_IS WIN32
+      /* A Windows descriptor is a HANDLE, so the shell fd number is mapped to
+         its C runtime handle before the tty check. */
+      return os::is_fd_a_tty(reinterpret_cast<os::descriptor>(
+          _get_osfhandle(static_cast<int>(file_descriptor))));
+#else
       return os::is_fd_a_tty(static_cast<os::descriptor>(file_descriptor));
+#endif
     }
     fail(StringView{"Unable to evaluate the test because '"} + op +
          "' is not a known unary operator, expected one of -z -n -e -f -d -s -r "

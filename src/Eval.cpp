@@ -27,6 +27,11 @@
 #include <regex.h>
 #endif
 
+/* _get_osfhandle maps a shell fd number to its Windows handle for the -t test. */
+#if SHIT_PLATFORM_IS WIN32
+#include <io.h>
+#endif
+
 namespace shit {
 
 EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
@@ -2959,8 +2964,15 @@ struct ConditionalEvaluator
     if (op == "-t") {
       if (ErrorOr<i64> descriptor = utils::parse_decimal_integer(operand);
           !descriptor.is_error())
+#if SHIT_PLATFORM_IS WIN32
+        /* A Windows descriptor is a HANDLE, so the shell fd number is mapped to
+           its C runtime handle before the tty check. */
+        return os::is_fd_a_tty(reinterpret_cast<os::descriptor>(
+            _get_osfhandle(static_cast<int>(descriptor.value()))));
+#else
         return os::is_fd_a_tty(
             static_cast<os::descriptor>(descriptor.value()));
+#endif
       return false;
     }
     /* -o tests a shell option by name. Only the emacs line-editing option is
@@ -5053,7 +5065,16 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
       process_substitution{shell_fd, child, location, source});
 
   let path = String{"/dev/fd/"};
+#if SHIT_PLATFORM_IS WIN32
+  /* A Windows descriptor is a HANDLE, so its pointer value is widened through an
+     integer of pointer width before it names the /dev/fd entry. This path is
+     unreachable on Windows since fork_compound_stage above throws first, but it
+     must still compile. */
+  path += utils::int_to_text(
+      static_cast<i64>(reinterpret_cast<intptr_t>(shell_fd)));
+#else
   path += utils::int_to_text(static_cast<i64>(shell_fd));
+#endif
   return path;
 }
 

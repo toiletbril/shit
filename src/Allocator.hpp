@@ -6,6 +6,10 @@
 #include <cstring>
 #include <new>
 
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
+
 namespace shit {
 
 /* Forward declared, so the allocator header does not include the arena header,
@@ -116,7 +120,13 @@ inline fn heap_alloc(void *context, usize length, usize alignment) wontthrow
      that is a multiple of the alignment, so the length is rounded up. */
   if (alignment > alignof(max_align_t)) {
     let const rounded_length = (length + alignment - 1) & ~(alignment - 1);
+#if defined(_WIN32)
+    /* Windows has no aligned_alloc, and an _aligned_malloc result must be freed
+       with _aligned_free, so the free path mirrors this branch on alignment. */
+    return _aligned_malloc(rounded_length, alignment);
+#else
     return std::aligned_alloc(alignment, rounded_length);
+#endif
   }
   return std::malloc(length);
 }
@@ -135,6 +145,14 @@ inline fn heap_free(void *context, void *pointer, usize length,
 {
   unused(context);
   unused(length);
+#if defined(_WIN32)
+  /* An over-aligned block came from _aligned_malloc, so it is freed with the
+     matching _aligned_free rather than free. */
+  if (alignment > alignof(max_align_t)) {
+    _aligned_free(pointer);
+    return;
+  }
+#endif
   unused(alignment);
   std::free(pointer);
 }
