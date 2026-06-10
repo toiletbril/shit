@@ -105,6 +105,17 @@ static pure fn is_in_command_position(StringView line,
   }
 }
 
+/* A glob-active mask with every position set, for an unquoted completion token
+   whose every byte is a live glob metacharacter. */
+static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
+{
+  let mask = ArrayList<bool>{};
+  mask.reserve(length);
+  for (usize i = 0; i < length; i++)
+    mask.push(true);
+  return mask;
+}
+
 /* A command-position token matches a command name either by carrying it as a
    plain prefix or, when the token holds a glob metacharacter, by matching it as
    a glob pattern. The shell offers command names rather than cwd entries for a
@@ -114,10 +125,7 @@ static fn command_name_matches(StringView name, StringView token,
 {
   if (!token_is_glob) return name.starts_with(token);
 
-  let glob_active = ArrayList<bool>{};
-  glob_active.reserve(token.length);
-  for (usize i = 0; i < token.length; i++)
-    glob_active.push(true);
+  let const glob_active = all_active_glob_mask(token.length);
   return utils::glob_matches(token, name, glob_active, 0);
 }
 
@@ -373,10 +381,7 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
 
   /* Every byte of the basename pattern is an active glob position, since the
      completion token is unquoted. */
-  let glob_active = ArrayList<bool>{};
-  glob_active.reserve(parts.basename_part.length);
-  for (usize i = 0; i < parts.basename_part.length; i++)
-    glob_active.push(true);
+  let const glob_active = all_active_glob_mask(parts.basename_part.length);
 
   for (const String &entry : *entries) {
     /* A dotfile only matches a pattern the user began with a dot, the way the
