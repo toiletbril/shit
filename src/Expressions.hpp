@@ -84,6 +84,13 @@ public:
   virtual ~Expression() = default;
 
   pure fn source_location() const wontthrow -> SourceLocation;
+  /* The byte just past this node's source text. It defaults to the end of the
+     opening token that source_location names, and a compound node whose source
+     runs to a closing token, such as a brace group's '}', sets it to that
+     token's end so the whole node's source span can be recovered without
+     widening source_location, which the error caret reads. */
+  pure fn source_end_position() const wontthrow -> usize;
+  fn set_source_end_position(usize position) wontthrow -> void;
   /* Expressions should override evaluate_impl() instead. This method is used
    * mainly for initialization before the actual evaluation. */
   fn evaluate(EvalContext &cxt) const throws -> i64;
@@ -144,6 +151,7 @@ protected:
   virtual fn evaluate_impl(EvalContext &cxt) const throws -> i64 = 0;
 
   SourceLocation m_location;
+  usize m_source_end_position;
 };
 
 namespace expressions {

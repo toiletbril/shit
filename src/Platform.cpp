@@ -1651,17 +1651,59 @@ fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
   return result;
 }
 
+fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
+                        Maybe<descriptor> out_fd, bool bash_compatible) throws
+    -> Maybe<process>
+{
+  /* A compound stage of a pipeline, such as the brace group in { a; b; } | c,
+     runs in a fresh shell that re-parses the stage's source, since Windows has
+     no fork to clone the in-memory state. The pipe ends are wired as the new
+     shell's standard input and output. The process is returned unwaited so the
+     pipeline reaps it the way it reaps a forked stage. The fresh shell inherits
+     the environment but not the parent's functions or unexported variables. */
+  char module_path[MAX_PATH];
+  if (GetModuleFileNameA(nullptr, module_path, MAX_PATH) == 0) return shit::None;
+
+  let arguments = ArrayList<String>{heap_allocator()};
+  arguments.push(String{heap_allocator(), StringView{module_path}});
+  if (bash_compatible)
+    arguments.push(String{heap_allocator(), StringView{"--bash-compatible"}});
+  arguments.push(String{heap_allocator(), StringView{"-c"}});
+  arguments.push(String{heap_allocator(), source});
+  let command_line = make_os_args(arguments);
+
+  STARTUPINFOA startup_info{};
+  startup_info.cb = sizeof(startup_info);
+  startup_info.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.hStdInput = in_fd ? *in_fd : GetStdHandle(STD_INPUT_HANDLE);
+  startup_info.hStdOutput = out_fd ? *out_fd : GetStdHandle(STD_OUTPUT_HANDLE);
+  startup_info.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  SetHandleInformation(startup_info.hStdInput, HANDLE_FLAG_INHERIT,
+                       HANDLE_FLAG_INHERIT);
+  SetHandleInformation(startup_info.hStdOutput, HANDLE_FLAG_INHERIT,
+                       HANDLE_FLAG_INHERIT);
+  SetHandleInformation(startup_info.hStdError, HANDLE_FLAG_INHERIT,
+                       HANDLE_FLAG_INHERIT);
+
+  PROCESS_INFORMATION process_info{};
+  if (CreateProcessA(module_path, const_cast<LPSTR>(command_line.data()),
+                     nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup_info,
+                     &process_info) == 0)
+    return shit::None;
+  CloseHandle(process_info.hThread);
+  return process_info.hProcess;
+}
+
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                        Maybe<descriptor> err_fd) -> process
 {
   unused(in_fd);
   unused(out_fd);
   unused(err_fd);
-  /* Windows has no fork, so a compound command cannot run as a separate process
-     stage of a pipeline. A re-exec of the stage's source would work the way the
-     process substitution does, but it needs the stage's full source span, which
-     the AST tracks only as the opening token, so the stage stays unsupported
-     until a compound node carries its end position. */
+  /* Windows has no fork. A compound stage whose source span is known re-execs
+     through spawn_subshell_stage, so this throw is reached only for a stage type
+     whose end position the parser does not yet record, such as an if or case
+     used as a pipeline stage. */
   throw shit::Error{
       "A compound command in a pipeline is not supported on this platform"};
 }

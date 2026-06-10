@@ -24,11 +24,24 @@ static fn indent_for_layer(usize layer) throws -> String
   return pad;
 }
 
-Expression::Expression(SourceLocation location) : m_location(steal(location)) {}
+Expression::Expression(SourceLocation location)
+    : m_location(location),
+      m_source_end_position(location.position + location.length)
+{}
 
 pure fn Expression::source_location() const wontthrow -> SourceLocation
 {
   return m_location;
+}
+
+pure fn Expression::source_end_position() const wontthrow -> usize
+{
+  return m_source_end_position;
+}
+
+fn Expression::set_source_end_position(usize position) wontthrow -> void
+{
+  m_source_end_position = position;
 }
 
 cold fn Expression::to_ast_string(usize layer) const throws -> String
@@ -1881,6 +1894,31 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       }
       if (!is_first) stage_in = last_stdin;
 
+#if SHIT_PLATFORM_IS WIN32
+      /* Windows has no fork. A stage whose full source span the parser recorded
+         re-execs in a fresh shell with the pipe ends as its standard input and
+         output. A stage without a recorded span, an if or a case, falls through
+         to fork_compound_stage, which reports it unsupported. */
+      const SourceLocation stage_location = stage->source_location();
+      const String *stage_source = cxt.current_source();
+      os::process child = SHIT_INVALID_PROCESS;
+      if (stage_source != nullptr &&
+          stage->source_end_position() >
+              stage_location.position + stage_location.length)
+      {
+        const StringView stage_text = stage_source->view().substring_of_length(
+            stage_location.position,
+            stage->source_end_position() - stage_location.position);
+        Maybe<os::process> spawned_stage = os::spawn_subshell_stage(
+            stage_text, stage_in, stage_out, cxt.is_bash_compatible());
+        if (!spawned_stage.has_value())
+          throw ErrorWithLocation{stage_location,
+                                  "Could not spawn the compound pipeline stage"};
+        child = *spawned_stage;
+      } else {
+        child = os::fork_compound_stage(stage_in, stage_out, {});
+      }
+#else
       const os::process child =
           os::fork_compound_stage(stage_in, stage_out, {});
 
@@ -1912,6 +1950,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
         shit::flush();
         os::exit_process_immediately(stage_status);
       }
+#endif
 
       /* The parent keeps neither pipe end open past the stage that owns it,
          otherwise a reader never sees the writer close. */

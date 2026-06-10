@@ -395,6 +395,16 @@ fn execute_program(ExecContext &&ec) throws -> process;
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                        Maybe<descriptor> err_fd) throws -> process;
 
+#if SHIT_PLATFORM_IS WIN32
+/* Run a compound pipeline stage on a platform with no fork by spawning a fresh
+   shell that re-parses the stage's source, with the pipe ends wired as its
+   standard input and output. The process is returned unwaited so the pipeline
+   reaps it like a forked stage. Windows only. */
+fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
+                        Maybe<descriptor> out_fd, bool bash_compatible) throws
+    -> Maybe<process>;
+#endif
+
 /* Terminate the current process at once with status, skipping the normal
    unwinding. A forked pipeline-stage child calls this after it evaluates its
    command so it never runs the parent's cleanup or unwinds back into the shared

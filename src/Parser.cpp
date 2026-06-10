@@ -1229,7 +1229,11 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
                        done_token->source_location());
   }
 
-  return m_lexer.arena().create<WhileLoop>(location, condition, body, is_until);
+  let loop =
+      m_lexer.arena().create<WhileLoop>(location, condition, body, is_until);
+  const SourceLocation done_location = done_token->source_location();
+  loop->set_source_end_position(done_location.position + done_location.length);
+  return loop;
 }
 
 static fn word_token_from_assignment(BumpArena &arena, const Assignment *a)
@@ -1379,8 +1383,11 @@ hot fn Parser::parse_for() throws -> Command *
                        "done", done_token->source_location());
   }
 
-  return m_lexer.arena().create<ForLoop>(location, variable_name.view(),
-                                         steal(words), has_in_clause, body);
+  let loop = m_lexer.arena().create<ForLoop>(location, variable_name.view(),
+                                             steal(words), has_in_clause, body);
+  const SourceLocation done_location = done_token->source_location();
+  loop->set_source_end_position(done_location.position + done_location.length);
+  return loop;
 }
 
 /* A bash select loop, select name in words; do BODY; done. It shares the for
@@ -1650,7 +1657,12 @@ hot fn Parser::parse_brace_group() throws -> Command *
                        m_lexer.source(), "}", close->source_location());
   }
 
-  return m_lexer.arena().create<BraceGroup>(open->source_location(), body);
+  BraceGroup *group =
+      m_lexer.arena().create<BraceGroup>(open->source_location(), body);
+  const SourceLocation close_location = close->source_location();
+  group->set_source_end_position(close_location.position +
+                                 close_location.length);
+  return group;
 }
 
 /* A parenthesis in command position opens either a subshell or, when a second
@@ -1690,7 +1702,12 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
                                       close->source_location(), "Expected ')'"};
   }
 
-  return m_lexer.arena().create<Subshell>(open->source_location(), body);
+  let subshell =
+      m_lexer.arena().create<Subshell>(open->source_location(), body);
+  const SourceLocation close_location = close->source_location();
+  subshell->set_source_end_position(close_location.position +
+                                    close_location.length);
+  return subshell;
 }
 
 /* Read the body of a (( )) construct. The first parenthesis is already consumed
