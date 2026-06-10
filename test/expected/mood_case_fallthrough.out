@@ -1,0 +1,154 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign fall=]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign fall+=two]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign fall+=three]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign fall+=default]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "fall=$fall"]
+  [CompoundListCondition, None]
+    [Assign marks=]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign marks+=3]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign marks+=x]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "marks=$marks"]
+[Word
+  Unquoted "fall="
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "fall+="
+  DoubleQuoted "one"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "fall+="
+  DoubleQuoted "two"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "fall+="
+  DoubleQuoted "three"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "fall+="
+  DoubleQuoted "default"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "fall="
+  Variable "fall"
+]
+[Word
+  Unquoted "marks="
+  DoubleQuoted ""
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "h*"
+]
+[Word
+  Unquoted "marks+="
+  DoubleQuoted "1"
+]
+[Word
+  Unquoted "*o"
+]
+[Word
+  Unquoted "marks+="
+  DoubleQuoted "2"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "marks+="
+  DoubleQuoted "3"
+]
+[Word
+  Unquoted "*"
+]
+[Word
+  Unquoted "marks+="
+  DoubleQuoted "x"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "marks="
+  Variable "marks"
+]
+fall=onetwo
+marks=123
+[Code 0]

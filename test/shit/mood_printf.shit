@@ -1,0 +1,11 @@
+#!/bin/env shit
+# printf with the bash q and b conversions and width in the default mood.
+printf '%q\n' 'a b'
+printf '%q\n' 'a$b;c'
+printf '%q\n' ''
+printf '%b\n' 'x\ty\n'
+printf '[%d]' 1 2 3; echo
+printf '%5d|%-5d|%05d\n' 42 42 42
+printf '%X %o %c\n' 255 8 65
+printf -v captured '%04d' 7
+echo "captured=$captured"

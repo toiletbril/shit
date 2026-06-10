@@ -1,0 +1,30 @@
+shit: 18:5: error: Expected a variable name after 'for'.
+    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
+       |      ^~ here.
+shit: 18:16: error: expected a command, found '<='.
+    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
+       |                 ^~ here.
+shit: 18:25: error: ')' has no matching '('.
+    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
+       |                          ^~ here.
+shit: 18:29: error: 'do' has no matching 'while', 'until', or 'for'.
+    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
+       |                              ^~ here.
+shit: 18:50: error: 'done' has no matching 'while', 'until', or 'for'.
+    18 |  for ((i = 1; i <= 5; i++)); do sum=$((sum + i)); done
+       |                                                   ^~~~ here.
+shit: 22:5: error: Expected a variable name after 'for'.
+    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
+       |      ^~ here.
+shit: 22:16: error: expected a command, found '<='.
+    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
+       |                 ^~ here.
+shit: 22:25: error: ')' has no matching '('.
+    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
+       |                          ^~ here.
+shit: 22:29: error: 'do' has no matching 'while', 'until', or 'for'.
+    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
+       |                              ^~ here.
+shit: 22:49: error: 'done' has no matching 'while', 'until', or 'for'.
+    22 |  for ((i = 1; i <= 5; i++)); do let "fact *= i"; done
+       |                                                  ^~~~ here.

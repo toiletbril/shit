@@ -1,0 +1,19 @@
+#!/bin/env shit
+# The bash case terminators ;& and ;;& are pure additions, on in every mood.
+fall=""
+case 1 in
+a) echo never ;;
+1) fall+="one" ;&
+2) fall+="two" ;;
+3) fall+="three" ;;
+*) fall+="default" ;;
+esac
+echo "fall=$fall"
+marks=""
+case hello in
+h*) marks+="1" ;;&
+*o) marks+="2" ;;&
+hello) marks+="3" ;;
+*) marks+="x" ;;
+esac
+echo "marks=$marks"

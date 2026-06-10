@@ -1,0 +1,167 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign word=configure-script-runner]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word%%-*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word##*-"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word//-/_"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word/-/_"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word/#configure/setup"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word/%runner/walker"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word^^"]
+  [CompoundListCondition, None]
+    [Assign upper=$word^^]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$upper,,"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word~"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word:10:6"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$word: -6"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#word"]
+  [CompoundListCondition, None]
+    [Assign ref=word]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$!ref"]
+  [CompoundListCondition, None]
+    [Assign prefix_one=1]
+  [CompoundListCondition, None]
+    [Assign prefix_two=2]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$!prefix_*"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$undef:-fallback" "$word:+present"]
+[Word
+  Unquoted "word="
+  DoubleQuoted "configure-script-runner"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word%%-*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word##*-"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word//-/_"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word/-/_"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word/#configure/setup"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word/%runner/walker"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word^^"
+]
+[Word
+  Unquoted "upper="
+  Variable "word^^"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "upper,,"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word~"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word:10:6"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "word: -6"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#word"
+]
+[Word
+  Unquoted "ref=word"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!ref"
+]
+[Word
+  Unquoted "prefix_one=1"
+]
+[Word
+  Unquoted "prefix_two=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!prefix_*"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "undef:-fallback"
+]
+[Word
+  Variable "word:+present"
+]
+configure
+runner
+configure_script_runner
+configure_script-runner
+setup-script-runner
+configure-script-walker
+CONFIGURE-SCRIPT-RUNNER
+configure-script-runner
+Configure-script-runner
+script
+runner
+23
+configure-script-runner
+prefix_one prefix_two
+fallback present
+[Code 0]

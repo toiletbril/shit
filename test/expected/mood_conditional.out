@@ -1,0 +1,234 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "glob-yes"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "quoted-literal"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "grouped"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "numeric"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [ConditionalCommand]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "rematch $BASH_REMATCH[1] $BASH_REMATCH[2] whole=$BASH_REMATCH[0]"]
+  [CompoundListCondition, None]
+    [Assign x=set]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "has-x"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "no-missing"]
+[Word
+  Unquoted "[["
+]
+[Word
+  DoubleQuoted "configure.sh"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "*.sh"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "glob-yes"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  DoubleQuoted "a*b"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  DoubleQuoted "a*b"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "quoted-literal"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  DoubleQuoted "x"
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  DoubleQuoted ""
+]
+[Word
+  DoubleQuoted "a"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  DoubleQuoted "a"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "grouped"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "10"
+]
+[Word
+  Unquoted "-gt"
+]
+[Word
+  Unquoted "5"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "-le"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "numeric"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  DoubleQuoted "v12.3"
+]
+[Word
+  Unquoted "=~"
+]
+[Word
+  Unquoted "^v"
+]
+[Word
+  Unquoted "[0-9]+"
+]
+[Word
+  Literal "."
+]
+[Word
+  Unquoted "[0-9]+"
+]
+[Word
+  Unquoted "$"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "rematch "
+  Variable "BASH_REMATCH[1]"
+  DoubleQuoted " "
+  Variable "BASH_REMATCH[2]"
+  DoubleQuoted " whole="
+  Variable "BASH_REMATCH[0]"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "x=set"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "has-x"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "missing"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "no-missing"
+]
+glob-yes
+quoted-literal
+grouped
+numeric
+rematch 12 3 whole=v12.3
+has-x
+no-missing
+[Code 0]

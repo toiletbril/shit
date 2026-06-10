@@ -1,0 +1,137 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%q\n" "a b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%q\n" "a$b;c"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%q\n" ""]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%b\n" "x\ty\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%d]" "1" "2" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%5d|%-5d|%05d\n" "42" "42" "42"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%X %o %c\n" "255" "8" "65"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "-v" "captured" "%04d" "7"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "captured=$captured"]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%q\n"
+]
+[Word
+  Literal "a b"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%q\n"
+]
+[Word
+  Literal "a$b;c"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%q\n"
+]
+[Word
+  Literal ""
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%b\n"
+]
+[Word
+  Literal "x\ty\n"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%d]"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%5d|%-5d|%05d\n"
+]
+[Word
+  Unquoted "42"
+]
+[Word
+  Unquoted "42"
+]
+[Word
+  Unquoted "42"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%X %o %c\n"
+]
+[Word
+  Unquoted "255"
+]
+[Word
+  Unquoted "8"
+]
+[Word
+  Unquoted "65"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "captured"
+]
+[Word
+  Literal "%04d"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "captured="
+  Variable "captured"
+]
+a\ b
+a\$b\;c
+''
+x	y
+
+[1][2][3]
+   42|42   |00042
+FF 10 6
+-vcaptured=
+[Code 0]

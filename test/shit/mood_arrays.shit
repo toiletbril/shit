@@ -1,0 +1,19 @@
+#!/bin/env shit
+# Indexed array literals are a dash-rejected pure addition, so they run in the
+# default strict mood, not only bash mode.
+a=(one two three four five)
+echo "${a[@]}"
+echo "${a[*]}"
+echo "${#a[@]}"
+echo "${a[2]}"
+a+=(six)
+echo "${#a[@]} ${a[-1]}"
+echo "${a[@]:1:2}"
+echo "${a[*]: -2}"
+echo "${!a[@]}"
+a[10]=far
+echo "${!a[@]}"
+echo "${#a[@]}"
+b=()
+echo "empty ${#b[@]}"
+for x in "${a[@]:0:3}"; do echo "elem $x"; done

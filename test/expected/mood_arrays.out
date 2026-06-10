@@ -1,0 +1,175 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$a[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$a[*]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#a[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$a[2]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#a[@] $a[-1]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$a[@]:1:2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$a[*]: -2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$!a[@]"]
+  [CompoundListCondition, None]
+    [Assign a[10]=far]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$!a[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$#a[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "empty $#b[@]"]
+  [CompoundListCondition, None]
+    [ForLoop "x"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "elem $x"]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "one"
+]
+[Word
+  Unquoted "two"
+]
+[Word
+  Unquoted "three"
+]
+[Word
+  Unquoted "four"
+]
+[Word
+  Unquoted "five"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "a[@]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "a[*]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#a[@]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "a[2]"
+]
+[Word
+  Unquoted "a+="
+]
+[Word
+  Unquoted "six"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#a[@]"
+  DoubleQuoted " "
+  Variable "a[-1]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "a[@]:1:2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "a[*]: -2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!a[@]"
+]
+[Word
+  Unquoted "a[10]=far"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!a[@]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "#a[@]"
+]
+[Word
+  Unquoted "b="
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "empty "
+  Variable "#b[@]"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "a[@]:0:3"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "elem "
+  Variable "x"
+]
+[Word
+  Unquoted "done"
+]
+one two three four five
+one two three four five
+5
+three
+6 six
+two three
+five six
+0 1 2 3 4 5
+0 1 2 3 4 5 10
+7
+empty 0
+elem one
+elem two
+elem three
+[Code 0]

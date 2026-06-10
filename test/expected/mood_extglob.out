@@ -1,0 +1,177 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "shopt" "-s" "extglob"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "plus"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "star"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "alt"]
+  [CompoundListCondition, None]
+    [ConditionalCommand]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "opt"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "not-bar"]
+  [CompoundListCondition, None]
+    [CaseClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "known"]
+[Word
+  Unquoted "shopt"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "extglob"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  DoubleQuoted "abbbc"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "a+(b)c"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "plus"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  DoubleQuoted "ac"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "a*(b)c"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "star"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  DoubleQuoted "abc"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "a@(b|x)c"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "alt"
+]
+[Word
+  Unquoted "[["
+]
+[Word
+  DoubleQuoted "ac"
+]
+[Word
+  Unquoted "=="
+]
+[Word
+  Unquoted "a?(b)c"
+]
+[Word
+  Unquoted "]]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "opt"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "foo"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "!(bar)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "not-bar"
+]
+[Word
+  Unquoted "esac"
+]
+[Word
+  Unquoted "case"
+]
+[Word
+  Unquoted "readme"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "@(readme|license)"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "known"
+]
+[Word
+  Unquoted "esac"
+]
+shit: 8:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
+     8 |  case foo in
+       |       ^~~ here.
+shit: 11:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
+    11 |  case readme in
+       |       ^~~~~~ here.
+plus
+star
+alt
+opt
+not-bar
+known
+[Code 0]

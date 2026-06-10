@@ -1,0 +1,22 @@
+#!/bin/env shit
+# Bash parameter expansion forms run in the default mood.
+word="configure-script-runner"
+echo "${word%%-*}"
+echo "${word##*-}"
+echo "${word//-/_}"
+echo "${word/-/_}"
+echo "${word/#configure/setup}"
+echo "${word/%runner/walker}"
+echo "${word^^}"
+upper=${word^^}
+echo "${upper,,}"
+echo "${word~}"
+echo "${word:10:6}"
+echo "${word: -6}"
+echo "${#word}"
+ref=word
+echo "${!ref}"
+prefix_one=1
+prefix_two=2
+echo "${!prefix_*}"
+echo "${undef:-fallback}" "${word:+present}"
