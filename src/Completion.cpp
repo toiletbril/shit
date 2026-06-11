@@ -9,6 +9,7 @@
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
+#include "Trace.hpp"
 #include "Utils.hpp"
 
 namespace shit {
@@ -218,6 +219,8 @@ static fn path_command_names() throws -> const ArrayList<String> &
   }
   CACHED_COMPLETION_PATH = String{current};
   CACHED_PATH_COMMANDS_VALID = true;
+  LOG(verbosity::Debug, "rebuilt the path command cache, %zu names",
+      CACHED_PATH_COMMANDS.count());
   return CACHED_PATH_COMMANDS;
 }
 
@@ -245,6 +248,9 @@ static fn complete_command(StringView token, bool token_is_glob,
 
   for (const String &entry : path_command_names())
     add_unique_command(candidates, seen, entry.view(), token, token_is_glob);
+
+  LOG(verbosity::All, "collected %zu command candidates for token '%.*s'",
+      candidates.count(), static_cast<int>(token.length), token.data);
 
   return candidates;
 }
@@ -363,6 +369,10 @@ static fn complete_filesystem(StringView token,
     candidates.push(steal(candidate));
   }
 
+  LOG(verbosity::All, "%zu entries of '%s' match basename '%.*s'",
+      candidates.count(), listing_directory.text().c_str(),
+      static_cast<int>(parts.basename_part.length), parts.basename_part.data);
+
   return candidates;
 }
 
@@ -415,6 +425,9 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
     candidates.push(steal(candidate));
   }
 
+  LOG(verbosity::All, "glob pattern '%.*s' matched %zu entries",
+      static_cast<int>(token.length), token.data, candidates.count());
+
   return candidates;
 }
 
@@ -466,6 +479,9 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   for (const String &name : os::environment_names())
     add_name(name.view());
 
+  LOG(verbosity::All, "%zu variable names match prefix '%.*s'",
+      candidates.count(), static_cast<int>(prefix.length), prefix.data);
+
   return candidates;
 }
 
@@ -492,6 +508,8 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
     candidate.push('/');
     candidates.push(steal(candidate));
   }
+  LOG(verbosity::All, "%zu user names match tilde prefix '%.*s'",
+      candidates.count(), static_cast<int>(prefix.length), prefix.data);
   return candidates;
 }
 
@@ -556,6 +574,339 @@ static fn manpage_name_for(StringView command) throws -> String
   return String{command};
 }
 
+/* The subcommand index scanned out of the man1 directories, a command name
+   mapped to the subcommands its dashed pages document, so git-commit.1 makes
+   commit a candidate for git with no per-program table. The scan is a readdir
+   pass that runs once per launch on the first explicit tab, never on the
+   ghost path and never at startup. */
+static HashMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
+/* Every stripped section-1 page name, the existence gate for the subcommand
+   split and the lookup that sends git commit -<tab> to the git-commit page. */
+static HashSet MAN_PAGE_NAMES{heap_allocator()};
+/* The full file path of each page, kept so the synopsis validation reads the
+   page source directly instead of forking man per candidate. */
+static HashMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
+/* The commands whose candidate lists already went through the synopsis
+   validation, so the page reads are paid once per command per launch. */
+static HashSet MAN_VALIDATED_COMMANDS{heap_allocator()};
+static bool MAN_SUBCOMMAND_INDEX_IS_BUILT = false;
+
+/* The man1 directories of the host, the $MANPATH entries when the variable is
+   set and the stock /usr/local and /usr trees otherwise. An empty $MANPATH
+   segment, a leading or trailing colon or a doubled one, stands for the
+   system defaults at that position, the manpath(1) reading, so a profile that
+   appends `:$extra` keeps the stock pages. A directory that does not exist
+   contributes nothing to the readdir pass. */
+static fn manpage_section1_directories() throws -> ArrayList<Path>
+{
+  let directories = ArrayList<Path>{};
+  let seen_roots = HashSet{heap_allocator()};
+
+  auto push_man1_of_root = [&](StringView root) {
+    if (seen_roots.contains(root)) return;
+    seen_roots.add(root);
+    let directory = Path{root};
+    directory.push_component("man1");
+    directories.push(steal(directory));
+  };
+  auto push_default_roots = [&]() {
+    push_man1_of_root("/usr/local/share/man");
+    push_man1_of_root("/usr/share/man");
+  };
+
+  let const manpath = os::get_environment_variable("MANPATH");
+  if (!manpath.has_value() || manpath->is_empty()) {
+    push_default_roots();
+    return directories;
+  }
+
+  const StringView value = manpath->view();
+  usize segment_start = 0;
+  for (usize i = 0; i <= value.length; i++) {
+    if (i != value.length && value[i] != os::PATH_DELIMITER) continue;
+    let const segment =
+        value.substring_of_length(segment_start, i - segment_start);
+    segment_start = i + 1;
+    if (segment.is_empty())
+      push_default_roots();
+    else
+      push_man1_of_root(segment);
+  }
+  return directories;
+}
+
+/* The page name with its .1 section suffix and an optional compression tail
+   removed, None when the entry is not a section-1 page. */
+static pure fn strip_man1_suffix(StringView entry) wontthrow
+    -> Maybe<StringView>
+{
+  let name = entry;
+  for (const StringView tail : {StringView{".gz"}, StringView{".xz"},
+                                StringView{".zst"}, StringView{".bz2"}})
+  {
+    if (name.length > tail.length &&
+        name.substring(name.length - tail.length) == tail)
+    {
+      name = name.substring_of_length(0, name.length - tail.length);
+      break;
+    }
+  }
+  if (name.length > 2 && name.substring(name.length - 2) == ".1")
+    return name.substring_of_length(0, name.length - 2);
+  return None;
+}
+
+/* One readdir pass over the man1 directories builds the page-name set, then a
+   second pass over the collected names splits each dashed page at its first
+   dash. The tail survives as a subcommand only when the head page exists too,
+   so xdg-open invents no xdg command, and a digit-leading tail such as the
+   aclocal-1.16 version suffix is no subcommand either. */
+static fn build_man_subcommand_index() throws -> void
+{
+  MAN_SUBCOMMAND_INDEX_IS_BUILT = true;
+  let page_names = ArrayList<String>{};
+  for (const Path &directory : manpage_section1_directories()) {
+    LOG(verbosity::Debug, "scanning man1 directory '%s'",
+        directory.text().c_str());
+    Maybe<ArrayList<String>> entries = Path::read_directory(directory);
+    if (!entries.has_value()) {
+      LOG(verbosity::Debug, "directory '%s' is unreadable, skipping",
+          directory.text().c_str());
+      continue;
+    }
+    for (const String &entry : *entries) {
+      let const stripped = strip_man1_suffix(entry.view());
+      if (!stripped.has_value() || stripped->is_empty()) continue;
+      if (MAN_PAGE_NAMES.contains(*stripped)) continue;
+      MAN_PAGE_NAMES.add(*stripped);
+      let file_path = directory.clone();
+      file_path.push_component(entry.view());
+      MAN_PAGE_FILE_PATHS.set(*stripped, String{file_path.text().view()});
+      page_names.push(String{*stripped});
+    }
+  }
+  for (const String &page : page_names) {
+    let const name = page.view();
+    let const dash = name.find_character('-');
+    if (!dash.has_value() || *dash == 0) continue;
+    let const head = name.substring_of_length(0, *dash);
+    let const tail = name.substring(*dash + 1);
+    if (tail.is_empty() || (tail[0] >= '0' && tail[0] <= '9')) continue;
+    if (!MAN_PAGE_NAMES.contains(head)) continue;
+    if (ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(head)) {
+      subcommands->push(String{tail});
+    } else {
+      let list = ArrayList<String>{};
+      list.push(String{tail});
+      MAN_SUBCOMMAND_INDEX.set(head, steal(list));
+    }
+  }
+  LOG(verbosity::Debug, "indexed %zu section-1 pages", page_names.count());
+}
+
+/* The synopsis region of a man page source, located by its .SH heading or the
+   mdoc .Sh form, with the roff font escapes stripped, the escaped dashes
+   rewritten, and whitespace runs folded, so the rendered space form is
+   searchable as plain bytes. Empty when the page has no synopsis section. */
+static fn cleaned_synopsis_of_page(StringView source) throws -> String
+{
+  let synopsis = String{};
+  let is_inside_synopsis = false;
+  usize line_start = 0;
+  for (usize i = 0; i <= source.length; i++) {
+    if (i != source.length && source[i] != '\n') continue;
+    let const line = source.substring_of_length(line_start, i - line_start);
+    line_start = i + 1;
+    if (line.starts_with(".SH") || line.starts_with(".Sh")) {
+      let is_synopsis_heading = false;
+      for (usize j = 0; j + 8 <= line.length && !is_synopsis_heading; j++)
+        is_synopsis_heading = line.substring(j).starts_with("SYNOPSIS");
+      if (is_inside_synopsis && !is_synopsis_heading) break;
+      is_inside_synopsis = is_synopsis_heading;
+      continue;
+    }
+    if (!is_inside_synopsis) continue;
+    for (usize j = 0; j < line.length; j++) {
+      const char byte = line[j];
+      if (byte == '\\' && j + 1 < line.length) {
+        const char escaped = line[j + 1];
+        if (escaped == 'f') {
+          j += 2;
+        } else if (escaped == '-') {
+          synopsis.push('-');
+          j++;
+        } else if (escaped == '&') {
+          j++;
+        } else {
+          synopsis.push(escaped);
+          j++;
+        }
+        continue;
+      }
+      if (byte == ' ' || byte == '\t') {
+        if (!synopsis.is_empty() &&
+            synopsis.view()[synopsis.length() - 1] != ' ')
+          synopsis.push(' ');
+        continue;
+      }
+      synopsis.push(byte);
+    }
+    synopsis.push(' ');
+  }
+  return synopsis;
+}
+
+/* Drops every candidate whose own page never writes the space-separated
+   command-subcommand form in its synopsis. A true subcommand page such as
+   git-commit.1 opens its synopsis with `git commit`, while a standalone
+   dashed tool such as ssh-keygen.1 only ever writes its literal dashed name,
+   so the standalone tools fall out with no per-program list. A page that
+   cannot be read or is compressed keeps its candidate, gated by the
+   head-page rule alone. */
+static fn validate_subcommands_for(StringView command) throws -> void
+{
+  if (MAN_VALIDATED_COMMANDS.contains(command)) return;
+  MAN_VALIDATED_COMMANDS.add(command);
+  ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(command);
+  if (subcommands == nullptr) return;
+  LOG(verbosity::Debug, "validating %zu subcommand pages of '%.*s'",
+      subcommands->count(), static_cast<int>(command.length), command.data);
+
+  let surviving = ArrayList<String>{};
+  for (const String &subcommand : *subcommands) {
+    let page_name = String{command};
+    page_name.push('-');
+    page_name.append(subcommand.view());
+    const String *file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
+    if (file_path == nullptr) continue;
+
+    Maybe<String> source = utils::read_entire_file(file_path->view());
+    if (!source.has_value()) {
+      surviving.push(String{subcommand.view()});
+      continue;
+    }
+    /* A compressed page cannot be scanned without a decompressor, so the
+       candidate stays on the head-page rule alone. */
+    if (source->length() >= 2 && (*source).view()[0] == '\x1f' &&
+        (*source).view()[1] == '\x8b')
+    {
+      surviving.push(String{subcommand.view()});
+      continue;
+    }
+    /* A page that is one .so redirect reads its target once, relative to the
+       man root above the section directory. */
+    if (source->view().starts_with(".so ")) {
+      let const rest = source->view().substring(4);
+      usize target_end = 0;
+      while (target_end < rest.length && rest[target_end] != '\n' &&
+             rest[target_end] != ' ')
+        target_end++;
+      let target = Path{file_path->view()}.parent().parent();
+      target.push_component(rest.substring_of_length(0, target_end));
+      source = utils::read_entire_file(target.text().view());
+      if (!source.has_value()) {
+        surviving.push(String{subcommand.view()});
+        continue;
+      }
+    }
+
+    let const synopsis = cleaned_synopsis_of_page(source->view());
+    let needle = String{command};
+    needle.push(' ');
+    needle.append(subcommand.view());
+    let has_space_form = false;
+    const StringView haystack = synopsis.view();
+    for (usize i = 0;
+         i + needle.length() <= haystack.length && !has_space_form; i++)
+      has_space_form = haystack.substring(i).starts_with(needle.view());
+    if (has_space_form)
+      surviving.push(String{subcommand.view()});
+    else
+      LOG(verbosity::All, "dropped '%s', no space form in its synopsis",
+          page_name.c_str());
+  }
+  LOG(verbosity::Debug, "%zu of %zu subcommands survived the synopsis check",
+      surviving.count(), subcommands->count());
+  *subcommands = steal(surviving);
+}
+
+/* Whether the token at token_start is the line's first argument, the word
+   right after the command with only blanks between, the slot a subcommand
+   completes at. */
+static fn is_first_argument_token(StringView line,
+                                  usize token_start) wontthrow -> bool
+{
+  let const command = command_word_of(line);
+  if (command.is_empty()) return false;
+  let const command_end =
+      static_cast<usize>(command.data - line.data) + command.length;
+  if (token_start <= command_end) return false;
+  for (usize i = command_end; i < token_start; i++)
+    if (line[i] != ' ' && line[i] != '\t') return false;
+  return true;
+}
+
+/* The line's settled second word past the command, the subcommand slot, None
+   when the line has no completed second word or it opens with a dash. */
+static fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
+{
+  let const command = command_word_of(line);
+  if (command.is_empty()) return None;
+  usize i = static_cast<usize>(command.data - line.data) + command.length;
+  while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
+    i++;
+  let const start = i;
+  while (i < line.length && line[i] != ' ' && line[i] != '\t')
+    i++;
+  /* A word the cursor still sits in has no separator after it, so it is the
+     token under completion rather than a settled subcommand. */
+  if (i >= line.length) return None;
+  let const word = line.substring_of_length(start, i - start);
+  if (word.is_empty() || word[0] == '-') return None;
+  return word;
+}
+
+/* Completes the first argument of a command from the subcommand index, so git
+   com offers commit the way the git-commit page promises. The index builds
+   once per launch on an explicit tab. The ghost path reads only an already
+   built and validated entry, so a keystroke never scans a directory or reads
+   a page. None means the position or the command has no subcommand story and
+   the caller falls through to the option, spec, and filesystem stages. */
+static fn complete_from_man_subcommands(StringView line, StringView token,
+                                        usize token_start,
+                                        bool for_listing) throws
+    -> Maybe<ArrayList<String>>
+{
+  if (!token.is_empty() && token[0] == '-') return None;
+  if (token.find_character('/').has_value()) return None;
+  if (!for_listing && token.is_empty()) return None;
+  if (!is_first_argument_token(line, token_start)) return None;
+  let const command = command_word_of(line);
+  if (command.is_empty() || command.find_character('/').has_value())
+    return None;
+
+  if (!MAN_SUBCOMMAND_INDEX_IS_BUILT ||
+      !MAN_VALIDATED_COMMANDS.contains(command))
+  {
+    if (!for_listing) return None;
+    if (!MAN_SUBCOMMAND_INDEX_IS_BUILT) build_man_subcommand_index();
+    validate_subcommands_for(command);
+  }
+
+  const ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(command);
+  if (subcommands == nullptr || subcommands->is_empty()) return None;
+
+  let matches = ArrayList<String>{};
+  for (const String &subcommand : *subcommands)
+    if (token.is_empty() || subcommand.view().starts_with(token))
+      matches.push(String{subcommand.view()});
+  LOG(verbosity::Debug, "%zu subcommands of '%.*s' match token '%.*s'",
+      matches.count(), static_cast<int>(command.length), command.data,
+      static_cast<int>(token.length), token.data);
+  if (matches.is_empty()) return None;
+  return matches;
+}
+
 /* Strips man's overstrike formatting, a bold byte renders as byte backspace
    byte and an underline as underscore backspace char, then pulls every -x and
    --long flag out of the cleaned text. The flags are deduplicated and returned
@@ -603,23 +954,22 @@ static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
   return options;
 }
 
-/* The option flags a command's manpage documents, parsed once and cached. The
-   man invocation is the general path that works for any command on the host,
-   so the completer is not limited to a hardcoded set of tools. */
-static fn manpage_options_for(StringView command, EvalContext &context) throws
+/* The option flags a manpage documents, parsed once and cached under the page
+   name. The man invocation is the general path that works for any command on
+   the host, so the completer is not limited to a hardcoded set of tools. */
+static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<String> &
 {
-  const String man_name = manpage_name_for(command);
-  if (MANPAGE_OPTION_CACHE.find(man_name.view()) == nullptr) {
+  if (MANPAGE_OPTION_CACHE.find(page_name) == nullptr) {
     let parsed = ArrayList<String>{};
     try {
       const String page = context.capture_command_substitution(
-          String{"man "} + man_name + " 2>/dev/null");
+          String{"man "} + String{page_name} + " 2>/dev/null");
       parsed = parse_manpage_options(page.view());
     } catch (...) {}
-    MANPAGE_OPTION_CACHE.set(man_name.view(), steal(parsed));
+    MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
   }
-  return *MANPAGE_OPTION_CACHE.find(man_name.view());
+  return *MANPAGE_OPTION_CACHE.find(page_name);
 }
 
 /* Completes an option token from the command's manpage, the general source
@@ -637,7 +987,23 @@ static fn complete_from_manpage(StringView line, StringView token,
   if (command.is_empty() || command.find_character('/').has_value())
     return None;
 
-  const ArrayList<String> &options = manpage_options_for(command, context);
+  /* git commit -<tab> reads the git-commit page when the index knows it, the
+     general command-subcommand form, so the options come from the subcommand
+     page rather than the umbrella one. The explicit-tab gate above already
+     holds here, so building the index is as lazy as the man fork itself. */
+  let page_name = manpage_name_for(command);
+  if (let const subcommand_word = second_word_of(line);
+      subcommand_word.has_value())
+  {
+    if (!MAN_SUBCOMMAND_INDEX_IS_BUILT) build_man_subcommand_index();
+    let combined = String{command};
+    combined.push('-');
+    combined.append(*subcommand_word);
+    if (MAN_PAGE_NAMES.contains(combined.view())) page_name = steal(combined);
+  }
+
+  const ArrayList<String> &options =
+      manpage_options_for(page_name.view(), context);
   if (options.is_empty()) return None;
 
   let matches = ArrayList<String>{};
@@ -757,9 +1123,15 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
 
   let candidates = ArrayList<String>{};
 
-  if (token_is_variable(token)) {
+  /* The POSIX mood keeps completion plain the way dash does. The command
+     position still completes command names, and everything else is the
+     filesystem, so the variable, tilde-user, manpage, and spec stages are
+     for the other moods. */
+  let const is_posix_completion = context.mood() == mimic_mood::Posix;
+
+  if (token_is_variable(token) && !is_posix_completion) {
     candidates = complete_variable(token, context);
-  } else if (token_is_tilde_user_prefix(token)) {
+  } else if (token_is_tilde_user_prefix(token) && !is_posix_completion) {
     candidates = complete_tilde_user(token);
   } else if (inline_glob) {
     candidates = complete_glob(token, base_directory);
@@ -795,18 +1167,22 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
   } else {
-    /* An option argument completes from the command's manpage first, the
-       general source that needs no per-command table, on an explicit tab only.
-       A command spec, the bash programmable completion, comes next, and a
-       plain argument falls back to filenames. */
-    if (Maybe<ArrayList<String>> from_manpage =
-            complete_from_manpage(line, token, for_listing, context);
-        from_manpage.has_value())
-      candidates = steal(*from_manpage);
-    else if (Maybe<ArrayList<String>> from_spec =
-                 complete_from_spec(line, token, cursor, for_listing, context);
-             from_spec.has_value())
-      candidates = steal(*from_spec);
+    /* The argument cascade is the mood's own. The default mood asks the man
+       sources first, the subcommand index then the option page, the general
+       path with no per-command table, then the registered specs, then the
+       filesystem. The bash mood is the bash engine alone, specs then files,
+       with no man stage. The POSIX mood defers straight to the filesystem. */
+    Maybe<ArrayList<String>> from_stage = None;
+    if (context.mood() == mimic_mood::Default) {
+      from_stage =
+          complete_from_man_subcommands(line, token, token_start, for_listing);
+      if (!from_stage.has_value())
+        from_stage = complete_from_manpage(line, token, for_listing, context);
+    }
+    if (!from_stage.has_value() && !is_posix_completion)
+      from_stage = complete_from_spec(line, token, cursor, for_listing, context);
+    if (from_stage.has_value())
+      candidates = steal(*from_stage);
     else
       candidates = complete_filesystem(token, base_directory);
   }

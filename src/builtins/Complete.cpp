@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 
 /* complete registers a programmable-completion spec for a command, the bash
    builtin a completion script calls, such as complete -o default -F _name name.
@@ -18,10 +19,12 @@ HELP_SYNOPSIS_DECL("[-abcdefgjksuv] [-o option] [-A action] [-G globpat] "
                    "[-P prefix] [-S suffix] [-pr] [name ...]");
 HELP_DESCRIPTION_DECL(
     "The complete builtin registers a programmable-completion spec for each "
-    "named command, the way a bash completion script does. The shell accepts "
-    "the spec and its options so a config that registers completions sources "
-    "cleanly. The interactive completion engine does not yet consult the "
-    "registered specs, so the registration is a no-op.");
+    "named command, the way a bash completion script does. The interactive "
+    "engine consults the spec when an argument of that command completes. "
+    "The -W word list filters on every keystroke, the -F function runs on an "
+    "explicit tab, -o default falls back to filename completion when the "
+    "spec yields nothing, and a -D default spec drives the bash-completion "
+    "dynamic loader with its 124 retry protocol.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -94,6 +97,9 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (is_default_completion) {
+    LOG(verbosity::Debug,
+        "complete registering the default spec with function '%s'",
+        function_name.c_str());
     let spec = completion_spec{};
     spec.function_name = String{heap_allocator(), function_name};
     spec.word_list = String{heap_allocator(), word_list};
@@ -103,6 +109,8 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   for (const String &command : commands) {
+    LOG(verbosity::Debug, "complete registering spec for '%s'",
+        command.c_str());
     let spec = completion_spec{};
     spec.function_name = String{heap_allocator(), function_name};
     spec.word_list = String{heap_allocator(), word_list};

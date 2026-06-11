@@ -10,6 +10,7 @@
 #include "Eval.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "Trace.hpp"
 #include "Utils.hpp"
 
 #include <cstdlib>
@@ -189,7 +190,12 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     out->token_end = ::tl_utf8_strnlen(buffer, result.token_end);
 
     return 1;
+  } catch (shit::ErrorBase &error) {
+    LOG(shit::verbosity::Debug, "completion swallowed an error: %s",
+        error.message().c_str());
+    return 0;
   } catch (...) {
+    LOG(shit::verbosity::Debug, "completion swallowed an unknown throw");
     return 0;
   }
 }
