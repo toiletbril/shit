@@ -696,6 +696,36 @@ public:
   fn set_echo_expanded(bool enabled) wontthrow -> void;
   fn set_error_unset(bool enabled) wontthrow -> void;
   pure fn error_unset() const wontthrow -> bool;
+  /* Marks the unset strictness as the script's own set -u rather than a mood
+     seed, so the -W downgrade leaves it fatal. */
+  fn set_error_unset_explicit(bool enabled) wontthrow -> void
+  {
+    m_error_unset_explicit = enabled;
+  }
+  /* -W keeps a run going past a strict error by reporting it as a warning. The
+     analysis stage reads the static flag, the runtime checks below read this
+     mirror so set -W flips it mid-run too. */
+  fn set_warnings_enabled(bool enabled) wontthrow -> void
+  {
+    m_warnings_enabled = enabled;
+  }
+  pure fn warnings_enabled() const wontthrow -> bool
+  {
+    return m_warnings_enabled;
+  }
+  /* A reference to an unset variable, fatal under set -u, downgraded to a
+     warning under -W unless the set -u was the script's explicit ask, expanded
+     to empty in a lenient run. The location rides the command being
+     evaluated. */
+  fn report_unset_reference(StringView name) throws -> void;
+  /* A suspicious runtime condition the strict default treats as fatal, the
+     unmatched glob the one caller. Throws when fatal and not downgraded,
+     warns under -W, returns for the lenient fallback otherwise. */
+  fn warn_or_throw(bool fatal, bool explicitly_requested,
+                   SourceLocation location, StringView message) throws -> void;
+  /* Renders a located runtime warning at the command being evaluated, the
+     shared path the -W downgrades print through. */
+  cold fn show_runtime_warning(StringView message) wontthrow -> void;
 
   /* pipefail makes a pipeline report the status of the rightmost stage that
      failed rather than the last stage alone. */
@@ -723,6 +753,12 @@ public:
      failglob. */
   fn set_failglob(bool enabled) wontthrow -> void;
   pure fn failglob() const wontthrow -> bool;
+  /* Marks the glob strictness as the script's own set -o failglob rather than
+     a mood seed, so the -W downgrade leaves it fatal. */
+  fn set_failglob_explicit(bool enabled) wontthrow -> void
+  {
+    m_failglob_explicit = enabled;
+  }
   /* True while a test or [ command expands its arguments, so an unmatched
      glob there stays a silent literal and the probe answers false instead of
      tripping failglob on the very check that asks whether a file exists. */
@@ -1193,6 +1229,11 @@ protected:
   ArrayList<String *> m_retained_sources{heap_allocator()};
 
   bool m_error_unset{false};
+  /* True when the unset strictness came from an explicit set -u rather than a
+     mood seed, and true while -W reports the run's diagnostics as warnings.
+     Both are read by the -W downgrade in report_unset_reference. */
+  bool m_error_unset_explicit{false};
+  bool m_warnings_enabled{false};
   bool m_pipefail{false};
   bool m_no_clobber{false};
   bool m_export_all{false};
@@ -1213,6 +1254,9 @@ protected:
   /* True while a test or [ command expands its arguments, so an unmatched
      glob stays a silent literal and the probe answers false. */
   bool m_glob_exempt_for_test{false};
+  /* True when the glob strictness came from an explicit set -o failglob rather
+     than a mood seed, read by the -W downgrade in warn_or_throw. */
+  bool m_failglob_explicit{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
   HashMap<String> m_traps{heap_allocator()};

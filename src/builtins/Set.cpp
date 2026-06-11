@@ -90,6 +90,10 @@ const SetOption SET_OPTIONS[] = {
      "Print the escape bitmap after each parse."                                                                                         },
     {'E',  "show-exit-code",   &EvalContext::set_show_exit_code,
      &EvalContext::show_exit_code,                                                              "Print the exit code after each command."},
+    {'W',  "warnings",         &EvalContext::set_warnings_enabled,
+     &EvalContext::warnings_enabled,
+     "Report a strict runtime error as a warning and let the run proceed, the "
+     "-W flag."                                                                               },
     {'S',  "show-stats",       &EvalContext::set_stats_enabled,
      &EvalContext::stats_enabled,
      "Print evaluation statistics after each run."                                                                                       },
@@ -153,6 +157,12 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
     throw Error{"Unable to change '" + String{option.name} +
                 "' because it is fixed at shell startup"};
   if (option.set != nullptr) (cxt.*(option.set))(enable);
+  /* An explicit set -u or set -o failglob is the script's own ask, so the -W
+     downgrade leaves it fatal. The mark follows the toggle both ways. */
+  if (option.set == &EvalContext::set_error_unset)
+    cxt.set_error_unset_explicit(enable);
+  else if (option.set == &EvalContext::set_failglob)
+    cxt.set_failglob_explicit(enable);
 }
 
 /* The reusable command form that set -o and set +o print, one line each. The

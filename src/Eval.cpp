@@ -247,6 +247,49 @@ fn EvalContext::append_indexed_array(StringView name,
   throw error;
 }
 
+cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
+{
+  /* The command being evaluated locates the caret, the same position the reap
+     and substitution warnings render at. A formatting failure is swallowed so
+     a diagnostic never becomes an error. */
+  try {
+    let const location = SourceLocation{m_current_location_position, 1};
+    show_message(m_current_source != nullptr
+                     ? WarningWithLocation{location, message}.to_string(
+                           m_current_source->view())
+                     : Warning{message}.to_string());
+  } catch (...) {}
+}
+
+fn EvalContext::report_unset_reference(StringView name) throws -> void
+{
+  /* -W downgrades the mood-seeded fatality to a warning so the run proceeds,
+     while an explicit set -u keeps the abort the script asked for. A lenient
+     run without -W expands the name to empty in silence. */
+  if (m_error_unset && (m_error_unset_explicit || !m_warnings_enabled))
+    throw_script_fatal("Unable to expand '" + String{name} +
+                       "' because the parameter is not set");
+  if (m_error_unset || m_warnings_enabled)
+    show_runtime_warning("the variable '" + String{name} +
+                         "' is not set, it expands to empty, which is rarely "
+                         "intended");
+}
+
+fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
+                              SourceLocation location, StringView message)
+    throws -> void
+{
+  if (fatal && (explicitly_requested || !m_warnings_enabled))
+    throw ErrorWithLocation{location, message};
+  if ((fatal || m_warnings_enabled) && m_current_source != nullptr) {
+    try {
+      show_message(
+          WarningWithLocation{location, message}.to_string(
+              m_current_source->view()));
+    } catch (...) {}
+  }
+}
+
 /* The flat-map key for one sparse indexed element, the array name and the
    decimal index joined by a byte that cannot occur in a name. The map copies a
    key it stores, so the callers build this on the per-command scratch arena. */
@@ -2173,10 +2216,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         name += word[j++];
       /* A nested reference inside a default or alternate word, or a heredoc
          body, obeys set -u the same way a top level reference does, so an unset
-         name here aborts rather than expanding to nothing. */
-      if (m_error_unset && !get_variable_value(name).has_value())
-        throw_script_fatal("Unable to expand '" + name +
-                    "' because the parameter is not set");
+         name here aborts rather than expanding to nothing, or warns under -W. */
+      if (!get_variable_value(name).has_value()) report_unset_reference(name);
       /* An ordinary name appends its stored value straight from the store, so
          the common reference pays no temporary String the way a synthesized
          special name would. */
@@ -2267,9 +2308,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
                lexer::is_number(next))
     {
       let const special_name = StringView{&next, 1};
-      if (m_error_unset && !get_variable_value(special_name).has_value())
-        throw_script_fatal("Unable to expand '" + special_name +
-                    "' because the parameter is not set");
+      if (!get_variable_value(special_name).has_value())
+        report_unset_reference(special_name);
       emit_run(expand_variable(special_name), !in_double_quote);
       i++;
     } else {
@@ -2358,9 +2398,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     }
 
     let const value = get_variable_value(name);
-    if (m_error_unset && !value.has_value())
-      throw_script_fatal("Unable to expand '" + name +
-                  "' because the parameter is not set");
+    if (!value.has_value()) report_unset_reference(name);
     return String{scratch_allocator(),
                   utils::uint_to_text(value.value_or(String{}).length())};
   }
@@ -2457,9 +2495,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     /* Under set -u a plain reference to a variable that is not set is an error,
        while a form with a modifier such as ${x:-w} handles the unset case
        itself. */
-    if (m_error_unset && !get_variable_value(name).has_value())
-      throw_script_fatal("Unable to expand '" + name +
-                  "' because the parameter is not set");
+    if (!get_variable_value(name).has_value()) report_unset_reference(name);
     return expand_variable(name);
   }
 
@@ -3154,9 +3190,8 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
         target_view.substring_of_length(0, *bracket),
         target_view.substring_of_length(*bracket + 1,
                                         target_view.length - *bracket - 2));
-  if (m_error_unset && !get_variable_value(target_view).has_value())
-    throw_script_fatal("Unable to expand '" + *target +
-                "' because the parameter is not set");
+  if (!get_variable_value(target_view).has_value())
+    report_unset_reference(*target);
   return expand_variable(target_view);
 }
 
@@ -4150,13 +4185,16 @@ hot fn EvalContext::expand_path(glob_field field,
      glob used to probe whether a file exists keeps its literal text in silence
      and the probe returns false rather than aborting the command. */
   if (values.count() == 0) {
-    if (m_failglob && !m_glob_exempt_for_test)
-      throw ErrorWithLocation{
-          location, "the glob pattern '" + pattern +
+    /* The test exemption keeps the literal fallback in silence. Otherwise the
+       failglob strictness throws, or -W downgrades it to a warning unless the
+       set -o failglob was the script's explicit ask. */
+    if (!m_glob_exempt_for_test)
+      warn_or_throw(m_failglob, m_failglob_explicit, location,
+                    "the glob pattern '" + pattern +
                         "' matched no file, it expands to its literal text, "
                         "which is rarely intended. Probe for matches with "
                         "compgen -G '" +
-                        pattern + "' or relax with set +o failglob"};
+                        pattern + "' or relax with set +o failglob");
     values.push(steal(pattern));
   }
 

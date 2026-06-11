@@ -708,6 +708,11 @@ fn main(int argc, char **argv) -> int
      stage both fail loudly at the prompt. An explicit set -u or set -o pipefail
      is honored throughout. */
   context.set_error_unset(FLAG_NOUNSET.is_enabled());
+  /* The CLI -u is the user's own ask the way set -u is, so the -W downgrade
+     leaves it fatal. -W mirrors onto the context so the runtime strictness
+     checks downgrade and set -W can flip it mid-run. */
+  if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
+  context.set_warnings_enabled(FLAG_WARNINGS.is_enabled());
   context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
