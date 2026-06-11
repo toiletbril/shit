@@ -85,6 +85,20 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   command.dup_out_to_err = ec.dup_out_to_err;
   command.dup_out_to_err_came_last = ec.dup_out_to_err_came_last;
 
+  /* Inside an in-process subshell or command substitution, the process the
+     exec would replace is the subshell, not the shell, so $(exec cat) must
+     not kill the session. The program runs as a spawned child and its status
+     ends the subshell scope, the way bash's forked subshell dies into its
+     exec. */
+  if (cxt.in_subshell()) {
+    LOG(verbosity::Info,
+        "exec runs '%s' as a child and ends the in-process subshell scope",
+        command_name.c_str());
+    let const status = utils::execute_context(steal(command), cxt, false);
+    cxt.request_exit(status, ec.source_location());
+    return status;
+  }
+
   /* An external command replaces the shell. replace_process returns only by
      throwing, when the program was found but could not be executed, which ends
      the shell with 126, the status reserved for a command that is present but

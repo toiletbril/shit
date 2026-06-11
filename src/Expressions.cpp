@@ -1492,6 +1492,19 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           cxt.has_functions() ? cxt.find_function(program_name) : nullptr;
       function_body != nullptr)
   {
+    /* A heredoc, a here-string, or an input file on the call lands on the
+       real fd 0 for the body's duration, so the in-process body and every
+       child it spawns read the staged bytes, the way bash redirects a forked
+       function's stdin. The descriptor defer above restores the caller's
+       stdin once the call ends. */
+    if (redirect_in_fd) {
+      dup_saved_descriptors.push(
+          os::save_and_replace_descriptor(0, *redirect_in_fd));
+      os::close_fd(*redirect_in_fd);
+      redirect_in_fd = shit::None;
+      redirect_in_fd_handed_off = true;
+    }
+
     /* The caller's parameters are moved out and restored by moving back, so a
        deep copy of the list is not paid on every call. The store is empty in
        the window between, which the call-param build below does not read. */
