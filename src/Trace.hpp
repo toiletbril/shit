@@ -25,6 +25,16 @@ enum class verbosity : u8
    comparison per call. */
 inline verbosity LOGGER_VERBOSITY = verbosity::Warn;
 
+/* The log sink, stderr unless --debug-output-file pointed it at a file opened
+   for append, so an interactive session logs without painting over the
+   prompt. Main owns the lifetime, the file stays open for the whole run. */
+inline std::FILE *LOGGER_OUTPUT = nullptr;
+
+inline std::FILE *log_output_stream()
+{
+  return LOGGER_OUTPUT != nullptr ? LOGGER_OUTPUT : stderr;
+}
+
 constexpr const char *verbosity_to_string(verbosity verbosity)
 {
   switch (verbosity) {
@@ -135,15 +145,19 @@ String format_named_values(StringView names, Args &&...args)
 
 } /* namespace shit */
 
-/* Print a printf-style message at the given level when the level is active. */
+/* Print a printf-style message at the given level when the level is active.
+   The flush after each message keeps a tailed --debug-output-file current
+   while the TUI is still alive. */
 #define LOG(level, ...)                                                        \
   do {                                                                         \
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
-      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): ",               \
+      std::FILE *t__log_stream = ::shit::log_output_stream();                  \
+      unused(std::fprintf(t__log_stream, "[%s] " __FILE__ ":%d %s(): ",        \
                           ::shit::verbosity_to_string(level), __LINE__,        \
                           __func__));                                          \
-      unused(std::fprintf(stderr, __VA_ARGS__));                               \
-      unused(std::fputc('\n', stderr));                                        \
+      unused(std::fprintf(t__log_stream, __VA_ARGS__));                        \
+      unused(std::fputc('\n', t__log_stream));                                 \
+      unused(std::fflush(t__log_stream));                                      \
     }                                                                          \
   } while (0)
 
@@ -154,8 +168,10 @@ String format_named_values(StringView names, Args &&...args)
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
       ::shit::String t__vars =                                                 \
           ::shit::log_detail::format_named_values(#__VA_ARGS__, __VA_ARGS__);  \
-      unused(std::fprintf(stderr, "[%s] " __FILE__ ":%d %s(): %s\n",           \
+      std::FILE *t__log_stream = ::shit::log_output_stream();                  \
+      unused(std::fprintf(t__log_stream, "[%s] " __FILE__ ":%d %s(): %s\n",    \
                           ::shit::verbosity_to_string(level), __LINE__,        \
                           __func__, t__vars.c_str()));                         \
+      unused(std::fflush(t__log_stream));                                      \
     }                                                                          \
   } while (0)

@@ -111,8 +111,13 @@ FLAG(DUMB, Bool, '\0', "dumb",
      "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics",
      "List the shellcheck-style checks the analysis stage reports, then exit.");
-FLAG(LOG, Bool, 'X', "enable-debug-logging",
-     "Enable verbose internal logging to stderr.");
+FLAG(LOG, String, 'X', "enable-debug-logging",
+     "Enable internal logging at the given level, one of 'error', 'warn', "
+     "'info', 'debug', or 'all'. An unknown spelling raises everything.");
+FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-output-file",
+     "Create the named file when missing and append the debug log to it "
+     "instead of stderr, so an interactive session logs without painting "
+     "over the prompt.");
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, 'V', "short-version",
@@ -272,6 +277,9 @@ static fn run_script_contents(const String &script_contents,
     ast_arena.reset();
     context.reset_scratch_arena();
 
+    LOG(verbosity::Debug, "parsing a chunk of %zu bytes",
+        script_contents.count());
+
     let p = Parser{
         Lexer{String{script_contents.view()}, ast_arena,
               context.show_lexed_words(), filename, context.mood()}
@@ -321,6 +329,8 @@ static fn run_script_contents(const String &script_contents,
         (!(context.is_bash_compatible() || context.is_posix_mode()) ||
          FLAG_WARNINGS.is_enabled()) &&
         !context.diagnostics_disabled();
+    LOG(verbosity::Debug, "the analysis stage %s for this chunk",
+        run_analysis ? "runs" : "is skipped");
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
                      context.alias_names(), FLAG_WARNINGS.is_enabled()))
@@ -330,6 +340,7 @@ static fn run_script_contents(const String &script_contents,
       /* Under -n the tree is parsed and validated but never run. */
       exit_code = EXIT_SUCCESS;
     } else {
+      LOG(verbosity::Debug, "evaluating the chunk");
       context.set_current_source(&script_contents, "the script");
       /* Run, timing the wall clock so the \D prompt segment can show how long
          the last command took. */
@@ -337,6 +348,7 @@ static fn run_script_contents(const String &script_contents,
       exit_code = static_cast<int>(ast->evaluate(context));
       context.set_last_command_duration_ns(shit::os::monotonic_nanos() -
                                            command_start_ns);
+      LOG(verbosity::Debug, "the chunk finished with exit code %d", exit_code);
       /* A trapped signal delivered during the last command of the chunk has no
          following node to trigger its action, so the pending traps drain here
          before the chunk ends, the way dash runs a pending trap before it reads
@@ -402,7 +414,15 @@ static fn source_file(const Path &path, EvalContext &context,
                       BumpArena &ast_arena) -> bool
 {
   Maybe<String> contents = utils::read_entire_file(path.text());
-  if (!contents) return false;
+  if (!contents) {
+    LOG(verbosity::Info,
+        "skipping '%s' because the file is missing or unreadable",
+        path.c_str());
+    return false;
+  }
+
+  LOG(verbosity::Info, "sourcing '%s', %zu bytes", path.c_str(),
+      contents->count());
 
   /* The profile path names the source, so a parse error in it and a backtrace
      caret for a file it sources both carry the file rather than a bare
@@ -429,6 +449,7 @@ static fn source_home_file(StringView name, EvalContext &context,
 static fn source_posix_login_files(EvalContext &context,
                                    BumpArena &ast_arena) throws -> void
 {
+  LOG(verbosity::Info, "sourcing the posix login files");
   source_file(Path{"/etc/profile"}, context, ast_arena);
   source_home_file(".profile", context, ast_arena);
 }
@@ -439,6 +460,7 @@ static fn source_posix_login_files(EvalContext &context,
 static fn source_bash_login_files(EvalContext &context,
                                   BumpArena &ast_arena) throws -> void
 {
+  LOG(verbosity::Info, "sourcing the bash login files in bash order");
   source_file(Path{"/etc/profile"}, context, ast_arena);
   if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
     for (const char *name : {".bash_profile", ".bash_login", ".profile"}) {
@@ -447,6 +469,43 @@ static fn source_bash_login_files(EvalContext &context,
       if (source_file(candidate, context, ast_arena)) break;
     }
   }
+}
+
+/* Source the system bashrc the way bash compiled with SYS_BASHRC reads it for
+   an interactive shell, the Void /etc/bash/bashrc or the Debian
+   /etc/bash.bashrc, whichever exists first. The system rc is what loads
+   bash-completion on most hosts, so skipping it leaves the programmable
+   completion unregistered. */
+static fn source_bash_system_rc(EvalContext &context,
+                                BumpArena &ast_arena) throws -> void
+{
+  LOG(verbosity::Info, "looking for the system bashrc");
+  for (const char *path : {"/etc/bash/bashrc", "/etc/bash.bashrc"})
+    if (source_file(Path{path}, context, ast_arena)) break;
+}
+
+/* bash-completion registers the complete -D dynamic loader when it loads. A
+   host whose rc chain never sources it, a stripped /etc/bash or a bare
+   ~/.bashrc, still gets the programmable completion under -L and in bash mode
+   by sourcing the stock script directly. The probe reads the default spec and
+   the script's own guard variable, so a chain that already loaded it does not
+   load it twice. */
+static fn ensure_bash_completion_loaded(EvalContext &context,
+                                        BumpArena &ast_arena) throws -> void
+{
+  if (context.default_completion_spec() != nullptr) {
+    LOG(verbosity::Info, "skipping the bash-completion bootstrap because a "
+                         "default completion spec is already registered");
+    return;
+  }
+  if (context.get_variable_value("BASH_COMPLETION_VERSINFO").has_value()) {
+    LOG(verbosity::Info, "skipping the bash-completion bootstrap because the "
+                         "rc chain already loaded the script");
+    return;
+  }
+  LOG(verbosity::Info, "sourcing the stock bash-completion script");
+  source_file(Path{"/usr/share/bash-completion/bash_completion"}, context,
+              ast_arena);
 }
 
 } /* namespace shit */
@@ -530,8 +589,38 @@ fn main(int argc, char **argv) -> int
 
   /* Raise the runtime log level before any helper runs, so the trace covers
      startup. The default stays Warn, so a run without -X pays one comparison
-     per LOG call and prints nothing. */
-  if (FLAG_LOG.is_enabled()) shit::LOGGER_VERBOSITY = shit::verbosity::All;
+     per LOG call and prints nothing. An unknown level spelling raises
+     everything rather than silently logging nothing. */
+  if (FLAG_LOG.is_set()) {
+    struct log_level_name
+    {
+      const char *name;
+      shit::verbosity level;
+    };
+    static const log_level_name LOG_LEVEL_NAMES[] = {
+        {"error", shit::verbosity::Error}, {"warn", shit::verbosity::Warn},
+        {"info", shit::verbosity::Info},   {"debug", shit::verbosity::Debug},
+        {"all", shit::verbosity::All},
+    };
+    shit::LOGGER_VERBOSITY = shit::verbosity::All;
+    for (const log_level_name &entry : LOG_LEVEL_NAMES)
+      if (FLAG_LOG.value() == entry.name) {
+        shit::LOGGER_VERBOSITY = entry.level;
+        break;
+      }
+  }
+
+  /* The log sink opens before anything logs, in append mode so consecutive
+     runs accumulate into one trace a tail -f can follow. A file that cannot
+     open leaves the sink on stderr rather than dropping the trace. */
+  if (FLAG_DEBUG_OUTPUT_FILE.is_set() &&
+      !FLAG_DEBUG_OUTPUT_FILE.value().is_empty())
+  {
+    let const log_file_name = shit::String{FLAG_DEBUG_OUTPUT_FILE.value()};
+    if (std::FILE *log_file = std::fopen(log_file_name.c_str(), "a");
+        log_file != nullptr)
+      shit::LOGGER_OUTPUT = log_file;
+  }
 
   /* Program path is the first argument. Pull it out and get rid of it. */
   let program_path = shit::String{};
@@ -562,11 +651,19 @@ fn main(int argc, char **argv) -> int
   shit::INVOKED_AS_POSIX_SHELL =
       program_basename == "sh" || program_basename == "dash";
   shit::INVOKED_AS_BASH = program_basename == "bash";
+  LOG(shit::verbosity::Info, "invocation basename is '%.*s'",
+      static_cast<int>(program_basename.length), program_basename.data);
+  LOG(shit::verbosity::Info, "selecting the %s mood",
+      shit::should_run_in_posix_mode()  ? "posix"
+      : shit::should_run_in_bash_mode() ? "bash"
+                                        : "default");
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
 
   if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
+  LOG(shit::verbosity::Info, "the shell %s a login shell",
+      is_login_shell ? "is" : "is not");
 
   /* init-as-bash initializes from the bash config files in bash mode, then
      snaps to the default at the interactive prompt. The SHIT_INIT_AS_BASH
@@ -589,6 +686,7 @@ fn main(int argc, char **argv) -> int
                        "Falling back to POSIX mode.");
     init_as_bash = false;
   }
+  LOG(shit::verbosity::Info, "init-as-bash is %s", init_as_bash ? "on" : "off");
 
   /* A privileged shell skips every startup config file, so a profile or rc that
      a less-privileged user controls cannot run with the raised privileges. The
@@ -596,6 +694,8 @@ fn main(int argc, char **argv) -> int
      default. */
   let const is_privileged =
       FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
+  LOG(shit::verbosity::Info, "privileged mode is %s",
+      is_privileged ? "on" : "off");
 
   /* Both stdin and interactive flags are enabled, but there will be only the
    * last man standing. */
@@ -649,6 +749,11 @@ fn main(int argc, char **argv) -> int
   } else {
     should_be_interactive = true;
   }
+  LOG(shit::verbosity::Info, "the input source is %s",
+      should_read_stdin         ? "standard input"
+      : should_execute_commands ? "the -c command strings"
+      : should_read_files       ? "the named script file"
+                                : "the interactive prompt");
 
   /* Resolve $0 and the positional parameters $1 upward from the operands per
      POSIX, since the rule differs by invocation mode. When running a script
@@ -700,6 +805,16 @@ fn main(int argc, char **argv) -> int
   context.set_login_shell(is_login_shell);
   context.set_inited_as_bash(init_as_bash);
   context.set_custom_rcfile(FLAG_RCFILE.is_set());
+  /* The shopt names bash ships enabled, seeded so a sourced config that
+     probes one with shopt -q, the way bash-completion gates on progcomp,
+     reads the real bash default rather than a never-set false. globstar
+     stays unseeded since bash ships it off and the glob engine reads it
+     live. */
+  for (const char *shopt_name :
+       {"progcomp", "promptvars", "sourcepath", "interactive_comments",
+        "extquote", "complete_fullquote", "hostcomplete", "cmdhist",
+        "checkwinsize", "force_fignore", "globasciiranges", "expand_aliases"})
+    context.set_shopt_option(shopt_name, true);
   /* The startup config files, the profiles and the rc, source with nounset and
      pipefail off, since they are written for a lax shell and read unset
      variables such as $BASH_VERSION on the /etc/profile path. The strict
@@ -812,6 +927,7 @@ fn main(int argc, char **argv) -> int
    * simple scripts! */
   shit::utils::clear_path_map();
   shit::os::set_default_signal_handlers();
+  LOG(shit::verbosity::Info, "installed the default signal handlers");
 
   /* The parse arena holds the AST and its tokens for one command, and is reset
      between commands. It outlives each tree it builds. */
@@ -826,6 +942,9 @@ fn main(int argc, char **argv) -> int
   /* The interactive rc the host bash would read, replaced by the --rcfile file
      when one is given, the way bash reads a named rc instead of ~/.bashrc. */
   let const source_bash_rc = [&]() {
+    /* bash runs the system rc before the user one even under --rcfile, so the
+       chain mirrors that order. */
+    shit::source_bash_system_rc(context, ast_arena);
     if (FLAG_RCFILE.is_set())
       source_file(shit::Path{FLAG_RCFILE.value()}, context, ast_arena);
     else
@@ -835,6 +954,8 @@ fn main(int argc, char **argv) -> int
   if (is_privileged) {
     /* A privileged shell sources nothing, the way bash's privileged mode leaves
        the profiles and rc files unread. */
+    LOG(shit::verbosity::Info,
+        "skipping every startup config file in privileged mode");
   } else if (init_as_bash) {
     /* init-as-bash sources the bash config files in bash mode so an existing
        bash setup loads. With -l it reads /etc/profile then the first existing
@@ -883,6 +1004,17 @@ fn main(int argc, char **argv) -> int
     }
   }
 
+  /* The bash programmable completion loads at the end of the chain, before
+     the init-as-bash snap-back below, so the script parses under the bash
+     grammar it is written for and its specs survive into the session. */
+  if (should_be_interactive && !is_privileged &&
+      (init_as_bash || shit::should_run_in_bash_mode()))
+  {
+    LOG(shit::verbosity::Info,
+        "bootstrapping the bash programmable completion");
+    shit::ensure_bash_completion_loaded(context, ast_arena);
+  }
+
   /* The startup files have finished, so a command typed at the prompt may now
      retitle the terminal. */
   context.set_startup_finished();
@@ -897,6 +1029,9 @@ fn main(int argc, char **argv) -> int
   if (should_be_interactive) {
     if (init_as_bash) context.set_bash_compatible(false);
     let const strict = !shit::should_run_in_compat_mode();
+    LOG(shit::verbosity::Info,
+        "flipping the strictness seam at the prompt, strict defaults are %s",
+        strict ? "on" : "off");
     context.set_error_unset(FLAG_NOUNSET.is_enabled() || strict);
     context.set_pipefail(strict);
     context.set_failglob(strict);
@@ -923,9 +1058,12 @@ fn main(int argc, char **argv) -> int
            named file, both through the descriptor layer so no iostream file
            stream is pulled in. */
         if (should_read_stdin || file_names[0] == "-") {
+          LOG(shit::verbosity::Info, "reading the whole standard input");
           script_contents = shit::utils::read_entire_standard_input();
         } else {
           const shit::String &file_name = file_names[0];
+          LOG(shit::verbosity::Info, "reading the script file '%s'",
+              file_name.c_str());
           shit::Maybe<shit::String> contents =
               shit::utils::read_entire_file(file_name.view());
           if (!contents) {
@@ -943,9 +1081,14 @@ fn main(int argc, char **argv) -> int
       } else if (should_execute_commands) {
         shit::StringView command_view = FLAG_COMMAND.next();
         script_contents = shit::String{command_view};
+        LOG(shit::verbosity::Info,
+            "taking the next -c command string, %zu bytes",
+            script_contents.count());
         if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
+          LOG(shit::verbosity::Info,
+              "initializing the line editor and the path map");
           shit::utils::initialize_path_map();
           toiletline::initialize();
           /* The line editor only completes at an interactive prompt, so the
@@ -1024,6 +1167,8 @@ fn main(int argc, char **argv) -> int
           }
         }
 
+        LOG(shit::verbosity::Info, "accepted an interactive line of %zu bytes",
+            script_contents.count());
         toiletline::exit_raw_mode();
       } else {
         unreachable();
@@ -1072,6 +1217,8 @@ fn main(int argc, char **argv) -> int
     if (should_quit || shit::os::is_child_process() ||
         (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {
+      LOG(shit::verbosity::Info, "exiting after the final chunk with code %d",
+          exit_code);
       if (!shit::os::is_child_process()) context.run_exit_trap();
       shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled());
     }
