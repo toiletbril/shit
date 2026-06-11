@@ -20,7 +20,7 @@
 ]
 hello
 [Code 0]
-shit: 1:7: error: No matches for the glob pattern 'nonexistent_zzz_glob_*.tmp'.
+shit: 1:7: error: the glob pattern 'nonexistent_zzz_glob_*.tmp' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'nonexistent_zzz_glob_*.tmp' or relax with set +o failglob.
      1 |  rm -f nonexistent_zzz_glob_*.tmp
        |        ^~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 shit: note: This error was raised while running the EXIT trap.

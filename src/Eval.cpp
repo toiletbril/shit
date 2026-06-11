@@ -4146,14 +4146,56 @@ hot fn EvalContext::expand_path(glob_field field,
   /* A glob that matches no file is a hard error by default, the typo-catching
      behavior. With failglob off the shell takes the POSIX fallback and expands
      the glob to its literal pattern as a single field, the way dash does. The
-     caret points at the offending word. */
+     caret points at the offending word. A test or [ command is exempt, so a
+     glob used to probe whether a file exists keeps its literal text in silence
+     and the probe returns false rather than aborting the command. */
   if (values.count() == 0) {
-    if (m_failglob)
-      throw ErrorWithLocation{location, "No matches for the glob pattern '" +
-                                            pattern + "'"};
+    if (m_failglob && !m_glob_exempt_for_test)
+      throw ErrorWithLocation{
+          location, "the glob pattern '" + pattern +
+                        "' matched no file, it expands to its literal text, "
+                        "which is rarely intended. Probe for matches with "
+                        "compgen -G '" +
+                        pattern + "' or relax with set +o failglob"};
     values.push(steal(pattern));
   }
 
+  return values;
+}
+
+/* The compgen -G probe, a glob expansion that reports matches and never trips
+   failglob. A pattern with no metacharacter names one file, so it reports
+   that file only when it exists, the way bash compgen -G does. set -f does not
+   apply, since the caller asks for the expansion explicitly. The matches land
+   on the scratch arena and die with the command. */
+fn EvalContext::expand_glob_lenient(StringView pattern) throws
+    -> ArrayList<String>
+{
+  let const scratch = scratch_allocator();
+  let values = ArrayList<String>{scratch};
+
+  let field = glob_field{scratch};
+  field.text.append(pattern);
+  for (usize i = 0; i < pattern.length; i++)
+    field.glob_active.push(true);
+
+  if (!first_active_glob(field.text.view(), field.glob_active,
+                         extglob_enabled())
+           .has_value())
+  {
+    LOG(verbosity::Debug,
+        "compgen -G probe of '%.*s' has no glob, checking existence",
+        static_cast<int>(pattern.length), pattern.data);
+    if (Path{pattern}.exists()) values.push(String{scratch, pattern});
+    return values;
+  }
+
+  let input = ArrayList<glob_field>{scratch};
+  input.push(steal(field));
+  for (glob_field &f : expand_path_recurse(steal(input)))
+    values.push(steal(f.text));
+  utils::sort_ascending(values);
+  LOG(verbosity::Debug, "compgen -G probe matched %zu paths", values.count());
   return values;
 }
 
@@ -6685,6 +6727,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   let is_declaration_command = false;
   let is_local_command = false;
   let is_declare_command = false;
+  let is_test_command = false;
   if (!args.is_empty() && args[0]->kind() == Token::Kind::Word) {
     const Word &command_word =
         static_cast<const tokens::WordToken *>(args[0])->word();
@@ -6704,8 +6747,27 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
       is_declare_command = name == "declare" || name == "typeset";
       is_declaration_command = is_local_command || is_declare_command ||
                                name == "export" || name == "readonly";
+      is_test_command = name == "test";
+    }
+    /* The lone bracket carries a glob metacharacter, so it never classifies as
+       a plain literal above, while as a command word it is the test builtin
+       and earns the same glob exemption. */
+    else if (command_word.segments.count() == 1 &&
+             command_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+             command_word.segments[0].text.view() == "[")
+    {
+      is_test_command = true;
     }
   }
+
+  /* A test or [ command reads its arguments to probe the filesystem, so an
+     unmatched glob there stays literal in silence and the probe returns false
+     naturally, rather than tripping failglob on the check that asks whether a
+     file exists. A user function named test keeps the exemption, the cost of
+     deciding before expansion. */
+  let const previous_glob_exempt = m_glob_exempt_for_test;
+  m_glob_exempt_for_test = is_test_command;
+  defer { m_glob_exempt_for_test = previous_glob_exempt; };
 
   for (const Token *t : args) {
     let const l = t->source_location();

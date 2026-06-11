@@ -42,6 +42,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   StringView wordlist{};
   let have_wordlist = false;
+  StringView glob_pattern{};
+  let have_glob_pattern = false;
   StringView word{};
   for (usize i = 1; i < args.count();) {
     let const argument = args[i].view();
@@ -59,18 +61,43 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       continue;
     }
+    if (argument == "-G") {
+      i++;
+      if (i < args.count()) {
+        glob_pattern = args[i].view();
+        have_glob_pattern = true;
+        i++;
+      }
+      continue;
+    }
     if (argument.length >= 2 && argument[0] == '-') {
       /* These options carry a value, so the value argument is skipped too. The
          action-letter options such as -c or -f carry none. */
-      if (argument == "-A" || argument == "-G" || argument == "-P" ||
-          argument == "-S" || argument == "-X" || argument == "-F" ||
-          argument == "-C")
+      if (argument == "-A" || argument == "-P" || argument == "-S" ||
+          argument == "-X" || argument == "-F" || argument == "-C")
         i++;
       i++;
       continue;
     }
     word = argument;
     i++;
+  }
+
+  /* compgen -G expands the pattern against the filesystem with failglob
+     suppressed, the probe the strict mood's unmatched-glob error points at.
+     The matches print one per line and the status reports whether any matched,
+     so 'if compgen -G pat >/dev/null' reads as an existence test. */
+  if (have_glob_pattern) {
+    let out = String{};
+    let any_matched = false;
+    for (const String &match : cxt.expand_glob_lenient(glob_pattern)) {
+      if (word.length != 0 && !match.view().starts_with(word)) continue;
+      out.append(match.view());
+      out.push('\n');
+      any_matched = true;
+    }
+    if (any_matched) ec.print_to_stdout(out.view());
+    return any_matched ? 0 : 1;
   }
 
   /* An unsupported action produces nothing rather than an error, so a

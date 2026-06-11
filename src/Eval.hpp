@@ -723,6 +723,21 @@ public:
      failglob. */
   fn set_failglob(bool enabled) wontthrow -> void;
   pure fn failglob() const wontthrow -> bool;
+  /* True while a test or [ command expands its arguments, so an unmatched
+     glob there stays a silent literal and the probe answers false instead of
+     tripping failglob on the very check that asks whether a file exists. */
+  fn set_glob_exempt_for_test(bool enabled) wontthrow -> void
+  {
+    m_glob_exempt_for_test = enabled;
+  }
+  pure fn glob_exempt_for_test() const wontthrow -> bool
+  {
+    return m_glob_exempt_for_test;
+  }
+  /* The compgen -G probe, glob matches with failglob suppressed and a plain
+     name reported only when the file exists. Public so the compgen builtin
+     reaches it. */
+  fn expand_glob_lenient(StringView pattern) throws -> ArrayList<String>;
 
   /* bash-compatible mode enables the bash extensions that change the meaning of
      valid POSIX syntax, such as the (( )) arithmetic command and brace
@@ -1153,6 +1168,9 @@ protected:
      run that never reads RANDOM pays neither the seed nor its syscall. */
   mutable bool m_random_seeded{false};
   bool m_failglob{true};
+  /* True while a test or [ command expands its arguments, so an unmatched
+     glob stays a silent literal and the probe answers false. */
+  bool m_glob_exempt_for_test{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
   HashMap<String> m_traps{heap_allocator()};
