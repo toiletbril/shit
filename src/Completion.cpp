@@ -514,11 +514,15 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 }
 
 /* The command a registered completion spec is looked up by, the first
-   whitespace-delimited word of the line past any transparent keyword prefix
-   such as time or ! so the spec for the real command is found. */
+   whitespace-delimited word of the line's last command segment past any
+   transparent keyword prefix such as time or !, so echo hi; git - completes
+   against git rather than echo. The separator scan is unquoted, the same
+   lightweight reading the rest of the engine applies to a half-typed line. */
 static fn command_word_of(StringView line) wontthrow -> StringView
 {
   usize i = 0;
+  for (usize k = 0; k < line.length; k++)
+    if (line[k] == ';' || line[k] == '|' || line[k] == '&') i = k + 1;
   for (;;) {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
       i++;
