@@ -276,16 +276,15 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
 }
 
 fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
-                              SourceLocation location, StringView message)
-    throws -> void
+                              SourceLocation location,
+                              StringView message) throws -> void
 {
   if (fatal && (explicitly_requested || !m_warnings_enabled))
     throw ErrorWithLocation{location, message};
   if ((fatal || m_warnings_enabled) && m_current_source != nullptr) {
     try {
-      show_message(
-          WarningWithLocation{location, message}.to_string(
-              m_current_source->view()));
+      show_message(WarningWithLocation{location, message}.to_string(
+          m_current_source->view()));
     } catch (...) {}
   }
 }
@@ -2216,7 +2215,8 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         name += word[j++];
       /* A nested reference inside a default or alternate word, or a heredoc
          body, obeys set -u the same way a top level reference does, so an unset
-         name here aborts rather than expanding to nothing, or warns under -W. */
+         name here aborts rather than expanding to nothing, or warns under -W.
+       */
       if (!get_variable_value(name).has_value()) report_unset_reference(name);
       /* An ordinary name appends its stored value straight from the store, so
          the common reference pays no temporary String the way a synthesized
@@ -2449,8 +2449,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
         let const is_colon = modifier_op == ':';
         let const after =
             is_colon && modifier.length > 1 ? modifier[1] : modifier_op;
-        let const is_test_form = after == '-' || after == '+' ||
-                                 after == '=' || after == '?';
+        let const is_test_form =
+            after == '-' || after == '+' || after == '=' || after == '?';
         if (is_colon && !is_test_form)
           return apply_substring_to_value(
               apply_array_subscript(name, subscript).view(),
@@ -2479,8 +2479,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
           case '?':
             if (treat_as_unset) {
               if (word.is_empty())
-                throw_script_fatal("Unable to expand '" + name + "[" + subscript +
-                            "]' because the element is not set or is empty");
+                throw_script_fatal(
+                    "Unable to expand '" + name + "[" + subscript +
+                    "]' because the element is not set or is empty");
               throw_script_fatal(expand_modifier_word(word));
             }
             return value;
@@ -2573,7 +2574,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     if (treat_as_unset) {
       if (word.is_empty())
         throw_script_fatal("Unable to expand '" + name +
-                    "' because the parameter is not set or is empty");
+                           "' because the parameter is not set or is empty");
       throw_script_fatal(expand_modifier_word(word));
     }
     ASSERT(current.has_value());
@@ -2625,7 +2626,7 @@ fn EvalContext::apply_substring_expansion(StringView name,
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
-                "' because the parameter is not set");
+                       "' because the parameter is not set");
   return apply_substring_to_value(current.value_or(String{}).view(), body);
 }
 
@@ -2667,8 +2668,9 @@ fn EvalContext::apply_substring_to_value(StringView value,
   if (end > value_length) end = value_length;
   /* A length that resolves to a point before the offset is the bash
      "substring expression < 0" error, fatal the way bash makes it. */
-  if (end < start) throw Error{"Unable to take the substring because the length names "
-                  "a point before the offset"};
+  if (end < start)
+    throw Error{"Unable to take the substring because the length names "
+                "a point before the offset"};
 
   return String{scratch_allocator(),
                 value.substring_of_length(static_cast<usize>(start),
@@ -2732,7 +2734,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
-                "' because the parameter is not set");
+                       "' because the parameter is not set");
   return pattern_replace_value(current.value_or(String{}), spec);
 }
 
@@ -2841,7 +2843,7 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
   let const current = get_variable_value(name);
   if (m_error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
-                "' because the parameter is not set");
+                       "' because the parameter is not set");
   return apply_case_modification_to_value(current.value_or(String{}).view(),
                                           spec);
 }
@@ -3035,13 +3037,14 @@ fn EvalContext::collect_array_elements(StringView name) const throws
 {
   /* FUNCNAME enumerates the call-name stack, innermost first the way bash
      orders it, so "${FUNCNAME[@]}" yields one frame per field. */
-  if (name == "FUNCNAME" && is_bash_compatible() &&
-      funcname_frame_count() > 0) [[unlikely]]
+  if (name == "FUNCNAME" && is_bash_compatible() && funcname_frame_count() > 0)
+      [[unlikely]]
   {
     let const depth = funcname_frame_count();
     let frames = ArrayList<String>{heap_allocator()};
     frames.reserve(depth);
-    for (usize i = 0; i < depth; i++) frames.push_managed(funcname_frame_at(i));
+    for (usize i = 0; i < depth; i++)
+      frames.push_managed(funcname_frame_at(i));
     return frames;
   }
 
@@ -3177,7 +3180,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   if (!target.has_value()) {
     if (m_error_unset)
       throw_script_fatal("Unable to expand '" + body +
-                  "' because the parameter is not set");
+                         "' because the parameter is not set");
     return String{scratch_allocator()};
   }
   /* A target naming an array element, the a[1] a reference variable holds,
@@ -4732,10 +4735,10 @@ public:
         return c == '=' ? binary_operator{0, 0, 0} : binary_operator{'R', 8, 2};
       if (b == '=') return {'g', 7, 2};
       return {'>', 7, 1};
-    case '=': return b == '=' ? binary_operator{'e', 6, 2}
-                              : binary_operator{0, 0, 0};
-    case '!': return b == '=' ? binary_operator{'n', 6, 2}
-                              : binary_operator{0, 0, 0};
+    case '=':
+      return b == '=' ? binary_operator{'e', 6, 2} : binary_operator{0, 0, 0};
+    case '!':
+      return b == '=' ? binary_operator{'n', 6, 2} : binary_operator{0, 0, 0};
     case '&':
       if (b == '&') return {'A', 2, 2};
       return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'&', 5, 1};
@@ -4782,8 +4785,8 @@ public:
 
       /* ** is right-associative, so it re-enters at its own precedence, and
          bash rejects a negative exponent in integer arithmetic. */
-      let const rhs = parse_binary(op.kind == 'P' ? op.precedence
-                                                  : op.precedence + 1);
+      let const rhs =
+          parse_binary(op.kind == 'P' ? op.precedence : op.precedence + 1);
       switch (op.kind) {
       case 'P':
         if (rhs < 0) fail("exponent less than 0");
@@ -5228,9 +5231,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const param_count = m_positional_params.count();
         const i64 total = static_cast<i64>(param_count) + 1;
         auto positional_at = [&](i64 index) wontthrow -> StringView {
-          return index == 0
-                     ? m_shell_name.view()
-                     : m_positional_params[static_cast<usize>(index - 1)].view();
+          return index == 0 ? m_shell_name.view()
+                            : m_positional_params[static_cast<usize>(index - 1)]
+                                  .view();
         };
 
         const usize sep = find_substring_length_separator(slice);
@@ -5245,8 +5248,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
           const StringView length_text = slice.substring(sep + 1);
           const i64 length =
               length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
-          if (length < 0) throw Error{"Unable to take the substring because the length names "
-                  "a point before the offset"};
+          if (length < 0)
+            throw Error{"Unable to take the substring because the length names "
+                        "a point before the offset"};
           end = start + length;
         }
         if (end > total) end = total;
@@ -5310,7 +5314,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
                 length_text.is_empty() ? 0 : evaluate_arithmetic(length_text);
             /* Unlike a string substring, an array slice rejects a negative
                length the way bash does rather than counting from the end. */
-            if (length < 0) throw Error{"Unable to take the substring because the length names "
+            if (length < 0)
+              throw Error{
+                  "Unable to take the substring because the length names "
                   "a point before the offset"};
             end = start + length;
           }

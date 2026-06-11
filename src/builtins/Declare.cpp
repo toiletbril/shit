@@ -141,8 +141,8 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       const StringView name = args[i].view();
       if (cxt.find_function(name) == nullptr) {
         if (!function_names_only)
-          report_soft_builtin_error(ec, cxt, StringView{"'"} + name +
-                                                 "' is not a function");
+          report_soft_builtin_error(
+              ec, cxt, StringView{"'"} + name + "' is not a function");
         status = 1;
         continue;
       }

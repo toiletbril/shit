@@ -325,7 +325,8 @@ fn analyze_ast(const Expression *root, StringView source,
      off. */
   if (source.length >= 2 && source[0] == '#' && source[1] == '!') {
     usize line_end = 0;
-    while (line_end < source.length && source[line_end] != '\n') line_end++;
+    while (line_end < source.length && source[line_end] != '\n')
+      line_end++;
     let const first_line = source.substring_of_length(0, line_end);
     let contains_dash = false;
     let contains_bash = false;
@@ -4244,10 +4245,11 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      captures the values at set time. This is shellcheck SC2064, single-quote
      the action so it expands when the signal arrives. The action is the first
      operand. */
-  if (command_literal == "trap" && !command_is_shadowed && m_args.count() >= 2 &&
-      m_args[1]->kind() == Token::Kind::Word)
+  if (command_literal == "trap" && !command_is_shadowed &&
+      m_args.count() >= 2 && m_args[1]->kind() == Token::Kind::Word)
   {
-    let const &action = static_cast<const tokens::WordToken *>(m_args[1])->word();
+    let const &action =
+        static_cast<const tokens::WordToken *>(m_args[1])->word();
     let action_expands_now = false;
     for (const WordSegment &segment : action.segments)
       if (segment.is_in_double_quotes &&
@@ -4819,7 +4821,6 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   "command directly with if or && so an intervening command "
                   "cannot clobber the status");
     }
-
   }
 
   /* A prefix assignment does not affect the expansion on the same command, so a
@@ -4997,8 +4998,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
         actx.known_aliases.contains(next_name->view());
 
     if (stage_name->view() == "find" && next_name->view() == "xargs" &&
-        !next_is_user &&
-        !actx.defined_functions.contains(stage_name->view()) &&
+        !next_is_user && !actx.defined_functions.contains(stage_name->view()) &&
         !actx.known_aliases.contains(stage_name->view()))
     {
       let has_null_flag = false;
@@ -5015,8 +5015,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
                   "pair find -print0 with xargs -0 or use find -exec");
     }
 
-    if (!next_is_user &&
-        NON_STDIN_READERS.find(next_name->view()).has_value())
+    if (!next_is_user && NON_STDIN_READERS.find(next_name->view()).has_value())
     {
       let has_stdin_operand = false;
       for (usize a = 1; a < next->args().count(); a++) {

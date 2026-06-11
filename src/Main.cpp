@@ -718,9 +718,8 @@ fn main(int argc, char **argv) -> int
      script fails loudly rather than hiding behind the last stage. A
      compatibility mood stays lenient, the way bash and dash report only the
      last stage, and the dash comparison runs shit under -P for that reason. */
-  context.set_pipefail(should_be_interactive
-                           ? false
-                           : !shit::should_run_in_compat_mode());
+  context.set_pipefail(
+      should_be_interactive ? false : !shit::should_run_in_compat_mode());
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());

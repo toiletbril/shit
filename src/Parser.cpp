@@ -1735,7 +1735,8 @@ hot fn Parser::parse_paren_command() throws -> Command *
   Token *next = m_lexer.peek_shell_token();
   ASSERT(next != nullptr);
   if (!m_lexer.is_posix_mode() && next->kind() == Token::Kind::LeftParen &&
-      next->source_location().position == open->source_location().position + 1 &&
+      next->source_location().position ==
+          open->source_location().position + 1 &&
       double_paren_closes_adjacent(m_lexer.source(),
                                    next->source_location().position + 1))
   {
@@ -2042,8 +2043,8 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
 
   /* The definition's span ends where its body ends, recorded so declare -f
      can print the definition text from the source. */
-  let definition = m_lexer.arena().create<FunctionDefinition>(location,
-                                                              name.view(), body);
+  let definition =
+      m_lexer.arena().create<FunctionDefinition>(location, name.view(), body);
   definition->set_source_end_position(body->source_end_position());
   return definition;
 }
@@ -2096,8 +2097,8 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
 
   /* The definition's span ends where its body ends, recorded so declare -f
      can print the definition text from the source. */
-  let definition = m_lexer.arena().create<FunctionDefinition>(location,
-                                                              name.view(), body);
+  let definition =
+      m_lexer.arena().create<FunctionDefinition>(location, name.view(), body);
   definition->set_source_end_position(body->source_end_position());
   return definition;
 }

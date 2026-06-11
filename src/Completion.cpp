@@ -577,9 +577,9 @@ static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
   for (usize i = 0; i < view.length; i++) {
     /* A flag starts at a dash that opens a word, so a hyphen inside a word or
        a numeric range is not mistaken for an option. */
-    const bool at_word_start =
-        i == 0 || view[i - 1] == ' ' || view[i - 1] == '\t' ||
-        view[i - 1] == '\n' || view[i - 1] == '(' || view[i - 1] == '[';
+    const bool at_word_start = i == 0 || view[i - 1] == ' ' ||
+                               view[i - 1] == '\t' || view[i - 1] == '\n' ||
+                               view[i - 1] == '(' || view[i - 1] == '[';
     if (view[i] != '-' || !at_word_start) continue;
     usize end = i;
     while (end < view.length &&
@@ -613,9 +613,8 @@ static fn manpage_options_for(StringView command, EvalContext &context) throws
   if (MANPAGE_OPTION_CACHE.find(man_name.view()) == nullptr) {
     let parsed = ArrayList<String>{};
     try {
-      const String page =
-          context.capture_command_substitution(String{"man "} + man_name +
-                                               " 2>/dev/null");
+      const String page = context.capture_command_substitution(
+          String{"man "} + man_name + " 2>/dev/null");
       parsed = parse_manpage_options(page.view());
     } catch (...) {}
     MANPAGE_OPTION_CACHE.set(man_name.view(), steal(parsed));
@@ -635,7 +634,8 @@ static fn complete_from_manpage(StringView line, StringView token,
   if (!for_listing) return None;
   if (token.is_empty() || token[0] != '-') return None;
   const StringView command = command_word_of(line);
-  if (command.is_empty() || command.find_character('/').has_value()) return None;
+  if (command.is_empty() || command.find_character('/').has_value())
+    return None;
 
   const ArrayList<String> &options = manpage_options_for(command, context);
   if (options.is_empty()) return None;

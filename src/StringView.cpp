@@ -47,5 +47,4 @@ fn StringView::starts_with(StringView prefix) const wontthrow -> bool
          std::memcmp(data, prefix.data, prefix.length) == 0;
 }
 
-
 } /* namespace shit */

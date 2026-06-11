@@ -1083,10 +1083,7 @@ public:
   {
     m_inited_as_bash = enabled;
   }
-  pure fn inited_as_bash() const wontthrow -> bool
-  {
-    return m_inited_as_bash;
-  }
+  pure fn inited_as_bash() const wontthrow -> bool { return m_inited_as_bash; }
   fn set_custom_rcfile(bool enabled) wontthrow -> void
   {
     m_has_custom_rcfile = enabled;
@@ -1386,16 +1383,16 @@ protected:
   fn expand_path(glob_field field, SourceLocation location) throws
       -> ArrayList<String>;
 
-  fn expand_tilde(WordSegment &leading_segment, bool word_continues) const
-      throws -> void;
+  fn expand_tilde(WordSegment &leading_segment,
+                  bool word_continues) const throws -> void;
   /* The directory a tilde prefix names, the home for an empty or user name
      and PWD or OLDPWD for + and -, or None when the name resolves to
      nothing and the word stays literal. */
   fn resolve_tilde_prefix(StringView name) const throws -> Maybe<String>;
   /* Expands a tilde after each unquoted colon inside one segment, the
      assignment-only rule bash applies to PATH=~/bin:~/tmp. */
-  fn expand_colon_tildes(WordSegment &segment, bool word_continues) const
-      throws -> void;
+  fn expand_colon_tildes(WordSegment &segment, bool word_continues) const throws
+      -> void;
 };
 
 /* Lower-level execution context. Path is the program path to execute, expanded
