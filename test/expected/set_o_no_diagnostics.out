@@ -1,0 +1,53 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-W"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "first=$never_a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "no-diagnostics"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "second=$never_b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "first="
+  Variable "never_a"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "no-diagnostics"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "second="
+  Variable "never_b"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+shit: 3:1: warning: the variable 'never_a' is not set, it expands to empty, which is rarely intended.
+     3 |  echo "first=$never_a"
+       |  ^~ here.
+first=
+second=
+done
+[Code 0]
