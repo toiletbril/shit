@@ -49,10 +49,23 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let word_list = String{};
   bool use_default = false;
   bool is_default_completion = false;
+  bool should_print_specs = false;
   let commands = ArrayList<String>{};
 
   for (usize i = 1; i < args.count();) {
     let const arg = args[i].view();
+    /* A double dash ends option parsing, so complete -p -- man reads man as a
+       command name rather than another option. */
+    if (arg == "--") {
+      for (i++; i < args.count(); i++)
+        commands.push_managed(args[i].view());
+      break;
+    }
+    if (arg == "-p") {
+      should_print_specs = true;
+      i++;
+      continue;
+    }
     /* -D registers the default completion, used for a command with no spec of
        its own, the way bash-completion attaches its dynamic loader. */
     if (arg == "-D") {
@@ -94,6 +107,48 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     commands.push_managed(arg);
     i++;
+  }
+
+  /* -p prints the named specs, or every spec with no names, in a form the
+     shell can replay, and reports failure when a named command has no spec.
+     The bash-completion loader probes exactly that, a successful print means
+     sourcing the completion file registered something. */
+  if (should_print_specs) {
+    let const print_one_spec = [&](StringView command,
+                                   const completion_spec &spec) throws {
+      let line = String{"complete "};
+      if (spec.use_default) line += "-o default ";
+      if (!spec.function_name.is_empty()) {
+        line += "-F ";
+        line += spec.function_name.view();
+        line += ' ';
+      }
+      if (!spec.word_list.is_empty()) {
+        line += "-W '";
+        line += spec.word_list.view();
+        line += "' ";
+      }
+      line += command;
+      line += '\n';
+      ec.print_to_stdout(line.view());
+    };
+    if (commands.is_empty()) {
+      cxt.completion_specs().for_each(
+          [&](StringView command, const completion_spec &spec) {
+            print_one_spec(command, spec);
+          });
+      return 0;
+    }
+    i32 print_status = 0;
+    for (const String &command : commands) {
+      const completion_spec *spec = cxt.lookup_completion_spec(command.view());
+      if (spec == nullptr) {
+        print_status = 1;
+        continue;
+      }
+      print_one_spec(command.view(), *spec);
+    }
+    return print_status;
   }
 
   if (is_default_completion) {

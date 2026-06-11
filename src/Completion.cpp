@@ -1025,6 +1025,13 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
   const StringView command = command_word_of(line);
   if (command.is_empty()) return None;
   const completion_spec *spec = context.lookup_completion_spec(command);
+  LOG(verbosity::All,
+      "spec lookup for '%.*s' %s, listing %d, function '%s', %zu word-list "
+      "bytes",
+      static_cast<int>(command.length), command.data,
+      spec != nullptr ? "hit" : "missed", for_listing ? 1 : 0,
+      spec != nullptr ? spec->function_name.c_str() : "",
+      spec != nullptr ? spec->word_list.length() : 0);
 
   /* No command-specific spec. On an explicit tab, consult the default
      completion the way bash-completion's complete -D dynamic loader does. The

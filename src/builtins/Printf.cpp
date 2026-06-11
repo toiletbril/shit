@@ -455,7 +455,22 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
            consumed_a_conversion);
 
   if (store_variable.has_value()) {
-    cxt.set_shell_variable(store_variable->view(), out.view());
+    /* A name[subscript] target writes one array element, the form the
+       bash-completion word reassembly stores through, while a plain name
+       writes the scalar. */
+    let const target = store_variable->view();
+    let const open_bracket = target.find_character('[');
+    if (open_bracket.has_value() && *open_bracket > 0 &&
+        target.length > *open_bracket + 2 &&
+        target[target.length - 1] == ']')
+    {
+      let const array_name = target.substring_of_length(0, *open_bracket);
+      let const subscript = target.substring_of_length(
+          *open_bracket + 1, target.length - *open_bracket - 2);
+      cxt.assign_array_element(array_name, subscript, out.view(), false);
+      return 0;
+    }
+    cxt.set_shell_variable(target, out.view());
     return 0;
   }
 

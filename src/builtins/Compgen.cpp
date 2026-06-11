@@ -122,14 +122,45 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   };
 
-  /* The word list splits on the ASCII whitespace bash treats as the default
+  /* The -W list undergoes the shell expansions bash applies to it, parameter
+     and command substitution, quote removal, and word splitting, so the
+     bash-completion idiom -W '"${options[@]}"' reaches the caller's array.
+     The list expands as an array literal in the current context and the
+     resulting elements are the candidates. A list that fails to parse falls
+     back to the plain whitespace split, so a malformed list still completes
+     something rather than erroring out of the completion. */
+  let did_expand = false;
+  try {
+    let expansion_source = String{"t__compgen_wordlist=("};
+    expansion_source.append(wordlist);
+    expansion_source.push(')');
+    cxt.run_source(expansion_source.view(), "compgen", false,
+                   ec.source_location(), StringView{"compgen"});
+    if (const ArrayList<String> *expanded =
+            cxt.lookup_indexed_array("t__compgen_wordlist");
+        expanded != nullptr)
+    {
+      for (const String &candidate : *expanded)
+        emit(candidate.view());
+      did_expand = true;
+    }
+    cxt.run_source(StringView{"unset -v t__compgen_wordlist"}, "compgen",
+                   false, ec.source_location(), StringView{"compgen"});
+  } catch (const ErrorBase &error) {
+    LOG(verbosity::Debug, "compgen -W expansion failed, splitting plain: %s",
+        error.message().c_str());
+  }
+
+  /* The fallback splits on the ASCII whitespace bash treats as the default
      field separators. A trailing sentinel flushes the final word. */
-  usize start = 0;
-  for (usize i = 0; i <= wordlist.length; i++) {
-    let const c = (i < wordlist.length) ? wordlist[i] : ' ';
-    if (c == ' ' || c == '\t' || c == '\n') {
-      if (i > start) emit(wordlist.substring_of_length(start, i - start));
-      start = i + 1;
+  if (!did_expand) {
+    usize start = 0;
+    for (usize i = 0; i <= wordlist.length; i++) {
+      let const c = (i < wordlist.length) ? wordlist[i] : ' ';
+      if (c == ' ' || c == '\t' || c == '\n') {
+        if (i > start) emit(wordlist.substring_of_length(start, i - start));
+        start = i + 1;
+      }
     }
   }
 
