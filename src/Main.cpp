@@ -101,7 +101,7 @@ FLAG(
 FLAG(DUMB, Bool, '\0', "dumb", shit::flag_section::Compat,
      "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
 
-FLAG(WARNINGS, Bool, 'W', "warnings", shit::flag_section::Shit,
+FLAG(WARNINGS, Bool, 'W', "enable-diagnostics", shit::flag_section::Shit,
      "Keep the analysis stage but report every error as a warning and let the "
      "run proceed, instead of stopping on the first error.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", shit::flag_section::Shit,

@@ -824,6 +824,17 @@ public:
      context. */
   fn set_mimicry(bool enabled) wontthrow -> void { m_mimicry = enabled; }
   pure fn mimicry() const wontthrow -> bool { return m_mimicry; }
+
+  /* The positive spelling of the analysis toggle, so set -o diagnostics
+     enables the stage the way --no-diagnostics disables it. */
+  fn set_diagnostics_enabled(bool enabled) wontthrow -> void
+  {
+    m_diagnostics_disabled = !enabled;
+  }
+  pure fn diagnostics_enabled() const wontthrow -> bool
+  {
+    return !m_diagnostics_disabled;
+  }
   /* Run the script at the resolved program in-process in the matching mode.
      When isolated is true the run is contained in a snapshotted subshell so its
      cd, exports, and exit do not leak, and when false the run is the terminal
