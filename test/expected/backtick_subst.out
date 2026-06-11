@@ -95,6 +95,12 @@
 shit: 2:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
      2 |  echo `echo hi`
        |       ^~~~~~~~~ here.
+shit: 2:6: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
+     2 |  echo `echo hi`
+       |       ^~~~~~~~~ here.
+shit: 4:6: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
+     4 |  echo "`echo q`"
+       |       ^~~~~~~~~~ here.
 shit: 5:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
      5 |  case `echo x` in x) echo matched;; esac
        |       ^~~~~~~~ here.
@@ -104,7 +110,13 @@ shit: 6:6: warning: an unquoted command substitution splits its output, quote it
 shit: 7:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
      7 |  echo `echo "a b"`
        |       ^~~~~~~~~~~~ here.
+shit: 7:6: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
+     7 |  echo `echo "a b"`
+       |       ^~~~~~~~~~~~ here.
 shit: 9:15: warning: an unquoted command substitution splits its output, quote it to keep one argument.
+     9 |  foo=bar; echo `echo \$foo`
+       |                ^~~~~~~~~~~~ here.
+shit: 9:15: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
      9 |  foo=bar; echo `echo \$foo`
        |                ^~~~~~~~~~~~ here.
 hi

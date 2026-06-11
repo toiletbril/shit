@@ -215,6 +215,12 @@
 [Word
   Unquoted "fi"
 ]
+shit: 2:9: warning: the operand is a literal, so this -n test is constant, test a variable or drop the check.
+     2 |  if [ -n abc ]; then echo n_true; fi
+       |          ^~~ here.
+shit: 3:9: warning: the operand is a literal, so this -z test is constant, test a variable or drop the check.
+     3 |  if [ -z "" ]; then echo z_true; fi
+       |          ^~ here.
 shit: 6:9: warning: a one-operand test is the nonempty-string test, write it with -n to read clearer.
      6 |  if test hello; then echo one_op_true; fi
        |          ^~~~~ here.

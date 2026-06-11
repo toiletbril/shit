@@ -45,6 +45,9 @@
 [Word
   Unquoted "f"
 ]
+shit: 2:11: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
+     2 |  f(){ echo "$(echo hi)"; }
+       |            ^~~~~~~~~~~~ here.
 hi
 hi
 hi

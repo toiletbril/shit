@@ -67,6 +67,9 @@
 [Word
   Unquoted "4"
 ]
+shit: 4:10: warning: the pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+     4 |  echo 4 | false || echo 4;
+       |           ^~~~~ here.
 1
 2
 3

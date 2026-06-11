@@ -1,0 +1,83 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lint_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "command"]
+          [CompoundListCondition, None]
+            [SimpleCommand "sort"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "wrapped $(echo inner)"]
+          [CompoundListCondition, None]
+            [SimpleCommand "printf" "%s" "a $@ b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "lint_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "command"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "out.log"
+]
+[Word
+  Unquoted "sort"
+]
+[Word
+  Unquoted "data"
+]
+[Word
+  Unquoted "data"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "wrapped "
+  CommandSubstitution "echo inner"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s"
+]
+[Word
+  DoubleQuoted "a "
+  Variable "@"
+  DoubleQuoted " b"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+shit: 3:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal, put the file redirect first as in '>file 2>&1'.
+     3 |    command 2>&1 > out.log
+       |                   ^~~~~~~ here.
+shit: 4:17: warning: the command reads and truncates 'data' at once, the truncation empties the input before it is read, write to a temporary and move it over.
+     4 |    sort < data > data
+       |                  ^~~~ here.
+shit: 5:8: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
+     5 |    echo "wrapped $(echo inner)"
+       |         ^~~~~~~~~~~~~~~~~~~~~~~ here.
+shit: 6:15: warning: $@ inside a longer word concatenates the surrounding text onto the first and last argument, use $* for one joined string or a separate "$@" word.
+     6 |    printf '%s' "a $@ b"
+       |                ^~~~~~~~ here.
+done
+[Code 0]

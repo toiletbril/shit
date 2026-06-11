@@ -1,0 +1,133 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lint_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-z" "lit" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "a"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "count" "-eq" "notanumber" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "b"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$x" "=" "glob*" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "c"]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "-n" "$(ls | grep x)" "]"]
+          [CompoundListCondition, &&]
+            [SimpleCommand "echo" "d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "lint_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-z"
+]
+[Word
+  Unquoted "lit"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "count"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "notanumber"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "b"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  DoubleQuoted "glob*"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  CommandSubstitution "ls | grep x"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+shit: 3:8: warning: the operand is a literal, so this -z test is constant, test a variable or drop the check.
+     3 |    [ -z lit ] && echo a
+       |         ^~~ here.
+shit: 4:5: warning: the numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
+     4 |    [ count -eq notanumber ] && echo b
+       |      ^~~~~ here.
+shit: 4:15: warning: the numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
+     4 |    [ count -eq notanumber ] && echo b
+       |                ^~~~~~~~~~ here.
+shit: 5:12: warning: [ and test compare strings byte for byte and never glob-match, use a case or the [[ ]] form for the pattern.
+     5 |    [ "$x" = "glob*" ] && echo c
+       |             ^~~~~~~ here.
+shit: 6:8: warning: the test buffers the whole grep output only to check it is nonempty, run grep -q directly and test its exit status.
+     6 |    [ -n "$(ls | grep x)" ] && echo d
+       |         ^~~~~~~~~~~~~~~~ here.
+done
+[Code 0]

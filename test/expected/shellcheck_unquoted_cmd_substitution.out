@@ -27,6 +27,12 @@
 shit: 2:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
      2 |  echo $(echo hi)
        |       ^~~~~~~~~~ here.
+shit: 2:6: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
+     2 |  echo $(echo hi)
+       |       ^~~~~~~~~~ here.
+shit: 4:6: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
+     4 |  echo "$(echo hi)"
+       |       ^~~~~~~~~~~~ here.
 hi
 hi
 [Code 0]
