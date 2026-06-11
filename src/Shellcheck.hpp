@@ -50,6 +50,20 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC3037", "echo flags are not in POSIX echo, use printf"               },
     {"SC3044", "declare is not in POSIX, assign plainly under a sh shebang"  },
     {"SC3046", "source is the bash spelling, the POSIX dot command is ."     },
+    {"SC2196", "egrep is deprecated, use grep -E"                           },
+    {"SC2197", "fgrep is deprecated, use grep -F"                           },
+    {"SC2003", "expr forks for arithmetic the shell does natively"          },
+    {"SC2219", "let runs arithmetic as a command, use ((...))"              },
+    {"SC2168", "local outside a function has no scope to bind"              },
+    {"SC2005", "echo of a command substitution is redundant"               },
+    {"SC2009", "grepping ps output races the table, use pgrep"              },
+    {"SC2010", "grepping ls output mangles names, use a glob or find"       },
+    {"SC2126", "wc -l on grep output, use grep -c to count matches"         },
+    {"SC2155", "declare and assign separately so the exit status is seen"   },
+    {"SC2181", "test the command directly rather than $? indirectly"        },
+    {"SC3043", "local is not in POSIX sh, the value stays global"           },
+    {"SC3045", "printf -v is a bash extension absent from POSIX printf"     },
+    {"SC3030", "mapfile and readarray are bash array builtins absent from sh"},
 };
 
 } /* namespace shit */

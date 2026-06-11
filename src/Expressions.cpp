@@ -4174,6 +4174,69 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(m_args[0]->source_location(),
                 "source is the bash spelling, the POSIX dot command is '.', "
                 "use '.' under a sh shebang");
+    if (command_literal == "local")
+      actx.warn(m_args[0]->source_location(),
+                "local is not in POSIX sh, the value stays global, rework the "
+                "function or switch the shebang to bash");
+    if (command_literal == "printf" && m_args.count() >= 2 &&
+        m_args[1]->kind() == Token::Kind::Word &&
+        static_cast<const tokens::WordToken *>(m_args[1])
+                ->word()
+                .to_literal_string()
+                .view() == "-v")
+      actx.warn(m_args[1]->source_location(),
+                "printf -v is a bash extension, the POSIX printf has no -v, "
+                "capture the output with a command substitution under a sh "
+                "shebang");
+    /* mapfile and its readarray alias are bash array builtins with no POSIX
+       counterpart. This is shellcheck SC3030, read the input with a while
+       read loop under a sh shebang. */
+    if (command_literal == "mapfile" || command_literal == "readarray")
+      actx.warn(m_args[0]->source_location(),
+                command_literal.view() +
+                    " is a bash array builtin absent from POSIX sh, read the "
+                    "input with a while read loop or switch the shebang to "
+                    "bash");
+  }
+
+  /* The deprecated-tool and native-form lints. egrep and fgrep are deprecated
+     by GNU grep, shellcheck SC2196 and SC2197, use grep -E and grep -F. expr
+     forks for arithmetic the shell does natively, shellcheck SC2003, use
+     $((...)). let runs arithmetic as a command, shellcheck SC2219, use the
+     ((...)) compound. local outside a function has no scope to bind,
+     shellcheck SC2168. echo of a single command substitution is redundant,
+     shellcheck SC2005, run the command on its own. */
+  if (!command_is_shadowed) {
+    if (command_literal == "egrep")
+      actx.warn(m_args[0]->source_location(),
+                "egrep is deprecated, use grep -E for the extended regular "
+                "expression match");
+    else if (command_literal == "fgrep")
+      actx.warn(m_args[0]->source_location(),
+                "fgrep is deprecated, use grep -F for the fixed string match");
+    else if (command_literal == "expr")
+      actx.warn(m_args[0]->source_location(),
+                "expr forks for arithmetic the shell does natively, use "
+                "$((...)) for the calculation");
+    else if (command_literal == "let")
+      actx.warn(m_args[0]->source_location(),
+                "let runs arithmetic as a command, use the ((...)) compound so "
+                "the operands need no quoting");
+    else if (command_literal == "local" && actx.function_scope_depth == 0)
+      actx.warn(m_args[0]->source_location(),
+                "local outside a function has no scope to bind, declare the "
+                "variable plainly or move it into a function");
+  }
+
+  if (command_literal == "echo" && !command_is_shadowed &&
+      m_args.count() == 2 && m_args[1]->kind() == Token::Kind::Word)
+  {
+    let const &word = static_cast<const tokens::WordToken *>(m_args[1])->word();
+    if (word.segments.count() == 1 &&
+        word.segments[0].kind == WordSegment::Kind::CommandSubstitution)
+      actx.warn(m_args[0]->source_location(),
+                "echo of a command substitution prints what the command "
+                "already prints, run the command on its own instead");
   }
 
   /* A trap action in double quotes expands its variables and command
@@ -4269,6 +4332,31 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       command_literal == "export" || command_literal == "readonly" ||
       command_literal == "local" || command_literal == "declare" ||
       command_literal == "typeset";
+
+  /* A declaration builtin that assigns from a command substitution, such as
+     local x=$(cmd), reports the builtin's own success rather than the
+     command's exit status, so a failing cmd looks like it succeeded. This is
+     shellcheck SC2155, declare on one line and assign on the next so the
+     status is seen. The value rides an Assignment token. */
+  if (command_is_assignment_builtin && !command_is_shadowed)
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Assignment) continue;
+      let const &value =
+          static_cast<const tokens::Assignment *>(m_args[i])->value_word();
+      let value_has_substitution = false;
+      for (const WordSegment &segment : value.segments)
+        if (segment.kind == WordSegment::Kind::CommandSubstitution) {
+          value_has_substitution = true;
+          break;
+        }
+      if (!value_has_substitution) continue;
+      actx.warn(m_args[i]->source_location(),
+                "declaring and assigning from a command substitution in one "
+                "command masks the command's exit status, split the "
+                "declaration and the assignment so a failure is seen");
+      break;
+    }
+
   for (usize i = 1; i < m_args.count(); i++) {
     if (m_args[i]->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
@@ -4719,6 +4807,17 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           break;
         }
       }
+
+      /* A test against $? checks the exit status indirectly, where the command
+         can be tested directly with if or &&. This is shellcheck SC2181, which
+         also avoids a $? clobbered by an intervening command. */
+      if (word.segments.count() == 1 &&
+          word.segments[0].kind == WordSegment::Kind::VariableReference &&
+          word.segments[0].text.view() == "?")
+        actx.warn(m_args[i]->source_location(),
+                  "testing $? checks the exit status indirectly, test the "
+                  "command directly with if or && so an intervening command "
+                  "cannot clobber the status");
     }
 
   }
@@ -4933,6 +5032,37 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
                       "', which never reads stdin, so the upstream output is "
                       "discarded");
     }
+
+    let const stage_is_user =
+        actx.defined_functions.contains(stage_name->view()) ||
+        actx.known_aliases.contains(stage_name->view());
+    let const next_is_grep = next_name->view() == "grep" ||
+                             next_name->view() == "egrep" ||
+                             next_name->view() == "fgrep";
+
+    /* ps piped into grep races the live process table and matches the grep
+       itself, shellcheck SC2009, use pgrep. */
+    if (stage_name->view() == "ps" && !stage_is_user && next_is_grep)
+      actx.warn(next->args()[0]->source_location(),
+                "grepping the ps output races the process table and matches "
+                "the grep itself, use pgrep to match a process by name");
+
+    /* ls piped into grep parses the formatted listing, which mangles a name
+       with a space or a newline, shellcheck SC2010, use a glob or find. */
+    if (stage_name->view() == "ls" && !stage_is_user && next_is_grep)
+      actx.warn(next->args()[0]->source_location(),
+                "grepping the ls listing mangles a name with a space or a "
+                "newline, match the names with a glob or with find instead");
+
+    /* grep whose output only feeds wc -l counts matches with a second
+       process, shellcheck SC2126, use grep -c. */
+    if (stage_name->view() == "grep" && !stage_is_user &&
+        next_name->view() == "wc" && !next_is_user &&
+        next->args().count() == 2 &&
+        next->args()[1]->raw_string().view() == "-l")
+      actx.warn(stage->args()[0]->source_location(),
+                "counting grep output with wc -l runs an extra process, use "
+                "grep -c to count the matching lines directly");
   }
 
   /* A multi-stage pipeline reads variables in its children and the table cannot
