@@ -1,0 +1,161 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign d=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-e" "*.zzz" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "bracket-exists"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "bracket-no-match"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "-e" "*.zzz"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "test-exists"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "test-no-match"]
+  [CompoundListCondition, None]
+    [SimpleCommand "touch" "real.zzz"]
+  [CompoundListCondition, None]
+    [SimpleCommand "[" "-e" "*.zzz" "]"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "bracket-exists"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "bracket-no-match"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "-e" "*.zzz"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "test-exists"]
+  [CompoundListCondition, ||]
+    [SimpleCommand "echo" "test-no-match"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-r" "$d"]
+[Word
+  Unquoted "d="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "*.zzz"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket-exists"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket-no-match"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "*.zzz"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "test-exists"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "test-no-match"
+]
+[Word
+  Unquoted "touch"
+]
+[Word
+  Unquoted "real.zzz"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "*.zzz"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket-exists"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "bracket-no-match"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "*.zzz"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "test-exists"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "test-no-match"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Variable "d"
+]
+bracket-no-match
+test-no-match
+bracket-exists
+test-exists
+[Code 0]

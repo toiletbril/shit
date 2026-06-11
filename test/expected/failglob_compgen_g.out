@@ -1,0 +1,165 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign d=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$d"]
+  [CompoundListCondition, None]
+    [SimpleCommand "touch" "real.txt"]
+  [CompoundListCondition, None]
+    [SimpleCommand "compgen" "-G" "*.txt"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "glob-match=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "compgen" "-G" "*.zzz"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "glob-miss=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "compgen" "-G" "real.txt"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "plain-exists=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "compgen" "-G" "missing.txt"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "plain-missing=$?"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "compgen" "-G" "*.txt"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "found"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-r" "$d"]
+[Word
+  Unquoted "d="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "d"
+]
+[Word
+  Unquoted "touch"
+]
+[Word
+  Unquoted "real.txt"
+]
+[Word
+  Unquoted "compgen"
+]
+[Word
+  Unquoted "-G"
+]
+[Word
+  Literal "*.txt"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "glob-match="
+  Variable "?"
+]
+[Word
+  Unquoted "compgen"
+]
+[Word
+  Unquoted "-G"
+]
+[Word
+  Literal "*.zzz"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "glob-miss="
+  Variable "?"
+]
+[Word
+  Unquoted "compgen"
+]
+[Word
+  Unquoted "-G"
+]
+[Word
+  Literal "real.txt"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "plain-exists="
+  Variable "?"
+]
+[Word
+  Unquoted "compgen"
+]
+[Word
+  Unquoted "-G"
+]
+[Word
+  Literal "missing.txt"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "plain-missing="
+  Variable "?"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "compgen"
+]
+[Word
+  Unquoted "-G"
+]
+[Word
+  Literal "*.txt"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "found"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "/"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Variable "d"
+]
+real.txt
+glob-match=0
+glob-miss=1
+real.txt
+plain-exists=0
+plain-missing=1
+found
+[Code 0]
