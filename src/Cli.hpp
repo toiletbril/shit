@@ -18,13 +18,36 @@
 #define FLAG_LIST_DECL()                                                       \
   static shit::ArrayList<shit::Flag *> FLAG_LIST { shit::heap_allocator() }
 
-#define FLAG(var_name, kind, short_name, long_name, description)               \
+/* FLAG takes an optional flag_section argument before the description. The
+   five-argument form is the common one for builtins and defaults to
+   NoSection, which renders the flag at the top of --help with no section
+   heading. The six-argument form names the section the flag renders under, so
+   the help renderer reads the section off the flag instead of matching long
+   names. */
+#define T__FLAG_SELECT(_1, _2, _3, _4, _5, _6, name, ...) name
+#define FLAG(...) T__FLAG_SELECT(__VA_ARGS__, T__FLAG6, T__FLAG5)(__VA_ARGS__)
+#define T__FLAG5(var_name, kind, short_name, long_name, description)           \
+  T__FLAG6(var_name, kind, short_name, long_name,                              \
+           shit::flag_section::NoSection, description)
+#define T__FLAG6(var_name, kind, short_name, long_name, section, description)  \
   static shit::Flag##kind concat_literal(FLAG_, var_name){                     \
-      short_name, long_name, description};                                     \
+      short_name, long_name, section, description};                            \
   static uchar concat_literal(t__flag_dummy_, __LINE__) =                      \
       (FLAG_LIST.push(&concat_literal(FLAG_, var_name)), 0)
 
 namespace shit {
+
+/* The --help section a flag renders under. NoSection flags print first with
+   no heading. The order here is the order the sections print in. */
+enum class flag_section : u8
+{
+  NoSection,
+  Posix,
+  Bash,
+  Compat,
+  Shit,
+  Debug,
+};
 
 extern const usize HELP_WRAP_WIDTH;
 extern const usize HELP_INDENT;
@@ -44,18 +67,20 @@ public:
   fn set_position(u32 n) throws -> void;
   pure fn short_name() const wontthrow -> char;
   pure fn long_name() const wontthrow -> StringView;
+  pure fn section() const wontthrow -> flag_section;
   pure fn description() const wontthrow -> StringView;
 
   /* Reset the flag state, mainly for builtins. */
   virtual fn reset() throws -> void = 0;
 
 protected:
-  Flag(Kind type, char short_name, StringView long_name,
+  Flag(Kind type, char short_name, StringView long_name, flag_section section,
        StringView description);
 
   Kind m_kind;
   usize m_position{0}; /* 0 if it wasn't specified. */
   char m_short_name;
+  flag_section m_section;
   String m_long_name;
   String m_description;
 };
@@ -63,7 +88,8 @@ protected:
 class FlagBool : public Flag
 {
 public:
-  FlagBool(char short_name, StringView long_name, StringView description);
+  FlagBool(char short_name, StringView long_name, flag_section section,
+           StringView description);
 
   fn toggle() throws -> void;
   pure fn is_enabled() const wontthrow -> bool;
@@ -77,7 +103,8 @@ private:
 class FlagString : public Flag
 {
 public:
-  FlagString(char short_name, StringView long_name, StringView description);
+  FlagString(char short_name, StringView long_name, flag_section section,
+             StringView description);
 
   fn set(StringView v) throws -> void;
   pure fn is_set() const wontthrow -> bool;
@@ -93,7 +120,7 @@ private:
 class FlagManyStrings : public Flag
 {
 public:
-  FlagManyStrings(char short_name, StringView long_name,
+  FlagManyStrings(char short_name, StringView long_name, flag_section section,
                   StringView description);
 
   fn append(StringView v) throws -> void;

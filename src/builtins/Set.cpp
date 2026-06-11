@@ -106,7 +106,7 @@ const SetOption SET_OPTIONS[] = {
      "Skip the analysis stage before each chunk runs."},
     {'G', "show-memory", &EvalContext::set_memory_stats_enabled,
      &EvalContext::memory_stats_enabled,
-     "Print a granular memory report at exit, the -G flag."},
+     "Print a granular memory report at exit, the --show-memory flag."},
     /* The startup facts. A null set with a live get reports the state in the
        listings while set -o refuses to change it, since the choice happened at
        invocation. */

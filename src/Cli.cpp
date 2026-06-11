@@ -17,9 +17,9 @@ constexpr usize HELP_INDENT = 2;
 /* TODO: Make CLI tests. */
 
 Flag::Flag(Flag::Kind kind, char short_name, StringView long_name,
-           StringView description)
-    : m_kind(kind), m_short_name(short_name), m_long_name(long_name),
-      m_description(description)
+           flag_section section, StringView description)
+    : m_kind(kind), m_short_name(short_name), m_section(section),
+      m_long_name(long_name), m_description(description)
 {}
 
 pure fn Flag::kind() const wontthrow -> Flag::Kind { return m_kind; }
@@ -32,14 +32,16 @@ pure fn Flag::short_name() const wontthrow -> char { return m_short_name; }
 
 pure fn Flag::long_name() const wontthrow -> StringView { return m_long_name; }
 
+pure fn Flag::section() const wontthrow -> flag_section { return m_section; }
+
 pure fn Flag::description() const wontthrow -> StringView
 {
   return m_description;
 }
 
-FlagBool::FlagBool(char short_name, StringView long_name,
+FlagBool::FlagBool(char short_name, StringView long_name, flag_section section,
                    StringView description)
-    : Flag(Flag::Kind::Bool, short_name, long_name, description)
+    : Flag(Flag::Kind::Bool, short_name, long_name, section, description)
 {}
 
 fn FlagBool::toggle() throws -> void { m_value = !m_value; }
@@ -53,8 +55,8 @@ fn FlagBool::reset() throws -> void
 }
 
 FlagString::FlagString(char short_name, StringView long_name,
-                       StringView description)
-    : Flag(Flag::Kind::String, short_name, long_name, description)
+                       flag_section section, StringView description)
+    : Flag(Flag::Kind::String, short_name, long_name, section, description)
 {}
 
 fn FlagString::set(StringView v) throws -> void
@@ -78,8 +80,9 @@ fn FlagString::reset() throws -> void
 }
 
 FlagManyStrings::FlagManyStrings(char short_name, StringView long_name,
-                                 StringView description)
-    : Flag(Flag::Kind::ManyStrings, short_name, long_name, description)
+                                 flag_section section, StringView description)
+    : Flag(Flag::Kind::ManyStrings, short_name, long_name, section,
+           description)
 {}
 
 fn FlagManyStrings::append(StringView v) throws -> void
@@ -546,34 +549,6 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
   static constexpr usize WRAP_WIDTH = 80;
   static constexpr usize TEXT_WIDTH = WRAP_WIDTH - DESCRIPTION_COLUMN;
 
-  /* Each flag is grouped under a heading by where it comes from, the general
-     flags with no heading first, then the POSIX, the bash, the compatibility,
-     and the shit-specific groups. A flag not named here falls in the general
-     group. */
-  let const section_of = [](StringView name) -> int {
-    /* The -h and -m options that carry no long name are the POSIX hashall and
-       monitor, accepted without effect, so they sit in the POSIX group. */
-    if (name.is_empty()) return 1;
-    if (name == "interactive" || name == "stdin" || name == "command" ||
-        name == "error-exit" || name == "no-glob" || name == "one-command" ||
-        name == "verbose" || name == "xtrace" || name == "export-all" ||
-        name == "no-clobber" || name == "no-exec" || name == "no-unset" ||
-        name == "login")
-      return 1;
-    if (name == "rcfile" || name == "privileged") return 2;
-    if (name == "posix" || name == "bash-compatible" ||
-        name == "init-as-bash" || name == "dumb")
-      return 3;
-    if (name == "mimicry" || name == "warnings" || name == "no-diagnostics" ||
-        name == "no-completion" || name == "show-ast" ||
-        name == "show-lexed-words" || name == "show-exit-code" ||
-        name == "show-stats" || name == "show-memory" ||
-        name == "list-diagnostics" || name == "enable-debug-logging" ||
-        name == "ftrace" || name == "strace")
-      return 4;
-    return 0;
-  };
-
   let const render_flag = [&](const shit::Flag *f) throws {
     s += "\n";
 
@@ -643,16 +618,20 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
     }
   };
 
+  /* Each flag renders under the section its definition names, in enum order.
+     NoSection flags print first with no heading at all. */
   static const StringView SECTION_HEADERS[] = {
-      "OPTIONS", "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
-      "OTHER OPTIONS"};
-  for (int section = 0; section < 5; section++) {
+      "",     "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
+      "SHIT OPTIONS", "DEBUG OPTIONS"};
+  for (u8 section = 0; section < 6; section++) {
     bool header_printed = false;
     for (const shit::Flag *f : flags) {
-      if (section_of(f->long_name()) != section) continue;
+      if (static_cast<u8>(f->section()) != section) continue;
       if (!header_printed) {
-        if (section > 0) s += "\n\n";
-        s += SECTION_HEADERS[section];
+        if (!SECTION_HEADERS[section].is_empty()) {
+          if (!s.is_empty()) s += "\n\n";
+          s += SECTION_HEADERS[section];
+        }
         header_printed = true;
       }
       render_flag(f);

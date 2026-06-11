@@ -13,17 +13,15 @@ namespace shit {
 enum class verbosity : u8
 {
   Nothing = 0,
-  Error,
-  Warn,
   Info,
   Debug,
   All,
 };
 
 /* The active log level. A message prints when its level is at or below this.
-   Main sets it from a flag, so a release build that leaves the default pays one
-   comparison per call. */
-inline verbosity LOGGER_VERBOSITY = verbosity::Warn;
+   Main sets it from the -X flag, so a release build that leaves the Nothing
+   default pays one comparison per call and prints nothing. */
+inline verbosity LOGGER_VERBOSITY = verbosity::Nothing;
 
 /* The log sink, stderr unless --debug-output-file pointed it at a file opened
    for append, so an interactive session logs without painting over the
@@ -39,8 +37,6 @@ constexpr const char *verbosity_to_string(verbosity verbosity)
 {
   switch (verbosity) {
   case verbosity::Nothing: return "Nothing";
-  case verbosity::Error: return "Error";
-  case verbosity::Warn: return "Warn";
   case verbosity::Info: return "Info";
   case verbosity::Debug: return "Debug";
   case verbosity::All: return "All";

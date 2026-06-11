@@ -23,64 +23,73 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]", "[-OPTIONS] -",
                    "[-OPTIONS]");
 
-FLAG(INTERACTIVE, Bool, 'i', "interactive",
-     "Specify that the shell is interactive.");
-FLAG(STDIN, Bool, 's', "stdin", "Execute command from stdin and exit.");
-FLAG(COMMAND, ManyStrings, 'c', "command",
-     "Execute specified command and exit. Can be used multiple times.");
-FLAG(ERROR_EXIT, Bool, 'e', "error-exit", "Die on first error.");
-FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", "Disable path expansion.");
-FLAG(ONE_COMMAND, Bool, 't', "one-command",
-     "Exit after executing one command.");
-FLAG(VERBOSE, Bool, 'v', "verbose",
-     "Write input to standard error as it is read.");
-FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace",
-     "Write expanded input to standard error as it is read.");
+FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
+FLAG(SHORT_VERSION, Bool, 'V', "short-version",
+     "Display version in a short form.");
+FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
-FLAG(EXPORT_ALL, Bool, 'a', "export-all",
+FLAG(INTERACTIVE, Bool, 'i', "interactive", shit::flag_section::Posix,
+     "Specify that the shell is interactive.");
+FLAG(STDIN, Bool, 's', "stdin", shit::flag_section::Posix,
+     "Execute command from stdin and exit.");
+FLAG(COMMAND, ManyStrings, 'c', "command", shit::flag_section::Posix,
+     "Execute specified command and exit. Can be used multiple times.");
+FLAG(ERROR_EXIT, Bool, 'e', "error-exit", shit::flag_section::Posix,
+     "Die on first error.");
+FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", shit::flag_section::Posix,
+     "Disable path expansion.");
+FLAG(ONE_COMMAND, Bool, 't', "one-command", shit::flag_section::Posix,
+     "Exit after executing one command.");
+FLAG(VERBOSE, Bool, 'v', "verbose", shit::flag_section::Posix,
+     "Write input to standard error as it is read.");
+FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace", shit::flag_section::Posix,
+     "Write expanded input to standard error as it is read.");
+FLAG(EXPORT_ALL, Bool, 'a', "export-all", shit::flag_section::Posix,
      "Mark every assigned variable for the environment.");
-FLAG(NO_CLOBBER, Bool, 'C', "no-clobber",
+FLAG(NO_CLOBBER, Bool, 'C', "no-clobber", shit::flag_section::Posix,
      "Refuse to overwrite an existing file through '>'.");
-FLAG(NO_EXEC, Bool, 'n', "no-exec",
+FLAG(NO_EXEC, Bool, 'n', "no-exec", shit::flag_section::Posix,
      "Read and parse commands but do not run them.");
-FLAG(NOUNSET, Bool, 'u', "no-unset", "Treat an unset variable as an error.");
-/* The variable is POSIX_MODE rather than POSIX, since Platform.hpp defines
-   POSIX as a platform-vector macro that would eat the flag name. */
-FLAG(
-    POSIX_MODE, Bool, 'P', "posix",
-    "Run in POSIX mode, the way dash behaves. The analysis stage is skipped so "
-    "a file with an analysis error still runs, an unmatched glob stays its "
-    "literal pattern, and the style warnings are off.");
-FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible",
-     "Run in Bash-compatible mode. Bash extensions such as [[ ]], arrays, and "
-     "brace expansion are enabled, the analysis stage is skipped, and an "
-     "unmatched glob stays its literal pattern.");
-FLAG(WARNINGS, Bool, 'W', "warnings",
-     "Keep the analysis stage but report every error as a warning and let the "
-     "run proceed, instead of stopping on the first error.");
-FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
-     "Skip the analysis stage, so no warnings or pre-run diagnostics are "
-     "reported and evaluation begins sooner.");
-FLAG(LOGIN, Bool, 'l', "login",
+FLAG(NOUNSET, Bool, 'u', "no-unset", shit::flag_section::Posix,
+     "Treat an unset variable as an error.");
+FLAG(LOGIN, Bool, 'l', "login", shit::flag_section::Posix,
      "Act as a login shell and source the profiles.");
-FLAG(INIT_AS_BASH, Bool, 'L', "init-as-bash",
-     "Initialize as bash, sourcing the bash config files in bash mode, then "
-     "snap to the default mode with all diagnostics at the interactive prompt. "
-     "Sources the bash login scripts only when combined with -l. The "
-     "SHIT_INIT_AS_BASH environment variable enables this when set.");
-FLAG(
-    PRIVILEGED, Bool, 'p', "privileged",
-    "Run in privileged mode and skip every startup config file, so a config a "
-    "less-privileged user controls cannot run with raised privileges. Turned "
-    "on automatically when the effective and the real user or group id differ, "
-    "the setuid or setgid case.");
-FLAG(RCFILE, String, '\0', "rcfile",
+FLAG(IGNORED1, Bool, 'h', "\0", shit::flag_section::Posix,
+     "Ignored, left for compatibility.");
+FLAG(IGNORED2, Bool, 'm', "\0", shit::flag_section::Posix,
+     "Ignored, left for compatibility.");
+
+FLAG(RCFILE, String, '\0', "rcfile", shit::flag_section::Bash,
      "Source FILE as the interactive rc instead of ~/.bashrc, the way bash "
      "reads "
      "a named rc. The shit rc still runs, and a non-interactive run reads no "
      "rc.");
 FLAG(
-    MIMICRY, Bool, 'I', "mimicry",
+    PRIVILEGED, Bool, 'p', "privileged", shit::flag_section::Bash,
+    "Run in privileged mode and skip every startup config file, so a config a "
+    "less-privileged user controls cannot run with raised privileges. Turned "
+    "on automatically when the effective and the real user or group id differ, "
+    "the setuid or setgid case.");
+
+/* The variable is POSIX_MODE rather than POSIX, since Platform.hpp defines
+   POSIX as a platform-vector macro that would eat the flag name. */
+FLAG(
+    POSIX_MODE, Bool, 'P', "posix", shit::flag_section::Compat,
+    "Run in POSIX mode, the way dash behaves. The analysis stage is skipped so "
+    "a file with an analysis error still runs, an unmatched glob stays its "
+    "literal pattern, and the style warnings are off.");
+FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible",
+     shit::flag_section::Compat,
+     "Run in Bash-compatible mode. Bash extensions such as [[ ]], arrays, and "
+     "brace expansion are enabled, the analysis stage is skipped, and an "
+     "unmatched glob stays its literal pattern.");
+FLAG(INIT_AS_BASH, Bool, 'L', "init-as-bash", shit::flag_section::Compat,
+     "Initialize as bash, sourcing the bash config files in bash mode, then "
+     "snap to the default mode with all diagnostics at the interactive prompt. "
+     "Sources the bash login scripts only when combined with -l. The "
+     "SHIT_INIT_AS_BASH environment variable enables this when set.");
+FLAG(
+    MIMICRY, Bool, 'I', "mimicry", shit::flag_section::Compat,
     "Mimic the shell a script's shebang names, for speed. A program whose "
     "shebang is a shell shit can emulate runs in-process in the matching mode "
     "rather than launching the shell, so a script-heavy run skips the fork and "
@@ -89,44 +98,48 @@ FLAG(
     "and shit in the default mode. A zsh, ksh, fish, or non-shell shebang "
     "still "
     "launches the real program.");
+FLAG(DUMB, Bool, '\0', "dumb", shit::flag_section::Compat,
+     "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
 
-FLAG(IGNORED1, Bool, 'h', "\0", "Ignored, left for compatibility.");
-FLAG(IGNORED2, Bool, 'm', "\0", "Ignored, left for compatibility.");
-
-FLAG(AST, Bool, 'A', "show-ast", "Print AST before executing each command.");
-FLAG(ESCAPE_MAP, Bool, 'M', "show-lexed-words",
-     "Print escape bitmap after each parsed command.");
-FLAG(EXIT_CODE, Bool, 'E', "show-exit-code",
-     "Print exit code after each executed command.");
-FLAG(STATS, Bool, 'S', "show-stats",
+FLAG(WARNINGS, Bool, 'W', "warnings", shit::flag_section::Shit,
+     "Keep the analysis stage but report every error as a warning and let the "
+     "run proceed, instead of stopping on the first error.");
+FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", shit::flag_section::Shit,
+     "List the shellcheck-style checks the analysis stage reports, then exit.");
+FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
+     shit::flag_section::Shit,
+     "Skip the analysis stage, so no warnings or pre-run diagnostics are "
+     "reported and evaluation begins sooner.");
+FLAG(NO_COMPLETION, Bool, 'T', "no-completion", shit::flag_section::Shit,
+     "Disable interactive tab completion and ghost-text.");
+FLAG(STATS, Bool, '\0', "show-stats", shit::flag_section::Shit,
      "Print statistics after each executed command, including commands "
      "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
      "peak.");
-FLAG(MEMORY, Bool, 'G', "show-memory",
+FLAG(MEMORY, Bool, '\0', "show-memory", shit::flag_section::Shit,
      "Print a granular memory report at exit, the AST and function arena bytes "
      "with their reserved capacity and the malloc heap in use.");
-FLAG(NO_COMPLETION, Bool, 'T', "no-completion",
-     "Disable interactive tab completion and ghost-text.");
-FLAG(DUMB, Bool, '\0', "dumb",
-     "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
-FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics",
-     "List the shellcheck-style checks the analysis stage reports, then exit.");
-FLAG(LOG, String, 'X', "enable-debug-logging",
-     "Enable internal logging at the given level, one of 'error', 'warn', "
-     "'info', 'debug', or 'all'. An unknown spelling raises everything.");
-FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-output-file",
+
+FLAG(AST, Bool, 'A', "show-ast", shit::flag_section::Debug,
+     "Print AST before executing each command.");
+FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", shit::flag_section::Debug,
+     "Print exit code after each executed command.");
+FLAG(ESCAPE_MAP, Bool, 'M', "show-lexed-words", shit::flag_section::Debug,
+     "Print escape bitmap after each parsed command.");
+FLAG(LOG, String, 'X', "debug-logging", shit::flag_section::Debug,
+     "Enable internal logging at the given level, one of 'info', 'debug', or "
+     "'all'. An unknown spelling is an error.");
+FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file",
+     shit::flag_section::Debug,
      "Create the named file when missing and append the debug log to it "
      "instead of stderr, so an interactive session logs without painting "
      "over the prompt.");
 
-FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
-FLAG(SHORT_VERSION, Bool, 'V', "short-version",
-     "Display version in a short form.");
-FLAG(HELP, Bool, '\0', "help", "Display help message.");
-
 #if SHIT_PLATFORM_IS COSMO
-FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", "Cosmopolitan: Trace functions.");
-FLAG(COSMO_STRACE, Bool, '\0', "strace", "Cosmopolitan: Trace system calls.");
+FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", shit::flag_section::Debug,
+     "Cosmopolitan: Trace functions.");
+FLAG(COSMO_STRACE, Bool, '\0', "strace", shit::flag_section::Debug,
+     "Cosmopolitan: Trace system calls.");
 #endif
 
 namespace shit {
@@ -588,9 +601,9 @@ fn main(int argc, char **argv) -> int
   }
 
   /* Raise the runtime log level before any helper runs, so the trace covers
-     startup. The default stays Warn, so a run without -X pays one comparison
-     per LOG call and prints nothing. An unknown level spelling raises
-     everything rather than silently logging nothing. */
+     startup. The default stays Nothing, so a run without -X pays one
+     comparison per LOG call and prints nothing. An unknown level spelling is
+     a usage error, the way an unknown flag is. */
   if (FLAG_LOG.is_set()) {
     struct log_level_name
     {
@@ -598,16 +611,25 @@ fn main(int argc, char **argv) -> int
       shit::verbosity level;
     };
     static const log_level_name LOG_LEVEL_NAMES[] = {
-        {"error", shit::verbosity::Error}, {"warn", shit::verbosity::Warn},
-        {"info", shit::verbosity::Info},   {"debug", shit::verbosity::Debug},
+        {"info", shit::verbosity::Info},
+        {"debug", shit::verbosity::Debug},
         {"all", shit::verbosity::All},
     };
-    shit::LOGGER_VERBOSITY = shit::verbosity::All;
+    let is_known_level = false;
     for (const log_level_name &entry : LOG_LEVEL_NAMES)
       if (FLAG_LOG.value() == entry.name) {
         shit::LOGGER_VERBOSITY = entry.level;
+        is_known_level = true;
         break;
       }
+    if (!is_known_level) {
+      shit::show_message(
+          shit::Error{"Unknown debug logging level '" +
+                      shit::String{FLAG_LOG.value()} +
+                      "', expected 'info', 'debug', or 'all'"}
+              .to_string());
+      return 2;
+    }
   }
 
   /* The log sink opens before anything logs, in append mode so consecutive
