@@ -24,12 +24,21 @@
 [Word
   CommandSubstitution "echo hi"
 ]
+shit: 2:1: warning: echo of a command substitution prints what the command already prints, run the command on its own instead.
+     2 |  echo $(echo hi)
+       |  ^~~~ here.
 shit: 2:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
      2 |  echo $(echo hi)
        |       ^~~~~~~~~~ here.
 shit: 2:6: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
      2 |  echo $(echo hi)
        |       ^~~~~~~~~~ here.
+shit: 3:8: warning: declaring and assigning from a command substitution in one command masks the command's exit status, split the declaration and the assignment so a failure is seen.
+     3 |  export FOO=$(echo hi)
+       |         ^~~~~~~~~~~~~~ here.
+shit: 4:1: warning: echo of a command substitution prints what the command already prints, run the command on its own instead.
+     4 |  echo "$(echo hi)"
+       |  ^~~~ here.
 shit: 4:6: warning: a useless echo inside the command substitution, the text can be used directly without the subshell.
      4 |  echo "$(echo hi)"
        |       ^~~~~~~~~~~~ here.
