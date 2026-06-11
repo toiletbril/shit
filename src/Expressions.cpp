@@ -2736,6 +2736,35 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
 
   unused(is_unconditional);
 
+  /* for over the words of an unquoted command substitution iterates IFS-split
+     words rather than lines, so a name with a space breaks apart. A $(cat
+     file) is shellcheck SC2013, read the lines with while read -r. A
+     $(find ...) is shellcheck SC2044, use find -exec or a read loop. */
+  for (const Token *t : m_words) {
+    if (t->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(t)->word();
+    for (const WordSegment &segment : word.segments) {
+      if (segment.kind != WordSegment::Kind::CommandSubstitution ||
+          segment.is_in_double_quotes)
+        continue;
+      let const body = segment.text.view();
+      usize start = 0;
+      while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
+        start++;
+      let const trimmed = body.substring(start);
+      if (trimmed.starts_with(StringView{"cat "}))
+        actx.warn(t->source_location(),
+                  "for over the cat output iterates IFS-split words rather "
+                  "than lines, read the lines with 'while IFS= read -r line' "
+                  "instead");
+      else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
+        actx.warn(t->source_location(),
+                  "for over the find output breaks a name with whitespace "
+                  "apart, use find -exec or a 'while read -r' loop over "
+                  "find -print0");
+    }
+  }
+
   /* The body runs repeatedly over the loop list and may reassign a name, so a
      value recorded before the loop does not hold inside it. Clearing the
      constant table before the body keeps a pre-loop constant from being inlined
@@ -3849,6 +3878,117 @@ cold fn is_test_binary_operator_word(StringView op) wontthrow -> bool
          op == "-ot";
 }
 
+/* The numeric comparison operators of test, where a non-numeric literal
+   operand always errors at run time, the SC2170 lint. */
+cold fn is_test_numeric_operator_word(StringView op) wontthrow -> bool
+{
+  return op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
+         op == "-gt" || op == "-ge";
+}
+
+/* True when every segment of the word is plain text with no expansion, so the
+   runtime value equals the source text. Read by the constant-test and the
+   glob-pattern lints. */
+cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
+{
+  for (const WordSegment &segment : word.segments)
+    if (segment.kind != WordSegment::Kind::LiteralText &&
+        segment.kind != WordSegment::Kind::UnquotedText &&
+        segment.kind != WordSegment::Kind::DoubleQuotedText)
+      return false;
+  return true;
+}
+
+/* True when an optional minus is followed by one or more digits and nothing
+   else, the operand shape the numeric test operators accept. */
+cold pure fn view_is_integer_literal(StringView view) wontthrow -> bool
+{
+  usize i = view.length >= 1 && view[0] == '-' ? 1 : 0;
+  if (i >= view.length) return false;
+  for (; i < view.length; i++)
+    if (view[i] < '0' || view[i] > '9') return false;
+  return true;
+}
+
+/* True when the view carries the needle anywhere, the substring probe
+   StringView itself does not offer. Both sides are tiny lint inputs, so the
+   plain scan costs nothing measurable. */
+cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
+{
+  if (needle.length == 0 || needle.length > view.length) return false;
+  for (usize i = 0; i + needle.length <= view.length; i++)
+    if (view.substring(i).starts_with(needle)) return true;
+  return false;
+}
+
+/* True when one of the leading short-option clusters carries the letter, the
+   way -rf carries r and f. A long option or a plain operand is not a
+   cluster. */
+cold fn args_have_short_flag(const ArrayList<const Token *> &args,
+                             char letter) throws -> bool
+{
+  for (usize i = 1; i < args.count(); i++) {
+    if (args[i]->kind() != Token::Kind::Word) continue;
+    let const literal = static_cast<const tokens::WordToken *>(args[i])
+                            ->word()
+                            .to_literal_string();
+    let const view = literal.view();
+    if (view.length >= 2 && view[0] == '-' && view[1] != '-' &&
+        view.find_character(letter).has_value())
+      return true;
+  }
+  return false;
+}
+
+/* The commands that never read stdin, so a pipe or an input redirect into one
+   of them silently discards the upstream data, shellcheck SC2216 for the pipe
+   and SC2217 for the redirect. The value is unused, the membership is the
+   answer. */
+constexpr StaticStringMap<bool>::entry NON_STDIN_READER_ENTRIES[] = {
+    {PackedStringKey::from_literal("rm"),       true},
+    {PackedStringKey::from_literal("echo"),     true},
+    {PackedStringKey::from_literal("printf"),   true},
+    {PackedStringKey::from_literal("true"),     true},
+    {PackedStringKey::from_literal("false"),    true},
+    {PackedStringKey::from_literal("mkdir"),    true},
+    {PackedStringKey::from_literal("rmdir"),    true},
+    {PackedStringKey::from_literal("touch"),    true},
+    {PackedStringKey::from_literal("chmod"),    true},
+    {PackedStringKey::from_literal("chown"),    true},
+    {PackedStringKey::from_literal("cp"),       true},
+    {PackedStringKey::from_literal("mv"),       true},
+    {PackedStringKey::from_literal("ln"),       true},
+    {PackedStringKey::from_literal("kill"),     true},
+    {PackedStringKey::from_literal("basename"), true},
+    {PackedStringKey::from_literal("dirname"),  true},
+    {PackedStringKey::from_literal("sleep"),    true},
+    {PackedStringKey::from_literal("unlink"),   true},
+};
+constexpr StaticStringMap<bool> NON_STDIN_READERS{
+    NON_STDIN_READER_ENTRIES,
+    sizeof(NON_STDIN_READER_ENTRIES) / sizeof(NON_STDIN_READER_ENTRIES[0])};
+
+/* The top-level system directories rm -r must never aim at, the SC2114
+   table. */
+constexpr StaticStringMap<bool>::entry SYSTEM_DIRECTORY_ENTRIES[] = {
+    {PackedStringKey::from_literal("/"),     true},
+    {PackedStringKey::from_literal("/bin"),  true},
+    {PackedStringKey::from_literal("/boot"), true},
+    {PackedStringKey::from_literal("/dev"),  true},
+    {PackedStringKey::from_literal("/etc"),  true},
+    {PackedStringKey::from_literal("/home"), true},
+    {PackedStringKey::from_literal("/lib"),  true},
+    {PackedStringKey::from_literal("/proc"), true},
+    {PackedStringKey::from_literal("/root"), true},
+    {PackedStringKey::from_literal("/sbin"), true},
+    {PackedStringKey::from_literal("/sys"),  true},
+    {PackedStringKey::from_literal("/usr"),  true},
+    {PackedStringKey::from_literal("/var"),  true},
+};
+constexpr StaticStringMap<bool> SYSTEM_DIRECTORIES{
+    SYSTEM_DIRECTORY_ENTRIES,
+    sizeof(SYSTEM_DIRECTORY_ENTRIES) / sizeof(SYSTEM_DIRECTORY_ENTRIES[0])};
+
 cold fn SimpleCommand::analyze(AnalysisContext &actx,
                                bool is_unconditional) const throws -> void
 {
@@ -4072,6 +4212,246 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
               "it to keep one argument");
   }
 
+  /* rm -r with a "$var/" operand deletes / outright when the variable is
+     empty, since only the slash remains. This is shellcheck SC2115, the
+     ${var:?} form aborts on the empty value instead. A literal operand naming
+     a top-level system directory is shellcheck SC2114. */
+  if (command_literal == "rm" && !command_is_shadowed &&
+      args_have_short_flag(m_args, 'r'))
+  {
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      if (word.segments.count() >= 2 &&
+          word.segments[0].kind == WordSegment::Kind::VariableReference &&
+          !word.segments[0].text.view().find_character(':').has_value() &&
+          !word.segments[1].text.is_empty() && word.segments[1].text[0] == '/')
+      {
+        actx.warn(m_args[i]->source_location(),
+                  "rm -r on \"$" + word.segments[0].text.view() +
+                      "/\" deletes '/' when the variable is empty, write ${" +
+                      word.segments[0].text.view() +
+                      ":?} so an empty value aborts the command instead");
+      }
+      if (word_is_fully_literal(word)) {
+        let const literal = word.to_literal_string();
+        if (SYSTEM_DIRECTORIES.find(literal.view()).has_value())
+          actx.warn(m_args[i]->source_location(),
+                    "rm -r aimed at the system directory '" + literal.view() +
+                        "', double-check the path before running this");
+      }
+    }
+  }
+
+  /* The grep pattern lints. An unquoted pattern with a glob metacharacter can
+     expand against the local files before grep ever sees it, shellcheck
+     SC2062. A quoted pattern that starts with * looks like a glob, but grep
+     reads a regular expression where a leading * has nothing to repeat,
+     shellcheck SC2063. The pattern is the first word past the options. */
+  if ((command_literal == "grep" || command_literal == "egrep" ||
+       command_literal == "fgrep") &&
+      !command_is_shadowed)
+  {
+    for (usize i = 1; i < m_args.count(); i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      let const literal = word.to_literal_string();
+      let const view = literal.view();
+      if (view.length >= 1 && view[0] == '-') continue;
+      if (word.segments.count() == 1 &&
+          word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+          word.segments[0].has_glob_metacharacter())
+      {
+        actx.warn(m_args[i]->source_location(),
+                  "the unquoted grep pattern can glob against the local files "
+                  "before grep sees it, quote the pattern");
+      } else if (!view.is_empty() && view[0] == '*') {
+        actx.warn(m_args[i]->source_location(),
+                  "grep reads a regular expression, where a leading * has "
+                  "nothing to repeat, this pattern looks like a glob");
+      }
+      break;
+    }
+  }
+
+  /* mkdir -p with -m applies the mode only to the deepest directory, the
+     parents take the umask default. This is shellcheck SC2174. */
+  if (command_literal == "mkdir" && !command_is_shadowed &&
+      args_have_short_flag(m_args, 'p') && args_have_short_flag(m_args, 'm'))
+  {
+    actx.warn(m_args[0]->source_location(),
+              "mkdir -pm applies the mode only to the deepest directory, the "
+              "created parents keep the umask default");
+  }
+
+  /* An exit or return code outside the literal 0-255 integer shape either
+     errors at run time or wraps modulo 256. This is shellcheck SC2242. */
+  if ((command_literal == "exit" || command_literal == "return") &&
+      !command_is_shadowed && m_args.count() >= 2 &&
+      m_args[1]->kind() == Token::Kind::Word)
+  {
+    let const &operand =
+        static_cast<const tokens::WordToken *>(m_args[1])->word();
+    if (word_is_fully_literal(operand)) {
+      let const literal = operand.to_literal_string();
+      let const view = literal.view();
+      let is_in_range = view_is_integer_literal(view) && view[0] != '-';
+      if (is_in_range) {
+        i64 value = 0;
+        for (usize i = 0; i < view.length && value <= 255; i++)
+          value = value * 10 + (view[i] - '0');
+        is_in_range = value <= 255;
+      }
+      if (!is_in_range)
+        actx.warn(m_args[1]->source_location(),
+                  "the code '" + view + "' is not a number from 0 to 255, " +
+                      command_literal.view() +
+                      " either rejects it or wraps it modulo 256");
+    }
+  }
+
+  /* The $@ word lints that need no array tracking. A bare $@ word-splits and
+     globs every argument, shellcheck SC2068, quote it as "$@". A $@ mixed
+     into a longer word concatenates the arguments around the neighboring text
+     unpredictably, shellcheck SC2145. The [[ form gets SC2199 below. */
+  for (usize i = command_literal == "[[" ? m_args.count() : 1;
+       i < m_args.count(); i++)
+  {
+    if (m_args[i]->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
+    for (const WordSegment &segment : word.segments) {
+      if (segment.kind != WordSegment::Kind::VariableReference ||
+          segment.text.view() != "@")
+        continue;
+      if (word.segments.count() == 1 && !segment.is_in_double_quotes) {
+        actx.warn(m_args[i]->source_location(),
+                  "an unquoted $@ word-splits and globs each argument, quote "
+                  "it as \"$@\" to pass the arguments through unchanged");
+      } else if (word.segments.count() > 1) {
+        actx.warn(m_args[i]->source_location(),
+                  "$@ inside a longer word concatenates the surrounding text "
+                  "onto the first and last argument, use $* for one joined "
+                  "string or a separate \"$@\" word");
+      }
+      break;
+    }
+  }
+
+  /* A command substitution that only echoes runs a subshell to produce text
+     the caller already has. This is shellcheck SC2116, drop the $(echo ...)
+     wrapper. A body carrying an operator runs more than the echo, so it is
+     left alone. */
+  for (usize i = 0; i < m_args.count(); i++) {
+    if (m_args[i]->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
+    for (const WordSegment &segment : word.segments) {
+      if (segment.kind != WordSegment::Kind::CommandSubstitution) continue;
+      let const body = segment.text.view();
+      usize start = 0;
+      while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
+        start++;
+      let const trimmed = body.substring(start);
+      if (!trimmed.starts_with(StringView{"echo "}) && trimmed != "echo")
+        continue;
+      let body_runs_more_than_echo = false;
+      for (usize b = 0; b < trimmed.length; b++)
+        if (trimmed[b] == '|' || trimmed[b] == ';' || trimmed[b] == '&' ||
+            trimmed[b] == '<' || trimmed[b] == '>' || trimmed[b] == '`')
+        {
+          body_runs_more_than_echo = true;
+          break;
+        }
+      if (!body_runs_more_than_echo)
+        actx.warn(m_args[i]->source_location(),
+                  "a useless echo inside the command substitution, the text "
+                  "can be used directly without the subshell");
+    }
+  }
+
+  /* The redirection lints. 2>&1 written before the stdout file redirect
+     duplicates the still-unredirected stdout, so stderr keeps going to the
+     terminal, shellcheck SC2069, write the file redirect first. Reading and
+     truncating the same file in one command destroys the input before it is
+     read, shellcheck SC2094. An input redirect into a command that never
+     reads stdin discards the data, shellcheck SC2217. */
+  {
+    let saw_stderr_to_stdout = false;
+    /* The read target is held as an owned String, not a view, since the view
+       of a to_literal_string() temporary would dangle past the statement. */
+    String read_target{};
+    const Token *read_token = nullptr;
+    for (const Redirection &redirection : m_redirections) {
+      if (redirection.kind == Redirection::Kind::DuplicateOutput &&
+          redirection.fd == 2 && redirection.dup_fd == 1)
+      {
+        saw_stderr_to_stdout = true;
+        continue;
+      }
+      let const is_file_output =
+          redirection.kind == Redirection::Kind::TruncateOutput ||
+          redirection.kind == Redirection::Kind::TruncateOutputOverride;
+      if (is_file_output && redirection.fd == 1 && saw_stderr_to_stdout &&
+          redirection.target != nullptr)
+      {
+        actx.warn(redirection.target->source_location(),
+                  "2>&1 before the file redirect duplicates the terminal, so "
+                  "stderr stays on the terminal, put the file redirect first "
+                  "as in '>file 2>&1'");
+      }
+      if (redirection.kind == Redirection::Kind::ReadInput &&
+          redirection.target != nullptr &&
+          redirection.target->kind() == Token::Kind::Word)
+      {
+        read_target = static_cast<const tokens::WordToken *>(redirection.target)
+                          ->word()
+                          .to_literal_string();
+        read_token = redirection.target;
+      }
+      if (is_file_output && redirection.target != nullptr &&
+          redirection.target->kind() == Token::Kind::Word &&
+          read_token != nullptr)
+      {
+        let const write_target =
+            static_cast<const tokens::WordToken *>(redirection.target)
+                ->word()
+                .to_literal_string();
+        if (!read_target.is_empty() &&
+            write_target.view() == read_target.view())
+          actx.warn(redirection.target->source_location(),
+                    "the command reads and truncates '" + read_target.view() +
+                        "' at once, the truncation empties the input before "
+                        "it is read, write to a temporary and move it over");
+      }
+    }
+
+    if (!m_redirections.is_empty() && !command_is_shadowed &&
+        NON_STDIN_READERS.find(command_literal.view()).has_value())
+    {
+      let has_stdin_operand = false;
+      for (usize i = 1; i < m_args.count(); i++) {
+        let const raw = m_args[i]->raw_string();
+        if (raw.view() == "-" || raw.view() == "/dev/stdin") {
+          has_stdin_operand = true;
+          break;
+        }
+      }
+      if (!has_stdin_operand)
+        for (const Redirection &redirection : m_redirections)
+          if (redirection.kind == Redirection::Kind::ReadInput ||
+              redirection.kind == Redirection::Kind::Heredoc ||
+              redirection.kind == Redirection::Kind::HereString)
+          {
+            actx.warn(m_args[0]->source_location(),
+                      "the input redirect feeds '" + command_literal.view() +
+                          "', which never reads stdin, so the data is "
+                          "discarded");
+            break;
+          }
+    }
+  }
+
   /* Obsolescent or redundant test forms, each a shellcheck check. -a and -o
      joining two conditions is obsolescent and misparses with some operands, so
      prefer a separate test joined with && or || (SC2166). The operator is
@@ -4183,6 +4563,80 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                   "with -n to read clearer");
       }
     }
+
+    /* The operand-shape lints over the closed operand range. A -z or -n on a
+       fully literal operand is constant, shellcheck SC2157. A numeric
+       comparison against a non-numeric literal always errors at run time,
+       shellcheck SC2170. A = or == against a literal with a glob character
+       reads like a pattern match the [ and test commands never do, shellcheck
+       SC2081. A grep inside a test substitution buffers the whole output
+       where grep -q answers on the first match, shellcheck SC2143. */
+    for (usize i = 1; i < operand_end; i++) {
+      if (m_args[i]->kind() != Token::Kind::Word) continue;
+      let const &word =
+          static_cast<const tokens::WordToken *>(m_args[i])->word();
+      let const literal = word.to_literal_string();
+      let const view = literal.view();
+
+      if ((view == "-z" || view == "-n") && i + 1 < operand_end &&
+          m_args[i + 1]->kind() == Token::Kind::Word)
+      {
+        let const &next =
+            static_cast<const tokens::WordToken *>(m_args[i + 1])->word();
+        if (word_is_fully_literal(next))
+          actx.warn(m_args[i + 1]->source_location(),
+                    "the operand is a literal, so this " + view +
+                        " test is constant, test a variable or drop the "
+                        "check");
+      }
+
+      if (is_test_numeric_operator_word(view)) {
+        for (usize side = i - 1; side <= i + 1; side += 2) {
+          if (side >= operand_end || m_args[side]->kind() != Token::Kind::Word)
+            continue;
+          let const &operand =
+              static_cast<const tokens::WordToken *>(m_args[side])->word();
+          if (!word_is_fully_literal(operand)) continue;
+          let const operand_literal = operand.to_literal_string();
+          if (!view_is_integer_literal(operand_literal.view()))
+            actx.warn(m_args[side]->source_location(),
+                      "the numeric comparison " + view + " reads '" +
+                          operand_literal.view() +
+                          "', which is not a number, so the test errors at "
+                          "run time");
+        }
+      }
+
+      if (command_literal != "[[" && (view == "=" || view == "==") &&
+          i + 1 < operand_end && m_args[i + 1]->kind() == Token::Kind::Word)
+      {
+        let const &right =
+            static_cast<const tokens::WordToken *>(m_args[i + 1])->word();
+        if (word_is_fully_literal(right)) {
+          let const right_literal = right.to_literal_string();
+          if (right_literal.view().find_character('*').has_value() ||
+              right_literal.view().find_character('?').has_value())
+            actx.warn(m_args[i + 1]->source_location(),
+                      "[ and test compare strings byte for byte and never "
+                      "glob-match, use a case or the [[ ]] form for the "
+                      "pattern");
+        }
+      }
+
+      for (const WordSegment &segment : word.segments) {
+        if (segment.kind != WordSegment::Kind::CommandSubstitution) continue;
+        if (view_contains(segment.text.view(), StringView{"grep"}) &&
+            !view_contains(segment.text.view(), StringView{"grep -c"}))
+        {
+          actx.warn(m_args[i]->source_location(),
+                    "the test buffers the whole grep output only to check it "
+                    "is nonempty, run grep -q directly and test its exit "
+                    "status");
+          break;
+        }
+      }
+    }
+
   }
 
   /* A prefix assignment does not affect the expansion on the same command, so a
@@ -4340,6 +4794,60 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
                     "instead of piping cat");
         }
       }
+    }
+  }
+
+  /* The stage-pair lints. find piped into xargs splits the names on whitespace
+     and quotes, so a name with a space breaks apart, shellcheck SC2038, pair
+     find -print0 with xargs -0 or use find -exec. A pipe into a command that
+     never reads stdin discards the upstream output, shellcheck SC2216. */
+  for (usize i = 0; i + 1 < m_commands.count(); i++) {
+    const SimpleCommand *stage = m_commands[i]->as_simple_command();
+    const SimpleCommand *next = m_commands[i + 1]->as_simple_command();
+    if (stage == nullptr || next == nullptr) continue;
+    if (stage->args().is_empty() || next->args().is_empty()) continue;
+    let const stage_name = static_command_name(stage->args()[0]);
+    let const next_name = static_command_name(next->args()[0]);
+    if (!stage_name.has_value() || !next_name.has_value()) continue;
+    let const next_is_user =
+        actx.defined_functions.contains(next_name->view()) ||
+        actx.known_aliases.contains(next_name->view());
+
+    if (stage_name->view() == "find" && next_name->view() == "xargs" &&
+        !next_is_user &&
+        !actx.defined_functions.contains(stage_name->view()) &&
+        !actx.known_aliases.contains(stage_name->view()))
+    {
+      let has_null_flag = false;
+      for (usize a = 1; a < stage->args().count() && !has_null_flag; a++)
+        if (stage->args()[a]->raw_string().view() == "-print0")
+          has_null_flag = true;
+      for (usize a = 1; a < next->args().count() && !has_null_flag; a++) {
+        let const raw = next->args()[a]->raw_string();
+        if (raw.view() == "-0" || raw.view() == "--null") has_null_flag = true;
+      }
+      if (!has_null_flag)
+        actx.warn(next->args()[0]->source_location(),
+                  "xargs splits the find output on whitespace and quotes, "
+                  "pair find -print0 with xargs -0 or use find -exec");
+    }
+
+    if (!next_is_user &&
+        NON_STDIN_READERS.find(next_name->view()).has_value())
+    {
+      let has_stdin_operand = false;
+      for (usize a = 1; a < next->args().count(); a++) {
+        let const raw = next->args()[a]->raw_string();
+        if (raw.view() == "-" || raw.view() == "/dev/stdin") {
+          has_stdin_operand = true;
+          break;
+        }
+      }
+      if (!has_stdin_operand)
+        actx.warn(next->args()[0]->source_location(),
+                  "the pipe feeds '" + next_name->view() +
+                      "', which never reads stdin, so the upstream output is "
+                      "discarded");
     }
   }
 
