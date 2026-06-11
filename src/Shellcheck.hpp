@@ -46,6 +46,7 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC2038", "find piped to xargs breaks on special names, use -print0"  },
     {"SC2216", "piping into a command that ignores stdin"                  },
     {"SC2217", "redirecting input into a command that ignores stdin"       },
+    {"SC2064", "a double-quoted trap action expands when set, not when fired"},
 };
 
 } /* namespace shit */

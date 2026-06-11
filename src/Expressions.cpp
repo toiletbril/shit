@@ -4117,6 +4117,31 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 "read the line literally");
   }
 
+  /* A trap action in double quotes expands its variables and command
+     substitutions when the trap is set, not when it fires, so the action
+     captures the values at set time. This is shellcheck SC2064, single-quote
+     the action so it expands when the signal arrives. The action is the first
+     operand. */
+  if (command_literal == "trap" && !command_is_shadowed && m_args.count() >= 2 &&
+      m_args[1]->kind() == Token::Kind::Word)
+  {
+    let const &action = static_cast<const tokens::WordToken *>(m_args[1])->word();
+    let action_expands_now = false;
+    for (const WordSegment &segment : action.segments)
+      if (segment.is_in_double_quotes &&
+          (segment.kind == WordSegment::Kind::VariableReference ||
+           segment.kind == WordSegment::Kind::CommandSubstitution))
+      {
+        action_expands_now = true;
+        break;
+      }
+    if (action_expands_now)
+      actx.warn(m_args[1]->source_location(),
+                "the double-quoted trap action expands now, when the trap is "
+                "set, not when it fires, single-quote it so it expands as the "
+                "signal arrives");
+  }
+
   /* printf reads its format argument as the template, so a variable or a
      command substitution there lets the data control the format directives.
      This is shellcheck SC2059, write printf '%s' \"$var\" instead. The format
