@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* The dot and source builtins read a file and run it in the current shell, so
@@ -41,6 +42,8 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
     throw Error{"Unable to source because a filename argument is required"};
 
   let const path = ec.args()[path_index].clone();
+  LOG(verbosity::Debug, "source running file '%s' in the current shell",
+      path.c_str());
   let const contents = utils::read_entire_file(path);
   if (!contents)
     throw Error{"Unable to source the file '" + path +

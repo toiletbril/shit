@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* hash remembers command locations in shells that cache the PATH search. This
@@ -32,7 +33,10 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  if (FLAG_RESET.is_enabled()) utils::invalidate_path_cache();
+  if (FLAG_RESET.is_enabled()) {
+    LOG(verbosity::Debug, "hash forgetting every remembered command location");
+    utils::invalidate_path_cache();
+  }
 
   return 0;
 }

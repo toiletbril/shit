@@ -6,6 +6,7 @@
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
+#include "Trace.hpp"
 
 namespace shit {
 
@@ -215,6 +216,9 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     key.push('[');
     key.append(subscript.view());
     key.push(']');
+
+    LOG(verbosity::Debug,
+        "folding the subscript into array element key '%s'", key.c_str());
 
     let value = Word{};
     value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,

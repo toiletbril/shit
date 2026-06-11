@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -29,6 +30,9 @@ fn Exit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* exit with no argument uses the status of the last command. */
   let const status = parse_optional_integer_arg(ec, cxt.last_exit_status());
+
+  LOG(verbosity::Debug, "exit ending the shell with status %lld",
+      static_cast<long long>(status));
 
   /* Inside a subshell or a command substitution, exit ends only that scope. */
   if (cxt.in_subshell()) {

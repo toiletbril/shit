@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 
 /* set toggles the shell options and rebinds the positional parameters. An
    option is named by a single letter after a minus to enable it or a plus to
@@ -156,6 +157,9 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
   if (option_is_startup_fact(option))
     throw Error{"Unable to change '" + String{option.name} +
                 "' because it is fixed at shell startup"};
+  LOG(verbosity::Debug, "set flipping option '%.*s' to %s",
+      static_cast<int>(option.name.length), option.name.data,
+      enable ? "on" : "off");
   if (option.set != nullptr) (cxt.*(option.set))(enable);
   /* An explicit set -u or set -o failglob is the script's own ask, so the -W
      downgrade leaves it fatal. The mark follows the toggle both ways. */
@@ -318,7 +322,11 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
     operands.push_managed(arg);
   }
 
-  if (should_rebind) cxt.set_positional_params(steal(operands));
+  if (should_rebind) {
+    LOG(verbosity::Debug, "set rebinding %zu positional parameters",
+        operands.count());
+    cxt.set_positional_params(steal(operands));
+  }
 
   return 0;
 }

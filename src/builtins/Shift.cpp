@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* shift drops the first n positional parameters, n defaulting to 1. */
@@ -33,6 +34,9 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const &params = cxt.positional_params();
   if (count < 0 || static_cast<usize>(count) > params.count()) return 1;
+
+  LOG(verbosity::Debug, "shift dropping %lld of %zu positional parameters",
+      static_cast<long long>(count), params.count());
 
   /* ArrayList has no erase, so the kept tail is copied into a fresh list from
      index count onward. */

@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 
 /* let evaluates each argument as an arithmetic expression. The status is zero
    when the last expression evaluates to a non-zero value and one when it
@@ -36,6 +37,9 @@ i32 Let::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* Each argument is one expression, evaluated in order so an earlier
      assignment is visible to a later one, and the last value decides the
      status. */
+  LOG(verbosity::Debug, "let evaluating %zu arithmetic expressions",
+      ec.args().count() - 1);
+
   i64 last = 0;
   for (usize i = 1; i < ec.args().count(); i++)
     last = cxt.evaluate_arithmetic(ec.args()[i].view());

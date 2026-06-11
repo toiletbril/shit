@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* Reads one line from standard input and splits it on IFS into the named
@@ -56,6 +57,8 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* With no operand the line goes to REPLY, otherwise to the operands in
      order. The operand names are addressed by an offset into names. */
   let const has_operands = names.count() > 1;
+  LOG(verbosity::Debug, "read reading into '%s'",
+      has_operands ? names[1].c_str() : "REPLY");
   const usize first_operand = 1;
   let const operand_count = has_operands ? names.count() - first_operand : 1;
   const String reply_name = "REPLY";

@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 #include <cstdio>
@@ -343,6 +344,8 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (ec.args().count() < 2) return 0;
+
+  LOG(verbosity::All, "printf formatting %zu arguments", ec.args().count() - 1);
 
   /* bash printf -v NAME stores the result in the named variable instead of
      printing it, so the format and operands shift two places past -v NAME. */

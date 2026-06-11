@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 #if SHIT_PLATFORM_IS POSIX
@@ -168,9 +169,13 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* A bare flag reads the limit, an operand sets it. With neither -H nor -S the
      read reports the soft limit and the set changes both. */
   if (args.count() < 2) {
+    LOG(verbosity::Debug, "ulimit reading the '%s' limit", resource.label);
     ec.print_to_stdout(render_limit(limit, resource.units_per_value) + "\n");
     return 0;
   }
+
+  LOG(verbosity::Debug, "ulimit changing the '%s' limit to '%s'",
+      resource.label, args[1].c_str());
 
   let const &requested = args[1];
   rlim_t value = RLIM_INFINITY;

@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* kill sends a signal to a job or a process. The signal defaults to TERM and is
@@ -41,6 +42,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const name = String{args[1].substring(1)};
     let const resolved = os::signal_number_from_name(name);
     if (!resolved) throw Error{"'" + name + "' is not a valid signal"};
+    LOG(verbosity::Debug, "kill resolved signal '%s' to number %d",
+        name.c_str(), *resolved);
     signal_number = *resolved;
     first_target = 2;
   }
@@ -88,6 +91,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       pid = os::process_from_pid(parsed.value());
     }
 
+    LOG(verbosity::Debug, "kill sending signal %d to target '%s'",
+        signal_number, target_text.c_str());
     if (!os::signal_process(pid, signal_number)) {
       report_soft_builtin_error(ec, cxt,
                                 StringView{"cannot signal '"} + target_text +

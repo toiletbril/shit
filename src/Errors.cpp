@@ -199,6 +199,9 @@ get_context_pointing_to(StringView source, usize byte_position,
                         usize unicode_position, Maybe<StringView> message,
                         const diagnostic_color &color) throws -> String
 {
+  LOG(verbosity::Debug, "assembling the caret context for line %zu",
+      line_number + 1);
+
   usize start_offset = byte_position - last_newline_location;
 
   /* A preceding newline puts start_offset on that newline, so it steps one past
@@ -307,7 +310,10 @@ get_context_pointing_to(StringView source, usize byte_position,
 ErrorBase::ErrorBase() = default;
 
 ErrorBase::ErrorBase(StringView message) : m_is_active(true), m_message(message)
-{}
+{
+  LOG(verbosity::Debug, "constructing an error with message '%.*s'",
+      static_cast<int>(message.length), message.data);
+}
 
 ErrorBase::~ErrorBase() = default;
 
@@ -351,7 +357,10 @@ ExecFormatError::ExecFormatError()
 ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
     : ErrorBase(message), m_location(steal(location))
-{}
+{
+  LOG(verbosity::Debug, "locating the error at byte %zu spanning %zu bytes",
+      m_location.position, m_location.length);
+}
 
 cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
 {
@@ -477,6 +486,9 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   ASSERT(byte_position <= source.count(),
          "byte position: %zu, source length: %zu", byte_position,
          source.count());
+
+  LOG(verbosity::Debug, "formatting the detail note at byte %zu",
+      byte_position);
 
   if (byte_position > 0 && byte_position == source.count() &&
       source[byte_position - 1] == '\n')

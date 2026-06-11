@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 
 /* local declares a variable local to the current function, so the value it had
    in the caller returns when the function ends. It is an error outside a
@@ -92,6 +93,8 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
        it fresh, not from the outer value the new local shadows. */
     let const was_already_local =
         is_append && cxt.is_local_in_current_scope(name);
+    LOG(verbosity::Debug, "local declaring '%.*s' in the function scope",
+        static_cast<int>(name.length), name.data);
     cxt.declare_local(name);
     /* declare_local dropped any inherited integer mark, so -i marks the fresh
        local here and leaving the scope removes it with the binding. */

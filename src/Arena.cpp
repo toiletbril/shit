@@ -2,6 +2,7 @@
 
 #include "Allocator.hpp"
 #include "Containers.hpp"
+#include "Trace.hpp"
 
 #include <cstdlib>
 
@@ -49,6 +50,8 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
   if (base == nullptr) throw std::bad_alloc{};
 
   ASSERT(size >= minimum_size, "fresh block must fit the requested allocation");
+
+  LOG(verbosity::Debug, "mapping a new arena block of %zu bytes", size);
 
   m_blocks.push(block{base, size, 0});
 }
@@ -118,6 +121,10 @@ fn BumpArena::release(Mark saved) wontthrow -> void
 
 cold fn BumpArena::reset() wontthrow -> void
 {
+  LOG(verbosity::Debug,
+      "resetting the arena holding %zu blocks and %zu used bytes",
+      m_blocks.count(), bytes_used());
+
   run_destructors_down_to(0);
 
   /* Every reset reclaims the storage a cached pointer may hold, so bump the

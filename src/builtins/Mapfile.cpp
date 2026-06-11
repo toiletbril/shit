@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* mapfile, also named readarray, reads every line of standard input into an
@@ -62,6 +63,9 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
   }
 
+  LOG(verbosity::Debug, "mapfile reading lines into array '%.*s'",
+      static_cast<int>(array_name.length), array_name.data);
+
   let lines = ArrayList<String>{heap_allocator()};
   for (;;) {
     if (max_lines > 0 && static_cast<i64>(lines.count()) >= max_lines) break;
@@ -74,6 +78,7 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
     lines.push(steal(element));
   }
 
+  LOG(verbosity::Debug, "mapfile stored %zu lines", lines.count());
   cxt.set_indexed_array(array_name, steal(lines));
   return 0;
 }

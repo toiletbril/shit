@@ -4,6 +4,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../ResolvedCommand.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* builtin runs the named shell builtin with its arguments, bypassing a shell
@@ -78,6 +79,9 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     ec.print_to_stdout(out.view());
     return 0;
   }
+
+  LOG(verbosity::Debug, "builtin forwarding to '%s' past functions and PATH",
+      name.c_str());
 
   let const target = search_builtin(name.view());
   if (!target.has_value()) {

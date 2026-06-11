@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 
 /* shopt sets, unsets, and queries the bash shell options such as extglob,
    globstar, nullglob, and dotglob. The states are tracked on the evaluator. An
@@ -181,6 +182,8 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (enable || disable) {
     for (const StringView name : names) {
       if (reject_unknown(name)) continue;
+      LOG(verbosity::Debug, "shopt setting '%.*s' to %s",
+          static_cast<int>(name.length), name.data, enable ? "on" : "off");
       cxt.set_shopt_option(name, enable);
     }
     return status;

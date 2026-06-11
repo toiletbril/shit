@@ -6,6 +6,7 @@
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Tokens.hpp"
+#include "Trace.hpp"
 
 namespace shit {
 
@@ -122,7 +123,11 @@ fn propagated_test_operand_value(const Token *token,
                                  const AnalysisContext &actx) throws
     -> Maybe<String>
 {
-  if (is_split_eligible_variable_operand(token)) return None;
+  if (is_split_eligible_variable_operand(token)) {
+    LOG(verbosity::Debug, "declining the test operand fold, the unquoted "
+                          "variable splits at run time");
+    return None;
+  }
   return propagated_literal_word_value(token, actx);
 }
 
@@ -258,8 +263,11 @@ fn propagated_literal_word_value(const Token *token,
 
   let const name = plain_variable_reference_name(token);
   if (!name.has_value()) return None;
-  if (const String *recorded = actx.constant_variables.find(*name))
+  if (const String *recorded = actx.constant_variables.find(*name)) {
+    LOG(verbosity::Debug, "reading the recorded constant '%.*s' = '%s'",
+        static_cast<int>(name->length), name->data, recorded->c_str());
     return recorded->clone();
+  }
   return None;
 }
 
@@ -278,6 +286,10 @@ fn try_fold_constant_arithmetic(StringView expression) wontthrow -> Maybe<i64>
   try {
     return evaluate_constant_arithmetic(expression);
   } catch (...) {
+    LOG(verbosity::Debug,
+        "swallowed an arithmetic error while folding '%.*s', leaving the "
+        "segment for the runtime path",
+        static_cast<int>(expression.length), expression.data);
     return None;
   }
 }
@@ -311,8 +323,19 @@ fn try_fold_arithmetic_with_constants(StringView expression,
       let const name = StringView{&expression.data[start], i - start};
 
       const String *recorded = actx.constant_variables.find(name);
-      if (recorded == nullptr) return None;
-      if (!is_plain_integer_literal(recorded->view())) return None;
+      if (recorded == nullptr) {
+        LOG(verbosity::Debug,
+            "skipping the arithmetic fold, '%.*s' is not a recorded constant",
+            static_cast<int>(name.length), name.data);
+        return None;
+      }
+      if (!is_plain_integer_literal(recorded->view())) {
+        LOG(verbosity::Debug,
+            "skipping the arithmetic fold, the value of '%.*s' is not a plain "
+            "integer",
+            static_cast<int>(name.length), name.data);
+        return None;
+      }
       rewritten.append(recorded->view());
     }
 
@@ -321,6 +344,9 @@ fn try_fold_arithmetic_with_constants(StringView expression,
     }
     return evaluate_constant_arithmetic(rewritten.view());
   } catch (...) {
+    LOG(verbosity::Debug,
+        "swallowed an arithmetic error while folding '%.*s' with constants",
+        static_cast<int>(expression.length), expression.data);
     return None;
   }
 }
@@ -340,16 +366,28 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
 
   /* A function or an alias of the same name shadows the builtin, so the program
      word no longer names the constant builtin and the fold declines it. */
-  if (actx.defined_functions.contains(name->view())) return None;
-  if (actx.known_aliases.contains(name->view())) return None;
+  if (actx.defined_functions.contains(name->view())) {
+    LOG(verbosity::Debug,
+        "declining the static verdict, a function shadows '%s'",
+        name->c_str());
+    return None;
+  }
+  if (actx.known_aliases.contains(name->view())) {
+    LOG(verbosity::Debug, "declining the static verdict, an alias shadows '%s'",
+        name->c_str());
+    return None;
+  }
 
   /* true and : always succeed, false always fails, each with no side effect. */
   if (*name == "true" || *name == ":") {
     if (args.count() != 1) return None;
+    LOG(verbosity::Debug, "the builtin '%s' always succeeds, verdict is true",
+        name->c_str());
     return Maybe<bool>{true};
   }
   if (*name == "false") {
     if (args.count() != 1) return None;
+    LOG(verbosity::Debug, "the builtin 'false' always fails, verdict is false");
     return Maybe<bool>{false};
   }
 
@@ -369,6 +407,8 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
     try {
       return constant_test_verdict(operands, actx);
     } catch (...) {
+      LOG(verbosity::Debug, "swallowed an error while judging the literal "
+                            "test, leaving it unfolded");
       return None;
     }
   }
@@ -442,6 +482,9 @@ fn fold_constant_arithmetic_in_word(const Word &word,
     if (!result.has_value())
       result = try_fold_arithmetic_with_constants(segment.text.view(), actx);
     if (result.has_value()) {
+      LOG(verbosity::Debug, "folded the constant arithmetic '%.*s' to %lld",
+          static_cast<int>(segment.text.view().length),
+          segment.text.view().data, static_cast<long long>(*result));
       segment.folded_arithmetic_result = result;
       did_fold = true;
     }
@@ -500,14 +543,23 @@ fn rule_dead_branch_elimination(const Expression *node,
   for (usize i = 0; i < clause->branches().count(); i++) {
     let const verdict =
         clause->branches()[i].condition->try_static_condition_verdict(actx);
-    if (!verdict.has_value()) return false;
+    if (!verdict.has_value()) {
+      LOG(verbosity::Debug,
+          "the dead-branch fold stops, condition %zu is not statically "
+          "decidable",
+          i);
+      return false;
+    }
     if (*verdict) {
+      LOG(verbosity::Debug, "dead-branch elimination chose branch %zu", i);
       clause->set_folded_branch(i);
       return true;
     }
   }
   /* Every condition failed, so the else body runs, or nothing when there is
      none. An index past the last branch names that outcome. */
+  LOG(verbosity::Debug,
+      "every if condition is statically false, folding to the else body");
   clause->set_folded_branch(clause->branches().count());
   return true;
 }
@@ -525,12 +577,22 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
   if (loop->is_folded_to_skip()) return false;
 
   let const verdict = loop->condition()->try_static_condition_verdict(actx);
-  if (!verdict.has_value()) return false;
+  if (!verdict.has_value()) {
+    LOG(verbosity::Debug,
+        "the loop fold declines, the condition is not statically decidable");
+    return false;
+  }
 
   let const body_would_run =
       loop->is_until() ? (*verdict == false) : (*verdict == true);
-  if (body_would_run) return false;
+  if (body_would_run) {
+    LOG(verbosity::Debug,
+        "the loop fold declines, the body would run under the static verdict");
+    return false;
+  }
 
+  LOG(verbosity::Debug, "loop elimination folded the %s loop to a skip",
+      loop->is_until() ? "until" : "while");
   loop->set_folded_to_skip();
   return true;
 }
@@ -564,7 +626,12 @@ fn optimize_node(const Expression *node, AnalysisContext &actx) throws -> void
       if (rule(node, actx)) any_rule_fired = true;
     }
     if (!any_rule_fired) return;
+    LOG(verbosity::All, "optimization pass %zu fired a rule, running another "
+                        "pass over the node",
+        pass);
   }
+  LOG(verbosity::Debug, "the optimizer hit the pass cap of %zu on one node",
+      MAX_OPTIMIZATION_PASSES);
 }
 
 } /* namespace optimizer */

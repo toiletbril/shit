@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* fg brings a background job to the foreground and waits for it, resuming it
@@ -43,6 +44,8 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (job == nullptr) throw Error{"there is no such job"};
   ASSERT(job != nullptr);
+
+  LOG(verbosity::Debug, "fg bringing job %d to the foreground", job->id);
 
   /* A job already reaped by a prior poll has its status recorded, so report it
      instead of waiting on a pid that no longer exists. */

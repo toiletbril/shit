@@ -4,6 +4,7 @@
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* exec replaces the shell with the named program, so it does not fork. With no
@@ -40,11 +41,16 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* exec with only redirections changes the shell's own descriptors and
      returns, so the rest of the session inherits them. */
   if (args.count() == 1) {
+    LOG(verbosity::Debug,
+        "exec applying redirections to the shell's own descriptors");
     os::redirect_self(ec);
     return 0;
   }
 
   let const &command_name = args[1];
+
+  LOG(verbosity::Debug, "exec replacing the shell with '%s'",
+      command_name.c_str());
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the
      status a command-not-found leaves. */

@@ -84,6 +84,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       try {
         os::replace_process(steal(ec));
       } catch (const ExecFormatError &) {
+        LOG(verbosity::Debug, "swallowed an exec format error, running the "
+                              "file as a shell script in place");
         /* The file has no shebang and is not a binary, so it runs as a shell
            script in place, the POSIX fallback. replace_process already placed
            any redirections onto the standard descriptors and closed the
@@ -116,10 +118,15 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        into the spawn. */
     let const command = is_async ? String{ec.program().view()} : String{};
 
+    LOG(verbosity::Debug, "spawning the external command '%s'%s",
+        ec.program().c_str(), is_async ? " in the background" : "");
+
     os::process p = SHIT_INVALID_PROCESS;
     try {
       p = os::execute_program(steal(ec), !is_async);
     } catch (const ExecFormatError &) {
+      LOG(verbosity::Debug, "swallowed an exec format error, running the "
+                            "file as a shell script in this process");
       /* The file has no shebang and is not a binary, so a foreground command
          runs it as a shell script in this process instead of as a child, the
          POSIX fallback. */
@@ -139,9 +146,11 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       return 0;
     }
 
+    LOG(verbosity::Debug, "waiting for the foreground child to finish");
     return os::wait_and_monitor_process(p);
   }
 
+  LOG(verbosity::Debug, "dispatching the builtin '%s'", ec.program().c_str());
   return execute_builtin(steal(ec), cxt);
 }
 
@@ -149,6 +158,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                bool is_async) throws -> i32
 {
   ASSERT(ecs.count() > 1);
+
+  LOG(verbosity::Debug, "running a pipeline of %zu stages%s", ecs.count(),
+      is_async ? " in the background" : "");
 
   i32 ret = 0;
 
@@ -657,6 +669,9 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes,
 
 fn canonicalize_path(StringView path) throws -> Maybe<Path>
 {
+  LOG(verbosity::Debug, "canonicalizing the path '%.*s'",
+      static_cast<int>(path.length), path.data);
+
   let candidate = Path{path};
 
   if (candidate.is_relative() && path.find_character('/').has_value()) {
@@ -1100,6 +1115,8 @@ cold fn print_memory_report() wontthrow -> void
 
 [[noreturn]] fn quit(i32 code, bool should_goodbye) throws -> void
 {
+  LOG(verbosity::Debug, "quitting with code %d", code);
+
   if (QUIT_CONTEXT != nullptr && QUIT_CONTEXT->memory_stats_enabled())
     print_memory_report();
 
@@ -1207,6 +1224,9 @@ fn initialize_path_map() throws -> void
 {
   if (!MAYBE_PATH) return;
 
+  LOG(verbosity::Debug,
+      "scanning every PATH directory to seed the program cache");
+
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
     let const directory = Path{dir_string.view()};
 
@@ -1241,6 +1261,10 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
      variable, so a plain PATH=... assignment that the store holds but the
      environment does not still drives the order. */
   if (!MAYBE_PATH) return ArrayList<Path>{};
+
+  LOG(verbosity::Debug, "statting candidates for '%.*s' along PATH%s",
+      static_cast<int>(program_name.length), program_name.data,
+      find_all ? ", collecting every match" : "");
 
   let result = ArrayList<Path>{};
 
@@ -1440,6 +1464,9 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
 
 fn read_entire_file(StringView path) throws -> Maybe<String>
 {
+  LOG(verbosity::Debug, "reading the entire file '%.*s'",
+      static_cast<int>(path.length), path.data);
+
   let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
   if (!file) return None;
 
@@ -1458,6 +1485,9 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
 
 fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
 {
+  LOG(verbosity::Debug, "probing '%s' for a shell shebang to mimic",
+      program.c_str());
+
   let const file =
       os::open_file_descriptor(program.text().view(), os::file_open_mode::Read);
   if (!file) return None;

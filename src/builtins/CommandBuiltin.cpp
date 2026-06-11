@@ -3,6 +3,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* command runs its operand as a command while ignoring a shell function of the
@@ -50,6 +51,9 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (args.count() < 2) return 0;
 
   let const &name = args[1];
+
+  LOG(verbosity::Debug, "command resolving '%s' past shell functions",
+      name.c_str());
 
   /* -v and -V resolve the name without running it, against a builtin and the
      PATH but not a function, the way command is meant to. */
@@ -123,6 +127,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   try {
     sub = ExecContext::make_from(ec.source_location(), steal(operand_args));
   } catch (const CommandNotFound &not_found) {
+    LOG(verbosity::Debug, "command swallowed a not-found error: %s",
+        not_found.message().c_str());
     const String *source = cxt.current_source();
     show_message(
         not_found.to_string(source != nullptr ? source->view() : StringView{}));

@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* time runs a command once and prints how long it took, the real elapsed time
@@ -49,6 +50,9 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (i > 1) command.push(' ');
     command.append(ec.args()[i].view());
   }
+
+  LOG(verbosity::Debug, "time running command '%s' under the clock",
+      command.c_str());
 
   double user_before = 0, system_before = 0;
   os::children_cpu_seconds(user_before, system_before);

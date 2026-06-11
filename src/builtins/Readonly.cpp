@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* readonly marks a variable so a later assignment to it fails, or with no
@@ -52,6 +53,9 @@ i32 Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const parts = utils::split_name_value_arg(arg);
+
+    LOG(verbosity::Debug, "readonly marking '%.*s' against later assignment",
+        static_cast<int>(parts.name.length), parts.name.data);
 
     /* An operand with an equals sign assigns the value first, then marks the
        name. A bare name marks whatever it currently holds. */

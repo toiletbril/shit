@@ -4,6 +4,7 @@
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* newgrp changes the real and effective group of the shell, which a process can
@@ -53,6 +54,9 @@ fn Newgrp::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let command = ExecContext::from_resolved(
       ec.source_location(), ResolvedCommand::from_program(found[0]),
       steal(command_args));
+
+  LOG(verbosity::Debug, "newgrp handing the shell off to '%s'",
+      found[0].text().c_str());
 
   /* replace_process returns only by throwing, when the program is present but
      cannot run, which leaves the shell with 126. */

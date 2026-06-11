@@ -1,5 +1,6 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 namespace shit {
@@ -12,6 +13,8 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());
+
+  LOG(verbosity::All, "echo printing %zu arguments", args.count() - 1);
 
   usize start = 1;
   let should_suppress_newline = false;

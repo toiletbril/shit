@@ -5,6 +5,7 @@
 #include "Errors.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
+#include "Trace.hpp"
 #include "Utils.hpp"
 
 namespace shit {
@@ -115,6 +116,8 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
   /* Each builtin is a stateless dispatch object, so its case constructs it on
      the stack and runs it, which avoids a heap allocation on every builtin
      command. */
+  LOG(verbosity::Debug, "dispatching builtin '%s' with %zu arguments",
+      ec.program().c_str(), ec.args().count());
   try {
     switch (ec.builtin_kind()) {
       BUILTIN_SWITCH_CASES();

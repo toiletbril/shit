@@ -1,6 +1,7 @@
 #include "Path.hpp"
 
 #include "Platform.hpp"
+#include "Trace.hpp"
 
 #include <cerrno>
 #include <cstdlib>
@@ -127,6 +128,8 @@ fn Path::with_extension(StringView new_extension) const throws -> Path
 
 cold fn Path::normalized() const throws -> Path
 {
+  LOG(verbosity::Debug, "normalizing the path '%s'", m_text.c_str());
+
   let const absolute = is_absolute();
 
   /* Each kept component is a view into the original text, valid for the life of
@@ -185,6 +188,7 @@ hot fn Path::operator==(const Path &other) const wontthrow -> bool
 
 cold fn Path::exists() const wontthrow -> bool
 {
+  LOG(verbosity::Debug, "probing whether '%s' exists", m_text.c_str());
   struct stat info{};
   return ::stat(m_text.c_str(), &info) == 0;
 }
@@ -297,6 +301,7 @@ cold fn Path::current_directory() throws -> Path
      returning an empty path for a deep directory. A real failure such as a
      removed working directory carries a different errno and ends the loop with
      an empty path. */
+  LOG(verbosity::Debug, "reading the current working directory");
   let buffer = ArrayList<char>{};
   usize buffer_size = 4096;
   for (;;) {
@@ -311,6 +316,8 @@ cold fn Path::current_directory() throws -> Path
 
 fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
+  LOG(verbosity::Debug, "changing the current directory to '%s'",
+      path.c_str());
   if (::chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
   return Success;
@@ -319,7 +326,10 @@ fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 {
   let const handle = ::opendir(dir.c_str());
-  if (handle == nullptr) return None;
+  if (handle == nullptr) {
+    LOG(verbosity::Debug, "could not open the directory '%s'", dir.c_str());
+    return None;
+  }
 
   let names = ArrayList<String>{};
   /* readdir returns NULL on both a clean end of the directory and a read error,
@@ -343,6 +353,9 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   }
 
   ::closedir(handle);
+
+  LOG(verbosity::Debug, "read %zu entries from the directory '%s'",
+      names.count(), dir.c_str());
 
   return names;
 }
@@ -491,6 +504,8 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
     names.push(String{name});
   } while (FindNextFileA(handle, &data) != 0);
   FindClose(handle);
+  LOG(verbosity::Debug, "read %zu entries from the directory '%s'",
+      names.count(), dir.c_str());
   return names;
 }
 

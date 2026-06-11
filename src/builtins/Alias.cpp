@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* alias defines a command word replacement, or with no operand lists the
@@ -53,6 +54,8 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parts = utils::split_name_value_arg(arg);
 
     if (parts.value.has_value()) {
+      LOG(verbosity::Debug, "alias defining '%.*s'",
+          static_cast<int>(parts.name.length), parts.name.data);
       cxt.set_alias(parts.name, *parts.value);
     } else if (const Maybe<String> value = cxt.get_alias(arg)) {
       String message = "alias ";

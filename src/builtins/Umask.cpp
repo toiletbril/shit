@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 #include <cstdio>
@@ -152,6 +153,9 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   let const &requested = args[*operand_index];
+
+  LOG(verbosity::Debug, "umask setting the file creation mask from '%s'",
+      requested.c_str());
 
   /* A leading digit names an octal mask, anything else a symbolic spec, the way
      POSIX distinguishes the two operand forms. */

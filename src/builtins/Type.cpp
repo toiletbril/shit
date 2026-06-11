@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* type reports how each name resolves, checking the same order the shell uses
@@ -52,6 +53,9 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
+
+    LOG(verbosity::Debug, "type classifying '%s' in resolution order",
+        name.c_str());
 
     /* -P forces a PATH lookup and ignores the keyword, alias, function, and
        builtin classes, so it reports the disk file even when the name also

@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 
 /* Removes shell variables, or with -f shell functions. The flag parser rejects
    an unknown option. */
@@ -40,6 +41,7 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
   for (usize i = 1; i < names.count(); i++) {
     let const &name = names[i];
     if (unset_function) {
+      LOG(verbosity::Debug, "unset removing function '%s'", name.c_str());
       cxt.unset_function(name);
     } else if (let const bracket = name.view().find_character('[');
                bracket.has_value() && name.count() > 0 &&
@@ -53,7 +55,10 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
           *bracket + 1, name.count() - *bracket - 2);
       try {
         cxt.unset_array_element(array_name, subscript);
-      } catch (const Error &) {
+      } catch (const Error &error) {
+        LOG(verbosity::Debug,
+            "unset swallowed an array element error: %s",
+            error.message().c_str());
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is read-only");
         had_error = true;
@@ -62,9 +67,13 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
       /* A read-only variable makes unset_shell_variable throw. The remaining
          names are still unset and the builtin reports a non-zero status, the
          way dash continues past a read-only name. */
+      LOG(verbosity::Debug, "unset removing variable '%s'", name.c_str());
       try {
         cxt.unset_shell_variable(name);
-      } catch (const Error &) {
+      } catch (const Error &error) {
+        LOG(verbosity::Debug,
+            "unset swallowed a read-only variable error: %s",
+            error.message().c_str());
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is read-only");
         had_error = true;

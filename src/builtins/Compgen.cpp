@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 
 /* compgen generates the completion candidates an action or a word list would
    produce, the way a bash completion function does, such as compgen -W "a b c"
@@ -88,6 +89,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      The matches print one per line and the status reports whether any matched,
      so 'if compgen -G pat >/dev/null' reads as an existence test. */
   if (have_glob_pattern) {
+    LOG(verbosity::Debug, "compgen expanding glob '%.*s' for prefix '%.*s'",
+        static_cast<int>(glob_pattern.length), glob_pattern.data,
+        static_cast<int>(word.length), word.data);
     let out = String{};
     let any_matched = false;
     for (const String &match : cxt.expand_glob_lenient(glob_pattern)) {
@@ -103,6 +107,9 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* An unsupported action produces nothing rather than an error, so a
      completion script that asks for one keeps running with an empty result. */
   if (!have_wordlist) return 1;
+
+  LOG(verbosity::Debug, "compgen filtering word list for prefix '%.*s'",
+      static_cast<int>(word.length), word.data);
 
   let out = String{};
   let any_matched = false;

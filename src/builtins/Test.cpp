@@ -2,6 +2,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* _get_osfhandle maps a shell fd number to its Windows handle for the -t test.
@@ -340,6 +341,8 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* An empty expression is false, as POSIX specifies for test with no
      arguments. */
   if (operands.is_empty()) return 1;
+
+  LOG(verbosity::All, "test evaluating %zu operands", operands.count());
 
   let evaluator =
       TestEvaluator{operands, 0, operands.count(), cxt.is_bash_compatible()};

@@ -3,6 +3,7 @@
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -68,6 +69,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     arg_path.append(p->text());
   }
 
+  LOG(verbosity::Debug, "cd changing directory to '%s'", arg_path.c_str());
+
   let target = Path{arg_path};
 
   /* The first CDPATH entry that yields an existing directory resolves the
@@ -93,6 +96,8 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                              : Path{entry}.push_component(arg_path.view());
         let resolved = candidate.to_absolute().normalized();
         if (resolved.is_directory()) {
+          LOG(verbosity::Debug, "cd resolved '%s' through CDPATH entry '%.*s'",
+              arg_path.c_str(), static_cast<int>(entry.length), entry.data);
           target = steal(resolved);
           reached_through_cdpath = !entry.is_empty();
           break;

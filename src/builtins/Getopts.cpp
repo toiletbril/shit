@@ -2,6 +2,7 @@
 #include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 /* getopts optstring name [arg ...]. It parses one option per call from the
@@ -59,6 +60,10 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parsed = utils::parse_decimal_integer(*value);
     optind = parsed.is_error() ? 1 : parsed.value();
   }
+
+  LOG(verbosity::Debug,
+      "getopts parsing into '%s' at OPTIND %lld of %zu operands", name.c_str(),
+      static_cast<long long>(optind), operands.count());
 
   /* A script that resets OPTIND starts a fresh scan, so the per-argument index
      returns to the first letter. */
@@ -155,6 +160,8 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   /* An option that takes no argument leaves OPTARG unset. */
+  LOG(verbosity::Debug, "getopts advancing past option '%s'",
+      option_as_string.c_str());
   advance_letter();
   cxt.unset_shell_variable("OPTARG");
   cxt.set_shell_variable(name, option_as_string);

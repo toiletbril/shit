@@ -3,6 +3,7 @@
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 #include <ctime>
@@ -216,6 +217,9 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     query.append(ec.args()[i]);
   }
 
+  LOG(verbosity::Debug, "z ranking the frecency store against query '%s'",
+      query.c_str());
+
   let entries = read_frecency_store();
   let const now = now_epoch_seconds();
 
@@ -241,6 +245,9 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{StringView{"z: no matching directory for '"} + query + "'"};
 
   let const target = Path{best->path.view()}.to_absolute().normalized();
+
+  LOG(verbosity::Debug, "z changing directory to '%s'",
+      target.text().c_str());
 
   let const old_directory = Path::current_directory();
   if (Path::set_current_directory(target).is_error())

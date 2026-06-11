@@ -1,6 +1,7 @@
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
+#include "../Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -25,6 +26,8 @@ i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const args = PARSE_BUILTIN_ARGS(ec);
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+
+  LOG(verbosity::Debug, "pwd printing the current working directory");
 
   let p = String{};
   p.append(Path::current_directory().text());

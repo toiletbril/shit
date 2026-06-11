@@ -1,6 +1,7 @@
 #include "../Eval.hpp"
 
 #include "../Builtin.hpp"
+#include "../Trace.hpp"
 
 /* The eval builtin joins its arguments with spaces and runs the result in the
    current shell. */
@@ -41,6 +42,9 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   if (joined.is_empty()) return 0;
+
+  LOG(verbosity::Debug, "eval running %zu joined bytes in the current shell",
+      joined.length());
 
   /* eval leaves a return pending so it ends the enclosing function or the
      shell, the way dash propagates it, rather than ending the eval itself. */
