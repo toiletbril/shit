@@ -618,20 +618,18 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
     }
   };
 
-  /* Each flag renders under the section its definition names, in enum order.
-     NoSection flags print first with no heading at all. */
+  /* Each flag renders under the section its definition names, in enum order,
+     the NoSection flags first under the plain OPTIONS heading. */
   static const StringView SECTION_HEADERS[] = {
-      "",     "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
+      "OPTIONS",      "POSIX OPTIONS", "BASH OPTIONS", "COMPATIBILITY OPTIONS",
       "SHIT OPTIONS", "DEBUG OPTIONS"};
   for (u8 section = 0; section < 6; section++) {
     bool header_printed = false;
     for (const shit::Flag *f : flags) {
       if (static_cast<u8>(f->section()) != section) continue;
       if (!header_printed) {
-        if (!SECTION_HEADERS[section].is_empty()) {
-          if (!s.is_empty()) s += "\n\n";
-          s += SECTION_HEADERS[section];
-        }
+        if (!s.is_empty()) s += "\n\n";
+        s += SECTION_HEADERS[section];
         header_printed = true;
       }
       render_flag(f);

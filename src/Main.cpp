@@ -112,13 +112,6 @@ FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
      "reported and evaluation begins sooner.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", shit::flag_section::Shit,
      "Disable interactive tab completion and ghost-text.");
-FLAG(STATS, Bool, '\0', "show-stats", shit::flag_section::Shit,
-     "Print statistics after each executed command, including commands "
-     "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
-     "peak.");
-FLAG(MEMORY, Bool, '\0', "show-memory", shit::flag_section::Shit,
-     "Print a granular memory report at exit, the AST and function arena bytes "
-     "with their reserved capacity and the malloc heap in use.");
 
 FLAG(AST, Bool, 'A', "show-ast", shit::flag_section::Debug,
      "Print AST before executing each command.");
@@ -126,6 +119,13 @@ FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", shit::flag_section::Debug,
      "Print exit code after each executed command.");
 FLAG(ESCAPE_MAP, Bool, 'M', "show-lexed-words", shit::flag_section::Debug,
      "Print escape bitmap after each parsed command.");
+FLAG(STATS, Bool, '\0', "show-stats", shit::flag_section::Debug,
+     "Print statistics after each executed command, including commands "
+     "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
+     "peak.");
+FLAG(MEMORY, Bool, '\0', "show-memory", shit::flag_section::Debug,
+     "Print a granular memory report at exit, the AST and function arena bytes "
+     "with their reserved capacity and the malloc heap in use.");
 FLAG(LOG, String, 'X', "debug-logging", shit::flag_section::Debug,
      "Enable internal logging at the given level, one of 'info', 'debug', or "
      "'all'. An unknown spelling is an error.");
