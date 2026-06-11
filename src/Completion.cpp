@@ -1537,11 +1537,13 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       break;
     }
 
-    /* An operator run, left in the default color. A separator or an opener
-       moves the next word back to command position, a redirection does not. */
+    /* An operator run, bold so the line's structure stands out from the
+       words. A separator or an opener moves the next word back to command
+       position, a redirection does not. */
     if (c == '|' || c == '&' || c == ';' || c == '<' || c == '>' || c == '(' ||
         c == ')' || c == '{' || c == '}')
     {
+      let const operator_start = i;
       bool has_separator = false;
       bool has_redirect = false;
       bool has_opener = false;
@@ -1564,6 +1566,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           break;
         }
       }
+      push(operator_start, i, colors::ansi::BOLD);
       if (has_opener || (has_separator && !has_redirect)) {
         command_position = true;
         expecting_in = false;
@@ -1644,7 +1647,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
     /* A for or case awaits its in, which is the keyword there. */
     if (expecting_in && plain && word == "in") {
-      push(word_start, word_end, colors::ansi::GREEN);
+      push(word_start, word_end, colors::ansi::BOLD_MAGENTA);
       expecting_in = false;
       for_variable_pending = false;
       command_position = false;
@@ -1739,17 +1742,18 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       if (is_keyword) {
         push(word_start, word_end,
-             keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
+             keyword_ok ? colors::ansi::BOLD_MAGENTA : colors::ansi::BOLD_RED);
         command_position = next_is_command;
         if (opens_in) expecting_in = true;
         if (opens_for_variable) for_variable_pending = true;
         continue;
       }
 
-      /* A command name. A resolved command keeps the default color, an
-         unresolved one is red. */
-      if (!first_word_resolves(word, context))
-        push(word_start, word_end, colors::ansi::RED);
+      /* A command name, green when it resolves and red when it does not, the
+         verdict fish paints at a glance. */
+      push(word_start, word_end, first_word_resolves(word, context)
+                                     ? colors::ansi::GREEN
+                                     : colors::ansi::RED);
       command_position = false;
       continue;
     }
