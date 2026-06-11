@@ -1,0 +1,39 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-W"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "failglob"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "*.zzz_explicit_fatal"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "not-reached"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "failglob"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "*.zzz_explicit_fatal"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "not-reached"
+]
+shit: 4:6: error: the glob pattern '*.zzz_explicit_fatal' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G '*.zzz_explicit_fatal' or relax with set +o failglob.
+     4 |  echo *.zzz_explicit_fatal
+       |       ^~~~~~~~~~~~~~~~~~~~ here.

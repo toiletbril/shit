@@ -1,0 +1,4 @@
+#!/bin/env shit
+set -W
+echo $((never_counted + 1))
+echo continued

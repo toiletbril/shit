@@ -1,0 +1,31 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-W"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((never_counted + 1))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "continued"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "never_counted + 1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "continued"
+]
+shit: 3:1: warning: the variable 'never_counted' is not set, it expands to empty, which is rarely intended.
+     3 |  echo $((never_counted + 1))
+       |  ^~ here.
+1
+continued
+[Code 0]

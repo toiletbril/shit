@@ -1,0 +1,37 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-W"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "echo" "value=$never_piped"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "continued"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-W"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "value="
+  Variable "never_piped"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "continued"
+]
+shit: 2:1: warning: the variable 'never_piped' is not set, it expands to empty, which is rarely intended.
+     2 |  set -W
+       |  ^~ here.
+value=
+continued
+[Code 0]

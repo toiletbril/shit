@@ -1,0 +1,4 @@
+#!/bin/env shit
+set -W
+echo "value=$never_piped" | cat
+echo continued
