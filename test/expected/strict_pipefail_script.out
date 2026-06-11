@@ -1,0 +1,93 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "false"]
+      [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "strict=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "pipefail"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "false"]
+      [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "relaxed=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "pipefail"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "false"]
+      [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "reenabled=$?"]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "strict="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "pipefail"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "relaxed="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "pipefail"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "reenabled="
+  Variable "?"
+]
+shit: 2:9: warning: the pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+     2 |  false | true
+       |          ^~~~ here.
+shit: 5:9: warning: the pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+     5 |  false | true
+       |          ^~~~ here.
+shit: 8:9: warning: the pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+     8 |  false | true
+       |          ^~~~ here.
+strict=1
+relaxed=0
+reenabled=1
+[Code 0]

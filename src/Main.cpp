@@ -713,7 +713,14 @@ fn main(int argc, char **argv) -> int
      checks downgrade and set -W can flip it mid-run. */
   if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
   context.set_warnings_enabled(FLAG_WARNINGS.is_enabled());
-  context.set_pipefail(false);
+  /* A non-interactive default-mood run carries the strict pipefail the way it
+     carries the strict unmatched glob below, so a failing pipeline stage in a
+     script fails loudly rather than hiding behind the last stage. A
+     compatibility mood stays lenient, the way bash and dash report only the
+     last stage, and the dash comparison runs shit under -P for that reason. */
+  context.set_pipefail(should_be_interactive
+                           ? false
+                           : !shit::should_run_in_compat_mode());
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());

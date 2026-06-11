@@ -76,9 +76,12 @@ dashdiff bashdiff mimicrydiff: SHELL := bash
 
 # A NAME_1.sh variant marks NAME.sh flaky across dash versions, the same
 # accepted-alternative idea the bashdiff _1.bash files carry.
+# The default mood is stricter than dash, a failing pipeline stage aborts and an
+# unmatched glob is fatal, so the dash comparison runs shit in POSIX mode with -P
+# where those strictnesses are off and the behavior tracks dash.
 dashdiff: $(BIN)
 	@for f in $(SH_COMPAT); do \
-		s="$$($(BIN) "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		s="$$($(BIN) -P "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		alt="$${f%.sh}_1.sh"; \
 		if [ "$$s" = "$$d" ]; then \

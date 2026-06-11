@@ -144,7 +144,7 @@ shit: 12:10: warning: the pipe feeds 'false', which never reads stdin, so the up
     12 |  ! true | false
        |           ^~~~~ here.
 tf=1
-ft=0
+ft=1
 fr=1
 er=0
 tt=0
