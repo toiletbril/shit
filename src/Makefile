@@ -128,7 +128,8 @@ CXXFLAGS += \
 # libsupc++, so the drop stays POSIX-only. The -O3 and link-time optimization
 # join this block because the mingw g++ -O3 optimizer hangs for minutes on the
 # parser's large functions and its whole-program pass needs tens of gigabytes of
-# memory, so the Windows cross path takes -O1 and no LTO instead.
+# memory, so the Windows cross path takes -O0 and no LTO instead, which also
+# keeps the cross build from hogging RAM.
 ifneq ($(TARGET_WINDOWS), 1)
 CXXFLAGS += \
 	-O3 \
