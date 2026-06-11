@@ -47,6 +47,9 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC2216", "piping into a command that ignores stdin"                  },
     {"SC2217", "redirecting input into a command that ignores stdin"       },
     {"SC2064", "a double-quoted trap action expands when set, not when fired"},
+    {"SC3037", "echo flags are not in POSIX echo, use printf"               },
+    {"SC3044", "declare is not in POSIX, assign plainly under a sh shebang"  },
+    {"SC3046", "source is the bash spelling, the POSIX dot command is ."     },
 };
 
 } /* namespace shit */

@@ -1,0 +1,12 @@
+#!/bin/sh
+# The sh shebang arms the bashism gate, so the analysis warns on each bash-only
+# construct. The triggers sit in a function that is never called, so nothing
+# runs.
+lint_only() {
+  echo -e escaped
+  echo -n nonewline
+  declare -A assoc
+  typeset scoped
+  source library.sh
+}
+echo done

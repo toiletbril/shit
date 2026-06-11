@@ -318,6 +318,33 @@ fn analyze_ast(const Expression *root, StringView source,
   AnalysisContext actx{source};
   actx.errors_are_warnings = errors_are_warnings;
 
+  /* A leading shebang that names a POSIX shell gates the bashism lints. The
+     first line is scanned for a contained 'dash', or for an 'sh' interpreter
+     name without 'bash', so '#!/bin/sh', '#!/usr/bin/env dash', and
+     '#!/bin/dash' all arm the gate while a bash or shit shebang leaves it
+     off. */
+  if (source.length >= 2 && source[0] == '#' && source[1] == '!') {
+    usize line_end = 0;
+    while (line_end < source.length && source[line_end] != '\n') line_end++;
+    let const first_line = source.substring_of_length(0, line_end);
+    let contains_dash = false;
+    let contains_bash = false;
+    let interpreter_is_sh = false;
+    for (usize i = 0; i + 4 <= first_line.length; i++) {
+      if (first_line.substring(i).starts_with(StringView{"dash"}))
+        contains_dash = true;
+      if (first_line.substring(i).starts_with(StringView{"bash"}))
+        contains_bash = true;
+    }
+    /* The interpreter ends the line, so a trailing 'sh' after a slash is the
+       sh program name. */
+    if (first_line.length >= 2 &&
+        first_line.substring(first_line.length - 2) == StringView{"sh"})
+      interpreter_is_sh = true;
+    if (contains_dash || (interpreter_is_sh && !contains_bash))
+      actx.shebang_is_posix_sh = true;
+  }
+
   /* A function or alias defined by an earlier command resolves, so seed the
      prepass with the names already registered. */
   known_functions.for_each(
@@ -4115,6 +4142,38 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.warn(source_location(),
                 "read without -r mangles a backslash in the input, add -r to "
                 "read the line literally");
+  }
+
+  /* The bashism lints, each fired only when the shebang names a POSIX shell so
+     a deliberately bash-shaped script stays quiet. echo with a -e, -n, or -E
+     flag relies on a bash builtin where the POSIX echo prints the flag as
+     text, shellcheck SC3037, use printf. declare and its typeset alias are not
+     in POSIX, shellcheck SC3044, assign plainly or use a function. source is
+     the bash spelling of the dot command, shellcheck SC3046, use '.'. */
+  if (actx.shebang_is_posix_sh && !command_is_shadowed) {
+    if (command_literal == "echo" && m_args.count() >= 2 &&
+        m_args[1]->kind() == Token::Kind::Word)
+    {
+      let const flag = static_cast<const tokens::WordToken *>(m_args[1])
+                           ->word()
+                           .to_literal_string();
+      let const view = flag.view();
+      if (view == "-e" || view == "-n" || view == "-E" || view == "-ne" ||
+          view == "-en")
+        actx.warn(m_args[1]->source_location(),
+                  "echo " + view +
+                      " relies on a bash builtin, the POSIX echo prints the "
+                      "flag as text, use printf instead under a sh shebang");
+    }
+    if (command_literal == "declare" || command_literal == "typeset")
+      actx.warn(m_args[0]->source_location(),
+                command_literal.view() +
+                    " is not in POSIX, assign the variable plainly under a sh "
+                    "shebang, or switch the shebang to bash");
+    if (command_literal == "source")
+      actx.warn(m_args[0]->source_location(),
+                "source is the bash spelling, the POSIX dot command is '.', "
+                "use '.' under a sh shebang");
   }
 
   /* A trap action in double quotes expands its variables and command

@@ -1,0 +1,88 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "lint_only"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "-e" "escaped"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "-n" "nonewline"]
+          [CompoundListCondition, None]
+            [SimpleCommand "declare" "-A" "assoc"]
+          [CompoundListCondition, None]
+            [SimpleCommand "typeset" "scoped"]
+          [CompoundListCondition, None]
+            [SimpleCommand "source" "library.sh"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "lint_only"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "escaped"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "nonewline"
+]
+[Word
+  Unquoted "declare"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "assoc"
+]
+[Word
+  Unquoted "typeset"
+]
+[Word
+  Unquoted "scoped"
+]
+[Word
+  Unquoted "source"
+]
+[Word
+  Unquoted "library.sh"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+shit: 6:8: warning: echo -e relies on a bash builtin, the POSIX echo prints the flag as text, use printf instead under a sh shebang.
+     6 |    echo -e escaped
+       |         ^~ here.
+shit: 7:8: warning: echo -n relies on a bash builtin, the POSIX echo prints the flag as text, use printf instead under a sh shebang.
+     7 |    echo -n nonewline
+       |         ^~ here.
+shit: 8:3: warning: declare is not in POSIX, assign the variable plainly under a sh shebang, or switch the shebang to bash.
+     8 |    declare -A assoc
+       |    ^~~~~~~ here.
+shit: 9:3: warning: typeset is not in POSIX, assign the variable plainly under a sh shebang, or switch the shebang to bash.
+     9 |    typeset scoped
+       |    ^~~~~~~ here.
+shit: 10:3: warning: source is the bash spelling, the POSIX dot command is '.', use '.' under a sh shebang.
+    10 |    source library.sh
+       |    ^~~~~~ here.
+done
+[Code 0]

@@ -64,6 +64,12 @@ public:
    */
   HashSet function_local_names{heap_allocator()};
 
+  /* True when the script's shebang names a POSIX shell, sh or dash, so a
+     bashism in the body would break under the shell the file asks for. The
+     SC3xxx bashism lints fire only behind this gate, since a script with a
+     shit or bash shebang means the bash extension on purpose. */
+  bool shebang_is_posix_sh{false};
+
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
   fn warn(SourceLocation location, StringView message) throws -> void;
