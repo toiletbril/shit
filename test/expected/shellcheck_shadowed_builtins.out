@@ -14,7 +14,7 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "my printf $1"]
   [CompoundListCondition, None]
-    [SimpleCommand "printf" "$1"]
+    [SimpleCommand "printf" "fmt"]
   [CompoundListCondition, None]
     [FunctionDefinition "test"]
       [BraceGroup]
@@ -65,7 +65,7 @@
   Unquoted "printf"
 ]
 [Word
-  Variable "1"
+  Unquoted "fmt"
 ]
 [Word
   Unquoted "test"
@@ -102,6 +102,6 @@
   Unquoted "b"
 ]
 my read line
-my printf 
+my printf fmt
 my test -f
 [Code 0]

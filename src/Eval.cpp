@@ -249,6 +249,9 @@ fn EvalContext::append_indexed_array(StringView name,
 
 cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
 {
+  /* no-diagnostics promises no warnings at all, so the runtime advisories
+     honor the live toggle the way the analysis stage does. */
+  if (diagnostics_disabled()) return;
   /* The command being evaluated locates the caret, the same position the reap
      and substitution warnings render at. A formatting failure is swallowed so
      a diagnostic never becomes an error. */
@@ -281,7 +284,9 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
 {
   if (fatal && (explicitly_requested || !m_warnings_enabled))
     throw ErrorWithLocation{location, message};
-  if ((fatal || m_warnings_enabled) && m_current_source != nullptr) {
+  if ((fatal || m_warnings_enabled) && !diagnostics_disabled() &&
+      m_current_source != nullptr)
+  {
     try {
       show_message(WarningWithLocation{location, message}.to_string(
           m_current_source->view()));
@@ -782,15 +787,18 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         break;
       }
     if (is_all_digits) {
-      if (name.count() > 9) return String{};
+      /* A positional beyond the count is unset rather than empty, so the
+         strict unset report fires on it and ${1-default} takes its default
+         the way bash reads an absent argument. */
+      if (name.count() > 9) return None;
       let const parsed_index = utils::parse_decimal_integer(name);
-      if (parsed_index.is_error()) return String{};
+      if (parsed_index.is_error()) return None;
       let const index = static_cast<usize>(parsed_index.value());
       if (index >= 1 && index <= m_positional_params.count()) {
         ASSERT(index - 1 < m_positional_params.count());
         return m_positional_params[index - 1];
       }
-      return String{};
+      return None;
     }
   }
 

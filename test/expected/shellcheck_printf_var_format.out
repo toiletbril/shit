@@ -1,10 +1,21 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "fmt\n"]
+  [CompoundListCondition, None]
     [SimpleCommand "printf" "$1"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "%s" "ok"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "--" "$1"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Literal "fmt\n"
+]
 [Word
   Unquoted "printf"
 ]
@@ -29,10 +40,12 @@
 [Word
   Variable "1"
 ]
-shit: 2:8: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
-     2 |  printf "$1"
+shit: 3:8: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+     3 |  printf "$1"
        |         ^~~~ here.
-shit: 4:11: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
-     4 |  printf -- "$1"
+shit: 5:11: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+     5 |  printf -- "$1"
        |            ^~~~ here.
-ok[Code 0]
+fmt
+okfmt
+[Code 0]
