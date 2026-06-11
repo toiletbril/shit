@@ -63,6 +63,13 @@ struct highlight_span
 fn highlight_line(StringView line, EvalContext &context) throws
     -> ArrayList<highlight_span>;
 
+/* Whether the line's command word still names something runnable, a keyword,
+   a builtin, a function, an alias, a PATH executable, or an existing path.
+   The ghost history suggestion vets each candidate entry through this, the
+   fish validation, so a recalled command that vanished is never suggested.
+   The verdicts are cached per word and the cache drops when PATH changes. */
+fn command_word_resolves(StringView line, EvalContext &context) throws -> bool;
+
 } /* namespace completion */
 
 } /* namespace shit */

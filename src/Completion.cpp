@@ -1270,6 +1270,34 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   return utils::search_program_path(word).count() > 0;
 }
 
+/* The ghost validation verdicts, cached per command word so a history scan
+   over many stale entries pays the PATH search once per distinct word per
+   session. The cache drops when PATH changes, the same rule the command-name
+   cache follows. */
+static String CACHED_GHOST_VERDICT_PATH{};
+static HashMap<bool> GHOST_WORD_VERDICTS{heap_allocator()};
+
+fn command_word_resolves(StringView line, EvalContext &context) throws -> bool
+{
+  let const word = command_word_of(line);
+  if (word.is_empty()) return true;
+
+  let const path = os::get_environment_variable("PATH");
+  let const current = path.has_value() ? path->view() : StringView{};
+  if (CACHED_GHOST_VERDICT_PATH.view() != current) {
+    GHOST_WORD_VERDICTS.clear();
+    CACHED_GHOST_VERDICT_PATH = String{current};
+  }
+
+  if (const bool *verdict = GHOST_WORD_VERDICTS.find(word))
+    return *verdict;
+  let const resolves = first_word_resolves(word, context);
+  LOG(verbosity::All, "ghost validation resolves '%.*s' to %s",
+      static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
+  GHOST_WORD_VERDICTS.set(word, resolves);
+  return resolves;
+}
+
 static pure fn is_highlight_name_start(char c) wontthrow -> bool
 {
   return lexer::is_variable_name_start(c);

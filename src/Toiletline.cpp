@@ -243,6 +243,24 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
   }
 }
 
+/* Bridge toiletline's ghost history validation onto the shell, the fish
+   autosuggestion rule. An entry whose command word no longer resolves is
+   rejected so the scan keeps looking for a live one. A throw accepts the
+   entry, since a suggestion is better than none when the resolver hiccups. */
+fn shit_ghost_validate_callback(const char *entry) -> int
+{
+  if (COMPLETION_CONTEXT == nullptr) return 1;
+  try {
+    const usize byte_length = std::strlen(entry);
+    return shit::completion::command_word_resolves(
+               shit::StringView{entry, byte_length}, *COMPLETION_CONTEXT)
+               ? 1
+               : 0;
+  } catch (...) {
+    return 1;
+  }
+}
+
 } /* namespace */
 
 namespace toiletline {
@@ -299,6 +317,9 @@ fn enable_completion(shit::EvalContext &context) -> void
      color decision, so a runtime change to NO_COLOR takes effect without
      re-registering. The callback returns no spans when color is off. */
   ::tl_set_highlight_callback(shit_highlight_callback);
+  /* The ghost history suggestion vets each entry's command word, the fish
+     validation, so a recalled command that vanished is never suggested. */
+  ::tl_set_ghost_validate_callback(shit_ghost_validate_callback);
 }
 
 fn disable_completion() -> void
@@ -306,6 +327,7 @@ fn disable_completion() -> void
   COMPLETION_CONTEXT = nullptr;
   ::tl_set_complete_callback(nullptr);
   ::tl_set_highlight_callback(nullptr);
+  ::tl_set_ghost_validate_callback(nullptr);
 }
 
 fn set_ghost_enabled(bool enabled) -> void
