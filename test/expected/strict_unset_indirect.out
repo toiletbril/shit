@@ -1,0 +1,49 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign ref=missing_target]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$!ref"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "target-form=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$!nope"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "not-reached"]
+[Word
+  Unquoted "ref=missing_target"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!ref"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "target-form="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "!nope"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "not-reached"
+]
+shit: 3:7: error: Unable to expand 'missing_target' because the parameter is not set.
+     3 |  (echo "${!ref}")
+       |        ^~~~~~~~~ here.
+target-form=2
+shit: 5:6: error: Unable to expand 'nope' because the parameter is not set.
+     5 |  echo "${!nope}"
+       |       ^~~~~~~~~~ here.

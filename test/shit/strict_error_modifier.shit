@@ -1,0 +1,10 @@
+#!/bin/env shit
+(echo "${nope:?custom message}")
+echo "default=$?"
+set -o bash-compatible
+(echo "${nope:?bash message}")
+echo "bash=$?"
+set +o bash-compatible
+set -o posix
+(echo "${nope?posix message}")
+echo "posix=$?"

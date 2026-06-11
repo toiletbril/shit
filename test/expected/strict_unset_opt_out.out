@@ -1,0 +1,53 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+u"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "[$nope]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-u"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$nope"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "code=$?"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+u"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "["
+  Variable "nope"
+  DoubleQuoted "]"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-u"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "nope"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "code="
+  Variable "?"
+]
+[]
+shit: 5:7: error: Unable to expand 'nope' because the parameter is not set.
+     5 |  (echo "$nope")
+       |        ^~~~~~~ here.
+code=2
+[Code 0]

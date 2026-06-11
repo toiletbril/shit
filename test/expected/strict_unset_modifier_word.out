@@ -1,0 +1,34 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=set]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "before"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$x:+$nope"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "not-reached"]
+[Word
+  Unquoted "x=set"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "before"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "x:+$nope"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "not-reached"
+]
+before
+shit: 4:6: error: Unable to expand 'nope' because the parameter is not set.
+     4 |  echo "${x:+$nope}"
+       |       ^~~~~~~~~~~~~ here.

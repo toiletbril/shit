@@ -1,0 +1,29 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "before"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "not-reached"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "before"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "not-reached"
+]
+before
+shit: 3:6: error: Unable to expand '1' because the parameter is not set.
+     3 |  echo "$1"
+       |       ^~~~ here.

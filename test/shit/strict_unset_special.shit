@@ -1,0 +1,4 @@
+#!/bin/env shit
+echo before
+echo "$1"
+echo not-reached

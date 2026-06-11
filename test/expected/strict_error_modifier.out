@@ -1,0 +1,107 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$nope:?custom message"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "default=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "bash-compatible"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$nope:?bash message"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bash=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "bash-compatible"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "posix"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "$nope?posix message"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "posix=$?"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "nope:?custom message"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "default="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "bash-compatible"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "nope:?bash message"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "bash="
+  Variable "?"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "bash-compatible"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "posix"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Variable "nope?posix message"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "posix="
+  Variable "?"
+]
+shit: 2:7: error: custom message.
+     2 |  (echo "${nope:?custom message}")
+       |        ^~~~~~~~~~~~~~~~~~~~~~~~~ here.
+default=2
+shit: 5:7: error: bash message.
+     5 |  (echo "${nope:?bash message}")
+       |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
+bash=1
+shit: 9:7: error: posix message.
+     9 |  (echo "${nope?posix message}")
+       |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
+posix=2
+[Code 0]
