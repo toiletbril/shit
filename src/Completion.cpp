@@ -541,6 +541,112 @@ static fn split_completion_words(StringView line, usize cursor,
   return words;
 }
 
+/* The option flags parsed out of a manpage, cached per command so a second
+   tab on the same command pays no man fork. An empty list is cached too, so a
+   command with no manpage or no options is not retried. */
+static HashMap<ArrayList<String>> MANPAGE_OPTION_CACHE{heap_allocator()};
+
+/* The shared-manpage aliases, the only commands whose options live under a
+   different page name. A general scan of `man COMMAND` covers every other
+   command, so the table stays tiny and is not a list of every known tool. */
+static fn manpage_name_for(StringView command) throws -> String
+{
+  if (command == "clang++" || command == "c++") return String{"clang"};
+  if (command == "g++") return String{"gcc"};
+  return String{command};
+}
+
+/* Strips man's overstrike formatting, a bold byte renders as byte backspace
+   byte and an underline as underscore backspace char, then pulls every -x and
+   --long flag out of the cleaned text. The flags are deduplicated and returned
+   in source order. */
+static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
+{
+  let clean = String{};
+  for (usize i = 0; i < text.length; i++) {
+    if (text[i] == '\b') {
+      if (!clean.is_empty()) clean.pop_back();
+      continue;
+    }
+    clean += text[i];
+  }
+
+  let options = ArrayList<String>{};
+  let seen = HashSet{heap_allocator()};
+  const StringView view = clean.view();
+  for (usize i = 0; i < view.length; i++) {
+    /* A flag starts at a dash that opens a word, so a hyphen inside a word or
+       a numeric range is not mistaken for an option. */
+    const bool at_word_start =
+        i == 0 || view[i - 1] == ' ' || view[i - 1] == '\t' ||
+        view[i - 1] == '\n' || view[i - 1] == '(' || view[i - 1] == '[';
+    if (view[i] != '-' || !at_word_start) continue;
+    usize end = i;
+    while (end < view.length &&
+           (view[end] == '-' || lexer::is_variable_name(view[end])))
+      end++;
+    const StringView flag = view.substring_of_length(i, end - i);
+    /* A lone dash and an all-digit run after the dashes are not options. */
+    bool has_letter = false;
+    for (usize j = 0; j < flag.length; j++)
+      if (flag[j] != '-') {
+        has_letter = !(flag[j] >= '0' && flag[j] <= '9');
+        if (has_letter) break;
+      }
+    if (flag.length >= 2 && has_letter && !seen.contains(flag)) {
+      seen.add(flag);
+      options.push(String{flag});
+    }
+    i = end;
+  }
+  options.shrink_to_fit();
+  return options;
+}
+
+/* The option flags a command's manpage documents, parsed once and cached. The
+   man invocation is the general path that works for any command on the host,
+   so the completer is not limited to a hardcoded set of tools. */
+static fn manpage_options_for(StringView command, EvalContext &context) throws
+    -> const ArrayList<String> &
+{
+  const String man_name = manpage_name_for(command);
+  if (MANPAGE_OPTION_CACHE.find(man_name.view()) == nullptr) {
+    let parsed = ArrayList<String>{};
+    try {
+      const String page =
+          context.capture_command_substitution(String{"man "} + man_name +
+                                               " 2>/dev/null");
+      parsed = parse_manpage_options(page.view());
+    } catch (...) {}
+    MANPAGE_OPTION_CACHE.set(man_name.view(), steal(parsed));
+  }
+  return *MANPAGE_OPTION_CACHE.find(man_name.view());
+}
+
+/* Completes an option token from the command's manpage, the general source
+   that needs no per-command table. Runs only on an explicit tab and only for a
+   token that opens with a dash, so the ghost never forks man and a plain
+   argument still completes as a filename. None means the man path did not
+   apply, so the caller falls through to the spec and the filesystem. */
+static fn complete_from_manpage(StringView line, StringView token,
+                                bool for_listing, EvalContext &context) throws
+    -> Maybe<ArrayList<String>>
+{
+  if (!for_listing) return None;
+  if (token.is_empty() || token[0] != '-') return None;
+  const StringView command = command_word_of(line);
+  if (command.is_empty() || command.find_character('/').has_value()) return None;
+
+  const ArrayList<String> &options = manpage_options_for(command, context);
+  if (options.is_empty()) return None;
+
+  let matches = ArrayList<String>{};
+  for (const String &option : options)
+    if (option.view().starts_with(token)) matches.push(String{option.view()});
+  if (matches.is_empty()) return None;
+  return matches;
+}
+
 /* Consult the completion spec registered for the line's command, when one
    exists. The word list filters to the entries that start with the token, and
    the -F function runs only on an explicit tab so the ghost does not run it on
@@ -689,12 +795,17 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
   } else {
-    /* An argument to a command that registered a completion spec consults the
-       spec first, the way bash runs a programmable completion, and falls back
-       to filenames when no spec applies or a -o default spec found nothing. */
-    if (Maybe<ArrayList<String>> from_spec =
-            complete_from_spec(line, token, cursor, for_listing, context);
-        from_spec.has_value())
+    /* An option argument completes from the command's manpage first, the
+       general source that needs no per-command table, on an explicit tab only.
+       A command spec, the bash programmable completion, comes next, and a
+       plain argument falls back to filenames. */
+    if (Maybe<ArrayList<String>> from_manpage =
+            complete_from_manpage(line, token, for_listing, context);
+        from_manpage.has_value())
+      candidates = steal(*from_manpage);
+    else if (Maybe<ArrayList<String>> from_spec =
+                 complete_from_spec(line, token, cursor, for_listing, context);
+             from_spec.has_value())
       candidates = steal(*from_spec);
     else
       candidates = complete_filesystem(token, base_directory);
