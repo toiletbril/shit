@@ -186,6 +186,12 @@ fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
     /* $BASH is the path the shell records as the executable that started it,
        which is the SHELL value the shell already holds. */
     set_shell_variable("BASH", get_variable_value("SHELL").value_or(String{}));
+    /* COMP_WORDBREAKS carries readline's word-break set the way bash exposes
+       it. bash-completion's word reassembly walks COMP_LINE against it, so a
+       missing value collapses every word into one and the computed cursor
+       word lands at zero, which kills every completion function. */
+    if (!get_variable_value("COMP_WORDBREAKS").has_value())
+      set_shell_variable("COMP_WORDBREAKS", StringView{" \t\n\"'><=;|&(:"});
     return;
   }
   /* sh and dash advertise no version variable, so the bash identity is just
@@ -203,12 +209,69 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   if (is_readonly(name))
     throw Error{"Unable to unset '" + name + "' because it is read only"};
 
+  /* A local a caller declared peels back to that caller's saved value, the
+     bash upvar semantics bash-completion bubbles every result through. The
+     same-scope local keeps the plain removal below, the unset local bash
+     reads as empty. */
+  if (peel_caller_local_binding(name)) return;
+
   force_unset_shell_variable(name);
   m_indexed_arrays.erase(name);
   clear_sparse_array(name);
   /* unset drops the integer mark with the value, the way bash clears the
      declare -i attribute, so a later assignment stores raw text again. */
   m_integer_names.remove(name);
+}
+
+fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
+{
+  /* The current scope's own local is not peeled, and outside a function there
+     is nothing to peel. */
+  if (m_local_scopes.count() < 2) return false;
+  if (is_local_in_current_scope(name)) return false;
+
+  /* The innermost caller frame holding a saved binding is the one bash's
+     unset peels, so the scan walks from the nearest caller outward. */
+  for (usize frame_index = m_local_scopes.count() - 1; frame_index-- > 0;) {
+    ArrayList<local_binding> &frame = m_local_scopes[frame_index];
+    for (usize i = frame.count(); i-- > 0;) {
+      let &binding = frame[i];
+      if (binding.name.view() != name) continue;
+      LOG(verbosity::Debug,
+          "peeling the local binding of '%.*s' from caller frame %zu",
+          static_cast<int>(name.length), name.data, frame_index);
+
+      /* The caller's saved state comes back right now, the same restore the
+         scope pop would have run, so the read after the unset already sees
+         the next binding out and a following assignment writes it. */
+      if (binding.previous_value.has_value())
+        assign_variable(binding.name, *binding.previous_value);
+      else
+        force_unset_shell_variable(binding.name);
+      if (binding.previous_indexed_array.has_value())
+        m_indexed_arrays.set(binding.name.view(),
+                             steal(*binding.previous_indexed_array));
+      else
+        m_indexed_arrays.erase(binding.name.view());
+      clear_associative_array(binding.name.view());
+      if (binding.previous_was_associative)
+        for (usize k = 0; k < binding.previous_associative_keys.count(); k++)
+          set_associative_element(binding.name.view(),
+                                  binding.previous_associative_keys[k].view(),
+                                  binding.previous_associative_values[k].view());
+      if (binding.previous_was_integer)
+        m_integer_names.add(binding.name.view());
+      else
+        m_integer_names.remove(binding.name.view());
+
+      /* The restore entry is consumed, so the frame's pop no longer rewinds
+         this name and the value a deeper callee assigns next survives into
+         the caller's caller. */
+      frame.remove(i);
+      return true;
+    }
+  }
+  return false;
 }
 
 fn EvalContext::set_indexed_array(StringView name,
@@ -1410,6 +1473,11 @@ fn EvalContext::declare_local(StringView name) throws -> void
 {
   if (m_local_scopes.is_empty()) return;
   ASSERT(!m_local_scopes.is_empty());
+  /* One binding per scope, the bash rule. A second local declaration of the
+     same name in the same scope keeps the first declaration's saved caller
+     state, so the scope pop restores the true pre-call value and the unset
+     peel finds exactly one entry to consume. */
+  if (is_local_in_current_scope(name)) return;
   LOG(verbosity::All, "declaring '%.*s' local in scope depth %zu",
       static_cast<int>(name.length), name.data, m_local_scopes.count());
 
@@ -5570,6 +5638,111 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
+      /* "${a[@]+word}" and "${a[@]-word}" pick between the word and the
+         elements with field fidelity, the nounset-safe array expansion idiom
+         bash-completion writes as ${a[@]+"${a[@]}"}. The dominant word shape,
+         one quoted or bare array expansion, emits one field per element the
+         way the plain "${a[@]}" does, and any other word shape falls through
+         to the general scalar path below. */
+      if (lexer::is_variable_name_start(segment_text[0])) {
+        usize name_end = 1;
+        while (name_end < segment_text.length &&
+               lexer::is_variable_name(segment_text[name_end]))
+          name_end++;
+        if (name_end + 3 < segment_text.length &&
+            segment_text[name_end] == '[' &&
+            (segment_text[name_end + 1] == '@' ||
+             segment_text[name_end + 1] == '*') &&
+            segment_text[name_end + 2] == ']')
+        {
+          let const rest = segment_text.substring(name_end + 3);
+          let const is_colon_form = !rest.is_empty() && rest[0] == ':';
+          let const op_index = is_colon_form ? usize{1} : usize{0};
+          if (op_index < rest.length &&
+              (rest[op_index] == '+' || rest[op_index] == '-'))
+          {
+            let const array_name =
+                segment_text.substring_of_length(0, name_end);
+            let const modifier_op = rest[op_index];
+            let const modifier_word = rest.substring(op_index + 1);
+            let const is_star = segment_text[name_end + 1] == '*';
+            let const elements = collect_array_elements(array_name);
+            let is_every_element_empty = true;
+            for (const String &element : elements)
+              if (!element.is_empty()) {
+                is_every_element_empty = false;
+                break;
+              }
+            let const treat_as_unset =
+                is_colon_form ? is_every_element_empty : elements.is_empty();
+            let const should_expand_word =
+                modifier_op == '+' ? !treat_as_unset : treat_as_unset;
+
+            /* The per-element emitter the plain "${a[@]}" cases use, one
+               field per element when quoted with @, an IFS join with *. */
+            auto emit_elements = [&](const ArrayList<String> &values) throws {
+              if (segment.is_in_double_quotes && is_star) {
+                let const ifs = m_field_separators.view();
+                let joined = String{scratch_allocator()};
+                for (usize i = 0; i < values.count(); i++) {
+                  if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+                  joined.append(values[i].view());
+                }
+                append_run(joined, false);
+                return;
+              }
+              for (usize i = 0; i < values.count(); i++) {
+                if (i > 0) flush();
+                if (segment.is_in_double_quotes)
+                  append_run(values[i].view(), false);
+                else
+                  append_split_run(values[i].view(), true);
+              }
+            };
+
+            if (!should_expand_word) {
+              /* + with an unset array contributes no field at all, and - with
+                 a set array reads the elements themselves. */
+              if (modifier_op == '-') emit_elements(elements);
+              break;
+            }
+
+            /* The word shape "${name[@]}" or its bare or starred forms, the
+               only shapes the idiom uses, expands to that array's elements. */
+            let word = modifier_word;
+            let const is_word_quoted = word.length >= 2 && word[0] == '"' &&
+                                       word[word.length - 1] == '"';
+            if (is_word_quoted)
+              word = word.substring_of_length(1, word.length - 2);
+            if (word.length >= 6 && word[0] == '$' && word[1] == '{' &&
+                word[word.length - 1] == '}')
+            {
+              let const inner = word.substring_of_length(2, word.length - 3);
+              usize inner_name_end = 0;
+              while (inner_name_end < inner.length &&
+                     lexer::is_variable_name(inner[inner_name_end]))
+                inner_name_end++;
+              if (inner_name_end > 0 && inner_name_end + 3 == inner.length &&
+                  inner[inner_name_end] == '[' &&
+                  (inner[inner_name_end + 1] == '@' ||
+                   inner[inner_name_end + 1] == '*') &&
+                  inner[inner_name_end + 2] == ']')
+              {
+                emit_elements(collect_array_elements(
+                    inner.substring_of_length(0, inner_name_end)));
+                break;
+              }
+            }
+            /* Any other word shape keeps the scalar expansion. */
+            let const value = apply_parameter_expansion(segment.text.view());
+            if (segment.is_in_double_quotes)
+              append_run(value, false);
+            else
+              append_split_run(value, true);
+            break;
+          }
+        }
+      }
       /* A plain $name that names a set scalar appends the stored value by view,
          with no copy, since the full parameter expansion would read the same
          string. A spec with a modifier, an unset name, or a synthesized name is
@@ -6375,8 +6548,11 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 fn EvalContext::register_completion_spec(StringView command,
                                          completion_spec spec) throws -> void
 {
-  LOG(verbosity::Debug, "registering a completion spec for '%.*s'",
-      static_cast<int>(command.length), command.data);
+  LOG(verbosity::Debug,
+      "registering a completion spec for '%.*s' with function '%s' and %zu "
+      "word-list bytes",
+      static_cast<int>(command.length), command.data,
+      spec.function_name.c_str(), spec.word_list.length());
   m_completion_specs.set(command, steal(spec));
 }
 
@@ -6422,6 +6598,20 @@ fn EvalContext::run_completion_function(StringView function_name,
   let const saved_mood = m_mood;
   m_mood = mimic_mood::Bash;
   defer { m_mood = saved_mood; };
+
+  /* bash-completion is written for bash's lax defaults and reads unset names
+     such as SHELLOPTS freely, so the mood-seeded strictness relaxes for the
+     function run the way the mood does. An explicit set -u or set -o failglob
+     is the user's own ask and stays fatal, the same rule -W follows. */
+  let const saved_error_unset = m_error_unset;
+  let const saved_failglob = m_failglob;
+  if (!m_error_unset_explicit) m_error_unset = false;
+  if (!m_failglob_explicit) m_failglob = false;
+  defer
+  {
+    m_error_unset = saved_error_unset;
+    m_failglob = saved_failglob;
+  };
 
   /* The completion variables bash exposes to the function, the words of the
      line, the index of the word under the cursor, and the raw line and byte. */
@@ -6494,9 +6684,11 @@ fn EvalContext::run_completion_function(StringView function_name,
     for (const String &entry : *reply)
       result.push_managed(entry.view());
   }
-  LOG(verbosity::Debug, "completion function '%.*s' returned %zu candidates",
+  LOG(verbosity::Debug,
+      "completion function '%.*s' returned %zu candidates with status %d",
       static_cast<int>(function_name.length), function_name.data,
-      result.count());
+      result.count(),
+      out_exit_status != nullptr ? *out_exit_status : last_exit_status());
   return result;
 }
 

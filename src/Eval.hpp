@@ -546,6 +546,11 @@ public:
      registered spec. */
   fn register_default_completion_spec(completion_spec spec) throws -> void;
   pure fn default_completion_spec() const wontthrow -> const completion_spec *;
+  /* The whole spec table, read by complete -p to replay the registrations. */
+  pure fn completion_specs() const wontthrow -> const HashMap<completion_spec> &
+  {
+    return m_completion_specs;
+  }
   /* out_exit_status, when given, receives the function's return status, so the
      engine can see the 124 a dynamic loader returns to request a retry. */
   fn run_completion_function(StringView function_name,
@@ -1311,6 +1316,12 @@ protected:
   /* Remove a variable without the read-only check, for the same local restore
      path as assign_variable where a throw would terminate the shell. */
   fn force_unset_shell_variable(StringView name) throws -> void;
+  /* The unset peel, the bash upvar semantics. A local declared by a caller
+     rather than the current scope restores that caller's saved value now and
+     cancels the restore its scope pop would have run, so the assignment that
+     follows writes the binding the next caller out sees. Returns whether a
+     binding was peeled. */
+  fn peel_caller_local_binding(StringView name) throws -> bool;
 
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */
