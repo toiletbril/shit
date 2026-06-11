@@ -8,7 +8,7 @@
           [SimpleCommand "getopts" "a:bc" "opt"]
       [CompoundList]
         [CompoundListCondition, None]
-          [SimpleCommand "echo" "opt=$opt arg=$OPTARG"]
+          [SimpleCommand "echo" "opt=$opt arg=$OPTARG-"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "rest=$1 ind=$OPTIND"]
   [CompoundListCondition, None]
@@ -16,7 +16,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "getopts" ":a:" "o"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "silent=$o arg=$OPTARG"]
+    [SimpleCommand "echo" "silent=$o arg=$OPTARG-"]
 [Word
   Unquoted "set"
 ]
@@ -57,7 +57,7 @@
   DoubleQuoted "opt="
   Variable "opt"
   DoubleQuoted " arg="
-  Variable "OPTARG"
+  Variable "OPTARG-"
 ]
 [Word
   Unquoted "done"
@@ -96,7 +96,7 @@
   DoubleQuoted "silent="
   Variable "o"
   DoubleQuoted " arg="
-  Variable "OPTARG"
+  Variable "OPTARG-"
 ]
 opt=a arg=val
 opt=b arg=

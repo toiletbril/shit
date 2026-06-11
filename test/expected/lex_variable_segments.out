@@ -46,4 +46,6 @@
   Unquoted "c"
   Variable "d"
 ]
-[Code 0]
+shit: 2:3: error: Unable to expand 'foo' because the parameter is not set.
+     2 |  : $foo ${bar}
+       |    ^~~~ here.

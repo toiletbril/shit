@@ -13,5 +13,6 @@
 shit: 2:12: warning: The assignment prefix does not affect this command, 'VAR' is read before it is set.
      2 |  VAR=1 echo $VAR
        |             ^~~~ here.
-
-[Code 0]
+shit: 2:12: error: Unable to expand 'VAR' because the parameter is not set.
+     2 |  VAR=1 echo $VAR
+       |             ^~~~ here.

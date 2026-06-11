@@ -29,4 +29,6 @@
 shit: 3:3: warning: an unquoted command substitution splits its output, quote it to keep one argument.
      3 |  : "a$b"'c'$(:)"d$(( 1 + 1 ))e"
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
-[Code 0]
+shit: 2:3: error: Unable to expand 'x' because the parameter is not set.
+     2 |  : pre"dq"'sq'$x${y}post
+       |    ^~~~~~~~~~~~~~~~~~~~~ here.

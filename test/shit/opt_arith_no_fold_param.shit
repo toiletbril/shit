@@ -1,3 +1,4 @@
 #!/bin/env shit
+set +u
 echo $((notrecorded+1))
 echo $((0x10+1))

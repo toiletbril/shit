@@ -1,8 +1,16 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "set" "+u"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "$((notrecorded+1))"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$((0x10+1))"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+u"
+]
 [Word
   Unquoted "echo"
 ]

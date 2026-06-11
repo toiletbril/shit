@@ -1,10 +1,18 @@
 [CompoundList]
   [CompoundListCondition, None]
+    [SimpleCommand "set" "+u"]
+  [CompoundListCondition, None]
     [SimpleCommand "echo" "$NOPE" "end"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$NOPE" "end"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "a$NOPEb"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+u"
+]
 [Word
   Unquoted "echo"
 ]

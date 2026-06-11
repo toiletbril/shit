@@ -14,7 +14,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "$#"]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "--" "$unset"]
+    [SimpleCommand "set" "--" "$unset-"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "count=$#"]
   [CompoundListCondition, None]
@@ -141,7 +141,7 @@
   Unquoted "--"
 ]
 [Word
-  Variable "unset"
+  Variable "unset-"
 ]
 [Word
   Unquoted "echo"
@@ -258,7 +258,7 @@
   Unquoted "in"
 ]
 [Word
-  Variable "unset"
+  Variable "unset-"
 ]
 [Word
   Unquoted "do"

@@ -4438,9 +4438,17 @@ public:
       return parse_arithmetic_operand(stored->view());
     }
 
-    let const value = context->get_variable_value(name).value_or(String{});
-    if (value.is_empty()) return 0;
-    return parse_arithmetic_operand(value.view());
+    let const value = context->get_variable_value(name);
+    if (!value.has_value()) {
+      /* An unset name in arithmetic goes through the same reporter as an unset
+         parameter expansion, so $((nope)) is not silently zero under the
+         strict mood. A skipped ternary branch reads without effect the way its
+         assignments are suppressed, so it never reports. */
+      if (!m_is_skipping) context->report_unset_reference(name);
+      return 0;
+    }
+    if (value->is_empty()) return 0;
+    return parse_arithmetic_operand(value->view());
   }
 
   /* The name of the variable at the cursor, or an empty view when no name sits

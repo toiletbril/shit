@@ -18,7 +18,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "printf" "-v" "captured" "%04d" "7"]
   [CompoundListCondition, None]
-    [SimpleCommand "echo" "captured=$captured"]
+    [SimpleCommand "echo" "captured=$captured-"]
 [Word
   Unquoted "printf"
 ]
@@ -123,7 +123,7 @@
 ]
 [Word
   DoubleQuoted "captured="
-  Variable "captured"
+  Variable "captured-"
 ]
 a\ b
 a\$b\;c

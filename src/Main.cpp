@@ -701,13 +701,17 @@ fn main(int argc, char **argv) -> int
   context.set_inited_as_bash(init_as_bash);
   context.set_custom_rcfile(FLAG_RCFILE.is_set());
   /* The startup config files, the profiles and the rc, source with nounset and
-     pipefail off the way a script does, since they are written for a lax shell
-     and read unset variables such as $BASH_VERSION on the /etc/profile path.
-     The strict interactive defaults are applied at the seam below once the
-     config has loaded, so a typo in a variable name and a failing pipeline
-     stage both fail loudly at the prompt. An explicit set -u or set -o pipefail
-     is honored throughout. */
-  context.set_error_unset(FLAG_NOUNSET.is_enabled());
+     pipefail off, since they are written for a lax shell and read unset
+     variables such as $BASH_VERSION on the /etc/profile path. The strict
+     interactive defaults are applied at the seam below once the config has
+     loaded, so a typo in a variable name and a failing pipeline stage both
+     fail loudly at the prompt. A non-interactive default-mood run sources no
+     config, so it carries the strict unset check from the start the way it
+     carries pipefail and failglob below, and -W downgrades the trip to a
+     warning. An explicit set -u or set -o pipefail is honored throughout. */
+  context.set_error_unset(
+      FLAG_NOUNSET.is_enabled() ||
+      (!should_be_interactive && !shit::should_run_in_compat_mode()));
   /* The CLI -u is the user's own ask the way set -u is, so the -W downgrade
      leaves it fatal. -W mirrors onto the context so the runtime strictness
      checks downgrade and set -W can flip it mid-run. */

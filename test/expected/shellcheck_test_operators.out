@@ -87,4 +87,6 @@ shit: 3:3: warning: a negated -z is just -n, test with -n instead.
 shit: 4:3: warning: a negated -n is just -z, test with -z instead.
      4 |  [ ! -n "$y" ]
        |    ^~ here.
-[Code 1]
+shit: 3:8: error: Unable to expand 'x' because the parameter is not set.
+     3 |  [ ! -z "$x" ]
+       |         ^~~~ here.
