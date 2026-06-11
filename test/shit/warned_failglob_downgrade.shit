@@ -1,0 +1,4 @@
+#!/bin/env shit
+set -W
+echo *.zzz_nomatch_downgrade
+echo continued
