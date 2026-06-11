@@ -7,6 +7,9 @@
 [Word
   CommandSubstitution "echo $(echo deep)"
 ]
+shit: 2:1: warning: echo of a command substitution prints what the command already prints, run the command on its own instead.
+     2 |  echo $(echo $(echo deep))
+       |  ^~~~ here.
 shit: 2:6: warning: an unquoted command substitution splits its output, quote it to keep one argument.
      2 |  echo $(echo $(echo deep))
        |       ^~~~~~~~~~~~~~~~~~~~ here.
