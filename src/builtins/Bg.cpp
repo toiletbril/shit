@@ -46,7 +46,7 @@ fn Bg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (job == nullptr) throw Error{"there is no such job"};
   ASSERT(job != nullptr);
 
-  LOG(verbosity::Debug, "bg resuming job %d in the background", job->id);
+  LOG(verbosity::Info, "bg resuming job %d in the background", job->id);
 
   if (const Maybe<i32> cont = os::signal_number_from_name("CONT"))
     os::signal_process(job->pid, *cont);

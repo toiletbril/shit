@@ -316,7 +316,7 @@ cold fn Path::current_directory() throws -> Path
 
 fn Path::set_current_directory(const Path &path) throws -> ErrorOr<Ok>
 {
-  LOG(verbosity::Debug, "changing the current directory to '%s'",
+  LOG(verbosity::Info, "changing the current directory to '%s'",
       path.c_str());
   if (::chdir(path.c_str()) != 0)
     return Error{"Could not change directory to '" + path.text() + "'"};
@@ -354,7 +354,7 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
 
   ::closedir(handle);
 
-  LOG(verbosity::Debug, "read %zu entries from the directory '%s'",
+  LOG(verbosity::All, "read %zu entries from the directory '%s'",
       names.count(), dir.c_str());
 
   return names;
@@ -504,7 +504,7 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
     names.push(String{name});
   } while (FindNextFileA(handle, &data) != 0);
   FindClose(handle);
-  LOG(verbosity::Debug, "read %zu entries from the directory '%s'",
+  LOG(verbosity::All, "read %zu entries from the directory '%s'",
       names.count(), dir.c_str());
   return names;
 }

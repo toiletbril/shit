@@ -157,7 +157,7 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
   if (option_is_startup_fact(option))
     throw Error{"Unable to change '" + String{option.name} +
                 "' because it is fixed at shell startup"};
-  LOG(verbosity::Debug, "set flipping option '%.*s' to %s",
+  LOG(verbosity::Info, "set flipping option '%.*s' to %s",
       static_cast<int>(option.name.length), option.name.data,
       enable ? "on" : "off");
   if (option.set != nullptr) (cxt.*(option.set))(enable);

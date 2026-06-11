@@ -267,13 +267,13 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (mark_integer_attribute) cxt.mark_integer(name);
     if (unmark_integer_attribute) cxt.unmark_integer(name);
 
-    LOG(verbosity::Debug, "declare applying attributes to '%.*s'",
+    LOG(verbosity::All, "declare applying attributes to '%.*s'",
         static_cast<int>(name.length), name.data);
 
     if (has_subscript && equals.has_value()) {
       cxt.assign_array_element(name, subscript, value, is_append);
     } else if (make_associative) {
-      LOG(verbosity::Debug, "declare making '%.*s' an associative array",
+      LOG(verbosity::All, "declare making '%.*s' an associative array",
           static_cast<int>(name.length), name.data);
       cxt.declare_associative_array(name);
     } else if (make_indexed) {
@@ -297,7 +297,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         cxt.set_shell_variable(name, value);
       }
       if (do_export) {
-        LOG(verbosity::Debug, "declare exporting '%.*s' to the environment",
+        LOG(verbosity::All, "declare exporting '%.*s' to the environment",
             static_cast<int>(name.length), name.data);
         cxt.record_environment_change(name);
         /* The store may have rewritten the value, an integer name stores the

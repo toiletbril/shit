@@ -54,7 +54,7 @@ fn Alias::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let const parts = utils::split_name_value_arg(arg);
 
     if (parts.value.has_value()) {
-      LOG(verbosity::Debug, "alias defining '%.*s'",
+      LOG(verbosity::All, "alias defining '%.*s'",
           static_cast<int>(parts.name.length), parts.name.data);
       cxt.set_alias(parts.name, *parts.value);
     } else if (const Maybe<String> value = cxt.get_alias(arg)) {

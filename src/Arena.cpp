@@ -51,7 +51,7 @@ cold fn BumpArena::add_block(usize minimum_size) throws -> void
 
   ASSERT(size >= minimum_size, "fresh block must fit the requested allocation");
 
-  LOG(verbosity::Debug, "mapping a new arena block of %zu bytes", size);
+  LOG(verbosity::All, "mapping a new arena block of %zu bytes", size);
 
   m_blocks.push(block{base, size, 0});
 }
@@ -121,7 +121,7 @@ fn BumpArena::release(Mark saved) wontthrow -> void
 
 cold fn BumpArena::reset() wontthrow -> void
 {
-  LOG(verbosity::Debug,
+  LOG(verbosity::All,
       "resetting the arena holding %zu blocks and %zu used bytes",
       m_blocks.count(), bytes_used());
 

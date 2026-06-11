@@ -49,7 +49,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const &command_name = args[1];
 
-  LOG(verbosity::Debug, "exec replacing the shell with '%s'",
+  LOG(verbosity::Info, "exec replacing the shell with '%s'",
       command_name.c_str());
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the

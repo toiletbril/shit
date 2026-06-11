@@ -39,7 +39,7 @@ fn Continue::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{"Unable to continue because '" + ec.args()[1] +
                 "' is not a valid loop count"};
 
-  LOG(verbosity::Debug, "continue skipping to the next iteration of %lld loops",
+  LOG(verbosity::All, "continue skipping to the next iteration of %lld loops",
       static_cast<long long>(level));
   cxt.request_continue(level, ec.source_location());
   return 0;

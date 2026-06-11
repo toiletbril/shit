@@ -89,7 +89,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      The matches print one per line and the status reports whether any matched,
      so 'if compgen -G pat >/dev/null' reads as an existence test. */
   if (have_glob_pattern) {
-    LOG(verbosity::Debug, "compgen expanding glob '%.*s' for prefix '%.*s'",
+    LOG(verbosity::All, "compgen expanding glob '%.*s' for prefix '%.*s'",
         static_cast<int>(glob_pattern.length), glob_pattern.data,
         static_cast<int>(word.length), word.data);
     let out = String{};

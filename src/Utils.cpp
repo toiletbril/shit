@@ -1115,7 +1115,7 @@ cold fn print_memory_report() wontthrow -> void
 
 [[noreturn]] fn quit(i32 code, bool should_goodbye) throws -> void
 {
-  LOG(verbosity::Debug, "quitting with code %d", code);
+  LOG(verbosity::Info, "quitting with code %d", code);
 
   if (QUIT_CONTEXT != nullptr && QUIT_CONTEXT->memory_stats_enabled())
     print_memory_report();
@@ -1172,7 +1172,7 @@ static fn cache_resolved_path(StringView name, const Path &full_path) throws
 
 fn clear_path_map() throws -> void
 {
-  LOG(verbosity::Debug,
+  LOG(verbosity::Info,
       "clear_path_map dropping %zu cached program resolutions",
       PATH_CACHE.count());
   MAYBE_PATH = os::get_environment_variable("PATH");
@@ -1185,14 +1185,14 @@ fn invalidate_path_cache() throws -> void
   /* The cache is not cleared here, since a cd or a PATH change is followed by
      few lookups in a script. The stale flag defers the clear to the next lookup
      so a run that never resolves a command again pays nothing. */
-  LOG(verbosity::Debug,
+  LOG(verbosity::Info,
       "invalidate_path_cache marking the program cache stale");
   PATH_CACHE_IS_STALE = true;
 }
 
 fn set_path_for_resolution(Maybe<String> path) throws -> void
 {
-  LOG(verbosity::Debug,
+  LOG(verbosity::Info,
       "set_path_for_resolution pointing the search at the shell's PATH value");
   MAYBE_PATH = steal(path);
   PATH_CACHE_IS_STALE = true;
@@ -1224,7 +1224,7 @@ fn initialize_path_map() throws -> void
 {
   if (!MAYBE_PATH) return;
 
-  LOG(verbosity::Debug,
+  LOG(verbosity::Info,
       "scanning every PATH directory to seed the program cache");
 
   for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
@@ -1317,7 +1317,7 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
   /* A cd, a PATH change, or hash -r left the cache stale, so it is dropped here
      before the lookup re-resolves against the current filesystem. */
   if (PATH_CACHE_IS_STALE) {
-    LOG(verbosity::Debug,
+    LOG(verbosity::Info,
         "search_program_path clearing stale cache before resolving '%.*s'",
         (int) program_name.length, program_name.data);
     PATH_CACHE.clear();

@@ -524,7 +524,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
      forgotten rather than recorded under the bracketed key. */
   if (let const bracket = name.view().find_character('['); bracket.has_value())
   {
-    LOG(verbosity::Debug,
+    LOG(verbosity::All,
         "forgetting the constant for the array base '%.*s' after an element "
         "assignment",
         static_cast<int>(*bracket), name.view().data);
@@ -553,7 +553,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
   if (!is_unconditional || actx.saw_runtime_definer ||
       m_assignment->is_append())
   {
-    LOG(verbosity::Debug,
+    LOG(verbosity::All,
         "forgetting the constant for '%s', the assignment is conditional, "
         "appends, or follows a runtime definer",
         name.c_str());
@@ -563,13 +563,13 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 
   let const literal = optimizer::literal_word_value(m_assignment->value_word());
   if (literal.has_value()) {
-    LOG(verbosity::Debug, "recording the constant '%s' = '%s'", name.c_str(),
+    LOG(verbosity::All, "recording the constant '%s' = '%s'", name.c_str(),
         literal->c_str());
     actx.constant_variables.set(name.view(), literal->view());
   } else {
     /* The value is only known at run time, so a constant recorded for this name
        under an earlier assignment no longer holds and is forgotten. */
-    LOG(verbosity::Debug,
+    LOG(verbosity::All,
         "forgetting the constant for '%s', its value is only known at run "
         "time",
         name.c_str());
@@ -581,7 +581,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_assignment != nullptr);
 
-  LOG(verbosity::Debug, "assigning the variable '%s'",
+  LOG(verbosity::All, "assigning the variable '%s'",
       m_assignment->key().c_str());
 
   /* Record where this assignment sits so a $LINENO in its value reports its
@@ -2984,7 +2984,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       continue;
     }
 
-    LOG(verbosity::Debug, "case arm %zu matched, running its body", i);
+    LOG(verbosity::All, "case arm %zu matched, running its body", i);
 
     bool should_resume_matching = false;
     for (;;) {
@@ -3560,7 +3560,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
         m_body->source_location().position,
         m_body->source_end_position() - m_body->source_location().position));
   }
-  LOG(verbosity::Debug, "registering the function '%s'%s", m_name.c_str(),
+  LOG(verbosity::Info, "registering the function '%s'%s", m_name.c_str(),
       definition_text.is_empty() ? " without recorded definition text" : "");
   cxt.register_function(m_name, m_body, definition_text.view());
   cxt.set_last_exit_status(0);

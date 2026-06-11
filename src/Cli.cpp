@@ -219,7 +219,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       next_arg_is_value = false;
 
       ASSERT(prev_flag != nullptr);
-      LOG(verbosity::Debug,
+      LOG(verbosity::All,
           "attaching the next argument '%s' as the value of the flag '%s'",
           argv[i], flag_name(prev_flag, prev_is_long).c_str());
       if (prev_flag->kind() == Flag::Kind::String)
@@ -282,7 +282,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
           fb->toggle();
           fb->set_position(++position);
-          LOG(verbosity::Debug, "toggled the flag '%s'",
+          LOG(verbosity::All, "toggled the flag '%s'",
               flag_name(fb, is_long).c_str());
 
           /* Check for combined flags, e.g -vAsn. */
@@ -298,7 +298,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           if (*value_offset == '\0') {
             /* There is None after the flag. Expect next argument
              * to be the value. */
-            LOG(verbosity::Debug,
+            LOG(verbosity::All,
                 "the flag '%s' expects the next argument as its value",
                 flag_name(flag, is_long).c_str());
             next_arg_is_value = true;
@@ -319,7 +319,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                   static_cast<FlagManyStrings *>(flag)->append(value_offset);
 
                 flag->set_position(++position);
-                LOG(verbosity::Debug, "set the flag '%s' to '%s'",
+                LOG(verbosity::All, "set the flag '%s' to '%s'",
                     flag_name(flag, is_long).c_str(), value_offset);
               } else {
                 throw Error{"No value provided for '" +
@@ -334,7 +334,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                 static_cast<FlagManyStrings *>(flag)->append(value_offset);
 
               flag->set_position(++position);
-              LOG(verbosity::Debug,
+              LOG(verbosity::All,
                   "set the flag '%s' to the attached value '%s'",
                   flag_name(flag, is_long).c_str(), value_offset);
             } else {

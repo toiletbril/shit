@@ -170,7 +170,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
 fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
 {
   if (bash_identity) {
-    LOG(verbosity::Debug, "seeding the bash identity variables");
+    LOG(verbosity::Info, "seeding the bash identity variables");
     set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
     /* BASH_VERSINFO is the version broken into its components, the array a
        config such as ble.sh reads to gate on a major version rather than
@@ -191,7 +191,7 @@ fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
   /* sh and dash advertise no version variable, so the bash identity is just
      cleared and nothing replaces it. The clear matters for a mimicked sh whose
      parent ran in bash mode, and is a no-op at startup where nothing is set. */
-  LOG(verbosity::Debug, "clearing the bash identity variables for a non-bash mood");
+  LOG(verbosity::Info, "clearing the bash identity variables for a non-bash mood");
   force_unset_shell_variable("BASH_VERSION");
   force_unset_shell_variable("BASH");
 }
@@ -214,7 +214,7 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
 fn EvalContext::set_indexed_array(StringView name,
                                   ArrayList<String> values) throws -> void
 {
-  LOG(verbosity::Debug, "storing indexed array '%.*s' with %zu elements",
+  LOG(verbosity::All, "storing indexed array '%.*s' with %zu elements",
       static_cast<int>(name.length), name.data, values.count());
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
@@ -234,7 +234,7 @@ fn EvalContext::append_indexed_array(StringView name,
      guard and the scalar clear match set_indexed_array, since the in-place path
      bypasses it. */
   if (let *existing = m_indexed_arrays.find(name)) {
-    LOG(verbosity::Debug,
+    LOG(verbosity::All,
         "appending %zu elements to the existing array '%.*s'", values.count(),
         static_cast<int>(name.length), name.data);
     if (is_readonly(name))
@@ -486,7 +486,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
     return;
   }
   /* A write past the run's end leaves a gap, so it is held sparsely. */
-  LOG(verbosity::Debug,
+  LOG(verbosity::All,
       "holding element %zu of '%.*s' sparsely past the dense run of %zu",
       index, static_cast<int>(name.length), name.data, count);
   m_sparse_array_values.set(
@@ -664,7 +664,7 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
 fn EvalContext::unset_array_element(StringView name,
                                     StringView subscript) throws -> void
 {
-  LOG(verbosity::Debug, "unsetting the array element '%.*s[%.*s]'",
+  LOG(verbosity::All, "unsetting the array element '%.*s[%.*s]'",
       static_cast<int>(name.length), name.data,
       static_cast<int>(subscript.length), subscript.data);
   if (is_readonly(name))
@@ -706,7 +706,7 @@ fn EvalContext::unset_array_element(StringView name,
 
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
-  LOG(verbosity::Debug,
+  LOG(verbosity::All,
       "removing variable '%.*s' from the store and the environment",
       static_cast<int>(name.length), name.data);
   m_shell_variables.erase(name);
@@ -739,7 +739,7 @@ fn EvalContext::record_environment_change(StringView name) throws -> void
 
 fn EvalContext::mark_exported(StringView name) throws -> void
 {
-  LOG(verbosity::Debug, "marking '%.*s' as exported",
+  LOG(verbosity::All, "marking '%.*s' as exported",
       static_cast<int>(name.length), name.data);
   m_exported_names.add(name);
 }
@@ -969,7 +969,7 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> i32
   new_job.state = job::State::Running;
   m_jobs.push(steal(new_job));
   ASSERT(!m_jobs.is_empty());
-  LOG(verbosity::Debug, "registered job %d", m_jobs.back().id);
+  LOG(verbosity::Info, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
 }
 
@@ -982,7 +982,7 @@ fn EvalContext::update_jobs() throws -> void
     let const state = os::poll_process(job.pid, status);
     switch (state) {
     case os::process_state::Exited:
-      LOG(verbosity::Debug, "job %d finished with status %d", job.id, status);
+      LOG(verbosity::Info, "job %d finished with status %d", job.id, status);
       job.state = job::State::Done;
       job.last_status = status;
       break;
@@ -1054,7 +1054,7 @@ fn EvalContext::notify_done_jobs() throws -> void
 
 fn EvalContext::set_monitor(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the monitor option flips to %s",
+  LOG(verbosity::Info, "the monitor option flips to %s",
       enabled ? "on" : "off");
   m_monitor = enabled;
 }
@@ -1064,7 +1064,7 @@ pure fn EvalContext::monitor() const wontthrow -> bool { return m_monitor; }
 fn EvalContext::register_function(StringView name, const Expression *body,
                                   StringView definition_text) throws -> void
 {
-  LOG(verbosity::Debug, "registering function '%.*s' with a %zu byte definition",
+  LOG(verbosity::Info, "registering function '%.*s' with a %zu byte definition",
       static_cast<int>(name.length), name.data, definition_text.length);
   m_functions.set(name, body);
   m_function_sources.set(name, definition_text);
@@ -1100,7 +1100,7 @@ pure fn EvalContext::has_functions() const wontthrow -> bool
 
 fn EvalContext::unset_function(StringView name) throws -> void
 {
-  LOG(verbosity::Debug, "unsetting function '%.*s'",
+  LOG(verbosity::Info, "unsetting function '%.*s'",
       static_cast<int>(name.length), name.data);
   m_functions.erase(name);
   m_function_sources.erase(name);
@@ -1139,7 +1139,7 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
 
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
-  LOG(verbosity::Debug, "setting a trap for '%.*s' with a %zu byte action",
+  LOG(verbosity::Info, "setting a trap for '%.*s' with a %zu byte action",
       static_cast<int>(condition.length), condition.data, action.length);
   m_traps.set(condition, action);
   /* EXIT runs at the shell's end and needs no OS handler. A signal condition
@@ -1156,7 +1156,7 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 
 fn EvalContext::remove_trap(StringView condition) throws -> void
 {
-  LOG(verbosity::Debug, "removing the trap for '%.*s'",
+  LOG(verbosity::Info, "removing the trap for '%.*s'",
       static_cast<int>(condition.length), condition.data);
   m_traps.erase(condition);
   /* Removing a signal trap returns the signal to its default disposition, so a
@@ -1168,7 +1168,7 @@ fn EvalContext::remove_trap(StringView condition) throws -> void
 
 fn EvalContext::install_trap_dispositions() throws -> void
 {
-  LOG(verbosity::Debug, "reinstalling the dispositions of %zu traps",
+  LOG(verbosity::Info, "reinstalling the dispositions of %zu traps",
       m_traps.count());
   m_traps.for_each([&](StringView condition, const String &action) {
     if (condition == "EXIT") return;
@@ -1206,7 +1206,7 @@ fn EvalContext::run_pending_traps() throws -> void
     if (!name.has_value()) continue;
     if (let const *action = m_traps.find(name->view()))
       if (action->count() > 0) {
-        LOG(verbosity::Debug, "running the trap action for signal '%s'",
+        LOG(verbosity::Info, "running the trap action for signal '%s'",
             name->c_str());
         run_source(action->view(), "the " + *name + " trap");
       }
@@ -1232,7 +1232,7 @@ cold fn EvalContext::run_exit_trap() throws -> void
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->count() > 0) {
-      LOG(verbosity::Debug, "running the EXIT trap action at shell exit");
+      LOG(verbosity::Info, "running the EXIT trap action at shell exit");
       run_source(action->view(), "the EXIT trap");
     }
 }
@@ -1257,7 +1257,7 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
      traps and variables. */
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->count() > 0) {
-      LOG(verbosity::Debug,
+      LOG(verbosity::Info,
           "running the EXIT trap action the subshell set at its end");
       run_source(action->view(), "the EXIT trap");
     }
@@ -1410,7 +1410,7 @@ fn EvalContext::declare_local(StringView name) throws -> void
 {
   if (m_local_scopes.is_empty()) return;
   ASSERT(!m_local_scopes.is_empty());
-  LOG(verbosity::Debug, "declaring '%.*s' local in scope depth %zu",
+  LOG(verbosity::All, "declaring '%.*s' local in scope depth %zu",
       static_cast<int>(name.length), name.data, m_local_scopes.count());
 
   /* The indexed array the name held is saved alongside the scalar value, so a
@@ -1461,7 +1461,7 @@ fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
 
 fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 {
-  LOG(verbosity::Debug, "setting alias '%.*s' to a %zu byte value",
+  LOG(verbosity::All, "setting alias '%.*s' to a %zu byte value",
       static_cast<int>(name.length), name.data, value.length);
   m_aliases.set(name, value);
 }
@@ -1469,7 +1469,7 @@ fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 fn EvalContext::remove_alias(StringView name) throws -> bool
 {
   if (m_aliases.find(name) == nullptr) return false;
-  LOG(verbosity::Debug, "removing alias '%.*s'",
+  LOG(verbosity::All, "removing alias '%.*s'",
       static_cast<int>(name.length), name.data);
   m_aliases.erase(name);
   return true;
@@ -1534,7 +1534,7 @@ fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
   }
   if (static_cast<usize>(level) > m_loop_depth)
     level = static_cast<i64>(m_loop_depth);
-  LOG(verbosity::Debug, "break requested, level %lld of depth %zu",
+  LOG(verbosity::All, "break requested, level %lld of depth %zu",
       (long long) level, m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Break, level, location,
                                 m_current_source, String{m_current_origin}};
@@ -1551,7 +1551,7 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) throws
   }
   if (static_cast<usize>(level) > m_loop_depth)
     level = static_cast<i64>(m_loop_depth);
-  LOG(verbosity::Debug, "continue requested, level %lld of depth %zu",
+  LOG(verbosity::All, "continue requested, level %lld of depth %zu",
       (long long) level, m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
                                 m_current_source, String{m_current_origin}};
@@ -1686,7 +1686,7 @@ fn EvalContext::leave_function_call() wontthrow -> void
 
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the errexit option flips to %s",
+  LOG(verbosity::Info, "the errexit option flips to %s",
       enabled ? "on" : "off");
   m_error_exit = enabled;
 }
@@ -1698,14 +1698,14 @@ pure fn EvalContext::error_exit() const wontthrow -> bool
 
 fn EvalContext::set_echo_expanded(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the xtrace option flips to %s",
+  LOG(verbosity::Info, "the xtrace option flips to %s",
       enabled ? "on" : "off");
   m_enable_echo_expanded = enabled;
 }
 
 fn EvalContext::set_error_unset(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the nounset option flips to %s",
+  LOG(verbosity::Info, "the nounset option flips to %s",
       enabled ? "on" : "off");
   m_error_unset = enabled;
 }
@@ -1717,7 +1717,7 @@ pure fn EvalContext::error_unset() const wontthrow -> bool
 
 fn EvalContext::set_pipefail(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the pipefail option flips to %s",
+  LOG(verbosity::Info, "the pipefail option flips to %s",
       enabled ? "on" : "off");
   m_pipefail = enabled;
 }
@@ -1726,7 +1726,7 @@ pure fn EvalContext::pipefail() const wontthrow -> bool { return m_pipefail; }
 
 fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the noclobber option flips to %s",
+  LOG(verbosity::Info, "the noclobber option flips to %s",
       enabled ? "on" : "off");
   m_no_clobber = enabled;
 }
@@ -1738,7 +1738,7 @@ pure fn EvalContext::no_clobber() const wontthrow -> bool
 
 fn EvalContext::set_export_all(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the allexport option flips to %s",
+  LOG(verbosity::Info, "the allexport option flips to %s",
       enabled ? "on" : "off");
   m_export_all = enabled;
 }
@@ -1760,7 +1760,7 @@ pure fn EvalContext::stats_enabled() const wontthrow -> bool
 
 fn EvalContext::set_no_glob(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the noglob option flips to %s",
+  LOG(verbosity::Info, "the noglob option flips to %s",
       enabled ? "on" : "off");
   m_enable_path_expansion = !enabled;
 }
@@ -1772,7 +1772,7 @@ pure fn EvalContext::no_glob() const wontthrow -> bool
 
 fn EvalContext::set_no_exec(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the noexec option flips to %s",
+  LOG(verbosity::Info, "the noexec option flips to %s",
       enabled ? "on" : "off");
   m_no_exec = enabled;
 }
@@ -1781,7 +1781,7 @@ pure fn EvalContext::no_exec() const wontthrow -> bool { return m_no_exec; }
 
 fn EvalContext::set_failglob(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Debug, "the failglob option flips to %s",
+  LOG(verbosity::Info, "the failglob option flips to %s",
       enabled ? "on" : "off");
   m_failglob = enabled;
 }
@@ -3219,7 +3219,7 @@ fn EvalContext::array_element_is_set(StringView name,
 fn EvalContext::matching_prefix_names(StringView prefix) const throws
     -> ArrayList<String>
 {
-  LOG(verbosity::Debug, "listing variable names with the prefix '%.*s'",
+  LOG(verbosity::All, "listing variable names with the prefix '%.*s'",
       static_cast<int>(prefix.length), prefix.data);
   let names = ArrayList<String>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
@@ -3867,7 +3867,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
      text is split on its last separator into a parent directory and the glob
      stem. */
   let const path = field.text.view();
-  LOG(verbosity::Debug, "scanning a directory for the glob component '%.*s'",
+  LOG(verbosity::All, "scanning a directory for the glob component '%.*s'",
       static_cast<int>(path.length), path.data);
 
   let last_slash = Maybe<usize>{};
@@ -4093,7 +4093,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
                                       field.glob_active[component_start + 1];
 
     if (is_globstar_component) {
-      LOG(verbosity::Debug,
+      LOG(verbosity::All,
           "expanding a globstar component across directory levels");
       let const prefix = text.substring_of_length(0, component_start);
       let base = Path{StringView{"."}};
@@ -4235,7 +4235,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment,
     throw Error{"Could not figure out home directory"};
   if (!directory) return;
 
-  LOG(verbosity::Debug, "the tilde prefix '~%.*s' expands to '%.*s'",
+  LOG(verbosity::All, "the tilde prefix '~%.*s' expands to '%.*s'",
       static_cast<int>(name.length), name.data,
       static_cast<int>(directory->view().length), directory->view().data);
   /* String has no in-place erase or insert, so the directory and the
@@ -4295,7 +4295,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
     i++;
   }
   if (changed) {
-    LOG(verbosity::Debug,
+    LOG(verbosity::All,
         "rewrote colon tilde prefixes in an assignment value");
     segment.text = steal(rewritten);
   }
@@ -4340,7 +4340,7 @@ hot fn EvalContext::expand_path(glob_field field,
      from spending most of its time in the sort comparator. */
   utils::sort_ascending(values);
 
-  LOG(verbosity::Debug, "the glob pattern '%s' matched %zu paths",
+  LOG(verbosity::All, "the glob pattern '%s' matched %zu paths",
       pattern.c_str(), values.count());
 
   /* A glob that matches no file is a hard error by default, the typo-catching

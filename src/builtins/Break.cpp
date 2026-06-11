@@ -35,7 +35,7 @@ fn Break::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     throw Error{"Unable to break because '" + ec.args()[1] +
                 "' is not a valid loop count"};
 
-  LOG(verbosity::Debug, "break leaving %lld enclosing loops",
+  LOG(verbosity::All, "break leaving %lld enclosing loops",
       static_cast<long long>(level));
   cxt.request_break(level, ec.source_location());
   return 0;

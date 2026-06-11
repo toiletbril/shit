@@ -160,7 +160,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   /* An option that takes no argument leaves OPTARG unset. */
-  LOG(verbosity::Debug, "getopts advancing past option '%s'",
+  LOG(verbosity::All, "getopts advancing past option '%s'",
       option_as_string.c_str());
   advance_letter();
   cxt.unset_shell_variable("OPTARG");

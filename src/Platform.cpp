@@ -317,7 +317,7 @@ fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index
 
 fn get_environment_variable(StringView key) throws -> Maybe<String>
 {
-  LOG(verbosity::Debug, "reading the environment variable '%.*s'",
+  LOG(verbosity::All, "reading the environment variable '%.*s'",
       static_cast<int>(key.length), key.data);
   const String key_string{key};
   const char *e = std::getenv(key_string.c_str());
@@ -327,7 +327,7 @@ fn get_environment_variable(StringView key) throws -> Maybe<String>
 
 fn set_environment_variable(StringView key, StringView value) throws -> void
 {
-  LOG(verbosity::Debug, "setting the environment variable '%.*s'",
+  LOG(verbosity::All, "setting the environment variable '%.*s'",
       static_cast<int>(key.length), key.data);
   const String key_string{key};
   const String value_string{value};
@@ -336,7 +336,7 @@ fn set_environment_variable(StringView key, StringView value) throws -> void
 
 fn unset_environment_variable(StringView key) throws -> void
 {
-  LOG(verbosity::Debug, "unsetting the environment variable '%.*s'",
+  LOG(verbosity::All, "unsetting the environment variable '%.*s'",
       static_cast<int>(key.length), key.data);
   const String key_string{key};
   unsetenv(key_string.c_str());
@@ -1015,7 +1015,7 @@ static fn handle_interrupt(int s) wontthrow -> void
 
 fn set_default_signal_handlers() throws -> void
 {
-  LOG(verbosity::Debug,
+  LOG(verbosity::Info,
       "blocking the terminal signals and installing the shell handlers");
 
   /* The terminal-generated signals that would kill the shell stay blocked, but
@@ -1058,7 +1058,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 {
   if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
 
-  LOG(verbosity::Debug, "installing the trap handler for signal %d",
+  LOG(verbosity::Info, "installing the trap handler for signal %d",
       signal_number);
 
   /* A signal the startup blocked, such as SIGTERM, must be unblocked so the
@@ -1076,7 +1076,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 fn set_trap_ignore(i32 signal_number) throws -> void
 {
   if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
-  LOG(verbosity::Debug, "ignoring signal %d", signal_number);
+  LOG(verbosity::Info, "ignoring signal %d", signal_number);
   struct sigaction sa = {};
   sa.sa_handler = SIG_IGN;
   check_syscall(sigaction(signal_number, &sa, nullptr));
@@ -1085,7 +1085,7 @@ fn set_trap_ignore(i32 signal_number) throws -> void
 fn clear_trap_handler(i32 signal_number) throws -> void
 {
   if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
-  LOG(verbosity::Debug, "clearing the trap for signal %d", signal_number);
+  LOG(verbosity::Info, "clearing the trap for signal %d", signal_number);
   struct sigaction sa = {};
   /* SIGINT returns to the shell's own interrupt handler so a Ctrl-C still
      aborts a shell-internal loop. Every other signal returns to its default

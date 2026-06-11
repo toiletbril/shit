@@ -219,7 +219,7 @@ static fn path_command_names() throws -> const ArrayList<String> &
   }
   CACHED_COMPLETION_PATH = String{current};
   CACHED_PATH_COMMANDS_VALID = true;
-  LOG(verbosity::Debug, "rebuilt the path command cache, %zu names",
+  LOG(verbosity::Info, "rebuilt the path command cache, %zu names",
       CACHED_PATH_COMMANDS.count());
   return CACHED_PATH_COMMANDS;
 }
@@ -666,7 +666,7 @@ static fn build_man_subcommand_index() throws -> void
   MAN_SUBCOMMAND_INDEX_IS_BUILT = true;
   let page_names = ArrayList<String>{};
   for (const Path &directory : manpage_section1_directories()) {
-    LOG(verbosity::Debug, "scanning man1 directory '%s'",
+    LOG(verbosity::Info, "scanning man1 directory '%s'",
         directory.text().c_str());
     Maybe<ArrayList<String>> entries = Path::read_directory(directory);
     if (!entries.has_value()) {
@@ -701,7 +701,7 @@ static fn build_man_subcommand_index() throws -> void
       MAN_SUBCOMMAND_INDEX.set(head, steal(list));
     }
   }
-  LOG(verbosity::Debug, "indexed %zu section-1 pages", page_names.count());
+  LOG(verbosity::Info, "indexed %zu section-1 pages", page_names.count());
 }
 
 /* The synopsis region of a man page source, located by its .SH heading or the
@@ -769,7 +769,7 @@ static fn validate_subcommands_for(StringView command) throws -> void
   MAN_VALIDATED_COMMANDS.add(command);
   ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(command);
   if (subcommands == nullptr) return;
-  LOG(verbosity::Debug, "validating %zu subcommand pages of '%.*s'",
+  LOG(verbosity::Info, "validating %zu subcommand pages of '%.*s'",
       subcommands->count(), static_cast<int>(command.length), command.data);
 
   let surviving = ArrayList<String>{};
@@ -825,7 +825,7 @@ static fn validate_subcommands_for(StringView command) throws -> void
       LOG(verbosity::All, "dropped '%s', no space form in its synopsis",
           page_name.c_str());
   }
-  LOG(verbosity::Debug, "%zu of %zu subcommands survived the synopsis check",
+  LOG(verbosity::Info, "%zu of %zu subcommands survived the synopsis check",
       surviving.count(), subcommands->count());
   *subcommands = steal(surviving);
 }

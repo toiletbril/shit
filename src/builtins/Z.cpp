@@ -246,7 +246,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const target = Path{best->path.view()}.to_absolute().normalized();
 
-  LOG(verbosity::Debug, "z changing directory to '%s'",
+  LOG(verbosity::Info, "z changing directory to '%s'",
       target.text().c_str());
 
   let const old_directory = Path::current_directory();

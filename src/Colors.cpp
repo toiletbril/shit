@@ -14,14 +14,14 @@ static fn color_is_suppressed_by_environment() throws -> bool
   if (let const no_color = os::get_environment_variable("NO_COLOR");
       no_color.has_value() && !no_color->is_empty())
   {
-    LOG(verbosity::Debug, "suppressing color because NO_COLOR is set");
+    LOG(verbosity::Info, "suppressing color because NO_COLOR is set");
     return true;
   }
 
   if (let const term = os::get_environment_variable("TERM");
       term.has_value() && term->view() == StringView{"dumb"})
   {
-    LOG(verbosity::Debug, "suppressing color because TERM is dumb");
+    LOG(verbosity::Info, "suppressing color because TERM is dumb");
     return true;
   }
 
