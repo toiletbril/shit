@@ -1,0 +1,129 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "no-glob"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "set" "-o"]
+      [SimpleCommand "grep" "glob"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "no-glob"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "error-exit"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "set" "-o"]
+      [SimpleCommand "grep" "errexit"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "error-exit"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "-o" "no-clobber"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "set" "-o"]
+      [SimpleCommand "grep" "clobber"]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "+o" "no-clobber"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "done"]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "no-glob"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "glob"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "no-glob"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "error-exit"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "errexit"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "error-exit"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "no-clobber"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "-o"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Unquoted "clobber"
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "+o"
+]
+[Word
+  Unquoted "no-clobber"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "done"
+]
+set -o noglob
+set -o failglob
+set -o errexit
+set -o noclobber
+done
+[Code 0]
