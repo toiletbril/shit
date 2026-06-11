@@ -315,10 +315,12 @@ static fn run_script_contents(const String &script_contents,
        bash mode off at the interactive seam, flips the analysis stage back on
        for the session. The context fields are seeded from the same helpers at
        startup, so a non-snapping run behaves exactly as before. */
+    /* The skip reads the context's diagnostics flag rather than only the
+       static one, so set -o no-diagnostics flips the stage at runtime. */
     let const run_analysis =
         (!(context.is_bash_compatible() || context.is_posix_mode()) ||
          FLAG_WARNINGS.is_enabled()) &&
-        !FLAG_SUPPRESS_DIAGNOSTICS.is_enabled();
+        !context.diagnostics_disabled();
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
                      context.alias_names(), FLAG_WARNINGS.is_enabled()))
@@ -692,6 +694,12 @@ fn main(int argc, char **argv) -> int
   context.set_show_lexed_words(FLAG_ESCAPE_MAP.is_enabled());
   context.set_show_exit_code(FLAG_EXIT_CODE.is_enabled());
   context.set_memory_stats_enabled(FLAG_MEMORY.is_enabled());
+  context.set_diagnostics_disabled(FLAG_SUPPRESS_DIAGNOSTICS.is_enabled());
+  /* The startup facts mirror onto the context once, so set -o lists them
+     read-only next to the live options. */
+  context.set_login_shell(is_login_shell);
+  context.set_inited_as_bash(init_as_bash);
+  context.set_custom_rcfile(FLAG_RCFILE.is_set());
   /* The startup config files, the profiles and the rc, source with nounset and
      pipefail off the way a script does, since they are written for a lax shell
      and read unset variables such as $BASH_VERSION on the /etc/profile path.

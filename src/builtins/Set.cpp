@@ -26,8 +26,11 @@ namespace shit {
 
 namespace {
 
-/* One shell option, named by its letter and its long name. set and get are the
-   accessors on EvalContext, both null for an option accepted without effect. */
+/* One shell option, named by its letter and its long name, with the command
+   line's --help spelling as an accepted alias where the two differ. set and
+   get are the accessors on EvalContext. Both null marks an option accepted
+   without effect, while a null set with a live get marks a startup fact that
+   set -o reports read-only and refuses to change. */
 class SetOption
 {
 public:
@@ -36,28 +39,31 @@ public:
   void (EvalContext::*set)(bool);
   bool (EvalContext::*get)() const;
   StringView help;
+  /* The default keeps the rows without a second spelling free of a trailing
+     empty initializer. */
+  StringView alias{};
 };
 
 const SetOption SET_OPTIONS[] = {
     {'e',  "errexit",          &EvalContext::set_error_exit,       &EvalContext::error_exit,
-     "Exit on the first command that fails."                                                                                             },
+     "Exit on the first command that fails.",                       "error-exit"             },
     {'x',  "xtrace",           &EvalContext::set_echo_expanded,
      &EvalContext::should_echo_expanded,
      "Print each command after expansion before it runs."                                                                                },
     {'u',  "nounset",          &EvalContext::set_error_unset,      &EvalContext::error_unset,
-     "Treat an unset variable as an error."                                                                                              },
+     "Treat an unset variable as an error.",                        "no-unset"               },
     {'\0', "pipefail",         &EvalContext::set_pipefail,         &EvalContext::pipefail,
      "Report a pipeline's status as the rightmost stage that failed."                                                                    },
     {'\0', "posix",            &EvalContext::set_posix_mode,       &EvalContext::is_posix_mode,
      "Behave like dash, the POSIX mode."                                                                                                 },
     {'a',  "allexport",        &EvalContext::set_export_all,       &EvalContext::export_all,
-     "Mark every assigned variable for the environment."                                                                                 },
+     "Mark every assigned variable for the environment.",          "export-all"              },
     {'C',  "noclobber",        &EvalContext::set_no_clobber,       &EvalContext::no_clobber,
-     "Refuse to overwrite an existing file through '>'."                                                                                 },
+     "Refuse to overwrite an existing file through '>'.",          "no-clobber"              },
     {'f',  "noglob",           &EvalContext::set_no_glob,          &EvalContext::no_glob,
-     "Disable pathname expansion."                                                                                                       },
+     "Disable pathname expansion.",                                "no-glob"                 },
     {'n',  "noexec",           &EvalContext::set_no_exec,          &EvalContext::no_exec,
-     "Read and parse commands but do not run them."                                                                                      },
+     "Read and parse commands but do not run them.",               "no-exec"                 },
     {'m',  "monitor",          &EvalContext::set_monitor,          &EvalContext::monitor,
      "Run background jobs in their own process group with notifications."                                                                },
     /* failglob has no short letter, so '\0' keeps find_option_by_letter from
@@ -66,7 +72,8 @@ const SetOption SET_OPTIONS[] = {
      "Fail a command whose glob matches nothing."                                                                                        },
     {'b',  "notify",           nullptr,                            nullptr,                     "Accepted without effect."               },
     {'h',  "hashall",          nullptr,                            nullptr,                     "Accepted without effect."               },
-    {'v',  "verbose",          nullptr,                            nullptr,                     "Accepted without effect."               },
+    {'v',  "verbose",          &EvalContext::set_echo,             &EvalContext::should_echo,
+     "Write input to standard error as it is read, the -v flag."                              },
     /* The keyword-assignment and the DEBUG/RETURN trace toggles are accepted so
        a bash config that sets them keeps sourcing. Brace expansion is always on
        in shit, so -B is already the behavior and +B is accepted without turning
@@ -86,6 +93,24 @@ const SetOption SET_OPTIONS[] = {
     {'S',  "show-stats",       &EvalContext::set_stats_enabled,
      &EvalContext::stats_enabled,
      "Print evaluation statistics after each run."                                                                                       },
+    {'\0', "bash-compatible",  &EvalContext::set_bash_compatible,
+     &EvalContext::is_bash_compatible,
+     "Behave like bash, the bash-compatible mode."                                            },
+    {'\0', "no-diagnostics",   &EvalContext::set_diagnostics_disabled,
+     &EvalContext::diagnostics_disabled,
+     "Skip the analysis stage before each chunk runs."                                        },
+    {'G',  "show-memory",      &EvalContext::set_memory_stats_enabled,
+     &EvalContext::memory_stats_enabled,
+     "Print a granular memory report at exit, the -G flag."                                   },
+    /* The startup facts. A null set with a live get reports the state in the
+       listings while set -o refuses to change it, since the choice happened at
+       invocation. */
+    {'\0', "login",            nullptr,                            &EvalContext::is_login_shell,
+     "Whether the shell started as a login shell, fixed at startup."                          },
+    {'\0', "init-as-bash",     nullptr,                            &EvalContext::inited_as_bash,
+     "Whether the shell initialized from the bash configs, fixed at startup."                 },
+    {'\0', "rcfile",           nullptr,                            &EvalContext::has_custom_rcfile,
+     "Whether a custom rc file was named at startup, fixed at startup."                        },
 };
 
 const SetOption *find_option_by_letter(char letter) throws
@@ -97,14 +122,37 @@ const SetOption *find_option_by_letter(char letter) throws
 
 const SetOption *find_option_by_name(StringView name) throws
 {
+  /* The alias is the command line's --help spelling, so set -o accepts both
+     'noglob' and 'no-glob' while the listings print the canonical name a
+     portable script replays. */
   for (const SetOption &option : SET_OPTIONS)
-    if (option.name == name) return &option;
+    if (option.name == name ||
+        (!option.alias.is_empty() && option.alias == name))
+      return &option;
   return nullptr;
 }
 
 bool option_is_on(const EvalContext &cxt, const SetOption &option) throws
 {
   return option.get != nullptr ? (cxt.*(option.get))() : false;
+}
+
+/* A startup fact carries a live get and no set, so the state lists while a
+   change is refused, since the choice happened at invocation. */
+bool option_is_startup_fact(const SetOption &option) throws
+{
+  return option.set == nullptr && option.get != nullptr;
+}
+
+/* The one application path every entry point shares, so a startup fact is
+   refused the same way from set -o and the letter form. */
+void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
+                            bool enable) throws
+{
+  if (option_is_startup_fact(option))
+    throw Error{"Unable to change '" + String{option.name} +
+                "' because it is fixed at shell startup"};
+  if (option.set != nullptr) (cxt.*(option.set))(enable);
 }
 
 /* The reusable command form that set -o and set +o print, one line each. The
@@ -116,6 +164,9 @@ String list_options(const EvalContext &cxt) throws
   let out = String{};
   for (const SetOption &option : SET_OPTIONS) {
     if (option.name.starts_with(StringView{"show-"})) continue;
+    /* A startup fact cannot be replayed through set -o, so the replay listing
+       leaves it out and set -p stays the place that shows it. */
+    if (option_is_startup_fact(option)) continue;
     out += option_is_on(cxt, option) ? "set -o " : "set +o ";
     out += option.name;
     out += '\n';
@@ -163,7 +214,7 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
 {
   const SetOption *option = find_option_by_name(name);
   if (option == nullptr) return false;
-  if (option->set != nullptr) (cxt.*(option->set))(enable);
+  apply_or_reject_option(cxt, *option, enable);
   return true;
 }
 
@@ -220,7 +271,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       let const option = find_option_by_name(name);
       if (option == nullptr)
         throw Error{StringView{"unknown -o option '"} + name + "'"};
-      if (option->set != nullptr) (cxt.*(option->set))(enable);
+      apply_or_reject_option(cxt, *option, enable);
       continue;
     }
 
@@ -245,7 +296,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
           invalid_option += letter;
           throw Error{StringView{"unknown option '"} + invalid_option + "'"};
         }
-        if (option->set != nullptr) (cxt.*(option->set))(enable);
+        apply_or_reject_option(cxt, *option, enable);
       }
       continue;
     }

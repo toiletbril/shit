@@ -973,6 +973,9 @@ public:
                                  bool is_pattern_word) throws -> String;
 
   pure fn should_echo() const wontthrow -> bool;
+  /* The -v input echo, settable at runtime through set -o verbose the way the
+     other debug toggles flip through set. */
+  fn set_echo(bool enabled) wontthrow -> void { m_enable_echo = enabled; }
   pure fn should_echo_expanded() const wontthrow -> bool;
   pure fn shell_is_interactive() const wontthrow -> bool;
 
@@ -1022,6 +1025,41 @@ public:
     return m_memory_stats_enabled;
   }
 
+  /* The --no-diagnostics skip, mirrored onto the context so set -o
+     no-diagnostics flips the per-chunk analysis gate at runtime. */
+  fn set_diagnostics_disabled(bool disabled) wontthrow -> void
+  {
+    m_diagnostics_disabled = disabled;
+  }
+  pure fn diagnostics_disabled() const wontthrow -> bool
+  {
+    return m_diagnostics_disabled;
+  }
+
+  /* The startup facts set -o reports read-only, mirrored from the invocation
+     flags once at startup and fixed for the session. */
+  fn set_login_shell(bool enabled) wontthrow -> void
+  {
+    m_is_login_shell = enabled;
+  }
+  pure fn is_login_shell() const wontthrow -> bool { return m_is_login_shell; }
+  fn set_inited_as_bash(bool enabled) wontthrow -> void
+  {
+    m_inited_as_bash = enabled;
+  }
+  pure fn inited_as_bash() const wontthrow -> bool
+  {
+    return m_inited_as_bash;
+  }
+  fn set_custom_rcfile(bool enabled) wontthrow -> void
+  {
+    m_has_custom_rcfile = enabled;
+  }
+  pure fn has_custom_rcfile() const wontthrow -> bool
+  {
+    return m_has_custom_rcfile;
+  }
+
   pure fn last_expressions_executed() const wontthrow -> usize;
   pure fn total_expressions_executed() const wontthrow -> usize;
 
@@ -1037,6 +1075,10 @@ protected:
   bool m_show_lexed_words{false};
   bool m_show_exit_code{false};
   bool m_memory_stats_enabled{false};
+  bool m_diagnostics_disabled{false};
+  bool m_is_login_shell{false};
+  bool m_inited_as_bash{false};
+  bool m_has_custom_rcfile{false};
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
   usize m_expansions_last{0};
