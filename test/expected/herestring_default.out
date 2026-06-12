@@ -1,0 +1,84 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "read" "-r" "first"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "read=$first"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Assign total=0]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [WhileLoop]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "read" "-r" "n"]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign total=$(( total + n ))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "summed=$total"]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  DoubleQuoted "one two three"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "read="
+  Variable "first"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  DoubleQuoted "straight through"
+]
+[Word
+  Unquoted "total=0"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "read"
+]
+[Word
+  Unquoted "-r"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "total="
+  ArithmeticExpansion " total + n "
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  CommandSubstitution "printf '3\n4\n5'"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "summed="
+  Variable "total"
+]
+read=one two three
+straight through
+summed=12
+[Code 0]

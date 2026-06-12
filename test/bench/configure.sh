@@ -15,6 +15,15 @@ PASS_COUNT=0
 FAIL_COUNT=0
 WORK_UNITS=0
 
+# Build-style feature toggles, assigned once and never reassigned, the shape a
+# real configure run carries. An optimizing shell can prove every guard that
+# reads them dead at parse time, while dash and bash test each guard on every
+# pass through the hot loops.
+CONFIG_TRACE=0
+CONFIG_PROFILE=0
+CONFIG_PARANOID=0
+CONFIG_RELEASE=1
+
 # ----------------------------------------------------------------------------
 # Character ordinals through a case lookup, since no external tool is allowed.
 # ----------------------------------------------------------------------------
@@ -216,6 +225,12 @@ probe_prime_density() {
     while [ "$k" -le "$limit" ]; do
         is_prime "$k"
         found=$(( found + PRIME ))
+        # A trace hook a release build never takes. The guard reads a constant,
+        # so it folds away under an optimizer and costs a test per prime under
+        # dash and bash.
+        if [ "$CONFIG_TRACE" -eq 1 ]; then
+            note "trace: $k scored $PRIME"
+        fi
         WORK_UNITS=$(( WORK_UNITS + 1 ))
         k=$(( k + 1 ))
     done
@@ -234,6 +249,15 @@ probe_gcd_field() {
             greatest_common_divisor "$a" "$b"
             if [ "$GCD" -eq 1 ]; then
                 coprime=$(( coprime + 1 ))
+            fi
+            # Dead diagnostics in the quadratic core, one constant guard and
+            # one statically false test, both folded by an optimizer and both
+            # paid per pair by dash and bash.
+            if [ "$CONFIG_PROFILE" -eq 1 ]; then
+                note "profile: pair $a $b"
+            fi
+            if [ 0 -eq 1 ]; then
+                coprime=$(( coprime * 2 ))
             fi
             total=$(( total + 1 ))
             WORK_UNITS=$(( WORK_UNITS + 1 ))
@@ -440,6 +464,118 @@ probe_text_table() {
     report_result "$rendered"
 }
 
+probe_dead_configuration() {
+    report_check "skipped configuration branches"
+    dc_live=0
+    dc_limit=$(( SCALE * SCALE / 2 ))
+    dc_i=1
+    while [ "$dc_i" -le "$dc_limit" ]; do
+        # The guards below never fire in a release configuration. The verdicts
+        # are provable at parse time, a constant variable, a literal test, a
+        # bare false, and a never-entered loop, so an optimizing shell picks
+        # the live path once while dash and bash re-test every guard on every
+        # pass.
+        if [ "$CONFIG_TRACE" -eq 1 ]; then
+            note "trace: iteration $dc_i"
+            dc_live=$(( dc_live + 1000 ))
+        fi
+        if [ "$CONFIG_PARANOID" -eq 1 ]; then
+            checksum_string "paranoid-$dc_i"
+            dc_live=$(( dc_live + CHECKSUM ))
+        fi
+        if [ 0 -eq 1 ]; then
+            dc_live=$(( dc_live * 3 ))
+        fi
+        if false; then
+            dc_live=$(( dc_live + 7 ))
+        fi
+        while [ 0 -ne 0 ]; do
+            dc_live=$(( dc_live + 1 ))
+        done
+        # A chain whose first heads are statically false, so the live tail is
+        # the chosen branch, and constant arithmetic dash and bash fold on
+        # every visit while an optimizer folds it once.
+        if [ "$CONFIG_RELEASE" -eq 0 ]; then
+            dc_live=$(( dc_live - 1 ))
+        elif [ "$CONFIG_PROFILE" -eq 1 ]; then
+            dc_live=$(( dc_live - 2 ))
+        else
+            dc_live=$(( dc_live + (1 << 4) - (64 / 4) + 3 * 7 - 20 ))
+        fi
+        WORK_UNITS=$(( WORK_UNITS + 1 ))
+        dc_i=$(( dc_i + 1 ))
+    done
+    note "$dc_live live units survived $dc_limit dead-guard passes"
+    report_result "$dc_live"
+}
+
+probe_field_splitting() {
+    report_check "field splitting and positional rebind"
+    fs_records="alpha:1 beta:22 gamma:333 delta:4444 epsilon:55555"
+    fs_total=0
+    fs_fields=0
+    fs_rounds=0
+    while [ "$fs_rounds" -lt "$SCALE" ]; do
+        for fs_record in $fs_records; do
+            fs_save_ifs=$IFS
+            IFS=:
+            set -- $fs_record
+            IFS=$fs_save_ifs
+            fs_fields=$(( fs_fields + $# ))
+            fs_total=$(( fs_total + ${#2} ))
+            WORK_UNITS=$(( WORK_UNITS + 1 ))
+        done
+        fs_rounds=$(( fs_rounds + 1 ))
+    done
+    note "split $fs_fields fields carrying $fs_total digits"
+    report_result "$fs_total"
+}
+
+probe_getopts_loop() {
+    report_check "getopts option parsing"
+    go_seen=0
+    go_rounds=0
+    while [ "$go_rounds" -lt "$SCALE" ]; do
+        OPTIND=1
+        while getopts "vqo:I:" go_flag -v -q -o target -I include -v; do
+            case $go_flag in
+            v) go_seen=$(( go_seen + 1 )) ;;
+            q) go_seen=$(( go_seen + 10 )) ;;
+            o) go_seen=$(( go_seen + ${#OPTARG} * 100 )) ;;
+            I) go_seen=$(( go_seen + ${#OPTARG} * 1000 )) ;;
+            *) go_seen=0 ;;
+            esac
+            WORK_UNITS=$(( WORK_UNITS + 1 ))
+        done
+        go_rounds=$(( go_rounds + 1 ))
+    done
+    note "getopts accumulated $go_seen across $go_rounds rounds"
+    report_result "$go_seen"
+}
+
+probe_param_defaults() {
+    report_check "parameter default forms"
+    pd_set="value"
+    pd_empty=""
+    pd_sum=0
+    pd_rounds=0
+    while [ "$pd_rounds" -lt $(( SCALE * 4 )) ]; do
+        pd_a=${pd_unset_name:-fallback}
+        pd_b=${pd_empty:-replaced}
+        pd_c=${pd_set:+present}
+        pd_d=${pd_set#va}
+        pd_e=${pd_set%ue}
+        pd_f=${pd_set##*l}
+        pd_g=${pd_set%%l*}
+        pd_sum=$(( pd_sum + ${#pd_a} + ${#pd_b} + ${#pd_c} + ${#pd_d} \
+            + ${#pd_e} + ${#pd_f} + ${#pd_g} ))
+        WORK_UNITS=$(( WORK_UNITS + 1 ))
+        pd_rounds=$(( pd_rounds + 1 ))
+    done
+    note "default forms summed to $pd_sum"
+    report_result "$pd_sum"
+}
+
 # ----------------------------------------------------------------------------
 # Driver.
 # ----------------------------------------------------------------------------
@@ -458,6 +594,10 @@ main() {
     probe_ackermann
     probe_sieve
     probe_text_table
+    probe_dead_configuration
+    probe_field_splitting
+    probe_getopts_loop
+    probe_param_defaults
 
     echo
     echo "summary"

@@ -664,8 +664,9 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
 
       /* $'...' is bash ANSI-C quoting. The backslash escapes are decoded here
          and the result is a final literal segment that neither expands nor
-         globs, the way single quotes produce a literal but with escapes. */
-      if (next == '\'' && is_bash_compatible()) {
+         globs, the way single quotes produce a literal but with escapes. A
+         pure addition, so it rides every mood but POSIX. */
+      if (next == '\'' && !is_posix_mode()) {
         byte_count++;
         bool did_emit_any = false;
         auto emit_literal = [&](char byte) {
@@ -1454,11 +1455,13 @@ hot fn Lexer::lex_sentinel() throws -> Token *
 
     /* < is input redirect, << a heredoc, <= a comparison. <<< is the bash
        here-string, which feeds a single expanded word as standard input. It
-       changes the POSIX reading of << with a <word delimiter, so it is bash
-       mode only and POSIX mode keeps tokenizing << then <. */
+       changes the POSIX reading of << with a <word delimiter, so POSIX mode
+       keeps tokenizing << then <, while the default and bash moods read the
+       here-string the way the other pure bash additions ride the default
+       mood. */
     case Token::Kind::Less: {
       if (chop_character(1) == '<') {
-        if (chop_character(2) == '<' && is_bash_compatible()) {
+        if (chop_character(2) == '<' && !is_posix_mode()) {
           tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
           extra_length += 2;
         } else {

@@ -716,6 +716,16 @@ fn Parser::build_heredoc_redirection(
   Token *delimiter_token = m_lexer.next_shell_token();
   ASSERT(delimiter_token != nullptr);
   if (delimiter_token->kind() != Token::Kind::Word) {
+    /* A <<<word in POSIX mode tokenizes as << then <word, so the stray <
+       here means the script used the bash here-string in a mode that does
+       not read it. The hint names the dialect rather than leaving a bare
+       delimiter complaint. */
+    if (delimiter_token->kind() == Token::Kind::Less) {
+      throw ErrorWithLocation{
+          delimiter_token->source_location(),
+          "Expected a heredoc delimiter. The <<< here-string is a bashism "
+          "that POSIX mode does not read, use a heredoc instead"};
+    }
     throw ErrorWithLocation{delimiter_token->source_location(),
                             "Expected a heredoc delimiter"};
   }

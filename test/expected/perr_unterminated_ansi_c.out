@@ -1,6 +1,6 @@
-shit: 2:7: error: Unterminated string literal.
+shit: 2:6: error: Unterminated $'...' string.
      2 |  echo $'abc
-       |        ^~~~ here.
+       |       ^~~~~ here.
 shit: 2:11: note:
      2 |  echo $'abc
        |            ^~ Expected ' here.

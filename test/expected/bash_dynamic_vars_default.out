@@ -1,0 +1,104 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [FunctionDefinition "outer"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "fn=$FUNCNAME"]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "fn0=$FUNCNAME[0]"]
+          [CompoundListCondition, None]
+            [SimpleCommand "inner"]
+  [CompoundListCondition, None]
+    [FunctionDefinition "inner"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "echo" "depth=$#FUNCNAME[@]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "outer"]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "-n" "$OSTYPE" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "ostype=set"]
+[Word
+  Unquoted "outer"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "fn="
+  Variable "FUNCNAME"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "fn0="
+  Variable "FUNCNAME[0]"
+]
+[Word
+  Unquoted "inner"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "inner"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "depth="
+  Variable "#FUNCNAME[@]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "outer"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Variable "OSTYPE"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "ostype=set"
+]
+[Word
+  Unquoted "fi"
+]
+fn=outer
+fn0=outer
+depth=2
+ostype=set
+[Code 0]

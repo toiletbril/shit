@@ -350,12 +350,12 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   LOG(verbosity::All, "printf formatting %zu arguments", ec.args().count() - 1);
 
   /* bash printf -v NAME stores the result in the named variable instead of
-     printing it, so the format and operands shift two places past -v NAME. */
+     printing it, so the format and operands shift two places past -v NAME.
+     The form is a pure addition, so it rides every mood but POSIX the way
+     the other bash extensions do. */
   usize format_index = 1;
   Maybe<String> store_variable;
-  if (cxt.is_bash_compatible() && ec.args()[1] == "-v" &&
-      ec.args().count() >= 3)
-  {
+  if (!cxt.is_posix_mode() && ec.args()[1] == "-v" && ec.args().count() >= 3) {
     store_variable = ec.args()[2];
     format_index = 3;
   }

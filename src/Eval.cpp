@@ -4592,11 +4592,11 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         }
       };
 
-      /* Brace expansion runs first in bash mode, turning one word into the
-         several the braces spell, each then taking the path above. The brace
-         scan is skipped when no { is present, so a brace-free word pays nothing
-         beyond the cheap check. */
-      if (is_bash_compatible() && word_has_brace_candidate(*word)) {
+      /* Brace expansion runs first in every mood but POSIX, turning one word
+         into the several the braces spell, each then taking the path above.
+         The brace scan is skipped when no { is present, so a brace-free word
+         pays nothing beyond the cheap check. */
+      if (!is_posix_mode() && word_has_brace_candidate(*word)) {
         for (const Word &brace_word : expand_braces(*word, scratch_allocator()))
           expand_one_word(brace_word);
       } else {

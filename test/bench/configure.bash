@@ -15,12 +15,27 @@ set -u
 # runs it.
 shopt -s extglob
 
+# An optimizing shell's default mood arrives with failglob strict, which a
+# sparse array literal like ([2]=a b) trips, so the script relaxes it the way
+# a configure run negotiates any feature. bash spells failglob as a shopt, so
+# its set rejects the name quietly here and the run continues unchanged.
+set +o failglob 2>/dev/null || true
+
 # The work multiplier. A larger value lengthens every loop.
 SCALE=${SCALE:-40}
 
 PASS_COUNT=0
 FAIL_COUNT=0
 WORK_UNITS=0
+
+# Build-style feature toggles, assigned once and never reassigned, the shape a
+# real configure run carries. An optimizing shell can prove every guard that
+# reads them dead at parse time, while bash tests each guard on every pass
+# through the hot loops.
+CONFIG_TRACE=0
+CONFIG_PROFILE=0
+CONFIG_PARANOID=0
+CONFIG_RELEASE=1
 
 # Record a probe result, comparing an actual value to an expected one.
 check() {
@@ -34,12 +49,20 @@ check() {
     fi
 }
 
+# Announce a stage before its work runs, so the output streams through the run
+# the way a real configure prints, rather than arriving in one burst at the
+# end of each probe.
+announce() {
+    printf 'configuring %s\n' "$1"
+}
+
 # ----------------------------------------------------------------------------
 # A coprime field, the heavy quadratic core. For every pair (i, j) up to SCALE
 # it computes the greatest common divisor through the euclidean loop, counts the
 # coprime pairs, and folds a rolling checksum, all in arithmetic and arrays.
 # ----------------------------------------------------------------------------
 probe_coprime_field() {
+    announce "the coprime field"
     local i j a b t coprime=0 checksum=0
     local -a column=()
     for ((i = 1; i <= SCALE; i++)); do
@@ -53,6 +76,15 @@ probe_coprime_field() {
             done
             if ((a == 1)); then
                 coprime=$((coprime + 1))
+            fi
+            # Dead diagnostics in the quadratic core, a constant guard and a
+            # literal test, both provable at parse time and both re-tested
+            # per pair by bash.
+            if [ "$CONFIG_TRACE" -eq 1 ]; then
+                printf 'trace: pair %d %d\n' "$i" "$j"
+            fi
+            if [ 0 -eq 1 ]; then
+                coprime=$((coprime * 2))
             fi
             checksum=$(((checksum + a * j + i) % 1000003))
             WORK_UNITS=$((WORK_UNITS + 1))
@@ -85,6 +117,7 @@ ordinal_sum() {
 }
 
 probe_string_forge() {
+    announce "the string forge"
     local -a pool=(configure-script alpha_beta_gamma BashTortureCase token123list
         Mixed-Case-Words under_score_name HELLO-world snake_AND_kebab)
     local round word rev i ch checksum=0 expansions=0
@@ -120,6 +153,7 @@ probe_string_forge() {
 # expression and folding the captured groups from BASH_REMATCH.
 # ----------------------------------------------------------------------------
 probe_regex_scan() {
+    announce "the regex scanner"
     local re='^v([0-9]+)\.([0-9]+)(-([a-z]+))?$'
     local -a tags=(v1.0 v2.5-beta v10.3 v0.9-rc nope v7.7-final)
     local round tag total=0 named=0
@@ -149,6 +183,7 @@ probe_regex_scan() {
 # subscripts, and folding a checksum over the elements.
 # ----------------------------------------------------------------------------
 probe_array_churn() {
+    announce "the array churn"
     local round i checksum=0
     local -a items window
     for ((round = 0; round < SCALE; round++)); do
@@ -181,6 +216,7 @@ probe_array_churn() {
 # Arithmetic, exponent, bases, C-style for, let, and the (( )) status.
 # ----------------------------------------------------------------------------
 probe_arithmetic() {
+    announce "the arithmetic mill"
     local round i acc=0
     for ((round = 0; round < SCALE; round++)); do
         for ((i = 1; i <= 24; i++)); do
@@ -221,6 +257,7 @@ probe_arithmetic() {
 # ;;&, driven over a SCALE loop.
 # ----------------------------------------------------------------------------
 probe_case_machine() {
+    announce "the case machine"
     local round k state=0 trail_len=0
     for ((round = 0; round < SCALE; round++)); do
         k=$((round % 6))
@@ -473,6 +510,70 @@ EOF
 }
 
 # ----------------------------------------------------------------------------
+# Dead configuration branches. Every guard in the hot loop reads a constant
+# toggle, a literal test, a bare false, or a never-entered while, all provable
+# at parse time, so an optimizing shell picks the live path once while bash
+# re-tests every guard on every pass. The live tail carries constant
+# arithmetic the optimizer folds the same way.
+# ----------------------------------------------------------------------------
+probe_dead_configuration() {
+    announce "the dead branches"
+    local i live=0 limit=$((SCALE * SCALE / 2))
+    for ((i = 1; i <= limit; i++)); do
+        if [ "$CONFIG_TRACE" -eq 1 ]; then
+            printf 'trace: %d\n' "$i"
+            live=$((live + 1000))
+        fi
+        if [ "$CONFIG_PARANOID" -eq 1 ]; then
+            live=$((live + i * i))
+        fi
+        if [ 0 -eq 1 ]; then
+            live=$((live * 3))
+        fi
+        if false; then
+            live=$((live + 7))
+        fi
+        while [ 0 -ne 0 ]; do
+            live=$((live + 1))
+        done
+        if [ "$CONFIG_RELEASE" -eq 0 ]; then
+            live=$((live - 1))
+        elif [ "$CONFIG_PROFILE" -eq 1 ]; then
+            live=$((live - 2))
+        else
+            live=$((live + (1 << 4) - (64 / 4) + 3 * 7 - 20))
+        fi
+        WORK_UNITS=$((WORK_UNITS + 1))
+    done
+    check "dead branches stayed dead" "$live" "$limit"
+    check "release toggle held" "$CONFIG_RELEASE" "1"
+    check "trace toggle held" "$CONFIG_TRACE" "0"
+}
+
+# ----------------------------------------------------------------------------
+# Expansion extras, the wider parameter and array surface with one check per
+# form, so the suite asserts more of the dialect per run.
+# ----------------------------------------------------------------------------
+probe_expansion_extras() {
+    announce "the expansion extras"
+    local word="configure-me-gently" ref=word
+    check "indirect expansion" "${!ref}" "configure-me-gently"
+    check "substring middle" "${word:10:2}" "me"
+    check "negative offset" "${word: -6:3}" "gen"
+    check "replace first" "${word/-/_}" "configure_me-gently"
+    check "replace all" "${word//-/_}" "configure_me_gently"
+    check "anchored replace" "${word/#configure/setup}" "setup-me-gently"
+    check "anchored tail" "${word/%gently/firmly}" "configure-me-firmly"
+    local -a slice=(zero one two three four five)
+    check "array slice" "${slice[*]:2:3}" "two three four"
+    check "array tail" "${slice[*]: -2}" "four five"
+    local joined
+    printf -v joined '%s|' "${slice[@]:1:2}"
+    check "printf -v join" "$joined" "one|two|"
+    check "case toggle one" "${word^}" "Configure-me-gently"
+    check "length of slice" "${#slice[@]}" "6"
+}
+
 main() {
     printf 'configuring with the bash feature suite, SCALE=%s\n' "$SCALE"
     printf '%s\n' "----------------------------------------------------------------"
@@ -492,6 +593,8 @@ main() {
     probe_functions
     probe_getopts
     probe_oneshot
+    probe_dead_configuration
+    probe_expansion_extras
 
     printf '%s\n' "----------------------------------------------------------------"
     printf 'configure complete: %d passed, %d failed, %d work units\n' \
