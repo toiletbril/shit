@@ -379,6 +379,11 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
     let warning = WarningWithLocation{location, message};
     warning.set_line_offset(line_offset);
     show_message(warning.to_string(resolved.text->view()));
+    /* A warning from a sourced file names the chain that reached it, the
+       same frames an error prints, since the user typed no source command
+       for an rc chain and the file alone does not say who pulled it in. A
+       warning in the typed line has no frames and stays a single report. */
+    if (!m_source_frames.is_empty()) print_source_backtrace();
   } catch (...) {
     LOG(verbosity::Debug,
         "formatting a runtime warning failed, the error is swallowed");

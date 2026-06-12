@@ -1,0 +1,11 @@
+shit: INNER:2:8: warning: The variable 'UNSET_CHAIN' is not set, it expands to empty, replace it with ${UNSET_CHAIN-} if empty expansion is desired.
+     2 |  [[ -z "$UNSET_CHAIN" ]]
+       |         ^~~~~~~~~~~~ here.
+shit: OUTER:2:1: trace location:
+     2 |  . INNER
+       |  ^~~~~~~~~~~~~~~~~~~~~ here.
+shit: 1:1: trace location:
+     1 |  . OUTER
+       |  ^~~~~~~~~~~~~~~~~~~~~ here.
+0
+rc=0
