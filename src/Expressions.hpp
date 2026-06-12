@@ -334,6 +334,10 @@ public:
   /* For a heredoc, the lexer-owned body and whether it is expanded. */
   const String *heredoc_body;
   bool heredoc_expand;
+  /* True for a bare >&word outside POSIX mode, where a word that expands to
+     neither a number nor a dash is the csh both-streams spelling bash reads
+     as >word 2>&1, resolved after the expansion the way bash decides it. */
+  bool dup_may_be_filename;
 };
 
 class SimpleCommand : public Command

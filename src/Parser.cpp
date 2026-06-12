@@ -535,10 +535,24 @@ hot fn Parser::parse_command_list(
 /* Build one redir for descriptor fd. The operator is already consumed, and
    op_location is its position. A & touching the operator means a descriptor
    duplication, n>&m, otherwise a filename word follows. */
+/* The 2>&1 record that points the standard error at the standard output, the
+   dup the &> redirection, the |& pipe stage, and the bare >&file spelling
+   build. */
+static fn stderr_to_stdout_dup() wontthrow -> expressions::Redirection
+{
+  expressions::Redirection dup{};
+  dup.fd = 2;
+  dup.target = nullptr;
+  dup.kind = expressions::Redirection::Kind::DuplicateOutput;
+  dup.dup_fd = 1;
+  return dup;
+}
+
 fn Parser::build_file_or_dup_redirection(
     i32 fd, Token::Kind op_kind, SourceLocation op_location,
     Maybe<SourceLocation> &first_location,
-    ArrayList<expressions::Redirection> &out) throws -> void
+    ArrayList<expressions::Redirection> &out,
+    bool fd_was_explicit) throws -> void
 {
   if (!first_location) first_location = op_location;
 
@@ -598,8 +612,16 @@ fn Parser::build_file_or_dup_redirection(
         return;
       }
 
+      /* A bare >&word in every mood but POSIX may be the csh both-streams
+         spelling, cmd >&/dev/null, which bash decides after the expansion,
+         a number or a dash duplicates and anything else writes both streams
+         to the file. The flag carries that reading to the resolution, while
+         an explicit descriptor as in 2>&word keeps the strict error. */
       redir.target = from;
       redir.dup_fd = -1;
+      redir.dup_may_be_filename = op_kind == Token::Kind::Greater &&
+                                  !fd_was_explicit &&
+                                  !m_lexer.is_posix_mode();
       out.push(redir);
       return;
     }
@@ -665,18 +687,6 @@ fn Parser::build_file_or_dup_redirection(
   out.push(redir);
 }
 
-/* The 2>&1 record that points the standard error at the standard output, the
-   dup both the &> redirection and the |& pipe stage build. */
-static fn stderr_to_stdout_dup() wontthrow -> expressions::Redirection
-{
-  expressions::Redirection dup{};
-  dup.fd = 2;
-  dup.target = nullptr;
-  dup.kind = expressions::Redirection::Kind::DuplicateOutput;
-  dup.dup_fd = 1;
-  return dup;
-}
-
 fn Parser::build_both_streams_redirection(
     bool append, SourceLocation op_location,
     Maybe<SourceLocation> &first_location,
@@ -686,7 +696,7 @@ fn Parser::build_both_streams_redirection(
      follow it, the same pair bash builds for &>file. */
   build_file_or_dup_redirection(
       1, append ? Token::Kind::DoubleGreater : Token::Kind::Greater,
-      op_location, first_location, out);
+      op_location, first_location, out, /*fd_was_explicit=*/true);
   out.push(stderr_to_stdout_dup());
 }
 
@@ -817,7 +827,8 @@ mustuse fn Parser::try_parse_descriptor_prefixed_redirection(
     if (nk == Token::Kind::DoubleLess) {
       build_heredoc_redirection(fd, op_location, first_location, out);
     } else {
-      build_file_or_dup_redirection(fd, nk, op_location, first_location, out);
+      build_file_or_dup_redirection(fd, nk, op_location, first_location, out,
+                                    /*fd_was_explicit=*/true);
     }
     return true;
   }
@@ -844,7 +855,7 @@ mustuse fn Parser::try_parse_trailing_redirection(
     m_lexer.advance_past_last_peek();
     build_file_or_dup_redirection((op_kind == Token::Kind::Less) ? 0 : 1,
                                   op_kind, op_location, ignored_first_location,
-                                  out);
+                                  out, /*fd_was_explicit=*/false);
     return true;
   }
 
@@ -949,9 +960,10 @@ hot fn Parser::parse_simple_command() throws -> Command *
   };
 
   auto add_redirection = [&](i32 fd, Token::Kind op_kind,
-                             SourceLocation op_location) {
+                             SourceLocation op_location,
+                             bool fd_was_explicit) {
     build_file_or_dup_redirection(fd, op_kind, op_location, source_location,
-                                  redirections);
+                                  redirections, fd_was_explicit);
   };
 
   for (;;) {
@@ -1154,7 +1166,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
       const let op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       add_redirection((op_kind == Token::Kind::Less) ? 0 : 1, op_kind,
-                      op_location);
+                      op_location, /*fd_was_explicit=*/false);
     } break;
 
     case Token::Kind::AmpersandGreater:

@@ -58,11 +58,15 @@ private:
 
   /* Build one file or descriptor-duplication redirection for descriptor fd. The
      operator is already consumed and op_location is its position. Shared by the
-     simple command parser and the trailing redirect parser. */
+     simple command parser and the trailing redirect parser. fd_was_explicit
+     records whether the source spelled the descriptor, since a bare >&word
+     with a literal non-numeric word is the csh both-streams spelling while
+     2>&word keeps the descriptor reading. */
   fn build_file_or_dup_redirection(
       i32 fd, Token::Kind op_kind, SourceLocation op_location,
       Maybe<SourceLocation> &first_location,
-      ArrayList<expressions::Redirection> &out) throws -> void;
+      ArrayList<expressions::Redirection> &out,
+      bool fd_was_explicit) throws -> void;
 
   /* Build the &> and &>> both-streams redirection, fd 1 to the file followed by
      fd 2 duplicating fd 1, the way bash expands &>file into >file 2>&1. */

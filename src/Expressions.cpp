@@ -737,28 +737,41 @@ fn assign_standard_fd(Maybe<os::descriptor> &in_fd,
    close and a numeric field names the descriptor. The result is a non-negative
    descriptor or Redirection::DUP_FD_CLOSE for the close form. A field that is
    neither throws a located error at the word. */
-fn resolve_duplication_fd(const Redirection &redir, EvalContext &cxt) throws
-    -> i32
+/* A resolved duplication target, the descriptor or close marker in fd, or
+   the csh both-streams filename when the bare >&word expanded to a name
+   rather than a number, which bash reads as >word 2>&1. */
+struct resolved_duplication
 {
-  if (redir.target == nullptr) return redir.dup_fd;
+  i32 fd{-1};
+  Maybe<String> both_streams_file{};
+};
+
+fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
+    -> resolved_duplication
+{
+  if (redir.target == nullptr)
+    return resolved_duplication{redir.dup_fd, shit::None};
 
   ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
   target_tokens.push(redir.target);
-  const ArrayList<String> fields = cxt.process_args(target_tokens);
+  ArrayList<String> fields = cxt.process_args(target_tokens);
   if (fields.count() != 1) {
     throw ErrorWithLocation{redir.target->source_location(),
                             "Duplication target is not a single descriptor"};
   }
 
-  const String &field = fields[0];
-  if (field == "-") return Redirection::DUP_FD_CLOSE;
+  String &field = fields[0];
+  if (field == "-")
+    return resolved_duplication{Redirection::DUP_FD_CLOSE, shit::None};
 
   let const parsed = utils::parse_decimal_integer(field.view());
   if (parsed.is_error() || parsed.value() < 0) {
+    if (redir.dup_may_be_filename)
+      return resolved_duplication{-1, steal(field)};
     throw ErrorWithLocation{redir.target->source_location(),
                             "'" + field + "' is not a valid descriptor"};
   }
-  return static_cast<i32>(parsed.value());
+  return resolved_duplication{static_cast<i32>(parsed.value()), shit::None};
 }
 
 } /* namespace */
@@ -828,7 +841,26 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     if (redir.kind == Redirection::Kind::DuplicateOutput ||
         redir.kind == Redirection::Kind::DuplicateInput)
     {
-      const i32 from_fd = resolve_duplication_fd(redir, cxt);
+      let const resolved = resolve_duplication(redir, cxt);
+      /* The both-streams filename opens like >file and points the standard
+         error after it, the pair bash builds for the csh >&file spelling. */
+      if (resolved.both_streams_file.has_value()) {
+        let opened = os::open_file_descriptor(
+            *resolved.both_streams_file,
+            redirection_open_mode(Redirection::Kind::TruncateOutput,
+                                  cxt.no_clobber()));
+        if (!opened) {
+          throw ErrorWithLocation{redir.target->source_location(),
+                                  "Could not open '" +
+                                      *resolved.both_streams_file +
+                                      "': " + os::last_system_error_message()};
+        }
+        assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, 1, opened.take());
+        ec.dup_err_to_out = true;
+        ec.dup_out_to_err_came_last = false;
+        continue;
+      }
+      const i32 from_fd = resolved.fd;
       /* A self copy changes nothing. The standard cross-routing keeps the flag
          fast path. An arbitrary descriptor or the close form is not represented
          by the stage's three descriptor slots and is left to the compound path.
@@ -1125,7 +1157,47 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       if (redir.kind == Redirection::Kind::DuplicateOutput ||
           redir.kind == Redirection::Kind::DuplicateInput)
       {
-        const i32 from_fd = resolve_duplication_fd(redir, cxt);
+        let resolved = resolve_duplication(redir, cxt);
+
+        /* The both-streams filename opens like >file, lands on the standard
+           output, and the standard error follows it, the pair bash builds
+           for the csh >&file spelling. The bare exec form keeps both moves
+           for good the way its file redirect does. */
+        if (resolved.both_streams_file.has_value()) {
+          let opened = os::open_file_descriptor(
+              *resolved.both_streams_file,
+              redirection_open_mode(Redirection::Kind::TruncateOutput,
+                                    cxt.no_clobber()));
+          if (!opened) {
+            redirection_open_failed = true;
+            throw ErrorWithLocation{redir.target->source_location(),
+                                    "Could not open '" +
+                                        *resolved.both_streams_file + "': " +
+                                        os::last_system_error_message()};
+          }
+          const os::descriptor file_fd = opened.take();
+          shit::flush();
+          if (is_bare_exec) {
+            cxt.snapshot_subshell_descriptor(1);
+            cxt.snapshot_subshell_descriptor(2);
+            const bool out_ok = os::replace_descriptor(1, file_fd);
+            const bool err_ok = os::replace_descriptor(2, file_fd);
+            os::close_fd(file_fd);
+            if (!out_ok || !err_ok) {
+              redirection_open_failed = true;
+              throw ErrorWithLocation{redir.target->source_location(),
+                                      "Bad file descriptor"};
+            }
+            continue;
+          }
+          dup_saved_descriptors.push(os::save_and_replace_descriptor(
+              1, file_fd));
+          dup_saved_descriptors.push(os::save_and_replace_descriptor(
+              2, file_fd));
+          os::close_fd(file_fd);
+          continue;
+        }
+        const i32 from_fd = resolved.fd;
 
         /* A bare exec applies a duplication to the shell's own descriptor for
            good, so the copy or the close stays in effect for every later
@@ -3791,7 +3863,29 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     if (redir.kind == Redirection::Kind::DuplicateOutput ||
         redir.kind == Redirection::Kind::DuplicateInput)
     {
-      const i32 from_fd = resolve_duplication_fd(redir, cxt);
+      let const resolved = resolve_duplication(redir, cxt);
+
+      /* The both-streams filename opens like >file onto the standard output
+         and the standard error follows it for the compound's duration, the
+         pair bash builds for the csh >&file spelling. */
+      if (resolved.both_streams_file.has_value()) {
+        let opened = os::open_file_descriptor(
+            *resolved.both_streams_file,
+            redirection_open_mode(Redirection::Kind::TruncateOutput,
+                                  cxt.no_clobber()));
+        if (!opened) {
+          throw ErrorWithLocation{redir.target->source_location(),
+                                  "Could not open '" +
+                                      *resolved.both_streams_file +
+                                      "': " + os::last_system_error_message()};
+        }
+        const os::descriptor file_fd = opened.take();
+        saved_descriptors.push(os::save_and_replace_descriptor(1, file_fd));
+        saved_descriptors.push(os::save_and_replace_descriptor(2, file_fd));
+        os::close_fd(file_fd);
+        continue;
+      }
+      const i32 from_fd = resolved.fd;
 
       /* The close form backs the descriptor up, then closes it. The backup is
          saved so restore reopens it when the compound command finishes. */

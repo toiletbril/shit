@@ -1,0 +1,7 @@
+# The csh both-streams spelling rides every mood but POSIX, so a bare >&file
+# sends both streams to the file while >&3 keeps the descriptor duplication.
+echo hi >&/dev/null
+echo after
+exec 3>&1
+echo fd3 >&3
+exec 3>&-

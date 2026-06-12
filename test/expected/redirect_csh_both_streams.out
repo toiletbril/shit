@@ -1,0 +1,56 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "hi"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after"]
+  [CompoundListCondition, None]
+    [SimpleCommand "exec"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "fd3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "exec"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after"
+]
+[Word
+  Unquoted "exec"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "fd3"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "exec"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "-"
+]
+after
+fd3
+[Code 0]
