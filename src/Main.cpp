@@ -126,6 +126,9 @@ FLAG(STATS, Bool, '\0', "show-stats", shit::flag_section::Debug,
 FLAG(MEMORY, Bool, '\0', "show-memory", shit::flag_section::Debug,
      "Print a granular memory report at exit, the AST and function arena bytes "
      "with their reserved capacity and the malloc heap in use.");
+/* The logging flags exist only in a debug build, the build whose LOG calls
+   compile in. A release binary rejects -X as an unknown flag. */
+#if !defined NDEBUG
 FLAG(LOG, String, 'X', "debug-logging", shit::flag_section::Debug,
      "Enable internal logging at the given level, one of 'info', 'debug', or "
      "'all'. An unknown spelling is an error.");
@@ -134,6 +137,7 @@ FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file",
      "Create the named file when missing and append the debug log to it "
      "instead of stderr, so an interactive session logs without painting "
      "over the prompt.");
+#endif
 
 #if SHIT_PLATFORM_IS COSMO
 FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", shit::flag_section::Debug,
@@ -603,7 +607,9 @@ fn main(int argc, char **argv) -> int
   /* Raise the runtime log level before any helper runs, so the trace covers
      startup. The default stays Nothing, so a run without -X pays one
      comparison per LOG call and prints nothing. An unknown level spelling is
-     a usage error, the way an unknown flag is. */
+     a usage error, the way an unknown flag is. A release build compiled the
+     flag and every LOG call out. */
+#if !defined NDEBUG
   if (FLAG_LOG.is_set()) {
     struct log_level_name
     {
@@ -643,6 +649,7 @@ fn main(int argc, char **argv) -> int
         log_file != nullptr)
       shit::LOGGER_OUTPUT = log_file;
   }
+#endif
 
   /* Program path is the first argument. Pull it out and get rid of it. */
   let program_path = shit::String{};

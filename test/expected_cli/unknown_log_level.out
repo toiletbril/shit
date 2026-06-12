@@ -1,3 +1,0 @@
-shit: error: Unknown debug logging level 'bogus', expected 'info', 'debug', or 'all'.
-rc=2
-rc=0

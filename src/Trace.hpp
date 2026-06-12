@@ -144,6 +144,21 @@ String format_named_values(StringView names, Args &&...args)
 #define T__LOG_STRINGIZE2(x) #x
 #define T__LOG_STRINGIZE(x) T__LOG_STRINGIZE2(x)
 
+/* A release build carries no logging at all, neither the format strings nor
+   the call sites, so the binary stays lean and the hot paths lose even the
+   level comparison. The -X flag disappears with it, a debug build is the one
+   that traces. */
+#if defined NDEBUG
+
+#define LOG(level, ...)                                                        \
+  do {                                                                         \
+  } while (0)
+#define LOG_VARS(level, ...)                                                   \
+  do {                                                                         \
+  } while (0)
+
+#else /* NDEBUG */
+
 /* Print a printf-style message at the given level when the level is active.
    The file:line and the function render right-aligned in fixed columns so a
    tailed log reads as a table. The flush after each message keeps a tailed
@@ -176,3 +191,5 @@ String format_named_values(StringView names, Args &&...args)
       unused(std::fflush(t__log_stream));                                      \
     }                                                                          \
   } while (0)
+
+#endif /* !NDEBUG */
