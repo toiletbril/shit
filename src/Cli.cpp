@@ -227,7 +227,10 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       continue;
     }
 
-    if (ignore_rest || argv[i][0] != '-') {
+    /* The first argument is the invocation name even when it opens with a
+       dash, the login convention that spawns a shell as -bash, so it is
+       never read as a flag bundle. */
+    if (ignore_rest || argv[i][0] != '-' || i == 0) {
       /* The program name is the first operand and does not end option parsing.
          The next operand is the script, after which every argument belongs to
          the script as a positional parameter, not to the shell, the way

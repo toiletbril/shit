@@ -735,7 +735,11 @@ fn main(int argc, char **argv) -> int
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
 
-  if (FLAG_LOGIN.is_enabled() || program_path == "-") is_login_shell = true;
+  /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
+     convention tmux and login use, the same mark the -l flag sets. */
+  if (FLAG_LOGIN.is_enabled() ||
+      (!program_path.is_empty() && program_path.view()[0] == '-'))
+    is_login_shell = true;
   LOG(shit::verbosity::Info, "the shell %s a login shell",
       is_login_shell ? "is" : "is not");
 
