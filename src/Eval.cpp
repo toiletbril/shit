@@ -6618,7 +6618,7 @@ fn EvalContext::run_completion_function(StringView function_name,
       has_functions() ? find_function(function_name) : nullptr;
   if (body == nullptr) return ArrayList<String>{};
 
-  LOG(verbosity::Debug,
+  LOG(verbosity::Info,
       "running the completion function '%.*s' with %zu words, cursor word %zu",
       static_cast<int>(function_name.length), function_name.data,
       words.count(), cword);
@@ -6719,7 +6719,7 @@ fn EvalContext::run_completion_function(StringView function_name,
     for (const String &entry : *reply)
       result.push_managed(entry.view());
   }
-  LOG(verbosity::Debug,
+  LOG(verbosity::Info,
       "completion function '%.*s' returned %zu candidates with status %d",
       static_cast<int>(function_name.length), function_name.data,
       result.count(),

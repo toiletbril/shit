@@ -973,7 +973,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args);
 
-  LOG(verbosity::Debug, "dispatching the command '%s' with %zu words",
+  LOG(verbosity::Info, "dispatching the command '%s' with %zu words",
       program_args.is_empty() ? "" : program_args[0].c_str(),
       program_args.count());
 

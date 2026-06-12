@@ -36,12 +36,12 @@ inline std::FILE *log_output_stream()
 constexpr const char *verbosity_to_string(verbosity verbosity)
 {
   switch (verbosity) {
-  case verbosity::Nothing: return "Nothing";
-  case verbosity::Info: return "Info";
-  case verbosity::Debug: return "Debug";
-  case verbosity::All: return "All";
+  case verbosity::Nothing: return "OFF";
+  case verbosity::Info: return "INF";
+  case verbosity::Debug: return "DBG";
+  case verbosity::All: return "ALL";
   }
-  return "?";
+  return "???";
 }
 
 namespace log_detail {
@@ -141,16 +141,20 @@ String format_named_values(StringView names, Args &&...args)
 
 } /* namespace shit */
 
+#define T__LOG_STRINGIZE2(x) #x
+#define T__LOG_STRINGIZE(x) T__LOG_STRINGIZE2(x)
+
 /* Print a printf-style message at the given level when the level is active.
-   The flush after each message keeps a tailed --debug-output-file current
-   while the TUI is still alive. */
+   The file:line and the function render right-aligned in fixed columns so a
+   tailed log reads as a table. The flush after each message keeps a tailed
+   --debug-logging-file current while the TUI is still alive. */
 #define LOG(level, ...)                                                        \
   do {                                                                         \
     if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
       std::FILE *t__log_stream = ::shit::log_output_stream();                  \
-      unused(std::fprintf(t__log_stream, "[%s] " __FILE__ ":%d %s(): ",        \
-                          ::shit::verbosity_to_string(level), __LINE__,        \
-                          __func__));                                          \
+      unused(std::fprintf(t__log_stream, "[%s] %32s %32s(): ",                 \
+                          ::shit::verbosity_to_string(level),                  \
+                          __FILE__ ":" T__LOG_STRINGIZE(__LINE__), __func__)); \
       unused(std::fprintf(t__log_stream, __VA_ARGS__));                        \
       unused(std::fputc('\n', t__log_stream));                                 \
       unused(std::fflush(t__log_stream));                                      \
@@ -165,9 +169,10 @@ String format_named_values(StringView names, Args &&...args)
       ::shit::String t__vars =                                                 \
           ::shit::log_detail::format_named_values(#__VA_ARGS__, __VA_ARGS__);  \
       std::FILE *t__log_stream = ::shit::log_output_stream();                  \
-      unused(std::fprintf(t__log_stream, "[%s] " __FILE__ ":%d %s(): %s\n",    \
-                          ::shit::verbosity_to_string(level), __LINE__,        \
-                          __func__, t__vars.c_str()));                         \
+      unused(std::fprintf(t__log_stream, "[%s] %32s %32s(): %s\n",             \
+                          ::shit::verbosity_to_string(level),                  \
+                          __FILE__ ":" T__LOG_STRINGIZE(__LINE__), __func__,   \
+                          t__vars.c_str()));                                   \
       unused(std::fflush(t__log_stream));                                      \
     }                                                                          \
   } while (0)
