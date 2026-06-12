@@ -4894,7 +4894,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                               .to_literal_string();
       if (!(operand.view().length >= 1 && operand.view()[0] == '-')) {
         actx.warn(m_args[1]->source_location(),
-                  "A one-operand test is the nonempty-string test, write it"
+                  "A one-operand test is the nonempty-string test, write it "
                   "with -n to read clearer");
       }
     }
@@ -5143,8 +5143,8 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
             !actx.known_aliases.contains(name->view()) && file_is_plain_operand)
         {
           actx.warn(cat_args[0]->source_location(),
-                    "A useless cat, give the file to the next command directly"
-                    "instead of piping cat");
+                    "A useless cat, give the file to the next command "
+                    "directly instead of piping cat");
         }
       }
     }
@@ -5180,7 +5180,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
       }
       if (!has_null_flag)
         actx.warn(next->args()[0]->source_location(),
-                  "An xargs splits the find output on whitespace and quotes,"
+                  "An xargs splits the find output on whitespace and quotes, "
                   "pair find -print0 with xargs -0 or use find -exec");
     }
 
@@ -5204,14 +5204,14 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
        itself, shellcheck SC2009, use pgrep. */
     if (stage_name->view() == "ps" && !stage_is_user && next_is_grep)
       actx.warn(next->args()[0]->source_location(),
-                "Grepping the ps output races the process table and matches"
+                "Grepping the ps output races the process table and matches "
                 "the grep itself, use pgrep to match a process by name");
 
     /* ls piped into grep parses the formatted listing, which mangles a name
        with a space or a newline, shellcheck SC2010, use a glob or find. */
     if (stage_name->view() == "ls" && !stage_is_user && next_is_grep)
       actx.warn(next->args()[0]->source_location(),
-                "Grepping the ls listing mangles a name with a space or a"
+                "Grepping the ls listing mangles a name with a space or a "
                 "newline, match the names with a glob or with find instead");
 
     /* grep whose output only feeds wc -l counts matches with a second
@@ -5221,7 +5221,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
         next->args().count() == 2 &&
         next->args()[1]->raw_string().view() == "-l")
       actx.warn(stage->args()[0]->source_location(),
-                "Counting grep output with wc -l runs an extra process, use"
+                "Counting grep output with wc -l runs an extra process, use "
                 "grep -c to count the matching lines directly");
   }
 

@@ -18,7 +18,7 @@
 [Word
   Variable "?"
 ]
-shit: 2:3: warning: A one-operand test is the nonempty-string test, write itwith -n to read clearer.
+shit: 2:3: warning: A one-operand test is the nonempty-string test, write it with -n to read clearer.
      2 |  [ ! ]
        |    ^~ here.
 0

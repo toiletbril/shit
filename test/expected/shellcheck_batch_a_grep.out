@@ -141,7 +141,7 @@ shit: 5:12: warning: A for over the cat output iterates IFS-split words rather t
 shit: 6:12: warning: A for over the find output breaks a name with whitespace apart, use find -exec or a 'while read -r' loop over find -print0.
      6 |    for f in $(find . -name x); do echo "$f"; done
        |             ^~~~~~~~~~~~~~~~~ here.
-shit: 7:12: warning: An xargs splits the find output on whitespace and quotes,pair find -print0 with xargs -0 or use find -exec.
+shit: 7:12: warning: An xargs splits the find output on whitespace and quotes, pair find -print0 with xargs -0 or use find -exec.
      7 |    find . | xargs echo
        |             ^~~~~ here.
 shit: 8:10: warning: The pipe feeds 'echo', which never reads stdin, so the upstream output is discarded.

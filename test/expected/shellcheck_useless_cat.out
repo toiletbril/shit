@@ -12,7 +12,7 @@
 [Word
   Unquoted "cat"
 ]
-shit: 2:1: warning: A useless cat, give the file to the next command directlyinstead of piping cat.
+shit: 2:1: warning: A useless cat, give the file to the next command directly instead of piping cat.
      2 |  cat /dev/null | cat
        |  ^~~ here.
 [Code 0]

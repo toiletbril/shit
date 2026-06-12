@@ -174,13 +174,13 @@ shit: 8:3: warning: A let runs arithmetic as a command, use the ((...)) compound
 shit: 9:3: warning: An echo of a command substitution prints what the command already prints, run the command on its own instead.
      9 |    echo "$(date)"
        |    ^~~~ here.
-shit: 10:8: warning: Grepping the ps output races the process table and matchesthe grep itself, use pgrep to match a process by name.
+shit: 10:8: warning: Grepping the ps output races the process table and matches the grep itself, use pgrep to match a process by name.
     10 |    ps | grep init
        |         ^~~~ here.
-shit: 11:8: warning: Grepping the ls listing mangles a name with a space or anewline, match the names with a glob or with find instead.
+shit: 11:8: warning: Grepping the ls listing mangles a name with a space or a newline, match the names with a glob or with find instead.
     11 |    ls | grep conf
        |         ^~~~ here.
-shit: 12:3: warning: Counting grep output with wc -l runs an extra process, usegrep -c to count the matching lines directly.
+shit: 12:3: warning: Counting grep output with wc -l runs an extra process, use grep -c to count the matching lines directly.
     12 |    grep needle file | wc -l
        |    ^~~~ here.
 shit: 14:5: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
