@@ -12,7 +12,8 @@ namespace shit {
 
 cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
                                const ArrayList<StringView> &hs,
-                               const ArrayList<Flag *> &fl) throws -> void
+                               const ArrayList<Flag *> &fl,
+                               StringView extra_sections) throws -> void
 {
   ASSERT(!ec.args().is_empty());
 
@@ -26,6 +27,12 @@ cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
   help_text += '\n';
   help_text += make_flag_help(fl);
   help_text += '\n';
+  /* The per-builtin generated text, the OPTION SWITCHES table of set and the
+     OPTION NAMES list of shopt, lands after the flag sections. */
+  if (!extra_sections.is_empty()) {
+    help_text += extra_sections;
+    help_text += '\n';
+  }
   ec.print_to_stdout(help_text);
 }
 

@@ -12,16 +12,20 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-t] [array]");
+HELP_SYNOPSIS_DECL("[-t] [-n count] [array]");
 
 HELP_DESCRIPTION_DECL(
     "The mapfile builtin, also named readarray, reads lines from the standard "
-    "input into an indexed array, one line per element. The -t flag strips the "
-    "trailing newline from each line. The default array name is MAPFILE when "
-    "no "
-    "name operand is given.");
+    "input into an indexed array, one line per element. The default array "
+    "name is MAPFILE when no name operand is given.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The letters are hand-parsed in execute, so these FLAG rows only feed the
+   help text. */
+FLAG(MAPFILE_TRIM, Bool, 't', "",
+     "Strip the trailing newline from each line.");
+FLAG(MAPFILE_COUNT, String, 'n', "",
+     "Read at most count lines, zero for all of them.");
 
 namespace shit {
 

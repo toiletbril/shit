@@ -15,18 +15,34 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-aAfFirxp] [name[=value] ...]");
+HELP_SYNOPSIS_DECL("[-aAfFgilnprtux] [+i] [name[=value] ...]");
 
 HELP_DESCRIPTION_DECL(
     "The declare builtin, also spelled typeset, declares variables and sets "
-    "their attributes. -a declares an indexed array, -A an associative array, "
-    "-i an integer whose assignments evaluate as arithmetic, -r a readonly, "
-    "-x an exported variable, and -p prints the declarations. -F prints the "
-    "names of defined functions and -f their recorded definitions, both "
-    "answering existence by status. +i removes the integer attribute. In bash "
-    "mode it backs the array and associative types.");
+    "their attributes. A plus before a letter removes the attribute where "
+    "the removal is backed, the +i form. In bash mode it backs the array and "
+    "associative types.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The attribute letters are hand-parsed in execute, so these FLAG rows only
+   feed the help text and never the parser. */
+FLAG(DECLARE_INDEXED, Bool, 'a', "", "Declare an indexed array.");
+FLAG(DECLARE_ASSOCIATIVE, Bool, 'A', "", "Declare an associative array.");
+FLAG(DECLARE_FUNCTIONS, Bool, 'f', "",
+     "Restrict to functions and print their recorded definitions.");
+FLAG(DECLARE_FUNCTION_NAMES, Bool, 'F', "",
+     "Print only the names of defined functions, existence by status.");
+FLAG(DECLARE_GLOBAL, Bool, 'g', "", "Accepted without effect.");
+FLAG(DECLARE_INTEGER, Bool, 'i', "",
+     "Mark an integer whose every assignment evaluates as arithmetic, "
+     "removed by +i.");
+FLAG(DECLARE_LOWERCASE, Bool, 'l', "", "Accepted without effect.");
+FLAG(DECLARE_NAMEREF, Bool, 'n', "", "Accepted without effect.");
+FLAG(DECLARE_PRINT, Bool, 'p', "", "Print the matching declarations.");
+FLAG(DECLARE_READONLY, Bool, 'r', "", "Accepted without effect.");
+FLAG(DECLARE_TRACE, Bool, 't', "", "Accepted without effect.");
+FLAG(DECLARE_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
+FLAG(DECLARE_EXPORT, Bool, 'x', "", "Mark the variable for the environment.");
 
 namespace shit {
 

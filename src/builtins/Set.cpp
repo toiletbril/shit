@@ -11,15 +11,17 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-abCefhmnuvx] [+abCefhmnuvx] [-o name] [+o name] "
-                   "[--] [arg ...]");
+HELP_SYNOPSIS_DECL("[-aAbBCeEfGhIkmMnSTuvWx] [+aAbBCeEfGhIkmMnSTuvWx] "
+                   "[-o name] [+o name] [-p] [--] [arg ...]");
 
 HELP_DESCRIPTION_DECL(
     "The set builtin enables a shell option named by a single letter after a "
     "minus or by its long name after -o, and disables it with a plus, and "
     "rebinds the positional parameters to its operands after a double dash or "
     "the first non-option word. With no argument it lists the shell "
-    "variables.");
+    "variables. The OPTION SWITCHES section below describes every switch "
+    "letter and every long name -o and +o accept, and -p prints the same "
+    "table with each option's current state.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -194,11 +196,16 @@ String list_options(const EvalContext &cxt) throws
   return out;
 }
 
-/* The full table that set -p prints, every toggleable option with its letter,
-   its long name, its current state, and a one-line description, so a user can
-   discover what is available without leaving the shell. */
-String list_options_with_help(const EvalContext &cxt) throws
+/* The full option table, one row per option with its letter, its long name,
+   and its description. set -p passes the context and gains a state column,
+   while set --help passes null and gains the alias spellings, so both
+   listings read from the one table. */
+String format_option_table(const EvalContext *cxt,
+                           bool include_alias_spellings) throws
 {
+  /* The plain set -p column fits the bare names, while the --help column
+     also holds the ", alias" spellings. */
+  const usize name_field_width = include_alias_spellings ? 30 : 18;
   let out = String{};
   for (const SetOption &option : SET_OPTIONS) {
     out += "  ";
@@ -209,14 +216,45 @@ String list_options_with_help(const EvalContext &cxt) throws
       out += "  ";
     }
     out += "  ";
-    out += option.name;
-    for (usize pad = option.name.length; pad < 18; pad++)
+    let name_cell = String{option.name};
+    if (include_alias_spellings && !option.alias.is_empty()) {
+      name_cell += ", ";
+      name_cell += option.alias;
+    }
+    out += name_cell.view();
+    for (usize pad = name_cell.count(); pad < name_field_width; pad++)
       out.push(' ');
-    out += option_is_on(cxt, option) ? "[on]  " : "[off] ";
+    if (cxt != nullptr)
+      out += option_is_on(*cxt, option) ? "[on]  " : "[off] ";
     out += option.help;
     out.push('\n');
   }
   return out;
+}
+
+/* The OPTION SWITCHES help section, the intro line, the full table with the
+   alias spellings, and the long names -o accepts on one wrapped list, so set
+   --help describes every switch. */
+String format_option_switches_help() throws
+{
+  let section = String{"OPTION SWITCHES\n"};
+  section += "  A letter after a minus enables the option and after a plus "
+             "disables it.\n  -o NAME and +o NAME do the same by long "
+             "name.\n\n";
+  section += format_option_table(nullptr, true);
+  section += "\n  The -o long names:\n";
+  let listed_names = String{};
+  for (const SetOption &option : SET_OPTIONS) {
+    if (!listed_names.is_empty()) listed_names += ", ";
+    listed_names += option.name;
+    if (!option.alias.is_empty()) {
+      listed_names += ", ";
+      listed_names += option.alias;
+    }
+  }
+  section += wrap_text(listed_names.view(), 4, HELP_WRAP_WIDTH);
+  section += '\n';
+  return section;
 }
 
 } /* namespace */
@@ -259,7 +297,9 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help")
+    SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(ec,
+                                       format_option_switches_help().view());
 
   /* set with no arguments lists the shell variables. */
   if (args.count() == 1) {
@@ -311,7 +351,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
        discovery aid available in every mode. The +p form is accepted without
        effect, since this shell has no privileged mode to turn off. */
     if (arg == "-p") {
-      ec.print_to_stdout(list_options_with_help(cxt));
+      ec.print_to_stdout(format_option_table(&cxt, false));
       continue;
     }
     if (arg == "+p") continue;

@@ -27,6 +27,20 @@ HELP_DESCRIPTION_DECL(
     "dynamic loader with its 124 retry protocol.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The options are hand-parsed in execute since several only skip their
+   value, so these FLAG rows only feed the help text. */
+FLAG(COMPLETE_WORDLIST, String, 'W', "",
+     "Register the word list as the command's candidates.");
+FLAG(COMPLETE_FUNCTION, String, 'F', "",
+     "Register the function to run on an explicit tab, COMPREPLY style.");
+FLAG(COMPLETE_OPTION, String, 'o', "",
+     "default, bashdefault, and dirnames fall back to filename completion, "
+     "any other option is accepted without effect.");
+FLAG(COMPLETE_PRINT, Bool, 'p', "",
+     "Print the named specs, or every spec, in a replayable form.");
+FLAG(COMPLETE_DEFAULT, Bool, 'D', "",
+     "Register the default spec used for a command with no spec of its own.");
+FLAG(COMPLETE_REMOVE, Bool, 'r', "", "Accepted without effect.");
 
 namespace shit {
 

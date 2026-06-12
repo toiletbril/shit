@@ -13,7 +13,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("name [argument ...]");
+HELP_SYNOPSIS_DECL("[-l] [name [argument ...]]");
 
 HELP_DESCRIPTION_DECL(
     "The builtin builtin runs name with its arguments as a shell builtin, "
@@ -23,6 +23,8 @@ HELP_DESCRIPTION_DECL(
     "shell builtin is an error.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+FLAG(BUILTIN_LIST, Bool, 'l', "list",
+     "List every builtin this shell carries in columns.");
 
 namespace shit {
 

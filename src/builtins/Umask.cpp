@@ -21,6 +21,9 @@ HELP_DESCRIPTION_DECL(
     "mask from an octal operand or a symbolic operand such as u=rwx,g=rx,o.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* -S is hand-parsed in execute, so this FLAG row only feeds the help text. */
+FLAG(UMASK_SYMBOLIC, Bool, 'S', "",
+     "Print the mask in symbolic form, the u=rwx,g=rx,o=rx style.");
 
 namespace shit {
 

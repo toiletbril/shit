@@ -281,11 +281,21 @@ const ArrayList<String> &builtin_names() throws;
 
 void show_builtin_help_impl(const ExecContext &ec, StringView description,
                             const ArrayList<StringView> &hs,
-                            const ArrayList<Flag *> &fl) throws;
+                            const ArrayList<Flag *> &fl,
+                            StringView extra_sections = {}) throws;
 
 #define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \
   do {                                                                         \
     show_builtin_help_impl(ec, HELP_DESCRIPTION, HELP_SYNOPSIS, FLAG_LIST);    \
+    return 0;                                                                  \
+  } while (false)
+
+/* The same help with a trailing per-builtin generated section, the set
+   OPTION SWITCHES table and kin. */
+#define SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(ec, extra)                          \
+  do {                                                                         \
+    show_builtin_help_impl(ec, HELP_DESCRIPTION, HELP_SYNOPSIS, FLAG_LIST,     \
+                           (extra));                                           \
     return 0;                                                                  \
   } while (false)
 

@@ -1,0 +1,37 @@
+DESCRIPTION
+  The shopt builtin sets, unsets, and queries the bash shell options such as
+  extglob, globstar, nullglob, and dotglob. With no flag a named option is
+  queried, and with no name every option is listed with its state. The OPTION
+  NAMES section below lists every name shopt accepts.
+
+SYNOPSIS
+  shopt [-supqo] [optname ...]
+
+OPTIONS
+      --help              Display help.
+  -s                      Enable each named option.
+  -u                      Disable each named option.
+  -q                      Suppress the status output, the scripted probe form.
+  -p                      Print in the replayable form, shopt -s or -u per line,
+                          and set -o or +o behind -o.
+  -o                      Operate on the set -o option names instead of the
+                          shopt names.
+OPTION NAMES
+  autocd                   assoc_expand_once        cdable_vars
+  cdspell                  checkhash                checkjobs
+  checkwinsize             cmdhist                  complete_fullquote
+  direxpand                dirspell                 dotglob
+  execfail                 expand_aliases           extdebug
+  extglob                  extquote                 failglob
+  force_fignore            globasciiranges          globskipdots
+  globstar                 gnu_errfmt               histappend
+  histreedit               histverify               hostcomplete
+  huponexit                inherit_errexit          interactive_comments
+  lastpipe                 lithist                  localvar_inherit
+  localvar_unset           login_shell              mailwarn
+  no_empty_cmd_completion  nocaseglob               nocasematch
+  nullglob                 progcomp                 progcomp_alias
+  promptvars               restricted_shell         shift_verbose
+  sourcepath               varredir_close           xpg_echo
+
+rc=0

@@ -1,4 +1,5 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
@@ -10,6 +11,23 @@
 #if SHIT_PLATFORM_IS WIN32
 #include <io.h>
 #endif
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("expression", "[ expression ]");
+
+HELP_DESCRIPTION_DECL(
+    "The test builtin evaluates the expression and reports 0 for true and 1 "
+    "for false. The unary file tests -e -f -d -r -w -x -s -L -h -p -S -b -c "
+    "-g -u -k -t check the named file, -n and -z check a string's length, "
+    "and a bare string is true when nonempty. The binary operators = and != "
+    "compare strings, == only in the bash mood, and -eq -ne -gt -ge -lt -le "
+    "compare integers. ! negates, -a binds tighter than -o, and parentheses "
+    "group. The [ form requires a closing ]. This help shows only in the "
+    "default mood with --help as the sole argument, since a POSIX or bash "
+    "test treats the word as a nonempty string.");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
 
@@ -325,6 +343,13 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      bracket form. */
   let const &arguments = ec.args();
   ASSERT(!arguments.is_empty());
+
+  /* Only the shit default mood answers --help, only as the sole argument,
+     and only for the word form, since bash and dash evaluate the word as a
+     nonempty string and [ --help ] stays an expression. */
+  if (arguments.count() == 2 && arguments[1] == "--help" &&
+      ec.program() != "[" && !cxt.is_posix_mode() && !cxt.is_bash_compatible())
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   usize expression_end = arguments.count();
   if (ec.program() == "[") {

@@ -12,16 +12,26 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-W wordlist] [-A action] [options] [word]");
+HELP_SYNOPSIS_DECL("[-W wordlist] [-G glob] [-A action] [-P prefix] "
+                   "[-S suffix] [-X filterpat] [-F function] [-C command] "
+                   "[word]");
 HELP_DESCRIPTION_DECL(
     "The compgen builtin writes the completion candidates for the given "
-    "options "
-    "and word to standard output. The -W word list undergoes the shell "
-    "expansions and filters to the entries that start with the word, each on "
-    "its own line, and -G probes the filesystem with a glob. The other "
-    "options are accepted so a completion script runs.");
+    "options and word to standard output, each on its own line.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The value-carrying options are hand-parsed in execute, so these FLAG rows
+   only feed the help text. */
+FLAG(COMPGEN_WORDLIST, String, 'W', "",
+     "Expand the word list the way the shell does and filter to the entries "
+     "that start with the word.");
+FLAG(COMPGEN_GLOB, String, 'G', "", "Probe the filesystem with the glob.");
+FLAG(COMPGEN_ACTION, String, 'A', "", "Accepted without effect.");
+FLAG(COMPGEN_PREFIX, String, 'P', "", "Accepted without effect.");
+FLAG(COMPGEN_SUFFIX, String, 'S', "", "Accepted without effect.");
+FLAG(COMPGEN_FILTER, String, 'X', "", "Accepted without effect.");
+FLAG(COMPGEN_FUNCTION, String, 'F', "", "Accepted without effect.");
+FLAG(COMPGEN_COMMAND, String, 'C', "", "Accepted without effect.");
 
 namespace shit {
 

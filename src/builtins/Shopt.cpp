@@ -9,19 +9,26 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-suqo] [optname ...]");
+HELP_SYNOPSIS_DECL("[-supqo] [optname ...]");
 
 HELP_DESCRIPTION_DECL(
     "The shopt builtin sets, unsets, and queries the bash shell options such "
-    "as "
-    "extglob, globstar, nullglob, and dotglob. The -s flag enables an option, "
-    "-u disables it, -q suppresses the status output for a scripted probe, and "
-    "-o operates on the set -o options instead of the shopt names. With no "
-    "flag "
-    "a named option is queried, and with no name every option that has a "
-    "recorded state is listed.");
+    "as extglob, globstar, nullglob, and dotglob. With no flag a named "
+    "option is queried, and with no name every option is listed with its "
+    "state. The OPTION NAMES section below lists every name shopt accepts.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The letters are hand-parsed in execute since they combine bash-style, so
+   these FLAG rows only feed the help text. */
+FLAG(SHOPT_SET, Bool, 's', "", "Enable each named option.");
+FLAG(SHOPT_UNSET, Bool, 'u', "", "Disable each named option.");
+FLAG(SHOPT_QUIET, Bool, 'q', "",
+     "Suppress the status output, the scripted probe form.");
+FLAG(SHOPT_PRINT, Bool, 'p', "",
+     "Print in the replayable form, shopt -s or -u per line, and set -o or "
+     "+o behind -o.");
+FLAG(SHOPT_SET_OPTIONS, Bool, 'o', "",
+     "Operate on the set -o option names instead of the shopt names.");
 
 namespace shit {
 
@@ -99,6 +106,32 @@ String shopt_status_line(StringView name, bool on) throws
   return line;
 }
 
+/* The OPTION NAMES help section, every shopt name in columns that fit a
+   usual terminal width, the same layout builtin -l prints. */
+String format_option_names_help() throws
+{
+  usize longest = 0;
+  for (const StringView name : SHOPT_OPTION_NAMES)
+    if (name.length > longest) longest = name.length;
+  let const column_width = longest + 2;
+  let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
+
+  let section = String{"OPTION NAMES\n"};
+  let const total = sizeof(SHOPT_OPTION_NAMES) / sizeof(SHOPT_OPTION_NAMES[0]);
+  for (usize i = 0; i < total; i++) {
+    if (i % columns == 0) section += "  ";
+    section += SHOPT_OPTION_NAMES[i];
+    let const last_in_row = i % columns == columns - 1 || i + 1 == total;
+    if (last_in_row) {
+      section += "\n";
+    } else {
+      for (usize pad = SHOPT_OPTION_NAMES[i].length; pad < column_width; pad++)
+        section += " ";
+    }
+  }
+  return section;
+}
+
 /* The bash -p display line, a command the shell replays to restore the
    option's state. A completion script captures this through $(shopt -p name)
    and runs it later, so the line must execute, shopt -s or -u for a shopt
@@ -127,7 +160,8 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  if (args.count() > 1 && args[1] == "--help")
+    SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(ec, format_option_names_help().view());
 
   bool enable = false;
   bool disable = false;

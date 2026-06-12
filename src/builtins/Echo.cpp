@@ -1,7 +1,26 @@
 #include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-neE] [arg ...]");
+
+HELP_DESCRIPTION_DECL(
+    "The echo builtin prints its arguments separated by spaces and ends with "
+    "a newline. -n drops the trailing newline. -e interprets the backslash "
+    "escapes and -E leaves them literal. The shit default interprets escapes "
+    "the way dash does while still reading the three options, the bash mood "
+    "leaves escapes literal unless -e asks, and the POSIX mood reads only a "
+    "leading -n. This help shows only in the default mood with --help as the "
+    "sole argument, since a POSIX or bash echo prints the literal text.");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+FLAG(ECHO_NO_NEWLINE, Bool, 'n', "", "Do not print the trailing newline.");
+FLAG(ECHO_ESCAPES, Bool, 'e', "", "Interpret backslash escapes.");
+FLAG(ECHO_NO_ESCAPES, Bool, 'E', "", "Leave backslash escapes literal.");
 
 namespace shit {
 
@@ -13,6 +32,13 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   let const &args = ec.args();
   ASSERT(!args.is_empty());
+
+  /* Only the shit default mood answers --help, and only as the sole
+     argument, since bash and dash both print the literal text and a script
+     may depend on that. */
+  if (args.count() == 2 && args[1] == "--help" && !cxt.is_posix_mode() &&
+      !cxt.is_bash_compatible())
+    SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   LOG(verbosity::All, "echo printing %zu arguments", args.count() - 1);
 

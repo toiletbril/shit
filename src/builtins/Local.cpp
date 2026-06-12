@@ -10,7 +10,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("name[=value] ...");
+HELP_SYNOPSIS_DECL("[-aAilnrux] name[=value] ...");
 HELP_DESCRIPTION_DECL(
     "The local builtin declares each named variable local to the current "
     "function, so the value it had in the caller returns when the function "
@@ -18,6 +18,17 @@ HELP_DESCRIPTION_DECL(
     "outside a function.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The attribute letters are hand-parsed in execute, so these FLAG rows only
+   feed the help text and never the parser. */
+FLAG(LOCAL_INDEXED, Bool, 'a', "", "Declare an indexed array.");
+FLAG(LOCAL_ASSOCIATIVE, Bool, 'A', "", "Declare an associative array.");
+FLAG(LOCAL_INTEGER, Bool, 'i', "",
+     "Mark an integer whose every assignment evaluates as arithmetic.");
+FLAG(LOCAL_LOWERCASE, Bool, 'l', "", "Accepted without effect.");
+FLAG(LOCAL_NAMEREF, Bool, 'n', "", "Accepted without effect.");
+FLAG(LOCAL_READONLY, Bool, 'r', "", "Accepted without effect.");
+FLAG(LOCAL_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
+FLAG(LOCAL_EXPORT, Bool, 'x', "", "Accepted without effect.");
 
 namespace shit {
 
