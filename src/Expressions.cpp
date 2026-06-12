@@ -4068,9 +4068,6 @@ cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
   return false;
 }
 
-/* True when one of the leading short-option clusters carries the letter, the
-   way -rf carries r and f. A long option or a plain operand is not a
-   cluster. */
 /* Whether any operand names standard input explicitly, the - and /dev/stdin
    spellings, the exemption the never-reads-stdin warnings share. */
 cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
@@ -4083,6 +4080,9 @@ cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
   return false;
 }
 
+/* True when one of the leading short-option clusters carries the letter, the
+   way -rf carries r and f. A long option or a plain operand is not a
+   cluster. */
 cold fn args_have_short_flag(const ArrayList<const Token *> &args,
                              char letter) throws -> bool
 {
@@ -4259,25 +4259,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      combined short flag such as -rs carries the r, a long option or a value
      does not. A function or alias named read is the user's own, so the lint is
      off for it. */
-  if (command_literal == "read" && !command_is_shadowed) {
-    bool has_raw_flag = false;
-    for (usize i = 1; i < m_args.count(); i++) {
-      if (m_args[i]->kind() != Token::Kind::Word) continue;
-      let const literal = static_cast<const tokens::WordToken *>(m_args[i])
-                              ->word()
-                              .to_literal_string();
-      let const view = literal.view();
-      if (view.length >= 2 && view[0] == '-' && view[1] != '-' &&
-          view.find_character('r').has_value())
-      {
-        has_raw_flag = true;
-        break;
-      }
-    }
-    if (!has_raw_flag)
-      actx.warn(source_location(),
-                "read without -r mangles a backslash in the input, add -r to "
-                "read the line literally");
+  if (command_literal == "read" && !command_is_shadowed &&
+      !args_have_short_flag(m_args, 'r'))
+  {
+    actx.warn(source_location(),
+              "read without -r mangles a backslash in the input, add -r to "
+              "read the line literally");
   }
 
   /* The bashism lints, each fired only when the shebang names a POSIX shell so
@@ -4608,10 +4595,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const view = literal.view();
       let is_in_range = view_is_integer_literal(view) && view[0] != '-';
       if (is_in_range) {
-        i64 value = 0;
-        for (usize i = 0; i < view.length && value <= 255; i++)
-          value = value * 10 + (view[i] - '0');
-        is_in_range = value <= 255;
+        let const parsed = utils::parse_decimal_integer(view);
+        is_in_range = !parsed.is_error() && parsed.value() <= 255;
       }
       if (!is_in_range)
         actx.warn(m_args[1]->source_location(),

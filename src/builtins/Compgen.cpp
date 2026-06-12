@@ -1,15 +1,14 @@
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
-#include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
 
-/* compgen generates the completion candidates an action or a word list would
-   produce, the way a bash completion function does, such as compgen -W "a b c"
-   -- "$cur". The -W word list is the common form, split on whitespace and
-   filtered to the words that start with the given prefix, each printed on its
-   own line. The other options are accepted so a completion script runs, though
-   only the word list yields candidates for now. */
+/* compgen generates the completion candidates an action, a word list, or a
+   glob would produce, the way a bash completion function does, such as
+   compgen -W "a b c" -- "$cur". The -W word list undergoes the shell
+   expansions and filters to the words that start with the given prefix, each
+   printed on its own line, and -G probes the filesystem. The other options
+   are accepted so a completion script runs. */
 
 FLAG_LIST_DECL();
 
@@ -17,10 +16,10 @@ HELP_SYNOPSIS_DECL("[-W wordlist] [-A action] [options] [word]");
 HELP_DESCRIPTION_DECL(
     "The compgen builtin writes the completion candidates for the given "
     "options "
-    "and word to standard output. The -W word list is split on whitespace and "
-    "filtered to the entries that start with the word, each on its own line. "
-    "The other options are accepted so a completion script runs, though only "
-    "the word list yields candidates for now.");
+    "and word to standard output. The -W word list undergoes the shell "
+    "expansions and filters to the entries that start with the word, each on "
+    "its own line, and -G probes the filesystem with a glob. The other "
+    "options are accepted so a completion script runs.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -35,7 +34,6 @@ pure fn Compgen::kind() const wontthrow -> Builtin::Kind
 
 fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
-  unused(cxt);
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 

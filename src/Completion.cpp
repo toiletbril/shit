@@ -197,15 +197,27 @@ static String CACHED_COMPLETION_PATH{};
 static ArrayList<String> CACHED_PATH_COMMANDS{};
 static bool CACHED_PATH_COMMANDS_VALID = false;
 
-static fn path_command_names() throws -> const ArrayList<String> &
+/* Whether the live PATH differs from the cached copy, updating the copy on a
+   change. The probe runs on every keystroke, so the value is read as a raw
+   view with no owning copy. */
+static fn environment_path_changed(String &cached_path) throws -> bool
 {
-  /* The staleness probe runs on every keystroke, so the PATH value is read
-     as a raw view with no owning copy. */
   const char *path = std::getenv("PATH");
   let const current = path != nullptr ? StringView{path} : StringView{};
-  if (CACHED_PATH_COMMANDS_VALID && CACHED_COMPLETION_PATH.view() == current)
+  if (cached_path.view() == current) return false;
+  cached_path = String{current};
+  return true;
+}
+
+static fn path_command_names() throws -> const ArrayList<String> &
+{
+  if (!environment_path_changed(CACHED_COMPLETION_PATH) &&
+      CACHED_PATH_COMMANDS_VALID)
     return CACHED_PATH_COMMANDS;
 
+  /* The helper above already stored the live PATH value, so the rebuild
+     walks the cached copy. */
+  const StringView current = CACHED_COMPLETION_PATH.view();
   CACHED_PATH_COMMANDS.clear();
   usize segment_start = 0;
   for (usize i = 0; i <= current.length; i++) {
@@ -219,7 +231,6 @@ static fn path_command_names() throws -> const ArrayList<String> &
         CACHED_PATH_COMMANDS.push(steal(entry));
     }
   }
-  CACHED_COMPLETION_PATH = String{current};
   CACHED_PATH_COMMANDS_VALID = true;
   LOG(verbosity::Info, "rebuilt the path command cache, %zu names",
       CACHED_PATH_COMMANDS.count());
@@ -780,16 +791,29 @@ static fn validate_subcommands_for(StringView command) throws -> void
     const String *file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
     if (file_path == nullptr) continue;
 
-    Maybe<String> source = utils::read_entire_file(file_path->view());
-    if (!source.has_value()) {
+    /* A compressed page cannot be scanned without a decompressor, so the
+       candidate stays on the head-page rule alone, with no read at all. The
+       suffix carries the verdict for every compression strip_man1_suffix
+       admits, which the gzip magic alone would miss. */
+    let const path_view = file_path->view();
+    let is_compressed_page = false;
+    for (const StringView tail : {StringView{".gz"}, StringView{".xz"},
+                                  StringView{".zst"}, StringView{".bz2"}})
+    {
+      if (path_view.length > tail.length &&
+          path_view.substring(path_view.length - tail.length) == tail)
+      {
+        is_compressed_page = true;
+        break;
+      }
+    }
+    if (is_compressed_page) {
       surviving.push(String{subcommand.view()});
       continue;
     }
-    /* A compressed page cannot be scanned without a decompressor, so the
-       candidate stays on the head-page rule alone. */
-    if (source->length() >= 2 && (*source).view()[0] == '\x1f' &&
-        (*source).view()[1] == '\x8b')
-    {
+
+    Maybe<String> source = utils::read_entire_file(file_path->view());
+    if (!source.has_value()) {
       surviving.push(String{subcommand.view()});
       continue;
     }
@@ -1222,6 +1246,11 @@ static fn expand_command_tilde(StringView word) throws -> Maybe<String>
   return String{expanded.text().view()};
 }
 
+/* The PATH search verdicts first_word_resolves caches, keyed by the word and
+   dropped when PATH changes. */
+static String CACHED_PATH_VERDICT_PATH{};
+static StringMap<bool> PATH_SEARCH_VERDICTS{heap_allocator()};
+
 static fn first_word_resolves(StringView word, EvalContext &context) throws
     -> bool
 {
@@ -1259,37 +1288,25 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   if (context.find_function(word) != nullptr) return true;
   if (context.get_alias(word).has_value()) return true;
 
-  return utils::search_program_path(word).count() > 0;
+  /* Only the PATH search verdict caches, so the highlighter and the ghost
+     validation both pay the directory stats once per distinct word per
+     session, while a function or an alias defined at the prompt is seen live
+     by the checks above. The cache drops when PATH changes. */
+  if (environment_path_changed(CACHED_PATH_VERDICT_PATH))
+    PATH_SEARCH_VERDICTS.clear();
+  if (const bool *verdict = PATH_SEARCH_VERDICTS.find(word)) return *verdict;
+  let const resolves = utils::search_program_path(word).count() > 0;
+  LOG(verbosity::All, "the path search resolves '%.*s' to %s",
+      static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
+  PATH_SEARCH_VERDICTS.set(word, resolves);
+  return resolves;
 }
-
-/* The ghost validation verdicts, cached per command word so a history scan
-   over many stale entries pays the PATH search once per distinct word per
-   session. The cache drops when PATH changes, the same rule the command-name
-   cache follows. */
-static String CACHED_GHOST_VERDICT_PATH{};
-static StringMap<bool> GHOST_WORD_VERDICTS{heap_allocator()};
 
 fn command_word_resolves(StringView line, EvalContext &context) throws -> bool
 {
   let const word = command_word_of(line);
   if (word.is_empty()) return true;
-
-  /* The staleness probe runs per scanned history entry per keystroke, so the
-     PATH value is read as a raw view with no owning copy. */
-  const char *path = std::getenv("PATH");
-  let const current = path != nullptr ? StringView{path} : StringView{};
-  if (CACHED_GHOST_VERDICT_PATH.view() != current) {
-    GHOST_WORD_VERDICTS.clear();
-    CACHED_GHOST_VERDICT_PATH = String{current};
-  }
-
-  if (const bool *verdict = GHOST_WORD_VERDICTS.find(word))
-    return *verdict;
-  let const resolves = first_word_resolves(word, context);
-  LOG(verbosity::All, "ghost validation resolves '%.*s' to %s",
-      static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
-  GHOST_WORD_VERDICTS.set(word, resolves);
-  return resolves;
+  return first_word_resolves(word, context);
 }
 
 static pure fn is_highlight_name_start(char c) wontthrow -> bool

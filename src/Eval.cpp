@@ -4163,12 +4163,14 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
         break;
       }
     let const component_end = slash_after.value_or(text.length);
-    let const is_globstar_component = is_shopt_enabled("globstar") &&
-                                      component_end - component_start == 2 &&
+    /* The two-byte shape test runs first, so the common single-star field
+       never pays the shopt lookup. */
+    let const is_globstar_component = component_end - component_start == 2 &&
                                       text.data[component_start] == '*' &&
                                       text.data[component_start + 1] == '*' &&
                                       field.glob_active[component_start] &&
-                                      field.glob_active[component_start + 1];
+                                      field.glob_active[component_start + 1] &&
+                                      is_shopt_enabled("globstar");
 
     if (is_globstar_component) {
       LOG(verbosity::All,
@@ -6588,6 +6590,9 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     return words;
   };
 
+  /* The ghost path never parses, so it skips even the metacharacter scan. */
+  if (!allow_expansion) return split_plain();
+
   /* A literal list, no expansion or quoting byte anywhere, splits with no
      parse at all, the common -W shape. */
   let needs_expansion = false;
@@ -6596,11 +6601,16 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     needs_expansion = c == '$' || c == '`' || c == '"' || c == '\'' ||
                       c == '\\' || c == '~' || c == '{';
   }
-  if (!needs_expansion || !allow_expansion) return split_plain();
+  if (!needs_expansion) return split_plain();
 
   /* The list expands as an array literal in the current context, so a word
-     such as "${options[@]}" reaches the caller's array, then the temp name
-     drops on both the success and the failure path. */
+     such as "${options[@]}" reaches the caller's array. The defer drops the
+     temp name on the success and the failure path alike. */
+  defer
+  {
+    m_indexed_arrays.erase("t__wordlist_fields");
+    force_unset_shell_variable("t__wordlist_fields");
+  };
   let fields = ArrayList<String>{};
   try {
     let expansion_source = String{"t__wordlist_fields=("};
@@ -6618,12 +6628,8 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   } catch (const ErrorBase &error) {
     LOG(verbosity::Debug, "-W expansion failed, splitting plain: %s",
         error.message().c_str());
-    m_indexed_arrays.erase("t__wordlist_fields");
-    force_unset_shell_variable("t__wordlist_fields");
     return split_plain();
   }
-  m_indexed_arrays.erase("t__wordlist_fields");
-  force_unset_shell_variable("t__wordlist_fields");
   return fields;
 }
 

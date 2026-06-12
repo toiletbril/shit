@@ -189,14 +189,15 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
     return status;
   }
 
-  /* A query with no names lists every option that has a recorded state. A named
-     query prints each option and reports a non-zero status when any is off,
-     which the -q form relies on. */
+  /* A query with no names lists every known option through the same read a
+     named query uses, so the bash default-on rows show without ever being
+     set. A named query prints each option and reports a non-zero status when
+     any is off, which the -q form relies on. */
   if (names.is_empty()) {
     if (!quiet) {
-      cxt.shopt_options().for_each([&](StringView name, const bool &on) {
-        ec.print_to_stdout(shopt_status_line(name, on).view());
-      });
+      for (const StringView name : SHOPT_OPTION_NAMES)
+        ec.print_to_stdout(
+            shopt_status_line(name, cxt.is_shopt_enabled(name)).view());
     }
     return 0;
   }
