@@ -61,11 +61,11 @@ run_tests: $(TEST_NAMES)
 # through a piped script, so the flag parser, the help sections, the located
 # invocation errors, and the SHIT_FLAGS environment stay covered. Each test is
 # a POSIX sh script that reads the binary path from BIN and prints the output
-# the golden in expected_cli records.
+# the golden in expected/cli records.
 CLI_INPUT := $(wildcard cli/*.sh)
 CLI_NAMES := $(CLI_INPUT:cli/%.sh=cli_%)
 
-cli_%: expected_cli/%.out
+cli_%: expected/cli/%.out
 	@out=$$(mktemp); \
 	BIN=$(BIN) sh cli/$*.sh > $$out 2>&1; \
 	if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
@@ -81,7 +81,7 @@ cli_tests: $(CLI_NAMES)
 cli_refill:
 	for f in $(CLI_INPUT:cli/%.sh=%); do \
 		printf "	%-64s $$f.out\n" cli/$$f.sh; \
-		BIN=$(BIN) sh cli/$$f.sh > expected_cli/$$f.out 2>&1; \
+		BIN=$(BIN) sh cli/$$f.sh > expected/cli/$$f.out 2>&1; \
 	done || true
 
 # The completion suite drives the engine through --debug-complete-at, the
@@ -91,7 +91,7 @@ cli_refill:
 COMPLETION_INPUT := $(wildcard completion/*.sh)
 COMPLETION_NAMES := $(COMPLETION_INPUT:completion/%.sh=completion_%)
 
-completion_%: expected_completion/%.out
+completion_%: expected/completion/%.out
 	@if ! $(BIN) --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
 		printf "	%-64s skipped, release binary\n" completion/$*.sh; \
 	else \
@@ -111,7 +111,7 @@ completion_tests: $(COMPLETION_NAMES)
 completion_refill:
 	for f in $(COMPLETION_INPUT:completion/%.sh=%); do \
 		printf "	%-64s $$f.out\n" completion/$$f.sh; \
-		BIN=$(BIN) sh completion/$$f.sh > expected_completion/$$f.out 2>/dev/null; \
+		BIN=$(BIN) sh completion/$$f.sh > expected/completion/$$f.out 2>/dev/null; \
 	done || true
 
 refill:
