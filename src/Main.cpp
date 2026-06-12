@@ -189,6 +189,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
 {
   if (FLAG_HELP.is_enabled()) {
     let h = String{};
+    h += "SHIT";
     h += "\n";
     h += wrap_text(
         "Shit, a pedantic, super-fast and awesome POSIX-compatible command "
@@ -199,8 +200,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     h += wrap_text(
         "Options are also read from the SHIT_FLAGS environment variable, so a "
         "flag set there is inherited by every invocation, while a flag given "
-        "on "
-        "the command line still has the final say.\n\n",
+        "on the command line still has the final say.\n\n",
         HELP_INDENT, HELP_WRAP_WIDTH);
     h += make_flag_help(FLAG_LIST);
     h += '\n';
