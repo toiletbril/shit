@@ -4827,11 +4827,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       }
       let const previous_is_bang = previous_literal.view() == "!";
       if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
-        actx.warn(
-            m_args[i]->source_location(),
-            "A test with -a or -o is obsolescent, join two tests with && "
-            "or "
-            "|| instead");
+        actx.warn(m_args[i]->source_location(),
+                  "A test with -a or -o is obsolescent, join two tests with && "
+                  "or "
+                  "|| instead");
       } else if (view == "!" && i + 1 < m_args.count() &&
                  m_args[i + 1]->kind() == Token::Kind::Word)
       {

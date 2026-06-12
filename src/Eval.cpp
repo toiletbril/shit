@@ -373,8 +373,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
     show_runtime_warning("The variable '" + String{name} +
                          "' is not set, it expands to empty, replace it with "
                          "${" +
-                         String{name} +
-                         "-} if empty expansion is desired");
+                         String{name} + "-} if empty expansion is desired");
 }
 
 fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
@@ -1055,8 +1054,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
          any dot-source the scalar reads as $0, the way bash sets
          BASH_SOURCE[0] for an executed file. The envman style probe
          test "$BASH_SOURCE" == "$0" then takes its executed branch. */
-      if (m_is_script_run)
-        return String{heap_allocator(), m_shell_name.view()};
+      if (m_is_script_run) return String{heap_allocator(), m_shell_name.view()};
       return String{heap_allocator()};
     }
   }
