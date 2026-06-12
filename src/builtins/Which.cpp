@@ -19,6 +19,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(ALL, Bool, 'a', "all", "Show all matches.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Which);
+
 namespace shit {
 
 Which::Which() = default;

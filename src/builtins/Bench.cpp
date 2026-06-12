@@ -36,6 +36,8 @@ HELP_DESCRIPTION_DECL(
     "the "
     "--duration budget in milliseconds.");
 
+REGISTER_BUILTIN_FLAGS(Bench);
+
 namespace shit {
 
 namespace {

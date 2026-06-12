@@ -27,6 +27,8 @@ FLAG(MAPFILE_TRIM, Bool, 't', "",
 FLAG(MAPFILE_COUNT, String, 'n', "",
      "Read at most count lines, zero for all of them.");
 
+REGISTER_BUILTIN_FLAGS(Mapfile);
+
 namespace shit {
 
 Mapfile::Mapfile() = default;

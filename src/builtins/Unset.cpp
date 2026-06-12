@@ -20,6 +20,8 @@ FLAG(UNSET_FUNCTION, Bool, 'f', "", "Remove functions instead of variables.");
 FLAG(UNSET_VARIABLE, Bool, 'v', "", "Remove variables, which is the default.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Unset);
+
 namespace shit {
 
 Unset::Unset() = default;

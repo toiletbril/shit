@@ -30,6 +30,8 @@ FLAG(SHOPT_PRINT, Bool, 'p', "",
 FLAG(SHOPT_SET_OPTIONS, Bool, 'o', "",
      "Operate on the set -o option names instead of the shopt names.");
 
+REGISTER_BUILTIN_FLAGS(Shopt);
+
 namespace shit {
 
 namespace {
@@ -150,6 +152,15 @@ String shopt_reusable_line(StringView name, bool on,
 }
 
 } /* namespace */
+
+fn shopt_option_name_list() throws -> ArrayList<StringView>
+{
+  let names = ArrayList<StringView>{};
+  names.reserve(sizeof(SHOPT_OPTION_NAMES) / sizeof(SHOPT_OPTION_NAMES[0]));
+  for (const StringView name : SHOPT_OPTION_NAMES)
+    names.push(name);
+  return names;
+}
 
 Shopt::Shopt() = default;
 

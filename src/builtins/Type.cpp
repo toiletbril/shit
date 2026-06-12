@@ -30,6 +30,8 @@ FLAG(TYPE_ALL, Bool, 'a', "",
      "builtin and every matching file on the PATH.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Type);
+
 namespace shit {
 
 Type::Type() = default;

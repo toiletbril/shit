@@ -29,6 +29,8 @@ FLAG(JOBS_CHANGED, Bool, 'n', "",
      "List only jobs that changed state since the last notification.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Jobs);
+
 namespace shit {
 
 namespace {

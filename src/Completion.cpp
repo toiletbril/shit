@@ -1039,6 +1039,127 @@ static fn complete_from_manpage(StringView line, StringView token,
   return matches;
 }
 
+/* The settled word right before the token, so set -o NAME completion sees
+   the -o. The scan is the same unquoted whitespace reading command_word_of
+   applies. */
+static fn previous_settled_word(StringView line,
+                                usize token_start) wontthrow -> StringView
+{
+  usize end = token_start;
+  while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
+    end--;
+  usize start = end;
+  while (start > 0 && line[start - 1] != ' ' && line[start - 1] != '\t')
+    start--;
+  return line.substring_of_length(start, end - start);
+}
+
+/* Complete a builtin's or the shell binary's own flags from the registered
+   FLAG lists, the option names of set and shopt, kill's signal names, and
+   kill's %job ids, all table reads with no subprocess so the ghost may run
+   it too. None lets the cascade continue. */
+static fn complete_from_builtin_flags(StringView line, StringView token,
+                                      usize token_start,
+                                      EvalContext &context) throws
+    -> Maybe<ArrayList<String>>
+{
+  const StringView command = command_word_of(line);
+  if (command.is_empty()) return None;
+
+  let const builtin_kind = search_builtin(command);
+  /* The shell's own invocation completes from its FLAG list, matched by the
+     basename so both shit and a path to it answer. */
+  let shell_binary_name = command;
+  for (usize i = command.length; i > 0; i--)
+    if (command[i - 1] == '/') {
+      shell_binary_name = command.substring(i);
+      break;
+    }
+  let const completes_shell_binary =
+      !builtin_kind.has_value() && shell_binary_name == "shit";
+  if (!builtin_kind.has_value() && !completes_shell_binary) return None;
+
+  let candidates = ArrayList<String>{};
+  let const push_matching = [&](StringView candidate) throws {
+    if (candidate.starts_with(token)) candidates.push(String{candidate});
+  };
+
+  /* set -o and set +o name an option by long name, no dash on the operand. */
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Set) {
+    const StringView previous = previous_settled_word(line, token_start);
+    if (previous == "-o" || previous == "+o") {
+      for (const StringView name : shell_option_names(true))
+        push_matching(name);
+      if (!candidates.is_empty()) return candidates;
+      return None;
+    }
+  }
+
+  /* A shopt operand is an option name, no dash required. */
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Shopt &&
+      (token.is_empty() || token[0] != '-'))
+  {
+    for (const StringView name : shopt_option_name_list())
+      push_matching(name);
+    if (!candidates.is_empty()) return candidates;
+    return None;
+  }
+
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Kill) {
+    /* kill - completes the signal names, and a bare operand the %job ids. */
+    if (!token.is_empty() && token[0] == '-') {
+      for (const StringView name : os::signal_names()) {
+        let with_dash = String{"-"};
+        with_dash += name;
+        push_matching(with_dash.view());
+      }
+      if (!candidates.is_empty()) return candidates;
+      return None;
+    }
+    for (const job &background_job : context.jobs()) {
+      let job_id = String{"%"};
+      job_id += utils::int_to_text(background_job.id, heap_allocator());
+      push_matching(job_id.view());
+    }
+    if (!candidates.is_empty()) return candidates;
+    return None;
+  }
+
+  /* Everything below is a flag, so the token must already start the dash. */
+  if (token.is_empty() || token[0] != '-') return None;
+
+  const ArrayList<Flag *> *flags = completes_shell_binary
+                                       ? &shit_binary_flag_list()
+                                       : builtin_flag_list(*builtin_kind);
+  if (flags == nullptr) return None;
+  for (const Flag *flag : *flags) {
+    if (flag->short_name() != '\0') {
+      let short_form = String{"-"};
+      short_form.push(flag->short_name());
+      push_matching(short_form.view());
+    }
+    if (!flag->long_name().is_empty()) {
+      let long_form = String{"--"};
+      long_form += flag->long_name();
+      push_matching(long_form.view());
+    }
+  }
+  /* set's switches live in its option table rather than its FLAG list, so
+     every letter and the -o selector come from there. */
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Set) {
+    let const letters = shell_option_letters();
+    for (usize i = 0; i < letters.count(); i++) {
+      let switch_form = String{"-"};
+      switch_form.push(letters[i]);
+      push_matching(switch_form.view());
+    }
+    push_matching("-o");
+    push_matching("-p");
+  }
+  if (candidates.is_empty()) return None;
+  return candidates;
+}
+
 /* Consult the completion spec registered for the line's command, when one
    exists. The word list filters to the entries that start with the token, and
    the -F function runs only on an explicit tab so the ghost does not run it on
@@ -1227,13 +1348,18 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   } else if (token_is_glob) {
     candidates = complete_glob(token, base_directory);
   } else {
-    /* The argument cascade is the mood's own. The default mood asks the man
-       sources first, the subcommand index then the option page, the general
-       path with no per-command table, then the registered specs, then the
-       filesystem. The bash mood is the bash engine alone, specs then files,
-       with no man stage. The POSIX mood defers straight to the filesystem. */
+    /* The argument cascade is the mood's own. The builtin flag tables answer
+       first in the default and bash moods, since a builtin never has a
+       manpage of its own. The default mood then asks the man sources, the
+       subcommand index then the option page, then the registered specs, then
+       the filesystem. The bash mood is the bash engine alone, specs then
+       files, with no man stage. The POSIX mood defers straight to the
+       filesystem. */
     Maybe<ArrayList<String>> from_stage = None;
-    if (context.mood() == mimic_mood::Default) {
+    if (!is_posix_completion)
+      from_stage =
+          complete_from_builtin_flags(line, token, token_start, context);
+    if (!from_stage.has_value() && context.mood() == mimic_mood::Default) {
       from_stage =
           complete_from_man_subcommands(line, token, token_start, for_listing);
       if (!from_stage.has_value())

@@ -26,6 +26,8 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(BUILTIN_LIST, Bool, 'l', "list",
      "List every builtin this shell carries in columns.");
 
+REGISTER_BUILTIN_FLAGS(BuiltinBuiltin);
+
 namespace shit {
 
 BuiltinBuiltin::BuiltinBuiltin() = default;

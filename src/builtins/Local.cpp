@@ -30,6 +30,8 @@ FLAG(LOCAL_READONLY, Bool, 'r', "", "Accepted without effect.");
 FLAG(LOCAL_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
 FLAG(LOCAL_EXPORT, Bool, 'x', "", "Accepted without effect.");
 
+REGISTER_BUILTIN_FLAGS(Local);
+
 namespace shit {
 
 Local::Local() = default;

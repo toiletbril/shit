@@ -28,6 +28,8 @@ FLAG(READ_NCHARS, String, 'n', "", "Read at most the given number of bytes.");
 FLAG(READ_SILENT, Bool, 's', "", "Do not echo the input from a terminal.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Read);
+
 namespace shit {
 
 Read::Read() = default;

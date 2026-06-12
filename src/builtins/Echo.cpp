@@ -22,6 +22,8 @@ FLAG(ECHO_NO_NEWLINE, Bool, 'n', "", "Do not print the trailing newline.");
 FLAG(ECHO_ESCAPES, Bool, 'e', "", "Interpret backslash escapes.");
 FLAG(ECHO_NO_ESCAPES, Bool, 'E', "", "Leave backslash escapes literal.");
 
+REGISTER_BUILTIN_FLAGS(Echo);
+
 namespace shit {
 
 Echo::Echo() = default;

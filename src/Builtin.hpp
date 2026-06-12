@@ -279,6 +279,27 @@ fn is_special_builtin_name(StringView name) wontthrow -> bool;
    so command completion offers exactly the registered builtins. */
 const ArrayList<String> &builtin_names() throws;
 
+/* The number of Builtin::Kind values, the bound of the per-kind flag-list
+   table below. Compopt is the last enumerator. */
+inline constexpr usize BUILTIN_KIND_COUNT =
+    static_cast<usize>(Builtin::Kind::Compopt) + 1;
+
+/* The FLAG_LIST of a builtin, registered at static-init time by the
+   REGISTER_BUILTIN_FLAGS line in its file, so the completion engine offers a
+   builtin's flags without a manpage. A kind with no registration reads back
+   null. */
+fn register_builtin_flag_list(Builtin::Kind kind,
+                              const ArrayList<Flag *> *flags) wontthrow
+    -> void;
+fn builtin_flag_list(Builtin::Kind kind) wontthrow
+    -> const ArrayList<Flag *> *;
+
+#define REGISTER_BUILTIN_FLAGS(kind)                                           \
+  static uchar t__builtin_flag_registrar =                                     \
+      (shit::register_builtin_flag_list(shit::Builtin::Kind::kind,            \
+                                        &FLAG_LIST),                          \
+       0)
+
 void show_builtin_help_impl(const ExecContext &ec, StringView description,
                             const ArrayList<StringView> &hs,
                             const ArrayList<Flag *> &fl,
@@ -315,9 +336,18 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
 
 /* The long names of every set -o option, canonical spellings first and the
    --help alias spellings after them when asked, so shopt -o can list the
-   options and the completion engine can offer them. */
+   options and the completion engine can offer them. shell_option_letters
+   carries every single-letter switch for the same engine. */
 fn shell_option_names(bool include_alias_spellings) throws
     -> ArrayList<StringView>;
+fn shell_option_letters() throws -> String;
+
+/* The shopt option names, defined in Shopt.cpp, for shopt name completion. */
+fn shopt_option_name_list() throws -> ArrayList<StringView>;
+
+/* The main binary's own FLAG list, defined in Main.cpp, so the completion
+   engine offers the shell's flags for the command word shit. */
+fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &;
 
 /* Report a builtin error that must not abort the run, such as one bad name in a
    loop that still processes the rest, with the same located caret in the

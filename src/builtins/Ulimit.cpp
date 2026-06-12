@@ -43,6 +43,8 @@ FLAG(HARD, Bool, 'H', "", "Read or set the hard limit.");
 FLAG(SOFT, Bool, 'S', "", "Read or set the soft limit.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Ulimit);
+
 namespace shit {
 
 #if SHIT_PLATFORM_IS POSIX

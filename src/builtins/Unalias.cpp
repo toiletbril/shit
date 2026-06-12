@@ -16,6 +16,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(ALL, Bool, 'a', "", "Remove every alias.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Unalias);
+
 namespace shit {
 
 Unalias::Unalias() = default;

@@ -33,6 +33,8 @@ FLAG(COMPGEN_FILTER, String, 'X', "", "Accepted without effect.");
 FLAG(COMPGEN_FUNCTION, String, 'F', "", "Accepted without effect.");
 FLAG(COMPGEN_COMMAND, String, 'C', "", "Accepted without effect.");
 
+REGISTER_BUILTIN_FLAGS(Compgen);
+
 namespace shit {
 
 Compgen::Compgen() = default;

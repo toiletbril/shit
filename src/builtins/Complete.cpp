@@ -42,6 +42,8 @@ FLAG(COMPLETE_DEFAULT, Bool, 'D', "",
      "Register the default spec used for a command with no spec of its own.");
 FLAG(COMPLETE_REMOVE, Bool, 'r', "", "Accepted without effect.");
 
+REGISTER_BUILTIN_FLAGS(Complete);
+
 namespace shit {
 
 Complete::Complete() = default;

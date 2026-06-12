@@ -28,6 +28,8 @@ FLAG(SHOW_VERBOSE, Bool, 'V', "",
      "Print the resolution of the name verbosely.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(CommandBuiltin);
+
 namespace shit {
 
 CommandBuiltin::CommandBuiltin() = default;

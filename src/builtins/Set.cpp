@@ -25,6 +25,8 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Set);
+
 namespace shit {
 
 namespace {
@@ -277,6 +279,14 @@ fn shell_option_names(bool include_alias_spellings) throws
     for (const SetOption &option : SET_OPTIONS)
       if (!option.alias.is_empty()) names.push(option.alias);
   return names;
+}
+
+fn shell_option_letters() throws -> String
+{
+  let letters = String{};
+  for (const SetOption &option : SET_OPTIONS)
+    if (option.letter != '\0') letters.push(option.letter);
+  return letters;
 }
 
 fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws

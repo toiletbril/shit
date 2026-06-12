@@ -18,6 +18,8 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Source);
+
 namespace shit {
 
 Source::Source() = default;

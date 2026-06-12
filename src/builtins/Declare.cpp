@@ -44,6 +44,8 @@ FLAG(DECLARE_TRACE, Bool, 't', "", "Accepted without effect.");
 FLAG(DECLARE_UPPERCASE, Bool, 'u', "", "Accepted without effect.");
 FLAG(DECLARE_EXPORT, Bool, 'x', "", "Mark the variable for the environment.");
 
+REGISTER_BUILTIN_FLAGS(Declare);
+
 namespace shit {
 
 namespace {

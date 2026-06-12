@@ -42,6 +42,24 @@ flatten fn search_builtin(StringView builtin_name) throws
   return BUILTINS.find(builtin_name);
 }
 
+/* The per-kind flag lists, a zero-initialized table immune to static-init
+   order, filled by each builtin file's registrar after its FLAG_LIST is
+   built, since both sit in the same translation unit in order. */
+static const ArrayList<Flag *> *BUILTIN_FLAG_LISTS[BUILTIN_KIND_COUNT] = {};
+
+fn register_builtin_flag_list(Builtin::Kind kind,
+                              const ArrayList<Flag *> *flags) wontthrow
+    -> void
+{
+  BUILTIN_FLAG_LISTS[static_cast<usize>(kind)] = flags;
+}
+
+fn builtin_flag_list(Builtin::Kind kind) wontthrow
+    -> const ArrayList<Flag *> *
+{
+  return BUILTIN_FLAG_LISTS[static_cast<usize>(kind)];
+}
+
 fn is_special_builtin_name(StringView name) wontthrow -> bool
 {
   /* The POSIX special builtin set, matched by name. The colon and the dot are

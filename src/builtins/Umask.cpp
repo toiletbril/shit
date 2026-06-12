@@ -25,6 +25,8 @@ FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(UMASK_SYMBOLIC, Bool, 'S', "",
      "Print the mask in symbolic form, the u=rwx,g=rx,o=rx style.");
 
+REGISTER_BUILTIN_FLAGS(Umask);
+
 namespace shit {
 
 namespace {

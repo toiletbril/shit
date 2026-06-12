@@ -153,6 +153,11 @@ FLAG(COSMO_STRACE, Bool, '\0', "strace", shit::flag_section::Debug,
 
 namespace shit {
 
+fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &
+{
+  return FLAG_LIST;
+}
+
 /* Set when the shell is invoked through a name whose basename is sh or dash,
    the way a system ln -s shit sh does. A script that names the shell after a
    system POSIX shell then runs compatibility-clean, the way bash run as sh

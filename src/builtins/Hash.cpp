@@ -19,6 +19,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(RESET, Bool, 'r', "", "Forget remembered command locations.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_BUILTIN_FLAGS(Hash);
+
 namespace shit {
 
 Hash::Hash() = default;

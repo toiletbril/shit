@@ -203,6 +203,10 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>;
    name reports. */
 fn signal_name_from_number(i32 number) throws -> Maybe<String>;
 
+/* The signal names signal_number_from_name accepts, for the completion
+   engine to offer after kill -. */
+fn signal_names() throws -> ArrayList<StringView>;
+
 /* Turn a numeric process id into the process handle the os layer uses. On POSIX
    the id is the handle. On Windows a handle is opened for it, which may be the
    invalid handle when the process is gone or not permitted. */

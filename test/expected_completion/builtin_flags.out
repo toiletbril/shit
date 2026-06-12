@@ -1,0 +1,79 @@
+== set switches:
+--help
+-A
+-B
+-C
+-E
+-G
+-I
+-M
+-S
+-T
+-W
+-a
+-b
+-e
+-f
+-h
+-k
+-m
+-n
+-o
+-p
+-u
+-v
+-x
+== set -o names by prefix:
+no-clobber
+no-diagnostics
+no-exec
+no-glob
+no-unset
+noclobber
+noexec
+noglob
+notify
+nounset
+== shit binary flags:
+--bash-compatible
+== declare letters:
+--help
+-A
+-F
+-a
+-f
+-g
+-i
+-l
+-n
+-p
+-r
+-t
+-u
+-x
+== kill signal names:
+-ABRT
+-ALRM
+-CONT
+-HUP
+-INT
+-KILL
+-PIPE
+-QUIT
+-STOP
+-TERM
+-TSTP
+-USR1
+-USR2
+== shopt names by prefix:
+globasciiranges
+globskipdots
+globstar
+== read flags:
+--help
+-a
+-n
+-p
+-r
+-s
+-t

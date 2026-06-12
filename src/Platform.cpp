@@ -961,6 +961,21 @@ fn signal_name_from_number(i32 number) throws -> Maybe<String>
   return shit::None;
 }
 
+fn signal_names() throws -> ArrayList<StringView>
+{
+  /* The same names signal_number_from_name resolves, in its order, so the
+     completion engine offers exactly the accepted spellings. */
+  let names = ArrayList<StringView>{};
+  static const StringView SIGNAL_NAMES[] = {
+      "HUP",  "INT",  "QUIT", "KILL", "TERM", "STOP", "TSTP",
+      "CONT", "USR1", "USR2", "ABRT", "ALRM", "PIPE",
+  };
+  names.reserve(sizeof(SIGNAL_NAMES) / sizeof(SIGNAL_NAMES[0]));
+  for (const StringView name : SIGNAL_NAMES)
+    names.push(name);
+  return names;
+}
+
 hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
 {
   ASSERT(args.count() > 0, "argv must carry at least the program name");
@@ -2109,6 +2124,18 @@ fn signal_name_from_number(i32 number) -> Maybe<String>
   if (number == 9) return String{"KILL"};
   if (number == 15) return String{"TERM"};
   return None;
+}
+
+fn signal_names() throws -> ArrayList<StringView>
+{
+  /* The names the Windows signal_number_from_name accepts. */
+  let names = ArrayList<StringView>{};
+  static const StringView SIGNAL_NAMES[] = {"HUP", "INT", "QUIT", "KILL",
+                                            "TERM"};
+  names.reserve(sizeof(SIGNAL_NAMES) / sizeof(SIGNAL_NAMES[0]));
+  for (const StringView name : SIGNAL_NAMES)
+    names.push(name);
+  return names;
 }
 
 /* Append one argument to a Windows command line, quoted and escaped the way
