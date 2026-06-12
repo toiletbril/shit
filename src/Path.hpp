@@ -76,6 +76,9 @@ public:
   mustuse fn is_fifo() const wontthrow -> bool;
   mustuse fn is_socket() const wontthrow -> bool;
   mustuse fn file_size() const wontthrow -> Maybe<u64>;
+  /* The mtime in whole seconds, None when the path is missing, the staleness
+     key the completion target caches refresh on. */
+  mustuse fn modification_time() const wontthrow -> Maybe<i64>;
 
   /* The access checks the test builtin asks for, each one access() call. */
   mustuse fn is_readable() const wontthrow -> bool;

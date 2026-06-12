@@ -1076,6 +1076,390 @@ static fn previous_settled_word(StringView line,
   return line.substring_of_length(start, end - start);
 }
 
+/* One tool's cached target list, keyed by its source file's absolute path
+   and refreshed when the file's mtime moves, so a second tab on the same
+   Makefile pays no fork. */
+struct cached_target_list
+{
+  i64 mtime;
+  ArrayList<String> targets;
+};
+static StringMap<cached_target_list> BUILD_TARGET_CACHE{heap_allocator()};
+
+/* The value of a -C or -f style option already settled on the line, reading
+   both the separated "-C dir" and the attached "-Cdir" spellings the way the
+   tools accept them. */
+static fn settled_option_value(StringView line, StringView option) throws
+    -> Maybe<String>
+{
+  usize cword = 0;
+  let const words = split_completion_words(line, line.length, cword);
+  for (usize i = 1; i < words.count(); i++) {
+    const StringView word = words[i].view();
+    if (word == option && i + 1 < words.count() && i + 1 != cword)
+      return String{words[i + 1].view()};
+    if (word.length > option.length && word.starts_with(option))
+      return String{word.substring(option.length)};
+  }
+  return None;
+}
+
+/* The targets of a GNU make database dump, the lines between "# Files" and
+   "# Finished Make data base" that open a rule. A comment, a dot rule, a
+   recipe line, and the rule a "# Not a target" comment disowns are all
+   skipped, the same reading fish's make completion applies. */
+static fn parse_make_database_targets(StringView database) throws
+    -> ArrayList<String>
+{
+  let targets = ArrayList<String>{};
+  bool in_files_section = false;
+  bool skip_next_rule = false;
+  usize i = 0;
+  while (i < database.length) {
+    usize end = i;
+    while (end < database.length && database[end] != '\n')
+      end++;
+    const StringView text = database.substring_of_length(i, end - i);
+    i = end + 1;
+
+    if (text.starts_with(StringView{"# Files"})) {
+      in_files_section = true;
+      continue;
+    }
+    if (text.starts_with(StringView{"# Finished Make data base"})) break;
+    if (!in_files_section) continue;
+    if (text.starts_with(StringView{"# Not a target"})) {
+      skip_next_rule = true;
+      continue;
+    }
+    if (text.is_empty() || text[0] == '#') continue;
+    /* The disowned rule line follows its comment block immediately, so the
+       first non-comment line consumes the flag whatever its shape, or a
+       .SUFFIXES disown would eat the next real target. */
+    if (skip_next_rule) {
+      skip_next_rule = false;
+      continue;
+    }
+    if (text[0] == '.' || text[0] == '\t') continue;
+    let const colon = text.find_character(':');
+    if (!colon.has_value() || *colon == 0) continue;
+    targets.push(String{text.substring_of_length(0, *colon)});
+  }
+  return targets;
+}
+
+/* The first line-leading name before a colon out of each line, the shape
+   ninja -t targets prints. */
+static fn parse_colon_led_names(StringView listing) throws -> ArrayList<String>
+{
+  let names = ArrayList<String>{};
+  usize i = 0;
+  while (i < listing.length) {
+    usize end = i;
+    while (end < listing.length && listing[end] != '\n')
+      end++;
+    const StringView text = listing.substring_of_length(i, end - i);
+    i = end + 1;
+    let const colon = text.find_character(':');
+    if (!colon.has_value() || *colon == 0) continue;
+    const StringView name = text.substring_of_length(0, *colon);
+    if (name.find_character(' ').has_value()) continue;
+    names.push(String{name});
+  }
+  return names;
+}
+
+/* The script names of a package.json "scripts" table, collected by a tolerant
+   scan that tracks only strings, escapes, and brace nesting, so no JSON
+   machinery is linked in. */
+static fn parse_package_json_scripts(StringView text) throws
+    -> ArrayList<String>
+{
+  let scripts = ArrayList<String>{};
+  let const section = StringView{"\"scripts\""};
+  usize at = 0;
+  let found = false;
+  for (; at + section.length <= text.length; at++)
+    if (text.substring_of_length(at, section.length) == section) {
+      found = true;
+      break;
+    }
+  if (!found) return scripts;
+  usize i = at + section.length;
+  while (i < text.length && text[i] != '{')
+    i++;
+  if (i >= text.length) return scripts;
+  i++;
+  usize depth = 1;
+  let expecting_key = true;
+  while (i < text.length && depth > 0) {
+    const char byte = text[i];
+    if (byte == '"') {
+      const usize start = ++i;
+      while (i < text.length && text[i] != '"') {
+        if (text[i] == '\\') i++;
+        i++;
+      }
+      if (expecting_key && depth == 1)
+        scripts.push(String{text.substring_of_length(start, i - start)});
+      expecting_key = false;
+      i++;
+      continue;
+    }
+    if (byte == ':') expecting_key = false;
+    if (byte == ',') expecting_key = true;
+    if (byte == '{') depth++;
+    if (byte == '}') depth--;
+    i++;
+  }
+  return scripts;
+}
+
+/* The host names an ssh invocation can reach, the Host lines of the user's
+   ssh config without the glob patterns, and the first fields of known_hosts
+   without the hashed rows. */
+static fn collect_ssh_hosts() throws -> ArrayList<String>
+{
+  let hosts = ArrayList<String>{};
+  let const home = os::get_home_directory();
+  if (!home.has_value()) return hosts;
+
+  let const push_unique = [&](StringView host) throws {
+    if (host.is_empty()) return;
+    for (const String &existing : hosts)
+      if (existing.view() == host) return;
+    hosts.push(String{host});
+  };
+
+  let config_path = home->clone();
+  config_path.push_component("/.ssh/config");
+  if (Maybe<String> config = utils::read_entire_file(config_path.text());
+      config.has_value())
+  {
+    const StringView text = config->view();
+    usize i = 0;
+    while (i < text.length) {
+      usize end = i;
+      while (end < text.length && text[end] != '\n')
+        end++;
+      StringView row = text.substring_of_length(i, end - i);
+      i = end + 1;
+      while (!row.is_empty() && (row[0] == ' ' || row[0] == '\t'))
+        row = row.substring(1);
+      if (!(row.starts_with(StringView{"Host "}) ||
+            row.starts_with(StringView{"Host\t"})))
+        continue;
+      row = row.substring(5);
+      /* The Host line lists names separated by blanks, and a name that
+         carries a pattern byte is a rule rather than a reachable host. */
+      usize k = 0;
+      while (k < row.length) {
+        while (k < row.length && (row[k] == ' ' || row[k] == '\t'))
+          k++;
+        const usize start = k;
+        while (k < row.length && row[k] != ' ' && row[k] != '\t')
+          k++;
+        const StringView name = row.substring_of_length(start, k - start);
+        if (!name.find_character('*').has_value() &&
+            !name.find_character('?').has_value() &&
+            !name.find_character('!').has_value())
+          push_unique(name);
+      }
+    }
+  }
+
+  let known_hosts_path = home->clone();
+  known_hosts_path.push_component("/.ssh/known_hosts");
+  if (Maybe<String> known = utils::read_entire_file(known_hosts_path.text());
+      known.has_value())
+  {
+    const StringView text = known->view();
+    usize i = 0;
+    while (i < text.length) {
+      usize end = i;
+      while (end < text.length && text[end] != '\n')
+        end++;
+      const StringView row = text.substring_of_length(i, end - i);
+      i = end + 1;
+      /* A hashed row opens with |1| and hides its host on purpose. */
+      if (row.is_empty() || row[0] == '#' || row[0] == '|') continue;
+      usize field_end = 0;
+      while (field_end < row.length && row[field_end] != ' ' &&
+             row[field_end] != '\t')
+        field_end++;
+      StringView field = row.substring_of_length(0, field_end);
+      /* The first field can list host,host and carry a [host]:port form. */
+      while (!field.is_empty()) {
+        let const comma = field.find_character(',');
+        StringView host =
+            comma.has_value() ? field.substring_of_length(0, *comma) : field;
+        field = comma.has_value() ? field.substring(*comma + 1) : StringView{};
+        if (host.length > 2 && host[0] == '[') {
+          let const close = host.find_character(']');
+          if (close.has_value()) host = host.substring_of_length(1, *close - 1);
+        }
+        push_unique(host);
+      }
+    }
+  }
+  return hosts;
+}
+
+/* Look the tool's targets up in the mtime cache, or rebuild them with the
+   given collector and store them under the source file's path. */
+template <typename Collector>
+static fn cached_targets_for(const Path &source_file,
+                             Collector collect) throws -> ArrayList<String>
+{
+  let const mtime = source_file.modification_time();
+  if (!mtime.has_value()) return ArrayList<String>{};
+  const StringView key = source_file.text().view();
+  if (const cached_target_list *cached = BUILD_TARGET_CACHE.find(key);
+      cached != nullptr && cached->mtime == *mtime)
+  {
+    let copies = ArrayList<String>{};
+    copies.reserve(cached->targets.count());
+    for (const String &target : cached->targets)
+      copies.push(String{target.view()});
+    return copies;
+  }
+  let collected = collect();
+  let entry = cached_target_list{*mtime, ArrayList<String>{}};
+  entry.targets.reserve(collected.count());
+  for (const String &target : collected)
+    entry.targets.push(String{target.view()});
+  BUILD_TARGET_CACHE.set(key, steal(entry));
+  return collected;
+}
+
+/* Complete a build tool's targets and kin, make and ninja targets through
+   the tool's own listing, cmake --build targets through its target help,
+   package.json script names for the npm family, and ssh hosts from the
+   user's ssh files. Subprocesses run only on an explicit tab, and every
+   listing caches on the source file's mtime. None lets the cascade
+   continue. */
+static fn complete_from_build_tools(StringView line, StringView token,
+                                    usize token_start, bool for_listing,
+                                    EvalContext &context) throws
+    -> Maybe<ArrayList<String>>
+{
+  if (!for_listing) return None;
+  if (!token.is_empty() && token[0] == '-') return None;
+  const StringView command = command_word_of(line);
+  if (command.is_empty()) return None;
+
+  let const capture = [&](const String &source) throws -> String {
+    try {
+      return context.capture_command_substitution(source);
+    } catch (...) {
+      LOG(verbosity::Debug, "swallowed a target listing failure");
+      return String{};
+    }
+  };
+
+  let targets = ArrayList<String>{};
+
+  if (command == "make") {
+    let const directory =
+        settled_option_value(line, "-C").value_or(String{"."});
+    let makefile_name = settled_option_value(line, "-f");
+    if (!makefile_name.has_value()) {
+      /* GNU make reads these three names in this order. */
+      for (const StringView candidate :
+           {StringView{"GNUmakefile"}, StringView{"makefile"},
+            StringView{"Makefile"}})
+      {
+        let probe = Path{directory.view()};
+        probe.push_component(candidate);
+        if (probe.exists()) {
+          makefile_name = String{candidate};
+          break;
+        }
+      }
+      if (!makefile_name.has_value()) return None;
+    }
+    let makefile_path = Path{directory.view()};
+    makefile_path.push_component(makefile_name->view());
+    targets = cached_targets_for(makefile_path, [&]() throws {
+      let invocation = String{"make -C "};
+      invocation += directory.view();
+      invocation += " -f ";
+      invocation += makefile_name->view();
+      invocation += " -pRrq : 2>/dev/null";
+      return parse_make_database_targets(capture(invocation).view());
+    });
+  } else if (command == "ninja") {
+    let const directory =
+        settled_option_value(line, "-C").value_or(String{"."});
+    let build_file = Path{directory.view()};
+    build_file.push_component(
+        settled_option_value(line, "-f").value_or(String{"build.ninja"}).view());
+    targets = cached_targets_for(build_file, [&]() throws {
+      let invocation = String{"ninja -C "};
+      invocation += directory.view();
+      invocation += " -t targets 2>/dev/null";
+      return parse_colon_led_names(capture(invocation).view());
+    });
+  } else if (command == "cmake") {
+    /* Only the --target operand of cmake --build completes, through the
+       generator's own target help. */
+    if (previous_settled_word(line, token_start) != "--target") return None;
+    let const build_directory = settled_option_value(line, "--build");
+    if (!build_directory.has_value()) return None;
+    let cache_file = Path{build_directory->view()};
+    cache_file.push_component("CMakeCache.txt");
+    targets = cached_targets_for(cache_file, [&]() throws {
+      let invocation = String{"cmake --build "};
+      invocation += build_directory->view();
+      invocation += " --target help 2>/dev/null";
+      /* The help lists one "... name" row per target. */
+      let names = ArrayList<String>{};
+      const String help = capture(invocation);
+      const StringView text = help.view();
+      usize i = 0;
+      while (i < text.length) {
+        usize end = i;
+        while (end < text.length && text[end] != '\n')
+          end++;
+        const StringView row = text.substring_of_length(i, end - i);
+        i = end + 1;
+        if (!row.starts_with(StringView{"... "})) continue;
+        StringView name = row.substring(4);
+        if (let const space = name.find_character(' '); space.has_value())
+          name = name.substring_of_length(0, *space);
+        if (!name.is_empty()) names.push(String{name});
+      }
+      return names;
+    });
+  } else if (command == "npm" || command == "yarn" || command == "pnpm" ||
+             command == "bun")
+  {
+    if (second_word_of(line) != "run") return None;
+    let const package_path = Path{StringView{"package.json"}};
+    targets = cached_targets_for(package_path, [&]() throws {
+      let const contents = utils::read_entire_file(package_path.text());
+      return contents.has_value()
+                 ? parse_package_json_scripts(contents->view())
+                 : ArrayList<String>{};
+    });
+  } else if (command == "ssh" || command == "scp") {
+    /* The host argument only, so an scp path operand still completes as a
+       file. A token that carries / or : is a path or a remote spec. */
+    if (token.find_character('/').has_value() ||
+        token.find_character(':').has_value())
+      return None;
+    targets = collect_ssh_hosts();
+  } else {
+    return None;
+  }
+
+  let candidates = ArrayList<String>{};
+  for (const String &target : targets)
+    if (target.view().starts_with(token)) candidates.push(String{target.view()});
+  if (candidates.is_empty()) return None;
+  return candidates;
+}
+
 /* Complete a builtin's or the shell binary's own flags from the registered
    FLAG lists, the option names of set and shopt, kill's signal names, and
    kill's %job ids, all table reads with no subprocess so the ghost may run
@@ -1386,6 +1770,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
           complete_from_man_subcommands(line, token, token_start, for_listing);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, token, for_listing, context);
+      if (!from_stage.has_value())
+        from_stage = complete_from_build_tools(line, token, token_start,
+                                               for_listing, context);
     }
     if (!from_stage.has_value() && !is_posix_completion)
       from_stage =

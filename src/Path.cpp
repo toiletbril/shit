@@ -248,6 +248,13 @@ fn Path::file_size() const wontthrow -> Maybe<u64>
   return static_cast<u64>(info.st_size);
 }
 
+fn Path::modification_time() const wontthrow -> Maybe<i64>
+{
+  struct stat info{};
+  if (::stat(m_text.c_str(), &info) != 0) return None;
+  return static_cast<i64>(info.st_mtime);
+}
+
 fn Path::is_same_file_as(const Path &other) const wontthrow -> bool
 {
   struct stat a{}, b{};
@@ -401,6 +408,18 @@ fn Path::file_size() const wontthrow -> Maybe<u64>
     return None;
   if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) return None;
   return (static_cast<u64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
+}
+
+fn Path::modification_time() const wontthrow -> Maybe<i64>
+{
+  WIN32_FILE_ATTRIBUTE_DATA data{};
+  if (GetFileAttributesExA(m_text.c_str(), GetFileExInfoStandard, &data) == 0)
+    return None;
+  /* The write time packs as a 64-bit count of 100ns ticks, enough for the
+     staleness compare without converting to the POSIX epoch. */
+  return static_cast<i64>(
+      (static_cast<u64>(data.ftLastWriteTime.dwHighDateTime) << 32) |
+      data.ftLastWriteTime.dwLowDateTime);
 }
 
 fn Path::is_same_file_as(const Path &other) const wontthrow -> bool

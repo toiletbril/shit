@@ -1,0 +1,15 @@
+== make targets:
+all
+build
+clean
+test
+== make by prefix:
+clean
+== npm run scripts:
+build
+dev
+lint:fix
+== bun run by prefix:
+lint:fix
+== make -C from outside:
+build
