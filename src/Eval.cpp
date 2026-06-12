@@ -953,6 +953,36 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       return utils::int_to_text(static_cast<i64>(std::time(nullptr)) -
                                 m_shell_start_time);
     }
+    /* SHELLOPTS is the colon list of the enabled set -o options, the variable
+       bash maintains and bash-completion greps for posix membership. The rows
+       mirror the live option getters in bash's alphabetical order. */
+    if (first_byte == 'S' && name == "SHELLOPTS") {
+      struct shellopts_row
+      {
+        const char *option_name;
+        bool (EvalContext::*get)() const;
+      };
+      static const shellopts_row SHELLOPTS_ROWS[] = {
+          {"allexport", &EvalContext::export_all},
+          {"errexit", &EvalContext::error_exit},
+          {"monitor", &EvalContext::monitor},
+          {"noclobber", &EvalContext::no_clobber},
+          {"noexec", &EvalContext::no_exec},
+          {"noglob", &EvalContext::no_glob},
+          {"nounset", &EvalContext::error_unset},
+          {"pipefail", &EvalContext::pipefail},
+          {"posix", &EvalContext::is_posix_mode},
+          {"verbose", &EvalContext::should_echo},
+          {"xtrace", &EvalContext::should_echo_expanded},
+      };
+      let joined = String{heap_allocator()};
+      for (const shellopts_row &row : SHELLOPTS_ROWS) {
+        if (!(this->*(row.get))()) continue;
+        if (!joined.is_empty()) joined.push(':');
+        joined.append(StringView{row.option_name});
+      }
+      return joined;
+    }
     if (first_byte == 'E' && name == "EPOCHSECONDS") {
       return utils::int_to_text(static_cast<i64>(std::time(nullptr)));
     }
