@@ -254,10 +254,16 @@ bench:
 		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --posix $(BENCH) >"$$s" 2>&1 ) 2>&1; \
 		if cmp "$$d" "$$s"; then echo "output matches dash"; \
 		else echo "output differs from dash:"; diff "$$d" "$$s" | head -20; fi; \
+		printf "  %-10s" "$(BIN)+opt"; ( time SCALE=$$scale $(BIN) $(BENCH) >"$$s" 2>/dev/null ) 2>&1; \
+		if cmp "$$d" "$$s"; then echo "output matches dash with the optimizer on"; \
+		else echo "output differs from dash:"; diff "$$d" "$$s" | head -20; fi; \
 		echo "configure.bash, wall-clock seconds at SCALE=$$scale, lower is better:"; \
 		printf "  %-10s" "$(BASH)"; ( time SCALE=$$scale $(BASH) $(BENCH_BASH) >"$$bb" 2>&1 ) 2>&1; \
 		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --bash-compatible $(BENCH_BASH) >"$$sb" 2>&1 ) 2>&1; \
 		if cmp "$$bb" "$$sb"; then echo "output matches bash"; \
+		else echo "output differs from bash:"; diff "$$bb" "$$sb" | head -20; fi; \
+		printf "  %-10s" "$(BIN)+opt"; ( time SCALE=$$scale $(BIN) $(BENCH_BASH) >"$$sb" 2>/dev/null ) 2>&1; \
+		if cmp "$$bb" "$$sb"; then echo "output matches bash with the optimizer on"; \
 		else echo "output differs from bash:"; diff "$$bb" "$$sb" | head -20; fi; \
 		rm -f "$$d" "$$b" "$$z" "$$g" "$$s" "$$bb" "$$sb"'
 
