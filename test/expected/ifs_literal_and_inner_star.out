@@ -1,0 +1,142 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign IFS=-]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a-b" "c-d"]
+  [CompoundListCondition, None]
+    [Assign x=p-q]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$x" "a-b"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$a[@]+"${b[*]}""]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$a[@]+${b[*]}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "[%s]\n" "$a[@]+"${b[@]}""]
+  [CompoundListCondition, None]
+    [SimpleCommand "set" "--" "$a[@]+"${b[*]}""]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "n=$#"]
+  [CompoundListCondition, None]
+    [SimpleCommand "unset" "IFS"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "a-b"]
+[Word
+  Unquoted "IFS=-"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a-b"
+]
+[Word
+  Unquoted "c-d"
+]
+[Word
+  Unquoted "x=p-q"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "x"
+]
+[Word
+  Unquoted "a-b"
+]
+[Word
+  Unquoted "a="
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "y"
+]
+[Word
+  Unquoted "b="
+]
+[Word
+  Unquoted "p"
+]
+[Word
+  Unquoted "q"
+]
+[Word
+  Unquoted "r"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "a[@]+"${b[*]}""
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "a[@]+${b[*]}"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "[%s]\n"
+]
+[Word
+  Variable "a[@]+"${b[@]}""
+]
+[Word
+  Unquoted "set"
+]
+[Word
+  Unquoted "--"
+]
+[Word
+  Variable "a[@]+"${b[*]}""
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "n="
+  Variable "#"
+]
+[Word
+  Unquoted "unset"
+]
+[Word
+  Unquoted "IFS"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "a-b"
+]
+a-b c-d
+[p]
+[q]
+[a-b]
+[p-q-r]
+[p-q-r]
+[p]
+[q]
+[r]
+n=1
+a-b
+[Code 0]

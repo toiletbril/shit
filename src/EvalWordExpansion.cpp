@@ -153,8 +153,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
     case WordSegment::Kind::DoubleQuotedText:
       append_run(segment_text, false);
       break;
+    /* Field splitting applies only to the results of expansions, so literal
+       text from the source stays one run even when it holds IFS bytes, the
+       way bash and dash keep a-b whole under IFS=-. */
     case WordSegment::Kind::UnquotedText:
-      append_split_run(segment_text, true);
+      append_run(segment_text, true);
       break;
     case WordSegment::Kind::VariableReference: {
       /* "$@" expands to one field per positional parameter. The first joins any
@@ -522,12 +525,13 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
             /* The per-element emitter the plain "${a[@]}" cases use, one
                field per element when quoted with @, an IFS join with *. The
-               quoting follows the expanded text, so "${arr[@]}" stays one
-               field per element even when the outer modifier is unquoted, the
-               way bash keeps the inner quotes. */
+               quoting and the star follow the emitted word, so the subject
+               elements join under the subject's own [*] while a modifier
+               word such as "${b[*]}" joins under its inner star, the way
+               bash reads each expansion by its own spelling. */
             auto emit_elements = [&](const ArrayList<String> &values,
-                                     bool quoted) throws {
-              if (quoted && is_star) {
+                                     bool quoted, bool star) throws {
+              if (quoted && star) {
                 let const ifs = m_field_separators.view();
                 let joined = String{scratch_allocator()};
                 for (usize i = 0; i < values.count(); i++) {
@@ -551,7 +555,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
                  a set array reads the elements themselves under the outer
                  quoting. */
               if (modifier_op == '-')
-                emit_elements(elements, segment.is_in_double_quotes);
+                emit_elements(elements, segment.is_in_double_quotes, is_star);
               break;
             }
 
@@ -565,7 +569,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
             {
               emit_elements(collect_array_elements(array_word->array_name),
                             array_word->is_quoted ||
-                                segment.is_in_double_quotes);
+                                segment.is_in_double_quotes,
+                            array_word->is_star);
               break;
             }
             /* Any other word shape, a plain literal alternate such as

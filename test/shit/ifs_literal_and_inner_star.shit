@@ -1,0 +1,16 @@
+# Field splitting touches only expansion results, so literal source text
+# keeps its IFS bytes, and an array-subject modifier word joins or splits by
+# its own inner spelling.
+IFS=-
+echo a-b c-d
+x=p-q
+printf '[%s]\n' $x a-b
+a=(x y)
+b=(p q r)
+printf '[%s]\n' ${a[@]+"${b[*]}"}
+printf '[%s]\n' "${a[@]+${b[*]}}"
+printf '[%s]\n' ${a[@]+"${b[@]}"}
+set -- ${a[@]+"${b[*]}"}
+echo "n=$#"
+unset IFS
+echo a-b
