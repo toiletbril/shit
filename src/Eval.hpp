@@ -898,6 +898,14 @@ public:
     return m_mood != mimic_mood::Posix;
   }
 
+  /* The pure bash additions that POSIX rejects outright, brace expansion and
+     printf -v, ride every mood but POSIX under the same rule. The lexer holds
+     its own copy of this predicate for the token-level additions. */
+  pure fn bash_additions_enabled() const wontthrow -> bool
+  {
+    return m_mood != mimic_mood::Posix;
+  }
+
   /* The bash shopt option states, set and read by the shopt builtin. A name
      with no entry reads its bash default through shopt_default_is_on. */
   fn set_shopt_option(StringView name, bool enabled) throws -> void

@@ -101,7 +101,7 @@ FLAG(
 FLAG(DUMB, Bool, '\0', "dumb", shit::flag_section::Compat,
      "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
 
-FLAG(WARNINGS, Bool, 'W', "enable-diagnostics", shit::flag_section::Shit,
+FLAG(WARNINGS, Bool, 'W', "force-warnings", shit::flag_section::Shit,
      "Keep the analysis stage but report every error as a warning and let the "
      "run proceed, instead of stopping on the first error.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", shit::flag_section::Shit,
@@ -253,9 +253,8 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     for (const strictness_warning &warning : STRICTNESS_WARNINGS) {
       l += "  ";
       l += warning.name;
-      for (usize pad = warning.name.length; pad < 19; pad++)
-        l += " ";
-      l += warning.summary;
+      l += '\n';
+      l += wrap_text(warning.summary, HELP_INDENT + 4, HELP_WRAP_WIDTH);
       l += '\n';
     }
     print(l);

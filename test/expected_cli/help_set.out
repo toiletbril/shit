@@ -35,7 +35,7 @@ OPTION SWITCHES
   -A  show-ast                      Print the AST before each command runs.
   -M  show-lexed-words              Print the escape bitmap after each parse.
   -E  show-exit-code                Print the exit code after each command.
-  -W  warnings, enable-diagnostics  Report a strict runtime error as a warning and let the run proceed, the -W flag.
+  -W  warnings, force-warnings      Report a strict runtime error as a warning and let the run proceed, the -W flag.
   -I  mimicry                       Mimic the shell a script's shebang names, the -I flag.
       diagnostics                   Run the analysis stage before each chunk, the inverse of no-diagnostics.
   -S  show-stats                    Print evaluation statistics after each run.
@@ -51,7 +51,7 @@ OPTION SWITCHES
     export-all, noclobber, no-clobber, noglob, no-glob, noexec, no-exec,
     monitor, failglob, notify, hashall, verbose, keyword, functrace,
     braceexpand, show-ast, show-lexed-words, show-exit-code, warnings,
-    enable-diagnostics, mimicry, diagnostics, show-stats, bash-compatible,
+    force-warnings, mimicry, diagnostics, show-stats, bash-compatible,
     no-diagnostics, show-memory, login, init-as-bash, rcfile
 
 rc=0

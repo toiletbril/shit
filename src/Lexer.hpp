@@ -72,6 +72,14 @@ public:
     return m_mood == mimic_mood::Posix;
   }
 
+  /* The token-level bash additions, $'...' and <<< and |& and &>, ride every
+     mood but POSIX under the pure-addition rule. EvalContext holds the same
+     predicate for the additions the evaluator gates. */
+  pure fn bash_additions_enabled() const wontthrow -> bool
+  {
+    return m_mood != mimic_mood::Posix;
+  }
+
   /* A lexer holds the pending-heredoc state and the source, so a copy would
      duplicate that state. Moving transfers it and leaves the source empty, and
      the copy is deleted so an accidental copy fails to compile. */

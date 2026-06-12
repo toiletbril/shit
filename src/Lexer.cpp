@@ -666,7 +666,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
          and the result is a final literal segment that neither expands nor
          globs, the way single quotes produce a literal but with escapes. A
          pure addition, so it rides every mood but POSIX. */
-      if (next == '\'' && !is_posix_mode()) {
+      if (next == '\'' && bash_additions_enabled()) {
         byte_count++;
         bool did_emit_any = false;
         auto emit_literal = [&](char byte) {
@@ -1417,7 +1417,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
        they change the POSIX meaning, so they ride every mood but POSIX the
        way the other pure bash additions do. */
     case Token::Kind::Ampersand: {
-      if (!is_posix_mode() && chop_character(1) == '>') {
+      if (bash_additions_enabled() && chop_character(1) == '>') {
         if (chop_character(2) == '>') {
           tok = m_arena->create<tokens::AmpersandDoubleGreater>(
               here(m_cursor_position, 3));
@@ -1443,7 +1443,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
       if (chop_character(1) == '|') {
         tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
         extra_length++;
-      } else if (!is_posix_mode() && chop_character(1) == '&') {
+      } else if (bash_additions_enabled() && chop_character(1) == '&') {
         tok =
             m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
         extra_length++;
@@ -1463,7 +1463,7 @@ hot fn Lexer::lex_sentinel() throws -> Token *
        mood. */
     case Token::Kind::Less: {
       if (chop_character(1) == '<') {
-        if (chop_character(2) == '<' && !is_posix_mode()) {
+        if (chop_character(2) == '<' && bash_additions_enabled()) {
           tok = m_arena->create<tokens::TripleLess>(here(m_cursor_position, 3));
           extra_length += 2;
         } else {
