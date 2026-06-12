@@ -1089,8 +1089,24 @@ fn main(int argc, char **argv) -> int
           shit::Maybe<shit::String> contents =
               shit::utils::read_entire_file(file_name.view());
           if (!contents) {
-            throw shit::Error{"Could not open '" + file_name.view() +
-                              "': " + shit::os::last_system_error_message()};
+            /* The caret points at the operand in the joined invocation, the
+               same line the flag parser renders its errors against, so the
+               unopenable name is located rather than reported bare. */
+            usize operand_offset = 0;
+            for (int a = 0; a < parse_argc; a++) {
+              if (file_name.view() == parse_argv[a]) break;
+              operand_offset += std::strlen(parse_argv[a]) + 1;
+            }
+            shit::show_message(
+                shit::ErrorWithLocation{
+                    shit::SourceLocation{operand_offset, file_name.count(),
+                                         shit::None},
+                    "Could not open '" + file_name.view() +
+                        "': " + shit::os::last_system_error_message()}
+                    .to_string(
+                        shit::join_command_line(parse_argc, parse_argv)
+                            .view()));
+            shit::utils::quit(127, true);
           }
           script_contents = steal(*contents);
           source_filename = file_name.view();
