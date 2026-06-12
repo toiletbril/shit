@@ -317,12 +317,14 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool errors_are_warnings) throws -> bool
+               bool errors_are_warnings,
+               bool silence_unresolved_commands) throws -> bool
 {
   ASSERT(root != nullptr);
 
   AnalysisContext actx{source};
   actx.errors_are_warnings = errors_are_warnings;
+  actx.silence_unresolved_commands = silence_unresolved_commands;
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
@@ -4998,7 +5000,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (name && !command_resolves(actx, *name) &&
+  if (name && !actx.silence_unresolved_commands &&
+      !command_resolves(actx, *name) &&
       !actx.defined_functions.contains(
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))

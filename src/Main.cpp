@@ -389,9 +389,14 @@ static fn run_script_contents(const String &script_contents,
         !context.diagnostics_disabled();
     LOG(verbosity::Debug, "the analysis stage %s for this chunk",
         run_analysis ? "runs" : "is skipped");
+    /* An interactive -W chunk runs right away and the runtime resolution
+       reports a missing command itself, so the analysis copy of that report
+       stays quiet to avoid the doubled error at the prompt. */
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), FLAG_WARNINGS.is_enabled()))
+                     context.alias_names(), FLAG_WARNINGS.is_enabled(),
+                     FLAG_WARNINGS.is_enabled() &&
+                         context.shell_is_interactive()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {

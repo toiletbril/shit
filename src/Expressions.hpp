@@ -70,6 +70,13 @@ public:
      shit or bash shebang means the bash extension on purpose. */
   bool shebang_is_posix_sh{false};
 
+  /* True when the unresolved-command check stays quiet. An interactive -W
+     chunk runs the moment the analysis ends and the runtime resolution
+     reports the same missing command with the same caret and hint, so the
+     analysis copy would only double the report at the prompt. A script run
+     keeps the check, since it lints branches the run may never reach. */
+  bool silence_unresolved_commands{false};
+
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
   fn warn(SourceLocation location, StringView message) throws -> void;
@@ -80,7 +87,8 @@ public:
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool errors_are_warnings) throws -> bool;
+               bool errors_are_warnings,
+               bool silence_unresolved_commands) throws -> bool;
 
 class Expression
 {
