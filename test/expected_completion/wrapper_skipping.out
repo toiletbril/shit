@@ -1,0 +1,27 @@
+== command position through sudo:
+export
+== inner builtin args through env and an assignment:
+no-clobber
+no-diagnostics
+no-exec
+no-glob
+no-unset
+noclobber
+noexec
+noglob
+notify
+nounset
+== signal names through command:
+-ABRT
+-ALRM
+-CONT
+-HUP
+-INT
+-KILL
+-PIPE
+-QUIT
+-STOP
+-TERM
+-TSTP
+-USR1
+-USR2

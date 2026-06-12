@@ -85,11 +85,33 @@ static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
    word of a command. The scan looks back over whitespace to the previous
    non-space byte and reports command position when that byte ends a command or
    the token is the very first on the line. */
-/* The keyword prefixes that are transparent to command position, so a command
-   word can follow them: ! and time and time's -p and --posix options. */
+/* The leading words that are transparent to command position, so a command
+   word can follow them: the ! and time keywords, and the wrapper commands
+   whose argument is itself a command, the way fish skips sudo. A dash word
+   is a wrapper's own option and an =-carrying word a leading assignment, so
+   sudo -E ls and FOO=bar make both read the inner command. */
+static constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
+    {PackedStringKey::from_literal("!"),       true},
+    {PackedStringKey::from_literal("time"),    true},
+    {PackedStringKey::from_literal("sudo"),    true},
+    {PackedStringKey::from_literal("doas"),    true},
+    {PackedStringKey::from_literal("env"),     true},
+    {PackedStringKey::from_literal("nice"),    true},
+    {PackedStringKey::from_literal("command"), true},
+    {PackedStringKey::from_literal("builtin"), true},
+};
+static constexpr StaticStringMap<bool> TRANSPARENT_PREFIXES{
+    TRANSPARENT_PREFIX_ENTRIES,
+    sizeof(TRANSPARENT_PREFIX_ENTRIES) / sizeof(TRANSPARENT_PREFIX_ENTRIES[0])};
+
 static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
 {
-  return word == "!" || word == "time" || word == "-p" || word == "--posix";
+  if (word.is_empty()) return false;
+  if (word[0] == '-') return true;
+  if (lexer::is_variable_name_start(word[0]) &&
+      word.find_character('=').has_value())
+    return true;
+  return TRANSPARENT_PREFIXES.find(word).has_value();
 }
 
 static pure fn is_in_command_position(StringView line,
