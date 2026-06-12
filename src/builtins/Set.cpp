@@ -228,8 +228,7 @@ String format_option_table(const EvalContext *cxt,
     out += name_cell.view();
     for (usize pad = name_cell.count(); pad < name_field_width; pad++)
       out.push(' ');
-    if (cxt != nullptr)
-      out += option_is_on(*cxt, option) ? "[on]  " : "[off] ";
+    if (cxt != nullptr) out += option_is_on(*cxt, option) ? "[on]  " : "[off] ";
     out += option.help;
     out.push('\n');
   }

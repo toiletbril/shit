@@ -1,8 +1,7 @@
-#include "Eval.hpp"
-
 #include "Arena.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Path.hpp"
@@ -44,8 +43,7 @@ static fn parse_modifier_array_word(StringView word) wontthrow
   usize name_end = 0;
   while (name_end < inner.length && lexer::is_variable_name(inner[name_end]))
     name_end++;
-  if (name_end == 0 || name_end + 3 != inner.length ||
-      inner[name_end] != '[' ||
+  if (name_end == 0 || name_end + 3 != inner.length || inner[name_end] != '[' ||
       (inner[name_end + 1] != '@' && inner[name_end + 1] != '*') ||
       inner[name_end + 2] != ']')
     return None;
@@ -610,16 +608,15 @@ hot fn EvalContext::expand_word(const Word &word) throws
             /* The bare name reads as element zero, so the plain form tests
                whether any element exists and the colon form whether the
                first is nonempty. */
-            let const treat_as_unset =
-                is_colon_form ? (subject_elements.is_empty() ||
-                                 subject_elements[0].is_empty())
-                              : subject_elements.is_empty();
+            let const treat_as_unset = is_colon_form
+                                           ? (subject_elements.is_empty() ||
+                                              subject_elements[0].is_empty())
+                                           : subject_elements.is_empty();
             let const modifier_op = rest[op_index];
             let const should_expand_word =
                 modifier_op == '+' ? !treat_as_unset : treat_as_unset;
             if (should_expand_word) {
-              let const values =
-                  collect_array_elements(array_word->array_name);
+              let const values = collect_array_elements(array_word->array_name);
               let const emit_quoted =
                   array_word->is_quoted || segment.is_in_double_quotes;
               if (emit_quoted && array_word->is_star) {

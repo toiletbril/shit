@@ -138,8 +138,7 @@ String format_option_names_help() throws
    option's state. A completion script captures this through $(shopt -p name)
    and runs it later, so the line must execute, shopt -s or -u for a shopt
    name and set -o or +o for a set option behind the -o bridge. */
-String shopt_reusable_line(StringView name, bool on,
-                           bool as_set_option) throws
+String shopt_reusable_line(StringView name, bool on, bool as_set_option) throws
 {
   let line = String{};
   if (as_set_option)

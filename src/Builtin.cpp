@@ -48,14 +48,12 @@ flatten fn search_builtin(StringView builtin_name) throws
 static const ArrayList<Flag *> *BUILTIN_FLAG_LISTS[BUILTIN_KIND_COUNT] = {};
 
 fn register_builtin_flag_list(Builtin::Kind kind,
-                              const ArrayList<Flag *> *flags) wontthrow
-    -> void
+                              const ArrayList<Flag *> *flags) wontthrow -> void
 {
   BUILTIN_FLAG_LISTS[static_cast<usize>(kind)] = flags;
 }
 
-fn builtin_flag_list(Builtin::Kind kind) wontthrow
-    -> const ArrayList<Flag *> *
+fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const ArrayList<Flag *> *
 {
   return BUILTIN_FLAG_LISTS[static_cast<usize>(kind)];
 }

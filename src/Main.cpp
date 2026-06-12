@@ -166,9 +166,9 @@ static fn run_debug_completion_driver(StringView driver_line,
                                       EvalContext &context) throws -> i32
 {
   utils::initialize_path_map();
-  let const driver_result = completion::complete(
-      driver_line, driver_line.length, context, Path::current_directory(),
-      true);
+  let const driver_result =
+      completion::complete(driver_line, driver_line.length, context,
+                           Path::current_directory(), true);
   let listing = String{};
   for (const String &candidate : driver_result.candidates) {
     listing += candidate.view();

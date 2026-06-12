@@ -1064,8 +1064,8 @@ static fn complete_from_manpage(StringView line, StringView token,
 /* The settled word right before the token, so set -o NAME completion sees
    the -o. The scan is the same unquoted whitespace reading command_word_of
    applies. */
-static fn previous_settled_word(StringView line,
-                                usize token_start) wontthrow -> StringView
+static fn previous_settled_word(StringView line, usize token_start) wontthrow
+    -> StringView
 {
   usize end = token_start;
   while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
@@ -1389,8 +1389,9 @@ static fn complete_from_build_tools(StringView line, StringView token,
     let const directory =
         settled_option_value(line, "-C").value_or(String{"."});
     let build_file = Path{directory.view()};
-    build_file.push_component(
-        settled_option_value(line, "-f").value_or(String{"build.ninja"}).view());
+    build_file.push_component(settled_option_value(line, "-f")
+                                  .value_or(String{"build.ninja"})
+                                  .view());
     targets = cached_targets_for(build_file, [&]() throws {
       let invocation = String{"ninja -C "};
       invocation += directory.view();
@@ -1435,9 +1436,8 @@ static fn complete_from_build_tools(StringView line, StringView token,
     let const package_path = Path{StringView{"package.json"}};
     targets = cached_targets_for(package_path, [&]() throws {
       let const contents = utils::read_entire_file(package_path.text());
-      return contents.has_value()
-                 ? parse_package_json_scripts(contents->view())
-                 : ArrayList<String>{};
+      return contents.has_value() ? parse_package_json_scripts(contents->view())
+                                  : ArrayList<String>{};
     });
   } else if (command == "ssh" || command == "scp") {
     /* The host argument only, so an scp path operand still completes as a
@@ -1453,7 +1453,8 @@ static fn complete_from_build_tools(StringView line, StringView token,
   if (targets == nullptr) return None;
   let candidates = ArrayList<String>{};
   for (const String &target : *targets)
-    if (target.view().starts_with(token)) candidates.push(String{target.view()});
+    if (target.view().starts_with(token))
+      candidates.push(String{target.view()});
   if (candidates.is_empty()) return None;
   return candidates;
 }
@@ -1702,8 +1703,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     let const reply = context.run_completion_function(
         spec->function_name.view(), words, cword, line, cursor);
     for (const String &entry : reply) {
-      if (entry_is_unrequested_dash_word(entry.view(),
-                                         should_offer_dash_words))
+      if (entry_is_unrequested_dash_word(entry.view(), should_offer_dash_words))
       {
         did_drop_dash_words = true;
         continue;
@@ -2374,9 +2374,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       /* A command name. A resolved command is blue the way fish paints one,
          an unresolved one is red. */
-      push(word_start, word_end, first_word_resolves(word, context)
-                                     ? colors::ansi::BLUE
-                                     : colors::ansi::RED);
+      push(word_start, word_end,
+           first_word_resolves(word, context) ? colors::ansi::BLUE
+                                              : colors::ansi::RED);
       command_position = false;
       continue;
     }

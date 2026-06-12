@@ -289,15 +289,13 @@ inline constexpr usize BUILTIN_KIND_COUNT =
    builtin's flags without a manpage. A kind with no registration reads back
    null. */
 fn register_builtin_flag_list(Builtin::Kind kind,
-                              const ArrayList<Flag *> *flags) wontthrow
-    -> void;
-fn builtin_flag_list(Builtin::Kind kind) wontthrow
-    -> const ArrayList<Flag *> *;
+                              const ArrayList<Flag *> *flags) wontthrow -> void;
+fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const ArrayList<Flag *> *;
 
 #define REGISTER_BUILTIN_FLAGS(kind)                                           \
   static uchar t__builtin_flag_registrar =                                     \
-      (shit::register_builtin_flag_list(shit::Builtin::Kind::kind,            \
-                                        &FLAG_LIST),                          \
+      (shit::register_builtin_flag_list(shit::Builtin::Kind::kind,             \
+                                        &FLAG_LIST),                           \
        0)
 
 void show_builtin_help_impl(const ExecContext &ec, StringView description,

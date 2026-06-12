@@ -919,27 +919,27 @@ using posix_class_test = bool (*)(u8 byte);
 
 constexpr StaticStringMap<posix_class_test>::entry POSIX_CLASS_ENTRIES[] = {
     {PackedStringKey::from_literal("alnum"),
-     [](u8 byte) { return std::isalnum(byte) != 0; }},
+     [](u8 byte) { return std::isalnum(byte) != 0; } },
     {PackedStringKey::from_literal("alpha"),
-     [](u8 byte) { return std::isalpha(byte) != 0; }},
+     [](u8 byte) { return std::isalpha(byte) != 0; } },
     {PackedStringKey::from_literal("blank"),
-     [](u8 byte) { return std::isblank(byte) != 0; }},
+     [](u8 byte) { return std::isblank(byte) != 0; } },
     {PackedStringKey::from_literal("cntrl"),
-     [](u8 byte) { return std::iscntrl(byte) != 0; }},
+     [](u8 byte) { return std::iscntrl(byte) != 0; } },
     {PackedStringKey::from_literal("digit"),
-     [](u8 byte) { return std::isdigit(byte) != 0; }},
+     [](u8 byte) { return std::isdigit(byte) != 0; } },
     {PackedStringKey::from_literal("graph"),
-     [](u8 byte) { return std::isgraph(byte) != 0; }},
+     [](u8 byte) { return std::isgraph(byte) != 0; } },
     {PackedStringKey::from_literal("lower"),
-     [](u8 byte) { return std::islower(byte) != 0; }},
+     [](u8 byte) { return std::islower(byte) != 0; } },
     {PackedStringKey::from_literal("print"),
-     [](u8 byte) { return std::isprint(byte) != 0; }},
+     [](u8 byte) { return std::isprint(byte) != 0; } },
     {PackedStringKey::from_literal("punct"),
-     [](u8 byte) { return std::ispunct(byte) != 0; }},
+     [](u8 byte) { return std::ispunct(byte) != 0; } },
     {PackedStringKey::from_literal("space"),
-     [](u8 byte) { return std::isspace(byte) != 0; }},
+     [](u8 byte) { return std::isspace(byte) != 0; } },
     {PackedStringKey::from_literal("upper"),
-     [](u8 byte) { return std::isupper(byte) != 0; }},
+     [](u8 byte) { return std::isupper(byte) != 0; } },
     {PackedStringKey::from_literal("xdigit"),
      [](u8 byte) { return std::isxdigit(byte) != 0; }},
 };
@@ -1110,8 +1110,7 @@ fn glob_matches(StringView glob, StringView str,
       bool is_first_member = true;
       bool prev_member_was_class = false;
       while (g < glob.count() && (is_first_member || !is_close_at(g))) {
-        if (Maybe<usize> past_class = class_end_past(g);
-            past_class.has_value())
+        if (Maybe<usize> past_class = class_end_past(g); past_class.has_value())
         {
           let const class_name =
               glob.substring_of_length(g + 2, *past_class - g - 4);

@@ -1192,8 +1192,7 @@ pure fn EvalContext::monitor() const wontthrow -> bool { return m_monitor; }
 
 fn EvalContext::set_notify(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the notify option flips to %s",
-      enabled ? "on" : "off");
+  LOG(verbosity::Info, "the notify option flips to %s", enabled ? "on" : "off");
   m_notify = enabled;
 }
 

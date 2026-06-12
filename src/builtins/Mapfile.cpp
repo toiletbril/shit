@@ -22,8 +22,7 @@ HELP_DESCRIPTION_DECL(
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 /* The letters are hand-parsed in execute, so these FLAG rows only feed the
    help text. */
-FLAG(MAPFILE_TRIM, Bool, 't', "",
-     "Strip the trailing newline from each line.");
+FLAG(MAPFILE_TRIM, Bool, 't', "", "Strip the trailing newline from each line.");
 FLAG(MAPFILE_COUNT, String, 'n', "",
      "Read at most count lines, zero for all of them.");
 
