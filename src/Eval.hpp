@@ -1590,8 +1590,12 @@ fn evaluate_constant_arithmetic(StringView expression) throws -> i64;
 
 /* The index of the colon that separates the offset from the length in a
    substring body, or the body length when there is none. Shared between the
-   parameter expansion in Eval.cpp and the array slice forms in
-   EvalWordExpansion.cpp. */
+   parameter expansion and the array slice forms across the evaluator files.
+ */
 fn find_substring_length_separator(StringView body) wontthrow -> usize;
+
+/* Throw an error carrying the script-fatal mark, the abort the set -u read
+   and the ${name:?} report perform even in the bash mood. */
+[[noreturn]] fn throw_script_fatal(String message) throws -> void;
 
 } /* namespace shit */
