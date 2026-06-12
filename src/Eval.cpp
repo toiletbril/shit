@@ -371,8 +371,10 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
                        "' because the parameter is not set");
   if (m_error_unset || m_warnings_enabled)
     show_runtime_warning("the variable '" + String{name} +
-                         "' is not set, it expands to empty, which is rarely "
-                         "intended");
+                         "' is not set, it expands to empty, replace it with "
+                         "${" +
+                         String{name} +
+                         "-} if empty expansion is desired");
 }
 
 fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,

@@ -23,7 +23,7 @@
 [Word
   Unquoted "continued"
 ]
-shit: 3:1: warning: the variable 'never_counted' is not set, it expands to empty, which is rarely intended.
+shit: 3:1: warning: the variable 'never_counted' is not set, it expands to empty, replace it with ${never_counted-} if empty expansion is desired.
      3 |  echo $((never_counted + 1))
        |  ^~ here.
 1
