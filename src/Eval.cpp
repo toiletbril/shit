@@ -268,6 +268,9 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     force_unset_shell_variable(binding.name);
   /* The store is written directly rather than through set_indexed_array,
      since the readonly check could throw from the same noexcept defer. */
+  /* The sparse elements drop first, so a deep index the body set does not
+     survive the restore the way the plain unset clears it. */
+  clear_sparse_array(binding.name.view());
   if (binding.previous_indexed_array.has_value())
     m_indexed_arrays.set(binding.name.view(),
                          steal(*binding.previous_indexed_array));
@@ -976,6 +979,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       static const shellopts_row SHELLOPTS_ROWS[] = {
           {"allexport", &EvalContext::export_all},
           {"errexit", &EvalContext::error_exit},
+          {"failglob", &EvalContext::failglob},
           {"monitor", &EvalContext::monitor},
           {"noclobber", &EvalContext::no_clobber},
           {"noexec", &EvalContext::no_exec},
@@ -5691,9 +5695,13 @@ hot fn EvalContext::expand_word(const Word &word) throws
                 modifier_op == '+' ? !treat_as_unset : treat_as_unset;
 
             /* The per-element emitter the plain "${a[@]}" cases use, one
-               field per element when quoted with @, an IFS join with *. */
-            auto emit_elements = [&](const ArrayList<String> &values) throws {
-              if (segment.is_in_double_quotes && is_star) {
+               field per element when quoted with @, an IFS join with *. The
+               quoting follows the expanded text, so "${arr[@]}" stays one
+               field per element even when the outer modifier is unquoted, the
+               way bash keeps the inner quotes. */
+            auto emit_elements = [&](const ArrayList<String> &values,
+                                     bool quoted) throws {
+              if (quoted && is_star) {
                 let const ifs = m_field_separators.view();
                 let joined = String{scratch_allocator()};
                 for (usize i = 0; i < values.count(); i++) {
@@ -5705,7 +5713,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
               }
               for (usize i = 0; i < values.count(); i++) {
                 if (i > 0) flush();
-                if (segment.is_in_double_quotes)
+                if (quoted)
                   append_run(values[i].view(), false);
                 else
                   append_split_run(values[i].view(), true);
@@ -5714,8 +5722,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
 
             if (!should_expand_word) {
               /* + with an unset array contributes no field at all, and - with
-                 a set array reads the elements themselves. */
-              if (modifier_op == '-') emit_elements(elements);
+                 a set array reads the elements themselves under the outer
+                 quoting. */
+              if (modifier_op == '-')
+                emit_elements(elements, segment.is_in_double_quotes);
               break;
             }
 
@@ -5740,8 +5750,12 @@ hot fn EvalContext::expand_word(const Word &word) throws
                    inner[inner_name_end + 1] == '*') &&
                   inner[inner_name_end + 2] == ']')
               {
+                /* The inner word's own quoting governs the split, so a quoted
+                   "${arr[@]}" keeps each element whole even though the outer
+                   modifier here is unquoted. */
                 emit_elements(collect_array_elements(
-                    inner.substring_of_length(0, inner_name_end)));
+                                  inner.substring_of_length(0, inner_name_end)),
+                              is_word_quoted || segment.is_in_double_quotes);
                 break;
               }
             }
@@ -6602,6 +6616,60 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
                       c == '\\' || c == '~' || c == '{';
   }
   if (!needs_expansion) return split_plain();
+
+  /* The list expands by wrapping it in an array literal, so a structural byte
+     that would close the literal early and run the rest as a command, a
+     top-level ')' or ';' or '|' or '&' or '(' or a comment '#', is a break-out
+     a malicious or careless -W list could carry. Such a list degrades to the
+     plain split rather than executing the tail. The scan tracks quotes and the
+     $(...) and ${...} and backtick nesting so a paren inside an expansion is
+     not mistaken for a top-level one. */
+  auto is_array_literal_safe = [&]() wontthrow -> bool {
+    char quote = 0;
+    usize paren_depth = 0;
+    usize brace_depth = 0;
+    bool in_backtick = false;
+    bool at_word_start = true;
+    for (usize i = 0; i < wordlist.length; i++) {
+      const char c = wordlist[i];
+      if (quote != 0) {
+        if (c == quote) quote = 0;
+        at_word_start = false;
+        continue;
+      }
+      if (c == '\\') {
+        i++;
+        at_word_start = false;
+        continue;
+      }
+      if (c == '\'' || c == '"') {
+        quote = c;
+      } else if (c == '`') {
+        in_backtick = !in_backtick;
+      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '(') {
+        paren_depth++;
+        i++;
+      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '{') {
+        brace_depth++;
+        i++;
+      } else if (c == ')' && paren_depth > 0) {
+        paren_depth--;
+      } else if (c == '}' && brace_depth > 0) {
+        brace_depth--;
+      } else if (!in_backtick && paren_depth == 0 && brace_depth == 0) {
+        if (c == ')' || c == '(' || c == ';' || c == '|' || c == '&' ||
+            c == '<' || c == '>' || c == '\n')
+          return false;
+        if (c == '#' && at_word_start) return false;
+      }
+      at_word_start = c == ' ' || c == '\t';
+    }
+    return quote == 0 && !in_backtick && paren_depth == 0 && brace_depth == 0;
+  };
+  if (!is_array_literal_safe()) {
+    LOG(verbosity::Debug, "-W list is not array-literal safe, splitting plain");
+    return split_plain();
+  }
 
   /* The list expands as an array literal in the current context, so a word
      such as "${options[@]}" reaches the caller's array. The defer drops the

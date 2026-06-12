@@ -860,7 +860,7 @@ public:
   }
 
   /* The bash shopt option states, set and read by the shopt builtin. A name
-     with no entry reads as off. */
+     with no entry reads its bash default through shopt_default_is_on. */
   fn set_shopt_option(StringView name, bool enabled) throws -> void
   {
     m_shopt_options.set(name, enabled);
@@ -877,10 +877,6 @@ public:
   /* Whether bash ships the named shopt option enabled, the miss fallback for
      is_shopt_enabled. */
   static pure fn shopt_default_is_on(StringView name) wontthrow -> bool;
-  pure fn shopt_options() const wontthrow -> const StringMap<bool> &
-  {
-    return m_shopt_options;
-  }
 
   /* A condition, such as an if test or an && operand, suppresses set -e while
      it runs, since its failure is expected. */
@@ -919,6 +915,18 @@ public:
   pure fn is_completion_function_running() const wontthrow -> bool
   {
     return m_is_completion_function_running;
+  }
+
+  /* Whether a builtin is running as a stage of a multi-stage pipeline. exec
+     reads it so exec in a pipeline stage spawns a child rather than replacing
+     the whole shell, the way bash runs each stage in its own process. */
+  fn set_in_pipeline_stage(bool in_stage) wontthrow -> void
+  {
+    m_is_in_pipeline_stage = in_stage;
+  }
+  pure fn is_in_pipeline_stage() const wontthrow -> bool
+  {
+    return m_is_in_pipeline_stage;
   }
   /* Whether a dispatched command may retitle the window. Only a command the
      user submitted at an interactive prompt qualifies, never a startup file,
@@ -1318,6 +1326,7 @@ protected:
   bool m_running_traps{false};
   bool m_terminal_exec_allowed{false};
   bool m_is_completion_function_running{false};
+  bool m_is_in_pipeline_stage{false};
 
   /* Install the OS signal disposition for each signal in the trap table, called
      after a subshell restore brings the parent's table back so the process

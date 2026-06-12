@@ -754,7 +754,10 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
         }
         continue;
       }
-      if (byte == ' ' || byte == '\t') {
+      /* A CR at a CRLF line end folds like whitespace, so a page with DOS
+         line endings does not leave a stray byte between the words the space
+         form needs to match. */
+      if (byte == ' ' || byte == '\t' || byte == '\r') {
         if (!synopsis.is_empty() &&
             synopsis.view()[synopsis.length() - 1] != ' ')
           synopsis.push(' ');

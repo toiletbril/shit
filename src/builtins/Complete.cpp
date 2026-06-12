@@ -124,8 +124,17 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         line += ' ';
       }
       if (!spec.word_list.is_empty()) {
+        /* The word list single-quotes, with each embedded quote written as the
+           '\'' escape, so a list carrying an apostrophe replays as valid
+           shell rather than an unbalanced quote. */
         line += "-W '";
-        line += spec.word_list.view();
+        const StringView list = spec.word_list.view();
+        for (usize i = 0; i < list.length; i++) {
+          if (list[i] == '\'')
+            line += "'\\''";
+          else
+            line.push(list[i]);
+        }
         line += "' ";
       }
       line += command;

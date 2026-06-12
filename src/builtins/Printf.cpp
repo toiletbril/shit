@@ -461,7 +461,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const target = store_variable->view();
     let const open_bracket = target.find_character('[');
     if (open_bracket.has_value() && *open_bracket > 0 &&
-        target.length > *open_bracket + 2 &&
+        target.length >= *open_bracket + 2 &&
         target[target.length - 1] == ']')
     {
       let const array_name = target.substring_of_length(0, *open_bracket);

@@ -85,17 +85,17 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   command.dup_out_to_err = ec.dup_out_to_err;
   command.dup_out_to_err_came_last = ec.dup_out_to_err_came_last;
 
-  /* Inside an in-process subshell or command substitution, the process the
-     exec would replace is the subshell, not the shell, so $(exec cat) must
-     not kill the session. The program runs as a spawned child and its status
-     ends the subshell scope, the way bash's forked subshell dies into its
-     exec. */
-  if (cxt.in_subshell()) {
+  /* Inside an in-process subshell, a command substitution, or a pipeline
+     stage, the process the exec would replace is that inner scope, not the
+     shell, so $(exec cat) and true | exec cat must not kill the session. The
+     program runs as a spawned child and its status ends the scope, the way
+     bash's forked subshell or stage dies into its exec. */
+  if (cxt.in_subshell() || cxt.is_in_pipeline_stage()) {
     LOG(verbosity::Info,
-        "exec runs '%s' as a child and ends the in-process subshell scope",
+        "exec runs '%s' as a child rather than replacing the shell",
         command_name.c_str());
     let const status = utils::execute_context(steal(command), cxt, false);
-    cxt.request_exit(status, ec.source_location());
+    if (cxt.in_subshell()) cxt.request_exit(status, ec.source_location());
     return status;
   }
 
