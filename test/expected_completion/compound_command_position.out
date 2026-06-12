@@ -1,0 +1,21 @@
+== if body:
+export
+== then body:
+export
+== while body:
+export
+== do body:
+export
+== brace group:
+export
+== arguments through the keyword:
+no-clobber
+no-diagnostics
+no-exec
+no-glob
+no-unset
+noclobber
+noexec
+noglob
+notify
+nounset
