@@ -1,5 +1,7 @@
 # shit
 
+[![Shit is faster than Bash at least by 5 times](https://github.com/toiletbril/shit/actions/workflows/ci.yml/badge.svg)](https://github.com/toiletbril/shit/actions/workflows/ci.yml)
+
 Man, my shell is **shit**™ (built on top of
 [toiletline](https://github.com/toiletbril/toiletline))
 
