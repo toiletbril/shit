@@ -551,8 +551,8 @@ static fn stderr_to_stdout_dup() wontthrow -> expressions::Redirection
 fn Parser::build_file_or_dup_redirection(
     i32 fd, Token::Kind op_kind, SourceLocation op_location,
     Maybe<SourceLocation> &first_location,
-    ArrayList<expressions::Redirection> &out,
-    bool fd_was_explicit) throws -> void
+    ArrayList<expressions::Redirection> &out, bool fd_was_explicit) throws
+    -> void
 {
   if (!first_location) first_location = op_location;
 
@@ -620,8 +620,7 @@ fn Parser::build_file_or_dup_redirection(
       redir.target = from;
       redir.dup_fd = -1;
       redir.dup_may_be_filename = op_kind == Token::Kind::Greater &&
-                                  !fd_was_explicit &&
-                                  !m_lexer.is_posix_mode();
+                                  !fd_was_explicit && !m_lexer.is_posix_mode();
       out.push(redir);
       return;
     }
@@ -960,8 +959,7 @@ hot fn Parser::parse_simple_command() throws -> Command *
   };
 
   auto add_redirection = [&](i32 fd, Token::Kind op_kind,
-                             SourceLocation op_location,
-                             bool fd_was_explicit) {
+                             SourceLocation op_location, bool fd_was_explicit) {
     build_file_or_dup_redirection(fd, op_kind, op_location, source_location,
                                   redirections, fd_was_explicit);
   };

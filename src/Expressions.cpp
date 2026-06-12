@@ -1170,10 +1170,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                                     cxt.no_clobber()));
           if (!opened) {
             redirection_open_failed = true;
-            throw ErrorWithLocation{redir.target->source_location(),
-                                    "Could not open '" +
-                                        *resolved.both_streams_file + "': " +
-                                        os::last_system_error_message()};
+            throw ErrorWithLocation{
+                redir.target->source_location(),
+                "Could not open '" + *resolved.both_streams_file +
+                    "': " + os::last_system_error_message()};
           }
           const os::descriptor file_fd = opened.take();
           shit::flush();

@@ -370,8 +370,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
                               : Maybe<StringView>{resolved.filename};
       line_offset = resolved.line_offset;
     }
-    if (resolved.text == nullptr ||
-        location.position > resolved.text->count())
+    if (resolved.text == nullptr || location.position > resolved.text->count())
     {
       show_message(Warning{message}.to_string());
       return;
@@ -407,10 +406,9 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
   if (resolved.windowed) {
     scan_start = fallback.position - resolved.body_start_position +
                  resolved.header_length;
-    absolute_shift =
-        resolved.body_start_position > resolved.header_length
-            ? resolved.body_start_position - resolved.header_length
-            : 0;
+    absolute_shift = resolved.body_start_position > resolved.header_length
+                         ? resolved.body_start_position - resolved.header_length
+                         : 0;
   }
   if (scan_start >= source.length) return fallback;
 
@@ -457,8 +455,7 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
         (k == 0 || !lexer::is_variable_name(source[k - 1])) &&
         (k + name.length == source.length ||
          !lexer::is_variable_name(source[k + name.length])))
-      return SourceLocation{k + absolute_shift, name.length,
-                            fallback.filename};
+      return SourceLocation{k + absolute_shift, name.length, fallback.filename};
     k++;
   }
   return fallback;
@@ -1062,11 +1059,11 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     let const resolved = resolve_render_source(m_current_location);
     usize line = 1;
     if (resolved.text != nullptr) {
-      const usize render_position =
-          resolved.windowed ? m_current_location.position -
-                                  resolved.body_start_position +
-                                  resolved.header_length
-                            : m_current_location.position;
+      const usize render_position = resolved.windowed
+                                        ? m_current_location.position -
+                                              resolved.body_start_position +
+                                              resolved.header_length
+                                        : m_current_location.position;
       line = utils::line_number_at(resolved.text->view(), render_position) +
              (resolved.windowed ? resolved.line_offset : 0);
     }
@@ -1338,8 +1335,8 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   info.body_start_position = body_start_position;
   info.header_length = name.length + StringView{" () \n"}.length;
   if (m_current_source != nullptr && !definition_text.is_empty()) {
-    const usize body_line = utils::line_number_at(m_current_source->view(),
-                                                  body_start_position);
+    const usize body_line =
+        utils::line_number_at(m_current_source->view(), body_start_position);
     info.line_offset = body_line > 2 ? body_line - 2 : 0;
   }
   if (definition_location.filename.has_value())
@@ -1354,8 +1351,8 @@ fn EvalContext::function_definition_info_of(StringView name) const wontthrow
   return m_function_definition_infos.find(name);
 }
 
-pure fn EvalContext::resolve_render_source(SourceLocation location) const
-    wontthrow -> resolved_render_source
+pure fn EvalContext::resolve_render_source(
+    SourceLocation location) const wontthrow -> resolved_render_source
 {
   let resolved = resolved_render_source{};
   resolved.text = m_current_source;
@@ -1371,8 +1368,7 @@ pure fn EvalContext::resolve_render_source(SourceLocation location) const
   if (info == nullptr || info->defining_instance == m_current_source)
     return resolved;
   let const *copy = m_function_sources.find(innermost);
-  if (copy == nullptr || copy->count() <= info->header_length)
-    return resolved;
+  if (copy == nullptr || copy->count() <= info->header_length) return resolved;
   const usize body_length = copy->count() - info->header_length;
   if (location.position < info->body_start_position ||
       location.position >= info->body_start_position + body_length)
