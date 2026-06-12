@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ArrayList.hpp"
-#include "HashMap.hpp"
+#include "StringMap.hpp"
 #include "HashSet.hpp"
 #include "PackedStringKey.hpp"
 #include "StaticStringMap.hpp"

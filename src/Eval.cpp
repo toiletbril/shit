@@ -396,7 +396,7 @@ struct sparse_array_entry
 /* Every sparsely-held element of an array, sorted by ascending index. The
    sparse indices always sit beyond the dense run, so appending these after the
    dense elements yields the whole array in index order. */
-static fn collect_sparse_array_entries(const HashMap<String> &sparse,
+static fn collect_sparse_array_entries(const StringMap<String> &sparse,
                                        StringView name,
                                        Allocator allocator) throws
     -> ArrayList<sparse_array_entry>
@@ -1308,7 +1308,7 @@ fn EvalContext::run_pending_traps() throws -> void
   m_last_exit_status = saved_exit_status;
 }
 
-pure fn EvalContext::traps() const wontthrow -> const HashMap<String> &
+pure fn EvalContext::traps() const wontthrow -> const StringMap<String> &
 {
   return m_traps;
 }

@@ -14,7 +14,7 @@ class ArrayList
 {
 public:
   /* A default list is heap-backed and empty, so it can serve as the value a
-     HashMap slot holds before a real list is placed into it. */
+     StringMap slot holds before a real list is placed into it. */
   ArrayList() : m_allocator(heap_allocator()) {}
   explicit ArrayList(Allocator allocator) : m_allocator(allocator) {}
 

@@ -1152,7 +1152,7 @@ cold fn print_memory_report() wontthrow -> void
    without rebuilding from a directory index. The resizable map carries a packed
    key per slot, so a lookup rejects a mismatch in two words before the byte
    compare. */
-static HashMap<ArrayList<Path>> PATH_CACHE{heap_allocator()};
+static StringMap<ArrayList<Path>> PATH_CACHE{heap_allocator()};
 
 /* A cd, a PATH assignment, and hash -r set this so the next lookup drops the
    cache and re-resolves, the way dash rehashes lazily. While it is false a hit

@@ -566,7 +566,7 @@ static fn split_completion_words(StringView line, usize cursor,
 /* The option flags parsed out of a manpage, cached per command so a second
    tab on the same command pays no man fork. An empty list is cached too, so a
    command with no manpage or no options is not retried. */
-static HashMap<ArrayList<String>> MANPAGE_OPTION_CACHE{heap_allocator()};
+static StringMap<ArrayList<String>> MANPAGE_OPTION_CACHE{heap_allocator()};
 
 /* The shared-manpage aliases, the only commands whose options live under a
    different page name. A general scan of `man COMMAND` covers every other
@@ -583,13 +583,13 @@ static fn manpage_name_for(StringView command) throws -> String
    commit a candidate for git with no per-program table. The scan is a readdir
    pass that runs once per launch on the first explicit tab, never on the
    ghost path and never at startup. */
-static HashMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
+static StringMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
 /* Every stripped section-1 page name, the existence gate for the subcommand
    split and the lookup that sends git commit -<tab> to the git-commit page. */
 static HashSet MAN_PAGE_NAMES{heap_allocator()};
 /* The full file path of each page, kept so the synopsis validation reads the
    page source directly instead of forking man per candidate. */
-static HashMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
+static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
 /* The commands whose candidate lists already went through the synopsis
    validation, so the page reads are paid once per command per launch. */
 static HashSet MAN_VALIDATED_COMMANDS{heap_allocator()};
@@ -1279,7 +1279,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
    session. The cache drops when PATH changes, the same rule the command-name
    cache follows. */
 static String CACHED_GHOST_VERDICT_PATH{};
-static HashMap<bool> GHOST_WORD_VERDICTS{heap_allocator()};
+static StringMap<bool> GHOST_WORD_VERDICTS{heap_allocator()};
 
 fn command_word_resolves(StringView line, EvalContext &context) throws -> bool
 {

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "HashMap.hpp"
+#include "StringMap.hpp"
 #include "Maybe.hpp"
 #include "StringView.hpp"
 
 namespace shit {
 
-/* A set of byte-string keys over the HashMap open-addressing table. The value
+/* A set of byte-string keys over the StringMap open-addressing table. The value
    is None, so a set stores only keys. It owns a copy of every key it holds, so
    a view passed to add need not outlive it. */
 class HashSet
@@ -40,7 +40,7 @@ public:
   }
 
 private:
-  HashMap<Nothing> m_map;
+  StringMap<Nothing> m_map;
 };
 
 } /* namespace shit */

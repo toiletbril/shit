@@ -199,13 +199,13 @@ struct process_substitution_mark
    a set -x, or a trap inside the subshell stays inside it. */
 struct eval_state_snapshot
 {
-  HashMap<String> shell_variables;
-  HashMap<const Expression *> functions;
-  HashMap<String> function_sources;
-  HashMap<String> aliases;
+  StringMap<String> shell_variables;
+  StringMap<const Expression *> functions;
+  StringMap<String> function_sources;
+  StringMap<String> aliases;
   ArrayList<String> positional_params;
   Path working_directory;
-  HashMap<String> traps;
+  StringMap<String> traps;
   bool error_exit;
   bool enable_path_expansion;
   bool enable_echo;
@@ -547,7 +547,7 @@ public:
   fn register_default_completion_spec(completion_spec spec) throws -> void;
   pure fn default_completion_spec() const wontthrow -> const completion_spec *;
   /* The whole spec table, read by complete -p to replay the registrations. */
-  pure fn completion_specs() const wontthrow -> const HashMap<completion_spec> &
+  pure fn completion_specs() const wontthrow -> const StringMap<completion_spec> &
   {
     return m_completion_specs;
   }
@@ -571,7 +571,7 @@ public:
      runs when the signal arrives. */
   fn set_trap(StringView condition, StringView action) throws -> void;
   fn remove_trap(StringView condition) throws -> void;
-  pure fn traps() const wontthrow -> const HashMap<String> &;
+  pure fn traps() const wontthrow -> const StringMap<String> &;
   fn run_exit_trap() throws -> void;
 
   /* Run the action of every signal whose flag the handler set, called at the
@@ -859,7 +859,7 @@ public:
     const bool *value = m_shopt_options.find(name);
     return value != nullptr && *value;
   }
-  pure fn shopt_options() const wontthrow -> const HashMap<bool> &
+  pure fn shopt_options() const wontthrow -> const StringMap<bool> &
   {
     return m_shopt_options;
   }
@@ -1150,24 +1150,24 @@ protected:
   usize m_peak_ast_arena_bytes{0};
 
   mutable BumpArena m_scratch_arena{};
-  HashMap<String> m_shell_variables{heap_allocator()};
-  HashMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
+  StringMap<String> m_shell_variables{heap_allocator()};
+  StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   /* The completion specs the complete builtin registered, keyed by command. */
-  HashMap<completion_spec> m_completion_specs{heap_allocator()};
+  StringMap<completion_spec> m_completion_specs{heap_allocator()};
   /* The default completion that complete -D registered, if any. */
   Maybe<completion_spec> m_default_completion_spec{};
   HashSet m_associative_names{heap_allocator()};
-  HashMap<String> m_associative_values{heap_allocator()};
+  StringMap<String> m_associative_values{heap_allocator()};
   /* An indexed array element whose subscript is past the dense limit, held by
      its name and decimal index so a sparse far subscript such as a bitmask key
      does not pad a huge dense gap. The name still reads as indexed. */
-  HashMap<String> m_sparse_array_values{heap_allocator()};
-  HashMap<bool> m_shopt_options{heap_allocator()};
+  StringMap<String> m_sparse_array_values{heap_allocator()};
+  StringMap<bool> m_shopt_options{heap_allocator()};
 #if SHIT_PLATFORM_IS POSIX
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
      hot loop with a constant regex compiles it once and reuses it. The owning
      wrapper frees each entry on teardown or eviction. */
-  HashMap<CompiledRegex> m_regex_cache{heap_allocator()};
+  StringMap<CompiledRegex> m_regex_cache{heap_allocator()};
 #endif
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up in the map or the environment per word. */
@@ -1186,10 +1186,10 @@ protected:
   String m_shell_name{};
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
-  HashMap<const Expression *> m_functions{heap_allocator()};
+  StringMap<const Expression *> m_functions{heap_allocator()};
   /* The definition text of each function, kept on the heap since a function
      outlives the command and the source string it was parsed from. */
-  HashMap<String> m_function_sources{heap_allocator()};
+  StringMap<String> m_function_sources{heap_allocator()};
   usize m_subshell_depth{0};
   usize m_condition_depth{0};
   usize m_loop_depth{0};
@@ -1284,7 +1284,7 @@ protected:
   bool m_failglob_explicit{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
-  HashMap<String> m_traps{heap_allocator()};
+  StringMap<String> m_traps{heap_allocator()};
   bool m_exit_trap_ran{false};
   /* True while run_pending_traps is draining, so a signal delivered during a
      trap action does not nest a second drain. */
@@ -1304,7 +1304,7 @@ protected:
      an assignment to one evaluates its value as arithmetic. */
   HashSet m_integer_names{heap_allocator()};
   /* The alias name to replacement table. */
-  HashMap<String> m_aliases{heap_allocator()};
+  StringMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed
      so leaving the call restores them. */
   ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};

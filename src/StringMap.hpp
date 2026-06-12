@@ -18,12 +18,12 @@ namespace shit {
    quarters, and counts tombstones toward the load so an insert is never
    dropped. */
 template <class Value = String>
-class HashMap
+class StringMap
 {
 public:
-  explicit HashMap(Allocator allocator) : m_allocator(allocator) {}
+  explicit StringMap(Allocator allocator) : m_allocator(allocator) {}
 
-  cold HashMap(const HashMap &other) : m_allocator(other.m_allocator)
+  cold StringMap(const StringMap &other) : m_allocator(other.m_allocator)
   {
     rehash(other.m_capacity == 0 ? 16 : other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
@@ -34,9 +34,9 @@ public:
 
   /* An explicit deep copy, so a caller that means to duplicate the map says so
      rather than leaning on an implicit copy. */
-  mustuse cold fn clone() const throws -> HashMap { return HashMap{*this}; }
+  mustuse cold fn clone() const throws -> StringMap { return StringMap{*this}; }
 
-  HashMap(HashMap &&other) noexcept
+  StringMap(StringMap &&other) noexcept
       : m_allocator(other.m_allocator), m_slots(other.m_slots),
         m_capacity(other.m_capacity), m_count(other.m_count),
         m_tombstones(other.m_tombstones)
@@ -46,7 +46,7 @@ public:
     other.m_count = 0;
     other.m_tombstones = 0;
   }
-  fn operator=(HashMap &&other) wontthrow->HashMap &
+  fn operator=(StringMap &&other) wontthrow->StringMap &
   {
     if (this != &other) {
       destroy_all();
@@ -62,16 +62,16 @@ public:
     }
     return *this;
   }
-  cold fn operator=(const HashMap &other) throws->HashMap &
+  cold fn operator=(const StringMap &other) throws->StringMap &
   {
     if (this != &other) {
-      HashMap copy{other};
+      StringMap copy{other};
       *this = steal(copy);
     }
     return *this;
   }
 
-  ~HashMap() { destroy_all(); }
+  ~StringMap() { destroy_all(); }
 
   mustuse pure fn count() const wontthrow -> usize { return m_count; }
 
@@ -102,7 +102,7 @@ public:
      until the next set that grows the table. */
   hot flatten mustuse fn find(StringView key) wontthrow -> Value *
   {
-    return const_cast<Value *>(static_cast<const HashMap *>(this)->find(key));
+    return const_cast<Value *>(static_cast<const StringMap *>(this)->find(key));
   }
 
   /* The allocator the table owns, handed to a value built for it so a managed

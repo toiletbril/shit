@@ -43,7 +43,7 @@ public:
   /* Caches whether a command name resolved against the builtins and PATH during
      this pass. A name run many times across the file then hits the filesystem
      at most once. */
-  HashMap<bool> command_resolution_cache{heap_allocator()};
+  StringMap<bool> command_resolution_cache{heap_allocator()};
   /* Names assigned a plain literal value in the current straight-line block,
      mapped to that value. The constant-propagation rule records a name here on
      an unconditional literal assignment and reads it to fold a $name reference
@@ -51,7 +51,7 @@ public:
      a conditional branch, a loop body, a function body, a subshell, and on any
      runtime definer, since a value recorded before such a boundary is no longer
      proven to hold past it. */
-  HashMap<String> constant_variables{heap_allocator()};
+  StringMap<String> constant_variables{heap_allocator()};
 
   /* The depth of function bodies the prepass is inside, raised on entry to a
      function body and lowered on exit. A plain scalar assignment at a depth
