@@ -1662,7 +1662,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
     /* A for or case awaits its in, which is the keyword there. */
     if (expecting_in && plain && word == "in") {
-      push(word_start, word_end, colors::ansi::BOLD_MAGENTA);
+      push(word_start, word_end, colors::ansi::GREEN);
       expecting_in = false;
       for_variable_pending = false;
       command_position = false;
@@ -1757,18 +1757,17 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       if (is_keyword) {
         push(word_start, word_end,
-             keyword_ok ? colors::ansi::BOLD_MAGENTA : colors::ansi::BOLD_RED);
+             keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
         command_position = next_is_command;
         if (opens_in) expecting_in = true;
         if (opens_for_variable) for_variable_pending = true;
         continue;
       }
 
-      /* A command name, green when it resolves and red when it does not, the
-         verdict fish paints at a glance. */
-      push(word_start, word_end,
-           first_word_resolves(word, context) ? colors::ansi::GREEN
-                                              : colors::ansi::RED);
+      /* A command name. A resolved command keeps the default foreground color,
+         an unresolved one is red. */
+      if (!first_word_resolves(word, context))
+        push(word_start, word_end, colors::ansi::RED);
       command_position = false;
       continue;
     }
