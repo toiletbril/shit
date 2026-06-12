@@ -1671,6 +1671,60 @@ fn read_line_from_fd(os::descriptor fd, bool &was_newline_terminated) throws
   return line;
 }
 
+fn current_git_branch() throws -> String
+{
+  let dir = Path::current_directory();
+  for (;;) {
+    let head = dir.clone();
+    head.push_component(".git");
+    /* A linked worktree or a submodule stores .git as a file holding a
+       'gitdir: <path>' pointer rather than a directory, so the real git dir is
+       followed before reading HEAD. */
+    let git_dir = head.clone();
+    if (let const dot_git = read_entire_file(head.text().view())) {
+      let const pointer = dot_git->view();
+      let const gitdir_prefix = StringView{"gitdir: "};
+      if (pointer.starts_with(gitdir_prefix)) {
+        let line = pointer.substring(gitdir_prefix.length);
+        while (!line.is_empty() &&
+               (line[line.length - 1] == '\n' || line[line.length - 1] == '\r'))
+        {
+          line = line.substring_of_length(0, line.length - 1);
+        }
+        let resolved_gitdir = Path{line};
+        /* A relative gitdir pointer is relative to the directory holding the
+           .git file, not the current directory. */
+        if (!resolved_gitdir.is_absolute()) {
+          resolved_gitdir = dir;
+          resolved_gitdir.push_component(line);
+        }
+        git_dir = steal(resolved_gitdir);
+      }
+    }
+    let git_head = git_dir.clone();
+    git_head.push_component("HEAD");
+    if (let const content = read_entire_file(git_head.text().view())) {
+      let text = content->view();
+      while (!text.is_empty() &&
+             (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
+      {
+        text = text.substring_of_length(0, text.length - 1);
+      }
+      let const ref_prefix = StringView{"ref: refs/heads/"};
+      if (text.starts_with(ref_prefix))
+        return String{text.substring(ref_prefix.length)};
+      return String{
+          text.substring_of_length(0, text.length < 7 ? text.length : 7)};
+    }
+    let parent = dir.clone();
+    parent.push_component("..");
+    let normalized = parent.to_absolute().normalized();
+    if (normalized.text() == dir.text()) break;
+    dir = steal(normalized);
+  }
+  return String{};
+}
+
 } /* namespace utils */
 
 } /* namespace shit */

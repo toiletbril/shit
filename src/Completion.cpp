@@ -2494,6 +2494,7 @@ fn highlight_line(StringView line, EvalContext &context) throws
        them, so a POSIX run reds an unset $RANDOM. */
     known_vars.add(StringView{"IFS"});
     known_vars.add(StringView{"LINENO"});
+    known_vars.add(StringView{"SHIT_GIT_BRANCH"});
     if (context.is_bash_compatible()) {
       known_vars.add(StringView{"RANDOM"});
       known_vars.add(StringView{"SECONDS"});

@@ -58,6 +58,12 @@ hot fn Word::to_literal_string() const throws -> String
       result += ")";
       continue;
     }
+    if (segment.kind == WordSegment::Kind::FunctionSubstitution) {
+      result += "${ ";
+      result += segment.text;
+      result += " }";
+      continue;
+    }
     if (segment.kind == WordSegment::Kind::ArithmeticExpansion) {
       result += "$((";
       result += segment.text;
@@ -84,7 +90,8 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
        text, so a word holding one is never all digits. */
     if (segment.kind == WordSegment::Kind::VariableReference ||
         segment.kind == WordSegment::Kind::CommandSubstitution ||
-        segment.kind == WordSegment::Kind::ArithmeticExpansion)
+        segment.kind == WordSegment::Kind::ArithmeticExpansion ||
+        segment.kind == WordSegment::Kind::FunctionSubstitution)
     {
       return false;
     }
@@ -115,6 +122,9 @@ cold fn Word::to_pretty_string() const throws -> String
       break;
     case WordSegment::Kind::ArithmeticExpansion:
       result += "ArithmeticExpansion";
+      break;
+    case WordSegment::Kind::FunctionSubstitution:
+      result += "FunctionSubstitution";
       break;
     }
     result += " \"";

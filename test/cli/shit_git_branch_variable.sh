@@ -1,0 +1,20 @@
+unset SHIT_FLAGS
+# SHIT_GIT_BRANCH reads the branch the \G prompt segment renders, from
+# .git/HEAD without forking git. The probe builds the repository shapes by
+# hand, the attached ref, the detached hash, the worktree gitdir pointer,
+# and the walk up from a subdirectory, so no git binary is needed.
+root=$(mktemp -d)
+mkdir -p "$root/repo/.git" "$root/repo/sub/dir"
+printf 'ref: refs/heads/probe-branch\n' > "$root/repo/.git/HEAD"
+"$BIN" -c "cd '$root/repo'; echo \"attached=\$SHIT_GIT_BRANCH\""
+"$BIN" -c "cd '$root/repo/sub/dir'; echo \"walked=\$SHIT_GIT_BRANCH\""
+printf '0123456789abcdef\n' > "$root/repo/.git/HEAD"
+"$BIN" -c "cd '$root/repo'; echo \"detached=\$SHIT_GIT_BRANCH\""
+mkdir -p "$root/real/gitdir" "$root/tree"
+printf 'gitdir: %s\n' "$root/real/gitdir" > "$root/tree/.git"
+printf 'ref: refs/heads/linked-tree\n' > "$root/real/gitdir/HEAD"
+"$BIN" -c "cd '$root/tree'; echo \"worktree=\$SHIT_GIT_BRANCH\""
+"$BIN" -c "cd '$root'; echo \"outside=[\$SHIT_GIT_BRANCH]\""
+"$BIN" -c "cd '$root/repo'; SHIT_GIT_BRANCH=stored; echo \"stored=\$SHIT_GIT_BRANCH\""
+rm -rf "$root"
+echo "rc=$?"

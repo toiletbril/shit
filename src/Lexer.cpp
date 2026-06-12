@@ -1037,6 +1037,19 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       } else if (next == '{') {
         byte_count++;
         let name = String{};
+        /* A ${ followed by whitespace is the bash 5.3 funsub, a command body
+           that runs in the current shell, riding every mood but POSIX like
+           the other pure additions. The leading whitespace drops and the
+           same balanced walk below finds the close brace. */
+        bool is_function_substitution = false;
+        if (bash_additions_enabled()) {
+          let probe = chop_character(byte_count);
+          while (probe == ' ' || probe == '\t' || probe == '\n') {
+            is_function_substitution = true;
+            byte_count++;
+            probe = chop_character(byte_count);
+          }
+        }
         /* The matching close brace lives at brace depth one, so a nested
            ${...} in a default or alternate word does not end the outer
            expansion early. A bare { does not raise the depth, matching dash,
@@ -1152,6 +1165,15 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             byte_count++;
             continue;
           }
+          /* The funsub body is command text, so a bare { opens a function
+             body or a brace group whose } must not close the substitution,
+             while a variable reference keeps the dash reading where only a
+             nested ${ raises the depth. */
+          if (c == '{' && is_function_substitution) {
+            brace_depth++;
+            name += c;
+            continue;
+          }
           if (c == '}') {
             brace_depth--;
             if (brace_depth == 0) break;
@@ -1160,8 +1182,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           }
           name += c;
         }
-        word.segments.push(WordSegment{WordSegment::Kind::VariableReference,
-                                       steal(name), is_in_double_quotes});
+        word.segments.push(WordSegment{
+            is_function_substitution ? WordSegment::Kind::FunctionSubstitution
+                                     : WordSegment::Kind::VariableReference,
+            steal(name), is_in_double_quotes});
       } else if (lexer::is_variable_name_start(next)) {
         let name = String{};
         while (lexer::is_variable_name(next = chop_character(byte_count))) {

@@ -1046,6 +1046,13 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   if (first_byte == 'I' && name == "IFS")
     return String{heap_allocator(), m_field_separators.view()};
 
+  /* The branch the \G prompt segment renders, the shell's own dynamic
+     variable, so a script or a prompt command reads it without forking git.
+     Empty outside a repository, the short hash on a detached HEAD. A stored
+     value above wins the way the other dynamic names yield. */
+  if (first_byte == 'S' && name == "SHIT_GIT_BRANCH")
+    return utils::current_git_branch();
+
   /* $LINENO reports the line of the command currently evaluating. It yields to
      a stored value above, so a script that assigns LINENO reads back what it
      set, matching dash. With no assignment it computes the line from the

@@ -689,6 +689,16 @@ hot fn EvalContext::expand_word(const Word &word) throws
         append_split_run(output, true);
     } break;
 
+    /* The funsub splices its captured output under the same quote and split
+       treatment as $(...), only the body's execution environment differs. */
+    case WordSegment::Kind::FunctionSubstitution: {
+      let const output = capture_function_substitution(segment);
+      if (segment.is_in_double_quotes)
+        append_run(output, false);
+      else
+        append_split_run(output, true);
+    } break;
+
     case WordSegment::Kind::ProcessSubstitution: {
       /* The /dev/fd path is a single literal field, so it neither splits on IFS
          nor globs, the way bash substitutes the process substitution. */
@@ -767,6 +777,9 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     case WordSegment::Kind::CommandSubstitution:
       result += capture_command_substitution(segment);
       break;
+    case WordSegment::Kind::FunctionSubstitution:
+      result += capture_function_substitution(segment);
+      break;
     case WordSegment::Kind::ArithmeticExpansion:
       result += utils::int_to_text(segment.folded_arithmetic_result.has_value()
                                        ? *segment.folded_arithmetic_result
@@ -822,6 +835,10 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
     } break;
     case WordSegment::Kind::CommandSubstitution: {
       let const output = capture_command_substitution(segment);
+      emit_run(output.view(), !segment.is_in_double_quotes);
+    } break;
+    case WordSegment::Kind::FunctionSubstitution: {
+      let const output = capture_function_substitution(segment);
       emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::ProcessSubstitution: {

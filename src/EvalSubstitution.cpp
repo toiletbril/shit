@@ -437,4 +437,113 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   return captured;
 }
 
+fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
+    -> String
+{
+  if (AST_ARENA == nullptr)
+    throw Error{"Function substitution outside of a parse"};
+
+  /* The same per-segment tree cache the $(...) capture keeps, so a funsub in
+     a loop body parses once per arena generation. */
+  const usize generation = AST_ARENA->reset_generation();
+  if (segment.cached_substitution_ast == nullptr ||
+      segment.cached_substitution_generation != generation)
+  {
+    LOG(verbosity::Debug,
+        "function substitution ast cache miss for generation %zu, reparsing",
+        generation);
+    let parser = Parser{
+        Lexer{String{segment.text.view()}, *AST_ARENA, false, None, mood()}
+    };
+    segment.cached_substitution_ast = parser.construct_ast();
+    segment.cached_substitution_generation = generation;
+  }
+  ASSERT(segment.cached_substitution_ast != nullptr);
+
+  let const ast = segment.cached_substitution_ast;
+  const String &source = segment.text;
+  LOG(verbosity::Debug, "running a function substitution body of %zu bytes",
+      source.count());
+
+  /* The body runs against the live state on purpose, no snapshot and no
+     subshell, so its assignments, cd, and definitions persist the way the
+     bash 5.3 funsub leaves them. Only the capture plumbing matches the
+     isolated path, the pipe, the drain thread, and the newline trim. */
+  let const previous_source = m_current_source;
+  let const previous_origin = m_current_origin;
+  let const previous_location = m_current_location;
+  set_current_source(&source, String{"function substitution"});
+  defer
+  {
+    set_current_source(previous_source, previous_origin);
+    m_current_location = previous_location;
+  };
+
+  let const pipe = os::make_pipe();
+  if (!pipe) throw Error{"Could not open a pipe for function substitution"};
+
+  let captured = String{heap_allocator()};
+  let drain_context = command_substitution_drain_context{&captured, pipe->in};
+  let const reader =
+      os::start_thread(drain_command_substitution_pipe, &drain_context);
+  if (!reader) {
+    os::close_fd(pipe->in);
+    os::close_fd(pipe->out);
+    throw Error{"Could not start a thread for function substitution"};
+  }
+
+  shit::flush();
+  let const saved = os::redirect_stdout(pipe->out);
+
+  let const was_interactive = m_shell_is_interactive;
+  m_shell_is_interactive = false;
+
+  std::exception_ptr error;
+  try {
+    ast->evaluate(*this);
+  } catch (...) {
+    error = std::current_exception();
+  }
+  /* A break, continue, or return acts only within the body and is consumed
+     here. An exit stays pending, so the shell ends after the surrounding
+     command finishes, the way bash exits from a funsub. */
+  if (has_pending_control_flow() &&
+      pending_control_flow().kind != control_flow::Kind::Exit)
+    clear_control_flow();
+
+  m_shell_is_interactive = was_interactive;
+
+  shit::flush();
+  os::restore_stdout(saved);
+  os::close_fd(pipe->out);
+  os::join_thread(*reader);
+  os::close_fd(pipe->in);
+
+  if (error) {
+    /* The same containment the $(...) capture applies, the error renders
+       against the body source with the backtrace and the parent continues
+       with the partial output and a failing status. */
+    LOG(verbosity::Debug,
+        "the function substitution failed, containing the error with status 1");
+    try {
+      std::rethrow_exception(error);
+    } catch (const ErrorWithLocationAndDetails &e) {
+      show_message(e.to_string(source.view()));
+      show_message(e.details_to_string(source.view()));
+      print_source_backtrace();
+    } catch (const ErrorWithLocation &e) {
+      show_message(e.to_string(source.view()));
+      print_source_backtrace();
+    } catch (const Error &e) {
+      show_message(e.to_string());
+      print_source_backtrace();
+    }
+    set_last_exit_status(1);
+  }
+
+  while (!captured.is_empty() && captured.back() == '\n')
+    captured.pop_back();
+  return captured;
+}
+
 } /* namespace shit */

@@ -1080,6 +1080,15 @@ public:
      unchanged. */
   fn capture_command_substitution(const WordSegment &segment) throws -> String;
 
+  /* Run the source of a ${ ...; } funsub and return its standard output with
+     trailing newlines stripped, the bash 5.3 form. The body runs in the
+     current shell with no snapshot and no subshell, so its assignments, cd,
+     and function definitions persist. A break, continue, or return is
+     consumed inside it, while an exit stays pending and ends the shell after
+     the surrounding command, the way bash exits from a funsub. */
+  fn capture_function_substitution(const WordSegment &segment) throws
+      -> String;
+
   /* The $(< file) shorthand reads the named file directly the way bash does,
      when the substitution body is only an input redirection naming one word
      with no command. None when the body is anything else, so the caller parses

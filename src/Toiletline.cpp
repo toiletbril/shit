@@ -498,61 +498,11 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
   return shortened;
 }
 
-/* The current git branch read from .git/HEAD without forking git, walking up
-   from the working directory to the filesystem root. Empty outside a
-   repository. A detached HEAD shows the short commit hash. */
+/* The branch the \G and \g prompt segments render, shared with the
+   SHIT_GIT_BRANCH dynamic variable through utils. */
 static fn git_branch() throws -> String
 {
-  let dir = Path::current_directory();
-  for (;;) {
-    let head = dir.clone();
-    head.push_component(".git");
-    /* A linked worktree or a submodule stores .git as a file holding a
-       'gitdir: <path>' pointer rather than a directory, so the real git dir is
-       followed before reading HEAD. */
-    let git_dir = head.clone();
-    if (let const dot_git = utils::read_entire_file(head.text().view())) {
-      let const pointer = dot_git->view();
-      let const gitdir_prefix = StringView{"gitdir: "};
-      if (pointer.starts_with(gitdir_prefix)) {
-        let line = pointer.substring(gitdir_prefix.length);
-        while (!line.is_empty() &&
-               (line[line.length - 1] == '\n' || line[line.length - 1] == '\r'))
-        {
-          line = line.substring_of_length(0, line.length - 1);
-        }
-        let resolved_gitdir = Path{line};
-        /* A relative gitdir pointer is relative to the directory holding the
-           .git file, not the current directory. */
-        if (!resolved_gitdir.is_absolute()) {
-          resolved_gitdir = dir;
-          resolved_gitdir.push_component(line);
-        }
-        git_dir = steal(resolved_gitdir);
-      }
-    }
-    let git_head = git_dir.clone();
-    git_head.push_component("HEAD");
-    if (let const content = utils::read_entire_file(git_head.text().view())) {
-      let text = content->view();
-      while (!text.is_empty() &&
-             (text[text.length - 1] == '\n' || text[text.length - 1] == '\r'))
-      {
-        text = text.substring_of_length(0, text.length - 1);
-      }
-      let const ref_prefix = StringView{"ref: refs/heads/"};
-      if (text.starts_with(ref_prefix))
-        return String{text.substring(ref_prefix.length)};
-      return String{
-          text.substring_of_length(0, text.length < 7 ? text.length : 7)};
-    }
-    let parent = dir.clone();
-    parent.push_component("..");
-    let normalized = parent.to_absolute().normalized();
-    if (normalized.text() == dir.text()) break;
-    dir = steal(normalized);
-  }
-  return String{};
+  return utils::current_git_branch();
 }
 
 /* A human duration for the \D prompt segment, quiet under a few milliseconds,
@@ -664,17 +614,10 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
       out += shorten_path_with_ellipsis(
           collapse_home_prefix(working_directory).view(), PROMPT_PWD_LENGTH);
       break;
-    /* The git branch wrapped in parentheses with a trailing space when the cwd
-       is inside a work tree, empty otherwise, the form the default prompt uses.
-       The bare \g escape stays the unwrapped name for a custom prompt. */
-    case 'G': {
-      let const branch = git_branch();
-      if (!branch.is_empty()) {
-        out += " (";
-        out += branch.view();
-        out += ")";
-      }
-    } break;
+    /* The current git branch, empty outside a repository, the same value
+       $SHIT_GIT_BRANCH reads. Any wrapping belongs to the PS1 text, the
+       default template spaces it through ${SHIT_GIT_BRANCH:+...}. */
+    case 'g': out += git_branch(); break;
     case '$': out += (user == "root") ? '#' : '$'; break;
     case 'n': out += '\n'; break;
     case 'r': out += '\r'; break;
@@ -723,8 +666,6 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
     case 'D':
       out += format_prompt_duration(context.last_command_duration_ns());
       break;
-    /* The current git branch, empty outside a repository. */
-    case 'g': out += git_branch(); break;
     /* \! and \# are the history and command numbers, which this shell does not
        track, so they expand to nothing rather than printing the escape raw. */
     case '!': break;
@@ -739,16 +680,99 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
   return out;
 }
 
-/* The decoded prompt and the result of its parameter pass from the previous
-   draw. While the decoded prompt is unchanged the expansion is reused, so a
-   command substitution in PS1 does not run again until a prompt input moves. */
-static String PROMPT_CACHE_KEY{};
-static String PROMPT_CACHE_VALUE{};
+
+/* The PS1 expansion from the previous prompt, reusable only while every value
+   it read is unchanged. The scanner below collects every name a pure
+   parameter-only template references, the cache stores those names with the
+   values they had at expansion time, and a later prompt compares each
+   name's current value before reusing the result. A template holding a
+   command, process, or arithmetic substitution, a funsub, or an assigning
+   parameter form has inputs the names cannot capture, so it never caches
+   and expands every prompt the way bash expands PS1. */
+struct prompt_cache_input
+{
+  String name{};
+  Maybe<String> value{};
+};
+static String PROMPT_CACHE_TEMPLATE{};
+static shit::ArrayList<prompt_cache_input> PROMPT_CACHE_INPUTS{};
+static String PROMPT_CACHE_EXPANSION{};
+static bool PROMPT_CACHE_VALID = false;
+
+/* Scan the template for parameter references, filling names and reporting
+   whether the template is pure enough to cache. The walk is conservative, a
+   $ that opens anything other than a plain name or a non-assigning braced
+   parameter form marks the template impure. Names inside a braced form's
+   word, the :+ alternate, are collected by the same linear walk when their
+   own $ comes by. */
+static fn scan_prompt_template_inputs(
+    StringView text, shit::ArrayList<prompt_cache_input> &names) throws -> bool
+{
+  auto is_name_byte = [](char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '_';
+  };
+  auto add_name = [&](StringView name) throws {
+    for (const prompt_cache_input &known : names)
+      if (known.name.view() == name) return;
+    let input = prompt_cache_input{};
+    input.name = String{name};
+    names.push(steal(input));
+  };
+
+  for (usize i = 0; i < text.length; i++) {
+    const char byte = text[i];
+    if (byte == '`') return false;
+    if (byte != '$') continue;
+    if (i + 1 >= text.length) continue;
+    const char next = text[i + 1];
+    if (next == '(') return false;
+    if (next == '{') {
+      usize j = i + 2;
+      /* A brace followed by whitespace or a pipe is the funsub, a command
+         with unknowable inputs. */
+      if (j < text.length &&
+          (text[j] == ' ' || text[j] == '\t' || text[j] == '\n' ||
+           text[j] == '|'))
+        return false;
+      if (j < text.length && (text[j] == '#' || text[j] == '!'))
+        j++;
+      usize name_start = j;
+      while (j < text.length && is_name_byte(text[j]))
+        j++;
+      if (j == name_start) return false;
+      add_name(text.substring_of_length(name_start, j - name_start));
+      /* An = directly or after a colon assigns at expansion time, an input
+         the cache cannot key. The other operators only read. */
+      if (j < text.length && text[j] == '=') return false;
+      if (j + 1 < text.length && text[j] == ':' && text[j + 1] == '=')
+        return false;
+      i = j - 1;
+      continue;
+    }
+    usize j = i + 1;
+    while (j < text.length && is_name_byte(text[j]))
+      j++;
+    if (j > i + 1) {
+      add_name(text.substring_of_length(i + 1, j - i - 1));
+      i = j - 1;
+      continue;
+    }
+    /* A special parameter such as $? or $$ reads one byte, keyed like a
+       name so a status change misses the cache. */
+    add_name(text.substring_of_length(i + 1, 1));
+    i++;
+  }
+  return true;
+}
 
 fn default_prompt_template() -> String
 {
+  /* The branch renders space-wrapped only when one exists, the bash :+
+     alternate around the SHIT_GIT_BRANCH dynamic variable, so the prompt
+     closes up to a single space outside a repository. */
   let template_string = String{};
-  template_string += R"(\s@\u@\h )";
+  template_string += R"([\u@\h${SHIT_GIT_BRANCH:+ ($SHIT_GIT_BRANCH)} )";
   if (colors::stdout_wants_color()) {
     template_string += colors::ansi::GREEN;
     template_string += R"(\P)";
@@ -756,7 +780,7 @@ fn default_prompt_template() -> String
   } else {
     template_string += R"(\P)";
   }
-  template_string += R"(\G $ )";
+  template_string += R"(] )";
   return template_string;
 }
 
@@ -864,20 +888,44 @@ fn build_prompt(EvalContext &context) -> String
     ps1_template = default_prompt_template();
 
   /* The raw template takes parameter expansion, command substitution, and
-     arithmetic first, so ${debian_chroot:+...} and $(...) render. This runs
-     before the backslash escapes are decoded, so the cwd, the user, and the
-     other escape-inserted text below are literal and never re-expanded. A
-     directory named $(...) therefore cannot run a command at the prompt. The
-     result is cached on the raw template and the exit status is restored, since
-     a command substitution here must not clobber $? for the next command. The
-     backslash escapes are decoded last on either path, inserting the cwd, the
-     user, and the clock as literal text the expansion never sees. */
-  if (ps1_template.view() == PROMPT_CACHE_KEY.view()) {
-    String rendered =
-        expand_prompt_escapes(PROMPT_CACHE_VALUE.view(), CACHED_USER.view(),
-                              full_pwd.view(), context);
-    if (!colors::stdout_wants_color()) return strip_ansi_color(rendered.view());
-    return rendered;
+     arithmetic first, so ${debian_chroot:+...} and $(...) render fresh on
+     every prompt the way bash expands PS1, and the default template's
+     ${SHIT_GIT_BRANCH:+...} follows a checkout or a cd. This runs before
+     the backslash escapes are decoded, so the cwd, the user, and the other
+     escape-inserted text below are literal and never re-expanded. A
+     directory named $(...) therefore cannot run a command at the prompt.
+     The exit status is restored, since a command substitution here must not
+     clobber $? for the next command. */
+
+  /* A pure parameter-only template reuses the previous expansion while the
+     template and every value it reads are unchanged, sparing the parse. The
+     value reads cost the same lookups the expansion would pay, the branch
+     read included, so a hit and a miss agree byte for byte. */
+  let scanned_inputs = shit::ArrayList<prompt_cache_input>{};
+  const bool is_cacheable =
+      scan_prompt_template_inputs(ps1_template.view(), scanned_inputs);
+  if (is_cacheable && PROMPT_CACHE_VALID &&
+      ps1_template.view() == PROMPT_CACHE_TEMPLATE.view())
+  {
+    bool every_input_unchanged = true;
+    for (const prompt_cache_input &input : PROMPT_CACHE_INPUTS) {
+      let current = context.get_variable_value(input.name.view());
+      const bool both_unset = !current.has_value() && !input.value.has_value();
+      const bool both_equal = current.has_value() && input.value.has_value() &&
+                              current->view() == input.value->view();
+      if (!both_unset && !both_equal) {
+        every_input_unchanged = false;
+        break;
+      }
+    }
+    if (every_input_unchanged) {
+      String rendered =
+          expand_prompt_escapes(PROMPT_CACHE_EXPANSION.view(),
+                                CACHED_USER.view(), full_pwd.view(), context);
+      if (!colors::stdout_wants_color())
+        return strip_ansi_color(rendered.view());
+      return rendered;
+    }
   }
 
   const i32 saved_status = context.last_exit_status();
@@ -894,8 +942,17 @@ fn build_prompt(EvalContext &context) -> String
     expanded = ps1_template;
   }
   context.set_last_exit_status(saved_status);
-  PROMPT_CACHE_KEY = ps1_template;
-  PROMPT_CACHE_VALUE = expanded;
+
+  PROMPT_CACHE_VALID = false;
+  if (is_cacheable) {
+    for (prompt_cache_input &input : scanned_inputs)
+      input.value = context.get_variable_value(input.name.view());
+    PROMPT_CACHE_TEMPLATE = ps1_template;
+    PROMPT_CACHE_INPUTS = steal(scanned_inputs);
+    PROMPT_CACHE_EXPANSION = expanded;
+    PROMPT_CACHE_VALID = true;
+  }
+
   String rendered = expand_prompt_escapes(expanded.view(), CACHED_USER.view(),
                                           full_pwd.view(), context);
   if (!colors::stdout_wants_color()) return strip_ansi_color(rendered.view());
@@ -966,8 +1023,10 @@ fn emit_newlines(StringView buffer) -> void { unused(buffer); }
 
 fn default_prompt_template() -> String
 {
+  /* The same shape the line-editor build renders, the space-wrapped branch
+     through the :+ alternate when one exists. */
   let template_string = String{};
-  template_string += "\\s@\\u@\\h ";
+  template_string += "[\\u@\\h${SHIT_GIT_BRANCH:+ ($SHIT_GIT_BRANCH)} ";
   if (shit::colors::stdout_wants_color()) {
     template_string += shit::colors::ansi::GREEN;
     template_string += "\\P";
@@ -975,7 +1034,7 @@ fn default_prompt_template() -> String
   } else {
     template_string += "\\P";
   }
-  template_string += "\\G \\$ ";
+  template_string += "] ";
   return template_string;
 }
 

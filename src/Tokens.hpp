@@ -39,6 +39,10 @@ public:
        >(...). The evaluator runs the command on a pipe and splices the /dev/fd
        path of the shell's end. */
     ProcessSubstitution,
+    /* The text holds the source inside ${ ... }, the bash 5.3 funsub. The
+       evaluator runs it in the current shell, so its assignments and cd
+       persist, and splices the captured output like CommandSubstitution. */
+    FunctionSubstitution,
   };
 
   Kind kind;

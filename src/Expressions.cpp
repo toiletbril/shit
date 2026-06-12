@@ -170,7 +170,13 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
 
   let name = String{};
   for (const WordSegment &segment : word.segments) {
-    if (segment.kind == WordSegment::Kind::VariableReference) return shit::None;
+    /* Any expansion segment makes the name a runtime value, the variable,
+       command, arithmetic, process, and function substitutions alike, so
+       none of their raw bytes may pass for the program text. */
+    if (segment.kind != WordSegment::Kind::LiteralText &&
+        segment.kind != WordSegment::Kind::DoubleQuotedText &&
+        segment.kind != WordSegment::Kind::UnquotedText)
+      return shit::None;
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       for (usize i = 0; i < segment.text.count(); i++) {
         if (lexer::is_expandable_char(segment.text[i])) return shit::None;

@@ -147,6 +147,12 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
    iostream file stream is pulled in. Returns None when the open fails. */
 fn read_entire_file(StringView path) throws -> Maybe<String>;
 
+/* The current git branch read from .git/HEAD without forking git, walking up
+   from the working directory to the filesystem root. Empty outside a
+   repository. A detached HEAD reads as the short commit hash. Shared by the
+   \G and \g prompt segments and the SHIT_GIT_BRANCH dynamic variable. */
+fn current_git_branch() throws -> String;
+
 /* The shell a script's shebang names, for the mimicry feature, or None when the
    resolved program is not a script shit can emulate. Only the first line is
    read. A sh or dash interpreter maps to POSIX mode, bash to bash mode, and
