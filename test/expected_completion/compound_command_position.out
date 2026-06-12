@@ -19,3 +19,19 @@ noexec
 noglob
 notify
 nounset
+== case arm body:
+export
+== case arm with alternates:
+export
+== arguments through the case arm:
+no-clobber
+no-diagnostics
+no-exec
+no-glob
+no-unset
+noclobber
+noexec
+noglob
+notify
+nounset
+== matched paren stays an argument:

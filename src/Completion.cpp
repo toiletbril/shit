@@ -39,6 +39,23 @@ static pure fn is_command_separator(char c) wontthrow -> bool
   return c == ';' || c == '|' || c == '&' || c == '(' || c == '\n';
 }
 
+/* Whether the closing paren at position matches no opener earlier on the
+   line, the shape of a case pattern's closing paren, where the word after it
+   opens the arm's first command. A matched paren closes a subshell or a
+   substitution instead, and the word after that one is an argument. */
+static pure fn is_unmatched_closing_paren(StringView line,
+                                          usize position) wontthrow -> bool
+{
+  usize depth = 0;
+  for (usize k = 0; k < position; k++) {
+    if (line[k] == '(')
+      depth++;
+    else if (line[k] == ')' && depth > 0)
+      depth--;
+  }
+  return depth == 0;
+}
+
 /* True when an unquoted glob metacharacter appears in the token, so TAB
    resolves the glob rather than listing a directory. */
 static pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
@@ -134,6 +151,10 @@ static pure fn is_in_command_position(StringView line,
       i--;
     if (i == 0) return true;
     if (is_command_separator(line[i - 1])) return true;
+    /* A case pattern's closing paren opens the arm's body, so case $x in a)
+       completes a command there the way the byte after do does. */
+    if (line[i - 1] == ')' && is_unmatched_closing_paren(line, i - 1))
+      return true;
     /* The word right before is examined, and a transparent keyword prefix is
        stepped over so the word after time or ! is still a command word. */
     usize word_start = i;
@@ -567,8 +588,22 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 static fn command_word_of(StringView line) wontthrow -> StringView
 {
   usize i = 0;
-  for (usize k = 0; k < line.length; k++)
-    if (line[k] == ';' || line[k] == '|' || line[k] == '&') i = k + 1;
+  usize open_parens = 0;
+  for (usize k = 0; k < line.length; k++) {
+    const char c = line[k];
+    if (c == '(') {
+      open_parens++;
+    } else if (c == ')') {
+      /* A matched paren closes a substitution or a subshell mid-word, while
+         an unmatched one closes a case pattern and starts the arm's body. */
+      if (open_parens > 0)
+        open_parens--;
+      else
+        i = k + 1;
+    } else if (c == ';' || c == '|' || c == '&') {
+      i = k + 1;
+    }
+  }
   for (;;) {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
       i++;
