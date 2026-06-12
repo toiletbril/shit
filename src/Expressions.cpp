@@ -2743,8 +2743,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     let const reply = String{StringView{*input}};
-    LOG(verbosity::All, "the select prompt read the reply '%s'",
-        reply.c_str());
+    LOG(verbosity::All, "the select prompt read the reply '%s'", reply.c_str());
     cxt.set_shell_variable("REPLY", reply.view());
     if (reply.is_empty()) {
       reprint_menu = true;
@@ -3677,8 +3676,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_child != nullptr);
 
-  LOG(verbosity::Debug,
-      "applying %zu redirections around the compound command",
+  LOG(verbosity::Debug, "applying %zu redirections around the compound command",
       m_redirections.count());
 
   /* A <(...) or >(...) in a redirection target, as in done < <(cmd), opens a

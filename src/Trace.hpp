@@ -142,7 +142,7 @@ String format_named_values(StringView names, Args &&...args)
 } /* namespace shit */
 
 #define T__LOG_STRINGIZE2(x) #x
-#define T__LOG_STRINGIZE(x) T__LOG_STRINGIZE2(x)
+#define T__LOG_STRINGIZE(x)  T__LOG_STRINGIZE2(x)
 
 /* A release build carries no logging at all, neither the format strings nor
    the call sites, so the binary stays lean and the hot paths lose even the

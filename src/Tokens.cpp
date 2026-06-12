@@ -217,8 +217,8 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     key.append(subscript.view());
     key.push(']');
 
-    LOG(verbosity::All,
-        "folding the subscript into array element key '%s'", key.c_str());
+    LOG(verbosity::All, "folding the subscript into array element key '%s'",
+        key.c_str());
 
     let value = Word{};
     value.segments.push(WordSegment{WordSegment::Kind::UnquotedText,

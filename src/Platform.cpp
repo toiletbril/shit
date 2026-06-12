@@ -764,8 +764,7 @@ fn wait_and_monitor_process(process pid) throws -> i32
 {
   ASSERT(pid >= 0);
 
-  LOG(verbosity::Debug, "waiting on process %lld",
-      static_cast<long long>(pid));
+  LOG(verbosity::Debug, "waiting on process %lld", static_cast<long long>(pid));
 
   i32 status{};
 

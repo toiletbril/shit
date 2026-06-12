@@ -94,8 +94,7 @@ const SetOption SET_OPTIONS[] = {
     {'W', "warnings", &EvalContext::set_warnings_enabled,
      &EvalContext::warnings_enabled,
      "Report a strict runtime error as a warning and let the run proceed, the "
-     "-W flag.",
-     "enable-diagnostics"},
+     "-W flag.", "enable-diagnostics"},
     {'I', "mimicry", &EvalContext::set_mimicry, &EvalContext::mimicry,
      "Mimic the shell a script's shebang names, the -I flag."},
     {'\0', "diagnostics", &EvalContext::set_diagnostics_enabled,

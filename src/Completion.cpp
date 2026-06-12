@@ -855,8 +855,8 @@ static fn validate_subcommands_for(StringView command) throws -> void
 /* Whether the token at token_start is the line's first argument, the word
    right after the command with only blanks between, the slot a subcommand
    completes at. */
-static fn is_first_argument_token(StringView line,
-                                  usize token_start) wontthrow -> bool
+static fn is_first_argument_token(StringView line, usize token_start) wontthrow
+    -> bool
 {
   let const command = command_word_of(line);
   if (command.is_empty()) return false;
@@ -1097,8 +1097,8 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     /* The -W list expands the way bash expands it, through the same shared
        path compgen -W reads. The ghost runs on every keystroke and so keeps
        the plain split for a list that would need a parse. */
-    for (const String &word : context.expand_wordlist_to_fields(
-             spec->word_list.view(), for_listing))
+    for (const String &word :
+         context.expand_wordlist_to_fields(spec->word_list.view(), for_listing))
       if (word.view().starts_with(token)) candidates.push(String{word.view()});
   }
 
@@ -1206,7 +1206,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         from_stage = complete_from_manpage(line, token, for_listing, context);
     }
     if (!from_stage.has_value() && !is_posix_completion)
-      from_stage = complete_from_spec(line, token, cursor, for_listing, context);
+      from_stage =
+          complete_from_spec(line, token, cursor, for_listing, context);
     if (from_stage.has_value())
       candidates = steal(*from_stage);
     else
@@ -1765,9 +1766,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       /* A command name, green when it resolves and red when it does not, the
          verdict fish paints at a glance. */
-      push(word_start, word_end, first_word_resolves(word, context)
-                                     ? colors::ansi::GREEN
-                                     : colors::ansi::RED);
+      push(word_start, word_end,
+           first_word_resolves(word, context) ? colors::ansi::GREEN
+                                              : colors::ansi::RED);
       command_position = false;
       continue;
     }

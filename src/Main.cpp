@@ -78,8 +78,7 @@ FLAG(
     "Run in POSIX mode, the way dash behaves. The analysis stage is skipped so "
     "a file with an analysis error still runs, an unmatched glob stays its "
     "literal pattern, and the style warnings are off.");
-FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible",
-     shit::flag_section::Compat,
+FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible", shit::flag_section::Compat,
      "Run in Bash-compatible mode. Bash extensions such as [[ ]], arrays, and "
      "brace expansion are enabled, the analysis stage is skipped, and an "
      "unmatched glob stays its literal pattern.");
@@ -617,9 +616,9 @@ fn main(int argc, char **argv) -> int
       shit::verbosity level;
     };
     static const log_level_name LOG_LEVEL_NAMES[] = {
-        {"info", shit::verbosity::Info},
+        {"info",  shit::verbosity::Info },
         {"debug", shit::verbosity::Debug},
-        {"all", shit::verbosity::All},
+        {"all",   shit::verbosity::All  },
     };
     let is_known_level = false;
     for (const log_level_name &entry : LOG_LEVEL_NAMES)
@@ -629,11 +628,10 @@ fn main(int argc, char **argv) -> int
         break;
       }
     if (!is_known_level) {
-      shit::show_message(
-          shit::Error{"Unknown debug logging level '" +
-                      shit::String{FLAG_LOG.value()} +
-                      "', expected 'info', 'debug', or 'all'"}
-              .to_string());
+      shit::show_message(shit::Error{"Unknown debug logging level '" +
+                                     shit::String{FLAG_LOG.value()} +
+                                     "', expected 'info', 'debug', or 'all'"}
+                             .to_string());
       return 2;
     }
   }
@@ -1101,10 +1099,10 @@ fn main(int argc, char **argv) -> int
                     shit::SourceLocation{operand_offset, file_name.count(),
                                          shit::None},
                     "Could not open '" + file_name.view() +
-                        "': " + shit::os::last_system_error_message()}
-                    .to_string(
-                        shit::join_command_line(parse_argc, parse_argv)
-                            .view()));
+                        "': " + shit::os::last_system_error_message()
+            }
+                    .to_string(shit::join_command_line(parse_argc, parse_argv)
+                                   .view()));
             shit::utils::quit(127, true);
           }
           script_contents = steal(*contents);

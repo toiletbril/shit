@@ -125,7 +125,7 @@ fn propagated_test_operand_value(const Token *token,
 {
   if (is_split_eligible_variable_operand(token)) {
     LOG(verbosity::All, "declining the test operand fold, the unquoted "
-                          "variable splits at run time");
+                        "variable splits at run time");
     return None;
   }
   return propagated_literal_word_value(token, actx);
@@ -367,8 +367,7 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
   /* A function or an alias of the same name shadows the builtin, so the program
      word no longer names the constant builtin and the fold declines it. */
   if (actx.defined_functions.contains(name->view())) {
-    LOG(verbosity::All,
-        "declining the static verdict, a function shadows '%s'",
+    LOG(verbosity::All, "declining the static verdict, a function shadows '%s'",
         name->c_str());
     return None;
   }
@@ -408,7 +407,7 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
       return constant_test_verdict(operands, actx);
     } catch (...) {
       LOG(verbosity::All, "swallowed an error while judging the literal "
-                            "test, leaving it unfolded");
+                          "test, leaving it unfolded");
       return None;
     }
   }
@@ -626,8 +625,9 @@ fn optimize_node(const Expression *node, AnalysisContext &actx) throws -> void
       if (rule(node, actx)) any_rule_fired = true;
     }
     if (!any_rule_fired) return;
-    LOG(verbosity::All, "optimization pass %zu fired a rule, running another "
-                        "pass over the node",
+    LOG(verbosity::All,
+        "optimization pass %zu fired a rule, running another "
+        "pass over the node",
         pass);
   }
   LOG(verbosity::All, "the optimizer hit the pass cap of %zu on one node",

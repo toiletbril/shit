@@ -552,7 +552,8 @@ public:
   fn register_default_completion_spec(completion_spec spec) throws -> void;
   pure fn default_completion_spec() const wontthrow -> const completion_spec *;
   /* The whole spec table, read by complete -p to replay the registrations. */
-  pure fn completion_specs() const wontthrow -> const StringMap<completion_spec> &
+  pure fn completion_specs() const wontthrow
+      -> const StringMap<completion_spec> &
   {
     return m_completion_specs;
   }

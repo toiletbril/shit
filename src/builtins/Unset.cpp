@@ -56,8 +56,7 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
       try {
         cxt.unset_array_element(array_name, subscript);
       } catch (const Error &error) {
-        LOG(verbosity::All,
-            "unset swallowed an array element error: %s",
+        LOG(verbosity::All, "unset swallowed an array element error: %s",
             error.message().c_str());
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is read-only");
@@ -71,8 +70,7 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
       try {
         cxt.unset_shell_variable(name);
       } catch (const Error &error) {
-        LOG(verbosity::All,
-            "unset swallowed a read-only variable error: %s",
+        LOG(verbosity::All, "unset swallowed a read-only variable error: %s",
             error.message().c_str());
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is read-only");

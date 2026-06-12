@@ -79,8 +79,7 @@ fn FlagString::reset() throws -> void
 
 FlagManyStrings::FlagManyStrings(char short_name, StringView long_name,
                                  flag_section section, StringView description)
-    : Flag(Flag::Kind::ManyStrings, short_name, long_name, section,
-           description)
+    : Flag(Flag::Kind::ManyStrings, short_name, long_name, section, description)
 {}
 
 fn FlagManyStrings::append(StringView v) throws -> void

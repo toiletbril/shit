@@ -1176,8 +1176,7 @@ static fn cache_resolved_path(StringView name, const Path &full_path) throws
 
 fn clear_path_map() throws -> void
 {
-  LOG(verbosity::Info,
-      "clear_path_map dropping %zu cached program resolutions",
+  LOG(verbosity::Info, "clear_path_map dropping %zu cached program resolutions",
       PATH_CACHE.count());
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
@@ -1189,8 +1188,7 @@ fn invalidate_path_cache() throws -> void
   /* The cache is not cleared here, since a cd or a PATH change is followed by
      few lookups in a script. The stale flag defers the clear to the next lookup
      so a run that never resolves a command again pays nothing. */
-  LOG(verbosity::Info,
-      "invalidate_path_cache marking the program cache stale");
+  LOG(verbosity::Info, "invalidate_path_cache marking the program cache stale");
   PATH_CACHE_IS_STALE = true;
 }
 

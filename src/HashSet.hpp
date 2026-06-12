@@ -1,7 +1,7 @@
 #pragma once
 
-#include "StringMap.hpp"
 #include "Maybe.hpp"
+#include "StringMap.hpp"
 #include "StringView.hpp"
 
 namespace shit {

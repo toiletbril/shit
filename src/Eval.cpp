@@ -197,7 +197,8 @@ fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
   /* sh and dash advertise no version variable, so the bash identity is just
      cleared and nothing replaces it. The clear matters for a mimicked sh whose
      parent ran in bash mode, and is a no-op at startup where nothing is set. */
-  LOG(verbosity::Info, "clearing the bash identity variables for a non-bash mood");
+  LOG(verbosity::Info,
+      "clearing the bash identity variables for a non-bash mood");
   force_unset_shell_variable("BASH_VERSION");
   force_unset_shell_variable("BASH");
 }
@@ -317,9 +318,8 @@ fn EvalContext::append_indexed_array(StringView name,
      guard and the scalar clear match set_indexed_array, since the in-place path
      bypasses it. */
   if (let *existing = m_indexed_arrays.find(name)) {
-    LOG(verbosity::All,
-        "appending %zu elements to the existing array '%.*s'", values.count(),
-        static_cast<int>(name.length), name.data);
+    LOG(verbosity::All, "appending %zu elements to the existing array '%.*s'",
+        values.count(), static_cast<int>(name.length), name.data);
     if (is_readonly(name))
       throw Error{"Unable to assign '" + name + "' because it is read only"};
     m_shell_variables.erase(name);
@@ -570,8 +570,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
   }
   /* A write past the run's end leaves a gap, so it is held sparsely. */
   LOG(verbosity::All,
-      "holding element %zu of '%.*s' sparsely past the dense run of %zu",
-      index, static_cast<int>(name.length), name.data, count);
+      "holding element %zu of '%.*s' sparsely past the dense run of %zu", index,
+      static_cast<int>(name.length), name.data, count);
   m_sparse_array_values.set(
       sparse_array_key(name, index, scratch_allocator()).view(), value);
 }
@@ -983,18 +983,18 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         bool (EvalContext::*get)() const;
       };
       static const shellopts_row SHELLOPTS_ROWS[] = {
-          {"allexport", &EvalContext::export_all},
-          {"errexit", &EvalContext::error_exit},
-          {"failglob", &EvalContext::failglob},
-          {"monitor", &EvalContext::monitor},
-          {"noclobber", &EvalContext::no_clobber},
-          {"noexec", &EvalContext::no_exec},
-          {"noglob", &EvalContext::no_glob},
-          {"nounset", &EvalContext::error_unset},
-          {"pipefail", &EvalContext::pipefail},
-          {"posix", &EvalContext::is_posix_mode},
-          {"verbose", &EvalContext::should_echo},
-          {"xtrace", &EvalContext::should_echo_expanded},
+          {"allexport", &EvalContext::export_all          },
+          {"errexit",   &EvalContext::error_exit          },
+          {"failglob",  &EvalContext::failglob            },
+          {"monitor",   &EvalContext::monitor             },
+          {"noclobber", &EvalContext::no_clobber          },
+          {"noexec",    &EvalContext::no_exec             },
+          {"noglob",    &EvalContext::no_glob             },
+          {"nounset",   &EvalContext::error_unset         },
+          {"pipefail",  &EvalContext::pipefail            },
+          {"posix",     &EvalContext::is_posix_mode       },
+          {"verbose",   &EvalContext::should_echo         },
+          {"xtrace",    &EvalContext::should_echo_expanded},
       };
       let joined = String{heap_allocator()};
       for (const shellopts_row &row : SHELLOPTS_ROWS) {
@@ -1570,8 +1570,8 @@ fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 fn EvalContext::remove_alias(StringView name) throws -> bool
 {
   if (m_aliases.find(name) == nullptr) return false;
-  LOG(verbosity::All, "removing alias '%.*s'",
-      static_cast<int>(name.length), name.data);
+  LOG(verbosity::All, "removing alias '%.*s'", static_cast<int>(name.length),
+      name.data);
   m_aliases.erase(name);
   return true;
 }
@@ -1799,8 +1799,7 @@ pure fn EvalContext::error_exit() const wontthrow -> bool
 
 fn EvalContext::set_echo_expanded(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the xtrace option flips to %s",
-      enabled ? "on" : "off");
+  LOG(verbosity::Info, "the xtrace option flips to %s", enabled ? "on" : "off");
   m_enable_echo_expanded = enabled;
 }
 
@@ -1861,8 +1860,7 @@ pure fn EvalContext::stats_enabled() const wontthrow -> bool
 
 fn EvalContext::set_no_glob(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the noglob option flips to %s",
-      enabled ? "on" : "off");
+  LOG(verbosity::Info, "the noglob option flips to %s", enabled ? "on" : "off");
   m_enable_path_expansion = !enabled;
 }
 
@@ -1873,8 +1871,7 @@ pure fn EvalContext::no_glob() const wontthrow -> bool
 
 fn EvalContext::set_no_exec(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the noexec option flips to %s",
-      enabled ? "on" : "off");
+  LOG(verbosity::Info, "the noexec option flips to %s", enabled ? "on" : "off");
   m_no_exec = enabled;
 }
 
@@ -4399,8 +4396,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
     i++;
   }
   if (changed) {
-    LOG(verbosity::All,
-        "rewrote colon tilde prefixes in an assignment value");
+    LOG(verbosity::All, "rewrote colon tilde prefixes in an assignment value");
     segment.text = steal(rewritten);
   }
 }
@@ -6599,10 +6595,10 @@ pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
   /* The shopt names bash ships enabled. globstar stays off the way bash
      ships it, and the glob engine reads its live value. */
   static const StringView DEFAULT_ON_SHOPT_NAMES[] = {
-      "progcomp",     "promptvars",        "sourcepath",
-      "extquote",     "complete_fullquote", "hostcomplete",
-      "cmdhist",      "checkwinsize",       "force_fignore",
-      "globasciiranges", "expand_aliases",  "interactive_comments",
+      "progcomp",        "promptvars",         "sourcepath",
+      "extquote",        "complete_fullquote", "hostcomplete",
+      "cmdhist",         "checkwinsize",       "force_fignore",
+      "globasciiranges", "expand_aliases",     "interactive_comments",
   };
   for (const StringView default_name : DEFAULT_ON_SHOPT_NAMES)
     if (name == default_name) return true;
@@ -6669,7 +6665,8 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
         quote = c;
       } else if (c == '`') {
         in_backtick = !in_backtick;
-      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '(') {
+      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '(')
+      {
         /* $(( opens arithmetic that closes with )), so both parens are
            counted and the )) decrements back to the top level cleanly. */
         if (i + 2 < wordlist.length && wordlist[i + 2] == '(') {
@@ -6679,7 +6676,8 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
           paren_depth++;
           i++;
         }
-      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '{') {
+      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '{')
+      {
         brace_depth++;
         i++;
       } else if (c == ')' && paren_depth > 0) {
@@ -6775,8 +6773,8 @@ fn EvalContext::run_completion_function(StringView function_name,
 
   LOG(verbosity::Info,
       "running the completion function '%.*s' with %zu words, cursor word %zu",
-      static_cast<int>(function_name.length), function_name.data,
-      words.count(), cword);
+      static_cast<int>(function_name.length), function_name.data, words.count(),
+      cword);
 
   /* A completion function is bash code that reads and writes arrays, COMP_WORDS
      and COMPREPLY above all, so the call evaluates in bash mode whatever the

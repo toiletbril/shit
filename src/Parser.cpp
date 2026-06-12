@@ -281,7 +281,8 @@ cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
     } catch (const ErrorWithLocationAndDetails &e) {
       /* Render both parts here, since the detail note would be sliced off a
          base-class copy and its hint lost. */
-      LOG(verbosity::Debug, "recording a detailed parse error and recovering: %s",
+      LOG(verbosity::Debug,
+          "recording a detailed parse error and recovering: %s",
           e.message().c_str());
       errors.push(e.to_string(m_lexer.source()));
       errors.push(e.details_to_string(m_lexer.source()));
@@ -742,7 +743,8 @@ fn Parser::build_heredoc_redirection(
     delimiter = delimiter.substring(1);
   }
 
-  LOG(verbosity::Debug, "registering a heredoc redirection with delimiter '%.*s'",
+  LOG(verbosity::Debug,
+      "registering a heredoc redirection with delimiter '%.*s'",
       static_cast<int>(delimiter.length), delimiter.data);
 
   /* A quoted delimiter, such as <<'EOF', keeps the body literal. */
@@ -2046,8 +2048,7 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
   const let location = name_token->source_location();
   const let name = name_token->raw_string();
 
-  LOG(verbosity::Debug, "parsing a function definition for '%s'",
-      name.c_str());
+  LOG(verbosity::Debug, "parsing a function definition for '%s'", name.c_str());
 
   /* The opening parenthesis was peeked by the caller. Consume the empty pair.
    */
