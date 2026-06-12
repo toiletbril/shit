@@ -2,6 +2,7 @@
 #include "Cli.hpp"
 #include "Colors.hpp"
 #include "Common.hpp"
+#include "Completion.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -136,6 +137,11 @@ FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file",
      "Create the named file when missing and append the debug log to it "
      "instead of stderr, so an interactive session logs without painting "
      "over the prompt.");
+FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at",
+     shit::flag_section::Debug,
+     "Print the completion candidates for the given line with the cursor at "
+     "its end, one per line the way an explicit tab lists them, after every "
+     "-c chunk has run, then exit. The completion test driver.");
 #endif
 
 #if SHIT_PLATFORM_IS COSMO
@@ -776,6 +782,15 @@ fn main(int argc, char **argv) -> int
   } else {
     should_be_interactive = true;
   }
+#if !defined NDEBUG
+  /* The completion test driver never prompts, so a bare driver run with no
+     other input reads the empty standard input and exits through the
+     driver's hook rather than initializing the editor. */
+  if (FLAG_DEBUG_COMPLETE_AT.is_set() && should_be_interactive) {
+    should_be_interactive = false;
+    should_read_stdin = true;
+  }
+#endif
   LOG(shit::verbosity::Info, "the input source is %s",
       should_read_stdin         ? "standard input"
       : should_execute_commands ? "the -c command strings"
@@ -1252,6 +1267,26 @@ fn main(int argc, char **argv) -> int
     if (should_quit || shit::os::is_child_process() ||
         (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {
+#if !defined NDEBUG
+      /* The completion test driver runs after the staged chunks, so a -c
+         that registered specs or sourced a completion file is visible to
+         the engine, and the exit code reflects the driver alone. */
+      if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process()) {
+        shit::utils::initialize_path_map();
+        let const driver_line = FLAG_DEBUG_COMPLETE_AT.value();
+        let const driver_result = shit::completion::complete(
+            driver_line, driver_line.length, context,
+            shit::Path::current_directory(), true);
+        let listing = shit::String{};
+        for (const shit::String &candidate : driver_result.candidates) {
+          listing += candidate.view();
+          listing += '\n';
+        }
+        shit::print(listing);
+        shit::flush();
+        exit_code = 0;
+      }
+#endif
       LOG(shit::verbosity::Info, "exiting after the final chunk with code %d",
           exit_code);
       if (!shit::os::is_child_process()) context.run_exit_trap();

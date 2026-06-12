@@ -1,0 +1,8 @@
+== empty token, mixed list:
+alpha
+beta
+== dash token, mixed list:
+--why
+-x
+== empty token, flags-only list falls to files:
+datafile

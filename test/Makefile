@@ -47,6 +47,7 @@ test: $(BIN)
 	@$(MAKE) -B clean
 	@$(MAKE) -B run_tests
 	@$(MAKE) -B cli_tests
+	@$(MAKE) -B completion_tests
 	@$(MAKE) -B dashdiff
 	@$(MAKE) -B bashdiff
 	@$(MAKE) -B mimicrydiff
@@ -81,6 +82,36 @@ cli_refill:
 	for f in $(CLI_INPUT:cli/%.sh=%); do \
 		printf "	%-64s $$f.out\n" cli/$$f.sh; \
 		BIN=$(BIN) sh cli/$$f.sh > expected_cli/$$f.out 2>&1; \
+	done || true
+
+# The completion suite drives the engine through --debug-complete-at, the
+# driver only a debug build compiles in, so the whole suite skips cleanly on
+# a release binary. Each test prints candidates with stderr dropped, since
+# the debug build traces there.
+COMPLETION_INPUT := $(wildcard completion/*.sh)
+COMPLETION_NAMES := $(COMPLETION_INPUT:completion/%.sh=completion_%)
+
+completion_%: expected_completion/%.out
+	@if ! $(BIN) --debug-complete-at '' </dev/null >/dev/null 2>&1; then \
+		printf "	%-64s skipped, release binary\n" completion/$*.sh; \
+	else \
+		out=$$(mktemp); \
+		BIN=$(BIN) sh completion/$*.sh > $$out 2>/dev/null; \
+		if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
+			printf "	%-64s ok\n" completion/$*.sh; \
+		else \
+			diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
+			printf "	%-64s FAILED :c\n" completion/$*.sh; \
+		fi; \
+		rm -f $$out; \
+	fi
+
+completion_tests: $(COMPLETION_NAMES)
+
+completion_refill:
+	for f in $(COMPLETION_INPUT:completion/%.sh=%); do \
+		printf "	%-64s $$f.out\n" completion/$$f.sh; \
+		BIN=$(BIN) sh completion/$$f.sh > expected_completion/$$f.out 2>/dev/null; \
 	done || true
 
 refill:
@@ -230,4 +261,5 @@ bench:
 		else echo "output differs from bash:"; diff "$$bb" "$$sb" | head -20; fi; \
 		rm -f "$$d" "$$b" "$$z" "$$g" "$$s" "$$bb" "$$sb"'
 
-.PHONY: test clean run_tests refill dashdiff bashdiff mimicrydiff bench
+.PHONY: test clean run_tests refill dashdiff bashdiff mimicrydiff bench \
+	completion_tests completion_refill cli_tests cli_refill
