@@ -1687,10 +1687,6 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     if (!for_listing) return None;
     const completion_spec *def = context.default_completion_spec();
     if (def == nullptr || def->function_name.is_empty()) return None;
-    /* The default's fallback flag is read before the function runs, since the
-       function may itself register a new default and move the spec the pointer
-       names, so the flag is captured rather than read back through def. */
-    let const default_falls_back = def->use_default;
     usize default_cword = 0;
     let const default_words =
         split_completion_words(line, cursor, default_cword);
@@ -1702,17 +1698,17 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
       /* The same dash gate the spec paths below apply, so the default
          function's reply offers options only once the token asks for them. */
       let const wants_dash_entries = !token.is_empty() && token[0] == '-';
-      let dropped_dash_entries = false;
       let loaded = ArrayList<String>{};
       for (const String &entry : reply) {
-        if (entry_is_unrequested_dash_word(entry.view(), wants_dash_entries)) {
-          dropped_dash_entries = true;
+        if (entry_is_unrequested_dash_word(entry.view(), wants_dash_entries))
           continue;
-        }
         loaded.push_managed(entry.view());
       }
-      if (loaded.is_empty() && (default_falls_back || dropped_dash_entries))
-        return None;
+      /* An empty reply never claims the completion, so the cascade falls to
+         the filesystem the way bash-completion's -o default behaves, and a
+         cp whose loaded spec offers nothing for an operand still completes
+         paths. */
+      if (loaded.is_empty()) return None;
       return loaded;
     }
     spec = context.lookup_completion_spec(command);
@@ -1722,7 +1718,6 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
   let candidates = ArrayList<String>{};
 
   let const should_offer_dash_words = !token.is_empty() && token[0] == '-';
-  bool did_drop_dash_words = false;
 
   if (!spec->word_list.is_empty()) {
     /* The -W list expands the way bash expands it, through the same shared
@@ -1732,10 +1727,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
          context.expand_wordlist_to_fields(spec->word_list.view(), for_listing))
     {
       if (entry_is_unrequested_dash_word(word.view(), should_offer_dash_words))
-      {
-        did_drop_dash_words = true;
         continue;
-      }
       if (word.view().starts_with(token)) candidates.push(String{word.view()});
     }
   }
@@ -1750,16 +1742,15 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
         spec->function_name.view(), words, cword, line, cursor);
     for (const String &entry : reply) {
       if (entry_is_unrequested_dash_word(entry.view(), should_offer_dash_words))
-      {
-        did_drop_dash_words = true;
         continue;
-      }
       candidates.push_managed(entry.view());
     }
   }
 
-  if (candidates.is_empty() && (spec->use_default || did_drop_dash_words))
-    return None;
+  /* An empty candidate set never claims the completion, whatever the spec's
+     options say, so a function that replied nothing for an operand falls to
+     the filesystem rather than leaving the token dead. */
+  if (candidates.is_empty()) return None;
   return candidates;
 }
 

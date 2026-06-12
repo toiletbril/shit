@@ -1,0 +1,8 @@
+== empty COMPREPLY falls to files:
+fallback_probe.txt
+== retry status 124 falls to files:
+fallback_probe.txt
+== dash-only reply on an operand falls to files:
+fallback_probe.txt
+== the dash token keeps the spec options:
+--archive
