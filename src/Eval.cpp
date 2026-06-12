@@ -1051,6 +1051,12 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         return String{
             heap_allocator(),
             m_source_frames[m_source_frames.count() - 1].source_path.view()};
+      /* A script-file run roots the stack at the script itself, so outside
+         any dot-source the scalar reads as $0, the way bash sets
+         BASH_SOURCE[0] for an executed file. The envman style probe
+         test "$BASH_SOURCE" == "$0" then takes its executed branch. */
+      if (m_is_script_run)
+        return String{heap_allocator(), m_shell_name.view()};
       return String{heap_allocator()};
     }
   }
