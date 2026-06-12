@@ -354,13 +354,31 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
      honor the live toggle the way the analysis stage does. */
   if (diagnostics_disabled()) return;
   /* The whole location is rendered, so the filename the lexer stamped
-     prefixes a warning from a sourced file. A formatting failure is
+     prefixes a warning from a sourced file. A windowed resolution rebases
+     the absolute position onto the function's definition copy and swaps in
+     its owned filename, since the stamped view may outlive its buffer once
+     the defining command's sources are freed. A formatting failure is
      swallowed so a diagnostic never becomes an error. */
   try {
-    show_message(m_current_source != nullptr
-                     ? WarningWithLocation{location, message}.to_string(
-                           m_current_source->view())
-                     : Warning{message}.to_string());
+    let const resolved = resolve_render_source(location);
+    usize line_offset = 0;
+    if (resolved.windowed) {
+      location.position = location.position - resolved.body_start_position +
+                          resolved.header_length;
+      location.filename = resolved.filename.is_empty()
+                              ? Maybe<StringView>{}
+                              : Maybe<StringView>{resolved.filename};
+      line_offset = resolved.line_offset;
+    }
+    if (resolved.text == nullptr ||
+        location.position > resolved.text->count())
+    {
+      show_message(Warning{message}.to_string());
+      return;
+    }
+    let warning = WarningWithLocation{location, message};
+    warning.set_line_offset(line_offset);
+    show_message(warning.to_string(resolved.text->view()));
   } catch (...) {
     LOG(verbosity::Debug,
         "formatting a runtime warning failed, the error is swallowed");
@@ -371,15 +389,31 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
     -> SourceLocation
 {
   let const fallback = m_current_location;
-  if (m_current_source == nullptr || name.is_empty()) return fallback;
-  let const source = m_current_source->view();
-  if (fallback.position >= source.length) return fallback;
+  if (name.is_empty()) return fallback;
+  let const resolved = resolve_render_source(fallback);
+  if (resolved.text == nullptr) return fallback;
+  let const source = resolved.text->view();
+
+  /* A windowed resolution means the text is the definition copy while the
+     location is absolute, so the scan indexes through the rebase and the
+     found location converts back, keeping every stored location absolute. */
+  usize scan_start = fallback.position;
+  usize absolute_shift = 0;
+  if (resolved.windowed) {
+    scan_start = fallback.position - resolved.body_start_position +
+                 resolved.header_length;
+    absolute_shift =
+        resolved.body_start_position > resolved.header_length
+            ? resolved.body_start_position - resolved.header_length
+            : 0;
+  }
+  if (scan_start >= source.length) return fallback;
 
   /* The command's span runs from its location to the end of its logical
      line, a backslash-newline continues it. The first $name or ${name
      spelling inside that span takes the caret, with the byte after the name
      required to end it so $FOO does not match a $FOOBAR reference. */
-  usize i = fallback.position;
+  usize i = scan_start;
   while (i < source.length) {
     const char byte = source[i];
     if (byte == '\n' && (i == 0 || source[i - 1] != '\\')) break;
@@ -402,14 +436,15 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
       if (is_braced && reference_end < source.length &&
           source[reference_end] == '}')
         reference_end++;
-      return SourceLocation{i, reference_end - i, fallback.filename};
+      return SourceLocation{i + absolute_shift, reference_end - i,
+                            fallback.filename};
     }
     i++;
   }
 
   /* Arithmetic reads a variable as a bare name with no dollar, so a second
      pass takes the first name-delimited spelling inside the same span. */
-  usize k = fallback.position;
+  usize k = scan_start;
   while (k + name.length <= source.length) {
     const char byte = source[k];
     if (byte == '\n' && (k == 0 || source[k - 1] != '\\')) break;
@@ -417,7 +452,8 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
         (k == 0 || !lexer::is_variable_name(source[k - 1])) &&
         (k + name.length == source.length ||
          !lexer::is_variable_name(source[k + name.length])))
-      return SourceLocation{k, name.length, fallback.filename};
+      return SourceLocation{k + absolute_shift, name.length,
+                            fallback.filename};
     k++;
   }
   return fallback;
@@ -1015,10 +1051,20 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      run with no real source, such as an interactive single line, reports
      line 1. The first byte gates the compare so an ordinary name skips it. */
   if (first_byte == 'L' && name == "LINENO") {
-    const usize line = m_current_source != nullptr
-                           ? utils::line_number_at(m_current_source->view(),
-                                                   m_current_location.position)
-                           : 1;
+    /* A windowed resolution maps the absolute position onto the definition
+       copy and adds the defining file's line offset back, so LINENO in a
+       function body reports the file line. */
+    let const resolved = resolve_render_source(m_current_location);
+    usize line = 1;
+    if (resolved.text != nullptr) {
+      const usize render_position =
+          resolved.windowed ? m_current_location.position -
+                                  resolved.body_start_position +
+                                  resolved.header_length
+                            : m_current_location.position;
+      line = utils::line_number_at(resolved.text->view(), render_position) +
+             (resolved.windowed ? resolved.line_offset : 0);
+    }
     return utils::uint_to_text(line);
   }
 
@@ -1269,12 +1315,71 @@ fn EvalContext::set_notify(bool enabled) wontthrow -> void
 pure fn EvalContext::notify() const wontthrow -> bool { return m_notify; }
 
 fn EvalContext::register_function(StringView name, const Expression *body,
-                                  StringView definition_text) throws -> void
+                                  StringView definition_text,
+                                  usize body_start_position,
+                                  SourceLocation definition_location) throws
+    -> void
 {
   LOG(verbosity::Info, "registering function '%.*s' with a %zu byte definition",
       static_cast<int>(name.length), name.data, definition_text.length);
   m_functions.set(name, body);
   m_function_sources.set(name, definition_text);
+
+  /* The copy is the "name () " header line then the body span verbatim, so
+     the header length and the body's line in the defining file map an
+     absolute body position onto the copy. The body sits on line two of the
+     copy, and the printed line adds the offset so it matches the file. */
+  let info = function_definition_info{};
+  info.body_start_position = body_start_position;
+  info.header_length = name.length + StringView{" () \n"}.length;
+  if (m_current_source != nullptr && !definition_text.is_empty()) {
+    const usize body_line = utils::line_number_at(m_current_source->view(),
+                                                  body_start_position);
+    info.line_offset = body_line > 2 ? body_line - 2 : 0;
+  }
+  if (definition_location.filename.has_value())
+    info.filename = String{*definition_location.filename};
+  info.defining_instance = m_current_source;
+  m_function_definition_infos.set(name, steal(info));
+}
+
+fn EvalContext::function_definition_info_of(StringView name) const wontthrow
+    -> const function_definition_info *
+{
+  return m_function_definition_infos.find(name);
+}
+
+pure fn EvalContext::resolve_render_source(SourceLocation location) const
+    wontthrow -> resolved_render_source
+{
+  let resolved = resolved_render_source{};
+  resolved.text = m_current_source;
+
+  /* Inside a function call the body's positions index the file that defined
+     it, which may not be the current source and may already be freed. When
+     the innermost function was defined against another source instance and
+     the position falls inside its recorded body span, the stored definition
+     copy renders it with the defining file's name and numbering. */
+  if (m_function_call_names.is_empty()) return resolved;
+  let const innermost = funcname_frame_at(0);
+  let const *info = m_function_definition_infos.find(innermost);
+  if (info == nullptr || info->defining_instance == m_current_source)
+    return resolved;
+  let const *copy = m_function_sources.find(innermost);
+  if (copy == nullptr || copy->is_empty()) return resolved;
+  const usize body_length = copy->count() - info->header_length;
+  if (location.position < info->body_start_position ||
+      location.position >= info->body_start_position + body_length)
+    return resolved;
+
+  resolved.text = copy;
+  resolved.windowed = true;
+  resolved.body_start_position = info->body_start_position;
+  resolved.header_length = info->header_length;
+  resolved.line_offset = info->line_offset;
+  resolved.filename =
+      info->filename.is_empty() ? StringView{} : info->filename.view();
+  return resolved;
 }
 
 fn EvalContext::find_function_source(StringView name) const wontthrow
@@ -1311,6 +1416,7 @@ fn EvalContext::unset_function(StringView name) throws -> void
       static_cast<int>(name.length), name.data);
   m_functions.erase(name);
   m_function_sources.erase(name);
+  m_function_definition_infos.erase(name);
 }
 
 fn EvalContext::function_names() const throws -> HashSet

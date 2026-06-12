@@ -420,7 +420,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += *name;
     result += ':';
   }
-  result += utils::uint_to_text(line_number + 1);
+  result += utils::uint_to_text(line_number + 1 + m_line_offset);
   result += ':';
   result += utils::uint_to_text(line_byte_position);
   result += ':';

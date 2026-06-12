@@ -538,12 +538,52 @@ public:
      each top-level parse to avoid pointing at freed storage. A function shadows
      a builtin and a program of the same name. */
   /* Registers a function and keeps a copy of its definition text, the source
-     span from the name to the body's close, which declare -f prints back. */
+     span from the name to the body's close, which declare -f prints back.
+     The body start and the location stamp map the body's absolute positions
+     onto that copy, so a diagnostic inside a later call renders against it
+     with the defining file's name and line numbers. */
   fn register_function(StringView name, const Expression *body,
-                       StringView definition_text) throws -> void;
+                       StringView definition_text, usize body_start_position,
+                       SourceLocation definition_location) throws -> void;
   /* The recorded definition text of a function, or null when the name is not
      a function or its span was not recorded. */
   fn find_function_source(StringView name) const wontthrow -> const String *;
+  /* How a function body's absolute source positions map onto the stored
+     definition copy. The copy holds a "name () " header line, then the body
+     span verbatim, so an absolute position rebases by the body start and the
+     header length, and the printed line adds the offset back to the defining
+     file's numbering. */
+  struct function_definition_info
+  {
+    usize body_start_position{0};
+    usize header_length{0};
+    usize line_offset{0};
+    String filename{};
+    /* The source instance the body was defined against. A call made while
+       this exact instance is still current needs no window, the absolute
+       positions already index the live text, which keeps the per-call cost
+       of a script running its own functions at one compare. */
+    const String *defining_instance{nullptr};
+  };
+  fn function_definition_info_of(StringView name) const wontthrow
+      -> const function_definition_info *;
+  /* The text and the mapping a location renders against. The current source
+     with identity numbering when the location indexes it, otherwise the
+     innermost function's definition copy with its window when the location
+     falls inside that body, the case of a function called after its
+     defining file's text was freed. Resolved only when a diagnostic or a
+     LINENO read fires, so a function call pays nothing for it. */
+  struct resolved_render_source
+  {
+    const String *text{nullptr};
+    bool windowed{false};
+    usize body_start_position{0};
+    usize header_length{0};
+    usize line_offset{0};
+    StringView filename{};
+  };
+  pure fn resolve_render_source(SourceLocation location) const wontthrow
+      -> resolved_render_source;
   /* Every defined function name, sorted, the list declare -F prints. */
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
@@ -1282,6 +1322,10 @@ protected:
   /* The definition text of each function, kept on the heap since a function
      outlives the command and the source string it was parsed from. */
   StringMap<String> m_function_sources{heap_allocator()};
+  /* The position mapping for each stored definition, keyed like the sources,
+     read by resolve_render_source when a diagnostic fires inside a call. */
+  StringMap<function_definition_info> m_function_definition_infos{
+      heap_allocator()};
   usize m_subshell_depth{0};
   /* The descriptors bare execs moved inside live in-process subshells, kept
      as a stack so leave_subshell unwinds its own depth's entries in reverse.

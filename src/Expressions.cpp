@@ -3609,7 +3609,8 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
   LOG(verbosity::Info, "registering the function '%s'%s", m_name.c_str(),
       definition_text.is_empty() ? " without recorded definition text" : "");
-  cxt.register_function(m_name, m_body, definition_text.view());
+  cxt.register_function(m_name, m_body, definition_text.view(),
+                        m_body->source_location().position, source_location());
   cxt.set_last_exit_status(0);
   return 0;
 }

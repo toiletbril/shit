@@ -131,8 +131,14 @@ public:
      Warning over the same caret without passing the word in. */
   virtual fn to_string(StringView source) const throws -> String;
 
+  /* The line numbering starts this many lines past one, for a source that is
+     a window into a larger file, the stored function definition text whose
+     first line sits deep inside the defining file. */
+  fn set_line_offset(usize offset) wontthrow -> void { m_line_offset = offset; }
+
 protected:
   SourceLocation m_location;
+  usize m_line_offset{0};
 };
 
 /* An ErrorWithLocation raised when a command word resolves to neither a
