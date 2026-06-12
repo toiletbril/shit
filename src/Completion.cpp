@@ -1458,6 +1458,72 @@ static fn complete_from_build_tools(StringView line, StringView token,
   return candidates;
 }
 
+/* The dash candidates of one builtin, or of the shell binary when the kind
+   is None, built once per kind since every source table is immutable and the
+   ghost reads these on each keystroke. A builtin's list carries the -x and
+   --long forms of its FLAG rows, set's adds its option letters with -o and
+   -p from the switch table, and kill's holds the signal names alone the way
+   kill -<tab> lists them. Null means the kind registered no flags. */
+static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
+    -> const ArrayList<String> *
+{
+  static ArrayList<String> per_kind_candidates[BUILTIN_KIND_COUNT]{};
+  static bool per_kind_built[BUILTIN_KIND_COUNT]{};
+  static ArrayList<String> binary_candidates{};
+  static bool binary_built = false;
+
+  let const append_flag_forms = [](const ArrayList<Flag *> &flags,
+                                   ArrayList<String> &out) throws {
+    for (const Flag *flag : flags) {
+      if (flag->short_name() != '\0') {
+        let short_form = String{"-"};
+        short_form.push(flag->short_name());
+        out.push(steal(short_form));
+      }
+      if (!flag->long_name().is_empty()) {
+        let long_form = String{"--"};
+        long_form += flag->long_name();
+        out.push(steal(long_form));
+      }
+    }
+  };
+
+  if (!builtin_kind.has_value()) {
+    if (!binary_built) {
+      append_flag_forms(shit_binary_flag_list(), binary_candidates);
+      binary_built = true;
+    }
+    return &binary_candidates;
+  }
+
+  let const index = static_cast<usize>(*builtin_kind);
+  if (!per_kind_built[index]) {
+    if (*builtin_kind == Builtin::Kind::Kill) {
+      for (const StringView name : os::signal_names()) {
+        let with_dash = String{"-"};
+        with_dash += name;
+        per_kind_candidates[index].push(steal(with_dash));
+      }
+    } else {
+      const ArrayList<Flag *> *flags = builtin_flag_list(*builtin_kind);
+      if (flags == nullptr) return nullptr;
+      append_flag_forms(*flags, per_kind_candidates[index]);
+      if (*builtin_kind == Builtin::Kind::Set) {
+        const String &letters = shell_option_letters();
+        for (usize i = 0; i < letters.count(); i++) {
+          let switch_form = String{"-"};
+          switch_form.push(letters[i]);
+          per_kind_candidates[index].push(steal(switch_form));
+        }
+        per_kind_candidates[index].push(String{"-o"});
+        per_kind_candidates[index].push(String{"-p"});
+      }
+    }
+    per_kind_built[index] = true;
+  }
+  return &per_kind_candidates[index];
+}
+
 /* Complete a builtin's or the shell binary's own flags from the registered
    FLAG lists, the option names of set and shopt, kill's signal names, and
    kill's %job ids, all table reads with no subprocess so the ghost may run
@@ -1509,17 +1575,10 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
     return None;
   }
 
-  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Kill) {
-    /* kill - completes the signal names, and a bare operand the %job ids. */
-    if (!token.is_empty() && token[0] == '-') {
-      for (const StringView name : os::signal_names()) {
-        let with_dash = String{"-"};
-        with_dash += name;
-        push_matching(with_dash.view());
-      }
-      if (!candidates.is_empty()) return candidates;
-      return None;
-    }
+  /* A bare kill operand completes the %job ids, the one live table here. */
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Kill &&
+      (token.is_empty() || token[0] != '-'))
+  {
     for (const job &background_job : context.jobs()) {
       let job_id = String{"%"};
       job_id += utils::int_to_text(background_job.id, heap_allocator());
@@ -1532,34 +1591,11 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   /* Everything below is a flag, so the token must already start the dash. */
   if (token.is_empty() || token[0] != '-') return None;
 
-  const ArrayList<Flag *> *flags = completes_shell_binary
-                                       ? &shit_binary_flag_list()
-                                       : builtin_flag_list(*builtin_kind);
-  if (flags == nullptr) return None;
-  for (const Flag *flag : *flags) {
-    if (flag->short_name() != '\0') {
-      let short_form = String{"-"};
-      short_form.push(flag->short_name());
-      push_matching(short_form.view());
-    }
-    if (!flag->long_name().is_empty()) {
-      let long_form = String{"--"};
-      long_form += flag->long_name();
-      push_matching(long_form.view());
-    }
-  }
-  /* set's switches live in its option table rather than its FLAG list, so
-     every letter and the -o selector come from there. */
-  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Set) {
-    let const letters = shell_option_letters();
-    for (usize i = 0; i < letters.count(); i++) {
-      let switch_form = String{"-"};
-      switch_form.push(letters[i]);
-      push_matching(switch_form.view());
-    }
-    push_matching("-o");
-    push_matching("-p");
-  }
+  const ArrayList<String> *dash_candidates = dash_candidates_for(
+      completes_shell_binary ? Maybe<Builtin::Kind>{None} : builtin_kind);
+  if (dash_candidates == nullptr) return None;
+  for (const String &candidate : *dash_candidates)
+    push_matching(candidate.view());
   if (candidates.is_empty()) return None;
   return candidates;
 }

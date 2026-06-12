@@ -158,6 +158,28 @@ fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &
   return FLAG_LIST;
 }
 
+#if !defined NDEBUG
+/* The completion test driver behind --debug-complete-at. It lists the
+   candidates for the given line with the cursor at its end, one per line the
+   way an explicit tab would, and the run exits with its status. */
+static fn run_debug_completion_driver(StringView driver_line,
+                                      EvalContext &context) throws -> i32
+{
+  utils::initialize_path_map();
+  let const driver_result = completion::complete(
+      driver_line, driver_line.length, context, Path::current_directory(),
+      true);
+  let listing = String{};
+  for (const String &candidate : driver_result.candidates) {
+    listing += candidate.view();
+    listing += '\n';
+  }
+  print(listing);
+  flush();
+  return 0;
+}
+#endif
+
 /* Set when the shell is invoked through a name whose basename is sh or dash,
    the way a system ln -s shit sh does. A script that names the shell after a
    system POSIX shell then runs compatibility-clean, the way bash run as sh
@@ -1279,21 +1301,9 @@ fn main(int argc, char **argv) -> int
       /* The completion test driver runs after the staged chunks, so a -c
          that registered specs or sourced a completion file is visible to
          the engine, and the exit code reflects the driver alone. */
-      if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process()) {
-        shit::utils::initialize_path_map();
-        let const driver_line = FLAG_DEBUG_COMPLETE_AT.value();
-        let const driver_result = shit::completion::complete(
-            driver_line, driver_line.length, context,
-            shit::Path::current_directory(), true);
-        let listing = shit::String{};
-        for (const shit::String &candidate : driver_result.candidates) {
-          listing += candidate.view();
-          listing += '\n';
-        }
-        shit::print(listing);
-        shit::flush();
-        exit_code = 0;
-      }
+      if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process())
+        exit_code = shit::run_debug_completion_driver(
+            FLAG_DEBUG_COMPLETE_AT.value(), context);
 #endif
       LOG(shit::verbosity::Info, "exiting after the final chunk with code %d",
           exit_code);

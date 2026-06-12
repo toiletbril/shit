@@ -284,10 +284,10 @@ fn shell_option_names(bool include_alias_spellings) throws
   }();
   static ArrayList<StringView> with_aliases = [] throws {
     let names = ArrayList<StringView>{};
-    for (const SetOption &option : SET_OPTIONS)
+    for (const SetOption &option : SET_OPTIONS) {
       names.push(option.name);
-    for (const SetOption &option : SET_OPTIONS)
       if (!option.alias.is_empty()) names.push(option.alias);
+    }
     return names;
   }();
   return include_alias_spellings ? with_aliases : canonical;
