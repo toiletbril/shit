@@ -343,14 +343,20 @@ fn EvalContext::append_indexed_array(StringView name,
 
 cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
 {
+  show_runtime_warning_at(m_current_location, message);
+}
+
+cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
+                                             StringView message) wontthrow
+    -> void
+{
   /* no-diagnostics promises no warnings at all, so the runtime advisories
      honor the live toggle the way the analysis stage does. */
   if (diagnostics_disabled()) return;
-  /* The command being evaluated locates the caret, the same position the reap
-     and substitution warnings render at. A formatting failure is swallowed so
-     a diagnostic never becomes an error. */
+  /* The whole location is rendered, so the filename the lexer stamped
+     prefixes a warning from a sourced file. A formatting failure is
+     swallowed so a diagnostic never becomes an error. */
   try {
-    let const location = SourceLocation{m_current_location_position, 1};
     show_message(m_current_source != nullptr
                      ? WarningWithLocation{location, message}.to_string(
                            m_current_source->view())
@@ -359,6 +365,62 @@ cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
     LOG(verbosity::Debug,
         "formatting a runtime warning failed, the error is swallowed");
   }
+}
+
+pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
+    -> SourceLocation
+{
+  let const fallback = m_current_location;
+  if (m_current_source == nullptr || name.is_empty()) return fallback;
+  let const source = m_current_source->view();
+  if (fallback.position >= source.length) return fallback;
+
+  /* The command's span runs from its location to the end of its logical
+     line, a backslash-newline continues it. The first $name or ${name
+     spelling inside that span takes the caret, with the byte after the name
+     required to end it so $FOO does not match a $FOOBAR reference. */
+  usize i = fallback.position;
+  while (i < source.length) {
+    const char byte = source[i];
+    if (byte == '\n' && (i == 0 || source[i - 1] != '\\')) break;
+    if (byte != '$' || i + 1 >= source.length) {
+      i++;
+      continue;
+    }
+    usize name_start = i + 1;
+    const bool is_braced = source[name_start] == '{';
+    if (is_braced) name_start++;
+    if (name_start + name.length <= source.length &&
+        source.substring_of_length(name_start, name.length) == name &&
+        (name_start + name.length == source.length ||
+         !lexer::is_variable_name(source[name_start + name.length])))
+    {
+      /* The caret spans the $ or ${ through the name, and a brace pair
+         closing right after the name joins it so ${PAGER} underlines
+         whole. */
+      usize reference_end = name_start + name.length;
+      if (is_braced && reference_end < source.length &&
+          source[reference_end] == '}')
+        reference_end++;
+      return SourceLocation{i, reference_end - i, fallback.filename};
+    }
+    i++;
+  }
+
+  /* Arithmetic reads a variable as a bare name with no dollar, so a second
+     pass takes the first name-delimited spelling inside the same span. */
+  usize k = fallback.position;
+  while (k + name.length <= source.length) {
+    const char byte = source[k];
+    if (byte == '\n' && (k == 0 || source[k - 1] != '\\')) break;
+    if (source.substring_of_length(k, name.length) == name &&
+        (k == 0 || !lexer::is_variable_name(source[k - 1])) &&
+        (k + name.length == source.length ||
+         !lexer::is_variable_name(source[k + name.length])))
+      return SourceLocation{k, name.length, fallback.filename};
+    k++;
+  }
+  return fallback;
 }
 
 fn EvalContext::report_unset_reference(StringView name) throws -> void
@@ -370,10 +432,12 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
     throw_script_fatal("Unable to expand '" + String{name} +
                        "' because the parameter is not set");
   if (m_error_unset || m_warnings_enabled)
-    show_runtime_warning("The variable '" + String{name} +
-                         "' is not set, it expands to empty, replace it with "
-                         "${" +
-                         String{name} + "-} if empty expansion is desired");
+    show_runtime_warning_at(locate_variable_reference(name),
+                            "The variable '" + String{name} +
+                                "' is not set, it expands to empty, replace "
+                                "it with ${" +
+                                String{name} +
+                                "-} if empty expansion is desired");
 }
 
 fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
@@ -953,7 +1017,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
   if (first_byte == 'L' && name == "LINENO") {
     const usize line = m_current_source != nullptr
                            ? utils::line_number_at(m_current_source->view(),
-                                                   m_current_location_position)
+                                                   m_current_location.position)
                            : 1;
     return utils::uint_to_text(line);
   }
@@ -1786,7 +1850,7 @@ fn EvalContext::print_source_backtrace() const throws -> void
 
 fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
 {
-  m_current_location_position = location.position;
+  m_current_location = location;
 }
 
 /* A cap on nested dot-source and eval runs. A configure script nests at most a
@@ -3788,7 +3852,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
      this text. */
   let const previous_source = m_current_source;
   let const previous_origin = m_current_origin;
-  let const previous_location_position = m_current_location_position;
+  let const previous_location = m_current_location;
 
   /* The redirections the spawn would have applied are applied to the standard
      descriptors for the in-process run, then put back. A file redirect to
@@ -3832,7 +3896,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   m_shell_name = String{heap_allocator(), ec.program().view()};
   set_current_source(&*contents, String{ec.program().view()});
-  m_current_location_position = 0;
+  m_current_location = SourceLocation{};
   m_mimicry_depth++;
 
   /* The terminal command the shell exits with needs no isolation, so the script
@@ -3892,7 +3956,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const status = last_exit_status();
   restore_state(steal(snapshot));
   set_current_source(previous_source, previous_origin);
-  m_current_location_position = previous_location_position;
+  m_current_location = previous_location;
   m_mood = previous_mood;
   m_is_script_run = previous_script_run;
   set_error_unset(previous_error_unset);
@@ -4018,16 +4082,16 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
     let const previous_source = m_current_source;
     let const previous_origin = m_current_origin;
-    let const previous_location_position = m_current_location_position;
+    let const previous_location = m_current_location;
     set_current_source(retained_source, String{origin});
     /* The sourced text has its own line numbering, so $LINENO inside it counts
-       from its first line. The parent position is restored on return so the
+       from its first line. The parent location is restored on return so the
        caller's $LINENO resumes against the caller's source. */
-    m_current_location_position = 0;
+    m_current_location = SourceLocation{};
     defer
     {
       set_current_source(previous_source, previous_origin);
-      m_current_location_position = previous_location_position;
+      m_current_location = previous_location;
     };
 
     ast->evaluate(*this);

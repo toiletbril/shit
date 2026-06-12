@@ -31,7 +31,7 @@
 ]
 shit: 2:1: warning: The variable 'never_piped' is not set, it expands to empty, replace it with ${never_piped-} if empty expansion is desired.
      2 |  set -W
-       |  ^~ here.
+       |  ^~~~~~ here.
 value=
 continued
 [Code 0]

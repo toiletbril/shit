@@ -771,8 +771,18 @@ public:
   fn warn_or_throw(bool fatal, bool explicitly_requested,
                    SourceLocation location, StringView message) throws -> void;
   /* Renders a located runtime warning at the command being evaluated, the
-     shared path the -W downgrades print through. */
+     shared path the -W downgrades print through. The _at form takes a finer
+     location inside that command, the unset-variable caret on the reference
+     itself. */
   cold fn show_runtime_warning(StringView message) wontthrow -> void;
+  cold fn show_runtime_warning_at(SourceLocation location,
+                                  StringView message) wontthrow -> void;
+  /* The location of the $name or ${name spelling inside the command being
+     evaluated, found by scanning the command's source span, since word
+     segments carry no positions of their own. The statement location is the
+     fallback when the spelling is not found, a name built dynamically. */
+  pure fn locate_variable_reference(StringView name) const wontthrow
+      -> SourceLocation;
 
   /* pipefail makes a pipeline report the status of the rightmost stage that
      failed rather than the last stage alone. */
@@ -1316,10 +1326,12 @@ protected:
   const String *m_current_source{nullptr};
   String m_current_origin{};
 
-  /* The byte offset in m_current_source of the command being evaluated, read by
-     $LINENO to report its line. It starts at zero so an interactive single
-     line, whose source holds no newlines, reports line 1. */
-  usize m_current_location_position{0};
+  /* The location in m_current_source of the command being evaluated, read by
+     $LINENO for its line and by the runtime warnings for their caret. The
+     whole location is kept rather than the bare position, so the filename the
+     lexer stamped rides into a warning from a sourced file. It starts at the
+     zero location so an interactive single line reports line 1. */
+  SourceLocation m_current_location{};
 
   /* The chain of sourced-file and eval frames from the outermost down to the
      one running now, so an error deep in a nested source prints every call site

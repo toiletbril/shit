@@ -270,10 +270,12 @@ inline constexpr StaticStringMap<Token::Kind> KEYWORDS{
     KEYWORD_ENTRIES, sizeof(KEYWORD_ENTRIES) / sizeof(KEYWORD_ENTRIES[0])};
 
 /* clang-format off */
+/* The location goes through the lexer's here() so the keyword token carries
+   the stamped filename like every other token, and a warning anchored at a
+   for or case keyword names its file. */
 #define KW_CASE(k)                                                             \
   case Token::Kind::k:                                                         \
-    t = m_arena->create<tokens::k>(                                            \
-        SourceLocation{actual_cursor_position, byte_count});                   \
+    t = m_arena->create<tokens::k>(here(actual_cursor_position, byte_count));  \
     break
 /* clang-format on */
 

@@ -193,7 +193,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
   os::make_fd_inheritable(shell_fd);
   /* The command currently evaluating is where this substitution was written, so
      its location points a later reap warning at the right word. */
-  let const location = SourceLocation{m_current_location_position, 1};
+  let const location = m_current_location;
   const StringView source =
       m_current_source != nullptr ? m_current_source->view() : StringView{};
   m_pending_process_substitutions.push(
@@ -333,12 +333,12 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
      the right byte, and the error caught below is formatted against it too. */
   let const previous_source = m_current_source;
   let const previous_origin = m_current_origin;
-  let const previous_location_position = m_current_location_position;
+  let const previous_location = m_current_location;
   set_current_source(&source, String{"command substitution"});
   defer
   {
     set_current_source(previous_source, previous_origin);
-    m_current_location_position = previous_location_position;
+    m_current_location = previous_location;
   };
 
   let const pipe = os::make_pipe();
