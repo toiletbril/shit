@@ -1190,11 +1190,18 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
             }
             continue;
           }
-          dup_saved_descriptors.push(os::save_and_replace_descriptor(
-              1, file_fd));
-          dup_saved_descriptors.push(os::save_and_replace_descriptor(
-              2, file_fd));
+          const os::saved_descriptor saved_out =
+              os::save_and_replace_descriptor(1, file_fd);
+          dup_saved_descriptors.push(saved_out);
+          const os::saved_descriptor saved_err =
+              os::save_and_replace_descriptor(2, file_fd);
+          dup_saved_descriptors.push(saved_err);
           os::close_fd(file_fd);
+          if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
+            redirection_open_failed = true;
+            throw ErrorWithLocation{redir.target->source_location(),
+                                    "Bad file descriptor"};
+          }
           continue;
         }
         const i32 from_fd = resolved.fd;
@@ -3880,9 +3887,17 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
                                       "': " + os::last_system_error_message()};
         }
         const os::descriptor file_fd = opened.take();
-        saved_descriptors.push(os::save_and_replace_descriptor(1, file_fd));
-        saved_descriptors.push(os::save_and_replace_descriptor(2, file_fd));
+        const os::saved_descriptor saved_out =
+            os::save_and_replace_descriptor(1, file_fd);
+        saved_descriptors.push(saved_out);
+        const os::saved_descriptor saved_err =
+            os::save_and_replace_descriptor(2, file_fd);
+        saved_descriptors.push(saved_err);
         os::close_fd(file_fd);
+        if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
+          throw ErrorWithLocation{redir.target->source_location(),
+                                  "Bad file descriptor"};
+        }
         continue;
       }
       const i32 from_fd = resolved.fd;

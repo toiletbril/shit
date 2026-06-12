@@ -1371,7 +1371,8 @@ pure fn EvalContext::resolve_render_source(SourceLocation location) const
   if (info == nullptr || info->defining_instance == m_current_source)
     return resolved;
   let const *copy = m_function_sources.find(innermost);
-  if (copy == nullptr || copy->is_empty()) return resolved;
+  if (copy == nullptr || copy->count() <= info->header_length)
+    return resolved;
   const usize body_length = copy->count() - info->header_length;
   if (location.position < info->body_start_position ||
       location.position >= info->body_start_position + body_length)
@@ -2191,13 +2192,19 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
   return assignments;
 }
 
-fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
+fn EvalContext::clear_functions() wontthrow -> void
+{
+  m_functions.clear();
+  m_function_sources.clear();
+  m_function_definition_infos.clear();
+}
 
 fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 {
   return eval_state_snapshot{m_shell_variables,
                              m_functions,
                              m_function_sources,
+                             m_function_definition_infos,
                              m_aliases,
                              m_positional_params,
                              Path::current_directory(),
@@ -2216,6 +2223,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_shell_variables = steal(snapshot.shell_variables);
   m_functions = steal(snapshot.functions);
   m_function_sources = steal(snapshot.function_sources);
+  m_function_definition_infos = steal(snapshot.function_definition_infos);
   /* An alias defined or removed inside a subshell or a command substitution
      stays inside it, the way bash isolates an alias change in a subshell. */
   m_aliases = steal(snapshot.aliases);
@@ -4246,6 +4254,14 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   /* The retained AST nodes live in the arena, which runs every node's
      destructor on the reset that follows, so this only drops the references. */
   m_retained_source_asts.clear();
+
+  /* A pending process substitution stashed its command's source view and
+     location for a later reap warning, and both may index a buffer freed
+     just below, so the stash drops to the unlocated rendering first. */
+  for (process_substitution &sub : m_pending_process_substitutions) {
+    sub.source = StringView{};
+    sub.location = SourceLocation{};
+  }
 
   /* The retained source buffers and filenames are heap String copies owned
      here, so they are freed explicitly. */

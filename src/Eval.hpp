@@ -211,11 +211,33 @@ struct subshell_saved_descriptor
    substitution so a cd or an assignment inside does not leak to the parent. The
    set option flags and the trap table are captured too, so a set -e, a set -f,
    a set -x, or a trap inside the subshell stays inside it. */
+/* How a function body's absolute source positions map onto the stored
+   definition copy. The copy holds a "name () " header line, then the body
+   span verbatim, so an absolute position rebases by the body start and the
+   header length, and the printed line adds the offset back to the defining
+   file's numbering. */
+struct function_definition_info
+{
+  usize body_start_position{0};
+  usize header_length{0};
+  usize line_offset{0};
+  String filename{};
+  /* The source instance the body was defined against. A call made while
+     this exact instance is still current needs no window, the absolute
+     positions already index the live text, which keeps the per-call cost
+     of a script running its own functions at one compare. */
+  const String *defining_instance{nullptr};
+};
+
 struct eval_state_snapshot
 {
   StringMap<String> shell_variables;
   StringMap<const Expression *> functions;
   StringMap<String> function_sources;
+  /* The definition position mappings ride the snapshot beside the sources,
+     so a function the isolated run defined does not leave a stale mapping
+     behind that disagrees with the restored function table. */
+  StringMap<function_definition_info> function_definition_infos;
   StringMap<String> aliases;
   ArrayList<String> positional_params;
   Path working_directory;
@@ -548,23 +570,6 @@ public:
   /* The recorded definition text of a function, or null when the name is not
      a function or its span was not recorded. */
   fn find_function_source(StringView name) const wontthrow -> const String *;
-  /* How a function body's absolute source positions map onto the stored
-     definition copy. The copy holds a "name () " header line, then the body
-     span verbatim, so an absolute position rebases by the body start and the
-     header length, and the printed line adds the offset back to the defining
-     file's numbering. */
-  struct function_definition_info
-  {
-    usize body_start_position{0};
-    usize header_length{0};
-    usize line_offset{0};
-    String filename{};
-    /* The source instance the body was defined against. A call made while
-       this exact instance is still current needs no window, the absolute
-       positions already index the live text, which keeps the per-call cost
-       of a script running its own functions at one compare. */
-    const String *defining_instance{nullptr};
-  };
   fn function_definition_info_of(StringView name) const wontthrow
       -> const function_definition_info *;
   /* The text and the mapping a location renders against. The current source
