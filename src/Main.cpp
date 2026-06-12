@@ -11,7 +11,7 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
-#include "Shellcheck.hpp"
+#include "Diagnostics.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -241,11 +241,21 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
     return EXIT_SUCCESS;
   }
   if (FLAG_LIST_CHECKS.is_enabled()) {
-    let l = String{};
+    let l = String{"SHELLCHECK CHECKS\n"};
     for (const shellcheck_check &check : SHELLCHECK_CHECKS) {
+      l += "  ";
       l += check.code;
       l += "  ";
       l += check.summary;
+      l += '\n';
+    }
+    l += "\nSTRICTNESS WARNINGS\n";
+    for (const strictness_warning &warning : STRICTNESS_WARNINGS) {
+      l += "  ";
+      l += warning.name;
+      for (usize pad = warning.name.length; pad < 19; pad++)
+        l += " ";
+      l += warning.summary;
       l += '\n';
     }
     print(l);

@@ -66,4 +66,34 @@ inline const shellcheck_check SHELLCHECK_CHECKS[] = {
     {"SC3030", "mapfile and readarray are bash array builtins absent from sh"},
 };
 
+/* One shit strictness diagnostic, the advisories and downgraded strict
+   errors the shell's own default mood emits beyond the shellcheck mirrors.
+   Each is named by the option or rule that drives it, so --list-diagnostics
+   shows the full set a -W run can print. */
+struct strictness_warning
+{
+  StringView name;
+  StringView summary;
+};
+
+inline const strictness_warning STRICTNESS_WARNINGS[] = {
+    {"nounset",
+     "a read of an unset variable errors in the strict default, -W reports "
+     "it and expands empty"                                                   },
+    {"failglob",
+     "a glob that matches no file errors in the strict default, -W reports "
+     "it and keeps the literal text"                                          },
+    {"pipefail",
+     "a pipeline reports the rightmost failing stage in the strict default"   },
+    {"no-local",
+     "an assignment in a function without local leaks to the global scope"    },
+    {"unquoted-test",
+     "an unquoted variable in a test can split or vanish, quote it"           },
+    {"malformed-glob", "a pattern holds an unterminated '[' class"            },
+    {"substitution-reap", "a process substitution child could not be reaped"  },
+    {"posix-bashism",
+     "a bashism such as <<<, |&, or for ((...)) tripped the POSIX parse, the "
+     "error names the owning dialect"                                         },
+};
+
 } /* namespace shit */
