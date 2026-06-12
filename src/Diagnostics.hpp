@@ -79,21 +79,21 @@ struct strictness_warning
 inline const strictness_warning STRICTNESS_WARNINGS[] = {
     {"nounset",
      "a read of an unset variable errors in the strict default, -W reports "
-     "it and expands empty"                                                   },
+     "it and expands empty"                                                 },
     {"failglob",
      "a glob that matches no file errors in the strict default, -W reports "
-     "it and keeps the literal text"                                          },
+     "it and keeps the literal text"                                        },
     {"pipefail",
-     "a pipeline reports the rightmost failing stage in the strict default"   },
+     "a pipeline reports the rightmost failing stage in the strict default" },
     {"no-local",
-     "an assignment in a function without local leaks to the global scope"    },
+     "an assignment in a function without local leaks to the global scope"  },
     {"unquoted-test",
-     "an unquoted variable in a test can split or vanish, quote it"           },
-    {"malformed-glob", "a pattern holds an unterminated '[' class"            },
-    {"substitution-reap", "a process substitution child could not be reaped"  },
+     "an unquoted variable in a test can split or vanish, quote it"         },
+    {"malformed-glob",    "a pattern holds an unterminated '[' class"       },
+    {"substitution-reap", "a process substitution child could not be reaped"},
     {"posix-bashism",
      "a bashism such as <<<, |&, or for ((...)) tripped the POSIX parse, the "
-     "error names the owning dialect"                                         },
+     "error names the owning dialect"                                       },
 };
 
 } /* namespace shit */

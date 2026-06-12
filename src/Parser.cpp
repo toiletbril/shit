@@ -1372,8 +1372,7 @@ hot fn Parser::parse_for() throws -> Command *
     /* A (( in the name slot under POSIX mode means the script used the bash
        C-style loop in a mode that keeps the dash reading, so the hint names
        the dialect rather than leaving a bare name complaint. */
-    if (m_lexer.is_posix_mode() &&
-        name_token->kind() == Token::Kind::LeftParen)
+    if (m_lexer.is_posix_mode() && name_token->kind() == Token::Kind::LeftParen)
     {
       throw ErrorWithLocation{
           name_token->source_location(),

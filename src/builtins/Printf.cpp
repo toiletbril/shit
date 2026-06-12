@@ -356,7 +356,8 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   usize format_index = 1;
   Maybe<String> store_variable;
   if (cxt.bash_additions_enabled() && ec.args()[1] == "-v" &&
-      ec.args().count() >= 3) {
+      ec.args().count() >= 3)
+  {
     store_variable = ec.args()[2];
     format_index = 3;
   }

@@ -156,9 +156,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     /* Field splitting applies only to the results of expansions, so literal
        text from the source stays one run even when it holds IFS bytes, the
        way bash and dash keep a-b whole under IFS=-. */
-    case WordSegment::Kind::UnquotedText:
-      append_run(segment_text, true);
-      break;
+    case WordSegment::Kind::UnquotedText: append_run(segment_text, true); break;
     case WordSegment::Kind::VariableReference: {
       /* "$@" expands to one field per positional parameter. The first joins any
          preceding text, the last leaves its field open for following text. */
