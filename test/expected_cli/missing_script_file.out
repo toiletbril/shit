@@ -1,4 +1,2 @@
-shit: 1:9: error: Could not open 'zz_no_such_script_file': No such file or directory.
-     1 |  ../shit zz_no_such_script_file
-       |          ^~~~~~~~~~~~~~~~~~~~~~ here.
+error: Could not open 'zz_no_such_script_file': No such file or directory.
 rc=127

@@ -230,10 +230,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       /* A builtin runs in this process, so its status stands in for the stage.
          The pipeline-stage flag rides the call so exec spawns a child rather
          than replacing the whole shell, since a stage is bash's own subshell.
-       */
+         The defer clears it even when the builtin throws, so the flag never
+         leaks into a later command run on the same context. */
       cxt.set_in_pipeline_stage(true);
+      defer { cxt.set_in_pipeline_stage(false); };
       ret = execute_builtin(steal(ec), cxt);
-      cxt.set_in_pipeline_stage(false);
       stage_status[stage_index] = ret;
     }
 

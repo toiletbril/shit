@@ -268,14 +268,20 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     force_unset_shell_variable(binding.name);
   /* The store is written directly rather than through set_indexed_array,
      since the readonly check could throw from the same noexcept defer. */
-  /* The sparse elements drop first, so a deep index the body set does not
-     survive the restore the way the plain unset clears it. */
-  clear_sparse_array(binding.name.view());
+  /* The dense run is restored first so the sparse re-insert below routes each
+     saved gap index beyond it the way the caller held it. */
   if (binding.previous_indexed_array.has_value())
     m_indexed_arrays.set(binding.name.view(),
                          steal(*binding.previous_indexed_array));
   else
     m_indexed_arrays.erase(binding.name.view());
+  /* The body's sparse elements drop and the caller's saved ones come back, so
+     a deep index the body set does not survive while a gap index the caller
+     held is restored rather than wiped. */
+  clear_sparse_array(binding.name.view());
+  for (usize i = 0; i < binding.previous_sparse_indices.count(); i++)
+    set_array_element(binding.name.view(), binding.previous_sparse_indices[i],
+                      binding.previous_sparse_values[i].view());
   clear_associative_array(binding.name.view());
   if (binding.previous_was_associative)
     for (usize k = 0; k < binding.previous_associative_keys.count(); k++)
@@ -1519,6 +1525,19 @@ fn EvalContext::declare_local(StringView name) throws -> void
     previous_values = associative_values(name);
   }
 
+  /* The sparse elements the name held are saved so a local that shadows a
+     caller's sparse array does not wipe those gap indices on return. The scan
+     is skipped when no sparse element exists at all. */
+  let previous_sparse_indices = ArrayList<usize>{heap_allocator()};
+  let previous_sparse_values = ArrayList<String>{heap_allocator()};
+  if (m_sparse_array_values.count() != 0)
+    for (const sparse_array_entry &entry : collect_sparse_array_entries(
+             m_sparse_array_values, name, heap_allocator()))
+    {
+      previous_sparse_indices.push(entry.index);
+      previous_sparse_values.push(String{heap_allocator(), entry.value.view()});
+    }
+
   /* A local starts with no attributes the way bash localizes a name fresh, so
      the caller's integer mark is dropped here and the saved flag puts it back
      when the scope ends. */
@@ -1528,6 +1547,7 @@ fn EvalContext::declare_local(StringView name) throws -> void
   m_local_scopes.back().push(local_binding{
       String{name}, get_variable_value(name), steal(previous_array),
       previous_was_associative, steal(previous_keys), steal(previous_values),
+      steal(previous_sparse_indices), steal(previous_sparse_values),
       previous_was_integer});
 }
 
@@ -5759,8 +5779,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
                 break;
               }
             }
-            /* Any other word shape keeps the scalar expansion. */
-            let const value = apply_parameter_expansion(segment.text.view());
+            /* Any other word shape, a plain literal alternate such as
+               ${a[@]+alt} or ${a[@]-default}, expands the modifier word
+               itself rather than re-reading the whole a[@] segment, which the
+               scalar path would mis-parse as ${a}. */
+            let const value = expand_modifier_word(modifier_word);
             if (segment.is_in_double_quotes)
               append_run(value, false);
             else
@@ -6647,8 +6670,15 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
       } else if (c == '`') {
         in_backtick = !in_backtick;
       } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '(') {
-        paren_depth++;
-        i++;
+        /* $(( opens arithmetic that closes with )), so both parens are
+           counted and the )) decrements back to the top level cleanly. */
+        if (i + 2 < wordlist.length && wordlist[i + 2] == '(') {
+          paren_depth += 2;
+          i += 2;
+        } else {
+          paren_depth++;
+          i++;
+        }
       } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '{') {
         brace_depth++;
         i++;

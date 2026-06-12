@@ -131,6 +131,11 @@ struct local_binding
   bool previous_was_associative{false};
   ArrayList<String> previous_associative_keys{heap_allocator()};
   ArrayList<String> previous_associative_values{heap_allocator()};
+  /* The sparse elements the name held, the gap indices beyond the dense run,
+     so a local that shadows a caller's sparse array restores those elements
+     on return rather than the scope pop wiping them. */
+  ArrayList<usize> previous_sparse_indices{heap_allocator()};
+  ArrayList<String> previous_sparse_values{heap_allocator()};
   /* The integer mark the name carried in the caller. declare_local drops the
      mark so a fresh local starts with no attributes the way bash localizes,
      and leaving the scope puts the caller's mark back. */
