@@ -303,6 +303,12 @@ fn query_shell_option(const EvalContext &cxt, StringView name) throws
 fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool;
 
+/* The long names of every set -o option, canonical spellings first and the
+   --help alias spellings after them when asked, so shopt -o can list the
+   options and the completion engine can offer them. */
+fn shell_option_names(bool include_alias_spellings) throws
+    -> ArrayList<StringView>;
+
 /* Report a builtin error that must not abort the run, such as one bad name in a
    loop that still processes the rest, with the same located caret in the
    default and posix moods and the same soft unlocated line in the bash mood

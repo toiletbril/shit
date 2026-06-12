@@ -911,6 +911,39 @@ fn extglob_full_match(StringView glob, StringView str,
                             mask_offset + 1);
 }
 
+/* The POSIX character classes a bracket accepts as [:name:], each name bound
+   to its ctype predicate. The wrappers pin the byte through unsigned char, the
+   only argument range the ctype functions define. */
+struct posix_class_entry
+{
+  StringView name;
+  bool (*byte_is_member)(u8 byte);
+};
+
+const posix_class_entry POSIX_CLASS_TABLE[] = {
+    {"alnum", [](u8 byte) { return std::isalnum(byte) != 0; }},
+    {"alpha", [](u8 byte) { return std::isalpha(byte) != 0; }},
+    {"blank", [](u8 byte) { return std::isblank(byte) != 0; }},
+    {"cntrl", [](u8 byte) { return std::iscntrl(byte) != 0; }},
+    {"digit", [](u8 byte) { return std::isdigit(byte) != 0; }},
+    {"graph", [](u8 byte) { return std::isgraph(byte) != 0; }},
+    {"lower", [](u8 byte) { return std::islower(byte) != 0; }},
+    {"print", [](u8 byte) { return std::isprint(byte) != 0; }},
+    {"punct", [](u8 byte) { return std::ispunct(byte) != 0; }},
+    {"space", [](u8 byte) { return std::isspace(byte) != 0; }},
+    {"upper", [](u8 byte) { return std::isupper(byte) != 0; }},
+    {"xdigit", [](u8 byte) { return std::isxdigit(byte) != 0; }},
+};
+
+/* Whether the byte belongs to the named class. An unknown name matches
+   nothing, the way bash treats a class it does not know. */
+bool byte_is_in_posix_class(StringView class_name, u8 byte) throws
+{
+  for (const posix_class_entry &entry : POSIX_CLASS_TABLE)
+    if (entry.name == class_name) return entry.byte_is_member(byte);
+  return false;
+}
+
 } /* namespace */
 
 fn glob_matches(StringView glob, StringView str,
@@ -996,6 +1029,23 @@ fn glob_matches(StringView glob, StringView str,
         return static_cast<u8>(view[index]);
       };
 
+      /* A [:name:] unit inside the bracket is a POSIX character class. The
+         index past its closing ":]" comes back when one starts here, so both
+         scans treat the unit atomically and its inner ] never closes the
+         bracket. */
+      let const class_end_past = [&](usize index) wontthrow -> Maybe<usize> {
+        if (index + 1 >= glob.count() || glob[index] != '[' ||
+            glob[index + 1] != ':' || !is_active(index))
+          return None;
+        for (usize scan = index + 2; scan + 1 < glob.count(); scan++) {
+          if (glob[scan] == ':' && glob[scan + 1] == ']') return scan + 2;
+          /* A ] before any ":]" means the [ was a plain member after all, the
+             way [[:a] is a bracket holding [, :, and a. */
+          if (glob[scan] == ']' && is_active(scan)) return None;
+        }
+        return None;
+      };
+
       /* A bracket with no closing ] is not a character class, so the [ is a
          literal character, as POSIX specifies. A ] right after [ or [^ is a
          member, so the scan for the closing ] starts past it. */
@@ -1006,11 +1056,18 @@ fn glob_matches(StringView glob, StringView str,
         close_scan++;
       if (close_scan < glob.count() && is_close_at(close_scan)) close_scan++;
       bool has_closing_bracket = false;
-      for (; close_scan < glob.count(); close_scan++) {
+      while (close_scan < glob.count()) {
+        if (Maybe<usize> past_class = class_end_past(close_scan);
+            past_class.has_value())
+        {
+          close_scan = *past_class;
+          continue;
+        }
         if (is_close_at(close_scan)) {
           has_closing_bracket = true;
           break;
         }
+        close_scan++;
       }
       if (!has_closing_bracket) {
         if (byte_at(glob, g) != byte_at(str, s)) return false;
@@ -1032,12 +1089,27 @@ fn glob_matches(StringView glob, StringView str,
         if (g >= glob.count()) GLOB_GROUP_ERR();
       }
 
-      u8 prev_glob_ch = byte_at(glob, g);
-      is_matched |= (prev_glob_ch == byte_at(str, s));
-      g++;
-
-      while (g < glob.count() && !is_close_at(g)) {
-        if (glob[g] == '-' && is_active(g)) {
+      /* The first member bypasses the close check, so a leading ] is a plain
+         member, and a class never opens a range, so a - after one is a plain
+         member too. */
+      u8 prev_glob_ch = 0;
+      bool is_first_member = true;
+      bool prev_member_was_class = false;
+      while (g < glob.count() && (is_first_member || !is_close_at(g))) {
+        if (Maybe<usize> past_class = class_end_past(g);
+            past_class.has_value())
+        {
+          let const class_name =
+              glob.substring_of_length(g + 2, *past_class - g - 4);
+          is_matched |= byte_is_in_posix_class(class_name, byte_at(str, s));
+          g = *past_class;
+          prev_member_was_class = true;
+          is_first_member = false;
+          continue;
+        }
+        if (!is_first_member && !prev_member_was_class && glob[g] == '-' &&
+            is_active(g))
+        {
           g++;
           if (g >= glob.count()) GLOB_GROUP_ERR();
 
@@ -1054,6 +1126,8 @@ fn glob_matches(StringView glob, StringView str,
           is_matched |= (prev_glob_ch == byte_at(str, s));
           g++;
         }
+        prev_member_was_class = false;
+        is_first_member = false;
       }
 
       if (g >= glob.count() || !is_close_at(g)) GLOB_GROUP_ERR();

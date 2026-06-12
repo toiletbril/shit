@@ -229,6 +229,18 @@ fn query_shell_option(const EvalContext &cxt, StringView name) throws
   return option_is_on(cxt, *option);
 }
 
+fn shell_option_names(bool include_alias_spellings) throws
+    -> ArrayList<StringView>
+{
+  let names = ArrayList<StringView>{};
+  for (const SetOption &option : SET_OPTIONS)
+    names.push(option.name);
+  if (include_alias_spellings)
+    for (const SetOption &option : SET_OPTIONS)
+      if (!option.alias.is_empty()) names.push(option.alias);
+  return names;
+}
+
 fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
     -> bool
 {

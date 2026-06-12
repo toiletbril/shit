@@ -1081,10 +1081,21 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
         def->function_name.view(), default_words, default_cword, line, cursor,
         &status);
     if (status != 124) {
+      /* The same dash gate the spec paths below apply, so the default
+         function's reply offers options only once the token asks for them. */
+      let const wants_dash_entries = !token.is_empty() && token[0] == '-';
+      let dropped_dash_entries = false;
       let loaded = ArrayList<String>{};
-      for (const String &entry : reply)
+      for (const String &entry : reply) {
+        if (!wants_dash_entries && !entry.is_empty() && entry.view()[0] == '-')
+        {
+          dropped_dash_entries = true;
+          continue;
+        }
         loaded.push_managed(entry.view());
-      if (loaded.is_empty() && default_falls_back) return None;
+      }
+      if (loaded.is_empty() && (default_falls_back || dropped_dash_entries))
+        return None;
       return loaded;
     }
     spec = context.lookup_completion_spec(command);
@@ -1093,27 +1104,50 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
 
   let candidates = ArrayList<String>{};
 
+  /* A dash word from the list is offered only when the token already starts
+     with a dash, so an empty argument token completes files rather than the
+     spec's option words. The drop is remembered, and a list reduced to nothing
+     by it falls through to filename completion below. */
+  let const should_offer_dash_words = !token.is_empty() && token[0] == '-';
+  bool did_drop_dash_words = false;
+
   if (!spec->word_list.is_empty()) {
     /* The -W list expands the way bash expands it, through the same shared
        path compgen -W reads. The ghost runs on every keystroke and so keeps
        the plain split for a list that would need a parse. */
     for (const String &word :
          context.expand_wordlist_to_fields(spec->word_list.view(), for_listing))
+    {
+      if (!should_offer_dash_words && !word.is_empty() && word.view()[0] == '-')
+      {
+        did_drop_dash_words = true;
+        continue;
+      }
       if (word.view().starts_with(token)) candidates.push(String{word.view()});
+    }
   }
 
   /* The function returns the final candidate list in COMPREPLY, already
-     filtered to the current word, so its entries are taken as they are. */
+     filtered to the current word, so its entries are taken as they are, under
+     the same dash gate the word list passes through. */
   if (for_listing && !spec->function_name.is_empty()) {
     usize cword = 0;
     let const words = split_completion_words(line, cursor, cword);
     let const reply = context.run_completion_function(
         spec->function_name.view(), words, cword, line, cursor);
-    for (const String &entry : reply)
+    for (const String &entry : reply) {
+      if (!should_offer_dash_words && !entry.is_empty() &&
+          entry.view()[0] == '-')
+      {
+        did_drop_dash_words = true;
+        continue;
+      }
       candidates.push_managed(entry.view());
+    }
   }
 
-  if (candidates.is_empty() && spec->use_default) return None;
+  if (candidates.is_empty() && (spec->use_default || did_drop_dash_words))
+    return None;
   return candidates;
 }
 

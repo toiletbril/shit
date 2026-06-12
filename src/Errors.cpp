@@ -367,9 +367,12 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   usize byte_position = m_location.position;
   const usize byte_count = m_location.length;
 
-  ASSERT(byte_position <= source.count(),
-         "byte position: %zu, source length: %zu", byte_position,
-         source.count());
+  /* The location can name a byte in a source other than the one being
+     rendered, a command-not-found thrown from a function body that a sourced
+     file defined while the interactive prompt's source is the empty line. The
+     caret would read out of bounds there, so the message renders unlocated
+     instead. */
+  if (byte_position > source.count()) return ErrorBase::to_string(source);
 
   LOG_VARS(verbosity::Debug, byte_position, byte_count);
   LOG(verbosity::Debug, "formatting located %s", severity_word().c_str());
@@ -483,9 +486,10 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
   usize byte_position = m_details_location.position;
   const usize byte_count = m_details_location.length;
 
-  ASSERT(byte_position <= source.count(),
-         "byte position: %zu, source length: %zu", byte_position,
-         source.count());
+  /* The same out-of-source guard to_string applies, so a detail note whose
+     location names another source renders nothing rather than reading past
+     the end. */
+  if (byte_position > source.count()) return String{};
 
   LOG(verbosity::Debug, "formatting the detail note at byte %zu",
       byte_position);

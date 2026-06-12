@@ -285,6 +285,19 @@ fn is_child_process() wontthrow -> bool;
 /* The process id of the shell itself, for $$. */
 fn get_shell_process_id() wontthrow -> i64;
 
+/* The OSTYPE name bash compiles in, so the dynamic variable reads the
+   platform a config branches on. */
+inline fn ostype_name() wontthrow -> StringView
+{
+#if defined(_WIN32)
+  return "msys";
+#elif defined(__APPLE__)
+  return "darwin";
+#else
+  return "linux-gnu";
+#endif
+}
+
 /* Whether the shell runs with an effective user or group id that differs from
    its real one, the setuid or setgid case. The shell skips its startup config
    files then, so a file an attacker controls cannot run with the raised

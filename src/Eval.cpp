@@ -956,11 +956,11 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     return utils::uint_to_text(line);
   }
 
-  /* The bash dynamic variables are computed on each read. They only apply in
-     bash mode so POSIX behaves like dash, where these names are ordinary. A
-     stored assignment above still wins, so RANDOM=5 reads back 5. The first
-     byte gates each compare so an ordinary name skips them. */
-  if (is_bash_compatible()) {
+  /* The bash dynamic variables are computed on each read. They apply in every
+     mood but POSIX, where these names stay ordinary so the mode behaves like
+     dash. A stored assignment above still wins, so RANDOM=5 reads back 5. The
+     first byte gates each compare so an ordinary name skips them. */
+  if (bash_dynamic_variables_enabled()) {
     if (first_byte == 'R' && name == "RANDOM") {
       if (!m_random_seeded) {
         std::srand(static_cast<unsigned>(m_shell_start_time) ^
@@ -1021,6 +1021,11 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
     if (first_byte == 'B' && name == "BASHPID") {
       return utils::int_to_text(os::get_shell_process_id());
+    }
+    /* OSTYPE names the platform the way bash compiles it in, the read a
+       config such as bash_completion branches on. */
+    if (first_byte == 'O' && name == "OSTYPE") {
+      return String{heap_allocator(), os::ostype_name()};
     }
     /* The subshell nesting level, zero at the top, the way bash reports it. */
     if (first_byte == 'B' && name == "BASH_SUBSHELL") {
@@ -2590,7 +2595,8 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       const StringView subscript =
           name.substring_of_length(*bracket + 1, name.length - *bracket - 2);
       if (subscript == "@" || subscript == "*") {
-        if (array_name == "FUNCNAME" && is_bash_compatible()) [[unlikely]]
+        if (array_name == "FUNCNAME" && bash_dynamic_variables_enabled())
+            [[unlikely]]
           return String{scratch_allocator(),
                         utils::uint_to_text(funcname_frame_count())};
         if (is_associative_array(array_name))
@@ -3148,7 +3154,7 @@ fn EvalContext::apply_array_subscript(StringView name,
 {
   /* FUNCNAME reads the call-name stack, index zero the innermost frame the
      way bash exposes it, @ and * the whole stack outward. */
-  if (name == "FUNCNAME" && is_bash_compatible()) [[unlikely]] {
+  if (name == "FUNCNAME" && bash_dynamic_variables_enabled()) [[unlikely]] {
     let const depth = funcname_frame_count();
     if (subscript == "@" || subscript == "*") {
       /* The * form joins with the first IFS byte the way "${a[*]}" does in
@@ -3257,8 +3263,8 @@ fn EvalContext::collect_array_elements(StringView name) const throws
 {
   /* FUNCNAME enumerates the call-name stack, innermost first the way bash
      orders it, so "${FUNCNAME[@]}" yields one frame per field. */
-  if (name == "FUNCNAME" && is_bash_compatible() && funcname_frame_count() > 0)
-      [[unlikely]]
+  if (name == "FUNCNAME" && bash_dynamic_variables_enabled() &&
+      funcname_frame_count() > 0) [[unlikely]]
   {
     let const depth = funcname_frame_count();
     let frames = ArrayList<String>{heap_allocator()};
@@ -5785,6 +5791,87 @@ hot fn EvalContext::expand_word(const Word &word) throws
             else
               append_split_run(value, true);
             break;
+          }
+        }
+      }
+      /* "${name+word}" and "${name-word}" with a bare scalar subject keep the
+         same field fidelity when the word is itself an array expansion. bash
+         reads the bare name of an array as its element zero, and
+         bash-completion writes ${words+"${words[@]}"}, where the general
+         scalar path below would join the elements into one string and lose
+         the empty ones on the re-split. A word of any other shape falls
+         through to that path unchanged. */
+      if (lexer::is_variable_name_start(segment_text[0])) {
+        usize name_end = 1;
+        while (name_end < segment_text.length &&
+               lexer::is_variable_name(segment_text[name_end]))
+          name_end++;
+        let const rest = segment_text.substring(name_end);
+        let const is_colon_form = !rest.is_empty() && rest[0] == ':';
+        let const op_index = is_colon_form ? usize{1} : usize{0};
+        if (op_index < rest.length &&
+            (rest[op_index] == '+' || rest[op_index] == '-'))
+        {
+          let word = rest.substring(op_index + 1);
+          let const is_word_quoted = word.length >= 2 && word[0] == '"' &&
+                                     word[word.length - 1] == '"';
+          if (is_word_quoted)
+            word = word.substring_of_length(1, word.length - 2);
+          if (word.length >= 6 && word[0] == '$' && word[1] == '{' &&
+              word[word.length - 1] == '}')
+          {
+            let const inner = word.substring_of_length(2, word.length - 3);
+            usize inner_name_end = 0;
+            while (inner_name_end < inner.length &&
+                   lexer::is_variable_name(inner[inner_name_end]))
+              inner_name_end++;
+            if (inner_name_end > 0 && inner_name_end + 3 == inner.length &&
+                inner[inner_name_end] == '[' &&
+                (inner[inner_name_end + 1] == '@' ||
+                 inner[inner_name_end + 1] == '*') &&
+                inner[inner_name_end + 2] == ']')
+            {
+              let const subject_elements = collect_array_elements(
+                  segment_text.substring_of_length(0, name_end));
+              /* The bare name reads as element zero, so the plain form tests
+                 whether any element exists and the colon form whether the
+                 first is nonempty. */
+              let const treat_as_unset =
+                  is_colon_form ? (subject_elements.is_empty() ||
+                                   subject_elements[0].is_empty())
+                                : subject_elements.is_empty();
+              let const modifier_op = rest[op_index];
+              let const should_expand_word =
+                  modifier_op == '+' ? !treat_as_unset : treat_as_unset;
+              if (should_expand_word) {
+                let const values = collect_array_elements(
+                    inner.substring_of_length(0, inner_name_end));
+                let const emit_quoted =
+                    is_word_quoted || segment.is_in_double_quotes;
+                if (emit_quoted && inner[inner_name_end + 1] == '*') {
+                  let const ifs = m_field_separators.view();
+                  let joined = String{scratch_allocator()};
+                  for (usize i = 0; i < values.count(); i++) {
+                    if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+                    joined.append(values[i].view());
+                  }
+                  append_run(joined, false);
+                } else {
+                  for (usize i = 0; i < values.count(); i++) {
+                    if (i > 0) flush();
+                    if (emit_quoted)
+                      append_run(values[i].view(), false);
+                    else
+                      append_split_run(values[i].view(), true);
+                  }
+                }
+                break;
+              }
+              /* + with an unset subject contributes no field, while - with a
+                 set subject reads the subject itself, which is the general
+                 path's case below. */
+              if (modifier_op == '+') break;
+            }
           }
         }
       }

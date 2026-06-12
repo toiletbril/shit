@@ -865,6 +865,14 @@ public:
     return m_mood != mimic_mood::Posix;
   }
 
+  /* The bash dynamic variables, FUNCNAME and RANDOM and their kin, exist
+     everywhere except POSIX mode, the same pure-addition rule the extended
+     globs follow, so a bash config sources in the default mood too. */
+  pure fn bash_dynamic_variables_enabled() const wontthrow -> bool
+  {
+    return m_mood != mimic_mood::Posix;
+  }
+
   /* The bash shopt option states, set and read by the shopt builtin. A name
      with no entry reads its bash default through shopt_default_is_on. */
   fn set_shopt_option(StringView name, bool enabled) throws -> void

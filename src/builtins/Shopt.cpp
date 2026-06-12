@@ -99,6 +99,23 @@ String shopt_status_line(StringView name, bool on) throws
   return line;
 }
 
+/* The bash -p display line, a command the shell replays to restore the
+   option's state. A completion script captures this through $(shopt -p name)
+   and runs it later, so the line must execute, shopt -s or -u for a shopt
+   name and set -o or +o for a set option behind the -o bridge. */
+String shopt_reusable_line(StringView name, bool on,
+                           bool as_set_option) throws
+{
+  let line = String{};
+  if (as_set_option)
+    line += on ? "set -o " : "set +o ";
+  else
+    line += on ? "shopt -s " : "shopt -u ";
+  line += name;
+  line += '\n';
+  return line;
+}
+
 } /* namespace */
 
 Shopt::Shopt() = default;
@@ -116,13 +133,14 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool disable = false;
   bool quiet = false;
   bool operate_on_set_options = false;
+  bool print_reusable = false;
   let names = ArrayList<StringView>{heap_allocator()};
 
   for (usize i = 1; i < args.count(); i++) {
     const StringView arg = args[i].view();
     /* The options combine into one argument, such as the -qo of shopt -qo
-       posix, so each letter is read in turn. A -p or any other letter is
-       accepted without effect. */
+       posix, so each letter is read in turn. Any other letter is accepted
+       without effect. */
     if (arg.length >= 2 && arg[0] == '-') {
       for (usize k = 1; k < arg.length; k++) {
         if (arg[k] == 's')
@@ -133,11 +151,21 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
           quiet = true;
         else if (arg[k] == 'o')
           operate_on_set_options = true;
+        else if (arg[k] == 'p')
+          print_reusable = true;
       }
     } else {
       names.push(arg);
     }
   }
+
+  /* -p prints in the replayable command form rather than the status form, so a
+     query keeps printing while the line changes shape. */
+  let const format_status_line = [&](StringView name, bool on) throws {
+    return print_reusable
+               ? shopt_reusable_line(name, on, operate_on_set_options)
+               : shopt_status_line(name, on);
+  };
 
   i32 status = 0;
   auto reject_unknown = [&](StringView name) throws -> bool {
@@ -157,6 +185,15 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
      bridge bash provides so the same options answer either builtin. A config
      probes shopt -qo posix to detect the POSIX mode. */
   if (operate_on_set_options) {
+    /* A bare shopt -o or shopt -po lists every set option, the way the named
+       query prints one. */
+    if (names.is_empty()) {
+      if (!quiet)
+        for (const StringView name : shell_option_names(false))
+          if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
+            ec.print_to_stdout(format_status_line(name, *on).view());
+      return 0;
+    }
     for (const StringView name : names) {
       if (enable || disable) {
         if (!apply_shell_option(cxt, name, enable)) {
@@ -168,7 +205,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
       } else if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
       {
         if (!*on) status = 1;
-        if (!quiet) ec.print_to_stdout(shopt_status_line(name, *on).view());
+        if (!quiet) ec.print_to_stdout(format_status_line(name, *on).view());
       } else {
         if (quiet)
           status = 1;
@@ -197,7 +234,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (!quiet) {
       for (const StringView name : SHOPT_OPTION_NAMES)
         ec.print_to_stdout(
-            shopt_status_line(name, cxt.is_shopt_enabled(name)).view());
+            format_status_line(name, cxt.is_shopt_enabled(name)).view());
     }
     return 0;
   }
@@ -206,7 +243,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (reject_unknown(name)) continue;
     const bool on = cxt.is_shopt_enabled(name);
     if (!on) status = 1;
-    if (!quiet) ec.print_to_stdout(shopt_status_line(name, on).view());
+    if (!quiet) ec.print_to_stdout(format_status_line(name, on).view());
   }
   return status;
 }
