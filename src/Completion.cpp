@@ -1798,10 +1798,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         continue;
       }
 
-      /* A command name. A resolved command keeps the default foreground color,
+      /* A command name. A resolved command is blue the way fish paints one,
          an unresolved one is red. */
-      if (!first_word_resolves(word, context))
-        push(word_start, word_end, colors::ansi::RED);
+      push(word_start, word_end, first_word_resolves(word, context)
+                                     ? colors::ansi::BLUE
+                                     : colors::ansi::RED);
       command_position = false;
       continue;
     }

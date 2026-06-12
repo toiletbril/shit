@@ -19,6 +19,7 @@ inline const StringView DIM = "\x1b[2m";
 inline const StringView RED = "\x1b[31m";
 inline const StringView GREEN = "\x1b[32m";
 inline const StringView YELLOW = "\x1b[33m";
+inline const StringView BLUE = "\x1b[34m";
 inline const StringView BOLD_RED = "\x1b[1;31m";
 inline const StringView BOLD_GREEN = "\x1b[1;32m";
 inline const StringView BOLD_YELLOW = "\x1b[1;33m";
