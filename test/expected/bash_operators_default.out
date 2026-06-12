@@ -1,0 +1,96 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [RedirectedCommand]
+        [SimpleCommand "echo" "through"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [RedirectedCommand]
+        [BraceGroup]
+          [CompoundList]
+            [CompoundListCondition, None]
+              [SimpleCommand "echo" "to-err"]
+      [SimpleCommand "cat"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "both"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "/tmp/shit-golden-amp"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "more"]
+  [CompoundListCondition, None]
+    [SimpleCommand "cat" "/tmp/shit-golden-amp"]
+  [CompoundListCondition, None]
+    [SimpleCommand "rm" "-f" "/tmp/shit-golden-amp"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "through"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "to-err"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "both"
+]
+[Word
+  Unquoted "/tmp/shit-golden-amp"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/tmp/shit-golden-amp"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "more"
+]
+[Word
+  Unquoted "/tmp/shit-golden-amp"
+]
+[Word
+  Unquoted "cat"
+]
+[Word
+  Unquoted "/tmp/shit-golden-amp"
+]
+[Word
+  Unquoted "rm"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "/tmp/shit-golden-amp"
+]
+through
+to-err
+both
+both
+more
+[Code 0]

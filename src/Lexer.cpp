@@ -1412,11 +1412,12 @@ hot fn Lexer::lex_sentinel() throws -> Token *
       TOKEN_CASE_TWO(RightSquareBracket, ']', DoubleRightSquareBracket);
       TOKEN_CASE_TWO(LeftSquareBracket, '[', DoubleLeftSquareBracket);
       TOKEN_CASE_TWO(ExclamationMark, '=', ExclamationEquals);
-    /* & is the background operator, && the logical and. In bash mode &> and &>>
-       redirect both standard streams to a file, so they are recognized here
-       before the plain & since they change the POSIX meaning. */
+    /* & is the background operator, && the logical and. &> and &>> redirect
+       both standard streams to a file, recognized before the plain & since
+       they change the POSIX meaning, so they ride every mood but POSIX the
+       way the other pure bash additions do. */
     case Token::Kind::Ampersand: {
-      if (is_bash_compatible() && chop_character(1) == '>') {
+      if (!is_posix_mode() && chop_character(1) == '>') {
         if (chop_character(2) == '>') {
           tok = m_arena->create<tokens::AmpersandDoubleGreater>(
               here(m_cursor_position, 3));
@@ -1435,13 +1436,14 @@ hot fn Lexer::lex_sentinel() throws -> Token *
       }
     } break;
 
-    /* | is a pipe, || the logical or. In bash mode |& pipes both standard
-       output and standard error, the shorthand for 2>&1 |. */
+    /* | is a pipe, || the logical or. |& pipes both standard output and
+       standard error, the shorthand for 2>&1 |, riding every mood but POSIX
+       the way the other pure bash additions do. */
     case Token::Kind::Pipe: {
       if (chop_character(1) == '|') {
         tok = m_arena->create<tokens::DoublePipe>(here(m_cursor_position, 2));
         extra_length++;
-      } else if (is_bash_compatible() && chop_character(1) == '&') {
+      } else if (!is_posix_mode() && chop_character(1) == '&') {
         tok =
             m_arena->create<tokens::PipeAmpersand>(here(m_cursor_position, 2));
         extra_length++;

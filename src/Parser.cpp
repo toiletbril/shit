@@ -478,6 +478,22 @@ hot fn Parser::parse_command_list(
       for (;;) {
         Command *rhs = parse_simple_command();
         if (rhs == nullptr) {
+          /* An ampersand glued to the pipe under POSIX mode means the script
+             used the bash |& stderr pipe in a mode that reads | then &, so
+             the hint names the dialect rather than leaving a bare pipeline
+             complaint. */
+          Token *after = m_lexer.peek_shell_token();
+          if (m_lexer.is_posix_mode() && after != nullptr &&
+              after->kind() == Token::Kind::Ampersand &&
+              after->source_location().position ==
+                  last_pipe_token->source_location().position + 1)
+          {
+            throw shit::ErrorWithLocation{
+                last_pipe_token->source_location(),
+                "Unable to build the pipeline because no command follows "
+                "the pipe. The |& stderr pipe is a bashism that POSIX mode "
+                "does not read, use 2>&1 | instead"};
+          }
           throw shit::ErrorWithLocation{
               last_pipe_token->source_location(),
               "Unable to build the pipeline because no command follows the "
@@ -1353,6 +1369,18 @@ hot fn Parser::parse_for() throws -> Command *
                                        name_token->source_location());
   }
   if (name_token->kind() != Token::Kind::Word) {
+    /* A (( in the name slot under POSIX mode means the script used the bash
+       C-style loop in a mode that keeps the dash reading, so the hint names
+       the dialect rather than leaving a bare name complaint. */
+    if (m_lexer.is_posix_mode() &&
+        name_token->kind() == Token::Kind::LeftParen)
+    {
+      throw ErrorWithLocation{
+          name_token->source_location(),
+          "Expected a variable name after 'for'. The for ((...)) C-style "
+          "loop is a bashism that POSIX mode does not read, use a while "
+          "loop instead"};
+    }
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
   }
