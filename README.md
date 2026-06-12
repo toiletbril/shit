@@ -23,23 +23,22 @@ which a normal shell will half-assedly run and leave you with a mess, gets
 caught up front and the run stops. The same stage carries most of shellcheck
 built in as warnings. Every error or warning at stage is called a diagnostic.
 
-`-P` makes it POSIX to the letter. `--bash-compatible` makes it Bash. Name the
-binary `sh`, `dash`, or `bash` and it reads its own name and picks the matching
-mood, disabling diagnostics. `-W` keeps the diagnostics but turns every error
-into a warning and lets the run continue to stay compatible.
+`-P` makes it POSIX. `--bash-compatible` makes it Bash. If the binary is named
+or symlinked to `sh`, `dash`, or `bash`, it picks the matching mood, disabling
+diagnostics. `-W` keeps the diagnostics but turns every error into a warning
+and lets the run continue to stay compatible.
 
-`-I` is mimicry. With it on, a script whose shebang names `sh`, `dash`, `bash`,
-or **shit** runs inside **shit** in the matching mood rather than launching the
-real shell for more speed.
+`-I` is mimicry. With it on, a script whose shebang names `sh`, `dash`, `bash`
+runs inside **shit** in the matching mood rather than launching the real shell
+for more speed.
 
 `-L` boots from the existing bash setup. It sources the bash profiles and
 `~/.bashrc` in bash mode, then snaps back to the strict default at the first
 prompt. The startup files always source lenient, so an unset variable or an
 unmatched glob in a profile never aborts the login.
 
-`SHIT_FLAGS` sets your defaults once. Put `-ahmu --bash-compatible -I` in it
-and every **shit** starts that way, while a flag on the command line still
-wins.
+`SHIT_FLAGS` sets your defaults once. Put the recommended `-WLI` in it and
+every **shit** starts that way, while a flag on the command line still wins.
 
 ## Additional bull**shit**
 
