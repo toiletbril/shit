@@ -26,7 +26,7 @@ OPTION SWITCHES
   -n  noexec, no-exec               Read and parse commands but do not run them.
   -m  monitor                       Run background jobs in their own process group with notifications.
       failglob                      Fail a command whose glob matches nothing.
-  -b  notify                        Accepted without effect.
+  -b  notify                        Report a background job's completion immediately instead of before the next prompt.
   -h  hashall                       Accepted without effect.
   -v  verbose                       Write input to standard error as it is read, the -v flag.
   -k  keyword                       Accepted without effect.

@@ -357,6 +357,10 @@ fn reset_signal_handlers() throws -> void;
    The main loop clears it before each interactive command. */
 extern volatile sig_atomic_t INTERRUPT_REQUESTED;
 
+/* Raised by the SIGCHLD handler when a child changes state, read and cleared
+   by the prompt's wake hook so set -b reports a finished job immediately. */
+extern volatile sig_atomic_t CHILD_STATE_CHANGED;
+
 /* Set to one whenever any trapped signal arrives, so the evaluator's hot poll
    is a single read. The drain at the command boundary clears it as it consumes
    the per-signal flags. */

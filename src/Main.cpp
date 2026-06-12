@@ -1146,6 +1146,9 @@ fn main(int argc, char **argv) -> int
               "initializing the line editor and the path map");
           shit::utils::initialize_path_map();
           toiletline::initialize();
+          /* The set -b wake hook registers whenever the editor runs, even
+             under -T, since job reporting is not completion. */
+          toiletline::enable_job_notifications(context);
           /* The line editor only completes at an interactive prompt, so the
              engine is registered here and never on the script or -c path. The
              -T flag leaves it unregistered, so the editor runs with no

@@ -508,12 +508,22 @@ public:
      reports it, and the caller gates the call on an interactive shell so a
      script stays silent. */
   fn notify_done_jobs() throws -> void;
+  /* The Done lines notify_done_jobs prints, with the caller's line ending,
+     so the editor's wake hook prints \r\n rows while the terminal sits in
+     raw mode. The finished jobs are forgotten either way. */
+  fn format_done_job_notifications(StringView line_ending) throws -> String;
 
   /* monitor mode is set -m. It is on by default in an interactive shell, and it
      gates the terminal handoff so a non-interactive run never touches the
      controlling terminal. */
   fn set_monitor(bool enabled) wontthrow -> void;
   pure fn monitor() const wontthrow -> bool;
+
+  /* notify mode is set -b. The prompt's wake hook reads it and reports a
+     background job's completion immediately, the zsh notify behavior, while
+     off the report waits for the next prompt. */
+  fn set_notify(bool enabled) wontthrow -> void;
+  pure fn notify() const wontthrow -> bool;
 
   /* Shell functions live in the parse arena, so the table is cleared before
      each top-level parse to avoid pointing at freed storage. A function shadows
@@ -1371,6 +1381,7 @@ protected:
   ArrayList<job> m_jobs{heap_allocator()};
   i32 m_next_job_id{1};
   bool m_monitor{false};
+  bool m_notify{false};
   bool m_enable_path_expansion;
   bool m_enable_echo;
   bool m_enable_echo_expanded;

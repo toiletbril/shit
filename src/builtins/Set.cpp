@@ -75,7 +75,9 @@ const SetOption SET_OPTIONS[] = {
        ever matching a parsed option character. */
     {'\0', "failglob", &EvalContext::set_failglob, &EvalContext::failglob,
      "Fail a command whose glob matches nothing."},
-    {'b', "notify", nullptr, nullptr, "Accepted without effect."},
+    {'b', "notify", &EvalContext::set_notify, &EvalContext::notify,
+     "Report a background job's completion immediately instead of before the "
+     "next prompt."},
     {'h', "hashall", nullptr, nullptr, "Accepted without effect."},
     {'v', "verbose", &EvalContext::set_echo, &EvalContext::should_echo,
      "Write input to standard error as it is read, the -v flag."},

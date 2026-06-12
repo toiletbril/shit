@@ -35,6 +35,10 @@ String build_prompt(shit::EvalContext &context);
 void enable_completion(shit::EvalContext &context);
 void disable_completion();
 
+/* Register the set -b wake hook on the editor, so a finished background job
+   reports above the live prompt. Independent of completion so -T keeps it. */
+void enable_job_notifications(shit::EvalContext &context);
+
 /* Turn the dimmed ghost suggestion on or off. The no-completion flag turns it
    off so neither completion nor history offers an inline hint. */
 void set_ghost_enabled(bool enabled);

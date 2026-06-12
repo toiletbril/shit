@@ -1013,12 +1013,18 @@ static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
+volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
+
 static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) wontthrow
     -> void
 {
   unused(n);
   unused(ctx);
   unused(siginfo);
+  /* The flag store is the only async-signal-safe action. The handlers carry
+     no SA_RESTART, so the editor's poll wakes with EINTR and its wake hook
+     reads this for the set -b notification. */
+  CHILD_STATE_CHANGED = 1;
 }
 
 fn reset_signal_handlers() throws -> void
@@ -2256,6 +2262,10 @@ fn last_system_error_message() -> String
 }
 
 volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
+
+/* Windows has no SIGCHLD, so the flag exists for the shared readers and
+   stays down. */
+volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
 
 static fn handle_interrupt(int s) -> void
 {

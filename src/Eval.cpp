@@ -1143,10 +1143,12 @@ fn EvalContext::forget_done_jobs() throws -> void
   m_jobs = steal(kept);
 }
 
-fn EvalContext::notify_done_jobs() throws -> void
+fn EvalContext::format_done_job_notifications(StringView line_ending) throws
+    -> String
 {
   update_jobs();
 
+  let out = String{};
   for (usize i = 0; i < m_jobs.count(); i++) {
     const job &job = m_jobs[i];
     if (job.state != job::State::Done) continue;
@@ -1159,16 +1161,23 @@ fn EvalContext::notify_done_jobs() throws -> void
     else if (m_jobs.count() >= 2 && i == m_jobs.count() - 2)
       marker = '-';
 
-    let line = String{};
-    line += "[" + utils::int_to_text(job.id) + "]";
-    line.push(marker);
-    line += " Done  ";
-    line += job.command.c_str();
-    line.push('\n');
-    print_error(line);
+    out += "[" + utils::int_to_text(job.id) + "]";
+    out.push(marker);
+    out += " Done  ";
+    out += job.command.c_str();
+    /* The caller picks the ending, \n at the prompt boundary and \r\n when
+       the terminal sits in raw mode under the editor. */
+    out += line_ending;
   }
 
   forget_done_jobs();
+  return out;
+}
+
+fn EvalContext::notify_done_jobs() throws -> void
+{
+  let const lines = format_done_job_notifications("\n");
+  if (!lines.is_empty()) print_error(lines);
 }
 
 fn EvalContext::set_monitor(bool enabled) wontthrow -> void
@@ -1179,6 +1188,15 @@ fn EvalContext::set_monitor(bool enabled) wontthrow -> void
 }
 
 pure fn EvalContext::monitor() const wontthrow -> bool { return m_monitor; }
+
+fn EvalContext::set_notify(bool enabled) wontthrow -> void
+{
+  LOG(verbosity::Info, "the notify option flips to %s",
+      enabled ? "on" : "off");
+  m_notify = enabled;
+}
+
+pure fn EvalContext::notify() const wontthrow -> bool { return m_notify; }
 
 fn EvalContext::register_function(StringView name, const Expression *body,
                                   StringView definition_text) throws -> void

@@ -243,6 +243,39 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
   }
 }
 
+/* The context the wake callback reads jobs from, set by
+   enable_job_notifications, and the formatted rows stashed between the
+   callback's query and print phases. */
+shit::EvalContext *JOB_CONTEXT = nullptr;
+shit::String WAKE_NOTIFICATION_STASH{};
+
+/* The two-phase wake hook the editor's wait loop drives for set -b. Phase 0
+   asks whether anything must print, reading and clearing the SIGCHLD flag
+   and formatting the Done rows with \r\n endings for the raw-mode screen.
+   Phase 1 prints the stash after the editor cleared its render block, and
+   the editor redraws the prompt below the rows. The split keeps toiletline
+   ignorant of jobs and the shell ignorant of render-row geometry. The body
+   is guarded since toiletline calls through a C function pointer. */
+fn shit_wake_callback(int phase) -> int
+{
+  try {
+    if (phase == 0) {
+      if (shit::os::CHILD_STATE_CHANGED == 0) return 0;
+      shit::os::CHILD_STATE_CHANGED = 0;
+      if (JOB_CONTEXT == nullptr || !JOB_CONTEXT->notify()) return 0;
+      WAKE_NOTIFICATION_STASH =
+          JOB_CONTEXT->format_done_job_notifications("\r\n");
+      return WAKE_NOTIFICATION_STASH.is_empty() ? 0 : 1;
+    }
+    shit::print_error(WAKE_NOTIFICATION_STASH.view());
+    shit::flush();
+    WAKE_NOTIFICATION_STASH = shit::String{};
+    return 0;
+  } catch (...) {
+    return 0;
+  }
+}
+
 /* Bridge toiletline's ghost history validation onto the shell, the fish
    autosuggestion rule. An entry whose command word no longer resolves is
    rejected so the scan keeps looking for a live one. A throw accepts the
@@ -328,6 +361,15 @@ fn disable_completion() -> void
   ::tl_set_complete_callback(nullptr);
   ::tl_set_highlight_callback(nullptr);
   ::tl_set_ghost_validate_callback(nullptr);
+}
+
+fn enable_job_notifications(shit::EvalContext &context) -> void
+{
+  /* Registered whenever the editor runs, even under -T, since set -b is job
+     reporting rather than completion. The callback gates itself on the live
+     notify option. */
+  JOB_CONTEXT = &context;
+  ::tl_set_wake_callback(shit_wake_callback);
 }
 
 fn set_ghost_enabled(bool enabled) -> void
