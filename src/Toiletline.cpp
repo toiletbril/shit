@@ -403,8 +403,15 @@ fn set_input(const String &input) -> void
 
 fn enter_raw_mode() -> void
 {
-  if (::tl_enter_raw_mode() != TL_SUCCESS)
-    throw shit::Error{"Toiletline: Couldn't force the terminal into raw mode"};
+  if (::tl_enter_raw_mode() == TL_SUCCESS) return;
+  /* A script run can leave fd 0 pointing away from the terminal, the
+     configure-style exec redirection performed in-process, so the controlling
+     tty is reopened onto fd 0 and raw mode retried before the prompt gives
+     up on the session. */
+  if (shit::os::reopen_terminal_as_stdin() &&
+      ::tl_enter_raw_mode() == TL_SUCCESS)
+    return;
+  throw shit::Error{"Toiletline: Couldn't force the terminal into raw mode"};
 }
 
 fn exit_raw_mode() -> void

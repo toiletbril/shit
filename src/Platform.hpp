@@ -251,6 +251,10 @@ struct saved_descriptor
    restore_descriptor. The target descriptor is left for the caller to close. */
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     -> saved_descriptor;
+/* Back up shell_fd without replacing it, so a run that may move the descriptor
+   underneath, a mimicked script's own exec redirection, can be put back with
+   restore_descriptor. */
+fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor;
 /* Put shell_fd back the way save_and_replace_descriptor found it, closing the
    backup. */
 fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void;
@@ -304,6 +308,11 @@ inline fn ostype_name() wontthrow -> StringView
    privileges, the way bash enters privileged mode. A platform without the
    distinction reports false. */
 fn is_running_setuid() wontthrow -> bool;
+
+/* Reopen the controlling terminal onto fd 0, the recovery for a script run
+   that left stdin pointing away from the tty. Reports whether fd 0 is a
+   terminal afterwards. */
+fn reopen_terminal_as_stdin() wontthrow -> bool;
 
 /* The numeric process id of a spawned process, for $!. */
 fn process_id_of(process p) wontthrow -> i64;

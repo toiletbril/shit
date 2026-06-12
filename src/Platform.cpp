@@ -128,6 +128,29 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
   }
 }
 
+fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
+{
+  saved_descriptor result{};
+  result.shell_fd = shell_fd;
+  /* The backup carries close-on-exec the same way save_and_replace_descriptor
+     takes its backup, so a spawned command never inherits it. */
+  const os::descriptor backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, 0);
+  result.was_open = backup != -1;
+  result.saved = backup;
+  result.dup2_ok = true;
+  return result;
+}
+
+fn reopen_terminal_as_stdin() wontthrow -> bool
+{
+  const int tty_fd = open("/dev/tty", O_RDWR);
+  if (tty_fd == -1) return false;
+  LOG(verbosity::Info, "reopening the controlling terminal onto fd 0");
+  const bool replaced = dup2(tty_fd, STDIN_FILENO) != -1;
+  close(tty_fd);
+  return replaced && isatty(STDIN_FILENO) == 1;
+}
+
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {
   return shell_fd;
@@ -1453,6 +1476,28 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
     CloseHandle(saved.replacement);
   if (saved.was_open) SetStdHandle(*slot, saved.saved);
 }
+
+fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
+{
+  saved_descriptor result{};
+  result.shell_fd = shell_fd;
+  const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
+  if (!slot.has_value()) {
+    result.dup2_ok = false;
+    return result;
+  }
+  result.saved = GetStdHandle(*slot);
+  result.was_open = result.saved != INVALID_HANDLE_VALUE;
+  /* No replacement handle is installed, so the restore only puts the slot
+     back. */
+  result.replacement = INVALID_HANDLE_VALUE;
+  result.dup2_ok = true;
+  return result;
+}
+
+/* Windows has no /dev/tty rebind for the console, so the recovery reports
+   failure and the caller keeps its error path. */
+fn reopen_terminal_as_stdin() wontthrow -> bool { return false; }
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {

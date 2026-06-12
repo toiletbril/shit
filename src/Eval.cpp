@@ -6569,14 +6569,19 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
      descriptors for the in-process run, then put back. A file redirect to
      stdout or stderr is already staged on the real shell fd by the simple
      command, so only the descriptors carried on the context are applied here.
-   */
+     A standard descriptor with no staged redirect is backed up too, since the
+     script itself may move it with an exec redirection, the way configure
+     points stdin away, and a fork would have contained that. */
   let saved_fds = ArrayList<os::saved_descriptor>{};
-  if (ec.in_fd.has_value())
-    saved_fds.push(os::save_and_replace_descriptor(0, *ec.in_fd));
-  if (ec.out_fd.has_value())
-    saved_fds.push(os::save_and_replace_descriptor(1, *ec.out_fd));
-  if (ec.err_fd.has_value())
-    saved_fds.push(os::save_and_replace_descriptor(2, *ec.err_fd));
+  saved_fds.push(ec.in_fd.has_value()
+                     ? os::save_and_replace_descriptor(0, *ec.in_fd)
+                     : os::save_descriptor(0));
+  saved_fds.push(ec.out_fd.has_value()
+                     ? os::save_and_replace_descriptor(1, *ec.out_fd)
+                     : os::save_descriptor(1));
+  saved_fds.push(ec.err_fd.has_value()
+                     ? os::save_and_replace_descriptor(2, *ec.err_fd)
+                     : os::save_descriptor(2));
   let const restore_fds = [&]() {
     for (usize i = saved_fds.count(); i > 0; i--)
       os::restore_descriptor(saved_fds[i - 1]);
