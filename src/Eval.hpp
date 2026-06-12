@@ -1588,4 +1588,10 @@ private:
    arithmetic parser lives in this translation unit. */
 fn evaluate_constant_arithmetic(StringView expression) throws -> i64;
 
+/* The index of the colon that separates the offset from the length in a
+   substring body, or the body length when there is none. Shared between the
+   parameter expansion in Eval.cpp and the array slice forms in
+   EvalWordExpansion.cpp. */
+fn find_substring_length_separator(StringView body) wontthrow -> usize;
+
 } /* namespace shit */
