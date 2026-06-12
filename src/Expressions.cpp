@@ -2261,6 +2261,11 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     cxt.add_evaluated_expression();
 
+    /* The stage expands here rather than through SimpleCommand::evaluate, so
+       the location moves onto the stage first and a runtime warning from its
+       words carets the stage that read the variable. */
+    cxt.set_current_location(e->source_location());
+
     let stage_args = cxt.process_args(e->args(), /*args_are_transient=*/true);
 
     /* A stage that expands to no command word, such as a bare assignment or an
