@@ -1639,8 +1639,34 @@ fn EvalContext::enter_subshell() wontthrow -> void
 fn EvalContext::leave_subshell() wontthrow -> void
 {
   ASSERT(m_subshell_depth > 0);
+  /* A bare exec inside this subshell moved real descriptors. The backups put
+     them back the way a forked subshell's exit would, newest first so
+     stacked moves unwind in order. */
+  while (!m_subshell_saved_descriptors.is_empty() &&
+         m_subshell_saved_descriptors.back().depth == m_subshell_depth)
+  {
+    LOG(verbosity::Debug,
+        "restoring descriptor %d a subshell exec moved at depth %zu",
+        m_subshell_saved_descriptors.back().saved.shell_fd, m_subshell_depth);
+    os::restore_descriptor(m_subshell_saved_descriptors.back().saved);
+    m_subshell_saved_descriptors.remove(m_subshell_saved_descriptors.count() -
+                                        1);
+  }
   m_subshell_depth--;
   LOG(verbosity::Debug, "left a subshell, depth now %zu", m_subshell_depth);
+}
+
+fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
+{
+  if (m_subshell_depth == 0) return;
+  for (const subshell_saved_descriptor &entry : m_subshell_saved_descriptors)
+    if (entry.depth == m_subshell_depth && entry.saved.shell_fd == shell_fd)
+      return;
+  LOG(verbosity::Debug,
+      "backing up descriptor %d before a subshell exec moves it at depth %zu",
+      shell_fd, m_subshell_depth);
+  m_subshell_saved_descriptors.push(subshell_saved_descriptor{
+      m_subshell_depth, os::save_descriptor(shell_fd)});
 }
 
 pure fn EvalContext::in_subshell() const wontthrow -> bool

@@ -97,6 +97,12 @@ fn restore_stdout(os::descriptor saved) wontthrow -> void
   close(saved);
 }
 
+/* Shell-internal descriptor backups live at or above this number, so a
+   script that addresses the single-digit descriptors POSIX guarantees it
+   never sees the shell's own bookkeeping, the way dash keeps its internal
+   copies above 9. */
+constexpr int SHELL_BACKUP_FD_FLOOR = 10;
+
 fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
     -> saved_descriptor
 {
@@ -105,7 +111,8 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
 
   /* The backup is close-on-exec so a command spawned by the redirected child
      does not inherit the shell's own original descriptor and hold it open. */
-  const os::descriptor backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, 0);
+  const os::descriptor backup =
+      fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
   result.was_open = backup != -1;
   result.saved = backup;
 
@@ -133,8 +140,10 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
   saved_descriptor result{};
   result.shell_fd = shell_fd;
   /* The backup carries close-on-exec the same way save_and_replace_descriptor
-     takes its backup, so a spawned command never inherits it. */
-  const os::descriptor backup = fcntl(shell_fd, F_DUPFD_CLOEXEC, 0);
+     takes its backup, so a spawned command never inherits it, and it lands
+     above the user range so an in-process script never sees it. */
+  const os::descriptor backup =
+      fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
   result.was_open = backup != -1;
   result.saved = backup;
   result.dup2_ok = true;

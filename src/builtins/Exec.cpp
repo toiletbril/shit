@@ -41,10 +41,15 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   /* exec with only redirections changes the shell's own descriptors and
-     returns, so the rest of the session inherits them. */
+     returns, so the rest of the session inherits them. Inside an in-process
+     subshell each touched descriptor is backed up first, so the change stays
+     contained at the subshell's end. */
   if (args.count() == 1) {
     LOG(verbosity::Debug,
         "exec applying redirections to the shell's own descriptors");
+    if (ec.in_fd.has_value()) cxt.snapshot_subshell_descriptor(0);
+    if (ec.out_fd.has_value()) cxt.snapshot_subshell_descriptor(1);
+    if (ec.err_fd.has_value()) cxt.snapshot_subshell_descriptor(2);
     os::redirect_self(ec);
     return 0;
   }

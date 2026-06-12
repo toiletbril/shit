@@ -1058,8 +1058,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         }
 
         /* A bare exec heredoc points the shell's standard input at the staged
-           body for good and drops the temporary descriptor. */
+           body for good and drops the temporary descriptor. Inside an
+           in-process subshell the move is backed up first, so it stays
+           contained the way a fork would contain it. */
         if (is_bare_exec) {
+          cxt.snapshot_subshell_descriptor(redir.fd);
           shit::flush();
           const os::descriptor body_fd = opened.take();
           os::replace_descriptor(redir.fd, body_fd);
@@ -1123,10 +1126,12 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         const i32 from_fd = resolve_duplication_fd(redir, cxt);
 
         /* A bare exec applies a duplication to the shell's own descriptor for
-           good, with no backup, so the copy or the close stays in effect for
-           every later command. The flush keeps buffered output on the original
-           descriptor before it moves. */
+           good, so the copy or the close stays in effect for every later
+           command, except inside an in-process subshell where the move is
+           backed up and contained at the subshell's end. The flush keeps
+           buffered output on the original descriptor before it moves. */
         if (is_bare_exec) {
+          cxt.snapshot_subshell_descriptor(redir.fd);
           shit::flush();
 
           if (from_fd == Redirection::DUP_FD_CLOSE) {
@@ -1221,6 +1226,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
          same number closes the earlier file rather than leaking it. The flush
          keeps buffered output on the original descriptor before it moves. */
       if (is_bare_exec) {
+        cxt.snapshot_subshell_descriptor(redir.fd);
         shit::flush();
         const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
 #if SHIT_PLATFORM_IS WIN32

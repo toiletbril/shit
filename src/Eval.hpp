@@ -198,6 +198,15 @@ struct process_substitution_mark
   usize temp{0};
 };
 
+/* A shell descriptor a bare exec moved inside an in-process subshell, backed
+   up so leave_subshell puts it back, the containment a forked subshell gets
+   for free. The depth names the subshell that owns the backup. */
+struct subshell_saved_descriptor
+{
+  usize depth;
+  os::saved_descriptor saved;
+};
+
 /* A snapshot of the mutable shell state, taken around a subshell or a command
    substitution so a cd or an assignment inside does not leak to the parent. The
    set option flags and the trap table are captured too, so a set -e, a set -f,
@@ -688,6 +697,12 @@ public:
   fn enter_subshell() wontthrow -> void;
   fn leave_subshell() wontthrow -> void;
   pure fn in_subshell() const wontthrow -> bool;
+  /* Back the descriptor up before a bare exec moves it inside an in-process
+     subshell, so leave_subshell restores it and the move never leaks to the
+     parent the way a fork would have contained it. The first backup of a
+     descriptor per subshell wins, since it saw the original state. Outside a
+     subshell this is a no-op and the move stays permanent. */
+  fn snapshot_subshell_descriptor(i32 shell_fd) throws -> void;
 
   /* The control-flow channel the break, continue, return, and exit builtins
      write instead of throwing. A request records where it was made against the
@@ -1250,6 +1265,11 @@ protected:
      outlives the command and the source string it was parsed from. */
   StringMap<String> m_function_sources{heap_allocator()};
   usize m_subshell_depth{0};
+  /* The descriptors bare execs moved inside live in-process subshells, kept
+     as a stack so leave_subshell unwinds its own depth's entries in reverse.
+   */
+  ArrayList<subshell_saved_descriptor> m_subshell_saved_descriptors{
+      heap_allocator()};
   usize m_condition_depth{0};
   usize m_loop_depth{0};
 
