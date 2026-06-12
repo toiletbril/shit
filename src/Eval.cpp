@@ -4005,7 +4005,11 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     }
   };
 
-  m_shell_name = String{heap_allocator(), ec.program().view()};
+  /* The kernel hands a shebang interpreter the resolved script path, so $0
+     and BASH_SOURCE read the path the exec would have received, not the
+     word as typed. realpath "$0" then finds the script's true directory for
+     a PATH-found command the way it does under bash. */
+  m_shell_name = String{heap_allocator(), ec.program_path().text().view()};
   set_current_source(&*contents, String{ec.program().view()});
   m_current_location = SourceLocation{};
   m_mimicry_depth++;

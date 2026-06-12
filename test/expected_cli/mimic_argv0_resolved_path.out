@@ -1,0 +1,3 @@
+zero=BINDIR/argv0probe
+match
+rc=0
