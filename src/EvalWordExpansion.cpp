@@ -17,6 +17,42 @@
 
 namespace shit {
 
+/* The optionally quoted "${name[@]}" or "${name[*]}" shape an alternate or
+   default modifier word takes, the one form the field-fidelity branches
+   accept, parsed once for both the array-subject and the scalar-subject
+   branch so the shape rules cannot drift apart. None means the word has
+   another shape. */
+struct modifier_array_word
+{
+  StringView array_name;
+  bool is_star;
+  bool is_quoted;
+};
+
+static fn parse_modifier_array_word(StringView word) wontthrow
+    -> Maybe<modifier_array_word>
+{
+  let inner_word = word;
+  let const is_quoted = inner_word.length >= 2 && inner_word[0] == '"' &&
+                        inner_word[inner_word.length - 1] == '"';
+  if (is_quoted)
+    inner_word = inner_word.substring_of_length(1, inner_word.length - 2);
+  if (inner_word.length < 6 || inner_word[0] != '$' || inner_word[1] != '{' ||
+      inner_word[inner_word.length - 1] != '}')
+    return None;
+  let const inner = inner_word.substring_of_length(2, inner_word.length - 3);
+  usize name_end = 0;
+  while (name_end < inner.length && lexer::is_variable_name(inner[name_end]))
+    name_end++;
+  if (name_end == 0 || name_end + 3 != inner.length ||
+      inner[name_end] != '[' ||
+      (inner[name_end + 1] != '@' && inner[name_end + 1] != '*') ||
+      inner[name_end + 2] != ']')
+    return None;
+  return modifier_array_word{inner.substring_of_length(0, name_end),
+                             inner[name_end + 1] == '*', is_quoted};
+}
+
 hot fn EvalContext::expand_word(const Word &word) throws
     -> ArrayList<glob_field>
 {
@@ -522,34 +558,17 @@ hot fn EvalContext::expand_word(const Word &word) throws
             }
 
             /* The word shape "${name[@]}" or its bare or starred forms, the
-               only shapes the idiom uses, expands to that array's elements. */
-            let word = modifier_word;
-            let const is_word_quoted = word.length >= 2 && word[0] == '"' &&
-                                       word[word.length - 1] == '"';
-            if (is_word_quoted)
-              word = word.substring_of_length(1, word.length - 2);
-            if (word.length >= 6 && word[0] == '$' && word[1] == '{' &&
-                word[word.length - 1] == '}')
+               only shapes the idiom uses, expands to that array's elements.
+               The inner word's own quoting governs the split, so a quoted
+               "${arr[@]}" keeps each element whole even though the outer
+               modifier here is unquoted. */
+            if (let const array_word = parse_modifier_array_word(modifier_word);
+                array_word.has_value())
             {
-              let const inner = word.substring_of_length(2, word.length - 3);
-              usize inner_name_end = 0;
-              while (inner_name_end < inner.length &&
-                     lexer::is_variable_name(inner[inner_name_end]))
-                inner_name_end++;
-              if (inner_name_end > 0 && inner_name_end + 3 == inner.length &&
-                  inner[inner_name_end] == '[' &&
-                  (inner[inner_name_end + 1] == '@' ||
-                   inner[inner_name_end + 1] == '*') &&
-                  inner[inner_name_end + 2] == ']')
-              {
-                /* The inner word's own quoting governs the split, so a quoted
-                   "${arr[@]}" keeps each element whole even though the outer
-                   modifier here is unquoted. */
-                emit_elements(collect_array_elements(
-                                  inner.substring_of_length(0, inner_name_end)),
-                              is_word_quoted || segment.is_in_double_quotes);
-                break;
-              }
+              emit_elements(collect_array_elements(array_word->array_name),
+                            array_word->is_quoted ||
+                                segment.is_in_double_quotes);
+              break;
             }
             /* Any other word shape, a plain literal alternate such as
                ${a[@]+alt} or ${a[@]-default}, expands the modifier word
@@ -582,66 +601,50 @@ hot fn EvalContext::expand_word(const Word &word) throws
         if (op_index < rest.length &&
             (rest[op_index] == '+' || rest[op_index] == '-'))
         {
-          let word = rest.substring(op_index + 1);
-          let const is_word_quoted = word.length >= 2 && word[0] == '"' &&
-                                     word[word.length - 1] == '"';
-          if (is_word_quoted)
-            word = word.substring_of_length(1, word.length - 2);
-          if (word.length >= 6 && word[0] == '$' && word[1] == '{' &&
-              word[word.length - 1] == '}')
+          if (let const array_word =
+                  parse_modifier_array_word(rest.substring(op_index + 1));
+              array_word.has_value())
           {
-            let const inner = word.substring_of_length(2, word.length - 3);
-            usize inner_name_end = 0;
-            while (inner_name_end < inner.length &&
-                   lexer::is_variable_name(inner[inner_name_end]))
-              inner_name_end++;
-            if (inner_name_end > 0 && inner_name_end + 3 == inner.length &&
-                inner[inner_name_end] == '[' &&
-                (inner[inner_name_end + 1] == '@' ||
-                 inner[inner_name_end + 1] == '*') &&
-                inner[inner_name_end + 2] == ']')
-            {
-              let const subject_elements = collect_array_elements(
-                  segment_text.substring_of_length(0, name_end));
-              /* The bare name reads as element zero, so the plain form tests
-                 whether any element exists and the colon form whether the
-                 first is nonempty. */
-              let const treat_as_unset =
-                  is_colon_form ? (subject_elements.is_empty() ||
-                                   subject_elements[0].is_empty())
-                                : subject_elements.is_empty();
-              let const modifier_op = rest[op_index];
-              let const should_expand_word =
-                  modifier_op == '+' ? !treat_as_unset : treat_as_unset;
-              if (should_expand_word) {
-                let const values = collect_array_elements(
-                    inner.substring_of_length(0, inner_name_end));
-                let const emit_quoted =
-                    is_word_quoted || segment.is_in_double_quotes;
-                if (emit_quoted && inner[inner_name_end + 1] == '*') {
-                  let const ifs = m_field_separators.view();
-                  let joined = String{scratch_allocator()};
-                  for (usize i = 0; i < values.count(); i++) {
-                    if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
-                    joined.append(values[i].view());
-                  }
-                  append_run(joined, false);
-                } else {
-                  for (usize i = 0; i < values.count(); i++) {
-                    if (i > 0) flush();
-                    if (emit_quoted)
-                      append_run(values[i].view(), false);
-                    else
-                      append_split_run(values[i].view(), true);
-                  }
+            let const subject_elements = collect_array_elements(
+                segment_text.substring_of_length(0, name_end));
+            /* The bare name reads as element zero, so the plain form tests
+               whether any element exists and the colon form whether the
+               first is nonempty. */
+            let const treat_as_unset =
+                is_colon_form ? (subject_elements.is_empty() ||
+                                 subject_elements[0].is_empty())
+                              : subject_elements.is_empty();
+            let const modifier_op = rest[op_index];
+            let const should_expand_word =
+                modifier_op == '+' ? !treat_as_unset : treat_as_unset;
+            if (should_expand_word) {
+              let const values =
+                  collect_array_elements(array_word->array_name);
+              let const emit_quoted =
+                  array_word->is_quoted || segment.is_in_double_quotes;
+              if (emit_quoted && array_word->is_star) {
+                let const ifs = m_field_separators.view();
+                let joined = String{scratch_allocator()};
+                for (usize i = 0; i < values.count(); i++) {
+                  if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+                  joined.append(values[i].view());
                 }
-                break;
+                append_run(joined, false);
+              } else {
+                for (usize i = 0; i < values.count(); i++) {
+                  if (i > 0) flush();
+                  if (emit_quoted)
+                    append_run(values[i].view(), false);
+                  else
+                    append_split_run(values[i].view(), true);
+                }
               }
-              /* + with an unset subject contributes no field, while - with a
-                 set subject reads the subject itself, which is the general
-                 path's case below. */
-              if (modifier_op == '+') break;
+              break;
             }
+            /* + with an unset subject contributes no field, while - with a
+               set subject reads the subject itself, which is the general
+               path's case below. */
+            if (modifier_op == '+') break;
           }
         }
       }

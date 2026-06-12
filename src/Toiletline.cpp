@@ -261,15 +261,18 @@ fn shit_wake_callback(int phase) -> int
   try {
     if (phase == 0) {
       if (shit::os::CHILD_STATE_CHANGED == 0) return 0;
-      shit::os::CHILD_STATE_CHANGED = 0;
+      /* The flag clears only when this hook consumes it, so a completion
+         that lands before set -b turns notify on still reports once the
+         option flips. */
       if (JOB_CONTEXT == nullptr || !JOB_CONTEXT->notify()) return 0;
+      shit::os::CHILD_STATE_CHANGED = 0;
       WAKE_NOTIFICATION_STASH =
           JOB_CONTEXT->format_done_job_notifications("\r\n");
       return WAKE_NOTIFICATION_STASH.is_empty() ? 0 : 1;
     }
     shit::print_error(WAKE_NOTIFICATION_STASH.view());
     shit::flush();
-    WAKE_NOTIFICATION_STASH = shit::String{};
+    WAKE_NOTIFICATION_STASH.clear();
     return 0;
   } catch (...) {
     return 0;
