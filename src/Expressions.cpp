@@ -2708,6 +2708,10 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   ASSERT(m_body != nullptr);
   cxt.set_terminal_exec_allowed(false);
 
+  /* The word list expands here, so a runtime warning from it carets this
+     select rather than the statement before it. */
+  cxt.set_current_location(source_location());
+
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
   if (values.is_empty()) return 0;
@@ -2814,6 +2818,9 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A loop body runs repeatedly in the shell process, so no command in it may
      replace the shell. */
   cxt.set_terminal_exec_allowed(false);
+  /* The word list expands here, so a runtime warning from it carets this for
+     rather than the statement before it. */
+  cxt.set_current_location(source_location());
   /* Without an in clause the loop walks the positional parameters. */
   let const values =
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
@@ -2938,6 +2945,10 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A command inside a case branch forks rather than replacing the shell, so
      the terminal exec stays confined to a top-level simple command. */
   cxt.set_terminal_exec_allowed(false);
+
+  /* The subject word and the patterns expand here, so a runtime warning from
+     them carets this case rather than the statement before it. */
+  cxt.set_current_location(source_location());
 
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no pathname globbing, so a pattern keeps its metacharacters
@@ -3158,7 +3169,10 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The [[ ]] evaluator reports a malformed expression as a plain error, so it
      is relocated to this command's position to carry a caret at the [[ in a
      script, the same as the shell's other located diagnostics. A diagnostic
-     that is already located passes through untouched. */
+     that is already located passes through untouched. The operand expansion
+     also reads variables, so the current location moves here first and a
+     runtime warning carets this [[ rather than the statement before it. */
+  cxt.set_current_location(source_location());
   i64 status;
   try {
     /* A true conditional exits zero, the way the [[ ]] command reports success.
@@ -3204,6 +3218,10 @@ fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   LOG(verbosity::Debug, "evaluating the arithmetic command '%s'",
       m_expression.c_str());
+
+  /* The expression reads variables, so a runtime warning from it carets this
+     (( )) rather than the statement before it. */
+  cxt.set_current_location(source_location());
 
   /* An empty (( )) is a failure with no evaluation, the way bash reads it as a
      null expression that yields status 1 rather than a parse error. */
@@ -3317,6 +3335,10 @@ fn ArrayAssignCommand::append_to(usize d, String &f, bool duplicate) throws
 
 fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
+  /* The element words expand here, so a runtime warning from them carets this
+     assignment rather than the statement before it. */
+  cxt.set_current_location(source_location());
+
   /* The elements expand the way command arguments do, with field splitting and
      globbing, so a=( $list *.txt ) builds the array bash would. */
   ArrayList<String> values = cxt.process_args(m_elements);
@@ -3344,6 +3366,10 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A loop body runs repeatedly in the shell process, so no command in it may
      replace the shell. */
   cxt.set_terminal_exec_allowed(false);
+
+  /* The three arithmetic sections read variables, so a runtime warning from
+     them carets this loop rather than the statement before it. */
+  cxt.set_current_location(source_location());
 
   LOG(verbosity::Debug,
       "entering the c-style for loop with init '%s', condition '%s', step "
@@ -3684,6 +3710,10 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   LOG(verbosity::Debug, "applying %zu redirections around the compound command",
       m_redirections.count());
+
+  /* The redirection targets expand here, so a runtime warning from done < $f
+     carets this redirection rather than the statement before it. */
+  cxt.set_current_location(source_location());
 
   /* A <(...) or >(...) in a redirection target, as in done < <(cmd), opens a
      pipe and forks a child or leaves a temp file during the expansion below.
