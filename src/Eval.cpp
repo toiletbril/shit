@@ -6687,6 +6687,10 @@ fn EvalContext::run_completion_function(StringView function_name,
   let const saved_terminal_exec = terminal_exec_allowed();
   set_terminal_exec_allowed(false);
   defer { set_terminal_exec_allowed(saved_terminal_exec); };
+  /* The retitle gate reads this, so a command a completion runs internally,
+     the man fork or a loader's child, never renames the window. */
+  set_completion_function_running(true);
+  defer { set_completion_function_running(false); };
 
   /* A completion function that errors must not abort the prompt, so any error
      is swallowed and yields no candidates, and a stray break or return is

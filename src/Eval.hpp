@@ -890,6 +890,18 @@ public:
      last, and every other node clears it, so only a command whose status
      becomes the shell's status sees it set. */
   fn set_terminal_exec_allowed(bool enabled) wontthrow -> void;
+
+  /* Whether a completion function is evaluating right now. The terminal
+     retitle reads it so a tab press never renames the window after the
+     command a completion ran internally. */
+  fn set_completion_function_running(bool running) wontthrow -> void
+  {
+    m_is_completion_function_running = running;
+  }
+  pure fn is_completion_function_running() const wontthrow -> bool
+  {
+    return m_is_completion_function_running;
+  }
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
   /* The name=value lines that set with no argument prints, sorted. */
@@ -1278,6 +1290,7 @@ protected:
      trap action does not nest a second drain. */
   bool m_running_traps{false};
   bool m_terminal_exec_allowed{false};
+  bool m_is_completion_function_running{false};
 
   /* Install the OS signal disposition for each signal in the trap table, called
      after a subshell restore brings the parent's table back so the process

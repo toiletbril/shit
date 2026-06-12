@@ -1577,7 +1577,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     return function_ret;
   }
 
-  if (cxt.shell_is_interactive() && cxt.startup_finished())
+  /* The window retitles only for a command the user submitted at the prompt.
+     A completion-time run, the man fork or a loader child, and an in-process
+     subshell or substitution keep the title the prompt set. */
+  if (cxt.shell_is_interactive() && cxt.startup_finished() &&
+      !cxt.in_subshell() && !cxt.is_completion_function_running())
     toiletline::set_title(utils::merge_args_to_string(program_args));
 
   /* Reuse a memoized resolution when the command word is unchanged, otherwise
