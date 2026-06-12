@@ -35,6 +35,17 @@ ifeq ($(WIN), 1)
 TARGET_WINDOWS := 1
 endif
 
+ifneq ($(TARGET_WINDOWS), 1)
+UNAME_S := $(shell uname -s)
+TARGET_MACOS :=
+ifeq ($(UNAME_S), Darwin)
+  TARGET_MACOS := 1
+else
+all:
+	$(error Unable to decipher your OS)
+endif
+endif
+
 ifeq ($(TARGET_WINDOWS), 1)
 OUT := ../shit.exe
 else
@@ -120,24 +131,24 @@ endif
 ifeq ($(MODE), rel)
 CXXFLAGS += \
 	-s \
-	-DNDEBUG
-# Link the runtime statically so a -c invocation or a script launch does not
-# pay the dynamic linker on every startup. This nearly halves the startup time.
-# Drop libstdc++ with -nostdlib++ and keep only libsupc++ for the exception
-# runtime, since the shell carries its own containers. Windows clang has no
-# libsupc++, so the drop stays POSIX-only. The -O3 and link-time optimization
-# join this block because the mingw g++ -O3 optimizer hangs for minutes on the
-# parser's large functions and its whole-program pass needs tens of gigabytes of
-# memory, so the Windows cross path takes -O0 and no LTO instead, which also
-# keeps the cross build from hogging RAM.
-ifneq ($(TARGET_WINDOWS), 1)
-CXXFLAGS += \
-	-O3 \
+	-DNDEBUG \
 	-flto \
 	-static-pie \
+	-O0
+ifneq ($(TARGET_WINDOWS), 1)
+ifneq ($(TARGET_MACOS), 1)
+# Linux
+CXXFLAGS += \
+	-O3 \
 	-nostdlib++
 LINK_LIBS += -lsupc++
+endif
+else ifeq ($(TARGET_MACOS), 1)
+# MacOS
+CXXFLAGS += \
+	-O3
 else
+# Sindows
 CXXFLAGS += \
 	-O0
 endif

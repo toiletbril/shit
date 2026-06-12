@@ -23,6 +23,10 @@
 #include <sys/time.h>
 #include <time.h>
 
+/* TODO move this to toiletline */
+#include <sys/ioctl.h>
+#include <termios.h>
+
 #if defined __linux__
 #include <linux/perf_event.h>
 #include <sys/ioctl.h>

@@ -10,6 +10,12 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifdef __APPLE__
+#define st_mtim st_mtimespec
+#define st_atim st_atimespec
+#define st_ctim st_ctimespec
+#endif
 #elif SHIT_PLATFORM_IS WIN32
 #include <direct.h>
 #include <io.h>
