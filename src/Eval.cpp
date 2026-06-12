@@ -370,7 +370,7 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
     throw_script_fatal("Unable to expand '" + String{name} +
                        "' because the parameter is not set");
   if (m_error_unset || m_warnings_enabled)
-    show_runtime_warning("the variable '" + String{name} +
+    show_runtime_warning("The variable '" + String{name} +
                          "' is not set, it expands to empty, replace it with "
                          "${" +
                          String{name} +

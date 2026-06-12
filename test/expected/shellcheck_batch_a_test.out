@@ -114,19 +114,19 @@
 [Word
   Unquoted "done"
 ]
-shit: 3:8: warning: the operand is a literal, so this -z test is constant, test a variable or drop the check.
+shit: 3:8: warning: The operand is a literal, so this -z test is constant, test a variable or drop the check.
      3 |    [ -z lit ] && echo a
        |         ^~~ here.
-shit: 4:5: warning: the numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
+shit: 4:5: warning: The numeric comparison -eq reads 'count', which is not a number, so the test errors at run time.
      4 |    [ count -eq notanumber ] && echo b
        |      ^~~~~ here.
-shit: 4:15: warning: the numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
+shit: 4:15: warning: The numeric comparison -eq reads 'notanumber', which is not a number, so the test errors at run time.
      4 |    [ count -eq notanumber ] && echo b
        |                ^~~~~~~~~~ here.
 shit: 5:12: warning: [ and test compare strings byte for byte and never glob-match, use a case or the [[ ]] form for the pattern.
      5 |    [ "$x" = "glob*" ] && echo c
        |             ^~~~~~~ here.
-shit: 6:8: warning: the test buffers the whole grep output only to check it is nonempty, run grep -q directly and test its exit status.
+shit: 6:8: warning: The test buffers the whole grep output only to check it is nonempty, run grep -q directly and test its exit status.
      6 |    [ -n "$(ls | grep x)" ] && echo d
        |         ^~~~~~~~~~~~~~~~ here.
 done

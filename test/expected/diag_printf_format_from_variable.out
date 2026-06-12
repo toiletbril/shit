@@ -24,7 +24,7 @@
 [Word
   Unquoted "after"
 ]
-shit: 3:8: warning: printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+shit: 3:8: warning: The printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
      3 |  printf $fmt hi
        |         ^~~~ here.
 hi

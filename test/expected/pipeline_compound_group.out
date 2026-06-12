@@ -67,10 +67,10 @@
 [Word
   Unquoted "}"
 ]
-shit: 3:13: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+shit: 3:13: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
      3 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |              ^~~~~~ here.
-shit: 3:21: warning: read without -r mangles a backslash in the input, add -r to read the line literally.
+shit: 3:21: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
      3 |  seq 1 3 | { read a; read b; echo "$a-$b"; }
        |                      ^~~~~~ here.
 x

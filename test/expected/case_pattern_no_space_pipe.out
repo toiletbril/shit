@@ -98,10 +98,10 @@
 [Word
   Unquoted "esac"
 ]
-shit: 2:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
+shit: 2:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
      2 |  case a in a|b) echo match;; esac
        |       ^~ here.
-shit: 3:6: warning: this case has no default *) branch, a value no pattern matches is silently ignored.
+shit: 3:6: warning: This case has no default *) branch, a value no pattern matches is silently ignored.
      3 |  case b in a|b) echo match;; esac
        |       ^~ here.
 match

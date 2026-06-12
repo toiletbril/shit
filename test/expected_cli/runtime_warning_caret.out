@@ -1,6 +1,6 @@
-shit: 2:1: warning: the variable 'UNSET_COND' is not set, it expands to empty, replace it with ${UNSET_COND-} if empty expansion is desired.
-shit: 4:1: warning: the variable 'UNSET_SUBJECT' is not set, it expands to empty, replace it with ${UNSET_SUBJECT-} if empty expansion is desired.
-shit: 6:1: warning: the variable 'UNSET_ARITH' is not set, it expands to empty, replace it with ${UNSET_ARITH-} if empty expansion is desired.
-shit: 8:1: warning: the variable 'UNSET_LIST' is not set, it expands to empty, replace it with ${UNSET_LIST-} if empty expansion is desired.
-shit: 10:1: warning: the variable 'UNSET_ELEM' is not set, it expands to empty, replace it with ${UNSET_ELEM-} if empty expansion is desired.
+shit: 2:1: warning: The variable 'UNSET_COND' is not set, it expands to empty, replace it with ${UNSET_COND-} if empty expansion is desired.
+shit: 4:1: warning: The variable 'UNSET_SUBJECT' is not set, it expands to empty, replace it with ${UNSET_SUBJECT-} if empty expansion is desired.
+shit: 6:1: warning: The variable 'UNSET_ARITH' is not set, it expands to empty, replace it with ${UNSET_ARITH-} if empty expansion is desired.
+shit: 8:1: warning: The variable 'UNSET_LIST' is not set, it expands to empty, replace it with ${UNSET_LIST-} if empty expansion is desired.
+shit: 10:1: warning: The variable 'UNSET_ELEM' is not set, it expands to empty, replace it with ${UNSET_ELEM-} if empty expansion is desired.
 rc=0

@@ -26,7 +26,7 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:3: warning: a one-operand test is the nonempty-string test, write it with -n to read clearer.
+shit: 2:3: warning: A one-operand test is the nonempty-string test, write itwith -n to read clearer.
      2 |  [ hello ] && echo yes
        |    ^~~~~ here.
 yes

@@ -7,6 +7,6 @@
 [Word
   Unquoted "a*.zzznomatch"
 ]
-shit: 2:6: error: the glob pattern 'a*.zzznomatch' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'a*.zzznomatch' or relax with set +o failglob.
+shit: 2:6: error: The glob pattern 'a*.zzznomatch' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'a*.zzznomatch' or relax with set +o failglob.
      2 |  echo a*.zzznomatch
        |       ^~~~~~~~~~~~~ here.

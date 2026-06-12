@@ -119,13 +119,13 @@
 [Word
   Unquoted "echo"
 ]
-shit: 5:15: warning: an unquoted $@ word-splits and globs each argument, quote it as "$@" to pass the arguments through unchanged.
+shit: 5:15: warning: An unquoted $@ word-splits and globs each argument, quote it as "$@" to pass the arguments through unchanged.
      5 |  printf '[%s]' $@
        |                ^~ here.
-shit: 10:15: warning: an unquoted $@ word-splits and globs each argument, quote it as "$@" to pass the arguments through unchanged.
+shit: 10:15: warning: An unquoted $@ word-splits and globs each argument, quote it as "$@" to pass the arguments through unchanged.
     10 |  printf '[%s]' $@
        |                ^~ here.
-shit: 15:15: warning: an unquoted $@ word-splits and globs each argument, quote it as "$@" to pass the arguments through unchanged.
+shit: 15:15: warning: An unquoted $@ word-splits and globs each argument, quote it as "$@" to pass the arguments through unchanged.
     15 |  printf '[%s]' $@
        |                ^~ here.
 [a][b][c]

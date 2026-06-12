@@ -32,10 +32,10 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:3: warning: a negated -n is just -z, test with -z instead.
+shit: 2:3: warning: A negated -n is just -z, test with -z instead.
      2 |  [ ! -n "" ] && echo empty
        |    ^~ here.
-shit: 2:8: warning: the operand is a literal, so this -n test is constant, test a variable or drop the check.
+shit: 2:8: warning: The operand is a literal, so this -n test is constant, test a variable or drop the check.
      2 |  [ ! -n "" ] && echo empty
        |         ^~ here.
 empty

@@ -78,13 +78,13 @@
 [Word
   Unquoted "]"
 ]
-shit: 2:8: warning: test with -a or -o is obsolescent, join two tests with && or || instead.
+shit: 2:8: warning: A test with -a or -o is obsolescent, join two tests with && or || instead.
      2 |  [ -f a -a -f b ]
        |         ^~ here.
-shit: 3:3: warning: a negated -z is just -n, test with -n instead.
+shit: 3:3: warning: A negated -z is just -n, test with -n instead.
      3 |  [ ! -z "$x" ]
        |    ^~ here.
-shit: 4:3: warning: a negated -n is just -z, test with -z instead.
+shit: 4:3: warning: A negated -n is just -z, test with -z instead.
      4 |  [ ! -n "$y" ]
        |    ^~ here.
 shit: 3:8: error: Unable to expand 'x' because the parameter is not set.

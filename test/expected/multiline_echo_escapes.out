@@ -14,6 +14,6 @@
 [Word
   Unquoted "does_not_exist*"
 ]
-shit: 6:1: error: the glob pattern 'does_not_exist*' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'does_not_exist*' or relax with set +o failglob.
+shit: 6:1: error: The glob pattern 'does_not_exist*' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'does_not_exist*' or relax with set +o failglob.
      6 |  does_not_exist*
        |  ^~~~~~~~~~~~~~~ here.

@@ -44,7 +44,7 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   } else
     job = cxt.most_recent_job();
 
-  if (job == nullptr) throw Error{"there is no such job"};
+  if (job == nullptr) throw Error{"There is no such job"};
   ASSERT(job != nullptr);
 
   LOG(verbosity::Info, "fg bringing job %d to the foreground", job->id);

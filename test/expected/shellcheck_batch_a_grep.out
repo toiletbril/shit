@@ -129,22 +129,22 @@
 [Word
   Unquoted "done"
 ]
-shit: 3:8: warning: the unquoted grep pattern can glob against the local files before grep sees it, quote the pattern.
+shit: 3:8: warning: The unquoted grep pattern can glob against the local files before grep sees it, quote the pattern.
      3 |    grep *.txt file
        |         ^~~~~ here.
-shit: 4:8: warning: grep reads a regular expression, where a leading * has nothing to repeat, this pattern looks like a glob.
+shit: 4:8: warning: A grep reads a regular expression, where a leading * has nothing to repeat, this pattern looks like a glob.
      4 |    grep '*x' file
        |         ^~~~ here.
-shit: 5:12: warning: for over the cat output iterates IFS-split words rather than lines, read the lines with 'while IFS= read -r line' instead.
+shit: 5:12: warning: A for over the cat output iterates IFS-split words rather than lines, read the lines with 'while IFS= read -r line' instead.
      5 |    for f in $(cat list); do echo "$f"; done
        |             ^~~~~~~~~~~ here.
-shit: 6:12: warning: for over the find output breaks a name with whitespace apart, use find -exec or a 'while read -r' loop over find -print0.
+shit: 6:12: warning: A for over the find output breaks a name with whitespace apart, use find -exec or a 'while read -r' loop over find -print0.
      6 |    for f in $(find . -name x); do echo "$f"; done
        |             ^~~~~~~~~~~~~~~~~ here.
-shit: 7:12: warning: xargs splits the find output on whitespace and quotes, pair find -print0 with xargs -0 or use find -exec.
+shit: 7:12: warning: An xargs splits the find output on whitespace and quotes,pair find -print0 with xargs -0 or use find -exec.
      7 |    find . | xargs echo
        |             ^~~~~ here.
-shit: 8:10: warning: the pipe feeds 'echo', which never reads stdin, so the upstream output is discarded.
+shit: 8:10: warning: The pipe feeds 'echo', which never reads stdin, so the upstream output is discarded.
      8 |    true | echo discarded
        |           ^~~~ here.
 done

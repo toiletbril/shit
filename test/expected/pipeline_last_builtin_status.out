@@ -131,16 +131,16 @@
   DoubleQuoted "neg="
   Variable "?"
 ]
-shit: 2:8: warning: the pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+shit: 2:8: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
      2 |  true | false
        |         ^~~~~ here.
-shit: 4:9: warning: the pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+shit: 4:9: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
      4 |  false | true
        |          ^~~~ here.
-shit: 10:8: warning: the pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
+shit: 10:8: warning: The pipe feeds 'true', which never reads stdin, so the upstream output is discarded.
     10 |  true | true
        |         ^~~~ here.
-shit: 12:10: warning: the pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
+shit: 12:10: warning: The pipe feeds 'false', which never reads stdin, so the upstream output is discarded.
     12 |  ! true | false
        |           ^~~~~ here.
 tf=1

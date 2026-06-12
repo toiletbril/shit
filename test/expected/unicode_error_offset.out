@@ -13,6 +13,6 @@
   Unquoted "does_not_exist*"
 ]
 юникод
-shit: 2:14: error: the glob pattern 'does_not_exist*' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'does_not_exist*' or relax with set +o failglob.
+shit: 2:14: error: The glob pattern 'does_not_exist*' matched no file, it expands to its literal text, which is rarely intended. Probe for matches with compgen -G 'does_not_exist*' or relax with set +o failglob.
      2 |  echo юникод; does_not_exist*
        |               ^~~~~~~~~~~~~~~ here.

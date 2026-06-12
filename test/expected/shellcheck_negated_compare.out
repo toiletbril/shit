@@ -39,10 +39,10 @@
 [Word
   Unquoted "]"
 ]
-shit: 2:3: warning: a negated -eq is just -ne, drop the ! and use -ne.
+shit: 2:3: warning: A negated -eq is just -ne, drop the ! and use -ne.
      2 |  [ ! 1 -eq 2 ]
        |    ^~ here.
-shit: 3:3: warning: a negated = is just !=, drop the ! and use !=.
+shit: 3:3: warning: A negated = is just !=, drop the ! and use !=.
      3 |  [ ! a = b ]
        |    ^~ here.
 [Code 0]

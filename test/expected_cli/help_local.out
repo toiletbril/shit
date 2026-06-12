@@ -1,4 +1,4 @@
-shit: 1:1: warning: local outside a function has no scope to bind, declare the variable plainly or move it into a function.
+shit: 1:1: warning: A local outside a function has no scope to bind, declare the variable plainly or move it into a function.
      1 |  local --help
        |  ^~~~~ here.
 DESCRIPTION

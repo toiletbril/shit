@@ -516,7 +516,7 @@ hot fn EvalContext::expand_path(glob_field field,
        set -o failglob was the script's explicit ask. */
     if (!m_glob_exempt_for_test)
       warn_or_throw(m_failglob, m_failglob_explicit, location,
-                    "the glob pattern '" + pattern +
+                    "The glob pattern '" + pattern +
                         "' matched no file, it expands to its literal text, "
                         "which is rarely intended. Probe for matches with "
                         "compgen -G '" +
