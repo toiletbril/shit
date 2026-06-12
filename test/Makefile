@@ -268,4 +268,4 @@ bench:
 		rm -f "$$d" "$$b" "$$z" "$$g" "$$s" "$$bb" "$$sb"'
 
 .PHONY: test clean run_tests refill dashdiff bashdiff mimicrydiff bench \
-	completion_tests completion_refill cli_tests cli_refill
+		completion_tests completion_refill cli_tests cli_refill
