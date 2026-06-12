@@ -99,7 +99,7 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       i += 2;
       continue;
     }
-    /* Any other dash option, such as -p, -r, -f, or the action letters, is
+    /* Any other dash option, such as -r, -f, or the action letters, is
        accepted without effect. */
     if (!arg.is_empty() && arg[0] == '-') {
       i++;
@@ -151,26 +151,28 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return print_status;
   }
 
-  if (is_default_completion) {
-    LOG(verbosity::Debug,
-        "complete registering the default spec with function '%s'",
-        function_name.c_str());
+  /* The one spec the parsed options describe, built by a single maker so the
+     default registration and the per-command ones cannot diverge. */
+  let const make_spec = [&]() throws -> completion_spec {
     let spec = completion_spec{};
     spec.function_name = String{heap_allocator(), function_name};
     spec.word_list = String{heap_allocator(), word_list};
     spec.use_default = use_default;
-    cxt.register_default_completion_spec(steal(spec));
+    return spec;
+  };
+
+  if (is_default_completion) {
+    LOG(verbosity::Debug,
+        "complete registering the default spec with function '%s'",
+        function_name.c_str());
+    cxt.register_default_completion_spec(make_spec());
     return 0;
   }
 
   for (const String &command : commands) {
     LOG(verbosity::Debug, "complete registering spec for '%s'",
         command.c_str());
-    let spec = completion_spec{};
-    spec.function_name = String{heap_allocator(), function_name};
-    spec.word_list = String{heap_allocator(), word_list};
-    spec.use_default = use_default;
-    cxt.register_completion_spec(command.view(), steal(spec));
+    cxt.register_completion_spec(command.view(), make_spec());
   }
   return 0;
 }

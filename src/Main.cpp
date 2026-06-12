@@ -834,16 +834,6 @@ fn main(int argc, char **argv) -> int
   context.set_login_shell(is_login_shell);
   context.set_inited_as_bash(init_as_bash);
   context.set_custom_rcfile(FLAG_RCFILE.is_set());
-  /* The shopt names bash ships enabled, seeded so a sourced config that
-     probes one with shopt -q, the way bash-completion gates on progcomp,
-     reads the real bash default rather than a never-set false. globstar
-     stays unseeded since bash ships it off and the glob engine reads it
-     live. */
-  for (const char *shopt_name :
-       {"progcomp", "promptvars", "sourcepath", "interactive_comments",
-        "extquote", "complete_fullquote", "hostcomplete", "cmdhist",
-        "checkwinsize", "force_fignore", "globasciiranges", "expand_aliases"})
-    context.set_shopt_option(shopt_name, true);
   /* The startup config files, the profiles and the rc, source with nounset and
      pipefail off, since they are written for a lax shell and read unset
      variables such as $BASH_VERSION on the /etc/profile path. The strict
@@ -853,9 +843,10 @@ fn main(int argc, char **argv) -> int
      config, so it carries the strict unset check from the start the way it
      carries pipefail and failglob below, and -W downgrades the trip to a
      warning. An explicit set -u or set -o pipefail is honored throughout. */
-  context.set_error_unset(
-      FLAG_NOUNSET.is_enabled() ||
-      (!should_be_interactive && !shit::should_run_in_compat_mode()));
+  const bool is_non_interactive_strict =
+      !should_be_interactive && !shit::should_run_in_compat_mode();
+  context.set_error_unset(FLAG_NOUNSET.is_enabled() ||
+                          is_non_interactive_strict);
   /* The CLI -u is the user's own ask the way set -u is, so the -W downgrade
      leaves it fatal. -W mirrors onto the context so the runtime strictness
      checks downgrade and set -W can flip it mid-run. */
@@ -866,8 +857,7 @@ fn main(int argc, char **argv) -> int
      script fails loudly rather than hiding behind the last stage. A
      compatibility mood stays lenient, the way bash and dash report only the
      last stage, and the dash comparison runs shit under -P for that reason. */
-  context.set_pipefail(
-      should_be_interactive ? false : !shit::should_run_in_compat_mode());
+  context.set_pipefail(is_non_interactive_strict);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
@@ -970,9 +960,13 @@ fn main(int argc, char **argv) -> int
 
   /* The interactive rc the host bash would read, replaced by the --rcfile file
      when one is given, the way bash reads a named rc instead of ~/.bashrc. */
+  /* Set when the bash interactive rc chain ran, the one condition the
+     bash-completion bootstrap below keys on. */
+  bool did_source_bash_rc = false;
   let const source_bash_rc = [&]() {
     /* bash runs the system rc before the user one even under --rcfile, so the
        chain mirrors that order. */
+    did_source_bash_rc = true;
     shit::source_bash_system_rc(context, ast_arena);
     if (FLAG_RCFILE.is_set())
       source_file(shit::Path{FLAG_RCFILE.value()}, context, ast_arena);
@@ -1036,9 +1030,7 @@ fn main(int argc, char **argv) -> int
   /* The bash programmable completion loads at the end of the chain, before
      the init-as-bash snap-back below, so the script parses under the bash
      grammar it is written for and its specs survive into the session. */
-  if (should_be_interactive && !is_privileged &&
-      (init_as_bash || shit::should_run_in_bash_mode()))
-  {
+  if (did_source_bash_rc) {
     LOG(shit::verbosity::Info,
         "bootstrapping the bash programmable completion");
     shit::ensure_bash_completion_loaded(context, ast_arena);

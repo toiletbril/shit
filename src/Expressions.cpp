@@ -1577,11 +1577,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     return function_ret;
   }
 
-  /* The window retitles only for a command the user submitted at the prompt.
-     A completion-time run, the man fork or a loader child, and an in-process
-     subshell or substitution keep the title the prompt set. */
-  if (cxt.shell_is_interactive() && cxt.startup_finished() &&
-      !cxt.in_subshell() && !cxt.is_completion_function_running())
+  if (cxt.should_retitle_for_command())
     toiletline::set_title(utils::merge_args_to_string(program_args));
 
   /* Reuse a memoized resolution when the command word is unchanged, otherwise
@@ -4075,6 +4071,18 @@ cold pure fn view_contains(StringView view, StringView needle) wontthrow -> bool
 /* True when one of the leading short-option clusters carries the letter, the
    way -rf carries r and f. A long option or a plain operand is not a
    cluster. */
+/* Whether any operand names standard input explicitly, the - and /dev/stdin
+   spellings, the exemption the never-reads-stdin warnings share. */
+cold fn args_have_stdin_operand(const ArrayList<const Token *> &args) throws
+    -> bool
+{
+  for (usize i = 1; i < args.count(); i++) {
+    let const raw = args[i]->raw_string();
+    if (raw.view() == "-" || raw.view() == "/dev/stdin") return true;
+  }
+  return false;
+}
+
 cold fn args_have_short_flag(const ArrayList<const Token *> &args,
                              char letter) throws -> bool
 {
@@ -4730,15 +4738,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     if (!m_redirections.is_empty() && !command_is_shadowed &&
         NON_STDIN_READERS.find(command_literal.view()).has_value())
     {
-      let has_stdin_operand = false;
-      for (usize i = 1; i < m_args.count(); i++) {
-        let const raw = m_args[i]->raw_string();
-        if (raw.view() == "-" || raw.view() == "/dev/stdin") {
-          has_stdin_operand = true;
-          break;
-        }
-      }
-      if (!has_stdin_operand)
+      if (!args_have_stdin_operand(m_args))
         for (const Redirection &redirection : m_redirections)
           if (redirection.kind == Redirection::Kind::ReadInput ||
               redirection.kind == Redirection::Kind::Heredoc ||
@@ -5150,15 +5150,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
 
     if (!next_is_user && NON_STDIN_READERS.find(next_name->view()).has_value())
     {
-      let has_stdin_operand = false;
-      for (usize a = 1; a < next->args().count(); a++) {
-        let const raw = next->args()[a]->raw_string();
-        if (raw.view() == "-" || raw.view() == "/dev/stdin") {
-          has_stdin_operand = true;
-          break;
-        }
-      }
-      if (!has_stdin_operand)
+      if (!args_have_stdin_operand(next->args()))
         actx.warn(next->args()[0]->source_location(),
                   "the pipe feeds '" + next_name->view() +
                       "', which never reads stdin, so the upstream output is "

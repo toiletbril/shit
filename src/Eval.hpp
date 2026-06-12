@@ -558,6 +558,17 @@ public:
                              StringView line, usize point,
                              i32 *out_exit_status = nullptr) throws
       -> ArrayList<String>;
+  /* The bash -W word list semantics. The list text undergoes the shell
+     expansions and splits into fields, so '"${options[@]}"' reaches the
+     caller's array. complete -W and compgen -W both route through here so
+     the two paths cannot diverge. A list with no expansion byte splits plain
+     with no parse, the common shape, and a list that fails to parse splits
+     plain too rather than erroring out of a completion. allow_expansion off
+     keeps the plain split for the per-keystroke ghost path, which must not
+     parse on every key. */
+  fn expand_wordlist_to_fields(StringView wordlist,
+                               bool allow_expansion = true) throws
+      -> ArrayList<String>;
 
   /* The names of every shell variable, so variable completion can offer them
      after a '$'. The environment names are added by the caller, since they live
@@ -856,9 +867,16 @@ public:
   }
   pure fn is_shopt_enabled(StringView name) const wontthrow -> bool
   {
+    /* A name never set falls back to the bash default table, so a config that
+       probes shopt -q progcomp reads the real bash default with no per-launch
+       seeding cost. */
     const bool *value = m_shopt_options.find(name);
-    return value != nullptr && *value;
+    if (value != nullptr) return *value;
+    return shopt_default_is_on(name);
   }
+  /* Whether bash ships the named shopt option enabled, the miss fallback for
+     is_shopt_enabled. */
+  static pure fn shopt_default_is_on(StringView name) wontthrow -> bool;
   pure fn shopt_options() const wontthrow -> const StringMap<bool> &
   {
     return m_shopt_options;
@@ -901,6 +919,15 @@ public:
   pure fn is_completion_function_running() const wontthrow -> bool
   {
     return m_is_completion_function_running;
+  }
+  /* Whether a dispatched command may retitle the window. Only a command the
+     user submitted at an interactive prompt qualifies, never a startup file,
+     an in-process subshell or substitution, or a completion-time run. A new
+     internal-run context extends this predicate rather than its call site. */
+  pure fn should_retitle_for_command() const wontthrow -> bool
+  {
+    return shell_is_interactive() && startup_finished() && !in_subshell() &&
+           !is_completion_function_running();
   }
   pure fn terminal_exec_allowed() const wontthrow -> bool;
 
@@ -1346,6 +1373,11 @@ protected:
      follows writes the binding the next caller out sees. Returns whether a
      binding was peeled. */
   fn peel_caller_local_binding(StringView name) throws -> bool;
+  /* The one restore a saved local binding gets, the scalar, the arrays, and
+     the integer mark, shared by the scope pop and the unset peel so the two
+     cannot drift. The binding's saved array moves out, both callers drop the
+     entry right after. */
+  fn restore_local_binding(local_binding &binding) throws -> void;
 
   /* Expand a ${...} body, which is a plain name or a name with a length, a
      default, an alternate, an assign, an error, or a prefix or suffix trim. */

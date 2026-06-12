@@ -41,10 +41,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  StringView wordlist{};
-  let have_wordlist = false;
-  StringView glob_pattern{};
-  let have_glob_pattern = false;
+  Maybe<StringView> wordlist;
+  Maybe<StringView> glob_pattern;
   StringView word{};
   for (usize i = 1; i < args.count();) {
     let const argument = args[i].view();
@@ -57,7 +55,6 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       i++;
       if (i < args.count()) {
         wordlist = args[i].view();
-        have_wordlist = true;
         i++;
       }
       continue;
@@ -66,7 +63,6 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       i++;
       if (i < args.count()) {
         glob_pattern = args[i].view();
-        have_glob_pattern = true;
         i++;
       }
       continue;
@@ -88,13 +84,13 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      suppressed, the probe the strict mood's unmatched-glob error points at.
      The matches print one per line and the status reports whether any matched,
      so 'if compgen -G pat >/dev/null' reads as an existence test. */
-  if (have_glob_pattern) {
+  if (glob_pattern.has_value()) {
     LOG(verbosity::All, "compgen expanding glob '%.*s' for prefix '%.*s'",
-        static_cast<int>(glob_pattern.length), glob_pattern.data,
+        static_cast<int>(glob_pattern->length), glob_pattern->data,
         static_cast<int>(word.length), word.data);
     let out = String{};
     let any_matched = false;
-    for (const String &match : cxt.expand_glob_lenient(glob_pattern)) {
+    for (const String &match : cxt.expand_glob_lenient(*glob_pattern)) {
       if (word.length != 0 && !match.view().starts_with(word)) continue;
       out.append(match.view());
       out.push('\n');
@@ -106,62 +102,21 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* An unsupported action produces nothing rather than an error, so a
      completion script that asks for one keeps running with an empty result. */
-  if (!have_wordlist) return 1;
+  if (!wordlist.has_value()) return 1;
 
   LOG(verbosity::Debug, "compgen filtering word list for prefix '%.*s'",
       static_cast<int>(word.length), word.data);
 
+  /* The -W list undergoes the shell expansions bash applies to it through
+     the shared word-list expander, the same path complete -W reads, so the
+     bash-completion idiom -W '"${options[@]}"' reaches the caller's array. */
   let out = String{};
   let any_matched = false;
-  let const emit = [&](StringView candidate) {
-    if (candidate.length == 0) return;
-    if (word.length == 0 || candidate.starts_with(word)) {
-      out.append(candidate);
-      out.push('\n');
-      any_matched = true;
-    }
-  };
-
-  /* The -W list undergoes the shell expansions bash applies to it, parameter
-     and command substitution, quote removal, and word splitting, so the
-     bash-completion idiom -W '"${options[@]}"' reaches the caller's array.
-     The list expands as an array literal in the current context and the
-     resulting elements are the candidates. A list that fails to parse falls
-     back to the plain whitespace split, so a malformed list still completes
-     something rather than erroring out of the completion. */
-  let did_expand = false;
-  try {
-    let expansion_source = String{"t__compgen_wordlist=("};
-    expansion_source.append(wordlist);
-    expansion_source.push(')');
-    cxt.run_source(expansion_source.view(), "compgen", false,
-                   ec.source_location(), StringView{"compgen"});
-    if (const ArrayList<String> *expanded =
-            cxt.lookup_indexed_array("t__compgen_wordlist");
-        expanded != nullptr)
-    {
-      for (const String &candidate : *expanded)
-        emit(candidate.view());
-      did_expand = true;
-    }
-    cxt.run_source(StringView{"unset -v t__compgen_wordlist"}, "compgen",
-                   false, ec.source_location(), StringView{"compgen"});
-  } catch (const ErrorBase &error) {
-    LOG(verbosity::Debug, "compgen -W expansion failed, splitting plain: %s",
-        error.message().c_str());
-  }
-
-  /* The fallback splits on the ASCII whitespace bash treats as the default
-     field separators. A trailing sentinel flushes the final word. */
-  if (!did_expand) {
-    usize start = 0;
-    for (usize i = 0; i <= wordlist.length; i++) {
-      let const c = (i < wordlist.length) ? wordlist[i] : ' ';
-      if (c == ' ' || c == '\t' || c == '\n') {
-        if (i > start) emit(wordlist.substring_of_length(start, i - start));
-        start = i + 1;
-      }
-    }
+  for (const String &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {
+    if (candidate.is_empty() || !candidate.view().starts_with(word)) continue;
+    out.append(candidate.view());
+    out.push('\n');
+    any_matched = true;
   }
 
   ec.print_to_stdout(out.view());

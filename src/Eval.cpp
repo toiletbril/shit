@@ -242,27 +242,9 @@ fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
           static_cast<int>(name.length), name.data, frame_index);
 
       /* The caller's saved state comes back right now, the same restore the
-         scope pop would have run, so the read after the unset already sees
-         the next binding out and a following assignment writes it. */
-      if (binding.previous_value.has_value())
-        assign_variable(binding.name, *binding.previous_value);
-      else
-        force_unset_shell_variable(binding.name);
-      if (binding.previous_indexed_array.has_value())
-        m_indexed_arrays.set(binding.name.view(),
-                             steal(*binding.previous_indexed_array));
-      else
-        m_indexed_arrays.erase(binding.name.view());
-      clear_associative_array(binding.name.view());
-      if (binding.previous_was_associative)
-        for (usize k = 0; k < binding.previous_associative_keys.count(); k++)
-          set_associative_element(binding.name.view(),
-                                  binding.previous_associative_keys[k].view(),
-                                  binding.previous_associative_values[k].view());
-      if (binding.previous_was_integer)
-        m_integer_names.add(binding.name.view());
-      else
-        m_integer_names.remove(binding.name.view());
+         scope pop runs, so the read after the unset already sees the next
+         binding out and a following assignment writes it. */
+      restore_local_binding(binding);
 
       /* The restore entry is consumed, so the frame's pop no longer rewinds
          this name and the value a deeper callee assigns next survives into
@@ -272,6 +254,35 @@ fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
     }
   }
   return false;
+}
+
+fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
+{
+  /* Restore through assign_variable, not set_shell_variable, since the scope
+     pop runs this inside a noexcept defer where a readonly name would
+     otherwise throw from a destructor and terminate the shell. Both callers
+     drop the binding right after, so the saved array moves out. */
+  if (binding.previous_value.has_value())
+    assign_variable(binding.name, *binding.previous_value);
+  else
+    force_unset_shell_variable(binding.name);
+  /* The store is written directly rather than through set_indexed_array,
+     since the readonly check could throw from the same noexcept defer. */
+  if (binding.previous_indexed_array.has_value())
+    m_indexed_arrays.set(binding.name.view(),
+                         steal(*binding.previous_indexed_array));
+  else
+    m_indexed_arrays.erase(binding.name.view());
+  clear_associative_array(binding.name.view());
+  if (binding.previous_was_associative)
+    for (usize k = 0; k < binding.previous_associative_keys.count(); k++)
+      set_associative_element(binding.name.view(),
+                              binding.previous_associative_keys[k].view(),
+                              binding.previous_associative_values[k].view());
+  if (binding.previous_was_integer)
+    m_integer_names.add(binding.name.view());
+  else
+    m_integer_names.remove(binding.name.view());
 }
 
 fn EvalContext::set_indexed_array(StringView name,
@@ -1426,41 +1437,9 @@ fn EvalContext::leave_function_scope() throws -> void
       scope.count());
   for (usize i = scope.count(); i > 0; i--) {
     ASSERT(i - 1 < scope.count());
-    let &binding = scope[i - 1];
-    /* Restore through assign_variable, not set_shell_variable, since this runs
-       inside a noexcept defer and a readonly name would otherwise throw from a
-       destructor and terminate the shell. A local marked readonly in the body
-       is being torn down here, so the restore of the outer value is valid. */
-    if (binding.previous_value.has_value())
-      assign_variable(binding.name, *binding.previous_value);
-    else
-      force_unset_shell_variable(binding.name);
-    /* Restore the indexed array the name held before the shadow, or clear the
-       local array when the caller had none, so a local array does not leak. The
-       store is written directly rather than through set_indexed_array, since
-       this runs in a noexcept defer where a readonly check could throw from a
-       destructor. */
-    if (binding.previous_indexed_array.has_value())
-      m_indexed_arrays.set(binding.name.view(),
-                           steal(*binding.previous_indexed_array));
-    else
-      m_indexed_arrays.erase(binding.name.view());
-    /* Restore the associative array the name held, dropping the local one
-       first, then re-adding the saved pairs, or leaving it cleared when the
-       caller had none. set_associative_element does no readonly check, so it
-       cannot throw a located error from this noexcept defer. */
-    clear_associative_array(binding.name.view());
-    if (binding.previous_was_associative)
-      for (usize k = 0; k < binding.previous_associative_keys.count(); k++)
-        set_associative_element(binding.name.view(),
-                                binding.previous_associative_keys[k].view(),
-                                binding.previous_associative_values[k].view());
-    /* The integer mark is scoped with the binding, so a local -i mark drops
-       here and a caller's mark that declare_local suppressed comes back. */
-    if (binding.previous_was_integer)
-      m_integer_names.add(binding.name.view());
-    else
-      m_integer_names.remove(binding.name.view());
+    /* The shared restore puts back the scalar, the arrays, and the integer
+       mark, the same steps the unset peel runs for a single binding. */
+    restore_local_binding(scope[i - 1]);
   }
   /* The innermost scope is the one just restored, so it is dropped in place
      rather than rebuilding the whole stack into a fresh list on every return.
@@ -6574,6 +6553,78 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     return 1;
   }
   return status;
+}
+
+pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
+{
+  /* The shopt names bash ships enabled. globstar stays off the way bash
+     ships it, and the glob engine reads its live value. */
+  static const StringView DEFAULT_ON_SHOPT_NAMES[] = {
+      "progcomp",     "promptvars",        "sourcepath",
+      "extquote",     "complete_fullquote", "hostcomplete",
+      "cmdhist",      "checkwinsize",       "force_fignore",
+      "globasciiranges", "expand_aliases",  "interactive_comments",
+  };
+  for (const StringView default_name : DEFAULT_ON_SHOPT_NAMES)
+    if (name == default_name) return true;
+  return false;
+}
+
+fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
+                                          bool allow_expansion) throws
+    -> ArrayList<String>
+{
+  auto split_plain = [&]() throws -> ArrayList<String> {
+    let words = ArrayList<String>{};
+    usize start = 0;
+    for (usize i = 0; i <= wordlist.length; i++) {
+      const char c = i < wordlist.length ? wordlist[i] : ' ';
+      if (c == ' ' || c == '\t' || c == '\n') {
+        if (i > start)
+          words.push(String{wordlist.substring_of_length(start, i - start)});
+        start = i + 1;
+      }
+    }
+    return words;
+  };
+
+  /* A literal list, no expansion or quoting byte anywhere, splits with no
+     parse at all, the common -W shape. */
+  let needs_expansion = false;
+  for (usize i = 0; i < wordlist.length && !needs_expansion; i++) {
+    const char c = wordlist[i];
+    needs_expansion = c == '$' || c == '`' || c == '"' || c == '\'' ||
+                      c == '\\' || c == '~' || c == '{';
+  }
+  if (!needs_expansion || !allow_expansion) return split_plain();
+
+  /* The list expands as an array literal in the current context, so a word
+     such as "${options[@]}" reaches the caller's array, then the temp name
+     drops on both the success and the failure path. */
+  let fields = ArrayList<String>{};
+  try {
+    let expansion_source = String{"t__wordlist_fields=("};
+    expansion_source.append(wordlist);
+    expansion_source.push(')');
+    run_source(expansion_source.view(), "a -W word list", false);
+    if (const ArrayList<String> *expanded =
+            lookup_indexed_array("t__wordlist_fields");
+        expanded != nullptr)
+    {
+      fields.reserve(expanded->count());
+      for (const String &word : *expanded)
+        fields.push_managed(word.view());
+    }
+  } catch (const ErrorBase &error) {
+    LOG(verbosity::Debug, "-W expansion failed, splitting plain: %s",
+        error.message().c_str());
+    m_indexed_arrays.erase("t__wordlist_fields");
+    force_unset_shell_variable("t__wordlist_fields");
+    return split_plain();
+  }
+  m_indexed_arrays.erase("t__wordlist_fields");
+  force_unset_shell_variable("t__wordlist_fields");
+  return fields;
 }
 
 fn EvalContext::register_completion_spec(StringView command,

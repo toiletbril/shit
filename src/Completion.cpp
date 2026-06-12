@@ -199,8 +199,10 @@ static bool CACHED_PATH_COMMANDS_VALID = false;
 
 static fn path_command_names() throws -> const ArrayList<String> &
 {
-  let const path = os::get_environment_variable("PATH");
-  let const current = path.has_value() ? path->view() : StringView{};
+  /* The staleness probe runs on every keystroke, so the PATH value is read
+     as a raw view with no owning copy. */
+  const char *path = std::getenv("PATH");
+  let const current = path != nullptr ? StringView{path} : StringView{};
   if (CACHED_PATH_COMMANDS_VALID && CACHED_COMPLETION_PATH.view() == current)
     return CACHED_PATH_COMMANDS;
 
@@ -584,11 +586,11 @@ static fn manpage_name_for(StringView command) throws -> String
    pass that runs once per launch on the first explicit tab, never on the
    ghost path and never at startup. */
 static StringMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
-/* Every stripped section-1 page name, the existence gate for the subcommand
-   split and the lookup that sends git commit -<tab> to the git-commit page. */
-static HashSet MAN_PAGE_NAMES{heap_allocator()};
-/* The full file path of each page, kept so the synopsis validation reads the
-   page source directly instead of forking man per candidate. */
+/* Every stripped section-1 page name mapped to its full file path. The key
+   set is the existence gate for the subcommand split and the lookup that
+   sends git commit -<tab> to the git-commit page, and the path lets the
+   synopsis validation read the page source directly instead of forking man
+   per candidate. */
 static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
 /* The commands whose candidate lists already went through the synopsis
    validation, so the page reads are paid once per command per launch. */
@@ -668,7 +670,6 @@ static pure fn strip_man1_suffix(StringView entry) wontthrow
 static fn build_man_subcommand_index() throws -> void
 {
   MAN_SUBCOMMAND_INDEX_IS_BUILT = true;
-  let page_names = ArrayList<String>{};
   for (const Path &directory : manpage_section1_directories()) {
     LOG(verbosity::Info, "scanning man1 directory '%s'",
         directory.text().c_str());
@@ -681,31 +682,26 @@ static fn build_man_subcommand_index() throws -> void
     for (const String &entry : *entries) {
       let const stripped = strip_man1_suffix(entry.view());
       if (!stripped.has_value() || stripped->is_empty()) continue;
-      if (MAN_PAGE_NAMES.contains(*stripped)) continue;
-      MAN_PAGE_NAMES.add(*stripped);
+      if (MAN_PAGE_FILE_PATHS.find(*stripped) != nullptr) continue;
       let file_path = directory.clone();
       file_path.push_component(entry.view());
       MAN_PAGE_FILE_PATHS.set(*stripped, String{file_path.text().view()});
-      page_names.push(String{*stripped});
     }
   }
-  for (const String &page : page_names) {
-    let const name = page.view();
+  /* Candidate order does not matter, complete() sorts, so the second pass
+     walks the path map itself rather than a third copy of the names. */
+  MAN_PAGE_FILE_PATHS.for_each([&](StringView name, const String &) {
     let const dash = name.find_character('-');
-    if (!dash.has_value() || *dash == 0) continue;
+    if (!dash.has_value() || *dash == 0) return;
     let const head = name.substring_of_length(0, *dash);
     let const tail = name.substring(*dash + 1);
-    if (tail.is_empty() || (tail[0] >= '0' && tail[0] <= '9')) continue;
-    if (!MAN_PAGE_NAMES.contains(head)) continue;
-    if (ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(head)) {
-      subcommands->push(String{tail});
-    } else {
-      let list = ArrayList<String>{};
-      list.push(String{tail});
-      MAN_SUBCOMMAND_INDEX.set(head, steal(list));
-    }
-  }
-  LOG(verbosity::Info, "indexed %zu section-1 pages", page_names.count());
+    if (tail.is_empty() || (tail[0] >= '0' && tail[0] <= '9')) return;
+    if (MAN_PAGE_FILE_PATHS.find(head) == nullptr) return;
+    MAN_SUBCOMMAND_INDEX.get_or_create(head, ArrayList<String>{})
+        .push(String{tail});
+  });
+  LOG(verbosity::Info, "indexed %zu section-1 pages",
+      MAN_PAGE_FILE_PATHS.count());
 }
 
 /* The synopsis region of a man page source, located by its .SH heading or the
@@ -818,12 +814,7 @@ static fn validate_subcommands_for(StringView command) throws -> void
     let needle = String{command};
     needle.push(' ');
     needle.append(subcommand.view());
-    let has_space_form = false;
-    const StringView haystack = synopsis.view();
-    for (usize i = 0;
-         i + needle.length() <= haystack.length && !has_space_form; i++)
-      has_space_form = haystack.substring(i).starts_with(needle.view());
-    if (has_space_form)
+    if (synopsis.find_substring(needle.view()).has_value())
       surviving.push(String{subcommand.view()});
     else
       LOG(verbosity::All, "dropped '%s', no space form in its synopsis",
@@ -902,7 +893,7 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
 
   let matches = ArrayList<String>{};
   for (const String &subcommand : *subcommands)
-    if (token.is_empty() || subcommand.view().starts_with(token))
+    if (subcommand.view().starts_with(token))
       matches.push(String{subcommand.view()});
   LOG(verbosity::Debug, "%zu subcommands of '%.*s' match token '%.*s'",
       matches.count(), static_cast<int>(command.length), command.data,
@@ -964,15 +955,18 @@ static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<String> &
 {
-  if (MANPAGE_OPTION_CACHE.find(page_name) == nullptr) {
-    let parsed = ArrayList<String>{};
-    try {
-      const String page = context.capture_command_substitution(
-          String{"man "} + String{page_name} + " 2>/dev/null");
-      parsed = parse_manpage_options(page.view());
-    } catch (...) {}
-    MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
+  if (const ArrayList<String> *cached = MANPAGE_OPTION_CACHE.find(page_name))
+    return *cached;
+  let parsed = ArrayList<String>{};
+  try {
+    const String page = context.capture_command_substitution(
+        String{"man "} + String{page_name} + " 2>/dev/null");
+    parsed = parse_manpage_options(page.view());
+  } catch (...) {
+    LOG(verbosity::Debug, "swallowed a man invocation failure for '%.*s'",
+        static_cast<int>(page_name.length), page_name.data);
   }
+  MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
   return *MANPAGE_OPTION_CACHE.find(page_name);
 }
 
@@ -1003,7 +997,8 @@ static fn complete_from_manpage(StringView line, StringView token,
     let combined = String{command};
     combined.push('-');
     combined.append(*subcommand_word);
-    if (MAN_PAGE_NAMES.contains(combined.view())) page_name = steal(combined);
+    if (MAN_PAGE_FILE_PATHS.find(combined.view()) != nullptr)
+      page_name = steal(combined);
   }
 
   const ArrayList<String> &options =
@@ -1072,19 +1067,12 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
   let candidates = ArrayList<String>{};
 
   if (!spec->word_list.is_empty()) {
-    const StringView list = spec->word_list.view();
-    usize start = 0;
-    for (usize i = 0; i <= list.length; i++) {
-      const char c = i < list.length ? list[i] : ' ';
-      if (c == ' ' || c == '\t' || c == '\n') {
-        if (i > start) {
-          const StringView word = list.substring_of_length(start, i - start);
-          if (token.is_empty() || word.starts_with(token))
-            candidates.push(String{word});
-        }
-        start = i + 1;
-      }
-    }
+    /* The -W list expands the way bash expands it, through the same shared
+       path compgen -W reads. The ghost runs on every keystroke and so keeps
+       the plain split for a list that would need a parse. */
+    for (const String &word : context.expand_wordlist_to_fields(
+             spec->word_list.view(), for_listing))
+      if (word.view().starts_with(token)) candidates.push(String{word.view()});
   }
 
   /* The function returns the final candidate list in COMPREPLY, already
@@ -1286,8 +1274,10 @@ fn command_word_resolves(StringView line, EvalContext &context) throws -> bool
   let const word = command_word_of(line);
   if (word.is_empty()) return true;
 
-  let const path = os::get_environment_variable("PATH");
-  let const current = path.has_value() ? path->view() : StringView{};
+  /* The staleness probe runs per scanned history entry per keystroke, so the
+     PATH value is read as a raw view with no owning copy. */
+  const char *path = std::getenv("PATH");
+  let const current = path != nullptr ? StringView{path} : StringView{};
   if (CACHED_GHOST_VERDICT_PATH.view() != current) {
     GHOST_WORD_VERDICTS.clear();
     CACHED_GHOST_VERDICT_PATH = String{current};
