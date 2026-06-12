@@ -339,11 +339,11 @@ fn apply_shell_option(EvalContext &cxt, StringView name, bool enable) throws
    options and the completion engine can offer them. shell_option_letters
    carries every single-letter switch for the same engine. */
 fn shell_option_names(bool include_alias_spellings) throws
-    -> ArrayList<StringView>;
-fn shell_option_letters() throws -> String;
+    -> const ArrayList<StringView> &;
+fn shell_option_letters() throws -> const String &;
 
 /* The shopt option names, defined in Shopt.cpp, for shopt name completion. */
-fn shopt_option_name_list() throws -> ArrayList<StringView>;
+fn shopt_option_name_list() throws -> const ArrayList<StringView> &;
 
 /* The main binary's own FLAG list, defined in Main.cpp, so the completion
    engine offers the shell's flags for the command word shit. */

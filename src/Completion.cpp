@@ -1224,10 +1224,12 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   let const home = os::get_home_directory();
   if (!home.has_value()) return hosts;
 
+  /* known_hosts repeats a host once per key type, so the dedup set keeps the
+     scan linear over hundreds of rows. */
+  let seen = HashSet{heap_allocator()};
   let const push_unique = [&](StringView host) throws {
-    if (host.is_empty()) return;
-    for (const String &existing : hosts)
-      if (existing.view() == host) return;
+    if (host.is_empty() || seen.contains(host)) return;
+    seen.add(host);
     hosts.push(String{host});
   };
 
@@ -1306,30 +1308,22 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
 }
 
 /* Look the tool's targets up in the mtime cache, or rebuild them with the
-   given collector and store them under the source file's path. */
+   given collector and store them under the source file's path. The result
+   points into the cache and stays valid until the next refresh, which the
+   one synchronous caller below finishes reading before. Null means the
+   source file is missing. */
 template <typename Collector>
-static fn cached_targets_for(const Path &source_file,
-                             Collector collect) throws -> ArrayList<String>
+static fn cached_targets_for(const Path &source_file, Collector collect) throws
+    -> const ArrayList<String> *
 {
   let const mtime = source_file.modification_time();
-  if (!mtime.has_value()) return ArrayList<String>{};
+  if (!mtime.has_value()) return nullptr;
   const StringView key = source_file.text().view();
   if (const cached_target_list *cached = BUILD_TARGET_CACHE.find(key);
       cached != nullptr && cached->mtime == *mtime)
-  {
-    let copies = ArrayList<String>{};
-    copies.reserve(cached->targets.count());
-    for (const String &target : cached->targets)
-      copies.push(String{target.view()});
-    return copies;
-  }
-  let collected = collect();
-  let entry = cached_target_list{*mtime, ArrayList<String>{}};
-  entry.targets.reserve(collected.count());
-  for (const String &target : collected)
-    entry.targets.push(String{target.view()});
-  BUILD_TARGET_CACHE.set(key, steal(entry));
-  return collected;
+    return &cached->targets;
+  BUILD_TARGET_CACHE.set(key, cached_target_list{*mtime, collect()});
+  return &BUILD_TARGET_CACHE.find(key)->targets;
 }
 
 /* Complete a build tool's targets and kin, make and ninja targets through
@@ -1357,7 +1351,10 @@ static fn complete_from_build_tools(StringView line, StringView token,
     }
   };
 
-  let targets = ArrayList<String>{};
+  /* The cached branches point straight into the mtime cache, while the ssh
+     branch owns its freshly collected list. */
+  let owned_targets = ArrayList<String>{};
+  const ArrayList<String> *targets = &owned_targets;
 
   if (command == "make") {
     let const directory =
@@ -1448,13 +1445,14 @@ static fn complete_from_build_tools(StringView line, StringView token,
     if (token.find_character('/').has_value() ||
         token.find_character(':').has_value())
       return None;
-    targets = collect_ssh_hosts();
+    owned_targets = collect_ssh_hosts();
   } else {
     return None;
   }
 
+  if (targets == nullptr) return None;
   let candidates = ArrayList<String>{};
-  for (const String &target : targets)
+  for (const String &target : *targets)
     if (target.view().starts_with(token)) candidates.push(String{target.view()});
   if (candidates.is_empty()) return None;
   return candidates;
@@ -1566,6 +1564,16 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   return candidates;
 }
 
+/* True when the entry is a dash word the token did not ask for, the one gate
+   every spec path applies so an empty argument token completes files rather
+   than option words. The caller remembers the drop so a list emptied by it
+   falls through to filename completion. */
+static pure fn entry_is_unrequested_dash_word(
+    StringView entry, bool token_asks_for_dash) wontthrow -> bool
+{
+  return !token_asks_for_dash && !entry.is_empty() && entry[0] == '-';
+}
+
 /* Consult the completion spec registered for the line's command, when one
    exists. The word list filters to the entries that start with the token, and
    the -F function runs only on an explicit tab so the ghost does not run it on
@@ -1614,8 +1622,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
       let dropped_dash_entries = false;
       let loaded = ArrayList<String>{};
       for (const String &entry : reply) {
-        if (!wants_dash_entries && !entry.is_empty() && entry.view()[0] == '-')
-        {
+        if (entry_is_unrequested_dash_word(entry.view(), wants_dash_entries)) {
           dropped_dash_entries = true;
           continue;
         }
@@ -1631,10 +1638,6 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
 
   let candidates = ArrayList<String>{};
 
-  /* A dash word from the list is offered only when the token already starts
-     with a dash, so an empty argument token completes files rather than the
-     spec's option words. The drop is remembered, and a list reduced to nothing
-     by it falls through to filename completion below. */
   let const should_offer_dash_words = !token.is_empty() && token[0] == '-';
   bool did_drop_dash_words = false;
 
@@ -1645,7 +1648,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     for (const String &word :
          context.expand_wordlist_to_fields(spec->word_list.view(), for_listing))
     {
-      if (!should_offer_dash_words && !word.is_empty() && word.view()[0] == '-')
+      if (entry_is_unrequested_dash_word(word.view(), should_offer_dash_words))
       {
         did_drop_dash_words = true;
         continue;
@@ -1663,8 +1666,8 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     let const reply = context.run_completion_function(
         spec->function_name.view(), words, cword, line, cursor);
     for (const String &entry : reply) {
-      if (!should_offer_dash_words && !entry.is_empty() &&
-          entry.view()[0] == '-')
+      if (entry_is_unrequested_dash_word(entry.view(),
+                                         should_offer_dash_words))
       {
         did_drop_dash_words = true;
         continue;

@@ -153,12 +153,18 @@ String shopt_reusable_line(StringView name, bool on,
 
 } /* namespace */
 
-fn shopt_option_name_list() throws -> ArrayList<StringView>
+fn shopt_option_name_list() throws -> const ArrayList<StringView> &
 {
-  let names = ArrayList<StringView>{};
-  names.reserve(sizeof(SHOPT_OPTION_NAMES) / sizeof(SHOPT_OPTION_NAMES[0]));
-  for (const StringView name : SHOPT_OPTION_NAMES)
-    names.push(name);
+  /* The table is immutable and the completion engine reads it on every
+     keystroke, so the list builds once. */
+  static ArrayList<StringView> names = [] throws {
+    let collected = ArrayList<StringView>{};
+    collected.reserve(sizeof(SHOPT_OPTION_NAMES) /
+                      sizeof(SHOPT_OPTION_NAMES[0]));
+    for (const StringView name : SHOPT_OPTION_NAMES)
+      collected.push(name);
+    return collected;
+  }();
   return names;
 }
 

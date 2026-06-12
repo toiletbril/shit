@@ -912,35 +912,49 @@ fn extglob_full_match(StringView glob, StringView str,
 }
 
 /* The POSIX character classes a bracket accepts as [:name:], each name bound
-   to its ctype predicate. The wrappers pin the byte through unsigned char, the
-   only argument range the ctype functions define. */
-struct posix_class_entry
-{
-  StringView name;
-  bool (*byte_is_member)(u8 byte);
+   to its ctype predicate through a packed-key map so the glob hot path pays
+   a word compare rather than a name chain. The wrappers pin the byte through
+   unsigned char, the only argument range the ctype functions define. */
+using posix_class_test = bool (*)(u8 byte);
+
+constexpr StaticStringMap<posix_class_test>::entry POSIX_CLASS_ENTRIES[] = {
+    {PackedStringKey::from_literal("alnum"),
+     [](u8 byte) { return std::isalnum(byte) != 0; }},
+    {PackedStringKey::from_literal("alpha"),
+     [](u8 byte) { return std::isalpha(byte) != 0; }},
+    {PackedStringKey::from_literal("blank"),
+     [](u8 byte) { return std::isblank(byte) != 0; }},
+    {PackedStringKey::from_literal("cntrl"),
+     [](u8 byte) { return std::iscntrl(byte) != 0; }},
+    {PackedStringKey::from_literal("digit"),
+     [](u8 byte) { return std::isdigit(byte) != 0; }},
+    {PackedStringKey::from_literal("graph"),
+     [](u8 byte) { return std::isgraph(byte) != 0; }},
+    {PackedStringKey::from_literal("lower"),
+     [](u8 byte) { return std::islower(byte) != 0; }},
+    {PackedStringKey::from_literal("print"),
+     [](u8 byte) { return std::isprint(byte) != 0; }},
+    {PackedStringKey::from_literal("punct"),
+     [](u8 byte) { return std::ispunct(byte) != 0; }},
+    {PackedStringKey::from_literal("space"),
+     [](u8 byte) { return std::isspace(byte) != 0; }},
+    {PackedStringKey::from_literal("upper"),
+     [](u8 byte) { return std::isupper(byte) != 0; }},
+    {PackedStringKey::from_literal("xdigit"),
+     [](u8 byte) { return std::isxdigit(byte) != 0; }},
 };
 
-const posix_class_entry POSIX_CLASS_TABLE[] = {
-    {"alnum", [](u8 byte) { return std::isalnum(byte) != 0; }},
-    {"alpha", [](u8 byte) { return std::isalpha(byte) != 0; }},
-    {"blank", [](u8 byte) { return std::isblank(byte) != 0; }},
-    {"cntrl", [](u8 byte) { return std::iscntrl(byte) != 0; }},
-    {"digit", [](u8 byte) { return std::isdigit(byte) != 0; }},
-    {"graph", [](u8 byte) { return std::isgraph(byte) != 0; }},
-    {"lower", [](u8 byte) { return std::islower(byte) != 0; }},
-    {"print", [](u8 byte) { return std::isprint(byte) != 0; }},
-    {"punct", [](u8 byte) { return std::ispunct(byte) != 0; }},
-    {"space", [](u8 byte) { return std::isspace(byte) != 0; }},
-    {"upper", [](u8 byte) { return std::isupper(byte) != 0; }},
-    {"xdigit", [](u8 byte) { return std::isxdigit(byte) != 0; }},
-};
+constexpr StaticStringMap<posix_class_test> POSIX_CLASSES{
+    POSIX_CLASS_ENTRIES,
+    sizeof(POSIX_CLASS_ENTRIES) / sizeof(POSIX_CLASS_ENTRIES[0])};
 
 /* Whether the byte belongs to the named class. An unknown name matches
    nothing, the way bash treats a class it does not know. */
 bool byte_is_in_posix_class(StringView class_name, u8 byte) throws
 {
-  for (const posix_class_entry &entry : POSIX_CLASS_TABLE)
-    if (entry.name == class_name) return entry.byte_is_member(byte);
+  if (const Maybe<posix_class_test> test = POSIX_CLASSES.find(class_name);
+      test.has_value())
+    return (*test)(byte);
   return false;
 }
 

@@ -272,22 +272,35 @@ fn query_shell_option(const EvalContext &cxt, StringView name) throws
 }
 
 fn shell_option_names(bool include_alias_spellings) throws
-    -> ArrayList<StringView>
+    -> const ArrayList<StringView> &
 {
-  let names = ArrayList<StringView>{};
-  for (const SetOption &option : SET_OPTIONS)
-    names.push(option.name);
-  if (include_alias_spellings)
+  /* SET_OPTIONS is immutable and the completion engine reads these on every
+     keystroke, so both spellings build once. */
+  static ArrayList<StringView> canonical = [] throws {
+    let names = ArrayList<StringView>{};
+    for (const SetOption &option : SET_OPTIONS)
+      names.push(option.name);
+    return names;
+  }();
+  static ArrayList<StringView> with_aliases = [] throws {
+    let names = ArrayList<StringView>{};
+    for (const SetOption &option : SET_OPTIONS)
+      names.push(option.name);
     for (const SetOption &option : SET_OPTIONS)
       if (!option.alias.is_empty()) names.push(option.alias);
-  return names;
+    return names;
+  }();
+  return include_alias_spellings ? with_aliases : canonical;
 }
 
-fn shell_option_letters() throws -> String
+fn shell_option_letters() throws -> const String &
 {
-  let letters = String{};
-  for (const SetOption &option : SET_OPTIONS)
-    if (option.letter != '\0') letters.push(option.letter);
+  static String letters = [] throws {
+    let collected = String{};
+    for (const SetOption &option : SET_OPTIONS)
+      if (option.letter != '\0') collected.push(option.letter);
+    return collected;
+  }();
   return letters;
 }
 

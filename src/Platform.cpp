@@ -931,48 +931,47 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
   return NAMES.find(bare);
 }
 
+/* The number-name pairs mirror signal_number_from_name's table, so a number
+   and the name it carries round-trip through the helpers, and the completion
+   engine offers exactly the accepted spellings. The list is short, so a
+   linear scan beats a second map. */
+struct signal_pair
+{
+  i32 number;
+  StringView name;
+};
+static const signal_pair SIGNAL_PAIRS[] = {
+    {SIGHUP,  "HUP" },
+    {SIGINT,  "INT" },
+    {SIGQUIT, "QUIT"},
+    {SIGKILL, "KILL"},
+    {SIGTERM, "TERM"},
+    {SIGSTOP, "STOP"},
+    {SIGTSTP, "TSTP"},
+    {SIGCONT, "CONT"},
+    {SIGUSR1, "USR1"},
+    {SIGUSR2, "USR2"},
+    {SIGABRT, "ABRT"},
+    {SIGALRM, "ALRM"},
+    {SIGPIPE, "PIPE"},
+};
+
 fn signal_name_from_number(i32 number) throws -> Maybe<String>
 {
-  /* The pairs mirror signal_number_from_name's table, so a number and the name
-     it carries round-trip through the two helpers. The list is short, so a
-     linear scan beats a second map. */
-  struct signal_pair
-  {
-    i32 number;
-    StringView name;
-  };
-  static const signal_pair SIGNAL_PAIRS[] = {
-      {SIGHUP,  "HUP" },
-      {SIGINT,  "INT" },
-      {SIGQUIT, "QUIT"},
-      {SIGKILL, "KILL"},
-      {SIGTERM, "TERM"},
-      {SIGSTOP, "STOP"},
-      {SIGTSTP, "TSTP"},
-      {SIGCONT, "CONT"},
-      {SIGUSR1, "USR1"},
-      {SIGUSR2, "USR2"},
-      {SIGABRT, "ABRT"},
-      {SIGALRM, "ALRM"},
-      {SIGPIPE, "PIPE"},
-  };
   for (const signal_pair &pair : SIGNAL_PAIRS)
     if (pair.number == number) return String{pair.name};
   return shit::None;
 }
 
-fn signal_names() throws -> ArrayList<StringView>
+fn signal_names() throws -> const ArrayList<StringView> &
 {
-  /* The same names signal_number_from_name resolves, in its order, so the
-     completion engine offers exactly the accepted spellings. */
-  let names = ArrayList<StringView>{};
-  static const StringView SIGNAL_NAMES[] = {
-      "HUP",  "INT",  "QUIT", "KILL", "TERM", "STOP", "TSTP",
-      "CONT", "USR1", "USR2", "ABRT", "ALRM", "PIPE",
-  };
-  names.reserve(sizeof(SIGNAL_NAMES) / sizeof(SIGNAL_NAMES[0]));
-  for (const StringView name : SIGNAL_NAMES)
-    names.push(name);
+  static ArrayList<StringView> names = [] throws {
+    let collected = ArrayList<StringView>{};
+    collected.reserve(sizeof(SIGNAL_PAIRS) / sizeof(SIGNAL_PAIRS[0]));
+    for (const signal_pair &pair : SIGNAL_PAIRS)
+      collected.push(pair.name);
+    return collected;
+  }();
   return names;
 }
 
@@ -2132,15 +2131,17 @@ fn signal_name_from_number(i32 number) -> Maybe<String>
   return None;
 }
 
-fn signal_names() throws -> ArrayList<StringView>
+fn signal_names() throws -> const ArrayList<StringView> &
 {
   /* The names the Windows signal_number_from_name accepts. */
-  let names = ArrayList<StringView>{};
-  static const StringView SIGNAL_NAMES[] = {"HUP", "INT", "QUIT", "KILL",
-                                            "TERM"};
-  names.reserve(sizeof(SIGNAL_NAMES) / sizeof(SIGNAL_NAMES[0]));
-  for (const StringView name : SIGNAL_NAMES)
-    names.push(name);
+  static ArrayList<StringView> names = [] throws {
+    let collected = ArrayList<StringView>{};
+    static const StringView WINDOWS_SIGNAL_NAMES[] = {"HUP", "INT", "QUIT",
+                                                      "KILL", "TERM"};
+    for (const StringView name : WINDOWS_SIGNAL_NAMES)
+      collected.push(name);
+    return collected;
+  }();
   return names;
 }
 
