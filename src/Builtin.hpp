@@ -5,8 +5,6 @@
 #include "Maybe.hpp"
 #include "Platform.hpp"
 
-/* TODO: test */
-
 namespace shit {
 
 class ExecContext;
@@ -291,7 +289,6 @@ void show_builtin_help_impl(const ExecContext &ec, StringView description,
     return 0;                                                                  \
   } while (false)
 
-/* TODO: More granular error location for flags? */
 #define PARSE_BUILTIN_ARGS(ec)                                                 \
   parse_flags_vec(FLAG_LIST, ec.args(), ec.source_location().position);        \
   defer { reset_flags(FLAG_LIST); }

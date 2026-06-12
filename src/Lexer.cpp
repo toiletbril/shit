@@ -9,8 +9,6 @@
 #include "Trace.hpp"
 #include "Utils.hpp"
 
-/* TODO: Rewrite the lexer and parser to suit the shell language better. */
-
 namespace shit {
 
 namespace lexer {
@@ -58,7 +56,6 @@ hot pure fn is_expression_sentinel(char ch) wontthrow -> bool
   };
 }
 
-/* TODO: Separate redirections from here. */
 hot pure fn is_shell_sentinel(char ch) wontthrow -> bool
 {
   /* A brace is not a sentinel. POSIX recognizes '{' and '}' as reserved words

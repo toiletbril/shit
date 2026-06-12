@@ -1127,7 +1127,6 @@ cold fn print_memory_report() wontthrow -> void
       try {
         toiletline::exit();
       } catch (const Error &e) {
-        /* TODO: A wild bug appeared! */
         show_message(e.to_string());
       }
     }

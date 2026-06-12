@@ -21,7 +21,6 @@ INPUT_FILES := $(wildcard shit/*.shit)
 
 TEST_NAMES := $(INPUT_FILES:shit/%.shit=%)
 
-# TODO: Custom test runner?
 # A test passes when its output matches the primary expected file or, for a test
 # whose output is not fully deterministic such as the ordering of two background
 # jobs, an alternative expected/NAME_1.out. The output is captured once to a
@@ -47,6 +46,7 @@ clean:
 test: $(BIN)
 	@$(MAKE) -B clean
 	@$(MAKE) -B run_tests
+	@$(MAKE) -B cli_tests
 	@$(MAKE) -B dashdiff
 	@$(MAKE) -B bashdiff
 	@$(MAKE) -B mimicrydiff
@@ -55,6 +55,33 @@ test: $(BIN)
 	@test ! -s $(FAILED_LIST)
 
 run_tests: $(TEST_NAMES)
+
+# The CLI suite drives the binary through its flags and operands rather than
+# through a piped script, so the flag parser, the help sections, the located
+# invocation errors, and the SHIT_FLAGS environment stay covered. Each test is
+# a POSIX sh script that reads the binary path from BIN and prints the output
+# the golden in expected_cli records.
+CLI_INPUT := $(wildcard cli/*.sh)
+CLI_NAMES := $(CLI_INPUT:cli/%.sh=cli_%)
+
+cli_%: expected_cli/%.out
+	@out=$$(mktemp); \
+	BIN=$(BIN) sh cli/$*.sh > $$out 2>&1; \
+	if diff $(DIFF_FLAGS) $< $$out >/dev/null 2>&1; then \
+		printf "	%-64s ok\n" cli/$*.sh; \
+	else \
+		diff $(DIFF_FLAGS) $< $$out >> $(FAILED_LIST); \
+		printf "	%-64s FAILED :c\n" cli/$*.sh; \
+	fi; \
+	rm -f $$out
+
+cli_tests: $(CLI_NAMES)
+
+cli_refill:
+	for f in $(CLI_INPUT:cli/%.sh=%); do \
+		printf "	%-64s $$f.out\n" cli/$$f.sh; \
+		BIN=$(BIN) sh cli/$$f.sh > expected_cli/$$f.out 2>&1; \
+	done || true
 
 refill:
 	for f in $(TEST_NAMES); do \

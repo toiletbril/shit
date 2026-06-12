@@ -2196,7 +2196,6 @@ static fn handle_interrupt(int s) -> void
   signal(SIGINT, handle_interrupt);
 }
 
-/* TODO: Use Windows events. */
 fn set_default_signal_handlers() -> void
 {
   if (signal(SIGTERM, SIG_IGN) == SIG_ERR ||

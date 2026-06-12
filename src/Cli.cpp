@@ -14,8 +14,6 @@ namespace shit {
 constexpr usize HELP_WRAP_WIDTH = 80;
 constexpr usize HELP_INDENT = 2;
 
-/* TODO: Make CLI tests. */
-
 Flag::Flag(Flag::Kind kind, char short_name, StringView long_name,
            flag_section section, StringView description)
     : m_kind(kind), m_short_name(short_name), m_section(section),

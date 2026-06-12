@@ -4034,7 +4034,8 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
     if (!should_expand_files && !full_path.is_directory()) continue;
 
-    /* TODO: Figure the rules of hidden file expansion. */
+    /* A hidden entry matches only a pattern that itself starts with a dot,
+       the POSIX rule the dotglob tests record. */
     if (glob[0] != '.' && !filename.is_empty() && filename[0] == '.') continue;
 
     if (utils::glob_matches(glob, filename, field.glob_active, stem_start,
@@ -7529,7 +7530,8 @@ fn ExecContext::make_from(SourceLocation location,
       if (ps.count() > 0) p = steal(ps[0]);
     }
   } else {
-    /* TODO: Sanitize extensions here too. */
+    /* canonicalize_path already tries the omitted suffixes, so a path-given
+       program resolves its extension the way the PATH search does. */
     p = utils::canonicalize_path(program.view());
   }
 

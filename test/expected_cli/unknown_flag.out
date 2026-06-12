@@ -1,0 +1,4 @@
+shit: 1:9: error: Unknown flag '--zz-bogus-flag'.
+     1 |  ../shit --zz-bogus-flag
+       |          ^~~~~~~~~~~~~~~ here.
+rc=2
