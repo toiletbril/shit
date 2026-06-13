@@ -608,9 +608,17 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      line, since a script may read it as x=$LINENO. */
   cxt.set_current_location(source_location());
 
-  /* The status defaults to 0, but a command substitution in the value sets it
-     to the status of that substitution, which the assignment then reports. */
-  cxt.set_last_exit_status(0);
+  /* The status the assignment leaves depends on the value. A value with no
+     command substitution resets it to 0, while a command or function
+     substitution in the value leaves the status of the last one, the way bash
+     reports x=$(false) as 1 and a plain x=1 as 0. The status reset waits until
+     after the expansion, so a $? in the value reads the prior command's status
+     rather than a value this assignment cleared first. */
+  bool value_ran_substitution = false;
+  for (const WordSegment &segment : m_assignment->value_word().segments)
+    if (segment.kind == WordSegment::Kind::CommandSubstitution ||
+        segment.kind == WordSegment::Kind::FunctionSubstitution)
+      value_ran_substitution = true;
 
   /* The value expansion and the store throw a plain Error, an unset variable
      under set -u or a readonly name. The assignment has a source location, so
@@ -632,8 +640,8 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           *bracket + 1, key_view.length - *bracket - 2);
       cxt.assign_array_element(array_name, subscript, value.view(),
                                m_assignment->is_append());
-      cxt.set_last_exit_status(0);
-      return 0;
+      if (!value_ran_substitution) cxt.set_last_exit_status(0);
+      return cxt.last_exit_status();
     }
 
     /* The append form NAME+=VALUE prepends the current value of NAME, treating
@@ -661,6 +669,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       os::set_environment_variable(key, value);
       cxt.mark_exported(key);
     }
+    if (!value_ran_substitution) cxt.set_last_exit_status(0);
     return cxt.last_exit_status();
   } catch (const Error &e) {
     throw relocate_error(e, source_location());

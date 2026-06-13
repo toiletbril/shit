@@ -1,0 +1,193 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [Assign x=$?]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_false=$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [Assign x=$?]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_true=$x"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "exit" "7"]
+  [CompoundListCondition, None]
+    [Assign x=$?]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_exit7=$x"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [Assign x=$?]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "status_after_assign=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [Assign y=a$?z]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "embedded=$y"]
+  [CompoundListCondition, None]
+    [Assign x=$(false)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csub_status=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [Assign x=$(true)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csub_resets=$?"]
+  [CompoundListCondition, None]
+    [Assign a[0]=$(false)]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "array_csub_status=$?"]
+  [CompoundListCondition, None]
+    [Assign x=A]
+  [CompoundListCondition, None]
+    [SimpleCommand "false"]
+  [CompoundListCondition, None]
+    [Assign x+=$?]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "append=$x"]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "x="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after_false="
+  Variable "x"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "x="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after_true="
+  Variable "x"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Unquoted "x="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "after_exit7="
+  Variable "x"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "x="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "status_after_assign="
+  Variable "?"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "y=a"
+  Variable "?"
+  Unquoted "z"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "embedded="
+  Variable "y"
+]
+[Word
+  Unquoted "x="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csub_status="
+  Variable "?"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "x="
+  CommandSubstitution "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csub_resets="
+  Variable "?"
+]
+[Word
+  Unquoted "a[0]="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "array_csub_status="
+  Variable "?"
+]
+[Word
+  Unquoted "x=A"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "x+="
+  Variable "?"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "append="
+  Variable "x"
+]
+after_false=1
+after_true=0
+after_exit7=7
+status_after_assign=0
+embedded=a1z
+csub_status=1
+csub_resets=0
+array_csub_status=1
+append=A1
+[Code 0]

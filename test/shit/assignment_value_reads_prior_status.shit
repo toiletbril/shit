@@ -1,0 +1,13 @@
+# A lone assignment expands its value before it resets the status, so a $? in
+# the value reads the prior command's status the way bash does. The assignment
+# itself then reports zero, while a command substitution in the value reports
+# the substitution's status.
+false; x=$?; echo "after_false=$x"
+true; x=$?; echo "after_true=$x"
+(exit 7); x=$?; echo "after_exit7=$x"
+false; x=$?; echo "status_after_assign=$?"
+false; y=a$?z; echo "embedded=$y"
+x=$(false); echo "csub_status=$?"
+false; x=$(true); echo "csub_resets=$?"
+a[0]=$(false); echo "array_csub_status=$?"
+x=A; false; x+=$?; echo "append=$x"
