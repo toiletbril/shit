@@ -392,16 +392,13 @@ static fn run_script_contents(const String &script_contents,
     /* An interactive -W chunk runs right away and the runtime resolution
        reports a missing command itself, so the analysis copy of that report
        stays quiet to avoid the doubled error at the prompt. */
-    /* The names already set in the shell or the environment seed the
-       prepass, so a function-body assignment to an existing name such as an
-       inherited PATH reads as an update and the no-local warning stays
-       quiet. */
-    shit::HashSet predefined_variables = context.variable_names();
-    for (const shit::String &name : shit::os::environment_names())
-      predefined_variables.add(name.view());
+    /* The live shell is handed to the prepass so the no-local check can
+       query, only when it is about to warn, whether the name is already a
+       shell or environment variable, an update rather than a leak. The
+       query is lazy, so the analysis pays nothing per chunk for it. */
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), predefined_variables,
+                     context.alias_names(), &context,
                      FLAG_WARNINGS.is_enabled(),
                      FLAG_WARNINGS.is_enabled() &&
                          context.shell_is_interactive()))

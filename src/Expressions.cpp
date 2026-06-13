@@ -323,7 +323,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               const HashSet &predefined_variables, bool errors_are_warnings,
+               const EvalContext *eval_context, bool errors_are_warnings,
                bool silence_unresolved_commands) throws -> bool
 {
   ASSERT(root != nullptr);
@@ -331,6 +331,7 @@ fn analyze_ast(const Expression *root, StringView source,
   AnalysisContext actx{source};
   actx.errors_are_warnings = errors_are_warnings;
   actx.silence_unresolved_commands = silence_unresolved_commands;
+  actx.eval_context = eval_context;
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
@@ -369,12 +370,6 @@ fn analyze_ast(const Expression *root, StringView source,
       [&actx](StringView name) { actx.defined_functions.add(name); });
   known_aliases.for_each(
       [&actx](StringView name) { actx.known_aliases.add(name); });
-  /* A variable already set in the shell or the environment is one a
-     function-body assignment updates rather than newly leaks, so seeding it
-     here keeps the no-local warning quiet for an inherited name such as
-     PATH that /etc/profile rewrites inside a function. */
-  predefined_variables.for_each(
-      [&actx](StringView name) { actx.global_assigned_names.add(name); });
 
   root->analyze(actx, true);
 
@@ -555,7 +550,9 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
      warning for a leaked variable. */
   if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
       !actx.function_local_names.contains(name.view()) &&
-      !actx.global_assigned_names.contains(name.view()))
+      !actx.global_assigned_names.contains(name.view()) &&
+      !(actx.eval_context != nullptr &&
+        actx.eval_context->get_variable_value(name.view()).has_value()))
     actx.warn(source_location(),
               StringView{"This assignment to '"} + name +
                   "' in a function has no local, so the value leaks to the "

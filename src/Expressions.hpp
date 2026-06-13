@@ -70,6 +70,13 @@ public:
      warning stays quiet for it. */
   HashSet global_assigned_names{heap_allocator()};
 
+  /* The live shell, queried only when the no-local check is about to warn,
+     so a name already set in the shell or the environment, such as an
+     inherited PATH a function rewrites, reads as an update without the
+     warning. The lookup is lazy, so the analysis pays nothing per chunk for
+     it, and null in a context with no live shell. */
+  const EvalContext *eval_context{nullptr};
+
   /* True when the script's shebang names a POSIX shell, sh or dash, so a
      bashism in the body would break under the shell the file asks for. The
      SC3xxx bashism lints fire only behind this gate, since a script with a
@@ -93,7 +100,7 @@ public:
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               const HashSet &predefined_variables, bool errors_are_warnings,
+               const EvalContext *eval_context, bool errors_are_warnings,
                bool silence_unresolved_commands) throws -> bool;
 
 class Expression
