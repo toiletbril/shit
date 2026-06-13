@@ -1,0 +1,60 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "simple=${ echo one;  }"]
+  [CompoundListCondition, None]
+    [SimpleCommand "${ persist=42;  }"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "persist=$persist"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "nested=${ echo $(echo inner);  }"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "split" "${ echo a b c;  }"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "joined=[${ echo x y z;  }]"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "simple="
+  FunctionSubstitution "echo one; "
+]
+[Word
+  FunctionSubstitution "persist=42; "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "persist="
+  Variable "persist"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "nested="
+  FunctionSubstitution "echo $(echo inner); "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "split"
+]
+[Word
+  FunctionSubstitution "echo a b c; "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "joined=["
+  FunctionSubstitution "echo x y z; "
+  DoubleQuoted "]"
+]
+simple=one
+persist=42
+nested=inner
+split a b c
+joined=[x y z]
+[Code 0]

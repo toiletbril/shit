@@ -4374,6 +4374,20 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.saw_runtime_definer = true;
   }
 
+  /* A funsub argument, ${ ...; }, runs its body in the current shell, so a
+     function it defines persists where the prepass cannot see it, the same
+     reason eval degrades a later unresolved command to a warning. */
+  for (const Token *t : m_args) {
+    if (t->kind() != Token::Kind::Word) continue;
+    let const &word = static_cast<const tokens::WordToken *>(t)->word();
+    for (const WordSegment &segment : word.segments) {
+      if (segment.kind == WordSegment::Kind::FunctionSubstitution) {
+        actx.saw_runtime_definer = true;
+        break;
+      }
+    }
+  }
+
   /* A glob pattern with an unterminated bracket expression can never compile
      into a matcher, so the expansion would throw at run time. The malformed
      pattern is visible from the word bytes alone, so the prepass rejects it

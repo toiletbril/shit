@@ -1,0 +1,9 @@
+# The funsub ${ command; } rides the default mood, the same pure-addition
+# rule the other bash additions follow, running its body in the current
+# shell and splicing the captured output.
+echo "simple=${ echo one; }"
+${ persist=42; }
+echo "persist=$persist"
+echo "nested=${ echo $(echo inner); }"
+echo split ${ echo a b c; }
+echo "joined=[${ echo x y z; }]"
