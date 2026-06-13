@@ -233,6 +233,7 @@ GOSH ?= gosh
 
 BENCH := bench/configure.sh
 BENCH_BASH := bench/configure.bash
+BENCH_SHIT := bench/configure.shit
 SCALE ?= 100
 
 # Each shell runs exactly once. The single timed pass redirects its output to a
@@ -265,7 +266,13 @@ bench:
 		printf "  %-10s" "$(BIN)+opt"; ( time SCALE=$$scale $(BIN) $(BENCH_BASH) >"$$sb" 2>/dev/null ) 2>&1; \
 		if cmp "$$bb" "$$sb"; then echo "output matches bash with the optimizer on"; \
 		else echo "output differs from bash:"; diff "$$bb" "$$sb" | head -20; fi; \
-		rm -f "$$d" "$$b" "$$z" "$$g" "$$s" "$$bb" "$$sb"'
+		zb=/tmp/shit_bench_zb; zs=/tmp/shit_bench_zs; \
+		echo "configure.shit, wall-clock seconds at SCALE=$$scale, lower is better:"; \
+		printf "  %-10s" "$(BASH)"; ( time SCALE=$$scale $(BASH) $(BENCH_SHIT) >"$$zb" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(BIN)+opt"; ( time SCALE=$$scale $(BIN) $(BENCH_SHIT) >"$$zs" 2>/dev/null ) 2>&1; \
+		if cmp "$$zb" "$$zs"; then echo "output matches bash with the optimizer on"; \
+		else echo "output differs from bash:"; diff "$$zb" "$$zs" | head -20; fi; \
+		rm -f "$$d" "$$b" "$$z" "$$g" "$$s" "$$bb" "$$sb" "$$zb" "$$zs"'
 
 .PHONY: test clean run_tests refill dashdiff bashdiff mimicrydiff bench \
 		completion_tests completion_refill cli_tests cli_refill
