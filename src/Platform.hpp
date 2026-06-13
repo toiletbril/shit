@@ -456,6 +456,11 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
    command may be handed the terminal's process group. */
 fn shell_has_controlling_terminal() wontthrow -> bool;
 
+/* The fully resolved path with every symlink followed, so completion can read
+   the spec and manpage of what a symlinked command really runs. None when the
+   path cannot be resolved. On Windows it returns the input unchanged. */
+fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
+
 /* Hand the controlling terminal to the given process's group, so it becomes
    the foreground job tmux reports, ignoring SIGTTOU across the change. A no-op
    without a controlling terminal. reclaim_controlling_terminal takes it back

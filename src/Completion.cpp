@@ -615,6 +615,40 @@ static fn command_word_of(StringView line) wontthrow -> StringView
   }
 }
 
+/* The command a spec or manpage lookup reads after following an alias to its
+   first word and a PATH symlink to its target basename, so completing g for a
+   g='git' alias consults git, and a vi that links to nvim reads nvim's
+   options. The alias walk is bounded against a cycle, and a name that
+   resolves to nothing returns unchanged. */
+static fn resolve_completion_command(StringView command,
+                                     EvalContext &context) throws -> String
+{
+  let name = String{command};
+  for (int depth = 0; depth < 8; depth++) {
+    let const expansion = context.get_alias(name.view());
+    if (!expansion.has_value()) break;
+    let const expanded = expansion->view();
+    usize i = 0;
+    while (i < expanded.length && (expanded[i] == ' ' || expanded[i] == '\t'))
+      i++;
+    const usize start = i;
+    while (i < expanded.length && expanded[i] != ' ' && expanded[i] != '\t')
+      i++;
+    let const first = expanded.substring_of_length(start, i - start);
+    if (first.is_empty() || first == name.view()) break;
+    name = String{first};
+  }
+  /* A name holding a slash is a path already, otherwise it is searched on
+     PATH, then the located file's symlinks are followed to the real target. */
+  let const located = utils::search_program_path(name.view());
+  if (!located.is_empty()) {
+    if (let const canonical = os::canonical_path(located.front());
+        canonical.has_value())
+      return String{canonical->filename()};
+  }
+  return name;
+}
+
 /* Split the line into whitespace words for COMP_WORDS, reporting the index of
    the word the cursor sits in. An empty trailing word is appended when the
    cursor is past the last one, so the function reads an empty current word. */
@@ -963,17 +997,22 @@ static fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
    a page. None means the position or the command has no subcommand story and
    the caller falls through to the option, spec, and filesystem stages. */
 static fn complete_from_man_subcommands(StringView line, StringView token,
-                                        usize token_start,
-                                        bool for_listing) throws
+                                        usize token_start, bool for_listing,
+                                        EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
   if (!token.is_empty() && token[0] == '-') return None;
   if (token.find_character('/').has_value()) return None;
   if (!for_listing && token.is_empty()) return None;
   if (!is_first_argument_token(line, token_start)) return None;
-  let const command = command_word_of(line);
-  if (command.is_empty() || command.find_character('/').has_value())
+  const StringView surface_command = command_word_of(line);
+  if (surface_command.is_empty() ||
+      surface_command.find_character('/').has_value())
     return None;
+  /* The subcommands are the resolved target's, so g for a g='git' alias
+     lists git's subcommands. */
+  let const resolved = resolve_completion_command(surface_command, context);
+  const StringView command = resolved.view();
 
   if (!MAN_SUBCOMMAND_INDEX_IS_BUILT ||
       !MAN_VALIDATED_COMMANDS.contains(command))
@@ -1076,9 +1115,15 @@ static fn complete_from_manpage(StringView line, StringView token,
 {
   if (!for_listing) return None;
   if (token.is_empty() || token[0] != '-') return None;
-  const StringView command = command_word_of(line);
-  if (command.is_empty() || command.find_character('/').has_value())
+  const StringView surface_command = command_word_of(line);
+  if (surface_command.is_empty() ||
+      surface_command.find_character('/').has_value())
     return None;
+
+  /* The manpage is the resolved target's, so an aliased or symlinked command
+     reads the options of what it really runs. */
+  let const resolved = resolve_completion_command(surface_command, context);
+  const StringView command = resolved.view();
 
   /* git commit -<tab> reads the git-commit page when the index knows it, the
      general command-subcommand form, so the options come from the subcommand
@@ -1672,7 +1717,16 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
 {
   const StringView command = command_word_of(line);
   if (command.is_empty()) return None;
+  /* The surface name wins when it has a spec of its own, so a complete -F on
+     the exact name still applies. Otherwise the name resolves through an
+     alias and a symlink, so g for a g='git' alias reads git's spec. */
   const completion_spec *spec = context.lookup_completion_spec(command);
+  String resolved_command;
+  if (spec == nullptr) {
+    resolved_command = resolve_completion_command(command, context);
+    if (resolved_command.view() != command)
+      spec = context.lookup_completion_spec(resolved_command.view());
+  }
   LOG(verbosity::All,
       "spec lookup for '%.*s' %s, listing %d, function '%s', %zu word-list "
       "bytes",
@@ -1847,7 +1901,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
           complete_from_builtin_flags(line, token, token_start, context);
     if (!from_stage.has_value() && context.mood() == mimic_mood::Default) {
       from_stage =
-          complete_from_man_subcommands(line, token, token_start, for_listing);
+          complete_from_man_subcommands(line, token, token_start, for_listing,
+                                        context);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, token, for_listing, context);
       if (!from_stage.has_value())

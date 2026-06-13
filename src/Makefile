@@ -35,7 +35,7 @@ OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 DEPS := $(OBJECTS:.o=.d)
 
 # Linker target file.
-ifeq $($(MODE), cosmo)
+ifeq ($(MODE), cosmo)
 OUT := ../shit.com
 else ifeq ($(TARGET), Windows_NT)
 OUT := ../shit.exe

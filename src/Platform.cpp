@@ -560,6 +560,17 @@ fn shell_has_controlling_terminal() wontthrow -> bool
   return isatty(STDIN_FILENO) == 1;
 }
 
+fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
+{
+  /* A null buffer makes realpath allocate one of the right size, freed here
+     after the view is copied into the returned Path. */
+  char *resolved = realpath(path.c_str(), nullptr);
+  if (resolved == nullptr) return None;
+  Path result{StringView{resolved}};
+  free(resolved);
+  return result;
+}
+
 fn give_controlling_terminal_to(process p) wontthrow -> void
 {
   if (!shell_has_controlling_terminal()) return;
@@ -1571,6 +1582,12 @@ fn reopen_terminal_as_stdin() wontthrow -> bool { return false; }
 fn shell_has_controlling_terminal() wontthrow -> bool { return false; }
 fn give_controlling_terminal_to(process p) wontthrow -> void { unused(p); }
 fn reclaim_controlling_terminal() wontthrow -> void {}
+
+/* Windows resolves a path lazily, so completion uses it as given. */
+fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
+{
+  return path.clone();
+}
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {
