@@ -113,10 +113,17 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   target = target.to_absolute().normalized();
 
   if (target.exists()) {
-    /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. An
-       unreadable current directory yields an empty path, so OLDPWD stays as it
-       was. */
-    let const old_directory = Path::current_directory();
+    /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. OLDPWD
+       takes the logical PWD the shell tracked, so a later cd - returns through
+       the same symlinks the path was reached by, the way bash does. An unset or
+       relative PWD falls back to the physical directory, and an unreadable
+       current directory yields an empty path, so OLDPWD stays as it was. */
+    let const logical_pwd = cxt.get_variable_value("PWD");
+    let const old_directory =
+        (logical_pwd.has_value() && !logical_pwd->is_empty() &&
+         logical_pwd->view()[0] == '/')
+            ? Path{logical_pwd->view()}
+            : Path::current_directory();
     /* A path that exists can still refuse the move, a regular file or a
        directory without execute permission among them. dash reports the
        failure, exits non-zero, and leaves PWD and OLDPWD untouched, so the
