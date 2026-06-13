@@ -437,8 +437,8 @@ cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
   return child_pid;
 }
 
-hot fn execute_program(ExecContext &&ec, bool allow_script_fallback) throws
-    -> process
+hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
+                       bool new_process_group) throws -> process
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
@@ -519,8 +519,16 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback) throws
   sigaddset(&default_signals, SIGCHLD);
   posix_spawnattr_setsigdefault(&attr, &default_signals);
 
-  posix_spawnattr_setflags(&attr,
-                           POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+  short spawn_flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+  /* A foreground interactive command runs in its own process group so it can
+     own the controlling terminal. pgid zero makes the child its own group
+     leader, the pgid then equal to its pid, which the caller hands the
+     terminal to. */
+  if (new_process_group) {
+    posix_spawnattr_setpgroup(&attr, 0);
+    spawn_flags |= POSIX_SPAWN_SETPGROUP;
+  }
+  posix_spawnattr_setflags(&attr, spawn_flags);
 
   pid_t child_pid = 0;
   /* The shell environment is passed as envp, so a prefix assignment the parent
@@ -545,6 +553,31 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback) throws
     return spawn_failure_child(ec.program_path(), spawn_error);
 
   return child_pid;
+}
+
+fn shell_has_controlling_terminal() wontthrow -> bool
+{
+  return isatty(STDIN_FILENO) == 1;
+}
+
+fn give_controlling_terminal_to(process p) wontthrow -> void
+{
+  if (!shell_has_controlling_terminal()) return;
+  /* The shell is the current foreground group, so handing the terminal away
+     would raise SIGTTOU on this write. It is ignored across the change and
+     the previous disposition restored. A failed tcsetpgrp, such as a child
+     that already exited, is left alone since the shell reclaims next. */
+  void (*const previous)(int) = signal(SIGTTOU, SIG_IGN);
+  tcsetpgrp(STDIN_FILENO, p);
+  signal(SIGTTOU, previous);
+}
+
+fn reclaim_controlling_terminal() wontthrow -> void
+{
+  if (!shell_has_controlling_terminal()) return;
+  void (*const previous)(int) = signal(SIGTTOU, SIG_IGN);
+  tcsetpgrp(STDIN_FILENO, getpgrp());
+  signal(SIGTTOU, previous);
 }
 
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
@@ -1532,6 +1565,13 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
    failure and the caller keeps its error path. */
 fn reopen_terminal_as_stdin() wontthrow -> bool { return false; }
 
+/* Windows has no POSIX process groups, so the terminal handoff that names the
+   tmux window after the running program is a no-op and the console keeps its
+   own job tracking. */
+fn shell_has_controlling_terminal() wontthrow -> bool { return false; }
+fn give_controlling_terminal_to(process p) wontthrow -> void { unused(p); }
+fn reclaim_controlling_terminal() wontthrow -> void {}
+
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
 {
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
@@ -1698,11 +1738,14 @@ fn environment_names() -> ArrayList<String>
   return names;
 }
 
-fn execute_program(ExecContext &&ec, bool allow_script_fallback) -> process
+fn execute_program(ExecContext &&ec, bool allow_script_fallback,
+                   bool new_process_group) -> process
 {
   /* Windows has no ENOEXEC interpreter convention, so the script fallback the
-     POSIX path offers does not apply here. */
+     POSIX path offers does not apply here, and no POSIX process groups, so the
+     terminal handoff is a no-op below. */
   unused(allow_script_fallback);
+  unused(new_process_group);
 
   LOG(verbosity::Debug, "spawning '%s' with %zu arguments",
       ec.program_path().c_str(), ec.args().count());

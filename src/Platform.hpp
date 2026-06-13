@@ -445,9 +445,23 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 /* allow_script_fallback lets a single foreground command report an ENOEXEC file
    to the caller through ExecFormatError, so the caller runs it as a shell
    script in place. A pipeline stage or a background command leaves it false and
-   an unrunnable file fails the stage at runtime instead. */
-fn execute_program(ExecContext &&ec, bool allow_script_fallback = false) throws
-    -> process;
+   an unrunnable file fails the stage at runtime instead. new_process_group puts
+   the child in its own process group so an interactive foreground command can
+   own the controlling terminal, which is what tmux reads to name the window
+   after the running program. */
+fn execute_program(ExecContext &&ec, bool allow_script_fallback = false,
+                   bool new_process_group = false) throws -> process;
+
+/* Whether standard input is the shell's controlling terminal, so a foreground
+   command may be handed the terminal's process group. */
+fn shell_has_controlling_terminal() wontthrow -> bool;
+
+/* Hand the controlling terminal to the given process's group, so it becomes
+   the foreground job tmux reports, ignoring SIGTTOU across the change. A no-op
+   without a controlling terminal. reclaim_controlling_terminal takes it back
+   for the shell's own group when the command finishes. */
+fn give_controlling_terminal_to(process p) wontthrow -> void;
+fn reclaim_controlling_terminal() wontthrow -> void;
 
 /* Fork a child for a compound command used as a pipeline stage. In the child it
    places the pipe ends onto the standard descriptors, resets the signal

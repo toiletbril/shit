@@ -121,9 +121,19 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     LOG(verbosity::Debug, "spawning the external command '%s'%s",
         ec.program().c_str(), is_async ? " in the background" : "");
 
+    /* An interactive foreground command runs in its own process group and is
+       handed the controlling terminal, so it dies on its own Ctrl-C and tmux
+       names the window after it rather than after the shell. A background
+       command, a non-interactive run, or a pipeline keeps the shell's group.
+     */
+    const bool is_foreground_job =
+        !is_async && cxt.shell_is_interactive() &&
+        os::shell_has_controlling_terminal();
+
     os::process p = SHIT_INVALID_PROCESS;
     try {
-      p = os::execute_program(steal(ec), !is_async);
+      p = os::execute_program(steal(ec), !is_async,
+                              /*new_process_group=*/is_foreground_job);
     } catch (const ExecFormatError &) {
       LOG(verbosity::Debug, "swallowed an exec format error, running the "
                             "file as a shell script in this process");
@@ -147,7 +157,10 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     }
 
     LOG(verbosity::Debug, "waiting for the foreground child to finish");
-    return os::wait_and_monitor_process(p);
+    if (is_foreground_job) os::give_controlling_terminal_to(p);
+    const i32 foreground_status = os::wait_and_monitor_process(p);
+    if (is_foreground_job) os::reclaim_controlling_terminal();
+    return foreground_status;
   }
 
   LOG(verbosity::Debug, "dispatching the builtin '%s'", ec.program().c_str());

@@ -29,13 +29,15 @@ endif
 endif
 endif
 
-OBJ_DIR := o/$(MODE)-$(TARGET)
+OBJ_DIR := o/$(TARGET)/$(MODE)
 
 OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 DEPS := $(OBJECTS:.o=.d)
 
 # Linker target file.
-ifeq ($(TARGET), Windows_NT)
+ifeq $($(MODE), cosmo)
+OUT := ../shit.com
+else ifeq ($(TARGET), Windows_NT)
 OUT := ../shit.exe
 else
 OUT := ../shit
