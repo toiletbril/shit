@@ -1,5 +1,7 @@
 # make MODE=dbg/rel/prof/cosmo/cosmo_dbg
 MODE ?= dbg
+TARGET ?= # Linux/Windows_NT/TODO: Darwin
+ARCH ?= $(shell uname -m) # TODO: arm64/x86_64
 
 SOURCES := $(wildcard *.cpp)
 HEADERS := $(wildcard *.hpp)
@@ -9,55 +11,44 @@ DIRS := $(wildcard */.)
 SOURCES += $(wildcard */**.cpp)
 HEADERS += $(wildcard */**.hpp)
 
-# Translate a list of <...>.cpp files to a list of paths like
-# o/$MODE/<...>.o.
-# The mingw cross objects go in a separate tree so a Windows build does not
-# clobber the POSIX objects that share the same MODE, and the reverse.
-ifeq ($(WIN), 1)
-OBJ_DIR := o/$(MODE)-win
+# Windows_NT/Linux/Darwin
+ifeq ($(TARGET),)
+ifeq ($(OS), Windows_NT)
+TARGET := Windows_NT
 else
-OBJ_DIR := o/$(MODE)
+TARGET := $(shell uname -s)
 endif
+endif
+
+# Validate TARGET
+ifneq ($(TARGET), Linux)
+ifneq ($(TARGET), Windows_NT)
+ifneq ($(TARGET), Darwin)
+$(error Unknown target: $(TARGET))
+endif
+endif
+endif
+
+OBJ_DIR := o/$(MODE)-$(TARGET)
 
 OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
-# One dependency file per object, written by the compiler, so a header edit
-# rebuilds every source that includes it.
 DEPS := $(OBJECTS:.o=.d)
 
-# TARGET_WINDOWS is set for a native Windows build and for a mingw cross-compile
-# from a POSIX host with WIN=1, so the compile and link flags target Windows
-# while the host-side build commands keep the POSIX shell and /dev/null.
-TARGET_WINDOWS :=
-ifeq ($(OS), Windows_NT)
-TARGET_WINDOWS := 1
-endif
-ifeq ($(WIN), 1)
-TARGET_WINDOWS := 1
-endif
-
-ifneq ($(TARGET_WINDOWS), 1)
-UNAME_S := $(shell uname -s)
-TARGET_MACOS :=
-ifeq ($(UNAME_S), Darwin)
-  TARGET_MACOS := 1
-else
-all:
-	$(error Unable to decipher your OS)
-endif
-endif
-
-ifeq ($(TARGET_WINDOWS), 1)
+# Linker target file.
+ifeq ($(TARGET), Windows_NT)
 OUT := ../shit.exe
 else
 OUT := ../shit
 endif
 
+# /dev/null
 ifeq ($(OS), Windows_NT)
 DEVNULL := "NUL"
 else
 DEVNULL := "/dev/null"
 endif
 
+# Cosmopolitan/Clang.
 ifeq ($(MODE), cosmo)
 CXX := cosmoc++
 else ifeq ($(MODE), cosmo_dbg)
@@ -66,8 +57,17 @@ else ifeq ($(OS), Windows_NT)
 CXX := clang++
 endif
 
-ifeq ($(WIN), 1)
+# If we're cross-compiling, use MingW.
+ifeq ($(TARGET), Windows_NT)
+ifneq ($(OS), Windows_NT)
 CXX := x86_64-w64-mingw32-g++
+endif
+endif
+
+ifeq ($(TARGET), Darwin)
+ifneq ($(UNAME_S), Darwin)
+$(error cross-compiling to macOS is not supported yet)
+endif
 endif
 
 ifeq ($(MODE), cosmo)
@@ -82,7 +82,7 @@ COMMIT_HASH := $(shell git rev-parse HEAD || echo "<no git>")
 
 # Remember CXXFLAGS passed to us from CLI.
 ENVCXXFLAGS := $(CXXFLAGS)
-override undefine CXXFLAGS
+CXXFLAGS := # nothing
 
 DEFINES := \
 	-DSHIT_COMPILER_COMMAND="\"$(CXX)\"" \
@@ -111,16 +111,10 @@ CXXFLAGS := \
 	$(DEFINES) \
 	$(ENVCXXFLAGS)
 
-# Libraries that must trail the objects on the link line, so a symbol an object
-# needs is still unresolved when the linker reaches the archive. libsupc++ backs
-# the exception runtime and operator new under -nostdlib++, and libpthread backs
-# the command-substitution drain thread.
 LINK_LIBS :=
 
 # Speed up the linking a bit.
-ifeq ($(TARGET_WINDOWS), 1)
-USE_LD :=
-else ifneq ($(shell which mold > $(DEVNULL) 2>&1),)
+ifneq ($(shell which mold > $(DEVNULL) 2>&1),)
 USE_LD := -fuse-ld=mold
 else ifneq ($(shell which lld > $(DEVNULL) 2>&1),)
 USE_LD := -fuse-ld=lld
@@ -128,42 +122,37 @@ else
 USE_LD :=
 endif
 
+# MODE=rel
 ifeq ($(MODE), rel)
 CXXFLAGS += \
 	-s \
 	-DNDEBUG \
-	-flto \
-	-static-pie \
-	-O0
-ifneq ($(TARGET_WINDOWS), 1)
-ifneq ($(TARGET_MACOS), 1)
-# Linux
+	-flto
+ifneq ($(TARGET), Windows_NT)
+# TODO: windows optimization fucks up the RAM.
 CXXFLAGS += \
-	-O3 \
+	-static-pie \
+	-O3
+endif
+ifeq ($(TARGET), Linux)
+CXXFLAGS += \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif
-else ifeq ($(TARGET_MACOS), 1)
-# MacOS
-CXXFLAGS += \
-	-O3
-else
-# Sindows
-CXXFLAGS += \
-	-O0
-endif
+# MODE=dbg
 else ifeq ($(MODE), dbg)
 CXXFLAGS += \
 	-fno-omit-frame-pointer \
 	-g3 \
 	-O0
-ifneq ($(TARGET_WINDOWS), 1)
+ifneq ($(TARGET), Windows_NT)
 ifneq ($(MODE), cosmo)
 CXXFLAGS += \
 	-fsanitize=address \
 	-fsanitize=undefined
 endif
 endif
+# MODE=cosmo
 else ifeq ($(MODE), cosmo)
 CXXFLAGS += \
 	-mcosmo \
@@ -175,6 +164,7 @@ CXXFLAGS += \
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo)
 endif
+# MODE=cosmo_dbg
 else ifeq ($(MODE), cosmo_dbg)
 CXXFLAGS += \
 	-mcosmo \
@@ -184,34 +174,27 @@ CXXFLAGS += \
 ifneq ($(CXX), cosmoc++)
 $(error Your CXX is "$(CXX)" instead of "cosmoc++" for MODE=cosmo_dbg)
 endif
+# MODE=prof
 else ifeq ($(MODE), prof)
-# Optimized like rel, but keep frame pointers and symbols so a profiler can
-# unwind, and drop the line editor so the terminal handling does not perturb
-# the measurement.
 CXXFLAGS += \
 	-g3 \
 	-DNDEBUG \
 	-DSHIT_NO_TOILETLINE \
 	-fno-omit-frame-pointer \
-	-O3
-# The same static link and libstdc++ drop as rel, so a profile measures the
-# shipped binary and the static link lets the profiled binary run in a container
-# whose glibc is older than the host's. Link-time optimization joins this block
-# so the Windows cross path skips its tens-of-gigabytes whole-program pass.
-ifneq ($(TARGET_WINDOWS), 1)
-CXXFLAGS += \
 	-flto \
+	-O3
+ifneq ($(TARGET), Windows_NT)
+# TODO: windows optimization fucks up the RAM.
+CXXFLAGS += \
 	-static-pie \
+	-O3
+endif
+ifeq ($(TARGET), Linux)
+CXXFLAGS += \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif
 else ifeq ($(MODE), cov)
-# Mirror prof, but instrument for clang source-based coverage instead of a
-# sampling profiler. Build at -O0 and without LTO so a coverage region maps to a
-# single source branch, and keep -DNDEBUG so a compiled-out assert does not read
-# as a permanently uncovered branch. Unlike prof the line editor stays in, since
-# coverage has no timing to perturb and the editor backs the UTF-8 width logic
-# the error caret uses, so the suite reproduces the golden output and passes.
 CXXFLAGS += \
 	-g3 \
 	-DNDEBUG \
@@ -219,37 +202,33 @@ CXXFLAGS += \
 	-O0 \
 	-fprofile-instr-generate \
 	-fcoverage-mapping
-ifneq ($(TARGET_WINDOWS), 1)
+ifneq ($(TARGET), Windows_NT)
 CXXFLAGS += \
+	-static-pie \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif
 else
-$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cov", "cosmo")
+$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cov", "cosmo", "cosmo_dbg")
 endif
 
 # The command-substitution drain runs on a pthread, so every POSIX build links
 # libpthread. Native Windows clang has no libpthread and uses the Win32 thread
 # API instead, so the flag stays off there.
-ifneq ($(TARGET_WINDOWS), 1)
+ifneq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-pthread
 LINK_LIBS += -lpthread
 endif
 
 # Missing Windows libraries.
-ifeq ($(TARGET_WINDOWS), 1)
+ifeq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-luserenv \
 	-ladvapi32
 endif
 
-# g++ on the mingw cross path does not know the clang loop pragmas the
-# containers carry, so the unknown-pragma warning is silenced for that build.
-# The mingw runtime is linked statically so the .exe carries libgcc and
-# libstdc++ rather than depending on libgcc_s_seh-1.dll and libstdc++-6.dll at
-# run time, which keeps it a single standalone binary the way the POSIX build is.
-ifeq ($(WIN), 1)
+ifeq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-Wno-unknown-pragmas \
 	-static \
@@ -257,10 +236,6 @@ CXXFLAGS += \
 	-static-libstdc++
 endif
 
-# Making objects in o/$MODE/<...>.o. -MMD writes the header dependency
-# list next to each object, and -MP guards against a removed header. The
-# Makefile is a prerequisite so a change to the flags, such as the link mode,
-# forces a recompile rather than relinking stale objects built with old flags.
 $(OBJ_DIR)/%.o: %.cpp Makefile
 	printf "\t%-42s $@\n" $<
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $(CWD)$@
@@ -307,6 +282,4 @@ clean:
 
 .PHONY: dirs shit install tidy fmt clean
 
-# Pull in the generated header dependencies. Missing on the first build, which
-# is fine since every object is compiled then anyway.
 -include $(DEPS)
