@@ -1,0 +1,9 @@
+# A command that expands to nothing takes the status of the last command
+# substitution it ran, the way bash does, so a bare $(false) or ${ false; }
+# reports the failure while a plain assignment line resets to zero.
+$(false); echo "bare_csub=$?"
+${ false; }; echo "bare_funsub=$?"
+true; $(false); echo "vanished_word=$?"
+a=$(true) b=$(false); echo "last_assign=$?"
+a=$(false) b=$(true); echo "last_assign2=$?"
+a=1 b=2; echo "plain_assign=$?"

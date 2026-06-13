@@ -1447,8 +1447,32 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       cxt.assign_indexed_array_elements(assignment.name, steal(values),
                                         assignment.is_append);
     }
-    cxt.set_last_exit_status(0);
-    return 0;
+    /* A command word or an assignment value that ran a command substitution
+       leaves the status of the last one, the way bash reports $(false) on its
+       own line as 1 and a=$(false) b=$(true) as 0. A line with no
+       substitution, a bare redirection or a plain assignment, resets to 0. */
+    auto word_ran_substitution = [](const Word &word) {
+      for (const WordSegment &segment : word.segments)
+        if (segment.kind == WordSegment::Kind::CommandSubstitution ||
+            segment.kind == WordSegment::Kind::FunctionSubstitution)
+          return true;
+      return false;
+    };
+    auto token_ran_substitution = [&](const Token *token) {
+      if (token == nullptr || token->kind() != Token::Kind::Word) return false;
+      return word_ran_substitution(
+          static_cast<const tokens::WordToken *>(token)->word());
+    };
+    bool ran_substitution = false;
+    for (const Token *token : m_args)
+      ran_substitution = ran_substitution || token_ran_substitution(token);
+    for (const prefix_assignment &var : m_local_vars)
+      ran_substitution = ran_substitution || word_ran_substitution(var.value);
+    for (const array_builtin_assignment &assignment : m_array_args)
+      for (const Token *token : assignment.elements)
+        ran_substitution = ran_substitution || token_ran_substitution(token);
+    if (!ran_substitution) cxt.set_last_exit_status(0);
+    return cxt.last_exit_status();
   }
 
   /* A prefix assignment before a special builtin persists after the command as

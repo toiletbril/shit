@@ -1,0 +1,110 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "$(false)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bare_csub=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "${ false;  }"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "bare_funsub=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "$(false)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "vanished_word=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "last_assign=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "last_assign2=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "plain_assign=$?"]
+[Word
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "bare_csub="
+  Variable "?"
+]
+[Word
+  FunctionSubstitution "false; "
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "bare_funsub="
+  Variable "?"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "vanished_word="
+  Variable "?"
+]
+[Word
+  Unquoted "a="
+  CommandSubstitution "true"
+]
+[Word
+  Unquoted "b="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "last_assign="
+  Variable "?"
+]
+[Word
+  Unquoted "a="
+  CommandSubstitution "false"
+]
+[Word
+  Unquoted "b="
+  CommandSubstitution "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "last_assign2="
+  Variable "?"
+]
+[Word
+  Unquoted "a=1"
+]
+[Word
+  Unquoted "b=2"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "plain_assign="
+  Variable "?"
+]
+bare_csub=1
+bare_funsub=1
+vanished_word=1
+last_assign=1
+last_assign2=0
+plain_assign=0
+[Code 0]
