@@ -1423,6 +1423,10 @@ static fn complete_from_build_tools(StringView line, StringView token,
     }
     let makefile_path = Path{directory.view()};
     makefile_path.push_component(makefile_name->view());
+    /* A -f naming a file that does not exist, or any path that vanished
+       between the probe and now, completes to nothing rather than running
+       make against a missing file. */
+    if (!makefile_path.exists()) return None;
     targets = cached_targets_for(makefile_path, [&]() throws {
       let invocation = String{"make -C "};
       invocation += directory.view();

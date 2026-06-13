@@ -392,9 +392,17 @@ static fn run_script_contents(const String &script_contents,
     /* An interactive -W chunk runs right away and the runtime resolution
        reports a missing command itself, so the analysis copy of that report
        stays quiet to avoid the doubled error at the prompt. */
+    /* The names already set in the shell or the environment seed the
+       prepass, so a function-body assignment to an existing name such as an
+       inherited PATH reads as an update and the no-local warning stays
+       quiet. */
+    shit::HashSet predefined_variables = context.variable_names();
+    for (const shit::String &name : shit::os::environment_names())
+      predefined_variables.add(name.view());
     if (run_analysis &&
         !analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), FLAG_WARNINGS.is_enabled(),
+                     context.alias_names(), predefined_variables,
+                     FLAG_WARNINGS.is_enabled(),
                      FLAG_WARNINGS.is_enabled() &&
                          context.shell_is_interactive()))
     {
@@ -599,12 +607,23 @@ fn main(int argc, char **argv) -> int
   {
     let const view = shit_flags->view();
     usize token_start = 0;
+    /* A -c in SHIT_FLAGS would splice a command string into every invocation,
+       which the variable is not for, so the -c token and the command word
+       after it are dropped while a real command-line -c stays untouched. */
+    bool skip_next_command_word = false;
     for (usize i = 0; i <= view.length; i++) {
       let const c = i < view.length ? view[i] : ' ';
       if (c == ' ' || c == '\t' || c == '\n') {
-        if (i > token_start)
-          shit_flags_tokens.push(shit::String{
-              view.substring_of_length(token_start, i - token_start)});
+        if (i > token_start) {
+          let const token = view.substring_of_length(token_start, i - token_start);
+          if (skip_next_command_word) {
+            skip_next_command_word = false;
+          } else if (token == "-c") {
+            skip_next_command_word = true;
+          } else {
+            shit_flags_tokens.push(shit::String{token});
+          }
+        }
         token_start = i + 1;
       }
     }

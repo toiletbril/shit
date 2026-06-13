@@ -323,7 +323,7 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool errors_are_warnings,
+               const HashSet &predefined_variables, bool errors_are_warnings,
                bool silence_unresolved_commands) throws -> bool
 {
   ASSERT(root != nullptr);
@@ -369,6 +369,12 @@ fn analyze_ast(const Expression *root, StringView source,
       [&actx](StringView name) { actx.defined_functions.add(name); });
   known_aliases.for_each(
       [&actx](StringView name) { actx.known_aliases.add(name); });
+  /* A variable already set in the shell or the environment is one a
+     function-body assignment updates rather than newly leaks, so seeding it
+     here keeps the no-local warning quiet for an inherited name such as
+     PATH that /etc/profile rewrites inside a function. */
+  predefined_variables.for_each(
+      [&actx](StringView name) { actx.global_assigned_names.add(name); });
 
   root->analyze(actx, true);
 
@@ -543,15 +549,24 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
   /* A plain scalar assignment inside a function body with no prior local for
      the name leaks the value to the global scope, the footgun shit's own
      default mood guards against at run time. The append form is left alone
-     since it extends a value the name already holds. This is the shellcheck
-     SC2030-style warning for a leaked variable. */
+     since it extends a value the name already holds. A name already assigned
+     at the top level is an update of that global, not a new leaking binding,
+     so the warning stays quiet for it. This is the shellcheck SC2030-style
+     warning for a leaked variable. */
   if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
-      !actx.function_local_names.contains(name.view()))
+      !actx.function_local_names.contains(name.view()) &&
+      !actx.global_assigned_names.contains(name.view()))
     actx.warn(source_location(),
               StringView{"This assignment to '"} + name +
                   "' in a function has no local, so the value leaks to the "
                   "global scope, declare it with local to keep it inside the "
                   "function");
+
+  /* An unconditional top-level assignment records the name as an existing
+     global, so a later function-body assignment to it reads as an update. */
+  if (actx.function_scope_depth == 0 && is_unconditional &&
+      !actx.saw_runtime_definer)
+    actx.global_assigned_names.add(name.view());
 
   /* A conditional or nested assignment may not run, and a runtime definer such
      as eval or dot may already have changed the name out of view, so neither

@@ -64,6 +64,12 @@ public:
    */
   HashSet function_local_names{heap_allocator()};
 
+  /* The names assigned unconditionally at the top level before any function
+     body, so an assignment to one of them inside a function updates an
+     existing global rather than leaking a new binding, and the no-local
+     warning stays quiet for it. */
+  HashSet global_assigned_names{heap_allocator()};
+
   /* True when the script's shebang names a POSIX shell, sh or dash, so a
      bashism in the body would break under the shell the file asks for. The
      SC3xxx bashism lints fire only behind this gate, since a script with a
@@ -87,7 +93,7 @@ public:
    an unconditional command failed to resolve. */
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
-               bool errors_are_warnings,
+               const HashSet &predefined_variables, bool errors_are_warnings,
                bool silence_unresolved_commands) throws -> bool;
 
 class Expression
