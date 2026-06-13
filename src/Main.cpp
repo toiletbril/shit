@@ -473,6 +473,32 @@ static fn run_script_contents(const String &script_contents,
   return exit_code;
 }
 
+/* Run the PROMPT_COMMAND hook before a primary prompt is drawn, the bash
+   mechanism a prompt framework such as starship uses to recompute PS1 on every
+   prompt. The hook reads the exit status of the last command in $?, so the
+   saved status and the measured command duration are restored after it runs,
+   which keeps the prompt escapes and the next command reading the real values
+   rather than the ones the hook left behind. An empty or unset PROMPT_COMMAND
+   runs nothing. */
+static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena)
+    -> void
+{
+  Maybe<String> command = context.get_variable_value("PROMPT_COMMAND");
+  if (!command.has_value() || command->is_empty()) return;
+
+  LOG(verbosity::Info, "running the PROMPT_COMMAND hook, %zu bytes",
+      command->count());
+
+  const i32 saved_exit_status = context.last_exit_status();
+  const u64 saved_command_duration_ns = context.last_command_duration_ns();
+
+  run_script_contents(*command, context, ast_arena,
+                      StringView{"PROMPT_COMMAND"});
+
+  context.set_last_exit_status(saved_exit_status);
+  context.set_last_command_duration_ns(saved_command_duration_ns);
+}
+
 /* Read a whole file and run it in the given context. A missing file is not an
    error, since a login shell sources profiles that may not exist. Returns
    whether the file existed and ran, so a caller that wants the first existing
@@ -1230,6 +1256,11 @@ fn main(int argc, char **argv) -> int
            ran, the way bash prints a Done line before the next prompt. This is
            the interactive branch, so a script never reaches it. */
         context.notify_done_jobs();
+
+        /* Run the PROMPT_COMMAND hook before the template is expanded, so a
+           framework that assigns PS1 inside the hook has its assignment in
+           place by the time the prompt is built. */
+        run_prompt_command(context, ast_arena);
 
         shit::String prompt = toiletline::build_prompt(context);
 
