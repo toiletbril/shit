@@ -83,6 +83,15 @@ fn take_pending_signal() wontthrow -> i32
 } /* namespace os */
 } /* namespace shit */
 
+/* The file creation mask call differs only by the name and the argument type
+   across the platforms, so the shared mask functions at the end of the file
+   reach the platform call through this one macro. */
+#if SHIT_PLATFORM_IS WIN32
+#define SHIT_UMASK(mask) _umask(static_cast<int>(mask))
+#else
+#define SHIT_UMASK(mask) umask(static_cast<mode_t>(mask))
+#endif
+
 #if SHIT_PLATFORM_IS POSIX
 
 namespace shit {
@@ -342,10 +351,6 @@ static const pid_t PARENT_SHELL_PID = getpid();
 
 fn is_child_process() wontthrow -> bool { return getpid() != PARENT_SHELL_PID; }
 
-fn get_shell_process_id() wontthrow -> i64
-{
-  return static_cast<i64>(PARENT_SHELL_PID);
-}
 
 fn is_running_setuid() wontthrow -> bool
 {
@@ -984,18 +989,6 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   return fd;
 }
 
-fn get_file_creation_mask() wontthrow -> u32
-{
-  /* umask only reads through a set, so the old value is read and put back. */
-  const mode_t old = umask(0);
-  umask(old);
-  return static_cast<u32>(old);
-}
-
-fn set_file_creation_mask(u32 mask) wontthrow -> void
-{
-  umask(static_cast<mode_t>(mask));
-}
 
 fn wait_and_monitor_process(process pid) throws -> i32
 {
@@ -1819,10 +1812,6 @@ fn is_child_process() wontthrow -> bool
   return GetCurrentProcessId() != PARENT_SHELL_PID;
 }
 
-fn get_shell_process_id() wontthrow -> i64
-{
-  return static_cast<i64>(PARENT_SHELL_PID);
-}
 
 /* Windows has no setuid or setgid notion, so the shell is never privileged in
    this sense and always reads its config. */
@@ -2258,17 +2247,6 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   return handle;
 }
 
-fn get_file_creation_mask() wontthrow -> u32
-{
-  int old = _umask(0);
-  _umask(old);
-  return static_cast<u32>(old);
-}
-
-fn set_file_creation_mask(u32 mask) wontthrow -> void
-{
-  _umask(static_cast<int>(mask));
-}
 
 fn wait_and_monitor_process(process p) -> i32
 {
@@ -2716,3 +2694,27 @@ fn erase_extension_and_get_its_index(String &program_name) -> ext_index
 } /* namespace shit */
 
 #endif /* COSMO || WIN32 */
+
+/* The platform blocks above set PARENT_SHELL_PID and pull in the headers each
+   platform needs. These functions read the same way on every platform, so they
+   live once here rather than once per block. */
+namespace shit {
+namespace os {
+
+fn get_shell_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(PARENT_SHELL_PID);
+}
+
+fn get_file_creation_mask() wontthrow -> u32
+{
+  /* umask only reads through a set, so the old value is read and put back. */
+  let const old = SHIT_UMASK(0);
+  SHIT_UMASK(static_cast<u32>(old));
+  return static_cast<u32>(old);
+}
+
+fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }
+
+} /* namespace os */
+} /* namespace shit */
