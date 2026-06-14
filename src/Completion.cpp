@@ -690,10 +690,18 @@ static fn split_completion_words(StringView line, usize cursor,
   return words;
 }
 
-/* The option flags parsed out of a manpage, cached per command so a second
-   tab on the same command pays no man fork. An empty list is cached too, so a
-   command with no manpage or no options is not retried. */
-static StringMap<ArrayList<String>> MANPAGE_OPTION_CACHE{heap_allocator()};
+/* A name a man page or a --help text lists with the description printed beside
+   it. The completion menu shows the description dimmed after the name. */
+struct help_entry
+{
+  String name;
+  String description;
+};
+
+/* The options parsed out of a manpage with their descriptions, cached per
+   command so a second tab on the same command pays no man fork. An empty list
+   is cached too, so a command with no manpage or no options is not retried. */
+static StringMap<ArrayList<help_entry>> MANPAGE_OPTION_CACHE{heap_allocator()};
 
 /* The shared-manpage aliases, the only commands whose options live under a
    different page name. A general scan of `man COMMAND` covers every other
@@ -1036,11 +1044,39 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
   return matches;
 }
 
-/* Strips man's overstrike formatting, a bold byte renders as byte backspace
-   byte and an underline as underscore backspace char, then pulls every -x and
-   --long flag out of the cleaned text. The flags are deduplicated and returned
-   in source order. */
-static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
+/* Pulls each dash-word out of an option line's tag part, such as -a and --all
+   from `-a, --all`, dropping a trailing =VALUE so the bare flag completes. */
+static fn manpage_tag_flags(StringView option_part) throws -> ArrayList<String>
+{
+  let flags = ArrayList<String>{};
+  usize k = 0;
+  while (k < option_part.length) {
+    while (k < option_part.length &&
+           (option_part[k] == ' ' || option_part[k] == ',' ||
+            option_part[k] == '\t'))
+      k++;
+    const usize token_start = k;
+    while (k < option_part.length && option_part[k] != ' ' &&
+           option_part[k] != ',' && option_part[k] != '\t')
+      k++;
+    StringView flag = option_part.substring_of_length(token_start,
+                                                      k - token_start);
+    if (let const equals = flag.find_character('='); equals.has_value())
+      flag = flag.substring_of_length(0, *equals);
+    if (flag.length >= 2 && flag[0] == '-') flags.push(String{flag});
+  }
+  return flags;
+}
+
+/* The options a command's manpage documents, each paired with the description
+   in its .TP block. The flag set is the same word scan as before, every -x and
+   --long at a word boundary, so the candidate list is unchanged, while a
+   line-oriented pass over the page records the description that sits inline
+   after the tag or on the indented line below it. man's overstrike formatting,
+   a byte backspace byte for bold and an underscore backspace char for an
+   underline, is stripped first. */
+static fn parse_manpage_option_entries(StringView text) throws
+    -> ArrayList<help_entry>
 {
   let clean = String{};
   for (usize i = 0; i < text.length; i++) {
@@ -1050,37 +1086,105 @@ static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
     }
     clean += text[i];
   }
-
-  let options = ArrayList<String>{};
-  let seen = HashSet{heap_allocator()};
   const StringView view = clean.view();
-  for (usize i = 0; i < view.length; i++) {
-    /* A flag starts at a dash that opens a word, so a hyphen inside a word or
-       a numeric range is not mistaken for an option. */
-    const bool at_word_start = i == 0 || view[i - 1] == ' ' ||
-                               view[i - 1] == '\t' || view[i - 1] == '\n' ||
-                               view[i - 1] == '(' || view[i - 1] == '[';
-    if (view[i] != '-' || !at_word_start) continue;
-    usize end = i;
+
+  /* The description for each flag, read from the .TP option blocks. */
+  let descriptions = StringMap<String>{heap_allocator()};
+  let pending_flags = ArrayList<String>{};
+  usize pending_indent = 0;
+  usize i = 0;
+  while (i < view.length) {
+    usize line_end = i;
+    while (line_end < view.length && view[line_end] != '\n') line_end++;
+    const StringView raw = view.substring_of_length(i, line_end - i);
+    i = line_end + 1;
+
+    usize indent = 0;
+    while (indent < raw.length && (raw[indent] == ' ' || raw[indent] == '\t'))
+      indent++;
+    if (indent >= raw.length) {
+      pending_flags.clear();
+      continue;
+    }
+
+    /* The first indented text line below a tag that carried no inline
+       description is that tag's description. */
+    if (!pending_flags.is_empty() && indent > pending_indent &&
+        raw[indent] != '-')
+    {
+      usize trim_end = raw.length;
+      while (trim_end > indent &&
+             (raw[trim_end - 1] == ' ' || raw[trim_end - 1] == '\t'))
+        trim_end--;
+      const StringView description =
+          raw.substring_of_length(indent, trim_end - indent);
+      for (const String &flag : pending_flags)
+        if (descriptions.find(flag.view()) == nullptr)
+          descriptions.set(flag.view(), String{description});
+      pending_flags.clear();
+      continue;
+    }
+    pending_flags.clear();
+
+    if (raw[indent] != '-') continue;
+
+    usize gap = raw.length;
+    for (usize j = indent; j + 1 < raw.length; j++)
+      if (raw[j] == ' ' && raw[j + 1] == ' ') {
+        gap = j;
+        break;
+      }
+    const StringView option_part = raw.substring_of_length(indent, gap - indent);
+    let line_flags = manpage_tag_flags(option_part);
+
+    if (gap < raw.length) {
+      usize d = gap;
+      while (d < raw.length && (raw[d] == ' ' || raw[d] == '\t')) d++;
+      usize d_end = raw.length;
+      while (d_end > d && (raw[d_end - 1] == ' ' || raw[d_end - 1] == '\t'))
+        d_end--;
+      const StringView inline_description = raw.substring_of_length(d, d_end - d);
+      for (const String &flag : line_flags)
+        if (descriptions.find(flag.view()) == nullptr)
+          descriptions.set(flag.view(), String{inline_description});
+    } else {
+      pending_flags = steal(line_flags);
+      pending_indent = indent;
+    }
+  }
+
+  /* The authoritative flag list is the word scan, so the candidate set matches
+     the prior behavior, with the description attached where the block pass
+     found one. */
+  let entries = ArrayList<help_entry>{};
+  let seen = HashSet{heap_allocator()};
+  for (usize j = 0; j < view.length; j++) {
+    const bool at_word_start = j == 0 || view[j - 1] == ' ' ||
+                               view[j - 1] == '\t' || view[j - 1] == '\n' ||
+                               view[j - 1] == '(' || view[j - 1] == '[';
+    if (view[j] != '-' || !at_word_start) continue;
+    usize end = j;
     while (end < view.length &&
            (view[end] == '-' || lexer::is_variable_name(view[end])))
       end++;
-    const StringView flag = view.substring_of_length(i, end - i);
-    /* A lone dash and an all-digit run after the dashes are not options. */
+    const StringView flag = view.substring_of_length(j, end - j);
     bool has_letter = false;
-    for (usize j = 0; j < flag.length; j++)
-      if (flag[j] != '-') {
-        has_letter = !(flag[j] >= '0' && flag[j] <= '9');
+    for (usize k = 0; k < flag.length; k++)
+      if (flag[k] != '-') {
+        has_letter = !(flag[k] >= '0' && flag[k] <= '9');
         if (has_letter) break;
       }
     if (flag.length >= 2 && has_letter && !seen.contains(flag)) {
       seen.add(flag);
-      options.push(String{flag});
+      const String *description = descriptions.find(flag);
+      entries.push(help_entry{
+          String{flag},
+          description != nullptr ? String{description->view()} : String{}});
     }
-    i = end;
+    j = end;
   }
-  options.shrink_to_fit();
-  return options;
+  entries.shrink_to_fit();
+  return entries;
 }
 
 /* The commands shit is allowed to fork for their --help text, each mapped to
@@ -1287,15 +1391,15 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
    name. The man invocation is the general path that works for any command on
    the host, so the completer is not limited to a hardcoded set of tools. */
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
-    -> const ArrayList<String> &
+    -> const ArrayList<help_entry> &
 {
-  if (const ArrayList<String> *cached = MANPAGE_OPTION_CACHE.find(page_name))
+  if (const ArrayList<help_entry> *cached = MANPAGE_OPTION_CACHE.find(page_name))
     return *cached;
-  let parsed = ArrayList<String>{};
+  let parsed = ArrayList<help_entry>{};
   try {
     const String page = context.capture_command_substitution(
         String{"man "} + String{page_name} + " 2>/dev/null");
-    parsed = parse_manpage_options(page.view());
+    parsed = parse_manpage_option_entries(page.view());
   } catch (...) {
     LOG(verbosity::Debug, "swallowed a man invocation failure for '%.*s'",
         static_cast<int>(page_name.length), page_name.data);
@@ -1310,7 +1414,8 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
    argument still completes as a filename. None means the man path did not
    apply, so the caller falls through to the spec and the filesystem. */
 static fn complete_from_manpage(StringView line, StringView token,
-                                bool for_listing, EvalContext &context) throws
+                                bool for_listing, EvalContext &context,
+                                StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -1345,13 +1450,17 @@ static fn complete_from_manpage(StringView line, StringView token,
       page_name = steal(combined);
   }
 
-  const ArrayList<String> &options =
+  const ArrayList<help_entry> &options =
       manpage_options_for(page_name.view(), context);
   if (options.is_empty()) return None;
 
   let matches = ArrayList<String>{};
-  for (const String &option : options)
-    if (option.view().starts_with(token)) matches.push(String{option.view()});
+  for (const help_entry &option : options)
+    if (option.name.view().starts_with(token)) {
+      matches.push(String{option.name.view()});
+      if (!option.description.is_empty())
+        descriptions.set(option.name.view(), String{option.description.view()});
+    }
   if (matches.is_empty()) return None;
   return matches;
 }
@@ -1359,14 +1468,6 @@ static fn complete_from_manpage(StringView line, StringView token,
 /* A command's --help text, the option flags it lists, and the subcommands it
    lists, each cached under the resolved command name. The raw text caches so
    the options and the subcommands parse from one fork rather than two. */
-/* A name a --help text lists with the description printed in the column beside
-   it. The completion menu shows the description dimmed after the name. */
-struct help_entry
-{
-  String name;
-  String description;
-};
-
 static StringMap<String> HELP_TEXT_CACHE{heap_allocator()};
 static StringMap<ArrayList<help_entry>> HELP_OPTION_CACHE{heap_allocator()};
 static StringMap<ArrayList<help_entry>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
@@ -2563,7 +2664,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
         from_stage = complete_from_help_subcommands(
             line, token, token_start, for_listing, context, descriptions);
       if (!from_stage.has_value())
-        from_stage = complete_from_manpage(line, token, for_listing, context);
+        from_stage = complete_from_manpage(line, token, for_listing, context,
+                                           descriptions);
       if (!from_stage.has_value())
         from_stage =
             complete_from_help(line, token, for_listing, context, descriptions);
