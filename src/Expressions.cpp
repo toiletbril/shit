@@ -80,6 +80,15 @@ cold fn AnalysisContext::warn(SourceLocation location,
   show_message(located.to_string(source));
 }
 
+cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
+    -> void
+{
+  if (!trace_optimizer) return;
+  print_error("[optimizer] ");
+  print_error(message);
+  print_error("\n");
+}
+
 cold fn AnalysisContext::fail(SourceLocation location,
                               StringView message) throws -> void
 {
@@ -324,7 +333,8 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
                const EvalContext *eval_context, bool errors_are_warnings,
-               bool silence_unresolved_commands) throws -> bool
+               bool silence_unresolved_commands, bool trace_optimizer) throws
+    -> bool
 {
   ASSERT(root != nullptr);
 
@@ -332,6 +342,7 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.errors_are_warnings = errors_are_warnings;
   actx.silence_unresolved_commands = silence_unresolved_commands;
   actx.eval_context = eval_context;
+  actx.trace_optimizer = trace_optimizer;
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
@@ -372,6 +383,19 @@ fn analyze_ast(const Expression *root, StringView source,
       [&actx](StringView name) { actx.known_aliases.add(name); });
 
   root->analyze(actx, true);
+
+  if (actx.trace_optimizer) {
+    let summary = String{"summary: "};
+    summary.append(utils::uint_to_text(actx.optimizer_folded_arithmetic));
+    summary.append(" arithmetic folded, ");
+    summary.append(utils::uint_to_text(actx.optimizer_recorded_constants));
+    summary.append(" constants recorded, ");
+    summary.append(utils::uint_to_text(actx.optimizer_folded_branches));
+    summary.append(" branches folded, ");
+    summary.append(utils::uint_to_text(actx.optimizer_folded_loops));
+    summary.append(" loops folded");
+    actx.trace_optimizer_line(summary.view());
+  }
 
   return !actx.has_fatal;
 }
@@ -586,6 +610,10 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
     LOG(verbosity::All, "recording the constant '%s' = '%s'", name.c_str(),
         literal->c_str());
     actx.constant_variables.set(name.view(), literal->view());
+    actx.optimizer_recorded_constants++;
+    if (actx.trace_optimizer)
+      actx.trace_optimizer_line(String{"recorded constant: "} + name + " = " +
+                                *literal);
   } else {
     /* The value is only known at run time, so a constant recorded for this name
        under an earlier assignment no longer holds and is forgotten. */

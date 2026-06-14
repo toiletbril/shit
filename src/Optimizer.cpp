@@ -469,8 +469,7 @@ namespace {
    arithmetic on every expansion. Returns true when this call newly folds a
    segment, so the driver counts the rule as having fired. */
 fn fold_constant_arithmetic_in_word(const Word &word,
-                                    const AnalysisContext &actx) wontthrow
-    -> bool
+                                    AnalysisContext &actx) throws -> bool
 {
   bool did_fold = false;
   for (const WordSegment &segment : word.segments) {
@@ -486,14 +485,18 @@ fn fold_constant_arithmetic_in_word(const Word &word,
           segment.text.view().data, static_cast<long long>(*result));
       segment.folded_arithmetic_result = result;
       did_fold = true;
+      actx.optimizer_folded_arithmetic++;
+      if (actx.trace_optimizer)
+        actx.trace_optimizer_line(String{"folded constant arithmetic: "} +
+                                  String{segment.text.view()} + " = " +
+                                  utils::int_to_text(*result));
     }
   }
   return did_fold;
 }
 
 fn fold_constant_arithmetic_in_token(const Token *token,
-                                     const AnalysisContext &actx) wontthrow
-    -> bool
+                                     AnalysisContext &actx) throws -> bool
 {
   if (token == nullptr) return false;
   if (token->kind() != Token::Kind::Word) return false;
@@ -552,6 +555,10 @@ fn rule_dead_branch_elimination(const Expression *node,
     if (*verdict) {
       LOG(verbosity::All, "dead-branch elimination chose branch %zu", i);
       clause->set_folded_branch(i);
+      actx.optimizer_folded_branches++;
+      if (actx.trace_optimizer)
+        actx.trace_optimizer_line(String{"folded if to branch "} +
+                                  utils::int_to_text(static_cast<i64>(i)));
       return true;
     }
   }
@@ -560,6 +567,9 @@ fn rule_dead_branch_elimination(const Expression *node,
   LOG(verbosity::All,
       "every if condition is statically false, folding to the else body");
   clause->set_folded_branch(clause->branches().count());
+  actx.optimizer_folded_branches++;
+  if (actx.trace_optimizer)
+    actx.trace_optimizer_line(String{"folded if to the else body"});
   return true;
 }
 
@@ -593,6 +603,11 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
   LOG(verbosity::All, "loop elimination folded the %s loop to a skip",
       loop->is_until() ? "until" : "while");
   loop->set_folded_to_skip();
+  actx.optimizer_folded_loops++;
+  if (actx.trace_optimizer)
+    actx.trace_optimizer_line(loop->is_until()
+                                  ? String{"folded until loop to a skip"}
+                                  : String{"folded while loop to a skip"});
   return true;
 }
 

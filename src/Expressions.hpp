@@ -90,10 +90,22 @@ public:
      keeps the check, since it lints branches the run may never reach. */
   bool silence_unresolved_commands{false};
 
+  /* The optimizer trace, set by --debug-optimizer. The prepass counts what it
+     folds and records, and prints a stable line per decision plus a summary, so
+     the optimizer golden tests can assert the behavior of each pass. */
+  bool trace_optimizer{false};
+  usize optimizer_folded_arithmetic{0};
+  usize optimizer_recorded_constants{0};
+  usize optimizer_folded_branches{0};
+  usize optimizer_folded_loops{0};
+
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
   fn warn(SourceLocation location, StringView message) throws -> void;
   fn fail(SourceLocation location, StringView message) throws -> void;
+  /* Prints one optimizer trace line to standard error when the trace is on, so
+     a golden test sees exactly what a pass folded. A no-op otherwise. */
+  fn trace_optimizer_line(StringView message) const throws -> void;
 };
 
 /* Walk the tree and report. Returns true when execution may proceed, false when
@@ -101,7 +113,8 @@ public:
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
                const EvalContext *eval_context, bool errors_are_warnings,
-               bool silence_unresolved_commands) throws -> bool;
+               bool silence_unresolved_commands,
+               bool trace_optimizer = false) throws -> bool;
 
 class Expression
 {

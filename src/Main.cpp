@@ -115,6 +115,8 @@ FLAG(NO_COMPLETION, Bool, 'T', "no-completion", shit::flag_section::Shit,
 
 FLAG(AST, Bool, 'A', "show-ast", shit::flag_section::Debug,
      "Print AST before executing each command.");
+FLAG(DEBUG_OPTIMIZER, Bool, '\0', "debug-optimizer", shit::flag_section::Debug,
+     "Trace the optimizer prepass decisions to standard error.");
 FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", shit::flag_section::Debug,
      "Print exit code after each executed command.");
 FLAG(ESCAPE_MAP, Bool, 'M', "show-lexed-words", shit::flag_section::Debug,
@@ -411,7 +413,8 @@ static fn run_script_contents(const String &script_contents,
         !analyze_ast(
             ast, script_contents, context.function_names(),
             context.alias_names(), &context, FLAG_WARNINGS.is_enabled(),
-            FLAG_WARNINGS.is_enabled() && context.shell_is_interactive());
+            FLAG_WARNINGS.is_enabled() && context.shell_is_interactive(),
+            FLAG_DEBUG_OPTIMIZER.is_enabled());
     /* A freshly parsed tree that parses and analyzes clean is handed back so a
        caller that wants to reuse it, the PROMPT_COMMAND hook, caches it. */
     if (!analysis_failed && out_ast != nullptr) *out_ast = ast;
