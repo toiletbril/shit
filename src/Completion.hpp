@@ -4,6 +4,7 @@
 #include "Eval.hpp"
 #include "Path.hpp"
 #include "String.hpp"
+#include "StringMap.hpp"
 #include "StringView.hpp"
 
 namespace shit {
@@ -18,6 +19,12 @@ namespace completion {
 struct completion_result
 {
   ArrayList<String> candidates;
+  /* The description for each candidate that carries one, keyed by the candidate
+     text so it survives the candidate sort. Only the --help option and
+     subcommand stages fill it, since a filesystem or command-name completion
+     has nothing to describe, so it is empty for those. The menu shows a
+     description dimmed after its candidate. */
+  StringMap<String> descriptions{heap_allocator()};
   String longest_common_prefix;
   /* The byte offset in the input line where the token under the cursor begins,
      so the caller knows which span the replacement covers. */

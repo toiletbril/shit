@@ -117,6 +117,11 @@ shit::EvalContext *COMPLETION_CONTEXT = nullptr;
    kept here until the next call replaces them. */
 shit::ArrayList<shit::String> COMPLETION_CANDIDATES{};
 shit::ArrayList<const char *> COMPLETION_CANDIDATE_POINTERS{};
+/* The description text for each candidate, aligned by index with the candidate
+   pointers, an empty string where a candidate has none. The owned strings keep
+   the pointers alive while toiletline reads them. */
+shit::ArrayList<shit::String> COMPLETION_DESCRIPTIONS{};
+shit::ArrayList<const char *> COMPLETION_DESCRIPTION_POINTERS{};
 shit::String COMPLETION_LCP{};
 
 /* The byte offset of the codepoint at the given codepoint index in a UTF-8
@@ -181,8 +186,29 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     for (const shit::String &candidate : COMPLETION_CANDIDATES)
       COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
 
+    /* Each candidate carries its description, looked up by candidate text since
+       the engine keyed the map that way to survive the sort. A candidate with
+       no description points at the empty string, so the array stays aligned by
+       index with the candidates. */
+    COMPLETION_DESCRIPTIONS.clear();
+    COMPLETION_DESCRIPTION_POINTERS.clear();
+    bool any_description = false;
+    for (const shit::String &candidate : COMPLETION_CANDIDATES) {
+      if (const shit::String *found = result.descriptions.find(candidate.view());
+          found != nullptr) {
+        COMPLETION_DESCRIPTIONS.push(shit::String{found->view()});
+        any_description = true;
+      } else {
+        COMPLETION_DESCRIPTIONS.push(shit::String{});
+      }
+    }
+    for (const shit::String &description : COMPLETION_DESCRIPTIONS)
+      COMPLETION_DESCRIPTION_POINTERS.push(description.c_str());
+
     out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
     out->count = COMPLETION_CANDIDATE_POINTERS.count();
+    out->descriptions =
+        any_description ? COMPLETION_DESCRIPTION_POINTERS.begin() : nullptr;
     out->longest_common_prefix = COMPLETION_LCP.c_str();
     /* The engine reports the token span in bytes, so convert each boundary to a
        codepoint index for toiletline, which replaces the span in codepoints. */

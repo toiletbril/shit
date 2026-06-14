@@ -1371,9 +1371,17 @@ static fn complete_from_manpage(StringView line, StringView token,
 /* A command's --help text, the option flags it lists, and the subcommands it
    lists, each cached under the resolved command name. The raw text caches so
    the options and the subcommands parse from one fork rather than two. */
+/* A name a --help text lists with the description printed in the column beside
+   it. The completion menu shows the description dimmed after the name. */
+struct help_entry
+{
+  String name;
+  String description;
+};
+
 static StringMap<String> HELP_TEXT_CACHE{heap_allocator()};
-static StringMap<ArrayList<String>> HELP_OPTION_CACHE{heap_allocator()};
-static StringMap<ArrayList<String>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
+static StringMap<ArrayList<help_entry>> HELP_OPTION_CACHE{heap_allocator()};
+static StringMap<ArrayList<help_entry>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
 
 /* Whether the directory the resolved binary sits in is safe to fork for its
    --help text. The check is permission-based rather than a fixed list, so a
@@ -1444,14 +1452,79 @@ static fn help_text_for(StringView command) throws -> StringView
   return HELP_TEXT_CACHE.find(command)->view();
 }
 
-/* The option flags a command's --help text lists, parsed once and cached. The
-   parse reuses the manpage flag scanner since the option syntax is the same. */
-static fn help_options_for(StringView command) throws
-    -> const ArrayList<String> &
+/* The dash-options a --help text lists, each paired with the description in the
+   column beside it. A line that opens with an option is split at the first run
+   of two or more spaces, the option part before it and the description after.
+   Every dash-word in the option part maps to the one description, so cargo's
+   -v, --verbose pair and ffmpeg's -pix_fmt with an argument placeholder both
+   read their text. A trailing =VALUE on a flag is dropped so the bare flag
+   completes. */
+static fn parse_help_option_entries(StringView text) throws
+    -> ArrayList<help_entry>
 {
-  if (const ArrayList<String> *cached = HELP_OPTION_CACHE.find(command))
+  let entries = ArrayList<help_entry>{};
+  let seen = HashSet{heap_allocator()};
+  usize i = 0;
+  while (i < text.length) {
+    usize line_end = i;
+    while (line_end < text.length && text[line_end] != '\n') line_end++;
+    const StringView raw = text.substring_of_length(i, line_end - i);
+    i = line_end + 1;
+
+    usize start = 0;
+    while (start < raw.length && (raw[start] == ' ' || raw[start] == '\t'))
+      start++;
+    if (start >= raw.length || raw[start] != '-') continue;
+
+    /* The first run of two or more spaces ends the option part and opens the
+       description column. */
+    usize gap = raw.length;
+    for (usize j = start; j + 1 < raw.length; j++)
+      if (raw[j] == ' ' && raw[j + 1] == ' ') {
+        gap = j;
+        break;
+      }
+    const StringView option_part = raw.substring_of_length(start, gap - start);
+
+    StringView description = StringView{};
+    if (gap < raw.length) {
+      usize d = gap;
+      while (d < raw.length && (raw[d] == ' ' || raw[d] == '\t')) d++;
+      usize d_end = raw.length;
+      while (d_end > d && (raw[d_end - 1] == ' ' || raw[d_end - 1] == '\t'))
+        d_end--;
+      description = raw.substring_of_length(d, d_end - d);
+    }
+
+    usize k = 0;
+    while (k < option_part.length) {
+      while (k < option_part.length &&
+             (option_part[k] == ' ' || option_part[k] == ','))
+        k++;
+      const usize token_start = k;
+      while (k < option_part.length && option_part[k] != ' ' &&
+             option_part[k] != ',')
+        k++;
+      StringView flag = option_part.substring_of_length(token_start,
+                                                        k - token_start);
+      if (let const equals = flag.find_character('='); equals.has_value())
+        flag = flag.substring_of_length(0, *equals);
+      if (flag.length >= 2 && flag[0] == '-' && !seen.contains(flag)) {
+        seen.add(flag);
+        entries.push(help_entry{String{flag}, String{description}});
+      }
+    }
+  }
+  return entries;
+}
+
+/* The options a command's --help text lists, parsed once and cached. */
+static fn help_options_for(StringView command) throws
+    -> const ArrayList<help_entry> &
+{
+  if (const ArrayList<help_entry> *cached = HELP_OPTION_CACHE.find(command))
     return *cached;
-  let parsed = parse_manpage_options(help_text_for(command));
+  let parsed = parse_help_option_entries(help_text_for(command));
   HELP_OPTION_CACHE.set(command, steal(parsed));
   return *HELP_OPTION_CACHE.find(command);
 }
@@ -1504,9 +1577,10 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
    The scan reads the first token of each indented line under such a header,
    drops options and the ... continuation marker, and stops at a blank line or
    a line that returns to the left margin. */
-static fn parse_help_subcommands(StringView text) throws -> ArrayList<String>
+static fn parse_help_subcommands(StringView text) throws
+    -> ArrayList<help_entry>
 {
-  let subcommands = ArrayList<String>{};
+  let subcommands = ArrayList<help_entry>{};
   let seen = HashSet{heap_allocator()};
   bool in_section = false;
   usize i = 0;
@@ -1551,7 +1625,22 @@ static fn parse_help_subcommands(StringView text) throws -> ArrayList<String>
     if (!is_plausible_subcommand_name(name)) continue;
     if (!seen.contains(name)) {
       seen.add(name);
-      subcommands.push(String{name});
+      /* The description is the text after the run of two or more spaces that
+         ends the name-and-alias column, trimmed. */
+      StringView description = StringView{};
+      usize gap = trimmed.length;
+      for (usize j = name_end; j + 1 < trimmed.length; j++)
+        if (trimmed[j] == ' ' && trimmed[j + 1] == ' ') {
+          gap = j;
+          break;
+        }
+      if (gap < trimmed.length) {
+        usize d = gap;
+        while (d < trimmed.length && (trimmed[d] == ' ' || trimmed[d] == '\t'))
+          d++;
+        description = trimmed.substring_of_length(d, trimmed.length - d);
+      }
+      subcommands.push(help_entry{String{name}, String{description}});
     }
   }
   return subcommands;
@@ -1559,9 +1648,9 @@ static fn parse_help_subcommands(StringView text) throws -> ArrayList<String>
 
 /* The subcommands a command's --help text lists, parsed once and cached. */
 static fn help_subcommands_for(StringView command) throws
-    -> const ArrayList<String> &
+    -> const ArrayList<help_entry> &
 {
-  if (const ArrayList<String> *cached = HELP_SUBCOMMAND_CACHE.find(command))
+  if (const ArrayList<help_entry> *cached = HELP_SUBCOMMAND_CACHE.find(command))
     return *cached;
   let parsed = parse_help_subcommands(help_text_for(command));
   HELP_SUBCOMMAND_CACHE.set(command, steal(parsed));
@@ -1573,7 +1662,8 @@ static fn help_subcommands_for(StringView command) throws
    the manpage stage uses hold here, so the ghost never forks a command and a
    plain argument still completes as a filename. */
 static fn complete_from_help(StringView line, StringView token,
-                             bool for_listing, EvalContext &context) throws
+                             bool for_listing, EvalContext &context,
+                             StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -1586,12 +1676,16 @@ static fn complete_from_help(StringView line, StringView token,
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved = resolve_completion_alias(surface_command, context);
-  const ArrayList<String> &options = help_options_for(resolved.view());
+  const ArrayList<help_entry> &options = help_options_for(resolved.view());
   if (options.is_empty()) return None;
 
   let matches = ArrayList<String>{};
-  for (const String &option : options)
-    if (option.view().starts_with(token)) matches.push(String{option.view()});
+  for (const help_entry &option : options)
+    if (option.name.view().starts_with(token)) {
+      matches.push(String{option.name.view()});
+      if (!option.description.is_empty())
+        descriptions.set(option.name.view(), String{option.description.view()});
+    }
   if (matches.is_empty()) return None;
   return matches;
 }
@@ -1602,7 +1696,8 @@ static fn complete_from_help(StringView line, StringView token,
    subcommand stage, so this never fires on an option token or for the ghost. */
 static fn complete_from_help_subcommands(StringView line, StringView token,
                                          usize token_start, bool for_listing,
-                                         EvalContext &context) throws
+                                         EvalContext &context,
+                                         StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   if (!for_listing) return None;
@@ -1617,14 +1712,18 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved = resolve_completion_alias(surface_command, context);
-  const ArrayList<String> &subcommands =
+  const ArrayList<help_entry> &subcommands =
       help_subcommands_for(resolved.view());
   if (subcommands.is_empty()) return None;
 
   let matches = ArrayList<String>{};
-  for (const String &subcommand : subcommands)
-    if (subcommand.view().starts_with(token))
-      matches.push(String{subcommand.view()});
+  for (const help_entry &subcommand : subcommands)
+    if (subcommand.name.view().starts_with(token)) {
+      matches.push(String{subcommand.name.view()});
+      if (!subcommand.description.is_empty())
+        descriptions.set(subcommand.name.view(),
+                         String{subcommand.description.view()});
+    }
   if (matches.is_empty()) return None;
   return matches;
 }
@@ -2395,6 +2494,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   const bool inline_glob = token_is_glob && cursor == token_end;
 
   let candidates = ArrayList<String>{};
+  /* Filled only by the --help option and subcommand stages, keyed by candidate
+     text so it survives the sort below, empty for every other source. */
+  let descriptions = StringMap<String>{heap_allocator()};
 
   /* The POSIX mood keeps completion plain the way dash does. The command
      position still completes command names, and everything else is the
@@ -2456,12 +2558,13 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
           complete_from_man_subcommands(line, token, token_start, for_listing,
                                         context);
       if (!from_stage.has_value())
-        from_stage = complete_from_help_subcommands(line, token, token_start,
-                                                    for_listing, context);
+        from_stage = complete_from_help_subcommands(
+            line, token, token_start, for_listing, context, descriptions);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, token, for_listing, context);
       if (!from_stage.has_value())
-        from_stage = complete_from_help(line, token, for_listing, context);
+        from_stage =
+            complete_from_help(line, token, for_listing, context, descriptions);
       if (!from_stage.has_value())
         from_stage = complete_from_build_tools(line, token, token_start,
                                                for_listing, context);
@@ -2485,8 +2588,11 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   }
 
   return completion_result{
-      steal(candidates),       steal(longest_common_prefix),
-      token_start + completion_offset, token_end + completion_offset,
+      steal(candidates),
+      steal(descriptions),
+      steal(longest_common_prefix),
+      token_start + completion_offset,
+      token_end + completion_offset,
       is_command,
   };
 }
