@@ -930,14 +930,15 @@ static fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
       if (!opened) {
         if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
         throw ErrorWithLocation{redir.target->source_location(),
-                                "Could not open '" + *resolved.both_streams_file +
+                                "Could not open '" +
+                                    *resolved.both_streams_file +
                                     "': " + os::last_system_error_message()};
       }
       return resolved_redirection{redirection_outcome::BothStreams, 1,
                                   opened.take(), -1};
     }
-    return resolved_redirection{redirection_outcome::Duplicate, redir.fd, {},
-                                resolved.fd};
+    return resolved_redirection{
+        redirection_outcome::Duplicate, redir.fd, {}, resolved.fd};
   }
 
   ASSERT(redir.target != nullptr);
