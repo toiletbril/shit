@@ -19,19 +19,20 @@
   static shit::ArrayList<shit::Flag *> FLAG_LIST { shit::heap_allocator() }
 
 /* FLAG takes an optional flag_section argument before the description. The
-   five-argument form is the common one for builtins and defaults to
-   NoSection, which renders the flag at the top of --help with no section
-   heading. The six-argument form names the section the flag renders under, so
-   the help renderer reads the section off the flag instead of matching long
-   names. */
+   section is named unqualified, such as Compat, and the macro prepends
+   shit::flag_section the way it prepends shit::Flag to the kind, so a call site
+   spells neither qualifier. The five-argument form is the common one for
+   builtins and defaults to NoSection, which renders the flag at the top of
+   --help with no section heading. The six-argument form names the section the
+   flag renders under, so the help renderer reads the section off the flag
+   instead of matching long names. */
 #define T__FLAG_SELECT(_1, _2, _3, _4, _5, _6, name, ...) name
 #define FLAG(...) T__FLAG_SELECT(__VA_ARGS__, T__FLAG6, T__FLAG5)(__VA_ARGS__)
 #define T__FLAG5(var_name, kind, short_name, long_name, description)           \
-  T__FLAG6(var_name, kind, short_name, long_name,                              \
-           shit::flag_section::NoSection, description)
+  T__FLAG6(var_name, kind, short_name, long_name, NoSection, description)
 #define T__FLAG6(var_name, kind, short_name, long_name, section, description)  \
   static shit::Flag##kind concat_literal(FLAG_, var_name){                     \
-      short_name, long_name, section, description};                            \
+      short_name, long_name, shit::flag_section::section, description};         \
   static uchar concat_literal(t__flag_dummy_, __LINE__) =                      \
       (FLAG_LIST.push(&concat_literal(FLAG_, var_name)), 0)
 

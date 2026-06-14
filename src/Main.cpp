@@ -29,67 +29,66 @@ FLAG(SHORT_VERSION, Bool, 'V', "short-version",
      "Display version in a short form.");
 FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
-FLAG(INTERACTIVE, Bool, 'i', "interactive", shit::flag_section::Posix,
+FLAG(INTERACTIVE, Bool, 'i', "interactive", Posix,
      "Specify that the shell is interactive.");
-FLAG(STDIN, Bool, 's', "stdin", shit::flag_section::Posix,
+FLAG(STDIN, Bool, 's', "stdin", Posix,
      "Execute command from stdin and exit.");
-FLAG(COMMAND, ManyStrings, 'c', "command", shit::flag_section::Posix,
+FLAG(COMMAND, ManyStrings, 'c', "command", Posix,
      "Execute specified command and exit. Can be used multiple times.");
-FLAG(ERROR_EXIT, Bool, 'e', "error-exit", shit::flag_section::Posix,
+FLAG(ERROR_EXIT, Bool, 'e', "error-exit", Posix,
      "Die on first error.");
-FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", shit::flag_section::Posix,
+FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", Posix,
      "Disable path expansion.");
-FLAG(ONE_COMMAND, Bool, 't', "one-command", shit::flag_section::Posix,
+FLAG(ONE_COMMAND, Bool, 't', "one-command", Posix,
      "Exit after executing one command.");
-FLAG(VERBOSE, Bool, 'v', "verbose", shit::flag_section::Posix,
+FLAG(VERBOSE, Bool, 'v', "verbose", Posix,
      "Write input to standard error as it is read.");
-FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace", shit::flag_section::Posix,
+FLAG(EXPAND_VERBOSE, Bool, 'x', "xtrace", Posix,
      "Write expanded input to standard error as it is read.");
-FLAG(EXPORT_ALL, Bool, 'a', "export-all", shit::flag_section::Posix,
+FLAG(EXPORT_ALL, Bool, 'a', "export-all", Posix,
      "Mark every assigned variable for the environment.");
-FLAG(NO_CLOBBER, Bool, 'C', "no-clobber", shit::flag_section::Posix,
+FLAG(NO_CLOBBER, Bool, 'C', "no-clobber", Posix,
      "Refuse to overwrite an existing file through '>'.");
-FLAG(NO_EXEC, Bool, 'n', "no-exec", shit::flag_section::Posix,
+FLAG(NO_EXEC, Bool, 'n', "no-exec", Posix,
      "Read and parse commands but do not run them.");
-FLAG(NOUNSET, Bool, 'u', "no-unset", shit::flag_section::Posix,
+FLAG(NOUNSET, Bool, 'u', "no-unset", Posix,
      "Treat an unset variable as an error.");
-FLAG(LOGIN, Bool, 'l', "login", shit::flag_section::Posix,
+FLAG(LOGIN, Bool, 'l', "login", Posix,
      "Act as a login shell and source the profiles.");
-FLAG(IGNORED1, Bool, 'h', "\0", shit::flag_section::Posix,
+FLAG(IGNORED1, Bool, 'h', "\0", Posix,
      "Ignored, left for compatibility.");
-FLAG(IGNORED2, Bool, 'm', "\0", shit::flag_section::Posix,
+FLAG(IGNORED2, Bool, 'm', "\0", Posix,
      "Ignored, left for compatibility.");
 
-FLAG(RCFILE, String, '\0', "rcfile", shit::flag_section::Bash,
+FLAG(RCFILE, String, '\0', "rcfile", Bash,
      "Source FILE as the interactive rc instead of ~/.bashrc, the way bash "
      "reads "
      "a named rc. The shit rc still runs, and a non-interactive run reads no "
      "rc.");
 FLAG(
-    PRIVILEGED, Bool, 'p', "privileged", shit::flag_section::Bash,
+    PRIVILEGED, Bool, 'p', "privileged", Bash,
     "Run in privileged mode and skip every startup config file, so a config a "
     "less-privileged user controls cannot run with raised privileges. Turned "
     "on automatically when the effective and the real user or group id differ, "
     "the setuid or setgid case.");
 
-/* The variable is POSIX_MODE rather than POSIX, since Platform.hpp defines
-   POSIX as a platform-vector macro that would eat the flag name. */
+FLAG(MOOD, String, 'M', "mood", Compat,
+     "Select the runtime mood, one of 'shit', 'bash', or 'sh'. The default "
+     "'shit' mood is the strict bash superset with the analysis stage on, "
+     "'bash' runs the bash extensions with the analysis stage off, and 'sh' "
+     "behaves like dash. The mood drives strictness, the analysis stage, and "
+     "the parser features, and set --mood changes it at runtime.");
+FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
+     "Source the startup files for each listed mood, in order, given comma "
+     "separated or by repeating the flag. 'shit' reads /etc/shitrc and "
+     "~/.shitrc, 'bash' reads the bash rc and completion, and 'sh' reads the "
+     "ENV file, with the login profiles added under -l. Defaults to the value "
+     "of --mood.");
+FLAG(INIT_AS_BASH, Bool, '\0', "init-as-bash", Compat,
+     "Deprecated alias for --init-moods=bash. The SHIT_INIT_AS_BASH environment "
+     "variable enables it when set.");
 FLAG(
-    POSIX_MODE, Bool, 'P', "posix", shit::flag_section::Compat,
-    "Run in POSIX mode, the way dash behaves. The analysis stage is skipped so "
-    "a file with an analysis error still runs, an unmatched glob stays its "
-    "literal pattern, and the style warnings are off.");
-FLAG(BASH_COMPATIBLE, Bool, '\0', "bash-compatible", shit::flag_section::Compat,
-     "Run in Bash-compatible mode. Bash extensions such as [[ ]], arrays, and "
-     "brace expansion are enabled, the analysis stage is skipped, and an "
-     "unmatched glob stays its literal pattern.");
-FLAG(INIT_AS_BASH, Bool, 'L', "init-as-bash", shit::flag_section::Compat,
-     "Initialize as bash, sourcing the bash config files in bash mode, then "
-     "snap to the default mode with all diagnostics at the interactive prompt. "
-     "Sources the bash login scripts only when combined with -l. The "
-     "SHIT_INIT_AS_BASH environment variable enables this when set.");
-FLAG(
-    MIMICRY, Bool, 'I', "mimicry", shit::flag_section::Compat,
+    MIMICRY, Bool, 'I', "mimicry", Compat,
     "Mimic the shell a script's shebang names, for speed. A program whose "
     "shebang is a shell shit can emulate runs in-process in the matching mode "
     "rather than launching the shell, so a script-heavy run skips the fork and "
@@ -98,58 +97,58 @@ FLAG(
     "and shit in the default mode. A zsh, ksh, fish, or non-shell shebang "
     "still "
     "launches the real program.");
-FLAG(DUMB, Bool, '\0', "dumb", shit::flag_section::Compat,
-     "Makes shit extremely dumb. Equals to -PT --no-diagnostics.");
+FLAG(DUMB, Bool, '\0', "dumb", Compat,
+     "Makes shit extremely dumb. Equals to --mood sh -T --no-diagnostics.");
 
-FLAG(WARNINGS, Bool, 'W', "force-warnings", shit::flag_section::Shit,
+FLAG(WARNINGS, Bool, 'W', "force-warnings", Shit,
      "Keep the analysis stage but report every error as a warning and let the "
      "run proceed, instead of stopping on the first error.");
-FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", shit::flag_section::Shit,
+FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
 FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
-     shit::flag_section::Shit,
+     Shit,
      "Skip the analysis stage, so no warnings or pre-run diagnostics are "
      "reported and evaluation begins sooner.");
-FLAG(NO_COMPLETION, Bool, 'T', "no-completion", shit::flag_section::Shit,
+FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
 
-FLAG(AST, Bool, 'A', "show-ast", shit::flag_section::Debug,
+FLAG(AST, Bool, 'A', "show-ast", Debug,
      "Print AST before executing each command.");
-FLAG(DEBUG_OPTIMIZER, Bool, '\0', "debug-optimizer", shit::flag_section::Debug,
+FLAG(DEBUG_OPTIMIZER, Bool, '\0', "debug-optimizer", Debug,
      "Trace the optimizer prepass decisions to standard error.");
-FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", shit::flag_section::Debug,
+FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", Debug,
      "Print exit code after each executed command.");
-FLAG(ESCAPE_MAP, Bool, 'M', "show-lexed-words", shit::flag_section::Debug,
+FLAG(ESCAPE_MAP, Bool, 'R', "show-lexed-words", Debug,
      "Print escape bitmap after each parsed command.");
-FLAG(STATS, Bool, '\0', "show-stats", shit::flag_section::Debug,
+FLAG(STATS, Bool, '\0', "show-stats", Debug,
      "Print statistics after each executed command, including commands "
      "evaluated, expansions, nodes evaluated, and AST arena bytes with the run "
      "peak.");
-FLAG(MEMORY, Bool, '\0', "show-memory", shit::flag_section::Debug,
+FLAG(MEMORY, Bool, '\0', "show-memory", Debug,
      "Print a granular memory report at exit, the AST and function arena bytes "
      "with their reserved capacity and the malloc heap in use.");
 /* The logging flags exist only in a debug build, the build whose LOG calls
    compile in. A release binary rejects -X as an unknown flag. */
 #if !defined NDEBUG
-FLAG(LOG, String, 'X', "debug-logging", shit::flag_section::Debug,
+FLAG(LOG, String, 'X', "debug-logging", Debug,
      "Enable internal logging at the given level, one of 'info', 'debug', or "
      "'all'. An unknown spelling is an error.");
 FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file",
-     shit::flag_section::Debug,
+     Debug,
      "Create the named file when missing and append the debug log to it "
      "instead of stderr, so an interactive session logs without painting "
      "over the prompt.");
 FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at",
-     shit::flag_section::Debug,
+     Debug,
      "Print the completion candidates for the given line with the cursor at "
      "its end, one per line the way an explicit tab lists them, after every "
      "-c chunk has run, then exit. The completion test driver.");
 #endif
 
 #if SHIT_PLATFORM_IS COSMO
-FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", shit::flag_section::Debug,
+FLAG(COSMO_FTRACE, Bool, '\0', "ftrace", Debug,
      "Cosmopolitan: Trace functions.");
-FLAG(COSMO_STRACE, Bool, '\0', "strace", shit::flag_section::Debug,
+FLAG(COSMO_STRACE, Bool, '\0', "strace", Debug,
      "Cosmopolitan: Trace system calls.");
 #endif
 
@@ -193,29 +192,34 @@ static bool INVOKED_AS_POSIX_SHELL = false;
    and dash select POSIX mode while bash selects bash mode. */
 static bool INVOKED_AS_BASH = false;
 
-/* True when POSIX behavior is in effect, from --posix or the sh invocation
-   name. The failglob default, the analysis skip, and the style-warning
-   suppression all read it. */
-pure static fn should_run_in_posix_mode() wontthrow -> bool
+/* Parse a --mood value into a mood, with 'shit' the strict default, 'bash' the
+   bash extensions, and 'sh' or 'posix' the dash semantics. An unknown spelling
+   returns None so the caller reports the usage error. */
+pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
 {
-  return FLAG_POSIX_MODE.is_enabled() || INVOKED_AS_POSIX_SHELL;
+  if (name == "shit" || name == "default") return mimic_mood::Default;
+  if (name == "bash") return mimic_mood::Bash;
+  if (name == "sh" || name == "posix" || name == "dash")
+    return mimic_mood::Posix;
+  return None;
 }
 
-/* True when bash behavior is in effect, from --bash-compatible or the bash
-   invocation name. Like POSIX mode it skips the analysis stage and leaves an
-   unmatched glob literal, and it additionally enables the bash extensions. */
-pure static fn should_run_in_bash_mode() wontthrow -> bool
+/* The runtime mood the session runs in, from --mood when given, then the
+   invocation basename, then the strict default. --dumb forces the sh mood when
+   --mood is absent. An invalid --mood value fails startup before this, so a
+   stray one falls back to the default. */
+pure static fn resolve_session_mood() wontthrow -> mimic_mood
 {
-  return FLAG_BASH_COMPATIBLE.is_enabled() || INVOKED_AS_BASH;
-}
-
-/* True in either compatibility mode, POSIX or bash. Both skip the analysis
-   stage and leave an unmatched glob literal, the way dash and bash do, so the
-   analysis gate and the failglob default read this rather than spelling out the
-   pair. */
-pure static fn should_run_in_compat_mode() wontthrow -> bool
-{
-  return should_run_in_posix_mode() || should_run_in_bash_mode();
+  if (FLAG_MOOD.is_set()) {
+    if (Maybe<mimic_mood> parsed = parse_mood_name(FLAG_MOOD.value());
+        parsed.has_value())
+      return *parsed;
+    return mimic_mood::Default;
+  }
+  if (FLAG_DUMB.is_enabled()) return mimic_mood::Posix;
+  if (INVOKED_AS_POSIX_SHELL) return mimic_mood::Posix;
+  if (INVOKED_AS_BASH) return mimic_mood::Bash;
+  return mimic_mood::Default;
 }
 
 /* Print the help or version text and return the exit code when one of those
@@ -563,10 +567,16 @@ static fn source_file(const Path &path, EvalContext &context,
   LOG(verbosity::Info, "sourcing '%s', %zu bytes", path.c_str(),
       contents->count());
 
-  /* The profile path names the source, so a parse error in it and a backtrace
-     caret for a file it sources both carry the file rather than a bare
-     line:col. */
-  run_script_contents(*contents, context, ast_arena, path.text().view());
+  /* The file runs through run_source, the same path the dot builtin uses, so it
+     parses into the active arena alongside the tree already being evaluated
+     rather than resetting it. A set --init-moods inside a sourced rc reaches
+     here while that rc's own tree is live, so resetting the arena would free the
+     node mid-walk. run_source also bounds the nesting and retains the AST. The
+     path names the source, so a parse error in it and a backtrace caret carry
+     the file rather than a bare line:col. */
+  unused(ast_arena);
+  context.run_source(*contents, path.text().view(), /*consume_return=*/true,
+                     /*call_site=*/None, path.text().view());
   return true;
 }
 
@@ -645,6 +655,81 @@ static fn ensure_bash_completion_loaded(EvalContext &context,
   LOG(verbosity::Info, "sourcing the stock bash-completion script");
   source_file(Path{"/usr/share/bash-completion/bash_completion"}, context,
               ast_arena);
+}
+
+fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
+                     const ArrayList<mimic_mood> &moods, bool is_login_shell,
+                     bool should_be_interactive) throws -> void
+{
+  /* Each flavor sources under its own mood, so a bash rc parses with the bash
+     grammar and a posix profile with the dash grammar. The caller restores the
+     session mood afterward. A missing file is silently skipped. */
+  bool did_source_bash_rc = false;
+  for (mimic_mood flavor : moods) {
+    /* A flavor already on the sourcing stack is skipped, so a set --init-moods
+       inside the very ~/.shitrc this is sourcing cannot re-source it and recurse
+       until the stack overflows. The bit clears when the flavor finishes, even
+       on a throw. */
+    if (context.init_mood_sourcing(flavor)) {
+      LOG(verbosity::Info,
+          "skipping the %s flavor, its startup files are already sourcing",
+          flavor == mimic_mood::Bash    ? "bash"
+          : flavor == mimic_mood::Posix ? "posix"
+                                        : "shit");
+      continue;
+    }
+    context.set_init_mood_sourcing(flavor, true);
+    defer { context.set_init_mood_sourcing(flavor, false); };
+    context.set_mood(flavor);
+    LOG(verbosity::Info, "sourcing the startup files for the %s flavor",
+        flavor == mimic_mood::Bash    ? "bash"
+        : flavor == mimic_mood::Posix ? "posix"
+                                      : "shit");
+    switch (flavor) {
+    case mimic_mood::Default:
+      /* The shit flavor reads the dash login profiles, then the system and the
+         home shit rc for an interactive shell. */
+      if (is_login_shell) source_posix_login_files(context, ast_arena);
+      if (should_be_interactive) {
+        source_file(Path{"/etc/shitrc"}, context, ast_arena);
+        source_home_file(".shitrc", context, ast_arena);
+      }
+      break;
+    case mimic_mood::Posix:
+      /* The posix flavor reads the dash login order, then the file named by ENV
+         for an interactive shell. */
+      if (is_login_shell) source_posix_login_files(context, ast_arena);
+      if (should_be_interactive) {
+        if (Maybe<String> env = context.get_variable_value("ENV");
+            env.has_value() && !env->is_empty())
+          source_file(Path{env->view()}, context, ast_arena);
+      }
+      break;
+    case mimic_mood::Bash:
+      /* The bash flavor reads the bash login order, then the system rc and the
+         user rc, the latter replaced by --rcfile. bash runs the system rc before
+         the user one even under --rcfile, so the order mirrors that. */
+      if (is_login_shell) source_bash_login_files(context, ast_arena);
+      if (should_be_interactive) {
+        did_source_bash_rc = true;
+        source_bash_system_rc(context, ast_arena);
+        if (FLAG_RCFILE.is_set())
+          source_file(Path{FLAG_RCFILE.value()}, context, ast_arena);
+        else
+          source_home_file(".bashrc", context, ast_arena);
+      }
+      break;
+    }
+    context.mark_mood_initialized(flavor);
+  }
+
+  /* The bash programmable completion loads once after a bash rc sourced, so the
+     script parses under the bash grammar and its specs survive into the
+     session. */
+  if (did_source_bash_rc) {
+    LOG(verbosity::Info, "bootstrapping the bash programmable completion");
+    ensure_bash_completion_loaded(context, ast_arena);
+  }
 }
 
 } /* namespace shit */
@@ -731,7 +816,8 @@ fn main(int argc, char **argv) -> int
      environment, so the prompt and the diagnostics stay plain on a dumb
      terminal. */
   if (FLAG_DUMB.is_enabled()) {
-    if (!FLAG_POSIX_MODE.is_enabled()) FLAG_POSIX_MODE.toggle();
+    /* The sh mood is selected by resolve_session_mood when --dumb is set, so the
+       block only turns off completion and diagnostics and forces plain output. */
     if (!FLAG_NO_COMPLETION.is_enabled()) FLAG_NO_COMPLETION.toggle();
     if (!FLAG_SUPPRESS_DIAGNOSTICS.is_enabled())
       FLAG_SUPPRESS_DIAGNOSTICS.toggle();
@@ -818,9 +904,9 @@ fn main(int argc, char **argv) -> int
   LOG(shit::verbosity::Info, "invocation basename is '%.*s'",
       static_cast<int>(program_basename.length), program_basename.data);
   LOG(shit::verbosity::Info, "selecting the %s mood",
-      shit::should_run_in_posix_mode()  ? "posix"
-      : shit::should_run_in_bash_mode() ? "bash"
-                                        : "default");
+      shit::resolve_session_mood() == shit::mimic_mood::Posix  ? "posix"
+      : shit::resolve_session_mood() == shit::mimic_mood::Bash ? "bash"
+                                                               : "default");
 
   if (shit::Maybe<int> code = shit::print_help_or_version_status(program_path))
     return *code;
@@ -831,11 +917,42 @@ fn main(int argc, char **argv) -> int
   LOG(shit::verbosity::Info, "the shell %s a login shell",
       is_login_shell ? "is" : "is not");
 
-  /* init-as-bash initializes from the bash config files in bash mode, then
-     snaps to the default at the interactive prompt. The SHIT_INIT_AS_BASH
-     environment variable enables it when set and not empty, the same as passing
-     -L. */
-  let init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
+  /* The runtime mood and the startup-file moods. --mood selects the session
+     mood the shell runs in, while --init-moods lists which moods' startup files
+     to source, in order, and defaults to the session mood. An invalid spelling
+     in either is a usage error the way an unknown flag is. */
+  if (FLAG_MOOD.is_set() && !shit::parse_mood_name(FLAG_MOOD.value())) {
+    shit::show_message("Unknown --mood value '" +
+                       shit::String{FLAG_MOOD.value()} +
+                       "', expected one of 'shit', 'bash', or 'sh'.");
+    return 2;
+  }
+  let const session_mood = shit::resolve_session_mood();
+
+  let init_moods = shit::ArrayList<shit::mimic_mood>{};
+  for (usize i = 0; i < FLAG_INIT_MOODS.count(); i++) {
+    shit::StringView entry = FLAG_INIT_MOODS.get(i);
+    /* A single --init-moods value may itself be a comma-separated list, so each
+       comma-separated name is parsed in turn. */
+    usize name_start = 0;
+    for (usize j = 0; j <= entry.length; j++) {
+      if (j != entry.length && entry[j] != ',') continue;
+      shit::StringView name = entry.substring_of_length(name_start, j - name_start);
+      name_start = j + 1;
+      if (name.is_empty()) continue;
+      shit::Maybe<shit::mimic_mood> parsed = shit::parse_mood_name(name);
+      if (!parsed.has_value()) {
+        shit::show_message("Unknown --init-moods value '" + shit::String{name} +
+                           "', expected one of 'shit', 'bash', or 'sh'.");
+        return 2;
+      }
+      init_moods.push(*parsed);
+    }
+  }
+
+  /* init-as-bash is the deprecated alias that adds the bash startup files. The
+     SHIT_INIT_AS_BASH environment variable enables it when set and not empty. */
+  bool init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
   if (!init_as_bash) {
     if (shit::Maybe<shit::String> env =
             shit::os::get_environment_variable("SHIT_INIT_AS_BASH");
@@ -843,16 +960,16 @@ fn main(int argc, char **argv) -> int
       init_as_bash = true;
   }
 
-  /* init-as-bash and POSIX mode contradict each other, one initializes as bash
-     and the other forces the dash semantics. POSIX takes precedence, the way
-     the shell resolves the other incompatible option pairs, and a warning names
-     the fallback. */
-  if (init_as_bash && shit::should_run_in_posix_mode()) {
-    shit::show_message("Both '--init-as-bash' and POSIX mode were specified. "
-                       "Falling back to POSIX mode.");
-    init_as_bash = false;
+  /* With no explicit --init-moods the session mood's files source. */
+  if (init_moods.is_empty()) init_moods.push(session_mood);
+
+  /* The bash alias appends bash when the list does not already carry it. */
+  if (init_as_bash) {
+    bool has_bash = false;
+    for (shit::mimic_mood listed : init_moods)
+      if (listed == shit::mimic_mood::Bash) has_bash = true;
+    if (!has_bash) init_moods.push(shit::mimic_mood::Bash);
   }
-  LOG(shit::verbosity::Info, "init-as-bash is %s", init_as_bash ? "on" : "off");
 
   /* A privileged shell skips every startup config file, so a profile or rc that
      a less-privileged user controls cannot run with the raised privileges. The
@@ -978,51 +1095,32 @@ fn main(int argc, char **argv) -> int
   /* The startup facts mirror onto the context once, so set -o lists them
      read-only next to the live options. */
   context.set_login_shell(is_login_shell);
-  context.set_inited_as_bash(init_as_bash);
   context.set_custom_rcfile(FLAG_RCFILE.is_set());
-  /* The startup config files, the profiles and the rc, source with nounset and
-     pipefail off, since they are written for a lax shell and read unset
-     variables such as $BASH_VERSION on the /etc/profile path. The strict
-     interactive defaults are applied at the seam below once the config has
-     loaded, so a typo in a variable name and a failing pipeline stage both
-     fail loudly at the prompt. A non-interactive default-mood run sources no
-     config, so it carries the strict unset check from the start the way it
-     carries pipefail and failglob below, and -W downgrades the trip to a
-     warning. An explicit set -u or set -o pipefail is honored throughout. */
-  const bool is_non_interactive_strict =
-      !should_be_interactive && !shit::should_run_in_compat_mode();
-  context.set_error_unset(FLAG_NOUNSET.is_enabled() ||
-                          is_non_interactive_strict);
+  /* The session runs in the resolved mood. The startup files source with
+     strictness off, since they are written for a lax shell and read unset
+     variables such as $BASH_VERSION on the /etc/profile path, and the chain
+     swaps the mood per flavor so a bash rc parses under the bash grammar. The
+     strictness for the session mood is applied at the seam below once the
+     config has loaded, so a default-mood prompt fails loudly on a typo or a
+     failing pipeline stage. A non-interactive run sources nothing, so the seam
+     still runs and seeds its strictness from the mood. */
+  context.set_mood(session_mood);
   /* The CLI -u is the user's own ask the way set -u is, so the -W downgrade
-     leaves it fatal. -W mirrors onto the context so the runtime strictness
-     checks downgrade and set -W can flip it mid-run. */
+     leaves it fatal and the mood seam keeps it on. -W mirrors onto the context
+     so the runtime strictness checks downgrade and set -W can flip it mid-run.
+   */
+  context.set_error_unset(FLAG_NOUNSET.is_enabled());
   if (FLAG_NOUNSET.is_enabled()) context.set_error_unset_explicit(true);
   context.set_warnings_enabled(FLAG_WARNINGS.is_enabled());
-  /* A non-interactive default-mood run carries the strict pipefail the way it
-     carries the strict unmatched glob below, so a failing pipeline stage in a
-     script fails loudly rather than hiding behind the last stage. A
-     compatibility mood stays lenient, the way bash and dash report only the
-     last stage, and the dash comparison runs shit under -P for that reason. */
-  context.set_pipefail(is_non_interactive_strict);
+  context.set_pipefail(false);
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
-  /* An interactive shell sources its profiles and rc with failglob off the way
-     a lax shell does, since a profile globs script directories that need not
-     match any file. The strict default returns at the prompt seam below. A
-     non-interactive run sources no profiles, so it keeps its mode default. */
-  context.set_failglob(
-      should_be_interactive ? false : !shit::should_run_in_compat_mode());
-  context.set_bash_compatible(shit::should_run_in_bash_mode());
-  context.set_posix_mode(shit::should_run_in_posix_mode());
+  context.set_failglob(false);
   /* Mimicry is mirrored onto the context, since the execution path in Utils
      reads it there rather than the static flag, which is internal to this file.
    */
   context.set_mimicry(FLAG_MIMICRY.is_enabled());
-  /* init-as-bash runs the bash config files in bash mode, so the parser accepts
-     their bash syntax and the analysis stage stays off while they source. The
-     interactive seam below snaps this back off for the session itself. */
-  if (init_as_bash) context.set_bash_compatible(true);
   /* Monitor mode is on by default in an interactive shell, the way job control
      is enabled at a prompt. */
   context.set_monitor(should_be_interactive);
@@ -1039,9 +1137,12 @@ fn main(int argc, char **argv) -> int
   /* Shell identity, so a script that probes for its host shell finds a known
      name and takes a working branch rather than a fragile fallback. The mimicry
      run seeds the same set for the shell it mimics, so the seeding is shared.
-     The shit version above stays present in every mode. */
-  context.seed_shell_identity_variables(shit::should_run_in_bash_mode() ||
-                                        init_as_bash);
+     The shit version above stays present in every mood. A bash session or a bash
+     flavor in the init list advertises BASH_VERSION so a bash rc detects it. */
+  bool wants_bash_identity = session_mood == shit::mimic_mood::Bash;
+  for (shit::mimic_mood listed : init_moods)
+    if (listed == shit::mimic_mood::Bash) wants_bash_identity = true;
+  context.seed_shell_identity_variables(wants_bash_identity);
 
   /* SHLVL counts shell nesting. It is read from the inherited environment,
      incremented, and exported so a child shell continues the count. */
@@ -1104,108 +1205,31 @@ fn main(int argc, char **argv) -> int
   let function_arena = shit::BumpArena{};
   shit::FUNCTION_ARENA = &function_arena;
 
-  /* The interactive rc the host bash would read, replaced by the --rcfile file
-     when one is given, the way bash reads a named rc instead of ~/.bashrc. */
-  /* Set when the bash interactive rc chain ran, the one condition the
-     bash-completion bootstrap below keys on. */
-  bool did_source_bash_rc = false;
-  let const source_bash_rc = [&]() {
-    /* bash runs the system rc before the user one even under --rcfile, so the
-       chain mirrors that order. */
-    did_source_bash_rc = true;
-    shit::source_bash_system_rc(context, ast_arena);
-    if (FLAG_RCFILE.is_set())
-      source_file(shit::Path{FLAG_RCFILE.value()}, context, ast_arena);
-    else
-      source_home_file(".bashrc", context, ast_arena);
-  };
-
+  /* The startup files source for each mood in the init list, in order, with the
+     mood swapped per flavor so a bash rc parses under the bash grammar. A
+     privileged shell sources nothing, the way bash's privileged mode leaves the
+     profiles and rc files unread. */
   if (is_privileged) {
-    /* A privileged shell sources nothing, the way bash's privileged mode leaves
-       the profiles and rc files unread. */
     LOG(shit::verbosity::Info,
         "skipping every startup config file in privileged mode");
-  } else if (init_as_bash) {
-    /* init-as-bash sources the bash config files in bash mode so an existing
-       bash setup loads. With -l it reads /etc/profile then the first existing
-       of
-       ~/.bash_profile, ~/.bash_login, and ~/.profile, the bash login order. An
-       interactive shell reads ~/.bashrc. The POSIX ENV is skipped, since the
-       intent is to initialize from the bash files. The shit rc still loads
-       after them, so a shit-native interactive config such as the prompt and
-       the aliases applies on top of the bash setup. */
-    if (is_login_shell) source_bash_login_files(context, ast_arena);
-    if (should_be_interactive) source_bash_rc();
-    if (should_be_interactive) source_home_file(".shitrc", context, ast_arena);
   } else {
-    /* A login shell reads the login files of the shell it emulates. Bash mode
-       reads the bash login order, so --bash-compatible -l or a bash invocation
-       gets the bash profiles. POSIX mode reads the strict dash login order,
-       /etc/profile then ~/.profile, while the file named by ENV is an
-       interactive feature read below rather than part of the login set. The
-       default shit mode reads the same dash order and then ENV. A missing file
-       is silently skipped. */
-    if (is_login_shell && shit::should_run_in_bash_mode()) {
-      source_bash_login_files(context, ast_arena);
-    } else if (is_login_shell && shit::should_run_in_posix_mode()) {
-      source_posix_login_files(context, ast_arena);
-    } else if (is_login_shell) {
-      source_posix_login_files(context, ast_arena);
-      if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
-          env.has_value() && !env->is_empty())
-        source_file(shit::Path{env->view()}, context, ast_arena);
-    }
-
-    /* An interactive shell reads ~/.shitrc, the home for interactive config
-       such as aliases, options, and the prompt. A login shell reads it too,
-       after the profiles, so a setting lands in every interactive session. A
-       missing file is silently skipped. */
-    if (should_be_interactive) source_home_file(".shitrc", context, ast_arena);
-
-    /* A compatibility mode reads the interactive rc its host shell would. Bash
-       mode reads ~/.bashrc, and POSIX mode reads the file named by ENV whether
-       or not the shell is a login one, since the POSIX login path above leaves
-       ENV to here. The shit rc above runs first in the default mode. A missing
-       file is silently skipped. */
-    if (should_be_interactive && shit::should_run_in_bash_mode()) {
-      source_bash_rc();
-    } else if (should_be_interactive && shit::should_run_in_posix_mode()) {
-      if (shit::Maybe<shit::String> env = context.get_variable_value("ENV");
-          env.has_value() && !env->is_empty())
-        source_file(shit::Path{env->view()}, context, ast_arena);
-    }
-  }
-
-  /* The bash programmable completion loads at the end of the chain, before
-     the init-as-bash snap-back below, so the script parses under the bash
-     grammar it is written for and its specs survive into the session. */
-  if (did_source_bash_rc) {
-    LOG(shit::verbosity::Info,
-        "bootstrapping the bash programmable completion");
-    shit::ensure_bash_completion_loaded(context, ast_arena);
+    shit::source_init_moods(context, ast_arena, init_moods, is_login_shell,
+                            should_be_interactive);
   }
 
   /* The startup files have finished, so a command typed at the prompt may now
      retitle the terminal. */
   context.set_startup_finished();
 
-  /* The startup config has loaded, so the strict interactive defaults take over
-     for the session. An interactive shit-native shell turns nounset and
-     pipefail on so a typo or a failing pipeline stage fails loudly at the
-     prompt, while a compatibility mode keeps the lax bash or dash defaults.
-     init-as-bash also leaves bash mode here, so the strict parser and the
-     analysis stage take over from the first prompt. A non-interactive run has
-     no prompt, so it keeps the lenient sourcing defaults for the whole run. */
-  if (should_be_interactive) {
-    if (init_as_bash) context.set_bash_compatible(false);
-    let const strict = !shit::should_run_in_compat_mode();
-    LOG(shit::verbosity::Info,
-        "flipping the strictness seam at the prompt, strict defaults are %s",
-        strict ? "on" : "off");
-    context.set_error_unset(FLAG_NOUNSET.is_enabled() || strict);
-    context.set_pipefail(strict);
-    context.set_failglob(strict);
-  }
+  /* The startup config has loaded, so the session mood takes over and seeds its
+     strictness. A default-mood shell turns nounset, pipefail, and failglob on so
+     a typo or a failing pipeline stage fails loudly, while a compatibility mood
+     keeps the lax bash or dash defaults. An explicit set -u survives. The
+     sourcing above swaps the mood per flavor, so the session mood is restored
+     here, unless the rc itself picked a mood with set --mood, which wins over
+     the startup default the way a command-line --mood would. */
+  if (!context.mood_set_explicitly()) context.set_mood(session_mood);
+  context.apply_strictness_for_mood();
 
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
@@ -1291,10 +1315,10 @@ fn main(int argc, char **argv) -> int
            */
           toiletline::set_ghost_enabled(!FLAG_NO_COMPLETION.is_enabled());
           shit::show_message(
-              init_as_bash                       ? "Bash me harder?"
-              : shit::should_run_in_posix_mode() ? "POSIX me harder!"
-              : shit::should_run_in_bash_mode()  ? "Bash me harder!"
-                                                 : "Welcome :3");
+              session_mood == shit::mimic_mood::Posix  ? "POSIX me harder!"
+              : session_mood == shit::mimic_mood::Bash ? "Bash me harder!"
+              : init_as_bash                           ? "Bash me harder?"
+                                                       : "Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
            * previosly! */

@@ -1987,8 +1987,10 @@ fn run_substitution_to_temp(StringView source, bool bash_compatible) throws
 
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), StringView{module_path}});
-  if (bash_compatible)
-    arguments.push(String{heap_allocator(), StringView{"--bash-compatible"}});
+  if (bash_compatible) {
+    arguments.push(String{heap_allocator(), StringView{"--mood"}});
+    arguments.push(String{heap_allocator(), StringView{"bash"}});
+  }
   arguments.push(String{heap_allocator(), StringView{"-c"}});
   arguments.push(String{heap_allocator(), source});
   let command_line = make_os_args(arguments);
@@ -2043,8 +2045,10 @@ fn spawn_subshell_stage(StringView source, Maybe<descriptor> in_fd,
 
   let arguments = ArrayList<String>{heap_allocator()};
   arguments.push(String{heap_allocator(), StringView{module_path}});
-  if (bash_compatible)
-    arguments.push(String{heap_allocator(), StringView{"--bash-compatible"}});
+  if (bash_compatible) {
+    arguments.push(String{heap_allocator(), StringView{"--mood"}});
+    arguments.push(String{heap_allocator(), StringView{"bash"}});
+  }
   arguments.push(String{heap_allocator(), StringView{"-c"}});
   arguments.push(String{heap_allocator(), source});
   let command_line = make_os_args(arguments);

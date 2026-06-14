@@ -833,6 +833,12 @@ public:
      failed rather than the last stage alone. */
   fn set_pipefail(bool enabled) wontthrow -> void;
   pure fn pipefail() const wontthrow -> bool;
+  /* Marks the pipeline strictness as the script's own set -o pipefail rather
+     than a mood seed, so a later mood switch leaves it in place. */
+  fn set_pipefail_explicit(bool enabled) wontthrow -> void
+  {
+    m_pipefail_explicit = enabled;
+  }
 
   /* noclobber rejects an overwrite of an existing file through a plain >, set
      by -C and set -o noclobber. */
@@ -877,44 +883,83 @@ public:
      reaches it. */
   fn expand_glob_lenient(StringView pattern) throws -> ArrayList<String>;
 
-  /* bash-compatible mode enables the bash extensions that change the meaning of
-     valid POSIX syntax, such as the (( )) arithmetic command and brace
-     expansion. The evaluator reads it for brace expansion and the parser is
-     handed it at construction for the (( )) and C-style for syntax. */
-  /* Each setter touches only its own mood, so disabling bash leaves an active
-     POSIX mood in place and the reverse, the way the two mode flags behaved.
-     The shell sits in exactly one mood at a time, held as m_mood. */
-  fn set_bash_compatible(bool enabled) wontthrow -> void
-  {
-    if (enabled)
-      m_mood = mimic_mood::Bash;
-    else if (m_mood == mimic_mood::Bash)
-      m_mood = mimic_mood::Default;
-  }
+  /* Bash mood enables the bash extensions that change the meaning of valid
+     POSIX syntax, such as the (( )) arithmetic command and brace expansion. The
+     evaluator reads it for brace expansion and the parser is handed it at
+     construction for the (( )) and C-style for syntax. The shell sits in exactly
+     one mood at a time, held as m_mood, and the mood is selected through set_mood
+     by the --mood flag and the set --mood builtin. These predicates name the
+     active mood for the lexer, the completion, and the globbing. */
   pure fn is_bash_compatible() const wontthrow -> bool
   {
     return m_mood == mimic_mood::Bash;
   }
 
-  /* POSIX mode behaves like dash. The non-posix-breaking bash additions that
-     are on in the default mode too, such as the extended globs, read this to
+  /* POSIX mood behaves like dash. The non-posix-breaking bash additions that
+     are on in the default mood too, such as the extended globs, read this to
      stay off only here. */
-  fn set_posix_mode(bool enabled) wontthrow -> void
-  {
-    if (enabled)
-      m_mood = mimic_mood::Posix;
-    else if (m_mood == mimic_mood::Posix)
-      m_mood = mimic_mood::Default;
-  }
   pure fn is_posix_mode() const wontthrow -> bool
   {
     return m_mood == mimic_mood::Posix;
   }
 
-  /* The mood the lexer reads, the single source of truth for the three modes.
-   */
+  /* The mood the lexer reads, the single source of truth for the three moods.
+     set_mood changes only the mood, so a caller that wants the strictness moved
+     with it calls apply_strictness_for_mood after. */
   fn set_mood(mimic_mood mood) wontthrow -> void { m_mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
+
+  /* Seed the nounset, pipefail, and failglob strictness from the active mood,
+     so the strict default mood runs strict and a compatibility mood runs lax,
+     the way the named shell does. An explicit set -u, set -o pipefail, or set -o
+     failglob is the script's own ask, so it survives the mood switch untouched.
+     The startup seam and the set --mood builtin both call this. */
+  fn apply_strictness_for_mood() wontthrow -> void
+  {
+    let const strict = m_mood == mimic_mood::Default;
+    if (!m_error_unset_explicit) set_error_unset(strict);
+    if (!m_pipefail_explicit) set_pipefail(strict);
+    if (!m_failglob_explicit) set_failglob(strict);
+  }
+
+  /* The moods whose startup files are being sourced right now, a bit per mood.
+     source_init_moods marks a flavor while it sources it and skips a flavor the
+     bit already names, so a set --init-moods inside a sourced ~/.shitrc cannot
+     re-source the same rc and recurse without end. */
+  fn set_init_mood_sourcing(mimic_mood mood, bool active) wontthrow -> void
+  {
+    let const bit = static_cast<u8>(1U << static_cast<u8>(mood));
+    if (active)
+      m_init_moods_sourcing |= bit;
+    else
+      m_init_moods_sourcing &= static_cast<u8>(~bit);
+  }
+  pure fn init_mood_sourcing(mimic_mood mood) const wontthrow -> bool
+  {
+    return (m_init_moods_sourcing & (1U << static_cast<u8>(mood))) != 0;
+  }
+
+  /* set --mood records that the user chose the mood, so the post-rc restore in
+     main leaves a mood the rc selected in place rather than overwriting it with
+     the startup default the way it would for a mood only the flavor sourcing
+     touched. */
+  fn note_explicit_mood() wontthrow -> void { m_mood_set_explicitly = true; }
+  pure fn mood_set_explicitly() const wontthrow -> bool
+  {
+    return m_mood_set_explicitly;
+  }
+
+  /* The moods whose startup files have finished sourcing this session, so set
+     --init-moods with no value reports what loaded. A flavor stays marked once
+     it sources, both at startup and from a later set --init-moods. */
+  fn mark_mood_initialized(mimic_mood mood) wontthrow -> void
+  {
+    m_initialized_moods |= static_cast<u8>(1U << static_cast<u8>(mood));
+  }
+  pure fn mood_initialized(mimic_mood mood) const wontthrow -> bool
+  {
+    return (m_initialized_moods & (1U << static_cast<u8>(mood))) != 0;
+  }
 
   /* Mimicry runs a shell script in-process in the matching mode rather than
      launching the shell, mirrored here so the execution path reads it off the
@@ -922,7 +967,7 @@ public:
   fn set_mimicry(bool enabled) wontthrow -> void { m_mimicry = enabled; }
   pure fn mimicry() const wontthrow -> bool { return m_mimicry; }
 
-  /* The positive spelling of the analysis toggle, so set -o diagnostics
+  /* The positive spelling of the analysis toggle, so set -o force-diagnostics
      enables the stage the way --no-diagnostics disables it. */
   fn set_diagnostics_enabled(bool enabled) wontthrow -> void
   {
@@ -1258,11 +1303,6 @@ public:
     m_is_login_shell = enabled;
   }
   pure fn is_login_shell() const wontthrow -> bool { return m_is_login_shell; }
-  fn set_inited_as_bash(bool enabled) wontthrow -> void
-  {
-    m_inited_as_bash = enabled;
-  }
-  pure fn inited_as_bash() const wontthrow -> bool { return m_inited_as_bash; }
   fn set_custom_rcfile(bool enabled) wontthrow -> void
   {
     m_has_custom_rcfile = enabled;
@@ -1289,7 +1329,6 @@ protected:
   bool m_memory_stats_enabled{false};
   bool m_diagnostics_disabled{false};
   bool m_is_login_shell{false};
-  bool m_inited_as_bash{false};
   bool m_has_custom_rcfile{false};
   usize m_expressions_executed_last{0};
   usize m_expressions_executed_total{0};
@@ -1422,6 +1461,10 @@ protected:
   bool m_error_unset_explicit{false};
   bool m_warnings_enabled{false};
   bool m_pipefail{false};
+  bool m_pipefail_explicit{false};
+  u8 m_init_moods_sourcing{0};
+  u8 m_initialized_moods{0};
+  bool m_mood_set_explicitly{false};
   bool m_no_clobber{false};
   bool m_export_all{false};
   bool m_no_exec{false};
@@ -1700,5 +1743,15 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize;
 /* Throw an error carrying the script-fatal mark, the abort the set -u read
    and the ${name:?} report perform even in the bash mood. */
 [[noreturn]] fn throw_script_fatal(String message) throws -> void;
+
+/* Source the startup files for each mood in the list, in order, the way the
+   --init-moods flag and the set --init-moods builtin both ask. A shit flavor
+   reads /etc/shitrc and ~/.shitrc, a bash flavor the bash rc and completion, a
+   posix flavor the ENV file, and each adds its login profiles when is_login is
+   set. Defined in Main.cpp next to the file-sourcing helpers, declared here so
+   the set builtin can replay it into a live session. */
+fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
+                     const ArrayList<mimic_mood> &moods, bool is_login_shell,
+                     bool should_be_interactive) throws -> void;
 
 } /* namespace shit */

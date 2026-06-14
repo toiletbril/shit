@@ -59,8 +59,6 @@ const SetOption SET_OPTIONS[] = {
      "Treat an unset variable as an error.", "no-unset"},
     {'\0', "pipefail", &EvalContext::set_pipefail, &EvalContext::pipefail,
      "Report a pipeline's status as the rightmost stage that failed."},
-    {'\0', "posix", &EvalContext::set_posix_mode, &EvalContext::is_posix_mode,
-     "Behave like dash, the POSIX mode."},
     {'a', "allexport", &EvalContext::set_export_all, &EvalContext::export_all,
      "Mark every assigned variable for the environment.", "export-all"},
     {'C', "noclobber", &EvalContext::set_no_clobber, &EvalContext::no_clobber,
@@ -92,27 +90,24 @@ const SetOption SET_OPTIONS[] = {
        the same way the -A flag does at startup. */
     {'A', "show-ast", &EvalContext::set_show_ast, &EvalContext::show_ast,
      "Print the AST before each command runs."},
-    {'M', "show-lexed-words", &EvalContext::set_show_lexed_words,
+    {'R', "show-lexed-words", &EvalContext::set_show_lexed_words,
      &EvalContext::show_lexed_words,
      "Print the escape bitmap after each parse."},
     {'E', "show-exit-code", &EvalContext::set_show_exit_code,
      &EvalContext::show_exit_code, "Print the exit code after each command."},
-    {'W', "warnings", &EvalContext::set_warnings_enabled,
+    {'W', "force-warnings", &EvalContext::set_warnings_enabled,
      &EvalContext::warnings_enabled,
      "Report a strict runtime error as a warning and let the run proceed, the "
-     "-W flag.", "force-warnings"},
+     "-W flag."},
     {'I', "mimicry", &EvalContext::set_mimicry, &EvalContext::mimicry,
      "Mimic the shell a script's shebang names, the -I flag."},
-    {'\0', "diagnostics", &EvalContext::set_diagnostics_enabled,
+    {'\0', "force-diagnostics", &EvalContext::set_diagnostics_enabled,
      &EvalContext::diagnostics_enabled,
      "Run the analysis stage before each chunk, the inverse of "
      "no-diagnostics."},
     {'S', "show-stats", &EvalContext::set_stats_enabled,
      &EvalContext::stats_enabled,
      "Print evaluation statistics after each run."},
-    {'\0', "bash-compatible", &EvalContext::set_bash_compatible,
-     &EvalContext::is_bash_compatible,
-     "Behave like bash, the bash-compatible mode."},
     {'\0', "no-diagnostics", &EvalContext::set_diagnostics_disabled,
      &EvalContext::diagnostics_disabled,
      "Skip the analysis stage before each chunk runs."},
@@ -124,11 +119,33 @@ const SetOption SET_OPTIONS[] = {
        invocation. */
     {'\0', "login", nullptr, &EvalContext::is_login_shell,
      "Whether the shell started as a login shell, fixed at startup."},
-    {'\0', "init-as-bash", nullptr, &EvalContext::inited_as_bash,
-     "Whether the shell initialized from the bash configs, fixed at startup."},
     {'\0', "rcfile", nullptr, &EvalContext::has_custom_rcfile,
      "Whether a custom rc file was named at startup, fixed at startup."},
 };
+
+/* Parse a set --mood value, with 'shit' the strict default, 'bash' the bash
+   extensions, and 'sh' or 'posix' the dash semantics. An unknown spelling
+   returns None so the caller reports the usage error the same way --mood does at
+   startup. */
+Maybe<mimic_mood> parse_mood_name(StringView name) throws
+{
+  if (name == "shit" || name == "default") return mimic_mood::Default;
+  if (name == "bash") return mimic_mood::Bash;
+  if (name == "sh" || name == "posix" || name == "dash")
+    return mimic_mood::Posix;
+  return None;
+}
+
+/* The canonical name of a mood, for the set --mood readout with no value. */
+StringView mood_name(mimic_mood mood) throws
+{
+  switch (mood) {
+  case mimic_mood::Bash: return "bash";
+  case mimic_mood::Posix: return "sh";
+  case mimic_mood::Default: return "shit";
+  }
+  return "shit";
+}
 
 const SetOption *find_option_by_letter(char letter) throws
 {
@@ -179,6 +196,8 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
     cxt.set_error_unset_explicit(enable);
   else if (option.set == &EvalContext::set_failglob)
     cxt.set_failglob_explicit(enable);
+  else if (option.set == &EvalContext::set_pipefail)
+    cxt.set_pipefail_explicit(enable);
 }
 
 /* The reusable command form that set -o and set +o print, one line each. The
@@ -351,6 +370,87 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (arg == "--") {
       collecting_operands = true;
       should_rebind = true;
+      continue;
+    }
+
+    /* set --mood [VALUE] changes the runtime mood, or prints the active mood
+       when no value follows. The mood drives strictness, so the nounset,
+       pipefail, and failglob defaults are reseeded from the new mood. */
+    if (arg == "--mood" || arg == "-M" ||
+        arg.view().starts_with(StringView{"--mood="}) ||
+        arg.view().starts_with(StringView{"-M="})) {
+      StringView value{};
+      bool have_value = false;
+      if (let const eq = arg.view().find_character('='); eq.has_value()) {
+        value = arg.view().substring(*eq + 1);
+        have_value = true;
+      } else if (i + 1 < args.count()) {
+        value = args[++i].view();
+        have_value = true;
+      }
+      if (!have_value) {
+        ec.print_to_stdout(String{mood_name(cxt.mood())} + "\n");
+        continue;
+      }
+      let const parsed = parse_mood_name(value);
+      if (!parsed.has_value())
+        throw Error{String{"unknown --mood value '"} + value +
+                    "', expected 'shit', 'bash', or 'sh'"};
+      cxt.set_mood(*parsed);
+      cxt.apply_strictness_for_mood();
+      cxt.note_explicit_mood();
+      continue;
+    }
+
+    /* set --init-moods=LIST re-runs the startup files for each listed flavor in
+       the live session, the way the --init-moods flag does at startup, so a
+       bash rc or a shit rc reloads on demand. */
+    if (arg == "--init-moods" || arg == "-L" ||
+        arg.view().starts_with(StringView{"--init-moods="}) ||
+        arg.view().starts_with(StringView{"-L="})) {
+      StringView value{};
+      bool have_value = false;
+      if (let const eq = arg.view().find_character('='); eq.has_value()) {
+        value = arg.view().substring(*eq + 1);
+        have_value = true;
+      } else if (i + 1 < args.count()) {
+        value = args[++i].view();
+        have_value = true;
+      }
+      /* With no value the form reports the moods whose startup files have
+         loaded this session, the way set --mood reports the active mood. */
+      if (!have_value) {
+        let out = String{};
+        for (mimic_mood listed :
+             {mimic_mood::Default, mimic_mood::Posix, mimic_mood::Bash}) {
+          if (!cxt.mood_initialized(listed)) continue;
+          if (!out.is_empty()) out += " ";
+          out += mood_name(listed);
+        }
+        out += "\n";
+        ec.print_to_stdout(out);
+        continue;
+      }
+      let moods = ArrayList<mimic_mood>{};
+      usize name_start = 0;
+      for (usize j = 0; j <= value.length; j++) {
+        if (j != value.length && value[j] != ',') continue;
+        let const name = value.substring_of_length(name_start, j - name_start);
+        name_start = j + 1;
+        if (name.is_empty()) continue;
+        let const parsed = parse_mood_name(name);
+        if (!parsed.has_value())
+          throw Error{String{"unknown --init-moods value '"} + name +
+                      "', expected 'shit', 'bash', or 'sh'"};
+        moods.push(*parsed);
+      }
+      if (AST_ARENA == nullptr)
+        throw Error{"Unable to source the init moods outside of a parse"};
+      let const previous_mood = cxt.mood();
+      source_init_moods(cxt, *AST_ARENA, moods, cxt.is_login_shell(),
+                        cxt.shell_is_interactive());
+      cxt.set_mood(previous_mood);
+      cxt.apply_strictness_for_mood();
       continue;
     }
 

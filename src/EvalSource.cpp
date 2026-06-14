@@ -66,20 +66,21 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const previous_script_run = m_is_script_run;
   m_is_script_run = true;
 
-  /* The strict interactive defaults shit turns on at its own prompt, nounset
-     and pipefail and failglob, do not belong to a real bash or sh running a
-     file, so a mimicked script clears them for its run and the isolated case
-     puts them back. This is why a mimicked declare -A array literal does not
-     abort on the unmatched [k]=v glob, and an unset parameter expands empty
-     rather than tripping nounset, the way the named shell runs the script. */
+  /* A mimicked script runs with the strictness of the mood it mimics, so a bash
+     or sh script clears nounset, pipefail, and failglob the way the named shell
+     runs a file, while a shit script keeps the strict default. The isolated case
+     puts the parent's options back. This is why a mimicked declare -A array
+     literal does not abort on the unmatched [k]=v glob, and an unset parameter
+     expands empty rather than tripping nounset, the way bash runs the script. */
   let const previous_error_unset = error_unset();
   let const previous_pipefail = pipefail();
   let const previous_failglob = failglob();
-  set_error_unset(false);
-  set_pipefail(false);
-  set_failglob(false);
-  LOG(verbosity::Debug,
-      "cleared the interactive strict options for the mimicked run");
+  let const mimic_strict = mode == mimic_mood::Default;
+  set_error_unset(mimic_strict);
+  set_pipefail(mimic_strict);
+  set_failglob(mimic_strict);
+  LOG(verbosity::Debug, "seeded the strict options for the %s mimicked run",
+      mimic_strict ? "shit" : "lax");
 
   let parser = Parser{
       Lexer{String{contents->view()}, *AST_ARENA, false, None, mood()}

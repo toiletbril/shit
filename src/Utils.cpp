@@ -94,8 +94,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
         ec.in_fd.reset();
         ec.out_fd.reset();
         ec.err_fd.reset();
-        const mimic_mood mode =
-            cxt.is_bash_compatible() ? mimic_mood::Bash : mimic_mood::Posix;
+        const mimic_mood mode = cxt.mood();
         const bool isolated = !(cxt.terminal_exec_allowed() &&
                                 !cxt.in_subshell() && !cxt.has_exit_trap());
         quit(cxt.run_mimicked_script(ec, mode, isolated), false);
@@ -139,8 +138,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       /* The file has no shebang and is not a binary, so a foreground command
          runs it as a shell script in this process instead of as a child, the
          POSIX fallback. */
-      const mimic_mood mode =
-          cxt.is_bash_compatible() ? mimic_mood::Bash : mimic_mood::Posix;
+      const mimic_mood mode = cxt.mood();
       const bool isolated = !(cxt.terminal_exec_allowed() &&
                               !cxt.in_subshell() && !cxt.has_exit_trap());
       return cxt.run_mimicked_script(ec, mode, isolated);
