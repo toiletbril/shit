@@ -109,6 +109,10 @@ FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
      Shit,
      "Skip the analysis stage, so no warnings or pre-run diagnostics are "
      "reported and evaluation begins sooner.");
+FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
+     "Suppress diagnostics and warnings only while the startup profiles and rc "
+     "files source, then restore them for the prompt. Pairs with -W so a strict "
+     "shell loads a lax bash config quietly yet keeps its checks afterward.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
 
@@ -1213,8 +1217,23 @@ fn main(int argc, char **argv) -> int
     LOG(shit::verbosity::Info,
         "skipping every startup config file in privileged mode");
   } else {
+    /* --no-init-diagnostics turns diagnostics and warnings off for the duration
+       of the init sourcing, so a -W shell loads a lax bash config without
+       printing its unset-variable and glob warnings. A function defined while
+       this is off captures the quiet state, so it stays quiet at the prompt
+       too. The state returns afterward, restoring -W for the session. */
+    let const saved_diagnostics_disabled = context.diagnostics_disabled();
+    let const saved_warnings = context.warnings_enabled();
+    if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
+      context.set_diagnostics_disabled(true);
+      context.set_warnings_enabled(false);
+    }
     shit::source_init_moods(context, ast_arena, init_moods, is_login_shell,
                             should_be_interactive);
+    if (FLAG_SUPPRESS_INIT_DIAGNOSTICS.is_enabled()) {
+      context.set_diagnostics_disabled(saved_diagnostics_disabled);
+      context.set_warnings_enabled(saved_warnings);
+    }
   }
 
   /* The startup files have finished, so a command typed at the prompt may now
