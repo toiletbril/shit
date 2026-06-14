@@ -1,17 +1,18 @@
-# A command in a trusted directory that lists subcommands under a Commands
-# header in its --help text, the shape cargo and similar tools use without a
-# manpage, completes those subcommands in subcommand position and its options
-# after a dash. A fake tool keeps the candidates stable across machines.
+# An allowlisted command in a trusted directory that lists subcommands under a
+# Commands header in its --help text, the shape cargo uses without a manpage,
+# completes those subcommands in subcommand position and its options after a
+# dash. A fake binary named for an allowlisted command keeps the candidates
+# stable across machines.
 dir=/tmp/shit_help_sub
 rm -rf "$dir"
 mkdir -p "$dir"
 chmod 755 "$dir"
-cat > "$dir/subtool" <<'SH'
+cat > "$dir/cargo" <<'SH'
 #!/bin/sh
 cat <<'HELP'
 A fake multi-tool
 
-Usage: subtool [OPTIONS] <COMMAND>
+Usage: cargo [OPTIONS] <COMMAND>
 
 Options:
       --verbose   Be loud
@@ -23,9 +24,9 @@ Commands:
     clean       Remove the output directory
 HELP
 SH
-chmod +x "$dir/subtool"
+chmod +x "$dir/cargo"
 echo "== subcommands in subcommand position:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'subtool c' </dev/null
+PATH="$dir:$PATH" "$BIN" --debug-complete-at 'cargo c' </dev/null
 echo "== option after a dash:"
-PATH="$dir:$PATH" "$BIN" --debug-complete-at 'subtool --v' </dev/null
+PATH="$dir:$PATH" "$BIN" --debug-complete-at 'cargo --v' </dev/null
 rm -rf "$dir"

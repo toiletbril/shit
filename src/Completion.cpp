@@ -1095,20 +1095,73 @@ static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
   return options;
 }
 
-/* Commands whose full option list needs a help argument other than the plain
-   --help. ffmpeg prints a short summary for --help and the complete option set
-   only for --help full, so it and its siblings read the fuller form. A command
-   in this table reads its options from --help rather than a manpage, so its
-   single-dash long options come through even when a manpage also exists. */
-static constexpr StaticStringMap<const char *>::entry HELP_ARGUMENT_ENTRIES[] =
+/* The commands shit is allowed to fork for their --help text, each mapped to
+   the help argument that prints the full option and subcommand list. This is
+   the allowlist half of the gate, so a command must appear here and resolve
+   into a trusted directory before its --help runs. The value is the help
+   argument, almost always --help, ffmpeg and its siblings the exception since
+   they print the complete set only for --help full. A command whose argument is
+   not plain --help reads its options from --help rather than a manpage, so its
+   single-dash long options come through even when a manpage also exists.
+
+   The list names common tools whose --help lists flags and subcommands, the
+   ones a zero-config shell should complete without a hand-written script,
+   leaning toward tools that lack a good manpage such as cargo. A name longer
+   than sixteen bytes cannot key the packed map, so it is left out. */
+static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
     {
-        {PackedStringKey::from_literal("ffmpeg"),  "--help full"},
-        {PackedStringKey::from_literal("ffprobe"), "--help full"},
-        {PackedStringKey::from_literal("ffplay"),  "--help full"},
+        {PackedStringKey::from_literal("ffmpeg"),     "--help full"},
+        {PackedStringKey::from_literal("ffprobe"),    "--help full"},
+        {PackedStringKey::from_literal("ffplay"),     "--help full"},
+        {PackedStringKey::from_literal("cargo"),      "--help"},
+        {PackedStringKey::from_literal("rustup"),     "--help"},
+        {PackedStringKey::from_literal("rustc"),      "--help"},
+        {PackedStringKey::from_literal("rustfmt"),    "--help"},
+        {PackedStringKey::from_literal("go"),         "--help"},
+        {PackedStringKey::from_literal("npm"),        "--help"},
+        {PackedStringKey::from_literal("pnpm"),       "--help"},
+        {PackedStringKey::from_literal("yarn"),       "--help"},
+        {PackedStringKey::from_literal("deno"),       "--help"},
+        {PackedStringKey::from_literal("bun"),        "--help"},
+        {PackedStringKey::from_literal("node"),       "--help"},
+        {PackedStringKey::from_literal("pip"),        "--help"},
+        {PackedStringKey::from_literal("pip3"),       "--help"},
+        {PackedStringKey::from_literal("docker"),     "--help"},
+        {PackedStringKey::from_literal("podman"),     "--help"},
+        {PackedStringKey::from_literal("kubectl"),    "--help"},
+        {PackedStringKey::from_literal("helm"),       "--help"},
+        {PackedStringKey::from_literal("gh"),         "--help"},
+        {PackedStringKey::from_literal("glab"),       "--help"},
+        {PackedStringKey::from_literal("terraform"),  "--help"},
+        {PackedStringKey::from_literal("cmake"),      "--help"},
+        {PackedStringKey::from_literal("ninja"),      "--help"},
+        {PackedStringKey::from_literal("meson"),      "--help"},
+        {PackedStringKey::from_literal("jq"),         "--help"},
+        {PackedStringKey::from_literal("yq"),         "--help"},
+        {PackedStringKey::from_literal("rg"),         "--help"},
+        {PackedStringKey::from_literal("fd"),         "--help"},
+        {PackedStringKey::from_literal("bat"),        "--help"},
+        {PackedStringKey::from_literal("fzf"),        "--help"},
+        {PackedStringKey::from_literal("zig"),        "--help"},
+        {PackedStringKey::from_literal("poetry"),     "--help"},
+        {PackedStringKey::from_literal("pipx"),       "--help"},
+        {PackedStringKey::from_literal("uv"),         "--help"},
+        {PackedStringKey::from_literal("just"),       "--help"},
+        {PackedStringKey::from_literal("hugo"),       "--help"},
 };
-static constexpr StaticStringMap<const char *> HELP_ARGUMENTS{
-    HELP_ARGUMENT_ENTRIES,
-    sizeof(HELP_ARGUMENT_ENTRIES) / sizeof(HELP_ARGUMENT_ENTRIES[0])};
+static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
+    HELP_ALLOWLIST_ENTRIES,
+    sizeof(HELP_ALLOWLIST_ENTRIES) / sizeof(HELP_ALLOWLIST_ENTRIES[0])};
+
+/* Whether the command reads its options from --help in preference to a manpage,
+   so the manpage stage skips it. Only a command whose help argument is not the
+   plain --help qualifies, the ffmpeg family, whose manpage carries the options
+   in a form the flag scanner does not read. */
+static fn command_prefers_help_over_manpage(StringView command) throws -> bool
+{
+  Maybe<const char *> argument = HELP_ALLOWLIST.find(command);
+  return argument.has_value() && StringView{*argument} != StringView{"--help"};
+}
 
 /* The option flags a manpage documents, parsed once and cached under the page
    name. The man invocation is the general path that works for any command on
@@ -1152,10 +1205,9 @@ static fn complete_from_manpage(StringView line, StringView token,
   let const resolved = resolve_completion_command(surface_command, context);
   const StringView command = resolved.view();
 
-  /* A command with a special help invocation reads its options from --help
-     rather than the manpage, so it skips this stage and the help stage below
-     picks it up. */
-  if (HELP_ARGUMENTS.find(command).has_value()) return None;
+  /* A command that prefers --help reads its options from there rather than the
+     manpage, so it skips this stage and the help stage below picks it up. */
+  if (command_prefers_help_over_manpage(command)) return None;
 
   /* git commit -<tab> reads the git-commit page when the index knows it, the
      general command-subcommand form, so the options come from the subcommand
@@ -1209,13 +1261,14 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
   return os::directory_is_trusted_for_exec(Path{directory});
 }
 
-/* A command's raw --help text, captured once for a command that resolves into a
-   trusted directory. The resolved absolute path runs, not the bare name, so an
-   alias or a function never shadows the trusted binary, the trusted-directory
-   gate keeps the fork off any program in an untrusted place, and stdin is
-   closed so a binary that would page or prompt reads end-of-file and exits
-   rather than hanging the prompt. An untrusted or unresolved command caches the
-   empty string, so it never forks twice. */
+/* A command's raw --help text, captured once. The fork passes two gates, the
+   command is on the allowlist and resolves into a trusted directory, so a
+   program shit does not recognize and a program in an untrusted place are both
+   left unforked. The resolved absolute path runs, not the bare name, so an
+   alias or a function never shadows the trusted binary, and stdin is closed so
+   a binary that would page or prompt reads end-of-file and exits rather than
+   hanging the prompt. A command that fails either gate caches the empty string,
+   so it never forks twice. */
 static fn help_text_for(StringView command, EvalContext &context) throws
     -> StringView
 {
@@ -1223,18 +1276,17 @@ static fn help_text_for(StringView command, EvalContext &context) throws
     return cached->view();
   let text = String{};
   try {
+    /* The allowlist entry carries the help argument, so ffmpeg forks --help
+       full rather than the summary-only --help. A command not on the list never
+       forks. */
+    Maybe<const char *> help_argument = HELP_ALLOWLIST.find(command);
     let const paths = utils::search_program_path(command);
-    if (!paths.is_empty() &&
+    if (help_argument.has_value() && !paths.is_empty() &&
         command_directory_is_trusted(paths[0].text().view()))
     {
-      /* A command with a non-standard help invocation reads its table entry,
-         so ffmpeg forks --help full rather than the summary-only --help. */
-      StringView help_argument = StringView{"--help"};
-      if (Maybe<const char *> custom = HELP_ARGUMENTS.find(command);
-          custom.has_value())
-        help_argument = StringView{*custom};
       const String command_line = String{paths[0].text().view()} + " " +
-                                  help_argument + " </dev/null 2>&1";
+                                  StringView{*help_argument} +
+                                  " </dev/null 2>&1";
       LOG(verbosity::Debug, "forking '%.*s' for its --help text",
           static_cast<int>(command.length), command.data);
       text = context.capture_command_substitution(command_line);

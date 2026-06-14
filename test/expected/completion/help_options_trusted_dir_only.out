@@ -1,7 +1,10 @@
-== a binary in a trusted directory offers its --help options:
+== allowlisted command in a trusted directory offers its --help options:
 --marker-option
 == and was forked:
 forked
-== a binary in a world-writable directory offers nothing:
+== a command not on the allowlist is never forked, even when trusted:
+== and was never forked:
+not forked
+== an allowlisted command in a world-writable directory is never forked:
 == and was never forked:
 not forked
