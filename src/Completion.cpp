@@ -953,11 +953,11 @@ static fn man_subcommand_page_is_valid(StringView command, StringView subcommand
   let page_name = String{command};
   page_name.push('-');
   page_name.append(subcommand);
-  if (const bool *cached = MAN_SUBCOMMAND_PAGE_VALID.find(page_name.view()))
+  if (let const cached = MAN_SUBCOMMAND_PAGE_VALID.find(page_name.view()))
     return *cached;
   if (!may_read) return false;
 
-  const String *file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
+  let const file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
   if (file_path == nullptr) {
     MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), false);
     return false;
@@ -975,7 +975,7 @@ static fn man_subcommand_page_is_valid(StringView command, StringView subcommand
       return true;
     }
 
-  Maybe<String> source = utils::read_entire_file(file_path->view());
+  let source = utils::read_entire_file(file_path->view());
   if (!source.has_value()) {
     MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
     return true;
@@ -1001,7 +1001,7 @@ static fn man_subcommand_page_is_valid(StringView command, StringView subcommand
   let needle = String{command};
   needle.push(' ');
   needle.append(subcommand);
-  const bool valid = synopsis.find_substring(needle.view()).has_value();
+  let const valid = synopsis.find_substring(needle.view()).has_value();
   MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), valid);
   return valid;
 }
@@ -1057,21 +1057,21 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
   if (token.find_character('/').has_value()) return None;
   if (!for_listing && token.is_empty()) return None;
   if (!is_first_argument_token(line, token_start)) return None;
-  const StringView surface_command = command_word_of(line);
+  let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
       surface_command.find_character('/').has_value())
     return None;
   /* The subcommands are the resolved target's, so g for a g='git' alias
      lists git's subcommands. */
   let const resolved = resolve_completion_command(surface_command, context);
-  const StringView command = resolved.view();
+  let const command = resolved.view();
 
   if (!MAN_SUBCOMMAND_INDEX_IS_BUILT) {
     if (!for_listing) return None;
     build_man_subcommand_index();
   }
 
-  const ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(command);
+  let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
   if (subcommands == nullptr || subcommands->is_empty()) return None;
 
   /* Only the candidates the token matches are validated, so a token that
@@ -1102,12 +1102,11 @@ static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
            (option_part[k] == ' ' || option_part[k] == ',' ||
             option_part[k] == '\t'))
       k++;
-    const usize token_start = k;
+    let const token_start = k;
     while (k < option_part.length && option_part[k] != ' ' &&
            option_part[k] != ',' && option_part[k] != '\t')
       k++;
-    StringView flag = option_part.substring_of_length(token_start,
-                                                      k - token_start);
+    let flag = option_part.substring_of_length(token_start, k - token_start);
     if (let const equals = flag.find_character('='); equals.has_value())
       flag = flag.substring_of_length(0, *equals);
     if (flag.length >= 2 && flag[0] == '-') flags.push(String{flag});
@@ -1134,7 +1133,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     }
     clean += text[i];
   }
-  const StringView view = clean.view();
+  let const view = clean.view();
 
   /* The description for each flag, read from the .TP option blocks. */
   let descriptions = StringMap<String>{heap_allocator()};
@@ -1144,10 +1143,10 @@ static fn parse_manpage_option_entries(StringView text) throws
   while (i < view.length) {
     usize line_end = i;
     while (line_end < view.length && view[line_end] != '\n') line_end++;
-    const StringView raw = view.substring_of_length(i, line_end - i);
+    let const raw = view.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
-    const usize indent = skip_blanks(raw, 0);
+    let const indent = skip_blanks(raw, 0);
     if (indent >= raw.length) {
       pending_flags.clear();
       continue;
@@ -1158,7 +1157,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     if (!pending_flags.is_empty() && indent > pending_indent &&
         raw[indent] != '-')
     {
-      const StringView description =
+      let const description =
           trim_blanks(raw.substring_of_length(indent, raw.length - indent));
       for (const String &flag : pending_flags)
         if (descriptions.find(flag.view()) == nullptr)
@@ -1170,17 +1169,17 @@ static fn parse_manpage_option_entries(StringView text) throws
 
     if (raw[indent] != '-') continue;
 
-    usize gap = raw.length;
+    let gap = raw.length;
     for (usize j = indent; j + 1 < raw.length; j++)
       if (raw[j] == ' ' && raw[j + 1] == ' ') {
         gap = j;
         break;
       }
-    const StringView option_part = raw.substring_of_length(indent, gap - indent);
+    let const option_part = raw.substring_of_length(indent, gap - indent);
     let line_flags = extract_dash_flags(option_part);
 
     if (gap < raw.length) {
-      const StringView inline_description =
+      let const inline_description =
           trim_blanks(raw.substring_of_length(gap, raw.length - gap));
       for (const String &flag : line_flags)
         if (descriptions.find(flag.view()) == nullptr)
@@ -1197,16 +1196,16 @@ static fn parse_manpage_option_entries(StringView text) throws
   let entries = ArrayList<help_entry>{};
   let seen = HashSet{heap_allocator()};
   for (usize j = 0; j < view.length; j++) {
-    const bool at_word_start = j == 0 || view[j - 1] == ' ' ||
+    let const at_word_start = j == 0 || view[j - 1] == ' ' ||
                                view[j - 1] == '\t' || view[j - 1] == '\n' ||
                                view[j - 1] == '(' || view[j - 1] == '[';
     if (view[j] != '-' || !at_word_start) continue;
-    usize end = j;
+    let end = j;
     while (end < view.length &&
            (view[end] == '-' || lexer::is_variable_name(view[end])))
       end++;
-    const StringView flag = view.substring_of_length(j, end - j);
-    bool has_letter = false;
+    let const flag = view.substring_of_length(j, end - j);
+    let has_letter = false;
     for (usize k = 0; k < flag.length; k++)
       if (flag[k] != '-') {
         has_letter = !(flag[k] >= '0' && flag[k] <= '9');
@@ -1214,7 +1213,7 @@ static fn parse_manpage_option_entries(StringView text) throws
       }
     if (flag.length >= 2 && has_letter && !seen.contains(flag)) {
       seen.add(flag);
-      const String *description = descriptions.find(flag);
+      let const description = descriptions.find(flag);
       entries.push(help_entry{
           String{flag},
           description != nullptr ? String{description->view()} : String{}});
@@ -1421,7 +1420,7 @@ static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
    in a form the flag scanner does not read. */
 static fn command_prefers_help_over_manpage(StringView command) throws -> bool
 {
-  Maybe<const char *> argument = HELP_ALLOWLIST.find(command);
+  let argument = HELP_ALLOWLIST.find(command);
   return argument.has_value() && StringView{*argument} != StringView{"--help"};
 }
 
@@ -1431,11 +1430,11 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
-  if (const ArrayList<help_entry> *cached = MANPAGE_OPTION_CACHE.find(page_name))
+  if (let const cached = MANPAGE_OPTION_CACHE.find(page_name))
     return *cached;
   let parsed = ArrayList<help_entry>{};
   try {
-    const String page = context.capture_command_substitution(
+    let const page = context.capture_command_substitution(
         String{"man "} + String{page_name} + " 2>/dev/null");
     parsed = parse_manpage_option_entries(page.view());
   } catch (...) {
@@ -1458,7 +1457,7 @@ static fn complete_from_manpage(StringView line, StringView token,
 {
   if (!for_listing) return None;
   if (token.is_empty() || token[0] != '-') return None;
-  const StringView surface_command = command_word_of(line);
+  let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
       surface_command.find_character('/').has_value())
     return None;
@@ -1466,7 +1465,7 @@ static fn complete_from_manpage(StringView line, StringView token,
   /* The manpage is the resolved target's, so an aliased or symlinked command
      reads the options of what it really runs. */
   let const resolved = resolve_completion_command(surface_command, context);
-  const StringView command = resolved.view();
+  let const command = resolved.view();
 
   /* A command that prefers --help reads its options from there rather than the
      manpage, so it skips this stage and the help stage below picks it up. */
@@ -1488,8 +1487,7 @@ static fn complete_from_manpage(StringView line, StringView token,
       page_name = steal(combined);
   }
 
-  const ArrayList<help_entry> &options =
-      manpage_options_for(page_name.view(), context);
+  let const &options = manpage_options_for(page_name.view(), context);
   if (options.is_empty()) return None;
 
   let matches = matches_from_help_entries(options, token, descriptions);
@@ -1518,7 +1516,7 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
   for (usize i = 0; i < absolute_path.length; i++)
     if (absolute_path[i] == '/') last_slash = i;
   if (last_slash == absolute_path.length) return false;
-  const StringView directory =
+  let const directory =
       last_slash == 0 ? StringView{"/"}
                       : absolute_path.substring_of_length(0, last_slash);
   return os::directory_is_trusted_for_exec(Path{directory});
@@ -1544,7 +1542,7 @@ static fn help_text_for(StringView command) throws -> String
   /* The allowlist entry carries the help argument, so ffmpeg forks --help full
      rather than the summary-only --help. A command not on the list never
      forks. */
-  Maybe<const char *> help_argument = HELP_ALLOWLIST.find(command);
+  let help_argument = HELP_ALLOWLIST.find(command);
   let const paths = utils::search_program_path(command);
   if (help_argument.has_value() && !paths.is_empty() &&
       command_directory_is_trusted(paths[0].text().view()))
@@ -1553,12 +1551,12 @@ static fn help_text_for(StringView command) throws -> String
        ffmpeg runs as the three words path, --help, full. */
     let argv = ArrayList<String>{};
     argv.push(String{paths[0].text().view()});
-    const StringView argument_view = StringView{*help_argument};
+    let const argument_view = StringView{*help_argument};
     usize i = 0;
     while (i < argument_view.length) {
       while (i < argument_view.length && argument_view[i] == ' ')
         i++;
-      const usize start = i;
+      let const start = i;
       while (i < argument_view.length && argument_view[i] != ' ')
         i++;
       if (i > start)
@@ -1591,23 +1589,23 @@ static fn parse_help_option_entries(StringView text) throws
     usize line_end = i;
     while (line_end < text.length && text[line_end] != '\n')
       line_end++;
-    const StringView raw = text.substring_of_length(i, line_end - i);
+    let const raw = text.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
-    const usize start = skip_blanks(raw, 0);
+    let const start = skip_blanks(raw, 0);
     if (start >= raw.length || raw[start] != '-') continue;
 
     /* The first run of two or more spaces ends the option part and opens the
        description column. */
-    usize gap = raw.length;
+    let gap = raw.length;
     for (usize j = start; j + 1 < raw.length; j++)
       if (raw[j] == ' ' && raw[j + 1] == ' ') {
         gap = j;
         break;
       }
-    const StringView option_part = raw.substring_of_length(start, gap - start);
+    let const option_part = raw.substring_of_length(start, gap - start);
 
-    StringView description = StringView{};
+    let description = StringView{};
     if (gap < raw.length)
       description = trim_blanks(raw.substring_of_length(gap, raw.length - gap));
 
@@ -1650,14 +1648,14 @@ static fn help_options_for(StringView command) throws
 static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
 {
   if (name.is_empty()) return false;
-  const char first = name[0];
-  const bool starts_word = (first >= 'a' && first <= 'z') ||
+  let const first = name[0];
+  let const starts_word = (first >= 'a' && first <= 'z') ||
                            (first >= 'A' && first <= 'Z') ||
                            (first >= '0' && first <= '9');
   if (!starts_word) return false;
   for (usize i = 0; i < name.length; i++) {
-    const char c = name[i];
-    const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+    let const c = name[i];
+    let const ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                     (c >= '0' && c <= '9') || c == '-' || c == '_';
     if (!ok) return false;
   }
@@ -1672,7 +1670,7 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
   if (trimmed.is_empty() || trimmed[trimmed.length - 1] != ':') return false;
   let const ends_with_ignoring_case = [&](StringView suffix) {
     if (trimmed.length < suffix.length) return false;
-    const usize offset = trimmed.length - suffix.length;
+    let const offset = trimmed.length - suffix.length;
     for (usize i = 0; i < suffix.length; i++) {
       char a = trimmed[offset + i];
       char b = suffix[i];
@@ -1697,17 +1695,17 @@ static fn parse_help_subcommands(StringView text) throws
 {
   let subcommands = ArrayList<help_entry>{};
   let seen = HashSet{heap_allocator()};
-  bool in_section = false;
+  let in_section = false;
   usize i = 0;
   while (i < text.length) {
     usize line_end = i;
     while (line_end < text.length && text[line_end] != '\n')
       line_end++;
-    const StringView raw = text.substring_of_length(i, line_end - i);
+    let const raw = text.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
-    const usize trim_start = skip_blanks(raw, 0);
-    const StringView trimmed = trim_blanks(raw);
+    let const trim_start = skip_blanks(raw, 0);
+    let const trimmed = trim_blanks(raw);
 
     if (line_opens_subcommand_section(trimmed)) {
       in_section = true;
@@ -1729,14 +1727,14 @@ static fn parse_help_subcommands(StringView text) throws
     while (name_end < trimmed.length && trimmed[name_end] != ' ' &&
            trimmed[name_end] != '\t' && trimmed[name_end] != ',')
       name_end++;
-    const StringView name = trimmed.substring_of_length(0, name_end);
+    let const name = trimmed.substring_of_length(0, name_end);
     if (!is_plausible_subcommand_name(name)) continue;
     if (!seen.contains(name)) {
       seen.add(name);
       /* The description is the text after the run of two or more spaces that
          ends the name-and-alias column, trimmed. */
-      StringView description = StringView{};
-      usize gap = trimmed.length;
+      let description = StringView{};
+      let gap = trimmed.length;
       for (usize j = name_end; j + 1 < trimmed.length; j++)
         if (trimmed[j] == ' ' && trimmed[j + 1] == ' ') {
           gap = j;
@@ -1770,7 +1768,7 @@ static fn complete_from_help(StringView line, StringView token,
 {
   if (!for_listing) return None;
   if (token.is_empty() || token[0] != '-') return None;
-  const StringView surface_command = command_word_of(line);
+  let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
       surface_command.find_character('/').has_value())
     return None;
@@ -1778,7 +1776,7 @@ static fn complete_from_help(StringView line, StringView token,
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved = resolve_completion_alias(surface_command, context);
-  const ArrayList<help_entry> &options = help_options_for(resolved.view());
+  let const &options = help_options_for(resolved.view());
   if (options.is_empty()) return None;
 
   let matches = matches_from_help_entries(options, token, descriptions);
@@ -1800,7 +1798,7 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
   if (!token.is_empty() && token[0] == '-') return None;
   if (token.find_character('/').has_value()) return None;
   if (!is_first_argument_token(line, token_start)) return None;
-  const StringView surface_command = command_word_of(line);
+  let const surface_command = command_word_of(line);
   if (surface_command.is_empty() ||
       surface_command.find_character('/').has_value())
     return None;
@@ -1814,13 +1812,11 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
      this one is the authoritative source. The fork is reserved for a tool like
      cargo that has subcommands but no man pages. */
   if (MAN_SUBCOMMAND_INDEX_IS_BUILT) {
-    const ArrayList<String> *man_subcommands =
-        MAN_SUBCOMMAND_INDEX.find(resolved.view());
+    let const man_subcommands = MAN_SUBCOMMAND_INDEX.find(resolved.view());
     if (man_subcommands != nullptr && !man_subcommands->is_empty()) return None;
   }
 
-  const ArrayList<help_entry> &subcommands =
-      help_subcommands_for(resolved.view());
+  let const &subcommands = help_subcommands_for(resolved.view());
   if (subcommands.is_empty()) return None;
 
   let matches = matches_from_help_entries(subcommands, token, descriptions);
