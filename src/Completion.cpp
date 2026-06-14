@@ -168,6 +168,32 @@ static pure fn is_in_command_position(StringView line,
   }
 }
 
+/* True when the byte is a space or a tab, the blanks the --help and the manpage
+   parsers step over between an option and its description. */
+static pure forceinline fn is_blank(char byte) throws -> bool
+{
+  return byte == ' ' || byte == '\t';
+}
+
+/* The first index at or after `from` whose byte is not a blank. */
+static pure forceinline fn skip_blanks(StringView text, usize from) throws
+    -> usize
+{
+  while (from < text.length && is_blank(text[from]))
+    from++;
+  return from;
+}
+
+/* The view with its leading and trailing blanks removed. */
+static pure forceinline fn trim_blanks(StringView text) throws -> StringView
+{
+  const usize start = skip_blanks(text, 0);
+  usize end = text.length;
+  while (end > start && is_blank(text[end - 1]))
+    end--;
+  return text.substring_of_length(start, end - start);
+}
+
 /* A glob-active mask with every position set, for an unquoted completion token
    whose every byte is a live glob metacharacter. */
 static fn all_active_glob_mask(usize length) throws -> ArrayList<bool>
@@ -1064,8 +1090,10 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
 }
 
 /* Pulls each dash-word out of an option line's tag part, such as -a and --all
-   from `-a, --all`, dropping a trailing =VALUE so the bare flag completes. */
-static fn manpage_tag_flags(StringView option_part) throws -> ArrayList<String>
+   from `-a, --all`, dropping a trailing =VALUE so the bare flag completes. The
+   manpage tag line and the --help option column both split this way, so both
+   parsers call it. */
+static fn extract_dash_flags(StringView option_part) throws -> ArrayList<String>
 {
   let flags = ArrayList<String>{};
   usize k = 0;
@@ -1098,6 +1126,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     -> ArrayList<help_entry>
 {
   let clean = String{};
+  clean.reserve(text.length);
   for (usize i = 0; i < text.length; i++) {
     if (text[i] == '\b') {
       if (!clean.is_empty()) clean.pop_back();
@@ -1118,9 +1147,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     const StringView raw = view.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
-    usize indent = 0;
-    while (indent < raw.length && (raw[indent] == ' ' || raw[indent] == '\t'))
-      indent++;
+    const usize indent = skip_blanks(raw, 0);
     if (indent >= raw.length) {
       pending_flags.clear();
       continue;
@@ -1131,12 +1158,8 @@ static fn parse_manpage_option_entries(StringView text) throws
     if (!pending_flags.is_empty() && indent > pending_indent &&
         raw[indent] != '-')
     {
-      usize trim_end = raw.length;
-      while (trim_end > indent &&
-             (raw[trim_end - 1] == ' ' || raw[trim_end - 1] == '\t'))
-        trim_end--;
       const StringView description =
-          raw.substring_of_length(indent, trim_end - indent);
+          trim_blanks(raw.substring_of_length(indent, raw.length - indent));
       for (const String &flag : pending_flags)
         if (descriptions.find(flag.view()) == nullptr)
           descriptions.set(flag.view(), String{description});
@@ -1154,15 +1177,11 @@ static fn parse_manpage_option_entries(StringView text) throws
         break;
       }
     const StringView option_part = raw.substring_of_length(indent, gap - indent);
-    let line_flags = manpage_tag_flags(option_part);
+    let line_flags = extract_dash_flags(option_part);
 
     if (gap < raw.length) {
-      usize d = gap;
-      while (d < raw.length && (raw[d] == ' ' || raw[d] == '\t')) d++;
-      usize d_end = raw.length;
-      while (d_end > d && (raw[d_end - 1] == ' ' || raw[d_end - 1] == '\t'))
-        d_end--;
-      const StringView inline_description = raw.substring_of_length(d, d_end - d);
+      const StringView inline_description =
+          trim_blanks(raw.substring_of_length(gap, raw.length - gap));
       for (const String &flag : line_flags)
         if (descriptions.find(flag.view()) == nullptr)
           descriptions.set(flag.view(), String{inline_description});
@@ -1575,9 +1594,7 @@ static fn parse_help_option_entries(StringView text) throws
     const StringView raw = text.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
-    usize start = 0;
-    while (start < raw.length && (raw[start] == ' ' || raw[start] == '\t'))
-      start++;
+    const usize start = skip_blanks(raw, 0);
     if (start >= raw.length || raw[start] != '-') continue;
 
     /* The first run of two or more spaces ends the option part and opens the
@@ -1591,34 +1608,14 @@ static fn parse_help_option_entries(StringView text) throws
     const StringView option_part = raw.substring_of_length(start, gap - start);
 
     StringView description = StringView{};
-    if (gap < raw.length) {
-      usize d = gap;
-      while (d < raw.length && (raw[d] == ' ' || raw[d] == '\t'))
-        d++;
-      usize d_end = raw.length;
-      while (d_end > d && (raw[d_end - 1] == ' ' || raw[d_end - 1] == '\t'))
-        d_end--;
-      description = raw.substring_of_length(d, d_end - d);
-    }
+    if (gap < raw.length)
+      description = trim_blanks(raw.substring_of_length(gap, raw.length - gap));
 
-    usize k = 0;
-    while (k < option_part.length) {
-      while (k < option_part.length &&
-             (option_part[k] == ' ' || option_part[k] == ','))
-        k++;
-      const usize token_start = k;
-      while (k < option_part.length && option_part[k] != ' ' &&
-             option_part[k] != ',')
-        k++;
-      StringView flag =
-          option_part.substring_of_length(token_start, k - token_start);
-      if (let const equals = flag.find_character('='); equals.has_value())
-        flag = flag.substring_of_length(0, *equals);
-      if (flag.length >= 2 && flag[0] == '-' && !seen.contains(flag)) {
-        seen.add(flag);
-        entries.push(help_entry{String{flag}, String{description}});
+    for (const String &flag : extract_dash_flags(option_part))
+      if (!seen.contains(flag.view())) {
+        seen.add(flag.view());
+        entries.push(help_entry{String{flag.view()}, String{description}});
       }
-    }
   }
   return entries;
 }
@@ -1709,16 +1706,8 @@ static fn parse_help_subcommands(StringView text) throws
     const StringView raw = text.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
-    usize trim_start = 0;
-    while (trim_start < raw.length &&
-           (raw[trim_start] == ' ' || raw[trim_start] == '\t'))
-      trim_start++;
-    usize trim_end = raw.length;
-    while (trim_end > trim_start &&
-           (raw[trim_end - 1] == ' ' || raw[trim_end - 1] == '\t'))
-      trim_end--;
-    const StringView trimmed =
-        raw.substring_of_length(trim_start, trim_end - trim_start);
+    const usize trim_start = skip_blanks(raw, 0);
+    const StringView trimmed = trim_blanks(raw);
 
     if (line_opens_subcommand_section(trimmed)) {
       in_section = true;
@@ -1753,12 +1742,9 @@ static fn parse_help_subcommands(StringView text) throws
           gap = j;
           break;
         }
-      if (gap < trimmed.length) {
-        usize d = gap;
-        while (d < trimmed.length && (trimmed[d] == ' ' || trimmed[d] == '\t'))
-          d++;
-        description = trimmed.substring_of_length(d, trimmed.length - d);
-      }
+      if (gap < trimmed.length)
+        description =
+            trim_blanks(trimmed.substring_of_length(gap, trimmed.length - gap));
       subcommands.push(help_entry{String{name}, String{description}});
     }
   }
