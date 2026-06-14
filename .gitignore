@@ -30,3 +30,6 @@ test/.test_directory_history
 /shit.com.dbg
 
 core.*
+
+# Local agent notes, kept out of the tree on purpose.
+CLAUDE.md
