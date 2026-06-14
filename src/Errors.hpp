@@ -66,9 +66,19 @@ public:
   }
   pure fn command_status() const wontthrow -> i64 { return m_command_status; }
 
+  /* A located error thrown from a function body is rendered at the call
+     boundary while the call name stack still names the defining file, since the
+     top-level handler renders against the typed line and cannot reach that
+     file once the frame unwinds. The flag marks an error already shown there,
+     so the top-level handler keeps the exit status but does not print it
+     twice. */
+  fn set_rendered() wontthrow -> void { m_was_rendered = true; }
+  pure fn was_rendered() const wontthrow -> bool { return m_was_rendered; }
+
 protected:
   bool m_is_active{false};
   bool m_is_script_fatal{false};
+  bool m_was_rendered{false};
   i64 m_command_status{1};
   String m_message;
 };
@@ -135,6 +145,15 @@ public:
      a window into a larger file, the stored function definition text whose
      first line sits deep inside the defining file. */
   fn set_line_offset(usize offset) wontthrow -> void { m_line_offset = offset; }
+
+  /* The stored location, read at the call boundary so a function-body error
+     rebases its absolute position onto the definition copy before it renders.
+   */
+  pure fn location() const wontthrow -> SourceLocation { return m_location; }
+  fn set_location(SourceLocation location) wontthrow -> void
+  {
+    m_location = location;
+  }
 
 protected:
   SourceLocation m_location;

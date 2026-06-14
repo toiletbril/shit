@@ -454,14 +454,18 @@ static fn run_script_contents(const String &script_contents,
       print("\n");
     }
   } catch (const ErrorWithLocationAndDetails &e) {
-    show_message(e.to_string(script_contents));
-    show_message(e.details_to_string(script_contents));
+    /* An error thrown from a function body was rendered at the call boundary
+       against the file that defined it, so it is not printed again here. */
+    if (!e.was_rendered()) {
+      show_message(e.to_string(script_contents));
+      show_message(e.details_to_string(script_contents));
+    }
     /* POSIX mode follows dash, which exits 2 on a fatal expansion or runtime
        error such as a set -u unset reference, while bash and the default mode
        keep the status-1 convention. */
     exit_code = context.is_posix_mode() ? 2 : EXIT_FAILURE;
   } catch (const ErrorWithLocation &e) {
-    show_message(e.to_string(script_contents));
+    if (!e.was_rendered()) show_message(e.to_string(script_contents));
     /* bash exits 127 on the script-fatal expansion aborts, the set -u read
        and the ${name:?} report, while POSIX follows dash with 2. */
     exit_code = context.is_posix_mode() ? 2

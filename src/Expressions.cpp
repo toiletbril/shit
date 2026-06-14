@@ -1720,7 +1720,51 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.set_terminal_exec_allowed(false);
     defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
 
-    let function_ret = function_body->evaluate(cxt);
+    /* A located error thrown from the body carries an absolute position into
+       the file that defined the function. The top-level handler renders
+       against the typed line and cannot reach that file once this frame
+       unwinds and its name leaves the call stack, so the error is rendered
+       here while the stack still names the function. The position rebases onto
+       the function's definition copy, the filename swaps to the function's
+       owned copy, and the error is marked rendered so the top-level handler
+       keeps the exit status without printing it a second time. An error that
+       does not window, such as one already rendered by a nested call, is
+       rethrown untouched. */
+    let const window_error =
+        [&](ErrorWithLocation &error) throws -> Maybe<StringView> {
+      let const resolved = cxt.resolve_render_source(error.location());
+      if (!resolved.windowed || resolved.text == nullptr) return None;
+      let rebased = error.location();
+      rebased.position = rebased.position - resolved.body_start_position +
+                         resolved.header_length;
+      rebased.filename = resolved.filename.is_empty()
+                             ? Maybe<StringView>{}
+                             : Maybe<StringView>{resolved.filename};
+      if (rebased.position > resolved.text->count()) return None;
+      error.set_location(rebased);
+      error.set_line_offset(resolved.line_offset);
+      return resolved.text->view();
+    };
+
+    i64 function_ret = 0;
+    try {
+      function_ret = function_body->evaluate(cxt);
+    } catch (ErrorWithLocationAndDetails &error) {
+      if (!error.was_rendered())
+        if (let const windowed = window_error(error); windowed.has_value()) {
+          show_message(error.to_string(*windowed));
+          show_message(error.details_to_string(*windowed));
+          error.set_rendered();
+        }
+      throw;
+    } catch (ErrorWithLocation &error) {
+      if (!error.was_rendered())
+        if (let const windowed = window_error(error); windowed.has_value()) {
+          show_message(error.to_string(*windowed));
+          error.set_rendered();
+        }
+      throw;
+    }
 
     /* A return inside the body unwinds to here and supplies the status. A break
        or a continue is scoped to a loop inside this function, so it does not
