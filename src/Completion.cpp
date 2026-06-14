@@ -1152,6 +1152,94 @@ static fn complete_from_manpage(StringView line, StringView token,
   return matches;
 }
 
+/* The options a command's --help text documents, parsed once and cached under
+   the command name. The cache key is the resolved command name. */
+static StringMap<ArrayList<String>> HELP_OPTION_CACHE{heap_allocator()};
+
+/* The directories a --help fork is allowed to run a binary from. A command that
+   resolves outside them never forks, so a program in the working directory or
+   another untrusted place is never executed for its --help text. */
+static const StringView TRUSTED_HELP_DIRECTORIES[] = {
+    StringView{"/bin"},          StringView{"/usr/bin"},
+    StringView{"/usr/local/bin"}, StringView{"/sbin"},
+    StringView{"/usr/sbin"},      StringView{"/opt/homebrew/bin"},
+    StringView{"/opt/local/bin"},
+};
+
+/* Whether the directory the absolute path sits in is one of the trusted set. */
+static fn command_directory_is_trusted(StringView absolute_path) wontthrow
+    -> bool
+{
+  usize last_slash = absolute_path.length;
+  for (usize i = 0; i < absolute_path.length; i++)
+    if (absolute_path[i] == '/') last_slash = i;
+  if (last_slash == absolute_path.length) return false;
+  const StringView directory = absolute_path.substring_of_length(0, last_slash);
+  for (const StringView &trusted : TRUSTED_HELP_DIRECTORIES)
+    if (directory == trusted) return true;
+  return false;
+}
+
+/* The option flags a command's --help text lists, for a command that resolves
+   into a trusted directory and has no manpage to read. The resolved absolute
+   path runs, not the bare name, so an alias or a function never shadows the
+   trusted binary, the trusted-directory gate keeps the fork off any program in
+   an untrusted place, and stdin is closed so a binary that would page or prompt
+   reads end-of-file and exits rather than hanging the prompt. The parse reuses
+   the manpage flag scanner since the option syntax is the same. */
+static fn help_options_for(StringView command, EvalContext &context) throws
+    -> const ArrayList<String> &
+{
+  if (const ArrayList<String> *cached = HELP_OPTION_CACHE.find(command))
+    return *cached;
+  let parsed = ArrayList<String>{};
+  try {
+    let const paths = utils::search_program_path(command);
+    if (!paths.is_empty() &&
+        command_directory_is_trusted(paths[0].text().view()))
+    {
+      const String command_line =
+          String{paths[0].text().view()} + " --help </dev/null 2>&1";
+      LOG(verbosity::Debug, "forking --help for '%.*s'",
+          static_cast<int>(command.length), command.data);
+      const String help_text =
+          context.capture_command_substitution(command_line);
+      parsed = parse_manpage_options(help_text.view());
+    }
+  } catch (...) {
+    LOG(verbosity::Debug, "swallowed a --help invocation failure for '%.*s'",
+        static_cast<int>(command.length), command.data);
+  }
+  HELP_OPTION_CACHE.set(command, steal(parsed));
+  return *HELP_OPTION_CACHE.find(command);
+}
+
+/* Completes an option token from the command's --help text, the fallback after
+   the manpage stage finds no page. The same explicit-tab and dash-token gates
+   the manpage stage uses hold here, so the ghost never forks a command and a
+   plain argument still completes as a filename. */
+static fn complete_from_help(StringView line, StringView token,
+                             bool for_listing, EvalContext &context) throws
+    -> Maybe<ArrayList<String>>
+{
+  if (!for_listing) return None;
+  if (token.is_empty() || token[0] != '-') return None;
+  const StringView surface_command = command_word_of(line);
+  if (surface_command.is_empty() ||
+      surface_command.find_character('/').has_value())
+    return None;
+
+  let const resolved = resolve_completion_command(surface_command, context);
+  const ArrayList<String> &options = help_options_for(resolved.view(), context);
+  if (options.is_empty()) return None;
+
+  let matches = ArrayList<String>{};
+  for (const String &option : options)
+    if (option.view().starts_with(token)) matches.push(String{option.view()});
+  if (matches.is_empty()) return None;
+  return matches;
+}
+
 /* The settled word right before the token, so set -o NAME completion sees
    the -o. The scan is the same unquoted whitespace reading command_word_of
    applies. */
@@ -1980,6 +2068,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
                                         context);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, token, for_listing, context);
+      if (!from_stage.has_value())
+        from_stage = complete_from_help(line, token, for_listing, context);
       if (!from_stage.has_value())
         from_stage = complete_from_build_tools(line, token, token_start,
                                                for_listing, context);
