@@ -320,7 +320,9 @@ static fn report_escaped_control_flow(EvalContext &context,
    same pipeline as an interactive line. Returns the resulting exit code. */
 static fn run_script_contents(const String &script_contents,
                               EvalContext &context, BumpArena &ast_arena,
-                              Maybe<StringView> filename = None) -> int
+                              Maybe<StringView> filename = None,
+                              Expression *precompiled_ast = nullptr,
+                              Expression **out_ast = nullptr) -> int
 {
   i32 exit_code = EXIT_FAILURE;
 
@@ -335,36 +337,43 @@ static fn run_script_contents(const String &script_contents,
     ast_arena.reset();
     context.reset_scratch_arena();
 
-    LOG(verbosity::Debug, "parsing a chunk of %zu bytes",
-        script_contents.count());
+    /* A precompiled tree, the cached PROMPT_COMMAND hook, skips the lex and the
+       parse and the analysis below, since those already ran when it was first
+       seen. The tree lives in a caller-owned arena that outlives this call, so
+       it is reused across prompts rather than rebuilt each one. */
+    Expression *ast = precompiled_ast;
+    if (precompiled_ast == nullptr) {
+      LOG(verbosity::Debug, "parsing a chunk of %zu bytes",
+          script_contents.count());
 
-    let p = Parser{
-        Lexer{String{script_contents.view()}, ast_arena,
-              context.show_lexed_words(), filename, context.mood()}
-    };
+      let p = Parser{
+          Lexer{String{script_contents.view()}, ast_arena,
+                context.show_lexed_words(), filename, context.mood()}
+      };
 
-    /* Recover from each parse error so the whole file is reported at once. A
-       file with any parse error must not run, so a non-empty error list prints
-       every error and fails without evaluating the partial tree. */
-    let parse_errors = ArrayList<shit::String>{heap_allocator()};
-    Expression *ast = p.construct_ast(parse_errors);
+      /* Recover from each parse error so the whole file is reported at once. A
+         file with any parse error must not run, so a non-empty error list
+         prints every error and fails without evaluating the partial tree. */
+      let parse_errors = ArrayList<shit::String>{heap_allocator()};
+      ast = p.construct_ast(parse_errors);
 
-    if (!parse_errors.is_empty()) {
-      for (const shit::String &e : parse_errors)
-        show_message(e);
-      context.set_last_exit_status(EXIT_FAILURE);
-      return EXIT_FAILURE;
-    }
+      if (!parse_errors.is_empty()) {
+        for (const shit::String &e : parse_errors)
+          show_message(e);
+        context.set_last_exit_status(EXIT_FAILURE);
+        return EXIT_FAILURE;
+      }
 
-    if (context.show_ast()) {
-      print(ast->to_ast_string());
-      print("\n");
-    }
-
-    if (context.show_lexed_words()) {
-      for (const auto &word : p.debug_words()) {
-        print(word.to_pretty_string());
+      if (context.show_ast()) {
+        print(ast->to_ast_string());
         print("\n");
+      }
+
+      if (context.show_lexed_words()) {
+        for (const auto &word : p.debug_words()) {
+          print(word.to_pretty_string());
+          print("\n");
+        }
       }
     }
 
@@ -384,6 +393,7 @@ static fn run_script_contents(const String &script_contents,
     /* The skip reads the context's diagnostics flag rather than only the
        static one, so set -o no-diagnostics flips the stage at runtime. */
     let const run_analysis =
+        precompiled_ast == nullptr &&
         (!(context.is_bash_compatible() || context.is_posix_mode()) ||
          FLAG_WARNINGS.is_enabled()) &&
         !context.diagnostics_disabled();
@@ -396,12 +406,17 @@ static fn run_script_contents(const String &script_contents,
        query, only when it is about to warn, whether the name is already a
        shell or environment variable, an update rather than a leak. The
        query is lazy, so the analysis pays nothing per chunk for it. */
-    if (run_analysis &&
+    let const analysis_failed =
+        run_analysis &&
         !analyze_ast(
             ast, script_contents, context.function_names(),
             context.alias_names(), &context, FLAG_WARNINGS.is_enabled(),
-            FLAG_WARNINGS.is_enabled() && context.shell_is_interactive()))
-    {
+            FLAG_WARNINGS.is_enabled() && context.shell_is_interactive());
+    /* A freshly parsed tree that parses and analyzes clean is handed back so a
+       caller that wants to reuse it, the PROMPT_COMMAND hook, caches it. */
+    if (!analysis_failed && out_ast != nullptr) *out_ast = ast;
+
+    if (analysis_failed) {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
       /* Under -n the tree is parsed and validated but never run. */
@@ -479,6 +494,14 @@ static fn run_script_contents(const String &script_contents,
    which keeps the prompt escapes and the next command reading the real values
    rather than the ones the hook left behind. An empty or unset PROMPT_COMMAND
    runs nothing. */
+/* The PROMPT_COMMAND text and the tree parsed from it, kept across prompts so a
+   hook whose text does not change parses once rather than every prompt. The
+   tree lives in its own arena, which the general per-command arena reset never
+   touches, so the cached pointer stays valid between prompts. */
+static BumpArena PROMPT_COMMAND_ARENA{};
+static String PROMPT_COMMAND_CACHED_TEXT{};
+static Expression *PROMPT_COMMAND_CACHED_AST = nullptr;
+
 static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 {
   Maybe<String> command = context.get_variable_value("PROMPT_COMMAND");
@@ -490,8 +513,24 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   const i32 saved_exit_status = context.last_exit_status();
   const u64 saved_command_duration_ns = context.last_command_duration_ns();
 
-  run_script_contents(*command, context, ast_arena,
-                      StringView{"PROMPT_COMMAND"});
+  if (PROMPT_COMMAND_CACHED_AST != nullptr &&
+      PROMPT_COMMAND_CACHED_TEXT.view() == command->view())
+  {
+    /* The text is unchanged, so the cached tree runs against its own retained
+       text rather than reparsing the hook. */
+    run_script_contents(PROMPT_COMMAND_CACHED_TEXT, context, ast_arena,
+                        StringView{"PROMPT_COMMAND"}, PROMPT_COMMAND_CACHED_AST);
+  } else {
+    /* A new or changed hook parses once into the prompt arena, which is reset
+       first so the previous hook's tree is reclaimed. The freshly parsed tree
+       comes back through out_ast and caches for the next prompt. */
+    PROMPT_COMMAND_ARENA.reset();
+    PROMPT_COMMAND_CACHED_AST = nullptr;
+    PROMPT_COMMAND_CACHED_TEXT = String{command->view()};
+    run_script_contents(PROMPT_COMMAND_CACHED_TEXT, context,
+                        PROMPT_COMMAND_ARENA, StringView{"PROMPT_COMMAND"},
+                        nullptr, &PROMPT_COMMAND_CACHED_AST);
+  }
 
   context.set_last_exit_status(saved_exit_status);
   context.set_last_command_duration_ns(saved_command_duration_ns);
