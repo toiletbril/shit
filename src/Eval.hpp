@@ -972,6 +972,21 @@ public:
     m_failglob = state.failglob;
   }
 
+  /* Switch into a mood and diagnostic state, deriving the strictness from the
+     mood, and return the previous runtime state so a defer restores it with
+     restore_runtime_state. This is the one entry a scope such as a function call
+     uses to enter its target state, rather than a set per flag. */
+  fn switch_runtime_state(mimic_mood mood, bool warnings_enabled,
+                          bool diagnostics_disabled) wontthrow -> runtime_state
+  {
+    let const previous = capture_runtime_state();
+    m_mood = mood;
+    m_warnings_enabled = warnings_enabled;
+    m_diagnostics_disabled = diagnostics_disabled;
+    apply_strictness_for_mood();
+    return previous;
+  }
+
   /* The moods whose startup files are being sourced right now, a bit per mood.
      source_init_moods marks a flavor while it sources it and skips a flavor the
      bit already names, so a set --init-moods inside a sourced ~/.shitrc cannot

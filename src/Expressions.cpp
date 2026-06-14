@@ -1733,14 +1733,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
          definition_info->defining_diagnostics_disabled !=
              cxt.diagnostics_disabled());
     Maybe<runtime_state> saved_runtime_state = None;
-    if (needs_state_swap) {
-      saved_runtime_state = cxt.capture_runtime_state();
-      cxt.set_mood(static_cast<mimic_mood>(definition_info->defining_mood));
-      cxt.set_warnings_enabled(definition_info->defining_warnings);
-      cxt.set_diagnostics_disabled(
+    if (needs_state_swap)
+      saved_runtime_state = cxt.switch_runtime_state(
+          static_cast<mimic_mood>(definition_info->defining_mood),
+          definition_info->defining_warnings,
           definition_info->defining_diagnostics_disabled);
-      cxt.apply_strictness_for_mood();
-    }
     defer
     {
       if (saved_runtime_state.has_value())
