@@ -2049,10 +2049,27 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             peek->kind() != Token::Kind::EndOfFile)
         {
           m_lexer.advance_past_last_peek();
-          Token *first = peek;
-          const usize start = first->source_location().position;
-          usize end = start + first->source_location().length;
-          usize joined_token_count = 1;
+          Token *const first = peek;
+          usize end = first->source_location().position +
+                      first->source_location().length;
+          /* The lexer split the regex into separate paren, pipe, and word
+             tokens, so the abutting tokens are rejoined into one operand. Their
+             segments are carried over rather than the raw source span, so a
+             ${var} in the regex still expands while a (, ), or | from unquoted
+             text stays a live regex metacharacter instead of a literal $ that
+             regcomp rejects. */
+          Word regex_word{};
+          let const append_segments = [&](Token *tok) throws {
+            if (tok->kind() == Token::Kind::Word) {
+              for (const WordSegment &segment :
+                   static_cast<const tokens::WordToken *>(tok)->word().segments)
+                regex_word.segments.push(segment);
+            } else {
+              regex_word.segments.push(WordSegment{
+                  WordSegment::Kind::UnquotedText, tok->raw_string(), false});
+            }
+          };
+          append_segments(first);
           for (;;) {
             Token *next = m_lexer.peek_shell_token();
             if (next == nullptr || is_unquoted_word(next, "]]") ||
@@ -2062,17 +2079,11 @@ hot fn Parser::parse_conditional_command() throws -> Command *
             m_lexer.advance_past_last_peek();
             end = next->source_location().position +
                   next->source_location().length;
-            joined_token_count++;
+            append_segments(next);
           }
-          if (joined_token_count == 1) {
-            elements.push({Kind::Operand, first});
-          } else {
-            const StringView regex_source =
-                m_lexer.source().substring_of_length(start, end - start);
-            elements.push({Kind::Operand,
-                           word_token_from_raw(m_lexer.arena(), regex_source,
-                                               first->source_location())});
-          }
+          elements.push({Kind::Operand,
+                         m_lexer.arena().create<tokens::WordToken>(
+                             first->source_location(), steal(regex_word))});
         }
       }
       break;
