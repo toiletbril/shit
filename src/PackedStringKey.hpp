@@ -21,8 +21,10 @@ public:
   u64 high_word{0};
 
   /* Pack a NUL-terminated literal at compile time, so a static table entry
-     becomes a constant with no runtime initialization. */
-  static constexpr fn from_literal(const char *text) wontthrow
+     becomes a constant with no runtime initialization. consteval forbids the
+     runtime path, so a caller that passed a non-literal would fail to compile
+     rather than silently pack the key at run time. */
+  static consteval fn from_literal(const char *text) wontthrow
       -> PackedStringKey
   {
     PackedStringKey key{};
