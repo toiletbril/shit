@@ -95,7 +95,7 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
      conditions it applies to. */
   if (args.count() == 2) {
     let const condition = normalize_condition(args[1]);
-    LOG(verbosity::Info, "trap resetting condition '%s' to its default",
+    LOG(Info, "trap resetting condition '%s' to its default",
         condition.c_str());
     cxt.remove_trap(condition);
     return 0;
@@ -107,7 +107,7 @@ i32 Trap::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 2; i < args.count(); i++) {
     let const condition = normalize_condition(args[i]);
-    LOG(verbosity::Info, "trap %s action for signal '%s'",
+    LOG(Info, "trap %s action for signal '%s'",
         is_reset ? "resetting the" : "setting", condition.c_str());
     if (is_reset)
       cxt.remove_trap(condition);

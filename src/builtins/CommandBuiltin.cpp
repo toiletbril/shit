@@ -54,7 +54,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const &name = args[1];
 
-  LOG(verbosity::Debug, "command resolving '%s' past shell functions",
+  LOG(Debug, "command resolving '%s' past shell functions",
       name.c_str());
 
   /* -v and -V resolve the name without running it, against a builtin and the
@@ -129,7 +129,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   try {
     sub = ExecContext::make_from(ec.source_location(), steal(operand_args));
   } catch (const CommandNotFound &not_found) {
-    LOG(verbosity::Debug, "command swallowed a not-found error: %s",
+    LOG(Debug, "command swallowed a not-found error: %s",
         not_found.message().c_str());
     const String *source = cxt.current_source();
     show_message(

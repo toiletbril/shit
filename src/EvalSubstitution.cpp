@@ -41,7 +41,7 @@ fn drain_command_substitution_pipe(void *raw_context) wontthrow -> void
       drain->captured->append(StringView{buffer, static_cast<usize>(*n)});
     }
   } catch (...) {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "the command substitution drain thread swallowed a failure while "
         "capturing");
   }
@@ -71,13 +71,13 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
 
   let const filename = expand_word_for_assignment(
       static_cast<const tokens::WordToken *>(name)->word());
-  LOG(verbosity::Debug, "the substitution is a bare file read of '%s'",
+  LOG(Debug, "the substitution is a bare file read of '%s'",
       filename.c_str());
   let content = utils::read_entire_file(filename.view());
   /* An unreadable file yields an empty substitution, the way bash leaves
      COMPREPLY-style reads empty rather than aborting. */
   if (!content.has_value()) {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "the file read substitution of '%s' failed, expanding to empty",
         filename.c_str());
     return String{};
@@ -91,7 +91,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
 fn EvalContext::capture_command_substitution(const String &source) throws
     -> String
 {
-  LOG(verbosity::Debug, "capturing a command substitution of %zu bytes",
+  LOG(Debug, "capturing a command substitution of %zu bytes",
       source.count());
   if (Maybe<String> file = read_redirect_substitution(source.view());
       file.has_value())
@@ -121,7 +121,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
      inner command source the child runs. */
   const char direction = text[0];
   const bool command_writes_the_pipe = direction == '<';
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "setting up a process substitution where the command %s the pipe",
       command_writes_the_pipe ? "writes" : "reads");
 
@@ -176,7 +176,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
       ast->evaluate(*this);
       status = last_exit_status();
     } catch (...) {
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "the process substitution child swallowed an error, exiting with "
           "status 1");
       status = 1;
@@ -201,7 +201,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 
   let path = String{"/dev/fd/"};
   path += utils::int_to_text(static_cast<i64>(shell_fd));
-  LOG(verbosity::Debug, "the process substitution is reachable at '%s'",
+  LOG(Debug, "the process substitution is reachable at '%s'",
       path.c_str());
   return path;
 #endif
@@ -217,7 +217,7 @@ fn EvalContext::mark_process_substitutions() const wontthrow
 fn EvalContext::cleanup_process_substitutions(
     process_substitution_mark mark) wontthrow -> void
 {
-  LOG(verbosity::Debug, "cleaning up %zu pending process substitutions",
+  LOG(Debug, "cleaning up %zu pending process substitutions",
       m_pending_process_substitutions.count() - mark.pending);
   for (usize i = mark.pending; i < m_pending_process_substitutions.count(); i++)
   {
@@ -228,7 +228,7 @@ fn EvalContext::cleanup_process_substitutions(
     try {
       os::reap_process_quietly(sub.child);
     } catch (const Error &e) {
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "a process substitution reap failed and was swallowed: %s",
           e.message().c_str());
       /* The child is reaped on a best-effort basis, so a wait failure is shown
@@ -246,12 +246,12 @@ fn EvalContext::cleanup_process_substitutions(
                            : WarningWithLocation{sub.location, text}.to_string(
                                  sub.source));
         } catch (...) {
-          LOG(verbosity::Debug,
+          LOG(Debug,
               "showing the reap warning failed, the error is swallowed");
         }
       }
     } catch (...) {
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "a process substitution reap failed with an unknown error, "
           "swallowed");
       if (!is_bash_compatible()) {
@@ -263,7 +263,7 @@ fn EvalContext::cleanup_process_substitutions(
                            : WarningWithLocation{sub.location, text}.to_string(
                                  sub.source));
         } catch (...) {
-          LOG(verbosity::Debug,
+          LOG(Debug,
               "showing the fallback reap warning failed, the error is "
               "swallowed");
         }
@@ -294,7 +294,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
   {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "command substitution ast cache miss for generation %zu, reparsing",
         generation);
     let parser = Parser{
@@ -313,7 +313,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
                                           const String &source) throws -> String
 {
   ASSERT(ast != nullptr);
-  LOG(verbosity::Debug, "running a captured substitution body of %zu bytes",
+  LOG(Debug, "running a captured substitution body of %zu bytes",
       source.count());
 
   /* A cd or an assignment inside the substitution must not leak. */
@@ -414,7 +414,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
        substitution source so its caret marks the right byte, with the source
        backtrace under it, then the parent continues with the partial output and
        a failing status. */
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "the command substitution failed, containing the error with status 1");
     try {
       std::rethrow_exception(error);
@@ -449,7 +449,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   if (segment.cached_substitution_ast == nullptr ||
       segment.cached_substitution_generation != generation)
   {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "function substitution ast cache miss for generation %zu, reparsing",
         generation);
     let parser = Parser{
@@ -462,7 +462,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
 
   let const ast = segment.cached_substitution_ast;
   const String &source = segment.text;
-  LOG(verbosity::Debug, "running a function substitution body of %zu bytes",
+  LOG(Debug, "running a function substitution body of %zu bytes",
       source.count());
 
   /* The body runs against the live state on purpose, no snapshot and no
@@ -523,7 +523,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     /* The same containment the $(...) capture applies, the error renders
        against the body source with the backtrace and the parent continues
        with the partial output and a failing status. */
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "the function substitution failed, containing the error with status 1");
     try {
       std::rethrow_exception(error);

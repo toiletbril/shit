@@ -47,7 +47,7 @@ fn Fg::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (job == nullptr) throw Error{"There is no such job"};
   ASSERT(job != nullptr);
 
-  LOG(verbosity::Info, "fg bringing job %d to the foreground", job->id);
+  LOG(Info, "fg bringing job %d to the foreground", job->id);
 
   /* A job already reaped by a prior poll has its status recorded, so report it
      instead of waiting on a pid that no longer exists. */

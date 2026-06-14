@@ -56,7 +56,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
 
-    LOG(verbosity::Debug, "type classifying '%s' in resolution order",
+    LOG(Debug, "type classifying '%s' in resolution order",
         name.c_str());
 
     /* -P forces a PATH lookup and ignores the keyword, alias, function, and

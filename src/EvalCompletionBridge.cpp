@@ -15,7 +15,7 @@ namespace shit {
 fn EvalContext::register_completion_spec(StringView command,
                                          completion_spec spec) throws -> void
 {
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "registering a completion spec for '%.*s' with function '%s' and %zu "
       "word-list bytes",
       static_cast<int>(command.length), command.data,
@@ -26,7 +26,7 @@ fn EvalContext::register_completion_spec(StringView command,
 fn EvalContext::register_default_completion_spec(completion_spec spec) throws
     -> void
 {
-  LOG(verbosity::Debug, "registering the default completion spec");
+  LOG(Debug, "registering the default completion spec");
   m_default_completion_spec = steal(spec);
 }
 
@@ -54,7 +54,7 @@ fn EvalContext::run_completion_function(StringView function_name,
       has_functions() ? find_function(function_name) : nullptr;
   if (body == nullptr) return ArrayList<String>{};
 
-  LOG(verbosity::Info,
+  LOG(Info,
       "running the completion function '%.*s' with %zu words, cursor word %zu",
       static_cast<int>(function_name.length), function_name.data, words.count(),
       cword);
@@ -137,7 +137,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   try {
     body->evaluate(*this);
   } catch (const ErrorBase &error) {
-    LOG(verbosity::Debug, "completion function '%.*s' threw: %s",
+    LOG(Debug, "completion function '%.*s' threw: %s",
         static_cast<int>(function_name.length), function_name.data,
         error.message().c_str());
   }
@@ -155,7 +155,7 @@ fn EvalContext::run_completion_function(StringView function_name,
     for (const String &entry : *reply)
       result.push_managed(entry.view());
   }
-  LOG(verbosity::Info,
+  LOG(Info,
       "completion function '%.*s' returned %zu candidates with status %d",
       static_cast<int>(function_name.length), function_name.data,
       result.count(),

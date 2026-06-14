@@ -68,7 +68,7 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
   }
 
-  LOG(verbosity::Debug, "mapfile reading lines into array '%.*s'",
+  LOG(Debug, "mapfile reading lines into array '%.*s'",
       static_cast<int>(array_name.length), array_name.data);
 
   let lines = ArrayList<String>{heap_allocator()};
@@ -83,7 +83,7 @@ i32 Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws
     lines.push(steal(element));
   }
 
-  LOG(verbosity::Debug, "mapfile stored %zu lines", lines.count());
+  LOG(Debug, "mapfile stored %zu lines", lines.count());
   cxt.set_indexed_array(array_name, steal(lines));
   return 0;
 }

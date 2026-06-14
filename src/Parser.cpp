@@ -233,7 +233,7 @@ fn Parser::skip_newlines_after_pipe() throws -> void
    token that itself triggered the error cannot stall the loop forever. */
 cold fn Parser::recover_to_next_statement() throws -> void
 {
-  LOG(verbosity::Debug, "skipping tokens to the next statement boundary");
+  LOG(Debug, "skipping tokens to the next statement boundary");
   bool has_consumed_token = false;
   for (;;) {
     Token *token = m_lexer.peek_shell_token();
@@ -281,14 +281,14 @@ cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
     } catch (const ErrorWithLocationAndDetails &e) {
       /* Render both parts here, since the detail note would be sliced off a
          base-class copy and its hint lost. */
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "recording a detailed parse error and recovering: %s",
           e.message().c_str());
       errors.push(e.to_string(m_lexer.source()));
       errors.push(e.details_to_string(m_lexer.source()));
       recover_to_next_statement();
     } catch (const ErrorWithLocation &e) {
-      LOG(verbosity::Debug, "recording a parse error and recovering: %s",
+      LOG(Debug, "recording a parse error and recovering: %s",
           e.message().c_str());
       errors.push(e.to_string(m_lexer.source()));
       recover_to_next_statement();
@@ -778,7 +778,7 @@ fn Parser::build_heredoc_redirection(
     delimiter = delimiter.substring(1);
   }
 
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "registering a heredoc redirection with delimiter '%.*s'",
       static_cast<int>(delimiter.length), delimiter.data);
 
@@ -1204,7 +1204,7 @@ hot fn Parser::parse_if() throws -> Command *
   ASSERT(if_token->kind() == Token::Kind::If);
   const let location = if_token->source_location();
 
-  LOG(verbosity::Debug, "parsing an if clause at byte %zu", location.position);
+  LOG(Debug, "parsing an if clause at byte %zu", location.position);
 
   let branches = ArrayList<if_branch>{};
   const Expression *otherwise = nullptr;
@@ -1255,7 +1255,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
-  LOG(verbosity::Debug, "parsing a %s loop at byte %zu",
+  LOG(Debug, "parsing a %s loop at byte %zu",
       is_until ? "until" : "while", location.position);
 
   Expression *condition = parse_command_list({Token::Kind::Do});
@@ -1343,7 +1343,7 @@ hot fn Parser::parse_for() throws -> Command *
   ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
-  LOG(verbosity::Debug, "parsing a for loop at byte %zu", location.position);
+  LOG(Debug, "parsing a for loop at byte %zu", location.position);
 
   /* A for header that opens with (( is the bash C-style loop, distinct from
      the for name in words form. POSIX keeps the bare-name reading dash
@@ -1508,7 +1508,7 @@ hot fn Parser::parse_select() throws -> Command *
   ASSERT(is_unquoted_word(keyword, "select"));
   const let location = keyword->source_location();
 
-  LOG(verbosity::Debug, "parsing a select loop at byte %zu", location.position);
+  LOG(Debug, "parsing a select loop at byte %zu", location.position);
 
   Token *name_token = m_lexer.next_shell_token();
   ASSERT(name_token != nullptr);
@@ -1636,7 +1636,7 @@ hot fn Parser::parse_case() throws -> Command *
   ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
-  LOG(verbosity::Debug, "parsing a case clause at byte %zu", location.position);
+  LOG(Debug, "parsing a case clause at byte %zu", location.position);
 
   Token *word = m_lexer.next_shell_token();
   ASSERT(word != nullptr);
@@ -1760,7 +1760,7 @@ hot fn Parser::parse_brace_group() throws -> Command *
   ASSERT(open != nullptr);
   ASSERT(is_brace_word(open, '{'));
 
-  LOG(verbosity::Debug, "parsing a brace group at byte %zu",
+  LOG(Debug, "parsing a brace group at byte %zu",
       open->source_location().position);
 
   /* RightBracket in the terminator set stands for a standalone '}' word, which
@@ -1822,7 +1822,7 @@ hot fn Parser::parse_subshell(Token *open) throws -> Command *
   ASSERT(open != nullptr);
   ASSERT(open->kind() == Token::Kind::LeftParen);
 
-  LOG(verbosity::Debug, "parsing a subshell at byte %zu",
+  LOG(Debug, "parsing a subshell at byte %zu",
       open->source_location().position);
 
   Expression *body = parse_command_list({Token::Kind::RightParen});
@@ -1899,7 +1899,7 @@ hot fn Parser::capture_double_paren_body(Token *open) throws -> StringView
    the parentheses and evaluated as arithmetic at run time. */
 hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
 {
-  LOG(verbosity::Debug, "parsing an arithmetic command at byte %zu",
+  LOG(Debug, "parsing an arithmetic command at byte %zu",
       open->source_location().position);
 
   const StringView body = capture_double_paren_body(open);
@@ -1920,7 +1920,7 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
 hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
     -> Command *
 {
-  LOG(verbosity::Debug, "parsing a c-style for header at byte %zu",
+  LOG(Debug, "parsing a c-style for header at byte %zu",
       location.position);
 
   const StringView header = capture_double_paren_body(open);
@@ -1993,7 +1993,7 @@ hot fn Parser::parse_conditional_command() throws -> Command *
   ASSERT(open != nullptr);
   ASSERT(is_unquoted_word(open, "[["));
 
-  LOG(verbosity::Debug, "parsing a conditional command at byte %zu",
+  LOG(Debug, "parsing a conditional command at byte %zu",
       open->source_location().position);
 
   /* The tokens between [[ and ]] are collected raw rather than run through the
@@ -2106,7 +2106,7 @@ hot fn Parser::parse_function_definition(Token *name_token) throws -> Command *
   const let location = name_token->source_location();
   const let name = name_token->raw_string();
 
-  LOG(verbosity::Debug, "parsing a function definition for '%s'", name.c_str());
+  LOG(Debug, "parsing a function definition for '%s'", name.c_str());
 
   /* The opening parenthesis was peeked by the caller. Consume the empty pair.
    */
@@ -2158,7 +2158,7 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
   const let location = name_token->source_location();
   const let name = name_token->raw_string();
 
-  LOG(verbosity::Debug, "parsing a keyword function definition for '%s'",
+  LOG(Debug, "parsing a keyword function definition for '%s'",
       name.c_str());
 
   /* An empty () pair may follow the name in the bash function form, where the

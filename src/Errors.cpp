@@ -199,7 +199,7 @@ get_context_pointing_to(StringView source, usize byte_position,
                         usize unicode_position, Maybe<StringView> message,
                         const diagnostic_color &color) throws -> String
 {
-  LOG(verbosity::Debug, "assembling the caret context for line %zu",
+  LOG(Debug, "assembling the caret context for line %zu",
       line_number + 1);
 
   usize start_offset = byte_position - last_newline_location;
@@ -311,7 +311,7 @@ ErrorBase::ErrorBase() = default;
 
 ErrorBase::ErrorBase(StringView message) : m_is_active(true), m_message(message)
 {
-  LOG(verbosity::Debug, "constructing an error with message '%.*s'",
+  LOG(Debug, "constructing an error with message '%.*s'",
       static_cast<int>(message.length), message.data);
 }
 
@@ -358,7 +358,7 @@ ErrorWithLocation::ErrorWithLocation(SourceLocation location,
                                      StringView message)
     : ErrorBase(message), m_location(steal(location))
 {
-  LOG(verbosity::Debug, "locating the error at byte %zu spanning %zu bytes",
+  LOG(Debug, "locating the error at byte %zu spanning %zu bytes",
       m_location.position, m_location.length);
 }
 
@@ -374,8 +374,8 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
      instead. */
   if (byte_position > source.count()) return ErrorBase::to_string(source);
 
-  LOG_VARS(verbosity::Debug, byte_position, byte_count);
-  LOG(verbosity::Debug, "formatting located %s", severity_word().c_str());
+  LOG_VARS(Debug, byte_position, byte_count);
+  LOG(Debug, "formatting located %s", severity_word().c_str());
 
   /* A position that lands on a line continuation or a bare newline points at
      the join rather than at the next real byte, so the caret is nudged past the
@@ -491,7 +491,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
      the end. */
   if (byte_position > source.count()) return String{};
 
-  LOG(verbosity::Debug, "formatting the detail note at byte %zu",
+  LOG(Debug, "formatting the detail note at byte %zu",
       byte_position);
 
   if (byte_position > 0 && byte_position == source.count() &&

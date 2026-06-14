@@ -211,7 +211,7 @@ fn reopen_terminal_as_stdin() wontthrow -> bool
 {
   const int tty_fd = open("/dev/tty", O_RDWR);
   if (tty_fd == -1) return false;
-  LOG(verbosity::Info, "reopening the controlling terminal onto fd 0");
+  LOG(Info, "reopening the controlling terminal onto fd 0");
   const bool replaced = dup2(tty_fd, STDIN_FILENO) != -1;
   close(tty_fd);
   return replaced && isatty(STDIN_FILENO) == 1;
@@ -367,7 +367,7 @@ fn is_fd_a_tty(descriptor fd) wontthrow -> bool { return isatty(fd); }
 
 fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
 {
-  LOG(verbosity::Debug, "querying the terminal size");
+  LOG(Debug, "querying the terminal size");
   struct winsize window{};
   if (ioctl(SHIT_STDOUT, TIOCGWINSZ, &window) != 0) return false;
   if (window.ws_col == 0 || window.ws_row == 0) return false;
@@ -401,7 +401,7 @@ fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index
 
 fn get_environment_variable(StringView key) throws -> Maybe<String>
 {
-  LOG(verbosity::All, "reading the environment variable '%.*s'",
+  LOG(All, "reading the environment variable '%.*s'",
       static_cast<int>(key.length), key.data);
   const String key_string{key};
   const char *e = std::getenv(key_string.c_str());
@@ -411,7 +411,7 @@ fn get_environment_variable(StringView key) throws -> Maybe<String>
 
 fn set_environment_variable(StringView key, StringView value) throws -> void
 {
-  LOG(verbosity::All, "setting the environment variable '%.*s'",
+  LOG(All, "setting the environment variable '%.*s'",
       static_cast<int>(key.length), key.data);
   const String key_string{key};
   const String value_string{value};
@@ -420,7 +420,7 @@ fn set_environment_variable(StringView key, StringView value) throws -> void
 
 fn unset_environment_variable(StringView key) throws -> void
 {
-  LOG(verbosity::All, "unsetting the environment variable '%.*s'",
+  LOG(All, "unsetting the environment variable '%.*s'",
       static_cast<int>(key.length), key.data);
   const String key_string{key};
   unsetenv(key_string.c_str());
@@ -464,7 +464,7 @@ fn check_syscall_impl(i32 status, StringView invocation) throws -> i32
 cold fn spawn_failure_child(const Path &program_path, int spawn_error) throws
     -> process
 {
-  LOG(verbosity::Debug, "forking a child to report the spawn failure for '%s'",
+  LOG(Debug, "forking a child to report the spawn failure for '%s'",
       program_path.c_str());
 
   const pid_t child_pid = check_syscall(fork());
@@ -490,7 +490,7 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
-  LOG(verbosity::Debug, "spawning '%s' with %zu arguments",
+  LOG(Debug, "spawning '%s' with %zu arguments",
       ec.program_path().c_str(), ec.args().count());
 
   /* On the ENOEXEC fallback the context's descriptors are handed to the script
@@ -755,7 +755,7 @@ fn reclaim_controlling_terminal() wontthrow -> void
 fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                        Maybe<descriptor> err_fd) throws -> process
 {
-  LOG(verbosity::Debug, "forking a compound pipeline stage");
+  LOG(Debug, "forking a compound pipeline stage");
 
   const pid_t child_pid = check_syscall(fork());
 
@@ -786,7 +786,7 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
       (void) write_fd(STDERR_FILENO, msg.data(), msg.count());
       exit_process_immediately(1);
     } catch (...) {
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "swallowed an unknown error while preparing the forked stage child");
       exit_process_immediately(1);
     }
@@ -804,7 +804,7 @@ fn replace_process(ExecContext &&ec) throws -> void
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
-  LOG(verbosity::Debug, "replacing the shell process with '%s'",
+  LOG(Debug, "replacing the shell process with '%s'",
       ec.program_path().c_str());
 
   let const child_args = make_os_args(ec.args());
@@ -855,7 +855,7 @@ fn redirect_self(const ExecContext &ec) throws -> void
 
 fn make_pipe() wontthrow -> Maybe<Pipe>
 {
-  LOG(verbosity::Debug, "opening a close-on-exec pipe");
+  LOG(Debug, "opening a close-on-exec pipe");
 
   descriptor p[2] = {SHIT_INVALID_FD, SHIT_INVALID_FD};
 
@@ -910,7 +910,7 @@ fn join_thread(thread t) wontthrow -> void { pthread_join(t.handle, nullptr); }
 fn open_file_descriptor(StringView path, file_open_mode mode) throws
     -> Maybe<descriptor>
 {
-  LOG(verbosity::Debug, "opening '%.*s'", static_cast<int>(path.length),
+  LOG(Debug, "opening '%.*s'", static_cast<int>(path.length),
       path.data);
 
   /* The descriptor is left inheritable rather than O_CLOEXEC, since a
@@ -942,7 +942,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
 
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 {
-  LOG(verbosity::Debug, "writing %zu bytes into an anonymous temp file",
+  LOG(Debug, "writing %zu bytes into an anonymous temp file",
       content.count());
 
   /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
@@ -992,7 +992,7 @@ fn wait_and_monitor_process(process pid) throws -> i32
 {
   ASSERT(pid >= 0);
 
-  LOG(verbosity::Debug, "waiting on process %lld", static_cast<long long>(pid));
+  LOG(Debug, "waiting on process %lld", static_cast<long long>(pid));
 
   i32 status{};
 
@@ -1049,7 +1049,7 @@ fn reap_process_quietly(process pid) throws -> i32
 {
   ASSERT(pid >= 0);
 
-  LOG(verbosity::Debug, "quietly reaping process %lld",
+  LOG(Debug, "quietly reaping process %lld",
       static_cast<long long>(pid));
 
   i32 status{};
@@ -1231,7 +1231,7 @@ static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) wontthrow
 
 fn reset_signal_handlers() throws -> void
 {
-  LOG(verbosity::Debug, "restoring the default signal dispositions");
+  LOG(Debug, "restoring the default signal dispositions");
 
   sigset_t sm;
   sigfillset(&sm);
@@ -1258,7 +1258,7 @@ static fn handle_interrupt(int s) wontthrow -> void
 
 fn set_default_signal_handlers() throws -> void
 {
-  LOG(verbosity::Info,
+  LOG(Info,
       "blocking the terminal signals and installing the shell handlers");
 
   /* The terminal-generated signals that would kill the shell stay blocked, but
@@ -1292,7 +1292,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
 
-  LOG(verbosity::Info, "installing the trap handler for signal %d",
+  LOG(Info, "installing the trap handler for signal %d",
       signal_number);
 
   /* A signal the startup blocked, such as SIGTERM, must be unblocked so the
@@ -1310,7 +1310,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 fn set_trap_ignore(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
-  LOG(verbosity::Info, "ignoring signal %d", signal_number);
+  LOG(Info, "ignoring signal %d", signal_number);
   struct sigaction sa = {};
   sa.sa_handler = SIG_IGN;
   check_syscall(sigaction(signal_number, &sa, nullptr));
@@ -1319,7 +1319,7 @@ fn set_trap_ignore(i32 signal_number) throws -> void
 fn clear_trap_handler(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
-  LOG(verbosity::Info, "clearing the trap for signal %d", signal_number);
+  LOG(Info, "clearing the trap for signal %d", signal_number);
   struct sigaction sa = {};
   /* SIGINT returns to the shell's own interrupt handler so a Ctrl-C still
      aborts a shell-internal loop. Every other signal returns to its default
@@ -1900,7 +1900,7 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   unused(allow_script_fallback);
   unused(new_process_group);
 
-  LOG(verbosity::Debug, "spawning '%s' with %zu arguments",
+  LOG(Debug, "spawning '%s' with %zu arguments",
       ec.program_path().c_str(), ec.args().count());
 
   String command_line = make_os_args(ec.args());
@@ -2100,7 +2100,7 @@ fn replace_process(ExecContext &&ec) -> void
   /* Windows cannot replace a process in place, so the program runs to
      completion and the shell exits with its status, which behaves like exec for
      a launched script. */
-  LOG(verbosity::Debug, "running '%s' to completion in place of an exec",
+  LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
   process child = execute_program(steal(ec));
   i32 status = wait_and_monitor_process(child);

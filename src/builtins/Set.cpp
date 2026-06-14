@@ -193,7 +193,7 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
   if (option_is_startup_fact(option))
     throw Error{"Unable to change '" + String{option.name} +
                 "' because it is fixed at shell startup"};
-  LOG(verbosity::Info, "set flipping option '%.*s' to %s",
+  LOG(Info, "set flipping option '%.*s' to %s",
       static_cast<int>(option.name.length), option.name.data,
       enable ? "on" : "off");
   if (option.set != nullptr) (cxt.*(option.set))(enable);
@@ -512,7 +512,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   if (should_rebind) {
-    LOG(verbosity::Debug, "set rebinding %zu positional parameters",
+    LOG(Debug, "set rebinding %zu positional parameters",
         operands.count());
     cxt.set_positional_params(steal(operands));
   }

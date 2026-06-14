@@ -139,7 +139,7 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
   /* Each builtin is a stateless dispatch object, so its case constructs it on
      the stack and runs it, which avoids a heap allocation on every builtin
      command. */
-  LOG(verbosity::Debug, "dispatching builtin '%s' with %zu arguments",
+  LOG(Debug, "dispatching builtin '%s' with %zu arguments",
       ec.program().c_str(), ec.args().count());
   try {
     switch (ec.builtin_kind()) {

@@ -29,7 +29,7 @@ i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  LOG(verbosity::Debug, "whoami printing the current user name");
+  LOG(Debug, "whoami printing the current user name");
 
   let p = String{};
 

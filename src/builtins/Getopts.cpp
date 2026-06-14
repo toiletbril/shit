@@ -63,7 +63,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     optind = parsed.is_error() ? 1 : parsed.value();
   }
 
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "getopts parsing into '%s' at OPTIND %lld of %zu operands", name.c_str(),
       static_cast<long long>(optind), operands.count());
 
@@ -162,7 +162,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   /* An option that takes no argument leaves OPTARG unset. */
-  LOG(verbosity::All, "getopts advancing past option '%s'",
+  LOG(All, "getopts advancing past option '%s'",
       option_as_string.c_str());
   advance_letter();
   cxt.unset_shell_variable("OPTARG");

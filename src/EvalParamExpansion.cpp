@@ -84,7 +84,7 @@ static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
                                    StringView word, trim_end end,
                                    bool longest) throws -> String
 {
-  LOG(verbosity::All,
+  LOG(All,
       "trimming a value of %zu bytes with the pattern word '%.*s'",
       value.length, static_cast<int>(word.length), word.data);
   let active = ArrayList<bool>{cxt.scratch_allocator()};
@@ -122,7 +122,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
                                             bool is_pattern_word) throws
     -> String
 {
-  LOG(verbosity::All, "expanding a modifier word of %zu bytes", word.length);
+  LOG(All, "expanding a modifier word of %zu bytes", word.length);
   let out = String{scratch_allocator()};
 
   /* Append one byte and record whether it may act as a glob metacharacter, so
@@ -443,7 +443,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
 
 hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
 {
-  LOG(verbosity::All, "applying the parameter expansion '${%.*s}'",
+  LOG(All, "applying the parameter expansion '${%.*s}'",
       static_cast<int>(spec.length), spec.data);
   if (spec.is_empty()) return String{scratch_allocator()};
 
@@ -758,7 +758,7 @@ fn EvalContext::apply_substring_expansion(StringView name,
 fn EvalContext::apply_substring_to_value(StringView value,
                                          StringView body) throws -> String
 {
-  LOG(verbosity::All, "taking the substring '%.*s' of a value of %zu bytes",
+  LOG(All, "taking the substring '%.*s' of a value of %zu bytes",
       static_cast<int>(body.length), body.data, value.length);
   const i64 value_length = static_cast<i64>(value.length);
 
@@ -868,7 +868,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
 fn EvalContext::pattern_replace_value(const String &value,
                                       StringView spec) throws -> String
 {
-  LOG(verbosity::All,
+  LOG(All,
       "applying the pattern replacement '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.count());
   /* The spec opens with the slash operator. A doubled slash replaces every
@@ -984,7 +984,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
                                                  StringView spec) throws
     -> String
 {
-  LOG(verbosity::All,
+  LOG(All,
       "applying the case modification '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.length);
   const char op = spec[0];

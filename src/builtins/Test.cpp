@@ -369,7 +369,7 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      arguments. */
   if (operands.is_empty()) return 1;
 
-  LOG(verbosity::All, "test evaluating %zu operands", operands.count());
+  LOG(All, "test evaluating %zu operands", operands.count());
 
   let evaluator =
       TestEvaluator{operands, 0, operands.count(), cxt.is_bash_compatible()};

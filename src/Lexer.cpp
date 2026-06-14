@@ -140,7 +140,7 @@ Lexer::Lexer(String source, BumpArena &arena, bool should_collect_debug_words,
     : m_source(steal(source)), m_arena(&arena), m_filename(filename),
       m_mood(mood), m_should_collect_debug_words(should_collect_debug_words)
 {
-  LOG(verbosity::Debug, "starting a lexer over %zu bytes of source",
+  LOG(Debug, "starting a lexer over %zu bytes of source",
       m_source.length());
 }
 
@@ -216,7 +216,7 @@ pure fn Lexer::arena() const wontthrow -> BumpArena & { return *m_arena; }
 
 fn Lexer::set_arena(BumpArena &arena) wontthrow -> void
 {
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "switching the lexer arena and dropping the cached peek");
   m_arena = &arena;
   /* The cached token lives in the old arena, so it must not survive the swap.
@@ -251,7 +251,7 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
   let body = m_arena->create<String>();
   ASSERT(body != nullptr);
 
-  LOG(verbosity::Debug, "registering a pending heredoc with delimiter '%.*s'",
+  LOG(Debug, "registering a pending heredoc with delimiter '%.*s'",
       static_cast<int>(delimiter.length), delimiter.data);
 
   m_pending_heredocs.push({String{delimiter}, strip_tabs, body});
@@ -261,7 +261,7 @@ cold fn Lexer::register_heredoc(StringView delimiter, bool strip_tabs) throws
 
 cold fn Lexer::collect_pending_heredocs() throws -> void
 {
-  LOG(verbosity::Debug, "collecting %zu pending heredoc bodies",
+  LOG(Debug, "collecting %zu pending heredoc bodies",
       m_pending_heredocs.count());
 
   for (heredoc_pending &pending : m_pending_heredocs) {
@@ -294,7 +294,7 @@ cold fn Lexer::collect_pending_heredocs() throws -> void
       collected.append(line);
       collected += '\n';
     }
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "capturing a heredoc body of %zu bytes for delimiter '%s'",
         collected.count(), pending.delimiter.c_str());
     ASSERT(pending.body != nullptr);
@@ -1575,7 +1575,7 @@ hot fn Lexer::lex_process_substitution(char direction) throws -> Token *
     inner += c;
   }
 
-  LOG(verbosity::Debug, "capturing a process substitution of %zu bytes",
+  LOG(Debug, "capturing a process substitution of %zu bytes",
       byte_count);
 
   let word = Word{};

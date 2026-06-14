@@ -269,7 +269,7 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (enable || disable) {
     for (const StringView name : names) {
       if (reject_unknown(name)) continue;
-      LOG(verbosity::Info, "shopt setting '%.*s' to %s",
+      LOG(Info, "shopt setting '%.*s' to %s",
           static_cast<int>(name.length), name.data, enable ? "on" : "off");
       cxt.set_shopt_option(name, enable);
     }

@@ -92,7 +92,7 @@ fn EvalContext::end_command() wontthrow -> void
 hot fn EvalContext::assign_variable(StringView name, StringView value) throws
     -> void
 {
-  LOG(verbosity::All, "assigning variable '%.*s' to a value of %zu bytes",
+  LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
   /* The field separators are read once per expanded word, so the live value is
      cached here to keep that path off the map and the environment. */
@@ -125,7 +125,7 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
 
 fn EvalContext::set_field_separators(StringView value) throws -> void
 {
-  LOG(verbosity::Debug, "caching %zu field separator bytes", value.length);
+  LOG(Debug, "caching %zu field separator bytes", value.length);
   /* The table is built before m_field_separators is touched, since the
      constructor seeds it from m_field_separators' own view, so value may alias
      the buffer that the assignment below rewrites. */
@@ -170,7 +170,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
 fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
 {
   if (bash_identity) {
-    LOG(verbosity::Info, "seeding the bash identity variables");
+    LOG(Info, "seeding the bash identity variables");
     set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
     /* BASH_VERSINFO is the version broken into its components, the array a
        config such as ble.sh reads to gate on a major version rather than
@@ -197,7 +197,7 @@ fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
   /* sh and dash advertise no version variable, so the bash identity is just
      cleared and nothing replaces it. The clear matters for a mimicked sh whose
      parent ran in bash mode, and is a no-op at startup where nothing is set. */
-  LOG(verbosity::Info,
+  LOG(Info,
       "clearing the bash identity variables for a non-bash mood");
   force_unset_shell_variable("BASH_VERSION");
   force_unset_shell_variable("BASH");
@@ -238,7 +238,7 @@ fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
     for (usize i = frame.count(); i-- > 0;) {
       let &binding = frame[i];
       if (binding.name.view() != name) continue;
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "peeling the local binding of '%.*s' from caller frame %zu",
           static_cast<int>(name.length), name.data, frame_index);
 
@@ -305,7 +305,7 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
 fn EvalContext::set_indexed_array(StringView name,
                                   ArrayList<String> values) throws -> void
 {
-  LOG(verbosity::All, "storing indexed array '%.*s' with %zu elements",
+  LOG(All, "storing indexed array '%.*s' with %zu elements",
       static_cast<int>(name.length), name.data, values.count());
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
@@ -325,7 +325,7 @@ fn EvalContext::append_indexed_array(StringView name,
      guard and the scalar clear match set_indexed_array, since the in-place path
      bypasses it. */
   if (let *existing = m_indexed_arrays.find(name)) {
-    LOG(verbosity::All, "appending %zu elements to the existing array '%.*s'",
+    LOG(All, "appending %zu elements to the existing array '%.*s'",
         values.count(), static_cast<int>(name.length), name.data);
     if (is_readonly(name))
       throw Error{"Unable to assign '" + name + "' because it is read only"};
@@ -391,7 +391,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
        warning in the typed line has no frames and stays a single report. */
     if (!m_source_frames.is_empty()) print_source_backtrace();
   } catch (...) {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "formatting a runtime warning failed, the error is swallowed");
   }
 }
@@ -498,7 +498,7 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
       show_message(WarningWithLocation{location, message}.to_string(
           m_current_source->view()));
     } catch (...) {
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "showing a located warning failed, the error is swallowed");
     }
   }
@@ -509,7 +509,7 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
    key it stores, so the callers build this on the per-command scratch arena. */
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
-  LOG(verbosity::All,
+  LOG(All,
       "removing variable '%.*s' from the store and the environment",
       static_cast<int>(name.length), name.data);
   m_shell_variables.erase(name);
@@ -542,7 +542,7 @@ fn EvalContext::record_environment_change(StringView name) throws -> void
 
 fn EvalContext::mark_exported(StringView name) throws -> void
 {
-  LOG(verbosity::All, "marking '%.*s' as exported",
+  LOG(All, "marking '%.*s' as exported",
       static_cast<int>(name.length), name.data);
   m_exported_names.add(name);
 }
@@ -819,7 +819,7 @@ fn EvalContext::take_positional_params() wontthrow -> ArrayList<String>
 fn EvalContext::enter_function_scope() throws -> void
 {
   m_local_scopes.push(ArrayList<local_binding>{});
-  LOG(verbosity::Debug, "entered function scope, local scope depth now %zu",
+  LOG(Debug, "entered function scope, local scope depth now %zu",
       m_local_scopes.count());
 }
 
@@ -831,7 +831,7 @@ fn EvalContext::leave_function_scope() throws -> void
      ends with the value it held before the function ran. */
   ASSERT(!m_local_scopes.is_empty());
   let &scope = m_local_scopes.back();
-  LOG(verbosity::Debug, "leaving function scope, restoring %zu shadowed locals",
+  LOG(Debug, "leaving function scope, restoring %zu shadowed locals",
       scope.count());
   for (usize i = scope.count(); i > 0; i--) {
     ASSERT(i - 1 < scope.count());
@@ -887,7 +887,7 @@ fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
 
 fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 {
-  LOG(verbosity::All, "setting alias '%.*s' to a %zu byte value",
+  LOG(All, "setting alias '%.*s' to a %zu byte value",
       static_cast<int>(name.length), name.data, value.length);
   m_aliases.set(name, value);
 }
@@ -895,7 +895,7 @@ fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 fn EvalContext::remove_alias(StringView name) throws -> bool
 {
   if (m_aliases.find(name) == nullptr) return false;
-  LOG(verbosity::All, "removing alias '%.*s'", static_cast<int>(name.length),
+  LOG(All, "removing alias '%.*s'", static_cast<int>(name.length),
       name.data);
   m_aliases.erase(name);
   return true;
@@ -935,7 +935,7 @@ fn EvalContext::alias_names() const throws -> HashSet
 fn EvalContext::enter_subshell() wontthrow -> void
 {
   m_subshell_depth++;
-  LOG(verbosity::Debug, "entered a subshell, depth now %zu", m_subshell_depth);
+  LOG(Debug, "entered a subshell, depth now %zu", m_subshell_depth);
 }
 
 fn EvalContext::leave_subshell() wontthrow -> void
@@ -947,7 +947,7 @@ fn EvalContext::leave_subshell() wontthrow -> void
   while (!m_subshell_saved_descriptors.is_empty() &&
          m_subshell_saved_descriptors.back().depth == m_subshell_depth)
   {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "restoring descriptor %d a subshell exec moved at depth %zu",
         m_subshell_saved_descriptors.back().saved.shell_fd, m_subshell_depth);
     os::restore_descriptor(m_subshell_saved_descriptors.back().saved);
@@ -955,7 +955,7 @@ fn EvalContext::leave_subshell() wontthrow -> void
                                         1);
   }
   m_subshell_depth--;
-  LOG(verbosity::Debug, "left a subshell, depth now %zu", m_subshell_depth);
+  LOG(Debug, "left a subshell, depth now %zu", m_subshell_depth);
 }
 
 fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
@@ -964,7 +964,7 @@ fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
   for (const subshell_saved_descriptor &entry : m_subshell_saved_descriptors)
     if (entry.depth == m_subshell_depth && entry.saved.shell_fd == shell_fd)
       return;
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "backing up descriptor %d before a subshell exec moves it at depth %zu",
       shell_fd, m_subshell_depth);
   m_subshell_saved_descriptors.push(subshell_saved_descriptor{
@@ -981,12 +981,12 @@ fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
   /* A break with no enclosing loop is a no-op, and a level past the nesting
      clamps to the outermost loop, so no leftover level escapes as an error. */
   if (m_loop_depth == 0) {
-    LOG(verbosity::Debug, "break requested outside a loop, ignored");
+    LOG(Debug, "break requested outside a loop, ignored");
     return;
   }
   if (static_cast<usize>(level) > m_loop_depth)
     level = static_cast<i64>(m_loop_depth);
-  LOG(verbosity::All, "break requested, level %lld of depth %zu",
+  LOG(All, "break requested, level %lld of depth %zu",
       (long long) level, m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Break, level, location,
                                 m_current_source, String{m_current_origin}};
@@ -998,12 +998,12 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) throws
   /* A continue with no enclosing loop is a no-op, and a level past the nesting
      clamps to the outermost loop, so no leftover level escapes as an error. */
   if (m_loop_depth == 0) {
-    LOG(verbosity::Debug, "continue requested outside a loop, ignored");
+    LOG(Debug, "continue requested outside a loop, ignored");
     return;
   }
   if (static_cast<usize>(level) > m_loop_depth)
     level = static_cast<i64>(m_loop_depth);
-  LOG(verbosity::All, "continue requested, level %lld of depth %zu",
+  LOG(All, "continue requested, level %lld of depth %zu",
       (long long) level, m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
                                 m_current_source, String{m_current_origin}};
@@ -1012,14 +1012,14 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) throws
 fn EvalContext::request_return(i64 status, SourceLocation location) throws
     -> void
 {
-  LOG(verbosity::Debug, "return requested, status %lld", (long long) status);
+  LOG(Debug, "return requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
                                 m_current_source, String{m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
-  LOG(verbosity::Debug, "exit requested, status %lld", (long long) status);
+  LOG(Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -1102,7 +1102,7 @@ static constexpr usize MAX_FUNCTION_CALL_DEPTH = 900;
 fn EvalContext::enter_source(SourceLocation location) throws -> void
 {
   if (m_source_depth >= MAX_SOURCE_DEPTH) {
-    LOG(verbosity::Debug, "source depth %zu exceeds cap %zu", m_source_depth,
+    LOG(Debug, "source depth %zu exceeds cap %zu", m_source_depth,
         MAX_SOURCE_DEPTH);
     throw ErrorWithLocation{location,
                             "Maximum source/recursion depth exceeded"};
@@ -1119,13 +1119,13 @@ fn EvalContext::leave_source() wontthrow -> void
 fn EvalContext::enter_function_call(SourceLocation location) throws -> void
 {
   if (m_function_call_depth >= MAX_FUNCTION_CALL_DEPTH) {
-    LOG(verbosity::Debug, "function call depth %zu exceeds cap %zu",
+    LOG(Debug, "function call depth %zu exceeds cap %zu",
         m_function_call_depth, MAX_FUNCTION_CALL_DEPTH);
     throw ErrorWithLocation{location,
                             "Maximum source/recursion depth exceeded"};
   }
   m_function_call_depth++;
-  LOG(verbosity::Debug, "entered function call depth %zu",
+  LOG(Debug, "entered function call depth %zu",
       m_function_call_depth);
 }
 
@@ -1137,7 +1137,7 @@ fn EvalContext::leave_function_call() wontthrow -> void
 
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the errexit option flips to %s",
+  LOG(Info, "the errexit option flips to %s",
       enabled ? "on" : "off");
   m_error_exit = enabled;
 }
@@ -1149,13 +1149,13 @@ pure fn EvalContext::error_exit() const wontthrow -> bool
 
 fn EvalContext::set_echo_expanded(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the xtrace option flips to %s", enabled ? "on" : "off");
+  LOG(Info, "the xtrace option flips to %s", enabled ? "on" : "off");
   m_enable_echo_expanded = enabled;
 }
 
 fn EvalContext::set_error_unset(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the nounset option flips to %s",
+  LOG(Info, "the nounset option flips to %s",
       enabled ? "on" : "off");
   m_error_unset = enabled;
 }
@@ -1167,7 +1167,7 @@ pure fn EvalContext::error_unset() const wontthrow -> bool
 
 fn EvalContext::set_pipefail(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the pipefail option flips to %s",
+  LOG(Info, "the pipefail option flips to %s",
       enabled ? "on" : "off");
   m_pipefail = enabled;
 }
@@ -1176,7 +1176,7 @@ pure fn EvalContext::pipefail() const wontthrow -> bool { return m_pipefail; }
 
 fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the noclobber option flips to %s",
+  LOG(Info, "the noclobber option flips to %s",
       enabled ? "on" : "off");
   m_no_clobber = enabled;
 }
@@ -1188,7 +1188,7 @@ pure fn EvalContext::no_clobber() const wontthrow -> bool
 
 fn EvalContext::set_export_all(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the allexport option flips to %s",
+  LOG(Info, "the allexport option flips to %s",
       enabled ? "on" : "off");
   m_export_all = enabled;
 }
@@ -1210,7 +1210,7 @@ pure fn EvalContext::stats_enabled() const wontthrow -> bool
 
 fn EvalContext::set_no_glob(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the noglob option flips to %s", enabled ? "on" : "off");
+  LOG(Info, "the noglob option flips to %s", enabled ? "on" : "off");
   m_enable_path_expansion = !enabled;
 }
 
@@ -1221,7 +1221,7 @@ pure fn EvalContext::no_glob() const wontthrow -> bool
 
 fn EvalContext::set_no_exec(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the noexec option flips to %s", enabled ? "on" : "off");
+  LOG(Info, "the noexec option flips to %s", enabled ? "on" : "off");
   m_no_exec = enabled;
 }
 
@@ -1229,7 +1229,7 @@ pure fn EvalContext::no_exec() const wontthrow -> bool { return m_no_exec; }
 
 fn EvalContext::set_failglob(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the failglob option flips to %s",
+  LOG(Info, "the failglob option flips to %s",
       enabled ? "on" : "off");
   m_failglob = enabled;
 }
@@ -1337,7 +1337,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "restoring the evaluator state after a subshell or substitution");
   m_shell_variables = steal(snapshot.shell_variables);
   m_functions = steal(snapshot.functions);
@@ -1391,7 +1391,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      that wrote no exported name logged nothing, so the count already matches
      the mark and the loop does not run. The rewind precedes the PATH re-point
      below, so an exported PATH reads its restored value. */
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "rewinding %zu environment writes made inside the subshell",
       m_environment_undo_log.count() - snapshot.environment_undo_mark);
   while (m_environment_undo_log.count() > snapshot.environment_undo_mark) {
@@ -1460,7 +1460,7 @@ pure fn EvalContext::last_exit_status() const wontthrow -> i32
 
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 {
-  LOG(verbosity::All, "applying the indirect expansion '${!%.*s}'",
+  LOG(All, "applying the indirect expansion '${!%.*s}'",
       static_cast<int>(body.length), body.data);
   if (body.is_empty()) return String{scratch_allocator()};
 
@@ -1715,11 +1715,11 @@ fn ExecContext::make_from(SourceLocation location,
   ResolvedCommand kind;
   if (!bk) {
     if (p.has_value()) {
-      LOG(verbosity::Debug, "resolved '%s' to the program '%s'",
+      LOG(Debug, "resolved '%s' to the program '%s'",
           program.c_str(), p->text().c_str());
       kind = ResolvedCommand::from_program(steal(*p));
     } else {
-      LOG(verbosity::Debug, "no builtin or program matches '%s'",
+      LOG(Debug, "no builtin or program matches '%s'",
           program.c_str());
       /* A close builtin or PATH program is offered as a did-you-mean hint, so a
          typo such as gti points at git. */
@@ -1732,7 +1732,7 @@ fn ExecContext::make_from(SourceLocation location,
       throw CommandNotFound{location, steal(message)};
     }
   } else {
-    LOG(verbosity::Debug, "resolved '%s' to a builtin", program.c_str());
+    LOG(Debug, "resolved '%s' to a builtin", program.c_str());
     kind = ResolvedCommand::from_builtin(*bk);
   }
 

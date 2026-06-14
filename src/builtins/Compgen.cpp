@@ -95,7 +95,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      The matches print one per line and the status reports whether any matched,
      so 'if compgen -G pat >/dev/null' reads as an existence test. */
   if (glob_pattern.has_value()) {
-    LOG(verbosity::All, "compgen expanding glob '%.*s' for prefix '%.*s'",
+    LOG(All, "compgen expanding glob '%.*s' for prefix '%.*s'",
         static_cast<int>(glob_pattern->length), glob_pattern->data,
         static_cast<int>(word.length), word.data);
     let out = String{};
@@ -114,7 +114,7 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      completion script that asks for one keeps running with an empty result. */
   if (!wordlist.has_value()) return 1;
 
-  LOG(verbosity::Debug, "compgen filtering word list for prefix '%.*s'",
+  LOG(Debug, "compgen filtering word list for prefix '%.*s'",
       static_cast<int>(word.length), word.data);
 
   /* The -W list undergoes the shell expansions bash applies to it through

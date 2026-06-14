@@ -318,7 +318,7 @@ static fn path_command_names() throws -> const ArrayList<String> &
     }
   }
   CACHED_PATH_COMMANDS_VALID = true;
-  LOG(verbosity::Info, "rebuilt the path command cache, %zu names",
+  LOG(Info, "rebuilt the path command cache, %zu names",
       CACHED_PATH_COMMANDS.count());
   return CACHED_PATH_COMMANDS;
 }
@@ -348,7 +348,7 @@ static fn complete_command(StringView token, bool token_is_glob,
   for (const String &entry : path_command_names())
     add_unique_command(candidates, seen, entry.view(), token, token_is_glob);
 
-  LOG(verbosity::All, "collected %zu command candidates for token '%.*s'",
+  LOG(All, "collected %zu command candidates for token '%.*s'",
       candidates.count(), static_cast<int>(token.length), token.data);
 
   return candidates;
@@ -468,7 +468,7 @@ static fn complete_filesystem(StringView token,
     candidates.push(steal(candidate));
   }
 
-  LOG(verbosity::All, "%zu entries of '%s' match basename '%.*s'",
+  LOG(All, "%zu entries of '%s' match basename '%.*s'",
       candidates.count(), listing_directory.text().c_str(),
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
 
@@ -524,7 +524,7 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
     candidates.push(steal(candidate));
   }
 
-  LOG(verbosity::All, "glob pattern '%.*s' matched %zu entries",
+  LOG(All, "glob pattern '%.*s' matched %zu entries",
       static_cast<int>(token.length), token.data, candidates.count());
 
   return candidates;
@@ -578,7 +578,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   for (const String &name : os::environment_names())
     add_name(name.view());
 
-  LOG(verbosity::All, "%zu variable names match prefix '%.*s'",
+  LOG(All, "%zu variable names match prefix '%.*s'",
       candidates.count(), static_cast<int>(prefix.length), prefix.data);
 
   return candidates;
@@ -607,7 +607,7 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
     candidate.push('/');
     candidates.push(steal(candidate));
   }
-  LOG(verbosity::All, "%zu user names match tilde prefix '%.*s'",
+  LOG(All, "%zu user names match tilde prefix '%.*s'",
       candidates.count(), static_cast<int>(prefix.length), prefix.data);
   return candidates;
 }
@@ -856,11 +856,11 @@ static fn build_man_subcommand_index() throws -> void
 {
   MAN_SUBCOMMAND_INDEX_IS_BUILT = true;
   for (const Path &directory : manpage_section1_directories()) {
-    LOG(verbosity::Info, "scanning man1 directory '%s'",
+    LOG(Info, "scanning man1 directory '%s'",
         directory.text().c_str());
     let entries = Path::read_directory(directory);
     if (!entries.has_value()) {
-      LOG(verbosity::Debug, "directory '%s' is unreadable, skipping",
+      LOG(Debug, "directory '%s' is unreadable, skipping",
           directory.text().c_str());
       continue;
     }
@@ -885,7 +885,7 @@ static fn build_man_subcommand_index() throws -> void
     MAN_SUBCOMMAND_INDEX.get_or_create(head, ArrayList<String>{})
         .push(String{tail});
   });
-  LOG(verbosity::Info, "indexed %zu section-1 pages",
+  LOG(Info, "indexed %zu section-1 pages",
       MAN_PAGE_FILE_PATHS.count());
 }
 
@@ -1089,7 +1089,7 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
     if (subcommand.view().starts_with(token) &&
         man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
       matches.push(String{subcommand.view()});
-  LOG(verbosity::Debug, "%zu subcommands of '%.*s' match token '%.*s'",
+  LOG(Debug, "%zu subcommands of '%.*s' match token '%.*s'",
       matches.count(), static_cast<int>(command.length), command.data,
       static_cast<int>(token.length), token.data);
   if (matches.is_empty()) return None;
@@ -1469,7 +1469,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
   if (man_paths.is_empty() ||
       !command_directory_is_trusted(man_paths[0].text().view()))
   {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "skipping the man fork for '%.*s' because man is absent or untrusted",
         static_cast<int>(page_name.length), page_name.data);
     MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
@@ -1481,7 +1481,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
         " 2>/dev/null");
     parsed = parse_manpage_option_entries(page.view());
   } catch (...) {
-    LOG(verbosity::Debug, "swallowed a man invocation failure for '%.*s'",
+    LOG(Debug, "swallowed a man invocation failure for '%.*s'",
         static_cast<int>(page_name.length), page_name.data);
   }
   MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
@@ -1605,7 +1605,7 @@ static fn help_text_for(StringView command) throws -> String
       if (i > start)
         argv.push(String{argument_view.substring_of_length(start, i - start)});
     }
-    LOG(verbosity::Debug, "forking '%.*s' for its --help text",
+    LOG(Debug, "forking '%.*s' for its --help text",
         static_cast<int>(command.length), command.data);
     if (Maybe<String> output =
             os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
@@ -2152,7 +2152,7 @@ static fn complete_from_build_tools(StringView line, StringView token,
     try {
       return context.capture_command_substitution(source);
     } catch (...) {
-      LOG(verbosity::Debug, "swallowed a target listing failure");
+      LOG(Debug, "swallowed a target listing failure");
       return String{};
     }
   };
@@ -2496,7 +2496,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     if (resolved_command.view() != command)
       spec = context.lookup_completion_spec(resolved_command.view());
   }
-  LOG(verbosity::All,
+  LOG(All,
       "spec lookup for '%.*s' %s, listing %d, function '%s', %zu word-list "
       "bytes",
       static_cast<int>(command.length), command.data,
@@ -2873,7 +2873,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
     PATH_SEARCH_VERDICTS.clear();
   if (const bool *verdict = PATH_SEARCH_VERDICTS.find(word)) return *verdict;
   let const resolves = utils::search_program_path(word).count() > 0;
-  LOG(verbosity::All, "the path search resolves '%.*s' to %s",
+  LOG(All, "the path search resolves '%.*s' to %s",
       static_cast<int>(word.length), word.data, resolves ? "yes" : "no");
   PATH_SEARCH_VERDICTS.set(word, resolves);
   return resolves;

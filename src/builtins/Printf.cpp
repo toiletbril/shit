@@ -347,7 +347,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (ec.args().count() < 2) return 0;
 
-  LOG(verbosity::All, "printf formatting %zu arguments", ec.args().count() - 1);
+  LOG(All, "printf formatting %zu arguments", ec.args().count() - 1);
 
   /* bash printf -v NAME stores the result in the named variable instead of
      printing it, so the format and operands shift two places past -v NAME.

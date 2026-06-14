@@ -54,7 +54,7 @@ static fn parse_modifier_array_word(StringView word) wontthrow
 hot fn EvalContext::expand_word(const Word &word) throws
     -> ArrayList<glob_field>
 {
-  LOG(verbosity::All, "expanding a word of %zu segments into fields",
+  LOG(All, "expanding a word of %zu segments into fields",
       word.segments.count());
   let const scratch = scratch_allocator();
 
@@ -732,7 +732,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
 hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     -> String
 {
-  LOG(verbosity::All, "expanding an assignment word of %zu segments",
+  LOG(All, "expanding an assignment word of %zu segments",
       word.segments.count());
   /* Only copy the segments when a tilde must be rewritten, the leading one or
      one after an unquoted colon, the assignment-only rule bash applies to
@@ -949,7 +949,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     return quote == 0 && !in_backtick && paren_depth == 0 && brace_depth == 0;
   };
   if (!is_array_literal_safe()) {
-    LOG(verbosity::Debug, "-W list is not array-literal safe, splitting plain");
+    LOG(Debug, "-W list is not array-literal safe, splitting plain");
     return split_plain();
   }
 
@@ -976,7 +976,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
         fields.push_managed(word.view());
     }
   } catch (const ErrorBase &error) {
-    LOG(verbosity::Debug, "-W expansion failed, splitting plain: %s",
+    LOG(Debug, "-W expansion failed, splitting plain: %s",
         error.message().c_str());
     return split_plain();
   }

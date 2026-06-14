@@ -994,7 +994,7 @@ fn EvalContext::read_array_element_integer(StringView name,
 
 fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 {
-  LOG(verbosity::All, "evaluating the arithmetic expression of %zu bytes",
+  LOG(All, "evaluating the arithmetic expression of %zu bytes",
       expression.length);
   /* Parameter expansion runs first, so a $1, a $x, or a ${...} inside the
      arithmetic becomes its value before the expression is parsed. A bare name
@@ -1010,7 +1010,7 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 
   /* The expanded word owns the bytes the parser views, so it outlives the
      parser below. */
-  LOG(verbosity::All,
+  LOG(All,
       "expanding parameters inside the arithmetic before the parse");
   let const expanded_word = expand_modifier_word(expression);
   let parser = ArithmeticParser{this, expanded_word.view(), 0};

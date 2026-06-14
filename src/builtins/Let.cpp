@@ -39,7 +39,7 @@ i32 Let::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* Each argument is one expression, evaluated in order so an earlier
      assignment is visible to a later one, and the last value decides the
      status. */
-  LOG(verbosity::Debug, "let evaluating %zu arithmetic expressions",
+  LOG(Debug, "let evaluating %zu arithmetic expressions",
       ec.args().count() - 1);
 
   i64 last = 0;

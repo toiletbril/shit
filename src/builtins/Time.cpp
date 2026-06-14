@@ -53,7 +53,7 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     command.append(ec.args()[i].view());
   }
 
-  LOG(verbosity::Debug, "time running command '%s' under the clock",
+  LOG(Debug, "time running command '%s' under the clock",
       command.c_str());
 
   double user_before = 0, system_before = 0;

@@ -323,7 +323,7 @@ fn expand_braces(const Word &word, Allocator alloc) throws -> ArrayList<Word>
     }
     words.push(steal(out));
   }
-  LOG(verbosity::Debug, "brace expansion produced %zu words", words.count());
+  LOG(Debug, "brace expansion produced %zu words", words.count());
   return words;
 }
 
@@ -333,7 +333,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                                  bool args_are_transient) throws
     -> ArrayList<String>
 {
-  LOG(verbosity::Debug, "expanding %zu argument tokens", args.count());
+  LOG(Debug, "expanding %zu argument tokens", args.count());
   /* The argument vector is built first, on the scratch arena for a transient
      request the caller scopes and frees, or on the heap otherwise. The per-word
      expansion fields are reclaimed on return only for the heap form, since the

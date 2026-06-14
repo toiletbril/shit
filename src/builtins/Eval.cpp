@@ -45,7 +45,7 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (joined.is_empty()) return 0;
 
-  LOG(verbosity::Debug, "eval running %zu joined bytes in the current shell",
+  LOG(Debug, "eval running %zu joined bytes in the current shell",
       joined.length());
 
   /* eval leaves a return pending so it ends the enclosing function or the

@@ -46,7 +46,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       head.length < binary_scan_limit ? head.length : binary_scan_limit;
   if (head.substring_of_length(0, scan_length).find_character('\0').has_value())
   {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "a NUL byte in the leading bytes marks '%s' as a binary file",
         ec.program().c_str());
     shit::print_error("shit: " + ec.program_path().text() +
@@ -59,7 +59,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
      the terminal run leaves it since the shell exits next. */
   let const previous_mood = m_mood;
   m_mood = mode;
-  LOG(verbosity::Debug, "mimicking the script '%s'%s", ec.program().c_str(),
+  LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
   /* A mimicked script is a script-file run, so its FUNCNAME bottoms out at
      "main" the way the direct file invocation marks it. */
@@ -79,7 +79,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   set_error_unset(mimic_strict);
   set_pipefail(mimic_strict);
   set_failglob(mimic_strict);
-  LOG(verbosity::Debug, "seeded the strict options for the %s mimicked run",
+  LOG(Debug, "seeded the strict options for the %s mimicked run",
       mimic_strict ? "shit" : "lax");
 
   let parser = Parser{
@@ -246,7 +246,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
      so a return or a break inside the evaluated source reaches the caller. */
   if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
 
-  LOG(verbosity::Debug, "running source '%.*s' of %zu bytes at depth %zu",
+  LOG(Debug, "running source '%.*s' of %zu bytes at depth %zu",
       static_cast<int>(origin.length), origin.data, source.length,
       m_source_depth);
 
@@ -377,7 +377,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
 fn EvalContext::clear_retained_sources() wontthrow -> void
 {
-  LOG(verbosity::All, "dropping %zu retained sources and %zu retained asts",
+  LOG(All, "dropping %zu retained sources and %zu retained asts",
       m_retained_sources.count(), m_retained_source_asts.count());
   /* The retained AST nodes live in the arena, which runs every node's
      destructor on the reset that follows, so this only drops the references. */
@@ -420,7 +420,7 @@ fn EvalContext::retain_ast(Expression *ast) throws -> void
 
 fn EvalContext::expand_heredoc_body(StringView body) throws -> String
 {
-  LOG(verbosity::Debug, "expanding a heredoc body of %zu bytes", body.length);
+  LOG(Debug, "expanding a heredoc body of %zu bytes", body.length);
   /* A heredoc body keeps its quote characters literally. */
   return expand_modifier_word(body, false);
 }

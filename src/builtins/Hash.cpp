@@ -36,7 +36,7 @@ fn Hash::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (FLAG_RESET.is_enabled()) {
-    LOG(verbosity::Info, "hash forgetting every remembered command location");
+    LOG(Info, "hash forgetting every remembered command location");
     utils::invalidate_path_cache();
   }
 

@@ -232,14 +232,14 @@ fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
   }
 
   if (const bool *cached = actx.command_resolution_cache.find(name.view())) {
-    LOG(verbosity::Debug, "reusing the cached resolution of '%s'",
+    LOG(Debug, "reusing the cached resolution of '%s'",
         name.c_str());
     return *cached;
   }
 
   const bool was_resolved =
       utils::search_program_path(name.view()).count() != 0;
-  LOG(verbosity::Debug, "scanning PATH for '%s', the command was %s",
+  LOG(Debug, "scanning PATH for '%s', the command was %s",
       name.c_str(), was_resolved ? "found" : "not found");
   actx.command_resolution_cache.set(name.view(), was_resolved);
   return was_resolved;
@@ -372,7 +372,7 @@ fn analyze_ast(const Expression *root, StringView source,
       actx.shebang_is_posix_sh = true;
   }
 
-  LOG(verbosity::Debug, "analyzing the ast, the posix sh shebang gate is %s",
+  LOG(Debug, "analyzing the ast, the posix sh shebang gate is %s",
       actx.shebang_is_posix_sh ? "armed" : "off");
 
   /* A function or alias defined by an earlier command resolves, so seed the
@@ -426,7 +426,7 @@ hot fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
    */
   if (cxt.has_pending_control_flow()) return condition;
 
-  LOG(verbosity::Debug, "the if condition yielded %lld, running the %s branch",
+  LOG(Debug, "the if condition yielded %lld, running the %s branch",
       static_cast<long long>(condition),
       condition ? "then" : (m_otherwise != nullptr ? "else" : "no"));
 
@@ -573,7 +573,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
      forgotten rather than recorded under the bracketed key. */
   if (let const bracket = name.view().find_character('['); bracket.has_value())
   {
-    LOG(verbosity::All,
+    LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "
         "assignment",
         static_cast<int>(*bracket), name.view().data);
@@ -613,7 +613,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
   if (!is_unconditional || actx.saw_runtime_definer ||
       m_assignment->is_append())
   {
-    LOG(verbosity::All,
+    LOG(All,
         "forgetting the constant for '%s', the assignment is conditional, "
         "appends, or follows a runtime definer",
         name.c_str());
@@ -623,7 +623,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
 
   let const literal = optimizer::literal_word_value(m_assignment->value_word());
   if (literal.has_value()) {
-    LOG(verbosity::All, "recording the constant '%s' = '%s'", name.c_str(),
+    LOG(All, "recording the constant '%s' = '%s'", name.c_str(),
         literal->c_str());
     actx.constant_variables.set(name.view(), literal->view());
     actx.optimizer_recorded_constants++;
@@ -633,7 +633,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
   } else {
     /* The value is only known at run time, so a constant recorded for this name
        under an earlier assignment no longer holds and is forgotten. */
-    LOG(verbosity::All,
+    LOG(All,
         "forgetting the constant for '%s', its value is only known at run "
         "time",
         name.c_str());
@@ -645,7 +645,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_assignment != nullptr);
 
-  LOG(verbosity::All, "assigning the variable '%s'",
+  LOG(All, "assigning the variable '%s'",
       m_assignment->key().c_str());
 
   /* Record where this assignment sits so a $LINENO in its value reports its
@@ -972,7 +972,7 @@ static fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                                         EvalContext &cxt) const throws -> void
 {
-  LOG(verbosity::Debug, "applying %zu redirections to the pipeline stage",
+  LOG(Debug, "applying %zu redirections to the pipeline stage",
       m_redirections.count());
   for (const Redirection &redir : m_redirections) {
     let const r = resolve_redirection(redir, cxt, source_location());
@@ -1046,7 +1046,7 @@ fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     let const body = cxt.get_alias(word);
     if (!body.has_value()) break;
     already_expanded.add(word.view());
-    LOG(verbosity::Debug, "expanding the alias '%s'", word.c_str());
+    LOG(Debug, "expanding the alias '%s'", word.c_str());
 
     /* The alias body replaces the first word, so the split words go in front of
        the remaining arguments. ArrayList has no in-place erase, so the new list
@@ -1118,7 +1118,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args);
 
-  LOG(verbosity::Info, "dispatching the command '%s' with %zu words",
+  LOG(Info, "dispatching the command '%s' with %zu words",
       program_args.is_empty() ? "" : program_args[0].c_str(),
       program_args.count());
 
@@ -1721,21 +1721,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        state returns when the call ends. */
     let const *const definition_info =
         cxt.function_definition_info_of(program_name.view());
-    let const saved_mood = cxt.mood();
-    let const saved_warnings = cxt.warnings_enabled();
-    let const saved_diagnostics_disabled = cxt.diagnostics_disabled();
-    let const saved_error_unset = cxt.error_unset();
-    let const saved_pipefail = cxt.pipefail();
-    let const saved_failglob = cxt.failglob();
-    defer
-    {
-      cxt.set_mood(saved_mood);
-      cxt.set_warnings_enabled(saved_warnings);
-      cxt.set_diagnostics_disabled(saved_diagnostics_disabled);
-      cxt.set_error_unset(saved_error_unset);
-      cxt.set_pipefail(saved_pipefail);
-      cxt.set_failglob(saved_failglob);
-    };
+    let const saved_runtime_state = cxt.capture_runtime_state();
+    defer { cxt.restore_runtime_state(saved_runtime_state); };
     if (definition_info != nullptr) {
       cxt.set_mood(static_cast<mimic_mood>(definition_info->defining_mood));
       cxt.set_warnings_enabled(definition_info->defining_warnings);
@@ -2023,7 +2010,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         return n->evaluate(cxt);
       } catch (const ErrorBase &error) {
         if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
-        LOG(verbosity::Debug,
+        LOG(Debug,
             "bash mood converted the error to command status %lld: %s",
             static_cast<long long>(error.command_status()),
             error.message().c_str());
@@ -2227,7 +2214,7 @@ cold fn Pipeline::to_ast_string(usize layer) const throws -> String
 cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     -> i64
 {
-  LOG(verbosity::Debug, "forking %zu pipeline stages, one child per stage",
+  LOG(Debug, "forking %zu pipeline stages, one child per stage",
       m_commands.count());
 
   let children = ArrayList<os::process>{};
@@ -2315,7 +2302,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           shit::show_message(e.to_string());
           stage_status = 1;
         } catch (...) {
-          LOG(verbosity::Debug,
+          LOG(Debug,
               "swallowed an unknown error in the pipeline stage child");
           stage_status = 1;
         }
@@ -2342,7 +2329,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       try {
         os::wait_and_monitor_process(child);
       } catch (...) {
-        LOG(verbosity::Debug,
+        LOG(Debug,
             "swallowed a wait error while reaping an aborted pipeline child");
       }
     }
@@ -2380,7 +2367,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
       }
   }
 
-  LOG(verbosity::Debug, "the pipeline stages were reaped, %s status is %d",
+  LOG(Debug, "the pipeline stages were reaped, %s status is %d",
       cxt.pipefail() ? "the pipefail" : "the last stage's", ret);
 
   cxt.set_last_exit_status(ret);
@@ -2441,7 +2428,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   }
 
-  LOG(verbosity::Debug, "the pipeline has %zu stages, taking the %s path",
+  LOG(Debug, "the pipeline has %zu stages, taking the %s path",
       m_commands.count(),
       has_compound_stage ? "fork-per-stage" : "all-simple fast");
 
@@ -2605,7 +2592,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
      and the chosen body runs straight away. An index past the last branch means
      every condition failed, so the else body runs or the if yields 0. */
   if (m_folded_branch.has_value()) {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "running the folded if branch %zu of %zu without testing conditions",
         *m_folded_branch, m_branches.count());
     if (*m_folded_branch < m_branches.count())
@@ -2760,7 +2747,7 @@ fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
      loop so the outer one consumes it. */
   if (control.value > 1) {
     control.value -= 1;
-    LOG(verbosity::All,
+    LOG(All,
         "the loop jump targets an outer loop, %lld levels stay pending",
         static_cast<long long>(control.value));
     return loop_disposition::StopLoop;
@@ -2770,7 +2757,7 @@ fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
      iteration. Either way the request is consumed here. */
   let const is_break = control.kind == control_flow::Kind::Break;
   cxt.clear_control_flow();
-  LOG(verbosity::All, "consuming the %s aimed at this loop",
+  LOG(All, "consuming the %s aimed at this loop",
       is_break ? "break" : "continue");
   return is_break ? loop_disposition::StopLoop : loop_disposition::RunNext;
 }
@@ -2786,7 +2773,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
      replace the shell. */
   cxt.set_terminal_exec_allowed(false);
 
-  LOG(verbosity::Debug, "entering the %s loop%s",
+  LOG(Debug, "entering the %s loop%s",
       m_is_until ? "until" : "while",
       m_folded_to_skip ? ", folded to skip the body" : "");
 
@@ -2916,7 +2903,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
   if (values.is_empty()) return 0;
 
-  LOG(verbosity::Debug, "the select loop offers %zu choices for '%s'",
+  LOG(Debug, "the select loop offers %zu choices for '%s'",
       values.count(), m_variable_name.c_str());
 
   cxt.enter_loop();
@@ -2953,7 +2940,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
 
     let const reply = String{StringView{*input}};
-    LOG(verbosity::All, "the select prompt read the reply '%s'", reply.c_str());
+    LOG(All, "the select prompt read the reply '%s'", reply.c_str());
     cxt.set_shell_variable("REPLY", reply.view());
     if (reply.is_empty()) {
       reprint_menu = true;
@@ -3041,7 +3028,7 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   };
 
-  LOG(verbosity::Debug, "the for loop binds '%s' over %zu values",
+  LOG(Debug, "the for loop binds '%s' over %zu values",
       m_variable_name.c_str(), values.count());
 
   /* The body runs inside one more loop level, so a break or a continue clamps
@@ -3170,7 +3157,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   let const subject = expand_no_glob(m_word);
 
-  LOG(verbosity::Debug, "the case subject expanded to '%s'", subject.c_str());
+  LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
 
   auto arm_matches = [&](const case_item &item) throws -> bool {
     for (const Token *pattern_token : item.patterns) {
@@ -3213,7 +3200,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
       continue;
     }
 
-    LOG(verbosity::All, "case arm %zu matched, running its body", i);
+    LOG(All, "case arm %zu matched, running its body", i);
 
     bool should_resume_matching = false;
     for (;;) {
@@ -3239,7 +3226,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   if (!did_run_a_body) {
-    LOG(verbosity::Debug, "no case arm matched the subject");
+    LOG(Debug, "no case arm matched the subject");
     cxt.set_last_exit_status(0);
   }
   return result;
@@ -3382,7 +3369,7 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   } catch (const Error &e) {
     throw relocate_error(e, source_location());
   }
-  LOG(verbosity::Debug, "the [[ ]] conditional yielded status %lld",
+  LOG(Debug, "the [[ ]] conditional yielded status %lld",
       static_cast<long long>(status));
   cxt.set_last_exit_status(static_cast<i32>(status));
   return status;
@@ -3417,7 +3404,7 @@ static pure fn is_blank_clause(StringView text) wontthrow -> bool
 
 fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  LOG(verbosity::Debug, "evaluating the arithmetic command '%s'",
+  LOG(Debug, "evaluating the arithmetic command '%s'",
       m_expression.c_str());
 
   /* The expression reads variables, so a runtime warning from it carets this
@@ -3528,7 +3515,7 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The elements expand the way command arguments do, with field splitting and
      globbing, so a=( $list *.txt ) builds the array bash would. */
   ArrayList<String> values = cxt.process_args(m_elements);
-  LOG(verbosity::Debug, "assigning %zu elements to the array '%s'",
+  LOG(Debug, "assigning %zu elements to the array '%s'",
       values.count(), m_name.c_str());
   cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);
   cxt.set_last_exit_status(0);
@@ -3557,7 +3544,7 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
      them carets this loop rather than the statement before it. */
   cxt.set_current_location(source_location());
 
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "entering the c-style for loop with init '%s', condition '%s', step "
       "'%s'",
       m_init.c_str(), m_condition.c_str(), m_step.c_str());
@@ -3639,7 +3626,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   cxt.set_loop_depth(0);
   defer { cxt.set_loop_depth(saved_loop_depth); };
 
-  LOG(verbosity::Debug, "entering the snapshot subshell");
+  LOG(Debug, "entering the snapshot subshell");
 
   let snapshot = cxt.snapshot_state();
 
@@ -3670,7 +3657,7 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
        status 1 the way bash answers it and 2 the way dash does, which the
        default mood follows. */
     if (error.is_script_fatal()) {
-      LOG(verbosity::Debug, "the subshell confined a script-fatal error: %s",
+      LOG(Debug, "the subshell confined a script-fatal error: %s",
           error.message().c_str());
       const String *source = cxt.current_source();
       show_message(
@@ -3790,7 +3777,7 @@ fn FunctionDefinition::evaluate_impl(EvalContext &cxt) const throws -> i64
         m_body->source_location().position,
         m_body->source_end_position() - m_body->source_location().position));
   }
-  LOG(verbosity::Info, "registering the function '%s'%s", m_name.c_str(),
+  LOG(Info, "registering the function '%s'%s", m_name.c_str(),
       definition_text.is_empty() ? " without recorded definition text" : "");
   cxt.register_function(m_name, m_body, definition_text.view(),
                         m_body->source_location().position, source_location());
@@ -3877,7 +3864,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_child != nullptr);
 
-  LOG(verbosity::Debug, "applying %zu redirections around the compound command",
+  LOG(Debug, "applying %zu redirections around the compound command",
       m_redirections.count());
 
   /* The redirection targets expand here, so a runtime warning from done < $f
@@ -4379,7 +4366,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   if (command_literal == "." || command_literal == "source" ||
       command_literal == "eval" || command_literal == "alias")
   {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "'%s' may define commands at run time, later resolution failures "
         "degrade to warnings",
         command_literal.c_str());
@@ -5231,7 +5218,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     clears_constants = true;
 
   if (clears_constants) {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "the command '%s' may write variables, forgetting the recorded "
         "constants",
         command_literal.c_str());

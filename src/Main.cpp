@@ -353,7 +353,7 @@ static fn run_script_contents(const String &script_contents,
        it is reused across prompts rather than rebuilt each one. */
     Expression *ast = precompiled_ast;
     if (precompiled_ast == nullptr) {
-      LOG(verbosity::Debug, "parsing a chunk of %zu bytes",
+      LOG(Debug, "parsing a chunk of %zu bytes",
           script_contents.count());
 
       let p = Parser{
@@ -407,7 +407,7 @@ static fn run_script_contents(const String &script_contents,
         (!(context.is_bash_compatible() || context.is_posix_mode()) ||
          FLAG_WARNINGS.is_enabled()) &&
         !context.diagnostics_disabled();
-    LOG(verbosity::Debug, "the analysis stage %s for this chunk",
+    LOG(Debug, "the analysis stage %s for this chunk",
         run_analysis ? "runs" : "is skipped");
     /* An interactive -W chunk runs right away and the runtime resolution
        reports a missing command itself, so the analysis copy of that report
@@ -433,7 +433,7 @@ static fn run_script_contents(const String &script_contents,
       /* Under -n the tree is parsed and validated but never run. */
       exit_code = EXIT_SUCCESS;
     } else {
-      LOG(verbosity::Debug, "evaluating the chunk");
+      LOG(Debug, "evaluating the chunk");
       context.set_current_source(&script_contents, "the script");
       /* Run, timing the wall clock so the \D prompt segment can show how long
          the last command took. */
@@ -441,7 +441,7 @@ static fn run_script_contents(const String &script_contents,
       exit_code = static_cast<int>(ast->evaluate(context));
       context.set_last_command_duration_ns(shit::os::monotonic_nanos() -
                                            command_start_ns);
-      LOG(verbosity::Debug, "the chunk finished with exit code %d", exit_code);
+      LOG(Debug, "the chunk finished with exit code %d", exit_code);
       /* A trapped signal delivered during the last command of the chunk has no
          following node to trigger its action, so the pending traps drain here
          before the chunk ends, the way dash runs a pending trap before it reads
@@ -522,7 +522,7 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   Maybe<String> command = context.get_variable_value("PROMPT_COMMAND");
   if (!command.has_value() || command->is_empty()) return;
 
-  LOG(verbosity::Info, "running the PROMPT_COMMAND hook, %zu bytes",
+  LOG(Info, "running the PROMPT_COMMAND hook, %zu bytes",
       command->count());
 
   const i32 saved_exit_status = context.last_exit_status();
@@ -562,13 +562,13 @@ static fn source_file(const Path &path, EvalContext &context,
 {
   Maybe<String> contents = utils::read_entire_file(path.text());
   if (!contents) {
-    LOG(verbosity::Info,
+    LOG(Info,
         "skipping '%s' because the file is missing or unreadable",
         path.c_str());
     return false;
   }
 
-  LOG(verbosity::Info, "sourcing '%s', %zu bytes", path.c_str(),
+  LOG(Info, "sourcing '%s', %zu bytes", path.c_str(),
       contents->count());
 
   /* The file runs through run_source, the same path the dot builtin uses, so it
@@ -602,7 +602,7 @@ static fn source_home_file(StringView name, EvalContext &context,
 static fn source_posix_login_files(EvalContext &context,
                                    BumpArena &ast_arena) throws -> void
 {
-  LOG(verbosity::Info, "sourcing the posix login files");
+  LOG(Info, "sourcing the posix login files");
   source_file(Path{"/etc/profile"}, context, ast_arena);
   source_home_file(".profile", context, ast_arena);
 }
@@ -613,7 +613,7 @@ static fn source_posix_login_files(EvalContext &context,
 static fn source_bash_login_files(EvalContext &context,
                                   BumpArena &ast_arena) throws -> void
 {
-  LOG(verbosity::Info, "sourcing the bash login files in bash order");
+  LOG(Info, "sourcing the bash login files in bash order");
   source_file(Path{"/etc/profile"}, context, ast_arena);
   if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
     for (const char *name : {".bash_profile", ".bash_login", ".profile"}) {
@@ -632,7 +632,7 @@ static fn source_bash_login_files(EvalContext &context,
 static fn source_bash_system_rc(EvalContext &context,
                                 BumpArena &ast_arena) throws -> void
 {
-  LOG(verbosity::Info, "looking for the system bashrc");
+  LOG(Info, "looking for the system bashrc");
   for (const char *path : {"/etc/bash/bashrc", "/etc/bash.bashrc"})
     if (source_file(Path{path}, context, ast_arena)) break;
 }
@@ -647,16 +647,16 @@ static fn ensure_bash_completion_loaded(EvalContext &context,
                                         BumpArena &ast_arena) throws -> void
 {
   if (context.default_completion_spec() != nullptr) {
-    LOG(verbosity::Info, "skipping the bash-completion bootstrap because a "
+    LOG(Info, "skipping the bash-completion bootstrap because a "
                          "default completion spec is already registered");
     return;
   }
   if (context.get_variable_value("BASH_COMPLETION_VERSINFO").has_value()) {
-    LOG(verbosity::Info, "skipping the bash-completion bootstrap because the "
+    LOG(Info, "skipping the bash-completion bootstrap because the "
                          "rc chain already loaded the script");
     return;
   }
-  LOG(verbosity::Info, "sourcing the stock bash-completion script");
+  LOG(Info, "sourcing the stock bash-completion script");
   source_file(Path{"/usr/share/bash-completion/bash_completion"}, context,
               ast_arena);
 }
@@ -675,7 +675,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
        until the stack overflows. The bit clears when the flavor finishes, even
        on a throw. */
     if (context.init_mood_sourcing(flavor)) {
-      LOG(verbosity::Info,
+      LOG(Info,
           "skipping the %s flavor, its startup files are already sourcing",
           flavor == mimic_mood::Bash    ? "bash"
           : flavor == mimic_mood::Posix ? "posix"
@@ -685,7 +685,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
     context.set_init_mood_sourcing(flavor, true);
     defer { context.set_init_mood_sourcing(flavor, false); };
     context.set_mood(flavor);
-    LOG(verbosity::Info, "sourcing the startup files for the %s flavor",
+    LOG(Info, "sourcing the startup files for the %s flavor",
         flavor == mimic_mood::Bash    ? "bash"
         : flavor == mimic_mood::Posix ? "posix"
                                       : "shit");
@@ -731,7 +731,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
      script parses under the bash grammar and its specs survive into the
      session. */
   if (did_source_bash_rc) {
-    LOG(verbosity::Info, "bootstrapping the bash programmable completion");
+    LOG(Info, "bootstrapping the bash programmable completion");
     ensure_bash_completion_loaded(context, ast_arena);
   }
 }
@@ -905,9 +905,9 @@ fn main(int argc, char **argv) -> int
   shit::INVOKED_AS_POSIX_SHELL =
       program_basename == "sh" || program_basename == "dash";
   shit::INVOKED_AS_BASH = program_basename == "bash";
-  LOG(shit::verbosity::Info, "invocation basename is '%.*s'",
+  LOG(Info, "invocation basename is '%.*s'",
       static_cast<int>(program_basename.length), program_basename.data);
-  LOG(shit::verbosity::Info, "selecting the %s mood",
+  LOG(Info, "selecting the %s mood",
       shit::resolve_session_mood() == shit::mimic_mood::Posix  ? "posix"
       : shit::resolve_session_mood() == shit::mimic_mood::Bash ? "bash"
                                                                : "default");
@@ -918,7 +918,7 @@ fn main(int argc, char **argv) -> int
   /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
      convention tmux and login use, the same mark the -l flag sets. */
   if (FLAG_LOGIN.is_enabled() || name_marks_login) is_login_shell = true;
-  LOG(shit::verbosity::Info, "the shell %s a login shell",
+  LOG(Info, "the shell %s a login shell",
       is_login_shell ? "is" : "is not");
 
   /* The runtime mood and the startup-file moods. --mood selects the session
@@ -981,7 +981,7 @@ fn main(int argc, char **argv) -> int
      default. */
   let const is_privileged =
       FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
-  LOG(shit::verbosity::Info, "privileged mode is %s",
+  LOG(Info, "privileged mode is %s",
       is_privileged ? "on" : "off");
 
   /* Both stdin and interactive flags are enabled, but there will be only the
@@ -1045,7 +1045,7 @@ fn main(int argc, char **argv) -> int
     should_read_stdin = true;
   }
 #endif
-  LOG(shit::verbosity::Info, "the input source is %s",
+  LOG(Info, "the input source is %s",
       should_read_stdin         ? "standard input"
       : should_execute_commands ? "the -c command strings"
       : should_read_files       ? "the named script file"
@@ -1197,7 +1197,7 @@ fn main(int argc, char **argv) -> int
    * simple scripts! */
   shit::utils::clear_path_map();
   shit::os::set_default_signal_handlers();
-  LOG(shit::verbosity::Info, "installed the default signal handlers");
+  LOG(Info, "installed the default signal handlers");
 
   /* The parse arena holds the AST and its tokens for one command, and is reset
      between commands. It outlives each tree it builds. */
@@ -1214,7 +1214,7 @@ fn main(int argc, char **argv) -> int
      privileged shell sources nothing, the way bash's privileged mode leaves the
      profiles and rc files unread. */
   if (is_privileged) {
-    LOG(shit::verbosity::Info,
+    LOG(Info,
         "skipping every startup config file in privileged mode");
   } else {
     /* --no-init-diagnostics turns diagnostics and warnings off for the duration
@@ -1271,11 +1271,11 @@ fn main(int argc, char **argv) -> int
            named file, both through the descriptor layer so no iostream file
            stream is pulled in. */
         if (should_read_stdin || file_names[0] == "-") {
-          LOG(shit::verbosity::Info, "reading the whole standard input");
+          LOG(Info, "reading the whole standard input");
           script_contents = shit::utils::read_entire_standard_input();
         } else {
           const shit::String &file_name = file_names[0];
-          LOG(shit::verbosity::Info, "reading the script file '%s'",
+          LOG(Info, "reading the script file '%s'",
               file_name.c_str());
           shit::Maybe<shit::String> contents =
               shit::utils::read_entire_file(file_name.view());
@@ -1310,13 +1310,13 @@ fn main(int argc, char **argv) -> int
       } else if (should_execute_commands) {
         shit::StringView command_view = FLAG_COMMAND.next();
         script_contents = shit::String{command_view};
-        LOG(shit::verbosity::Info,
+        LOG(Info,
             "taking the next -c command string, %zu bytes",
             script_contents.count());
         if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
-          LOG(shit::verbosity::Info,
+          LOG(Info,
               "initializing the line editor and the path map");
           shit::utils::initialize_path_map();
           toiletline::initialize();
@@ -1404,7 +1404,7 @@ fn main(int argc, char **argv) -> int
           }
         }
 
-        LOG(shit::verbosity::Info, "accepted an interactive line of %zu bytes",
+        LOG(Info, "accepted an interactive line of %zu bytes",
             script_contents.count());
         toiletline::exit_raw_mode();
       } else {
@@ -1462,7 +1462,7 @@ fn main(int argc, char **argv) -> int
         exit_code = shit::run_debug_completion_driver(
             FLAG_DEBUG_COMPLETE_AT.value(), context);
 #endif
-      LOG(shit::verbosity::Info, "exiting after the final chunk with code %d",
+      LOG(Info, "exiting after the final chunk with code %d",
           exit_code);
       if (!shit::os::is_child_process()) context.run_exit_trap();
       shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled());

@@ -44,10 +44,10 @@ i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (!want_physical && logical_pwd.has_value() && !logical_pwd->is_empty() &&
       logical_pwd->view()[0] == '/')
   {
-    LOG(verbosity::Debug, "pwd printing the logical directory from PWD");
+    LOG(Debug, "pwd printing the logical directory from PWD");
     p.append(logical_pwd->view());
   } else {
-    LOG(verbosity::Debug, "pwd printing the physical directory from getcwd");
+    LOG(Debug, "pwd printing the physical directory from getcwd");
     p.append(Path::current_directory().text());
   }
   p += '\n';

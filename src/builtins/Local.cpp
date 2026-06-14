@@ -106,7 +106,7 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
        it fresh, not from the outer value the new local shadows. */
     let const was_already_local =
         is_append && cxt.is_local_in_current_scope(name);
-    LOG(verbosity::All, "local declaring '%.*s' in the function scope",
+    LOG(All, "local declaring '%.*s' in the function scope",
         static_cast<int>(name.length), name.data);
     cxt.declare_local(name);
     /* declare_local dropped any inherited integer mark, so -i marks the fresh

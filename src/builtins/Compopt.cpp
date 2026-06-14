@@ -41,7 +41,7 @@ fn Compopt::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   /* The options are accepted and ignored, so a completion function that adjusts
      its options keeps running. */
-  LOG(verbosity::Debug, "compopt accepting %zu arguments without effect",
+  LOG(Debug, "compopt accepting %zu arguments without effect",
       args.count() - 1);
   return 0;
 }

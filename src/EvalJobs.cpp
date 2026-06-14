@@ -21,7 +21,7 @@ fn EvalContext::register_job(os::process pid, StringView command) throws -> i32
   new_job.state = job::State::Running;
   m_jobs.push(steal(new_job));
   ASSERT(!m_jobs.is_empty());
-  LOG(verbosity::Info, "registered job %d", m_jobs.back().id);
+  LOG(Info, "registered job %d", m_jobs.back().id);
   return m_jobs.back().id;
 }
 
@@ -34,7 +34,7 @@ fn EvalContext::update_jobs() throws -> void
     let const state = os::poll_process(job.pid, status);
     switch (state) {
     case os::process_state::Exited:
-      LOG(verbosity::Info, "job %d finished with status %d", job.id, status);
+      LOG(Info, "job %d finished with status %d", job.id, status);
       job.state = job::State::Done;
       job.last_status = status;
       break;
@@ -71,7 +71,7 @@ fn EvalContext::forget_done_jobs() throws -> void
     if (job.state == job::State::Done) continue;
     kept.push(steal(job));
   }
-  LOG(verbosity::Debug, "dropping finished jobs, keeping %zu of %zu",
+  LOG(Debug, "dropping finished jobs, keeping %zu of %zu",
       kept.count(), m_jobs.count());
   m_jobs = steal(kept);
 }
@@ -115,7 +115,7 @@ fn EvalContext::notify_done_jobs() throws -> void
 
 fn EvalContext::set_monitor(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the monitor option flips to %s",
+  LOG(Info, "the monitor option flips to %s",
       enabled ? "on" : "off");
   m_monitor = enabled;
 }
@@ -124,7 +124,7 @@ pure fn EvalContext::monitor() const wontthrow -> bool { return m_monitor; }
 
 fn EvalContext::set_notify(bool enabled) wontthrow -> void
 {
-  LOG(verbosity::Info, "the notify option flips to %s", enabled ? "on" : "off");
+  LOG(Info, "the notify option flips to %s", enabled ? "on" : "off");
   m_notify = enabled;
 }
 

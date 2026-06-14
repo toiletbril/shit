@@ -26,7 +26,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
      text is split on its last separator into a parent directory and the glob
      stem. */
   let const path = field.text.view();
-  LOG(verbosity::All, "scanning a directory for the glob component '%.*s'",
+  LOG(All, "scanning a directory for the glob component '%.*s'",
       static_cast<int>(path.length), path.data);
 
   let last_slash = Maybe<usize>{};
@@ -57,7 +57,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
      literal under failglob-off rather than raising an error here. */
   let const entries = Path::read_directory(parent_dir);
   if (!entries.has_value()) {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "the parent directory is unreadable, the glob '%.*s' yields no match",
         static_cast<int>(path.length), path.data);
     return expanded;
@@ -165,7 +165,7 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
                           Allocator allocator, ArrayList<String> &out) throws
     -> void
 {
-  LOG(verbosity::All,
+  LOG(All,
       "collecting globstar paths under the relative path '%.*s', depth %zu",
       static_cast<int>(relative.length), relative.data, depth);
   if (directories_only && include_base) out.push(String{allocator, relative});
@@ -255,7 +255,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
                                       is_shopt_enabled("globstar");
 
     if (is_globstar_component) {
-      LOG(verbosity::All,
+      LOG(All,
           "expanding a globstar component across directory levels");
       let const prefix = text.substring_of_length(0, component_start);
       let base = Path{StringView{"."}};
@@ -397,7 +397,7 @@ fn EvalContext::expand_tilde(WordSegment &leading_segment,
     throw Error{"Could not figure out home directory"};
   if (!directory) return;
 
-  LOG(verbosity::All, "the tilde prefix '~%.*s' expands to '%.*s'",
+  LOG(All, "the tilde prefix '~%.*s' expands to '%.*s'",
       static_cast<int>(name.length), name.data,
       static_cast<int>(directory->view().length), directory->view().data);
   /* String has no in-place erase or insert, so the directory and the
@@ -457,7 +457,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
     i++;
   }
   if (changed) {
-    LOG(verbosity::All, "rewrote colon tilde prefixes in an assignment value");
+    LOG(All, "rewrote colon tilde prefixes in an assignment value");
     segment.text = steal(rewritten);
   }
 }
@@ -501,7 +501,7 @@ hot fn EvalContext::expand_path(glob_field field,
      from spending most of its time in the sort comparator. */
   utils::sort_ascending(values);
 
-  LOG(verbosity::All, "the glob pattern '%s' matched %zu paths",
+  LOG(All, "the glob pattern '%s' matched %zu paths",
       pattern.c_str(), values.count());
 
   /* A glob that matches no file is a hard error by default, the typo-catching
@@ -547,7 +547,7 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
                          extglob_enabled())
            .has_value())
   {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "compgen -G probe of '%.*s' has no glob, checking existence",
         static_cast<int>(pattern.length), pattern.data);
     if (Path{pattern}.exists()) values.push(String{scratch, pattern});
@@ -559,7 +559,7 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
   for (glob_field &f : expand_path_recurse(steal(input)))
     values.push(steal(f.text));
   utils::sort_ascending(values);
-  LOG(verbosity::Debug, "compgen -G probe matched %zu paths", values.count());
+  LOG(Debug, "compgen -G probe matched %zu paths", values.count());
   return values;
 }
 

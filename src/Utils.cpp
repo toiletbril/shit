@@ -49,7 +49,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       if (Maybe<mimic_mood> mode = detect_mimic_shell(ec.program_path());
           mode.has_value())
       {
-        LOG(verbosity::Debug, "execute_context mimicking the shell for '%s'",
+        LOG(Debug, "execute_context mimicking the shell for '%s'",
             ec.program().c_str());
         /* The terminal command the shell exits with needs no isolation, the
            same condition the replace path below uses, so its run skips the
@@ -71,7 +71,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
     if (!is_async && cxt.terminal_exec_allowed() && !cxt.in_subshell() &&
         !cxt.has_exit_trap())
     {
-      LOG(verbosity::Debug,
+      LOG(Debug,
           "execute_context replacing the shell with the terminal command '%s'",
           ec.program().c_str());
       /* The shell's buffered output lands before the descriptors move and the
@@ -84,7 +84,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       try {
         os::replace_process(steal(ec));
       } catch (const ExecFormatError &) {
-        LOG(verbosity::Debug, "swallowed an exec format error, running the "
+        LOG(Debug, "swallowed an exec format error, running the "
                               "file as a shell script in place");
         /* The file has no shebang and is not a binary, so it runs as a shell
            script in place, the POSIX fallback. replace_process already placed
@@ -117,7 +117,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        into the spawn. */
     let const command = is_async ? String{ec.program().view()} : String{};
 
-    LOG(verbosity::Debug, "spawning the external command '%s'%s",
+    LOG(Debug, "spawning the external command '%s'%s",
         ec.program().c_str(), is_async ? " in the background" : "");
 
     /* An interactive foreground command runs in its own process group and is
@@ -133,7 +133,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       p = os::execute_program(steal(ec), !is_async,
                               /*new_process_group=*/is_foreground_job);
     } catch (const ExecFormatError &) {
-      LOG(verbosity::Debug, "swallowed an exec format error, running the "
+      LOG(Debug, "swallowed an exec format error, running the "
                             "file as a shell script in this process");
       /* The file has no shebang and is not a binary, so a foreground command
          runs it as a shell script in this process instead of as a child, the
@@ -153,14 +153,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
       return 0;
     }
 
-    LOG(verbosity::Debug, "waiting for the foreground child to finish");
+    LOG(Debug, "waiting for the foreground child to finish");
     if (is_foreground_job) os::give_controlling_terminal_to(p);
     const i32 foreground_status = os::wait_and_monitor_process(p);
     if (is_foreground_job) os::reclaim_controlling_terminal();
     return foreground_status;
   }
 
-  LOG(verbosity::Debug, "dispatching the builtin '%s'", ec.program().c_str());
+  LOG(Debug, "dispatching the builtin '%s'", ec.program().c_str());
   return execute_builtin(steal(ec), cxt);
 }
 
@@ -169,7 +169,7 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
 {
   ASSERT(ecs.count() > 1);
 
-  LOG(verbosity::Debug, "running a pipeline of %zu stages%s", ecs.count(),
+  LOG(Debug, "running a pipeline of %zu stages%s", ecs.count(),
       is_async ? " in the background" : "");
 
   i32 ret = 0;
@@ -684,7 +684,7 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes,
 
 fn canonicalize_path(StringView path) throws -> Maybe<Path>
 {
-  LOG(verbosity::Debug, "canonicalizing the path '%.*s'",
+  LOG(Debug, "canonicalizing the path '%.*s'",
       static_cast<int>(path.length), path.data);
 
   let candidate = Path{path};
@@ -1217,7 +1217,7 @@ cold fn print_memory_report() wontthrow -> void
 
 [[noreturn]] fn quit(i32 code, bool should_goodbye) throws -> void
 {
-  LOG(verbosity::Info, "quitting with code %d", code);
+  LOG(Info, "quitting with code %d", code);
 
   if (QUIT_CONTEXT != nullptr && QUIT_CONTEXT->memory_stats_enabled())
     print_memory_report();
@@ -1324,7 +1324,7 @@ static fn rebuild_path_cache() throws -> void
 
 fn clear_path_map() throws -> void
 {
-  LOG(verbosity::Info, "clear_path_map dropping %zu cached program resolutions",
+  LOG(Info, "clear_path_map dropping %zu cached program resolutions",
       PATH_CACHE.count());
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
@@ -1340,7 +1340,7 @@ fn invalidate_path_cache() throws -> void
      fresh disk read, and PATH_CACHE is left to the stale flag, which defers its
      clear to the next lookup so a run that resolves no further command pays
      nothing. */
-  LOG(verbosity::Info, "invalidate_path_cache marking the program cache stale");
+  LOG(Info, "invalidate_path_cache marking the program cache stale");
   DIR_LISTING_CACHE.clear();
   PATH_CACHE_IS_STALE = true;
 }
@@ -1358,7 +1358,7 @@ fn set_path_for_resolution(Maybe<String> path) throws -> void
   if (PATH_MAP_IS_EAGER) {
     /* The listing cache survives a PATH change, so the rebuild reads from disk
        only the directories the new PATH adds and reuses the rest. */
-    LOG(verbosity::Info, "set_path_for_resolution rebuilding for a changed PATH");
+    LOG(Info, "set_path_for_resolution rebuilding for a changed PATH");
     rebuild_path_cache();
   } else {
     /* A non-interactive run never seeded the map, so it stays lazy. */
@@ -1403,7 +1403,7 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
 
 fn initialize_path_map() throws -> void
 {
-  LOG(verbosity::Info,
+  LOG(Info,
       "scanning every PATH directory to seed the program cache");
   /* The interactive setup seeds the whole map once, so a later PATH change
      rebuilds it eagerly while reading only the directories the change adds. */
@@ -1425,7 +1425,7 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
      environment does not still drives the order. */
   if (!MAYBE_PATH) return ArrayList<Path>{};
 
-  LOG(verbosity::Debug, "statting candidates for '%.*s' along PATH%s",
+  LOG(Debug, "statting candidates for '%.*s' along PATH%s",
       static_cast<int>(program_name.length), program_name.data,
       find_all ? ", collecting every match" : "");
 
@@ -1480,7 +1480,7 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
   /* A cd, a PATH change, or hash -r left the cache stale, so it is dropped here
      before the lookup re-resolves against the current filesystem. */
   if (PATH_CACHE_IS_STALE) {
-    LOG(verbosity::Info,
+    LOG(Info,
         "search_program_path clearing stale cache before resolving '%.*s'",
         (int) program_name.length, program_name.data);
     PATH_CACHE.clear();
@@ -1627,7 +1627,7 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
 
 fn read_entire_file(StringView path) throws -> Maybe<String>
 {
-  LOG(verbosity::Debug, "reading the entire file '%.*s'",
+  LOG(Debug, "reading the entire file '%.*s'",
       static_cast<int>(path.length), path.data);
 
   let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
@@ -1648,7 +1648,7 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
 
 fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
 {
-  LOG(verbosity::Debug, "probing '%s' for a shell shebang to mimic",
+  LOG(Debug, "probing '%s' for a shell shebang to mimic",
       program.c_str());
 
   let const file =

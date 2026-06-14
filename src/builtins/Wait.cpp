@@ -51,7 +51,7 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
   i32 status = 0;
 
   if (args.count() == 1) {
-    LOG(verbosity::Debug, "wait blocking on every job of %zu",
+    LOG(Debug, "wait blocking on every job of %zu",
         cxt.jobs().count());
     for (job &job : cxt.jobs())
       status = wait_for_job(job);
@@ -62,7 +62,7 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
   for (usize i = 1; i < args.count(); i++) {
     let const &target = args[i];
 
-    LOG(verbosity::Debug, "wait blocking on target '%s'", target.c_str());
+    LOG(Debug, "wait blocking on target '%s'", target.c_str());
 
     if (!target.is_empty() && target[0] == '%') {
       let const parsed =

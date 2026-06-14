@@ -40,7 +40,7 @@ cold i32 Times::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  LOG(verbosity::Debug,
+  LOG(Debug,
       "times printing the shell and child process accounting");
 
   double self_user = 0, self_system = 0, child_user = 0, child_system = 0;

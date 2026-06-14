@@ -161,7 +161,7 @@ struct ConditionalEvaluator
       matches.push(regmatch_t{});
     const int match_result =
         regexec(compiled, value_text.c_str(), group_count, matches.begin(), 0);
-    LOG(verbosity::All, "the =~ regex %s the value",
+    LOG(All, "the =~ regex %s the value",
         match_result == 0 ? "matched" : "did not match");
     if (match_result != 0) {
       /* bash clears BASH_REMATCH on a non-match, so a later read does not see a
@@ -420,7 +420,7 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
      that changes compilation, such as REG_ICASE for nocasematch, must fold into
      the key so two intended compilations of one pattern do not collide. */
   if (CompiledRegex *cached = m_regex_cache.find(pattern)) {
-    LOG(verbosity::All, "regex cache hit for the pattern '%.*s'",
+    LOG(All, "regex cache hit for the pattern '%.*s'",
         static_cast<int>(pattern.length), pattern.data);
     return cached->get();
   }
@@ -428,12 +428,12 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
   /* A bounded miss path. When the cache is full it is cleared whole, which
      frees every compiled entry, rather than tracking a per-entry age. */
   if (m_regex_cache.count() >= REGEX_CACHE_CAP) {
-    LOG(verbosity::Debug, "regex cache full, dropping %zu compiled patterns",
+    LOG(Debug, "regex cache full, dropping %zu compiled patterns",
         m_regex_cache.count());
     m_regex_cache.clear();
   }
 
-  LOG(verbosity::Debug, "regex cache miss, compiling the pattern '%.*s'",
+  LOG(Debug, "regex cache miss, compiling the pattern '%.*s'",
       static_cast<int>(pattern.length), pattern.data);
   let const pattern_text = String{scratch_allocator(), pattern};
   regex_t compiled;
@@ -454,7 +454,7 @@ fn EvalContext::evaluate_conditional(
   if (elements.is_empty())
     throw Error{"Unable to evaluate the [[ ]] because the conditional "
                 "expression is empty"};
-  LOG(verbosity::Debug, "evaluating a [[ ]] conditional of %zu elements",
+  LOG(Debug, "evaluating a [[ ]] conditional of %zu elements",
       elements.count());
   let evaluator = ConditionalEvaluator{*this, elements};
   const bool result = evaluator.eval_or();

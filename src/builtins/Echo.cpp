@@ -42,7 +42,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       !cxt.is_bash_compatible())
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  LOG(verbosity::All, "echo printing %zu arguments", args.count() - 1);
+  LOG(All, "echo printing %zu arguments", args.count() - 1);
 
   usize start = 1;
   let should_suppress_newline = false;

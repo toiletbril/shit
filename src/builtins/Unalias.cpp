@@ -33,7 +33,7 @@ i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws
   ASSERT(!args.is_empty());
 
   if (FLAG_ALL.is_enabled()) {
-    LOG(verbosity::Debug, "unalias removing every alias");
+    LOG(Debug, "unalias removing every alias");
     /* alias_definitions yields name='value', so the name ends at the equals. */
     for (let const &definition : cxt.alias_definitions()) {
       let const equals_position = definition.find_character('=');
@@ -48,7 +48,7 @@ i32 Unalias::execute(ExecContext &ec, EvalContext &cxt) const throws
   i32 status = 0;
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
-    LOG(verbosity::All, "unalias removing alias '%s'", name.c_str());
+    LOG(All, "unalias removing alias '%s'", name.c_str());
     if (!cxt.remove_alias(name)) {
       /* The diagnostic goes to stderr the way bash reports it, so a caller that
          strips aliases off a list of names, as ble.sh does, neither floods the

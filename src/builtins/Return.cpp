@@ -32,7 +32,7 @@ i32 Return::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* return with no argument uses the status of the last command. */
   let const status = parse_optional_integer_arg(ec, cxt.last_exit_status());
 
-  LOG(verbosity::Debug, "return stopping the enclosing scope with status %lld",
+  LOG(Debug, "return stopping the enclosing scope with status %lld",
       static_cast<long long>(status));
   cxt.request_return(status, ec.source_location());
   return static_cast<i32>(status);

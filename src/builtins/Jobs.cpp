@@ -120,7 +120,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const may_color = may_color_jobs(cxt);
   const ArrayList<job> &jobs = cxt.jobs();
 
-  LOG(verbosity::Debug, "jobs listing %zu registered jobs", jobs.count());
+  LOG(Debug, "jobs listing %zu registered jobs", jobs.count());
 
   /* A jobspec argument restricts the listing to the named jobs, otherwise every
      job is shown. An unresolved jobspec is a no-such-job error and the exit

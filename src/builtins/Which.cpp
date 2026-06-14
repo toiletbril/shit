@@ -41,7 +41,7 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   for (usize i = 1; i < args.count(); i++) {
     let const &program_name = args[i];
-    LOG(verbosity::Debug, "which resolving '%s' against builtins and PATH",
+    LOG(Debug, "which resolving '%s' against builtins and PATH",
         program_name.c_str());
     if (search_builtin(program_name.view()).has_value()) {
       buf += program_name;

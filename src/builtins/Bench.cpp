@@ -586,7 +586,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   const bool may_color = colors::stdout_wants_color();
   const bool show_progress = progress_is_enabled();
 
-  LOG(verbosity::Debug, "bench sampling %zu commands for %llu ms each",
+  LOG(Debug, "bench sampling %zu commands for %llu ms each",
       arguments.count() - 1, static_cast<unsigned long long>(duration_millis));
 
   let results = ArrayList<command_result>{};

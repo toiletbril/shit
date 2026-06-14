@@ -45,7 +45,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      subshell each touched descriptor is backed up first, so the change stays
      contained at the subshell's end. */
   if (args.count() == 1) {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "exec applying redirections to the shell's own descriptors");
     if (ec.in_fd.has_value()) cxt.snapshot_subshell_descriptor(0);
     if (ec.out_fd.has_value()) cxt.snapshot_subshell_descriptor(1);
@@ -56,7 +56,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const &command_name = args[1];
 
-  LOG(verbosity::Info, "exec replacing the shell with '%s'",
+  LOG(Info, "exec replacing the shell with '%s'",
       command_name.c_str());
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the
@@ -98,7 +98,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      program runs as a spawned child and its status ends the scope, the way
      bash's forked subshell or stage dies into its exec. */
   if (cxt.in_subshell() || cxt.is_in_pipeline_stage()) {
-    LOG(verbosity::Info,
+    LOG(Info,
         "exec runs '%s' as a child rather than replacing the shell",
         command_name.c_str());
     let const status = utils::execute_context(steal(command), cxt, false);

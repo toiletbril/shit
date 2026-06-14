@@ -100,7 +100,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
      scalar rather than a syntax error, the shim the parser used to apply at
      parse time for every non-bash mood. */
   if (is_posix_mode()) [[unlikely]] {
-    LOG(verbosity::Debug,
+    LOG(Debug,
         "posix mode stores the array literal for '%.*s' as an empty scalar",
         static_cast<int>(name.length), name.data);
     set_shell_variable(name, "");
@@ -182,7 +182,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
     return;
   }
   /* A write past the run's end leaves a gap, so it is held sparsely. */
-  LOG(verbosity::All,
+  LOG(All,
       "holding element %zu of '%.*s' sparsely past the dense run of %zu", index,
       static_cast<int>(name.length), name.data, count);
   m_sparse_array_values.set(
@@ -205,7 +205,7 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
                                      StringView value, bool is_append) throws
     -> void
 {
-  LOG(verbosity::All, "assigning the array element '%.*s[%.*s]'",
+  LOG(All, "assigning the array element '%.*s[%.*s]'",
       static_cast<int>(name.length), name.data,
       static_cast<int>(subscript.length), subscript.data);
   if (is_readonly(name))
@@ -285,7 +285,7 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
 
 fn EvalContext::declare_associative_array(StringView name) throws -> void
 {
-  LOG(verbosity::Debug, "declaring '%.*s' as an associative array",
+  LOG(Debug, "declaring '%.*s' as an associative array",
       static_cast<int>(name.length), name.data);
   m_associative_names.add(name);
   m_shell_variables.erase(name);
@@ -360,7 +360,7 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
 fn EvalContext::unset_array_element(StringView name,
                                     StringView subscript) throws -> void
 {
-  LOG(verbosity::All, "unsetting the array element '%.*s[%.*s]'",
+  LOG(All, "unsetting the array element '%.*s[%.*s]'",
       static_cast<int>(name.length), name.data,
       static_cast<int>(subscript.length), subscript.data);
   if (is_readonly(name))
@@ -409,7 +409,7 @@ fn EvalContext::declare_local(StringView name) throws -> void
      state, so the scope pop restores the true pre-call value and the unset
      peel finds exactly one entry to consume. */
   if (is_local_in_current_scope(name)) return;
-  LOG(verbosity::All, "declaring '%.*s' local in scope depth %zu",
+  LOG(All, "declaring '%.*s' local in scope depth %zu",
       static_cast<int>(name.length), name.data, m_local_scopes.count());
 
   /* The indexed array the name held is saved alongside the scalar value, so a
@@ -649,7 +649,7 @@ fn EvalContext::array_element_is_set(StringView name,
 fn EvalContext::matching_prefix_names(StringView prefix) const throws
     -> ArrayList<String>
 {
-  LOG(verbosity::All, "listing variable names with the prefix '%.*s'",
+  LOG(All, "listing variable names with the prefix '%.*s'",
       static_cast<int>(prefix.length), prefix.data);
   let names = ArrayList<String>{heap_allocator()};
   let seen = HashSet{heap_allocator()};

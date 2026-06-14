@@ -27,7 +27,7 @@ i32 True::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  LOG(verbosity::All, "true returning a success status");
+  LOG(All, "true returning a success status");
   return 0;
 }
 

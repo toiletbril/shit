@@ -163,12 +163,16 @@ String format_named_values(StringView names, Args &&...args)
    The file:line and the function render right-aligned in fixed columns so a
    tailed log reads as a table. The flush after each message keeps a tailed
    --debug-logging-file current while the TUI is still alive. */
+/* The level is named unqualified, such as Debug, and the macro prepends
+   ::shit::verbosity the way the FLAG macro prepends the section, so a call site
+   spells neither the namespace nor the enum. */
 #define LOG(level, ...)                                                        \
   do {                                                                         \
-    if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
+    constexpr ::shit::verbosity t__log_level = ::shit::verbosity::level;       \
+    if (t__log_level <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {               \
       std::FILE *t__log_stream = ::shit::log_output_stream();                  \
       unused(std::fprintf(t__log_stream, "[%s] %32s %32s(): ",                 \
-                          ::shit::verbosity_to_string(level),                  \
+                          ::shit::verbosity_to_string(t__log_level),           \
                           __FILE__ ":" T__LOG_STRINGIZE(__LINE__), __func__)); \
       unused(std::fprintf(t__log_stream, __VA_ARGS__));                        \
       unused(std::fputc('\n', t__log_stream));                                 \
@@ -177,15 +181,16 @@ String format_named_values(StringView names, Args &&...args)
   } while (0)
 
 /* Print the named values of the listed variables, such as
-   LOG_VARS(verbosity::Debug, argument_count, name). */
+   LOG_VARS(Debug, argument_count, name). */
 #define LOG_VARS(level, ...)                                                   \
   do {                                                                         \
-    if ((level) <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {                    \
+    constexpr ::shit::verbosity t__log_level = ::shit::verbosity::level;       \
+    if (t__log_level <= ::shit::LOGGER_VERBOSITY) [[unlikely]] {               \
       ::shit::String t__vars =                                                 \
           ::shit::log_detail::format_named_values(#__VA_ARGS__, __VA_ARGS__);  \
       std::FILE *t__log_stream = ::shit::log_output_stream();                  \
       unused(std::fprintf(t__log_stream, "[%s] %32s %32s(): %s\n",             \
-                          ::shit::verbosity_to_string(level),                  \
+                          ::shit::verbosity_to_string(t__log_level),           \
                           __FILE__ ":" T__LOG_STRINGIZE(__LINE__), __func__,   \
                           t__vars.c_str()));                                   \
       unused(std::fflush(t__log_stream));                                      \

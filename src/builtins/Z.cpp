@@ -219,7 +219,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     query.append(ec.args()[i]);
   }
 
-  LOG(verbosity::Debug, "z ranking the frecency store against query '%s'",
+  LOG(Debug, "z ranking the frecency store against query '%s'",
       query.c_str());
 
   let entries = read_frecency_store();
@@ -248,7 +248,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const target = Path{best->path.view()}.to_absolute().normalized();
 
-  LOG(verbosity::Info, "z changing directory to '%s'", target.text().c_str());
+  LOG(Info, "z changing directory to '%s'", target.text().c_str());
 
   let const old_directory = Path::current_directory();
   if (Path::set_current_directory(target).is_error())

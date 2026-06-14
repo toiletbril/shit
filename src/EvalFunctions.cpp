@@ -14,7 +14,7 @@ fn EvalContext::register_function(StringView name, const Expression *body,
                                   SourceLocation definition_location) throws
     -> void
 {
-  LOG(verbosity::Info, "registering function '%.*s' with a %zu byte definition",
+  LOG(Info, "registering function '%.*s' with a %zu byte definition",
       static_cast<int>(name.length), name.data, definition_text.length);
   m_functions.set(name, body);
   m_function_sources.set(name, definition_text);
@@ -115,7 +115,7 @@ pure fn EvalContext::has_functions() const wontthrow -> bool
 
 fn EvalContext::unset_function(StringView name) throws -> void
 {
-  LOG(verbosity::Info, "unsetting function '%.*s'",
+  LOG(Info, "unsetting function '%.*s'",
       static_cast<int>(name.length), name.data);
   m_functions.erase(name);
   m_function_sources.erase(name);
@@ -155,7 +155,7 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
 
 fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 {
-  LOG(verbosity::Info, "setting a trap for '%.*s' with a %zu byte action",
+  LOG(Info, "setting a trap for '%.*s' with a %zu byte action",
       static_cast<int>(condition.length), condition.data, action.length);
   m_traps.set(condition, action);
   /* EXIT runs at the shell's end and needs no OS handler. A signal condition
@@ -172,7 +172,7 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 
 fn EvalContext::remove_trap(StringView condition) throws -> void
 {
-  LOG(verbosity::Info, "removing the trap for '%.*s'",
+  LOG(Info, "removing the trap for '%.*s'",
       static_cast<int>(condition.length), condition.data);
   m_traps.erase(condition);
   /* Removing a signal trap returns the signal to its default disposition, so a
@@ -184,7 +184,7 @@ fn EvalContext::remove_trap(StringView condition) throws -> void
 
 fn EvalContext::install_trap_dispositions() throws -> void
 {
-  LOG(verbosity::Info, "reinstalling the dispositions of %zu traps",
+  LOG(Info, "reinstalling the dispositions of %zu traps",
       m_traps.count());
   m_traps.for_each([&](StringView condition, const String &action) {
     if (condition == "EXIT") return;
@@ -222,7 +222,7 @@ fn EvalContext::run_pending_traps() throws -> void
     if (!name.has_value()) continue;
     if (let const *action = m_traps.find(name->view()))
       if (action->count() > 0) {
-        LOG(verbosity::Info, "running the trap action for signal '%s'",
+        LOG(Info, "running the trap action for signal '%s'",
             name->c_str());
         run_source(action->view(), "the " + *name + " trap");
       }
@@ -248,7 +248,7 @@ cold fn EvalContext::run_exit_trap() throws -> void
 
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->count() > 0) {
-      LOG(verbosity::Info, "running the EXIT trap action at shell exit");
+      LOG(Info, "running the EXIT trap action at shell exit");
       run_source(action->view(), "the EXIT trap");
     }
 }
@@ -273,7 +273,7 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
      traps and variables. */
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->count() > 0) {
-      LOG(verbosity::Info,
+      LOG(Info,
           "running the EXIT trap action the subshell set at its end");
       run_source(action->view(), "the EXIT trap");
     }

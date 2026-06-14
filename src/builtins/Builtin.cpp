@@ -84,7 +84,7 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 0;
   }
 
-  LOG(verbosity::Debug, "builtin forwarding to '%s' past functions and PATH",
+  LOG(Debug, "builtin forwarding to '%s' past functions and PATH",
       name.c_str());
 
   let const target = search_builtin(name.view());

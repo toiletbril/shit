@@ -80,7 +80,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        environment value is logged so the export does not leak past it. The
        unset is this move, not a user unset, so the integer mark it clears is
        put back. */
-    LOG(verbosity::All, "export moving '%s' into the environment",
+    LOG(All, "export moving '%s' into the environment",
         name.c_str());
     cxt.unset_shell_variable(name);
     if (is_integer_name) cxt.mark_integer(name.view());
