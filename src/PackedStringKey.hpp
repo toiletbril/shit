@@ -86,3 +86,7 @@ public:
 };
 
 } /* namespace shit */
+
+/* Build a PackedStringKey from a string literal at compile time, so a static
+   StaticStringMap entry reads as SSK("name") rather than the full call. */
+#define SSK(literal) shit::PackedStringKey::from_literal(literal)
