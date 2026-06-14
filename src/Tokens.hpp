@@ -96,6 +96,12 @@ public:
      segments directly and allocates no literal String. */
   pure fn is_all_ascii_digits() const wontthrow -> bool;
 
+  /* True when a segment of the word runs a command or a function substitution.
+     The empty-command status logic and the assignment value reset both ask
+     this to decide whether to reset the exit status, so both answer it from
+     the segments through one method rather than each scanning in place. */
+  pure fn runs_substitution() const wontthrow -> bool;
+
   /* A word is an assignment when its first segment is unquoted text holding an
      unescaped NAME= prefix. The returned word is the right hand side. */
   fn get_assignment_split() const throws -> Maybe<word_assignment_split>;

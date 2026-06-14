@@ -614,11 +614,8 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      reports x=$(false) as 1 and a plain x=1 as 0. The status reset waits until
      after the expansion, so a $? in the value reads the prior command's status
      rather than a value this assignment cleared first. */
-  bool value_ran_substitution = false;
-  for (const WordSegment &segment : m_assignment->value_word().segments)
-    if (segment.kind == WordSegment::Kind::CommandSubstitution ||
-        segment.kind == WordSegment::Kind::FunctionSubstitution)
-      value_ran_substitution = true;
+  let const value_ran_substitution =
+      m_assignment->value_word().runs_substitution();
 
   /* The value expansion and the store throw a plain Error, an unset variable
      under set -u or a readonly name. The assignment has a source location, so
@@ -1460,23 +1457,17 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        leaves the status of the last one, the way bash reports $(false) on its
        own line as 1 and a=$(false) b=$(true) as 0. A line with no
        substitution, a bare redirection or a plain assignment, resets to 0. */
-    auto word_ran_substitution = [](const Word &word) {
-      for (const WordSegment &segment : word.segments)
-        if (segment.kind == WordSegment::Kind::CommandSubstitution ||
-            segment.kind == WordSegment::Kind::FunctionSubstitution)
-          return true;
-      return false;
-    };
-    auto token_ran_substitution = [&](const Token *token) {
+    let token_ran_substitution = [&](const Token *token) {
       if (token == nullptr || token->kind() != Token::Kind::Word) return false;
-      return word_ran_substitution(
-          static_cast<const tokens::WordToken *>(token)->word());
+      return static_cast<const tokens::WordToken *>(token)
+          ->word()
+          .runs_substitution();
     };
-    bool ran_substitution = false;
+    let ran_substitution = false;
     for (const Token *token : m_args)
       ran_substitution = ran_substitution || token_ran_substitution(token);
     for (const prefix_assignment &var : m_local_vars)
-      ran_substitution = ran_substitution || word_ran_substitution(var.value);
+      ran_substitution = ran_substitution || var.value.runs_substitution();
     for (const array_builtin_assignment &assignment : m_array_args)
       for (const Token *token : assignment.elements)
         ran_substitution = ran_substitution || token_ran_substitution(token);

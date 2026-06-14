@@ -104,6 +104,15 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
   return saw_digit;
 }
 
+pure fn Word::runs_substitution() const wontthrow -> bool
+{
+  for (const WordSegment &segment : segments)
+    if (segment.kind == WordSegment::Kind::CommandSubstitution ||
+        segment.kind == WordSegment::Kind::FunctionSubstitution)
+      return true;
+  return false;
+}
+
 cold fn Word::to_pretty_string() const throws -> String
 {
   let result = String{"[Word"};
