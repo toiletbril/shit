@@ -110,4 +110,24 @@ private:
   String m_text{};
 };
 
+/* A small builder for assembling a path from a root and a run of components,
+   so a caller spells the intent rather than juggling separators by hand. */
+class PathBuilder
+{
+public:
+  PathBuilder() = default;
+  explicit PathBuilder(StringView root);
+
+  /* Add a component, inserting a separator unless the builder is empty or the
+     component itself starts at a root. */
+  fn append(StringView component) throws -> PathBuilder &;
+  /* Add raw bytes with no separator, for extending the last component. */
+  fn append_raw(StringView bytes) throws -> PathBuilder &;
+
+  mustuse fn build() const throws -> Path;
+
+private:
+  String m_text{};
+};
+
 } /* namespace shit */

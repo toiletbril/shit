@@ -548,5 +548,26 @@ fn Path::temp_directory() throws -> Path
 #endif
 }
 
+PathBuilder::PathBuilder(StringView root) : m_text(root) {}
+
+fn PathBuilder::append(StringView component) throws -> PathBuilder &
+{
+  if (component.length == 0) return *this;
+  if (!m_text.is_empty() && !is_directory_separator(m_text.back()) &&
+      !is_directory_separator(component.data[0]))
+  {
+    m_text.push(DIRECTORY_SEPARATOR);
+  }
+  m_text.append(component);
+  return *this;
+}
+
+fn PathBuilder::append_raw(StringView bytes) throws -> PathBuilder &
+{
+  m_text.append(bytes);
+  return *this;
+}
+
+fn PathBuilder::build() const throws -> Path { return Path{m_text}; }
 
 } /* namespace shit */
