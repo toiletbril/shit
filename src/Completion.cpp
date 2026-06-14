@@ -1083,6 +1083,21 @@ static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
   return options;
 }
 
+/* Commands whose full option list needs a help argument other than the plain
+   --help. ffmpeg prints a short summary for --help and the complete option set
+   only for --help full, so it and its siblings read the fuller form. A command
+   in this table reads its options from --help rather than a manpage, so its
+   single-dash long options come through even when a manpage also exists. */
+static constexpr StaticStringMap<const char *>::entry HELP_ARGUMENT_ENTRIES[] =
+    {
+        {PackedStringKey::from_literal("ffmpeg"),  "--help full"},
+        {PackedStringKey::from_literal("ffprobe"), "--help full"},
+        {PackedStringKey::from_literal("ffplay"),  "--help full"},
+};
+static constexpr StaticStringMap<const char *> HELP_ARGUMENTS{
+    HELP_ARGUMENT_ENTRIES,
+    sizeof(HELP_ARGUMENT_ENTRIES) / sizeof(HELP_ARGUMENT_ENTRIES[0])};
+
 /* The option flags a manpage documents, parsed once and cached under the page
    name. The man invocation is the general path that works for any command on
    the host, so the completer is not limited to a hardcoded set of tools. */
@@ -1124,6 +1139,11 @@ static fn complete_from_manpage(StringView line, StringView token,
      reads the options of what it really runs. */
   let const resolved = resolve_completion_command(surface_command, context);
   const StringView command = resolved.view();
+
+  /* A command with a special help invocation reads its options from --help
+     rather than the manpage, so it skips this stage and the help stage below
+     picks it up. */
+  if (HELP_ARGUMENTS.find(command).has_value()) return None;
 
   /* git commit -<tab> reads the git-commit page when the index knows it, the
      general command-subcommand form, so the options come from the subcommand
@@ -1198,8 +1218,14 @@ static fn help_options_for(StringView command, EvalContext &context) throws
     if (!paths.is_empty() &&
         command_directory_is_trusted(paths[0].text().view()))
     {
-      const String command_line =
-          String{paths[0].text().view()} + " --help </dev/null 2>&1";
+      /* A command with a non-standard help invocation reads its table entry,
+         so ffmpeg forks --help full rather than the summary-only --help. */
+      StringView help_argument = StringView{"--help"};
+      if (Maybe<const char *> custom = HELP_ARGUMENTS.find(command);
+          custom.has_value())
+        help_argument = StringView{*custom};
+      const String command_line = String{paths[0].text().view()} + " " +
+                                  help_argument + " </dev/null 2>&1";
       LOG(verbosity::Debug, "forking --help for '%.*s'",
           static_cast<int>(command.length), command.data);
       const String help_text =
