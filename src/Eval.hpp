@@ -1055,6 +1055,12 @@ public:
      shell variables and applying any assignments inside it. */
   fn evaluate_arithmetic(StringView expression) throws -> i64;
 
+  /* The same value as evaluate_arithmetic, but a substitution-free expression
+     lexes its tokens once onto the segment and re-evaluates from them, so a
+     $((...)) in a loop body does not re-scan its bytes each expansion. A
+     complex expression or any lexing failure falls back to the char parser. */
+  fn evaluate_arithmetic_cached(const WordSegment &segment) throws -> i64;
+
   fn evaluate_conditional(const ArrayList<conditional_element> &elements) throws
       -> bool;
 

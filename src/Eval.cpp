@@ -3854,6 +3854,321 @@ public:
   }
 };
 
+/* Lexes one arithmetic number literal at the front of `from`, the same forms
+   parse_primary reads, a base#digits radix literal, a 0x hex, a 0 octal, or a
+   decimal run. Stores the value and returns the byte count it consumed. */
+static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
+{
+  if (let const base_length = count_leading_digits(from, 10);
+      base_length > 0 && base_length < from.length && from[base_length] == '#')
+  {
+    let const base =
+        parse_arithmetic_operand(from.substring_of_length(0, base_length));
+    if (base < 2 || base > 64)
+      throw Error{"Arithmetic: an arithmetic base must be between 2 and 64"};
+    let digit_value = [base](char c) -> i64 {
+      if (c >= '0' && c <= '9') return c - '0';
+      if (c >= 'a' && c <= 'z') return c - 'a' + 10;
+      if (c >= 'A' && c <= 'Z') return base <= 36 ? c - 'A' + 10 : c - 'A' + 36;
+      if (c == '@') return 62;
+      if (c == '_') return 63;
+      return -1;
+    };
+    i64 value = 0;
+    usize i = base_length + 1;
+    while (i < from.length) {
+      let const digit = digit_value(from[i]);
+      if (digit < 0 || digit >= base) break;
+      value = value * base + digit;
+      i++;
+    }
+    *out_value = value;
+    return i;
+  }
+
+  usize consumed;
+  if (from.length >= 2 && from[0] == '0' && (from[1] == 'x' || from[1] == 'X'))
+    consumed = 2 + count_leading_digits(from.substring(2), 16);
+  else if (from.length >= 1 && from[0] == '0')
+    consumed = count_leading_digits(from, 8);
+  else
+    consumed = count_leading_digits(from, 10);
+  if (consumed == 0) consumed = 1;
+  *out_value = parse_arithmetic_operand(from.substring_of_length(0, consumed));
+  return consumed;
+}
+
+/* The operators an expression may hold, longest first so the scan munches
+   maximally, <<= before << before <. */
+static const StringView ARITH_OPERATORS[] = {
+    "<<=", ">>=", "**", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
+    "++",  "--",  "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "(",
+    ")",   ",",   "?",  ":",  "+",  "-",  "*",  "/",  "%",  "<",  ">",
+    "=",   "&",   "|",  "^",  "!",  "~",
+};
+
+/* Lexes the whole arithmetic expression into tokens once. A number carries its
+   value, a name and an operator carry a view into the source, and an array
+   subscript carries the balanced raw bytes between its brackets. */
+static fn tokenize_arithmetic(StringView src, ArrayList<arith_token> &out) throws
+    -> void
+{
+  usize i = 0;
+  while (i < src.length) {
+    let const c = src[i];
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+      i++;
+      continue;
+    }
+    if (lexer::is_number(c)) {
+      i64 value = 0;
+      let const consumed = lex_arith_number(src.substring(i), &value);
+      out.push(arith_token{arith_token::kind::number, value,
+                           src.substring_of_length(i, consumed)});
+      i += consumed;
+      continue;
+    }
+    if (lexer::is_variable_name_start(c)) {
+      let const name_start = i;
+      i++;
+      while (i < src.length && lexer::is_variable_name(src[i]))
+        i++;
+      out.push(arith_token{arith_token::kind::name, 0,
+                           src.substring_of_length(name_start, i - name_start)});
+      if (i < src.length && src[i] == '[') {
+        i++;
+        let const inner_start = i;
+        usize depth = 1;
+        while (i < src.length && depth > 0) {
+          if (src[i] == '[')
+            depth++;
+          else if (src[i] == ']' && --depth == 0)
+            break;
+          i++;
+        }
+        if (depth != 0)
+          throw Error{"Arithmetic: expected ']' after an array subscript"};
+        out.push(arith_token{arith_token::kind::subscript, 0,
+                             src.substring_of_length(inner_start,
+                                                     i - inner_start)});
+        i++;
+      }
+      continue;
+    }
+    bool matched = false;
+    for (const StringView &op : ARITH_OPERATORS) {
+      if (i + op.length <= src.length &&
+          src.substring_of_length(i, op.length) == op)
+      {
+        out.push(arith_token{arith_token::kind::op, 0,
+                             src.substring_of_length(i, op.length)});
+        i += op.length;
+        matched = true;
+        break;
+      }
+    }
+    /* An unrecognized byte becomes a one-byte op so the simple evaluator fails
+       on it the way the char parser does. */
+    if (!matched) {
+      out.push(
+          arith_token{arith_token::kind::op, 0, src.substring_of_length(i, 1)});
+      i++;
+    }
+  }
+}
+
+/* An operator that assigns, steps, short-circuits, or branches forces the full
+   char parser, since the token fast path keeps no side-effect ordering. */
+static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
+{
+  return t == "=" || t == "+=" || t == "-=" || t == "*=" || t == "/=" ||
+         t == "%=" || t == "&=" || t == "|=" || t == "^=" || t == "<<=" ||
+         t == ">>=" || t == "?" || t == ":" || t == "," || t == "++" ||
+         t == "--" || t == "&&" || t == "||";
+}
+
+/* True when every token is a plain arithmetic token, so the fast path can
+   evaluate it with no assignment, branch, or short-circuit to order. */
+static pure fn arith_tokens_are_simple(const ArrayList<arith_token> &toks)
+    wontthrow -> bool
+{
+  for (const arith_token &t : toks) {
+    if (t.k == arith_token::kind::subscript) return false;
+    if (t.k == arith_token::kind::op && arith_op_is_complex(t.text)) return false;
+  }
+  return true;
+}
+
+struct arith_binop
+{
+  char kind;
+  u8 precedence;
+};
+
+/* The dispatch tag and precedence of a binary operator token, mirroring
+   peek_binary_operator. Precedence 0 means the token is not a binary operator,
+   the short-circuit pair is excluded since a simple expression never holds it.
+ */
+static pure fn arith_classify_binop(StringView t) wontthrow -> arith_binop
+{
+  if (t == "**") return {'P', 11};
+  if (t == "*") return {'*', 10};
+  if (t == "/") return {'/', 10};
+  if (t == "%") return {'%', 10};
+  if (t == "+") return {'+', 9};
+  if (t == "-") return {'-', 9};
+  if (t == "<<") return {'L', 8};
+  if (t == ">>") return {'R', 8};
+  if (t == "<") return {'<', 7};
+  if (t == "<=") return {'l', 7};
+  if (t == ">") return {'>', 7};
+  if (t == ">=") return {'g', 7};
+  if (t == "==") return {'e', 6};
+  if (t == "!=") return {'n', 6};
+  if (t == "&") return {'&', 5};
+  if (t == "^") return {'^', 4};
+  if (t == "|") return {'|', 3};
+  return {0, 0};
+}
+
+/* Applies a binary operator, the same arithmetic helpers and rules the char
+   parser's ladder uses, so the fast path and the full parser agree. */
+static fn arith_apply_binop(char kind, i64 lhs, i64 rhs) throws -> i64
+{
+  switch (kind) {
+  case 'P':
+    if (rhs < 0) throw Error{"Arithmetic: exponent less than 0"};
+    return arithmetic_power(lhs, rhs);
+  case '*': return arithmetic_multiply(lhs, rhs);
+  case '/':
+    if (rhs == 0) throw Error{"Arithmetic: division by zero"};
+    return arithmetic_divide(lhs, rhs);
+  case '%':
+    if (rhs == 0) throw Error{"Arithmetic: division by zero"};
+    return arithmetic_modulo(lhs, rhs);
+  case '+': return arithmetic_add(lhs, rhs);
+  case '-': return arithmetic_subtract(lhs, rhs);
+  case 'L': return arithmetic_shift_left(lhs, rhs);
+  case 'R': return arithmetic_shift_right(lhs, rhs);
+  case '<': return lhs < rhs ? 1 : 0;
+  case 'l': return lhs <= rhs ? 1 : 0;
+  case '>': return lhs > rhs ? 1 : 0;
+  case 'g': return lhs >= rhs ? 1 : 0;
+  case 'e': return lhs == rhs ? 1 : 0;
+  case 'n': return lhs != rhs ? 1 : 0;
+  case '&': return lhs & rhs;
+  case '^': return lhs ^ rhs;
+  case '|': return lhs | rhs;
+  default: return rhs;
+  }
+}
+
+/* Reads a variable's integer value, the same path read_variable_value takes, an
+   unset name reports and reads as zero. The fast path runs only on a
+   side-effect-free expression, so the report is never suppressed. */
+static fn arith_read_variable(EvalContext *context, StringView name) throws
+    -> i64
+{
+  ASSERT(context != nullptr);
+  if (let const *stored = context->lookup_shell_variable(name)) {
+    if (stored->count() == 0) return 0;
+    return parse_arithmetic_operand(stored->view());
+  }
+  let const value = context->get_variable_value(name);
+  if (!value.has_value()) {
+    context->report_unset_reference(name);
+    return 0;
+  }
+  if (value->is_empty()) return 0;
+  return parse_arithmetic_operand(value->view());
+}
+
+/* A precedence-climbing evaluator over the cached token stream for a simple
+   expression, numbers, variable reads, unary operators, parentheses, and binary
+   operators. It has no assignment, ternary, comma, or short-circuit, so it
+   never orders a side effect, which the caller guarantees by the simple check.
+ */
+class ArithmeticTokenEvaluator
+{
+public:
+  EvalContext *context;
+  const ArrayList<arith_token> &toks;
+  usize ti{0};
+  usize depth{0};
+  static constexpr usize MAX_DEPTH = 512;
+
+  pure fn at_op(StringView s) wontthrow -> bool
+  {
+    return ti < toks.count() && toks[ti].k == arith_token::kind::op &&
+           toks[ti].text == s;
+  }
+
+  fn parse_operand() throws -> i64
+  {
+    depth++;
+    defer { depth--; };
+    if (depth > MAX_DEPTH) throw Error{"Arithmetic: expression nested too deeply"};
+
+    if (at_op("+")) {
+      ti++;
+      return parse_operand();
+    }
+    if (at_op("-")) {
+      ti++;
+      return arithmetic_subtract(0, parse_operand());
+    }
+    if (at_op("!")) {
+      ti++;
+      return parse_operand() == 0 ? 1 : 0;
+    }
+    if (at_op("~")) {
+      ti++;
+      return ~parse_operand();
+    }
+    if (at_op("(")) {
+      ti++;
+      let const value = parse_binary(1);
+      if (!at_op(")")) throw Error{"Arithmetic: expected ')'"};
+      ti++;
+      return value;
+    }
+    if (ti < toks.count() && toks[ti].k == arith_token::kind::number) {
+      let const value = toks[ti].value;
+      ti++;
+      return value;
+    }
+    if (ti < toks.count() && toks[ti].k == arith_token::kind::name) {
+      let const name = toks[ti].text;
+      ti++;
+      return arith_read_variable(context, name);
+    }
+    throw Error{"Arithmetic: unexpected character"};
+  }
+
+  fn parse_binary(u8 min_precedence) throws -> i64
+  {
+    let lhs = parse_operand();
+    for (;;) {
+      if (ti >= toks.count() || toks[ti].k != arith_token::kind::op) return lhs;
+      let const op = arith_classify_binop(toks[ti].text);
+      if (op.precedence < min_precedence) return lhs;
+      ti++;
+      let const rhs =
+          parse_binary(op.kind == 'P' ? op.precedence : op.precedence + 1);
+      lhs = arith_apply_binop(op.kind, lhs, rhs);
+    }
+  }
+
+  fn run() throws -> i64
+  {
+    if (toks.is_empty()) return 0;
+    let const result = parse_binary(1);
+    if (ti != toks.count())
+      throw Error{"Arithmetic: unexpected trailing characters"};
+    return result;
+  }
+};
+
 } /* namespace */
 
 fn EvalContext::read_array_element_integer(StringView name,
@@ -3886,6 +4201,42 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
   let const expanded_word = expand_modifier_word(expression);
   let parser = ArithmeticParser{this, expanded_word.view(), 0};
   return parser.parse();
+}
+
+fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
+    -> i64
+{
+  let const expr = segment.text.view();
+  /* A parameter or command substitution inside the arithmetic needs the full
+     expansion path, so only a substitution-free expression, the hot loop case
+     such as d=$((d+1)), takes the cached token path. */
+  if (expr.find_character('$').has_value() ||
+      expr.find_character('`').has_value())
+    return evaluate_arithmetic(expr);
+
+  if (!segment.arith_tokenized) {
+    segment.cached_arith_tokens.clear();
+    try {
+      tokenize_arithmetic(expr, segment.cached_arith_tokens);
+    } catch (...) {
+      /* A lexing failure leaves the token path off for this segment, so the
+         char parser reports the same error and the cache never adds one. */
+      segment.cached_arith_tokens.clear();
+      segment.arith_tokenized = true;
+      segment.arith_simple = false;
+      return evaluate_arithmetic(expr);
+    }
+    segment.arith_tokenized = true;
+    segment.arith_simple = arith_tokens_are_simple(segment.cached_arith_tokens);
+  }
+
+  /* A complex expression, an assignment, a ternary, a comma, a short-circuit,
+     an increment, or an array element, runs through the full char parser, which
+     keeps the side-effect ordering the fast path does not. */
+  if (!segment.arith_simple) return evaluate_arithmetic(expr);
+
+  ArithmeticTokenEvaluator evaluator{this, segment.cached_arith_tokens};
+  return evaluator.run();
 }
 
 fn evaluate_constant_arithmetic(StringView expression) throws -> i64

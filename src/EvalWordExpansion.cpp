@@ -711,7 +711,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
          is read straight from the cache rather than re-parsed here. */
       let const result = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
-                             : evaluate_arithmetic(segment.text.view());
+                             : evaluate_arithmetic_cached(segment);
       /* The field copies the digits in, so the conversion writes into a stack
          buffer and appends a view, with no heap allocation. */
       char buffer[24];
@@ -783,7 +783,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     case WordSegment::Kind::ArithmeticExpansion:
       result += utils::int_to_text(segment.folded_arithmetic_result.has_value()
                                        ? *segment.folded_arithmetic_result
-                                       : evaluate_arithmetic(segment_text));
+                                       : evaluate_arithmetic_cached(segment));
       break;
     default: result += segment_text; break;
     }
@@ -851,7 +851,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
          glob metacharacter and stays inactive. */
       let const number = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
-                             : evaluate_arithmetic(segment_text);
+                             : evaluate_arithmetic_cached(segment);
       emit_run(utils::int_to_text(number).view(), false);
     } break;
     }

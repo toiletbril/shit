@@ -15,6 +15,25 @@ class Expression;
    complete at this point. */
 struct word_assignment_split;
 
+/* One lexed token of an arithmetic expression. The expression text never
+   changes, so a $((...)) segment lexes its tokens once and re-evaluates from
+   them rather than re-scanning the bytes on every expansion in a loop body. The
+   value holds a parsed number, and the text views into the segment's own text
+   for a name, an operator, or the raw bytes of an array subscript. */
+struct arith_token
+{
+  enum class kind : u8
+  {
+    number,
+    name,
+    op,
+    subscript,
+  };
+  kind k;
+  i64 value{0};
+  StringView text{};
+};
+
 class WordSegment
 {
 public:
@@ -66,6 +85,18 @@ public:
      as stale and reparsed. A null pointer marks a never-parsed segment. */
   mutable const Expression *cached_substitution_ast{nullptr};
   mutable usize cached_substitution_generation{0};
+
+  /* The lexed tokens of an ArithmeticExpansion segment, filled once and reused.
+     The expression text is immutable, so the tokens stay valid for the
+     segment's life and need no generation guard, unlike the substitution tree.
+     The evaluator reads the variable values at eval time, so the cache holds
+     the parse, not the result. Empty until the first arithmetic evaluation. */
+  mutable ArrayList<arith_token> cached_arith_tokens{heap_allocator()};
+  mutable bool arith_tokenized{false};
+  /* Whether the cached tokens hold a simple expression the token evaluator can
+     run, decided once when the tokens are filled. A complex expression falls
+     back to the char parser. */
+  mutable bool arith_simple{false};
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
