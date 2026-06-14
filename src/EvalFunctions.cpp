@@ -34,6 +34,12 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   if (definition_location.filename.has_value())
     info.filename = String{*definition_location.filename};
   info.defining_instance = m_current_source;
+  /* The mood and the diagnostics state are captured so the call restores them,
+     letting a function defined in bash mood run bash after a later set --mood,
+     and a function defined while diagnostics were off skip its checks. */
+  info.defining_mood = static_cast<u8>(m_mood);
+  info.defining_warnings = m_warnings_enabled;
+  info.defining_diagnostics_disabled = m_diagnostics_disabled;
   m_function_definition_infos.set(name, steal(info));
 }
 

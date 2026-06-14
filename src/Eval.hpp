@@ -232,6 +232,14 @@ struct function_definition_info
      positions already index the live text, which keeps the per-call cost
      of a script running its own functions at one compare. */
   const String *defining_instance{nullptr};
+  /* The mood and the diagnostics state in effect when the function was defined,
+     so the body runs in its defining mood and fires no checks if it was defined
+     while diagnostics or warnings were off, regardless of the mood active at the
+     call. The mood rides as its underlying byte so this struct does not need the
+     mimic_mood enum ordered before it. */
+  u8 defining_mood{0};
+  bool defining_warnings{false};
+  bool defining_diagnostics_disabled{false};
 };
 
 struct eval_state_snapshot

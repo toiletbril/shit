@@ -1,0 +1,6 @@
+== bash-defined function stays lax after switching to shit:
+[]
+ok
+== shit-defined function stays strict when called from bash mood:
+is not set
+rc-done

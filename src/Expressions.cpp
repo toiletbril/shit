@@ -1713,6 +1713,37 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     cxt.set_terminal_exec_allowed(false);
     defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
 
+    /* The body runs in the mood and the diagnostics state the function was
+       defined in, so a function defined in bash mood runs bash even after a
+       later set --mood, and one defined while diagnostics or warnings were off
+       skips its checks. The defining mood drives the strictness too, while an
+       explicit set -u rides through apply_strictness_for_mood. The caller's
+       state returns when the call ends. */
+    let const *const definition_info =
+        cxt.function_definition_info_of(program_name.view());
+    let const saved_mood = cxt.mood();
+    let const saved_warnings = cxt.warnings_enabled();
+    let const saved_diagnostics_disabled = cxt.diagnostics_disabled();
+    let const saved_error_unset = cxt.error_unset();
+    let const saved_pipefail = cxt.pipefail();
+    let const saved_failglob = cxt.failglob();
+    defer
+    {
+      cxt.set_mood(saved_mood);
+      cxt.set_warnings_enabled(saved_warnings);
+      cxt.set_diagnostics_disabled(saved_diagnostics_disabled);
+      cxt.set_error_unset(saved_error_unset);
+      cxt.set_pipefail(saved_pipefail);
+      cxt.set_failglob(saved_failglob);
+    };
+    if (definition_info != nullptr) {
+      cxt.set_mood(static_cast<mimic_mood>(definition_info->defining_mood));
+      cxt.set_warnings_enabled(definition_info->defining_warnings);
+      cxt.set_diagnostics_disabled(
+          definition_info->defining_diagnostics_disabled);
+      cxt.apply_strictness_for_mood();
+    }
+
     /* A located error thrown from the body carries an absolute position into
        the file that defined the function. The top-level handler renders
        against the typed line and cannot reach that file once this frame
