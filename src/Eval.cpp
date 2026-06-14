@@ -1372,8 +1372,11 @@ pure fn EvalContext::resolve_render_source(
   if (m_function_call_names.is_empty()) return resolved;
   let const innermost = funcname_frame_at(0);
   let const *info = m_function_definition_infos.find(innermost);
-  if (info == nullptr || info->defining_instance == m_current_source)
-    return resolved;
+  /* The body span check below decides whether to window, not the defining
+     source pointer. A freed defining source can have its address reused by the
+     current source, so a pointer compare here would falsely read the body as
+     belonging to the current source and drop the function's filename. */
+  if (info == nullptr) return resolved;
   let const *copy = m_function_sources.find(innermost);
   if (copy == nullptr || copy->count() <= info->header_length) return resolved;
   const usize body_length = copy->count() - info->header_length;
