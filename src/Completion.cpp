@@ -1265,6 +1265,7 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("ffprobe"),      "--help full"},
         {SSK("ffplay"),       "--help full"},
         {SSK("cargo"),        "--help"     },
+        {SSK("tailscale"),    "--help"     },
         {SSK("rustup"),       "--help"     },
         {SSK("rustc"),        "--help"     },
         {SSK("rustfmt"),      "--help"     },
