@@ -2688,6 +2688,22 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                                ArrayList<highlight_span> &spans,
                                const HashSet &known_vars) throws -> void;
 
+/* Whether the plain word names a path that exists on disk, a tilde prefix
+   expanded the way the evaluator expands it. The highlighter paints such an
+   argument cyan, so a real file or directory stands apart from a typo, which
+   keeps the default color. */
+static fn word_names_existing_path(StringView word) throws -> bool
+{
+  if (word.is_empty()) return false;
+  if (word[0] == '~') {
+    if (Maybe<String> expanded = expand_command_tilde(word);
+        expanded.has_value())
+      return Path{expanded->view()}.exists();
+    return false;
+  }
+  return Path{word}.exists();
+}
+
 /* The plain variable name a $ expansion references when it is a simple $name or
    ${name}, None when the expansion carries an operator such as ${x:-y} or a
    form like ${#x} that is not a bare reference. The name may still be a special
@@ -3037,7 +3053,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
     /* An argument, an expansion-built command, or an assignment prefix. The
        inner spans stand. An assignment prefix keeps the next word in command
-       position, an expansion-built command moves past it. */
+       position, an expansion-built command moves past it. A plain argument that
+       names an existing path is painted cyan, since a real path stands apart
+       from a typo there. */
+    if (!command_position && plain && !is_assignment &&
+        word_names_existing_path(word))
+      push(word_start, word_end, colors::ansi::CYAN);
     for (const highlight_span &inner : word_spans)
       push(inner.start, inner.end, inner.sgr);
     if (command_position && !is_assignment) command_position = false;
