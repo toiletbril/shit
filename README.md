@@ -25,22 +25,28 @@ which a normal shell will half-assedly run and leave you with a mess, gets
 caught up front and the run stops. The same stage carries most of shellcheck
 built in as warnings. Every error or warning at stage is called a diagnostic.
 
-`-P` makes it POSIX. `--bash-compatible` makes it Bash. If the binary is named
-or symlinked to `sh`, `dash`, or `bash`, it picks the matching mood, disabling
-diagnostics. `-W` keeps the diagnostics but turns every error into a warning
-and lets the run continue to stay compatible.
+`--mood`, short `-M`, selects the mood, one of `shit`, `bash`, or `sh`. The
+default is `shit`. If the binary is named or symlinked to `sh`, `dash`, or
+`bash`, it picks the matching mood and disables diagnostics. `set --mood`
+changes the mood at runtime. `-W` keeps the diagnostics but turns every error
+into a warning and lets the run continue to stay compatible.
 
 `-I` is mimicry. With it on, a script whose shebang names `sh`, `dash`, `bash`
 runs inside **shit** in the matching mood rather than launching the real shell
 for more speed.
 
-`-L` boots from the existing bash setup. It sources the bash profiles and
-`~/.bashrc` in bash mode, then snaps back to the strict default at the first
-prompt. The startup files always source lenient, so an unset variable or an
-unmatched glob in a profile never aborts the login.
+`--init-moods`, short `-L`, lists which startup files to load, one flavor per
+name, comma separated or by repeating the flag, and defaults to the value of
+`--mood`. The `shit` flavor reads `/etc/shitrc` and `~/.shitrc`, the `bash`
+flavor reads the bash rc and its completion, and the `sh` flavor reads the file
+named by `ENV`. So `--init-moods=shit,bash` runs a strict shit prompt that still
+loads the whole bash setup. `set --init-moods` reloads the listed flavors into a
+live session. The startup files always source lenient, so an unset variable or
+an unmatched glob in a profile never aborts the login.
 
-`SHIT_FLAGS` sets your defaults once. Put the recommended `-WLI` in it and
-every **shit** starts that way, while a flag on the command line still wins.
+`SHIT_FLAGS` sets your defaults once. Put the recommended `-W -I
+--init-moods=shit,bash` in it and every **shit** starts that way, while a flag
+on the command line still wins.
 
 ## Additional bull**shit**
 
