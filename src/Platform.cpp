@@ -2704,9 +2704,10 @@ fn get_shell_process_id() wontthrow -> i64
 
 fn get_file_creation_mask() wontthrow -> u32
 {
-  /* umask only reads through a set, so the old value is read and put back. */
+  /* umask only reads through a set, so the old value is read and put back. The
+     macro casts to the platform type, so old passes through as is. */
   let const old = SHIT_UMASK(0);
-  SHIT_UMASK(static_cast<u32>(old));
+  SHIT_UMASK(old);
   return static_cast<u32>(old);
 }
 

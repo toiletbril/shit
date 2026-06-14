@@ -159,12 +159,16 @@ public:
   hot fn erase(StringView key) throws -> void
   {
     if (m_capacity == 0) return;
+    let const wanted = PackedStringKey::from_view(key);
     let const mask = m_capacity - 1;
     let i = hash_bytes(key) & mask;
     for (usize probe = 0; probe < m_capacity; probe++) {
       let &slot = m_slots[i];
       if (slot.state == slot::Empty) return;
-      if (slot.state == slot::Occupied && slot.key == key) {
+      /* The packed compare rejects a mismatch in two words before the byte
+         compare, the same fast reject find and set_value use. */
+      if (slot.state == slot::Occupied && slot.packed == wanted &&
+          slot.key == key) {
         /* Free the stored key and value but keep the slot objects alive, so a
            later place into this tombstone assigns into a live object rather
            than one whose lifetime already ended. */
