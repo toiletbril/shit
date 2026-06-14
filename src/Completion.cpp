@@ -2374,6 +2374,17 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
       if (!candidates.is_empty()) return candidates;
       return None;
     }
+    /* set --mood and set --init-moods take mood names as their value, so the
+       operand after either spelling completes the three mood names. */
+    if (previous == "--mood" || previous == "-M" || previous == "--init-moods" ||
+        previous == "-L")
+    {
+      for (const StringView name : {StringView{"shit"}, StringView{"bash"},
+                                    StringView{"sh"}})
+        push_matching(name);
+      if (!candidates.is_empty()) return candidates;
+      return None;
+    }
   }
 
   /* A shopt operand is an option name, no dash required. */

@@ -1,11 +1,15 @@
 == set switches:
 --help
+--init-moods
+--mood
 -A
 -B
 -C
 -E
 -G
 -I
+-L
+-M
 -R
 -S
 -T

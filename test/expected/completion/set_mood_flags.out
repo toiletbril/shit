@@ -1,0 +1,20 @@
+== set --m:
+--mood
+== set --i:
+--init-moods
+== set --mood value:
+bash
+sh
+shit
+== set --init-moods value:
+bash
+sh
+shit
+== set -M value:
+bash
+sh
+shit
+== set -L value:
+bash
+sh
+shit

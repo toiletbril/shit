@@ -24,6 +24,13 @@ HELP_DESCRIPTION_DECL(
     "table with each option's current state.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+/* The mood flags are parsed by hand in execute(), so these declarations only
+   join the set builtin's flag list for completion and the help listing. */
+FLAG(MOOD, String, 'M', "mood",
+     "Set the runtime mood to shit, bash, or sh, or print it with no value.");
+FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods",
+     "Source the startup files for the listed moods, or print the loaded ones "
+     "with no value.");
 
 REGISTER_BUILTIN_FLAGS(Set);
 

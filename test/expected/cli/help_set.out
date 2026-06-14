@@ -11,6 +11,11 @@ SYNOPSIS
 
 OPTIONS
       --help              Display help.
+  -M, --mood=<...>        Set the runtime mood to shit, bash, or sh, or print it
+                          with no value.
+  -L, --init-moods=<.., ..>
+                          Source the startup files for the listed moods, or
+                          print the loaded ones with no value.
 OPTION SWITCHES
   A letter after a minus enables the option and after a plus disables it.
   -o NAME and +o NAME do the same by long name.
