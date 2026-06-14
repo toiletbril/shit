@@ -724,7 +724,11 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
       }
       break;
     }
-    context.mark_mood_initialized(flavor);
+    /* A flavor counts as initialized only when it actually sourced a file, so
+       the set --init-moods readout reports what loaded rather than every flavor
+       the resolver listed for a non-interactive run that sourced nothing. */
+    if (is_login_shell || should_be_interactive)
+      context.mark_mood_initialized(flavor);
   }
 
   /* The bash programmable completion loads once after a bash rc sourced, so the

@@ -391,6 +391,12 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
     sub.location = SourceLocation{};
   }
 
+  /* A break or continue that escaped to the top level, such as one a stray rc
+     line ran, holds a pointer to its source that may be a buffer freed just
+     below, so it drops to the unlocated rendering the same way, since the
+     escaped jump is rendered only after the next chunk. */
+  if (has_pending_control_flow()) pending_control_flow().source = nullptr;
+
   /* The retained source buffers and filenames are heap String copies owned
      here, so they are freed explicitly. */
   for (String *source : m_retained_sources)

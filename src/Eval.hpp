@@ -293,6 +293,12 @@ struct runtime_state
   bool error_unset{false};
   bool pipefail{false};
   bool failglob{false};
+  /* The explicit marks ride with their values, so a set -u or set -o pipefail
+     run inside a mood-swapped scope does not leave the mark set after the value
+     reverts, which would make a later mood switch skip reseeding the toggle. */
+  bool error_unset_explicit{false};
+  bool pipefail_explicit{false};
+  bool failglob_explicit{false};
 };
 
 /* A programmable-completion spec the complete builtin registers for a command.
@@ -958,9 +964,15 @@ public:
      local and defer for each flag. */
   pure fn capture_runtime_state() const wontthrow -> runtime_state
   {
-    return runtime_state{m_mood,        m_warnings_enabled,
-                         m_diagnostics_disabled, m_error_unset,
-                         m_pipefail,    m_failglob};
+    return runtime_state{m_mood,
+                         m_warnings_enabled,
+                         m_diagnostics_disabled,
+                         m_error_unset,
+                         m_pipefail,
+                         m_failglob,
+                         m_error_unset_explicit,
+                         m_pipefail_explicit,
+                         m_failglob_explicit};
   }
   fn restore_runtime_state(const runtime_state &state) wontthrow -> void
   {
@@ -970,6 +982,9 @@ public:
     m_error_unset = state.error_unset;
     m_pipefail = state.pipefail;
     m_failglob = state.failglob;
+    m_error_unset_explicit = state.error_unset_explicit;
+    m_pipefail_explicit = state.pipefail_explicit;
+    m_failglob_explicit = state.failglob_explicit;
   }
 
   /* Switch into a mood and diagnostic state, deriving the strictness from the
