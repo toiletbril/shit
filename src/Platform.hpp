@@ -469,6 +469,16 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
    the --help completion fork stays off until a Windows ownership check lands. */
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool;
 
+/* Run argv as a child, capturing its standard output and standard error, and
+   return that text. The child's standard input is the null device so a program
+   that would page or prompt reads end-of-file and exits. The capture is bounded
+   by timeout_nanos, and a child still running at the deadline is killed and None
+   is returned, so a slow or hung --help never freezes the prompt. None also on a
+   spawn or pipe failure. On Windows it returns None until a Windows
+   implementation lands. */
+fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos)
+    wontthrow -> Maybe<String>;
+
 /* Hand the controlling terminal to the given process's group, so it becomes
    the foreground job tmux reports, ignoring SIGTTOU across the change. A no-op
    without a controlling terminal. reclaim_controlling_terminal takes it back

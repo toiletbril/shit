@@ -1261,39 +1261,52 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
   return os::directory_is_trusted_for_exec(Path{directory});
 }
 
+/* The wall-clock budget a single --help fork is allowed. A command whose --help
+   runs longer is killed and caches the empty string, so the prompt never
+   freezes on it and it is never forked again this session. */
+static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
+
 /* A command's raw --help text, captured once. The fork passes two gates, the
    command is on the allowlist and resolves into a trusted directory, so a
    program shit does not recognize and a program in an untrusted place are both
-   left unforked. The resolved absolute path runs, not the bare name, so an
-   alias or a function never shadows the trusted binary, and stdin is closed so
-   a binary that would page or prompt reads end-of-file and exits rather than
-   hanging the prompt. A command that fails either gate caches the empty string,
+   left unforked. The resolved absolute path runs as the only argv entry before
+   the help argument, not through a shell, so an alias or a function never
+   shadows the trusted binary, and stdin is the null device so a binary that
+   would page or prompt reads end-of-file and exits. The capture is bounded by
+   the timeout, and a command that fails any of these caches the empty string,
    so it never forks twice. */
-static fn help_text_for(StringView command, EvalContext &context) throws
-    -> StringView
+static fn help_text_for(StringView command) throws -> StringView
 {
   if (const String *cached = HELP_TEXT_CACHE.find(command))
     return cached->view();
   let text = String{};
-  try {
-    /* The allowlist entry carries the help argument, so ffmpeg forks --help
-       full rather than the summary-only --help. A command not on the list never
-       forks. */
-    Maybe<const char *> help_argument = HELP_ALLOWLIST.find(command);
-    let const paths = utils::search_program_path(command);
-    if (help_argument.has_value() && !paths.is_empty() &&
-        command_directory_is_trusted(paths[0].text().view()))
-    {
-      const String command_line = String{paths[0].text().view()} + " " +
-                                  StringView{*help_argument} +
-                                  " </dev/null 2>&1";
-      LOG(verbosity::Debug, "forking '%.*s' for its --help text",
-          static_cast<int>(command.length), command.data);
-      text = context.capture_command_substitution(command_line);
+  /* The allowlist entry carries the help argument, so ffmpeg forks --help full
+     rather than the summary-only --help. A command not on the list never
+     forks. */
+  Maybe<const char *> help_argument = HELP_ALLOWLIST.find(command);
+  let const paths = utils::search_program_path(command);
+  if (help_argument.has_value() && !paths.is_empty() &&
+      command_directory_is_trusted(paths[0].text().view()))
+  {
+    /* argv is the absolute path then the help argument split on spaces, so
+       ffmpeg runs as the three words path, --help, full. */
+    let argv = ArrayList<String>{};
+    argv.push(String{paths[0].text().view()});
+    const StringView argument_view = StringView{*help_argument};
+    usize i = 0;
+    while (i < argument_view.length) {
+      while (i < argument_view.length && argument_view[i] == ' ') i++;
+      const usize start = i;
+      while (i < argument_view.length && argument_view[i] != ' ') i++;
+      if (i > start)
+        argv.push(String{argument_view.substring_of_length(start, i - start)});
     }
-  } catch (...) {
-    LOG(verbosity::Debug, "swallowed a --help invocation failure for '%.*s'",
+    LOG(verbosity::Debug, "forking '%.*s' for its --help text",
         static_cast<int>(command.length), command.data);
+    if (Maybe<String> output =
+            os::capture_program_output(argv, HELP_FORK_TIMEOUT_NANOS);
+        output.has_value())
+      text = steal(*output);
   }
   HELP_TEXT_CACHE.set(command, steal(text));
   return HELP_TEXT_CACHE.find(command)->view();
@@ -1301,12 +1314,12 @@ static fn help_text_for(StringView command, EvalContext &context) throws
 
 /* The option flags a command's --help text lists, parsed once and cached. The
    parse reuses the manpage flag scanner since the option syntax is the same. */
-static fn help_options_for(StringView command, EvalContext &context) throws
+static fn help_options_for(StringView command) throws
     -> const ArrayList<String> &
 {
   if (const ArrayList<String> *cached = HELP_OPTION_CACHE.find(command))
     return *cached;
-  let parsed = parse_manpage_options(help_text_for(command, context));
+  let parsed = parse_manpage_options(help_text_for(command));
   HELP_OPTION_CACHE.set(command, steal(parsed));
   return *HELP_OPTION_CACHE.find(command);
 }
@@ -1413,12 +1426,12 @@ static fn parse_help_subcommands(StringView text) throws -> ArrayList<String>
 }
 
 /* The subcommands a command's --help text lists, parsed once and cached. */
-static fn help_subcommands_for(StringView command, EvalContext &context) throws
+static fn help_subcommands_for(StringView command) throws
     -> const ArrayList<String> &
 {
   if (const ArrayList<String> *cached = HELP_SUBCOMMAND_CACHE.find(command))
     return *cached;
-  let parsed = parse_help_subcommands(help_text_for(command, context));
+  let parsed = parse_help_subcommands(help_text_for(command));
   HELP_SUBCOMMAND_CACHE.set(command, steal(parsed));
   return *HELP_SUBCOMMAND_CACHE.find(command);
 }
@@ -1441,7 +1454,7 @@ static fn complete_from_help(StringView line, StringView token,
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved = resolve_completion_alias(surface_command, context);
-  const ArrayList<String> &options = help_options_for(resolved.view(), context);
+  const ArrayList<String> &options = help_options_for(resolved.view());
   if (options.is_empty()) return None;
 
   let matches = ArrayList<String>{};
@@ -1473,7 +1486,7 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved = resolve_completion_alias(surface_command, context);
   const ArrayList<String> &subcommands =
-      help_subcommands_for(resolved.view(), context);
+      help_subcommands_for(resolved.view());
   if (subcommands.is_empty()) return None;
 
   let matches = ArrayList<String>{};

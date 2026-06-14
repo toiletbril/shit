@@ -16,11 +16,14 @@
 
 #if SHIT_PLATFORM_IS POSIX
 #include <fcntl.h>
+#include <poll.h>
 #include <pwd.h>
+#include <signal.h>
 #include <spawn.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <time.h>
 
 /* TODO move this to toiletline */
@@ -585,6 +588,103 @@ fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
   const bool others_cannot_write =
       (directory_stat.st_mode & (S_IWGRP | S_IWOTH)) == 0;
   return owner_is_trusted && others_cannot_write;
+}
+
+fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos)
+    wontthrow -> Maybe<String>
+{
+  if (argv.is_empty()) return None;
+
+  int pipe_fds[2];
+  if (pipe(pipe_fds) != 0) return None;
+  const int read_end = pipe_fds[0];
+  const int write_end = pipe_fds[1];
+
+  const int devnull_fd = open("/dev/null", O_RDONLY);
+  if (devnull_fd < 0) {
+    close(read_end);
+    close(write_end);
+    return None;
+  }
+
+  /* The child reads its input from the null device and writes both its output
+     streams into the pipe, and closes the descriptors it does not keep. */
+  posix_spawn_file_actions_t file_actions;
+  posix_spawn_file_actions_init(&file_actions);
+  posix_spawn_file_actions_adddup2(&file_actions, devnull_fd, STDIN_FILENO);
+  posix_spawn_file_actions_adddup2(&file_actions, write_end, STDOUT_FILENO);
+  posix_spawn_file_actions_adddup2(&file_actions, write_end, STDERR_FILENO);
+  posix_spawn_file_actions_addclose(&file_actions, read_end);
+  posix_spawn_file_actions_addclose(&file_actions, write_end);
+  posix_spawn_file_actions_addclose(&file_actions, devnull_fd);
+
+  /* posix_spawn wants a NUL-terminated array of mutable C strings. The argv
+     strings outlive the spawn, so pointing at their storage is safe. */
+  ArrayList<char *> raw_args{heap_allocator()};
+  for (const String &argument : argv)
+    raw_args.push(const_cast<char *>(argument.c_str()));
+  raw_args.push(nullptr);
+
+  pid_t child_pid = 0;
+  const int spawn_result = posix_spawn(&child_pid, raw_args[0], &file_actions,
+                                       nullptr, raw_args.begin(), environ);
+  posix_spawn_file_actions_destroy(&file_actions);
+  close(write_end);
+  close(devnull_fd);
+  if (spawn_result != 0) {
+    close(read_end);
+    return None;
+  }
+
+  /* Read the child's output until it closes the pipe or the deadline passes.
+     poll waits with the time left in the budget, so a child that stalls is cut
+     at the deadline rather than blocking the prompt. */
+  let captured = String{heap_allocator()};
+  const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
+  bool timed_out = false;
+  for (;;) {
+    const u64 now_nanos = monotonic_nanos();
+    if (now_nanos >= deadline_nanos) {
+      timed_out = true;
+      break;
+    }
+    int remaining_millis =
+        static_cast<int>((deadline_nanos - now_nanos) / 1'000'000);
+    if (remaining_millis <= 0) remaining_millis = 1;
+
+    struct pollfd watch;
+    watch.fd = read_end;
+    watch.events = POLLIN;
+    watch.revents = 0;
+    const int ready = poll(&watch, 1, remaining_millis);
+    if (ready < 0) {
+      if (errno == EINTR) continue;
+      break;
+    }
+    if (ready == 0) {
+      timed_out = true;
+      break;
+    }
+
+    char buffer[4096];
+    const ssize_t read_count = read(read_end, buffer, sizeof(buffer));
+    if (read_count < 0) {
+      if (errno == EINTR) continue;
+      break;
+    }
+    if (read_count == 0) break;
+    captured.append(StringView{buffer, static_cast<usize>(read_count)});
+  }
+  close(read_end);
+
+  /* A child still running at the deadline is killed so it leaves no zombie, and
+     either way it is reaped. */
+  if (timed_out) signal_process(child_pid, SIGKILL);
+  int wait_status = 0;
+  waitpid(child_pid, &wait_status, 0);
+
+  if (timed_out) return None;
+  return captured;
 }
 
 fn give_controlling_terminal_to(process p) wontthrow -> void
@@ -1612,6 +1712,16 @@ fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
      completion fork stays off. */
   unused(directory);
   return false;
+}
+
+fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos)
+    wontthrow -> Maybe<String>
+{
+  /* The --help completion fork is off on Windows until the timed capture is
+     ported, so nothing is captured. */
+  unused(argv);
+  unused(timeout_nanos);
+  return None;
 }
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor
