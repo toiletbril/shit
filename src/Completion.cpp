@@ -296,16 +296,22 @@ static fn path_command_names() throws -> const ArrayList<String> &
     return CACHED_PATH_COMMANDS;
 
   /* The helper above already stored the live PATH value, so the rebuild
-     walks the cached copy. */
+     walks the cached copy. A directory repeated in PATH is read only once,
+     since a later occurrence lists the same commands, so a layered profile
+     does not multiply the scan. */
   let const current = CACHED_COMPLETION_PATH.view();
   CACHED_PATH_COMMANDS.clear();
+  let seen_directories = HashSet{heap_allocator()};
   usize segment_start = 0;
   for (usize i = 0; i <= current.length; i++) {
     if (i != current.length && current[i] != os::PATH_DELIMITER) continue;
     let const segment =
         current.substring_of_length(segment_start, i - segment_start);
     segment_start = i + 1;
-    let const directory = Path{segment.is_empty() ? StringView{"."} : segment};
+    let const dir_view = segment.is_empty() ? StringView{"."} : segment;
+    if (seen_directories.contains(dir_view)) continue;
+    seen_directories.add(dir_view);
+    let const directory = Path{dir_view};
     if (Maybe<ArrayList<String>> entries = Path::read_directory(directory)) {
       for (String &entry : *entries)
         CACHED_PATH_COMMANDS.push(steal(entry));

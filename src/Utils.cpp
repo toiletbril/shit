@@ -1258,12 +1258,27 @@ cold fn print_memory_report() wontthrow -> void
    compare. */
 static StringMap<ArrayList<Path>> PATH_CACHE{heap_allocator()};
 
-/* A cd, a PATH assignment, and hash -r set this so the next lookup drops the
-   cache and re-resolves, the way dash rehashes lazily. While it is false a hit
-   returns the stored path with no stat. */
+/* The filenames of each PATH directory, keyed by the directory text, so a
+   directory shared by several PATH entries or kept across a PATH change is read
+   from disk only once. A PATH update rebuilds PATH_CACHE from these listings,
+   reading from disk only the directories not already here. */
+static StringMap<ArrayList<String>> DIR_LISTING_CACHE{heap_allocator()};
+
+/* A cd and hash -r set this so the next lookup drops the cache and re-resolves,
+   the way dash rehashes lazily. While it is false a hit returns the stored path
+   with no stat. */
 static bool PATH_CACHE_IS_STALE = false;
 
+/* True once the interactive setup seeded the whole map, so a PATH change
+   rebuilds it eagerly. A non-interactive run never seeds it, so a PATH change
+   there only marks the cache stale and the resolver stays lazy. */
+static bool PATH_MAP_IS_EAGER = false;
+
 static Maybe<String> MAYBE_PATH = os::get_environment_variable("PATH");
+
+/* Defined below, declared here so the cache rebuild can split the current PATH
+   into its deduplicated directories. */
+static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>;
 
 /* Append one resolved absolute path under a program name, creating the list on
    the first hit. */
@@ -1273,30 +1288,84 @@ static fn cache_resolved_path(StringView name, const Path &full_path) throws
   PATH_CACHE.get_or_create(name, ArrayList<Path>{}).push(full_path);
 }
 
+/* The filenames in a directory, read from disk on the first request and kept
+   under the directory text for later. An unreadable directory caches an empty
+   listing so it is not stat-walked again until the cache is dropped. */
+static fn directory_listing(const Path &directory) throws
+    -> const ArrayList<String> &
+{
+  let const key = directory.text().view();
+  if (const ArrayList<String> *cached = DIR_LISTING_CACHE.find(key))
+    return *cached;
+  let entries = Path::read_directory(directory);
+  DIR_LISTING_CACHE.set(key, entries.has_value() ? steal(*entries)
+                                                 : ArrayList<String>{});
+  return *DIR_LISTING_CACHE.find(key);
+}
+
+/* Rebuild the program cache from the current PATH, in PATH order so the first
+   directory's copy of a name wins. A directory whose listing is already cached
+   is not read again, so a PATH change that only adds a directory reads just
+   that one from disk. */
+static fn rebuild_path_cache() throws -> void
+{
+  PATH_CACHE.clear();
+  PATH_CACHE_IS_STALE = false;
+  if (!MAYBE_PATH) return;
+  for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
+    let const directory = Path{dir_string.view()};
+    for (const String &entry_name : directory_listing(directory)) {
+      let name = entry_name.clone();
+      os::erase_extension_and_get_its_index(name);
+      let full_path = directory.clone();
+      full_path.push_component(entry_name.view());
+      cache_resolved_path(name.view(), full_path);
+    }
+  }
+}
+
 fn clear_path_map() throws -> void
 {
   LOG(verbosity::Info, "clear_path_map dropping %zu cached program resolutions",
       PATH_CACHE.count());
   MAYBE_PATH = os::get_environment_variable("PATH");
   PATH_CACHE.clear();
+  DIR_LISTING_CACHE.clear();
   PATH_CACHE_IS_STALE = false;
+  PATH_MAP_IS_EAGER = false;
 }
 
 fn invalidate_path_cache() throws -> void
 {
-  /* The cache is not cleared here, since a cd or a PATH change is followed by
-     few lookups in a script. The stale flag defers the clear to the next lookup
-     so a run that never resolves a command again pays nothing. */
+  /* A cd or hash -r can change what a relative PATH entry resolves to or add a
+     program to a directory, so the directory listings are dropped to force a
+     fresh disk read, and PATH_CACHE is left to the stale flag, which defers its
+     clear to the next lookup so a run that resolves no further command pays
+     nothing. */
   LOG(verbosity::Info, "invalidate_path_cache marking the program cache stale");
+  DIR_LISTING_CACHE.clear();
   PATH_CACHE_IS_STALE = true;
 }
 
 fn set_path_for_resolution(Maybe<String> path) throws -> void
 {
-  LOG(verbosity::Info,
-      "set_path_for_resolution pointing the search at the shell's PATH value");
+  /* A subshell or a command substitution re-points the search at the restored
+     PATH on every exit, so the common case is an unchanged value, which is a
+     no-op rather than a rebuild. */
+  if (MAYBE_PATH.has_value() == path.has_value() &&
+      (!path.has_value() || MAYBE_PATH->view() == path->view()))
+    return;
+
   MAYBE_PATH = steal(path);
-  PATH_CACHE_IS_STALE = true;
+  if (PATH_MAP_IS_EAGER) {
+    /* The listing cache survives a PATH change, so the rebuild reads from disk
+       only the directories the new PATH adds and reuses the rest. */
+    LOG(verbosity::Info, "set_path_for_resolution rebuilding for a changed PATH");
+    rebuild_path_cache();
+  } else {
+    /* A non-interactive run never seeded the map, so it stays lazy. */
+    PATH_CACHE_IS_STALE = true;
+  }
 }
 
 /* Split PATH into its directory components. The last component carries no
@@ -1307,46 +1376,41 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   let dirs = ArrayList<String>{};
   let current = String{};
 
+  /* A directory that appears more than once in PATH, which a layered profile
+     easily produces, is kept only on its first occurrence. The eager scan and
+     the per-command resolve both read this list, so dropping the repeats avoids
+     reading the same directory and re-resolving the same files several times,
+     while keeping the first occurrence leaves the search order and the copy a
+     command resolves to unchanged. The directory count is small, so a linear
+     membership check is cheaper than a set. */
+  let const push_unique = [&](String dir) throws -> void {
+    for (const String &seen : dirs)
+      if (seen.view() == dir.view()) return;
+    dirs.push(steal(dir));
+  };
+
   for (usize i = 0; i < path_var.length; i++) {
     const char ch = path_var.data[i];
     if (ch == os::PATH_DELIMITER) {
-      dirs.push(current.is_empty() ? String{"."} : current);
+      push_unique(current.is_empty() ? String{"."} : String{current.view()});
       current.clear();
     } else {
       current.push(ch);
     }
   }
-  dirs.push(current.is_empty() ? String{"."} : current);
+  push_unique(current.is_empty() ? String{"."} : String{current.view()});
 
   return dirs;
 }
 
 fn initialize_path_map() throws -> void
 {
-  if (!MAYBE_PATH) return;
-
   LOG(verbosity::Info,
       "scanning every PATH directory to seed the program cache");
-
-  for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
-    let const directory = Path{dir_string.view()};
-
-    /* read_directory returns None for a missing or unreadable directory, so the
-       path is skipped without a separate exists check. */
-    let const entries = Path::read_directory(directory);
-    if (!entries) continue;
-
-    /* Cache every file in the directory under its name without an omitted
-       extension, pointing at its full path. */
-    for (const String &entry_name : *entries) {
-      let name = entry_name.clone();
-      os::erase_extension_and_get_its_index(name);
-
-      let full_path = directory.clone();
-      full_path.push_component(entry_name.view());
-      cache_resolved_path(name.view(), full_path);
-    }
-  }
+  /* The interactive setup seeds the whole map once, so a later PATH change
+     rebuilds it eagerly while reading only the directories the change adds. */
+  PATH_MAP_IS_EAGER = true;
+  rebuild_path_cache();
 }
 
 /* Stat dir/name along PATH until a match, the way dash advances PATH and stats
