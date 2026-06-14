@@ -281,6 +281,20 @@ enum class mimic_mood : u8
   Bash,
 };
 
+/* A snapshot of the mood and the diagnostic and strictness toggles, captured
+   and restored as a unit so a scope that runs a body under a different mood,
+   such as a function call or a mimicked script, saves and puts back the whole
+   set with one call instead of a flag at a time. */
+struct runtime_state
+{
+  mimic_mood mood{mimic_mood::Default};
+  bool warnings_enabled{false};
+  bool diagnostics_disabled{false};
+  bool error_unset{false};
+  bool pipefail{false};
+  bool failglob{false};
+};
+
 /* A programmable-completion spec the complete builtin registers for a command.
    The interactive engine consults it when completing an argument to that
    command. function_name is the -F function, word_list is the -W word list, and
@@ -936,6 +950,26 @@ public:
     if (!m_error_unset_explicit) set_error_unset(strict);
     if (!m_pipefail_explicit) set_pipefail(strict);
     if (!m_failglob_explicit) set_failglob(strict);
+  }
+
+  /* Capture the mood and the diagnostic and strictness toggles, so a scope that
+     runs a body under a different mood saves the whole set with one call and
+     restore_runtime_state puts it all back, rather than threading a separate
+     local and defer for each flag. */
+  pure fn capture_runtime_state() const wontthrow -> runtime_state
+  {
+    return runtime_state{m_mood,        m_warnings_enabled,
+                         m_diagnostics_disabled, m_error_unset,
+                         m_pipefail,    m_failglob};
+  }
+  fn restore_runtime_state(const runtime_state &state) wontthrow -> void
+  {
+    m_mood = state.mood;
+    m_warnings_enabled = state.warnings_enabled;
+    m_diagnostics_disabled = state.diagnostics_disabled;
+    m_error_unset = state.error_unset;
+    m_pipefail = state.pipefail;
+    m_failglob = state.failglob;
   }
 
   /* The moods whose startup files are being sourced right now, a bit per mood.
