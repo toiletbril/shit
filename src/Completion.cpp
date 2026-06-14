@@ -1136,10 +1136,25 @@ static fn parse_manpage_option_entries(StringView text) throws
   }
   let const view = clean.view();
 
-  /* The description for each flag, read from the .TP option blocks. */
+  /* The description for each flag, read from the .TP option blocks. man wraps a
+     long description across several lines, inline after a long option or
+     indented below a short one, so the lines are joined into the whole
+     description rather than keeping only the first. */
   let descriptions = StringMap<String>{heap_allocator()};
   let pending_flags = ArrayList<String>{};
   usize pending_indent = 0;
+  let pending_description = String{};
+
+  let finalize_pending = [&]() throws -> void {
+    if (pending_flags.is_empty()) return;
+    let const desc = trim_blanks(pending_description.view());
+    for (const String &flag : pending_flags)
+      if (!desc.is_empty() && descriptions.find(flag.view()) == nullptr)
+        descriptions.set(flag.view(), String{desc});
+    pending_flags.clear();
+    pending_description = String{};
+  };
+
   usize i = 0;
   while (i < view.length) {
     let line_end = i;
@@ -1149,26 +1164,29 @@ static fn parse_manpage_option_entries(StringView text) throws
     i = line_end + 1;
 
     let const indent = skip_blanks(raw, 0);
+    /* A blank line ends the current option's description block. */
     if (indent >= raw.length) {
-      pending_flags.clear();
+      finalize_pending();
       continue;
     }
 
-    /* The first indented text line below a tag that carried no inline
-       description is that tag's description. */
-    if (!pending_flags.is_empty() && indent > pending_indent &&
-        raw[indent] != '-')
+    /* A line with no leading dash, at the option's indent or deeper, continues
+       the wrapped description man broke across lines, whether man wrapped it
+       inline after a long option or indented below a short one. */
+    if (!pending_flags.is_empty() && raw[indent] != '-' &&
+        indent >= pending_indent)
     {
-      let const description =
+      let const piece =
           trim_blanks(raw.substring_of_length(indent, raw.length - indent));
-      for (const String &flag : pending_flags)
-        if (descriptions.find(flag.view()) == nullptr)
-          descriptions.set(flag.view(), String{description});
-      pending_flags.clear();
+      if (!piece.is_empty()) {
+        if (!pending_description.is_empty()) pending_description += ' ';
+        pending_description.append(piece);
+      }
       continue;
     }
-    pending_flags.clear();
 
+    /* Any other line ends the pending block, and a dash line opens a new one. */
+    finalize_pending();
     if (raw[indent] != '-') continue;
 
     let gap = raw.length;
@@ -1178,19 +1196,14 @@ static fn parse_manpage_option_entries(StringView text) throws
         break;
       }
     let const option_part = raw.substring_of_length(indent, gap - indent);
-    let line_flags = extract_dash_flags(option_part);
-
-    if (gap < raw.length) {
-      let const inline_description =
-          trim_blanks(raw.substring_of_length(gap, raw.length - gap));
-      for (const String &flag : line_flags)
-        if (descriptions.find(flag.view()) == nullptr)
-          descriptions.set(flag.view(), String{inline_description});
-    } else {
-      pending_flags = steal(line_flags);
-      pending_indent = indent;
-    }
+    pending_flags = extract_dash_flags(option_part);
+    pending_indent = indent;
+    pending_description = String{};
+    if (gap < raw.length)
+      pending_description.append(
+          trim_blanks(raw.substring_of_length(gap, raw.length - gap)));
   }
+  finalize_pending();
 
   /* The authoritative flag list is the word scan, so the candidate set matches
      the prior behavior, with the description attached where the block pass
