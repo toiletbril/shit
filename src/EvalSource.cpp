@@ -1,10 +1,9 @@
-#include "Eval.hpp"
-
 #include "Arena.hpp"
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"

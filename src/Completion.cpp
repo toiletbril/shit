@@ -1185,7 +1185,8 @@ static fn parse_manpage_option_entries(StringView text) throws
       continue;
     }
 
-    /* Any other line ends the pending block, and a dash line opens a new one. */
+    /* Any other line ends the pending block, and a dash line opens a new one.
+     */
     finalize_pending();
     if (raw[indent] != '-') continue;
 

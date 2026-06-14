@@ -1,7 +1,6 @@
-#include "Eval.hpp"
-
 #include "Common.hpp"
 #include "Debug.hpp"
+#include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Platform.hpp"
 #include "Trace.hpp"

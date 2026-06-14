@@ -1730,8 +1730,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        keeps the exit status without printing it a second time. An error that
        does not window, such as one already rendered by a nested call, is
        rethrown untouched. */
-    let const window_error =
-        [&](ErrorWithLocation &error) throws -> Maybe<StringView> {
+    let const window_error = [&](ErrorWithLocation &error)
+                                 throws -> Maybe<StringView> {
       let const resolved = cxt.resolve_render_source(error.location());
       if (!resolved.windowed || resolved.text == nullptr) return None;
       let rebased = error.location();

@@ -1602,7 +1602,6 @@ pure fn EvalContext::peak_ast_arena_bytes() const wontthrow -> usize
 /* The arithmetic engine, the ArithmeticParser, the cached-token fast path, and
    the EvalContext arithmetic methods, lives in EvalArithmetic.cpp. */
 
-
 ExecContext::ExecContext(SourceLocation location, ResolvedCommand &&kind,
                          ArrayList<String> &&args)
     : m_kind(steal(kind)), m_location(location), m_args(steal(args))

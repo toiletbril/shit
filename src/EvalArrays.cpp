@@ -1,9 +1,8 @@
-#include "Eval.hpp"
-
 #include "Arena.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
 #include "Platform.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
