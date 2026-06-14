@@ -905,7 +905,11 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
 
     ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
     target_tokens.push(redir.target);
-    const ArrayList<String> target = cxt.process_args(target_tokens);
+    /* The path is opened right here and the field is never stored, so it
+       expands onto the scratch arena the command reclaims rather than the
+       heap. */
+    const ArrayList<String> target =
+        cxt.process_args(target_tokens, /*args_are_transient=*/true);
     if (target.count() != 1) {
       throw ErrorWithLocation{redir.target->source_location(),
                               "Redirection target is not a single file"};
@@ -1304,7 +1308,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
       ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
       target_tokens.push(redir.target);
-      const ArrayList<String> target = cxt.process_args(target_tokens);
+      /* The path is opened right here and the field is never stored, so it
+         expands onto the scratch arena the command reclaims rather than the
+         heap. */
+      const ArrayList<String> target =
+          cxt.process_args(target_tokens, /*args_are_transient=*/true);
       if (target.count() != 1) {
         /* An ambiguous redirect, the target expanding to more or fewer than one
            word, fails the command rather than the shell, the way dash does. */
@@ -3975,7 +3983,11 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
     target_tokens.push(redir.target);
-    const ArrayList<String> target = cxt.process_args(target_tokens);
+    /* The path is opened right here and the field is never stored, so it
+       expands onto the scratch arena the command reclaims rather than the
+       heap. */
+    const ArrayList<String> target =
+        cxt.process_args(target_tokens, /*args_are_transient=*/true);
     if (target.count() != 1) {
       throw ErrorWithLocation{redir.target->source_location(),
                               "Redirection target is not a single file"};
