@@ -6,7 +6,7 @@
 -E
 -G
 -I
--M
+-R
 -S
 -T
 -W
@@ -35,7 +35,6 @@ noglob
 notify
 nounset
 == shit binary flags:
---bash-compatible
 == declare letters:
 --help
 -A

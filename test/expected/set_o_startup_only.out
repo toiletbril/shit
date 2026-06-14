@@ -2,7 +2,7 @@
   [CompoundListCondition, None]
     [Pipeline]
       [SimpleCommand "set" "-p"]
-      [SimpleCommand "grep" "-E" "login|init-as-bash|rcfile"]
+      [SimpleCommand "grep" "-E" "login|rcfile"]
   [CompoundListCondition, None]
     [SimpleCommand "set" "-o" "login"]
   [CompoundListCondition, None]
@@ -20,7 +20,7 @@
   Unquoted "-E"
 ]
 [Word
-  Literal "login|init-as-bash|rcfile"
+  Literal "login|rcfile"
 ]
 [Word
   Unquoted "set"
@@ -38,7 +38,6 @@
   Unquoted "not-reached"
 ]
       login             [off] Whether the shell started as a login shell, fixed at startup.
-      init-as-bash      [off] Whether the shell initialized from the bash configs, fixed at startup.
       rcfile            [off] Whether a custom rc file was named at startup, fixed at startup.
 shit: 3:1: error: Builtin 'set': Unable to change 'login' because it is fixed at shell startup.
      3 |  set -o login

@@ -1,0 +1,10 @@
+== bash mood relaxes nounset:
+[]
+ok
+== -M short form prints the active mood:
+sh
+== default mood is strict:
+is not set
+== switching back to shit restores strictness:
+is not set
+rc-done

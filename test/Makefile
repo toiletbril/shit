@@ -7,7 +7,7 @@ else
 BIN ?= ../shit
 endif
 
-BIN_FLAGS := -AEM
+BIN_FLAGS := -AER
 
 # The suite runs cd and z, which write the directory history, so both the
 # command history and the directory history are redirected to ignored in-repo
@@ -139,7 +139,7 @@ dashdiff bashdiff mimicrydiff: SHELL := bash
 # where those strictnesses are off and the behavior tracks dash.
 dashdiff: $(BIN)
 	@for f in $(SH_COMPAT); do \
-		s="$$($(BIN) -P "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		s="$$($(BIN) --mood sh "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		d="$$($(DASH) "$$f" 2>/dev/null; printf X)"; d="$${d%X}"; \
 		alt="$${f%.sh}_1.sh"; \
 		if [ "$$s" = "$$d" ]; then \
@@ -168,7 +168,7 @@ BASH_COMPAT := $(filter-out %_1.bash,$(wildcard bash/*.bash))
 # bash on NAME.bash or matches bash running NAME_1.bash.
 bashdiff: $(BIN)
 	@for f in $(BASH_COMPAT); do \
-		s="$$($(BIN) --bash-compatible "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
+		s="$$($(BIN) --mood bash "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
 		b="$$($(BASH) "$$f" 2>/dev/null; printf X)"; b="$${b%X}"; \
 		alt="$${f%.bash}_1.bash"; \
 		if [ "$$s" = "$$b" ]; then \
@@ -252,7 +252,7 @@ bench:
 		printf "  %-10s" "$(BASH)"; ( time SCALE=$$scale $(BASH) $(BENCH) >"$$b" 2>&1 ) 2>&1; \
 		printf "  %-10s" "$(ZSH)";  ( time SCALE=$$scale $(ZSH)  $(BENCH) >"$$z" 2>&1 ) 2>&1; \
 		printf "  %-10s" "$(GOSH)"; ( time SCALE=$$scale $(GOSH) $(BENCH) >"$$g" 2>&1 ) 2>&1; \
-		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --posix $(BENCH) >"$$s" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --mood sh $(BENCH) >"$$s" 2>&1 ) 2>&1; \
 		if cmp "$$d" "$$s"; then echo "output matches dash"; \
 		else echo "output differs from dash:"; diff "$$d" "$$s" | head -20; fi; \
 		printf "  %-10s" "$(BIN)+opt"; ( time SCALE=$$scale $(BIN) $(BENCH) >"$$s" 2>/dev/null ) 2>&1; \
@@ -260,7 +260,7 @@ bench:
 		else echo "output differs from dash:"; diff "$$d" "$$s" | head -20; fi; \
 		echo "configure.bash, wall-clock seconds at SCALE=$$scale, lower is better:"; \
 		printf "  %-10s" "$(BASH)"; ( time SCALE=$$scale $(BASH) $(BENCH_BASH) >"$$bb" 2>&1 ) 2>&1; \
-		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --bash-compatible $(BENCH_BASH) >"$$sb" 2>&1 ) 2>&1; \
+		printf "  %-10s" "$(BIN)";  ( time SCALE=$$scale $(BIN) --mood bash $(BENCH_BASH) >"$$sb" 2>&1 ) 2>&1; \
 		if cmp "$$bb" "$$sb"; then echo "output matches bash"; \
 		else echo "output differs from bash:"; diff "$$bb" "$$sb" | head -20; fi; \
 		printf "  %-10s" "$(BIN)+opt"; ( time SCALE=$$scale $(BIN) $(BENCH_BASH) >"$$sb" 2>/dev/null ) 2>&1; \

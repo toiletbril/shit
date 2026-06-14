@@ -7,7 +7,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "default=$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "-o" "bash-compatible"]
+    [SimpleCommand "set" "--mood" "bash"]
   [CompoundListCondition, None]
     [Subshell]
       [CompoundList]
@@ -16,9 +16,7 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "bash=$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "set" "+o" "bash-compatible"]
-  [CompoundListCondition, None]
-    [SimpleCommand "set" "-o" "posix"]
+    [SimpleCommand "set" "--mood" "sh"]
   [CompoundListCondition, None]
     [Subshell]
       [CompoundList]
@@ -43,10 +41,10 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "-o"
+  Unquoted "--mood"
 ]
 [Word
-  Unquoted "bash-compatible"
+  Unquoted "bash"
 ]
 [Word
   Unquoted "echo"
@@ -65,19 +63,10 @@
   Unquoted "set"
 ]
 [Word
-  Unquoted "+o"
+  Unquoted "--mood"
 ]
 [Word
-  Unquoted "bash-compatible"
-]
-[Word
-  Unquoted "set"
-]
-[Word
-  Unquoted "-o"
-]
-[Word
-  Unquoted "posix"
+  Unquoted "sh"
 ]
 [Word
   Unquoted "echo"
@@ -100,8 +89,8 @@ shit: 5:7: error: bash message.
      5 |  (echo "${nope:?bash message}")
        |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
 bash=1
-shit: 9:7: error: posix message.
-     9 |  (echo "${nope?posix message}")
+shit: 8:7: error: posix message.
+     8 |  (echo "${nope?posix message}")
        |        ^~~~~~~~~~~~~~~~~~~~~~~ here.
 posix=2
 [Code 0]

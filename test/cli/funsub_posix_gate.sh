@@ -3,5 +3,5 @@ unset SHIT_FLAGS
 # ${ is a parameter expansion and a space-led name is a syntax error rather
 # than a command body. The default mood runs the body.
 "$BIN" -c 'echo ${ echo body; }'
-"$BIN" -P -c 'echo ${ echo body; }' 2>&1 | head -1
+"$BIN" --mood sh -c 'echo ${ echo body; }' 2>&1 | head -1
 echo "rc=$?"

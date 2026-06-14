@@ -7,7 +7,7 @@ dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 printf '#!/bin/bash\nexec </dev/null\necho script-ran\n' > "$dir/probe.sh"
 chmod +x "$dir/probe.sh"
-out=$(echo data | "$BIN" --bash-compatible -I -c "$dir/probe.sh; read -r line && echo got=\$line || echo stdin-lost")
+out=$(echo data | "$BIN" --mood bash -I -c "$dir/probe.sh; read -r line && echo got=\$line || echo stdin-lost")
 rc=$?
 printf '%s\n' "$out"
 echo "rc=$rc"

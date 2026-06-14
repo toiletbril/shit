@@ -19,7 +19,6 @@ OPTION SWITCHES
   -x  xtrace                        Print each command after expansion before it runs.
   -u  nounset, no-unset             Treat an unset variable as an error.
       pipefail                      Report a pipeline's status as the rightmost stage that failed.
-      posix                         Behave like dash, the POSIX mode.
   -a  allexport, export-all         Mark every assigned variable for the environment.
   -C  noclobber, no-clobber         Refuse to overwrite an existing file through '>'.
   -f  noglob, no-glob               Disable pathname expansion.
@@ -33,25 +32,23 @@ OPTION SWITCHES
   -T  functrace                     Accepted without effect.
   -B  braceexpand                   Accepted without effect.
   -A  show-ast                      Print the AST before each command runs.
-  -M  show-lexed-words              Print the escape bitmap after each parse.
+  -R  show-lexed-words              Print the escape bitmap after each parse.
   -E  show-exit-code                Print the exit code after each command.
-  -W  warnings, force-warnings      Report a strict runtime error as a warning and let the run proceed, the -W flag.
+  -W  force-warnings                Report a strict runtime error as a warning and let the run proceed, the -W flag.
   -I  mimicry                       Mimic the shell a script's shebang names, the -I flag.
-      diagnostics                   Run the analysis stage before each chunk, the inverse of no-diagnostics.
+      force-diagnostics             Run the analysis stage before each chunk, the inverse of no-diagnostics.
   -S  show-stats                    Print evaluation statistics after each run.
-      bash-compatible               Behave like bash, the bash-compatible mode.
       no-diagnostics                Skip the analysis stage before each chunk runs.
   -G  show-memory                   Print a granular memory report at exit, the --show-memory flag.
       login                         Whether the shell started as a login shell, fixed at startup.
-      init-as-bash                  Whether the shell initialized from the bash configs, fixed at startup.
       rcfile                        Whether a custom rc file was named at startup, fixed at startup.
 
   The -o long names:
-    errexit, error-exit, xtrace, nounset, no-unset, pipefail, posix, allexport,
+    errexit, error-exit, xtrace, nounset, no-unset, pipefail, allexport,
     export-all, noclobber, no-clobber, noglob, no-glob, noexec, no-exec,
     monitor, failglob, notify, hashall, verbose, keyword, functrace,
-    braceexpand, show-ast, show-lexed-words, show-exit-code, warnings,
-    force-warnings, mimicry, diagnostics, show-stats, bash-compatible,
-    no-diagnostics, show-memory, login, init-as-bash, rcfile
+    braceexpand, show-ast, show-lexed-words, show-exit-code, force-warnings,
+    mimicry, force-diagnostics, show-stats, no-diagnostics, show-memory, login,
+    rcfile
 
 rc=0

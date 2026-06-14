@@ -4,7 +4,7 @@
 # bun's completion file performs.
 shopt -p globstar
 shopt -p extglob nullglob
-shopt -po posix
+shopt -po pipefail
 reset=$(shopt -p globstar)
 shopt -s globstar
 $reset

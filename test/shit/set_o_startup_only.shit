@@ -1,4 +1,4 @@
 #!/bin/env shit
-set -p | grep -E 'login|init-as-bash|rcfile'
+set -p | grep -E 'login|rcfile'
 set -o login
 echo not-reached
