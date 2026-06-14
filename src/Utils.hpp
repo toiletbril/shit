@@ -61,11 +61,6 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
 fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                                bool is_async) throws -> i32;
 
-fn string_replace(String &s, StringView to_replace,
-                  StringView replace_with) throws -> void;
-
-fn lowercase_string(StringView s) throws -> String;
-
 /* Whether the word is one of the POSIX shell reserved words, the set the type
    and command builtins report as a shell keyword. It matches dash's set rather
    than the lexer's, so a shell-specific token such as time is excluded. */
@@ -92,9 +87,8 @@ pure fn split_name_value_arg(StringView arg) wontthrow -> name_value_arg;
 /* Format a signed integer as decimal into a fresh String, the StringView-native
    replacement for std::to_string. The unsigned form is for ids and sizes that
    exceed the i64 range. */
-/* The default allocator lives on the forward declaration in ErrorOr.hpp, so it
-   is not repeated here. */
-fn int_to_text(i64 value, Allocator allocator) throws -> String;
+/* int_to_text with its default allocator is forward-declared in ErrorOr.hpp,
+   so only the unsigned form is declared here. */
 fn uint_to_text(u64 value, Allocator allocator = heap_allocator()) throws
     -> String;
 

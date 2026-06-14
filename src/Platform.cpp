@@ -950,8 +950,8 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
      where /tmp does not exist. */
   let const temp_dir = Path::temp_directory();
 
-  let const path_template_path =
-      PathBuilder{temp_dir.text()}.append("shit_heredoc_XXXXXX").build();
+  let path_template_path = Path{temp_dir.text()};
+  path_template_path.push_component("shit_heredoc_XXXXXX");
 
   /* mkstemp rewrites the XXXXXX suffix in place, so the template lives in a
      mutable buffer with a trailing null rather than the immutable Path text. */

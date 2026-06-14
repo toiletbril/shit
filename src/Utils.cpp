@@ -283,63 +283,6 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   return stage_status[stage_count - 1];
 }
 
-/* The offset of the first occurrence of needle at or after start, or
-   NOT_FOUND_INDEX when no occurrence remains. The bytes carry no null
-   terminator, so the match is a plain byte scan rather than a C string search.
- */
-static pure fn find_subview(StringView haystack, StringView needle,
-                            usize start) wontthrow -> usize
-{
-  if (needle.length == 0)
-    return start <= haystack.length ? start : NOT_FOUND_INDEX;
-  if (needle.length > haystack.length) return NOT_FOUND_INDEX;
-
-  ASSERT(haystack.data != nullptr);
-  ASSERT(needle.data != nullptr);
-
-  for (usize i = start; i + needle.length <= haystack.length; i++) {
-    if (std::memcmp(haystack.data + i, needle.data, needle.length) == 0)
-      return i;
-  }
-
-  return NOT_FOUND_INDEX;
-}
-
-fn string_replace(String &s, const StringView to_replace,
-                  const StringView replace_with) throws -> void
-{
-  let result = String{};
-  result.reserve(s.count());
-
-  let const source = s.view();
-  usize i = 0;
-  usize previous = 0;
-
-  for (;;) {
-    previous = i;
-    const usize match = find_subview(source, to_replace, i);
-    if (match == NOT_FOUND_INDEX) break;
-
-    ASSERT(match >= previous, "match cannot precede the search start");
-    result.append(source.substring_of_length(previous, match - previous));
-    result.append(replace_with);
-
-    i = match + to_replace.length;
-  }
-
-  result.append(source.substring(previous));
-  s = steal(result);
-}
-
-fn lowercase_string(StringView s) throws -> String
-{
-  let l = String{};
-  l.reserve(s.count());
-  for (usize i = 0; i < s.count(); i++)
-    l.push(static_cast<char>(std::tolower(s[i])));
-  return l;
-}
-
 pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
 {
   static const StringView RESERVED_WORDS[] = {

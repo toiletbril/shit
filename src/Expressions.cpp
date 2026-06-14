@@ -498,6 +498,22 @@ pure fn Command::local_vars() const wontthrow
 
 fn Command::is_assignment() const wontthrow -> bool { return false; }
 
+/* The parser wraps a redirected command in a RedirectedCommand, so a plain
+   command node carries no target of its own and the default reports that. A
+   node that does take a target overrides this. */
+fn Command::redirect_to(usize d, String &f, bool duplicate) throws -> void
+{
+  unused(d);
+  unused(f);
+  unused(duplicate);
+  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
+}
+
+fn Command::append_to(usize d, String &f, bool duplicate) throws -> void
+{
+  redirect_to(d, f, duplicate);
+}
+
 DummyExpression::DummyExpression(SourceLocation location) : Expression(location)
 {}
 
@@ -709,19 +725,6 @@ cold fn AssignCommand::to_string() const throws -> String
 cold fn AssignCommand::to_ast_string(usize layer) const throws -> String
 {
   return indent_for_layer(layer) + "[" + to_string() + "]";
-}
-
-fn AssignCommand::redirect_to(usize d, String &f, bool duplicate) throws -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
-}
-
-fn AssignCommand::append_to(usize d, String &f, bool duplicate) throws -> void
-{
-  redirect_to(d, f, duplicate);
 }
 
 SimpleCommand::SimpleCommand(SourceLocation location,
@@ -1923,22 +1926,6 @@ cold fn SimpleCommand::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
-fn SimpleCommand::append_to(usize d, String &f, bool duplicate) throws -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
-}
-
-fn SimpleCommand::redirect_to(usize d, String &f, bool duplicate) throws -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
-}
-
 CompoundList::CompoundList() : Expression({0, 0}) {}
 
 /* The condition nodes live in the arena, torn down once on reset. */
@@ -2532,22 +2519,6 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       utils::execute_contexts_with_pipes(steal(ecs), cxt, is_async());
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;
-}
-
-fn Pipeline::append_to(usize d, String &f, bool duplicate) throws -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
-}
-
-fn Pipeline::redirect_to(usize d, String &f, bool duplicate) throws -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
 CompoundCommand::CompoundCommand(SourceLocation location) : Command(location) {}
@@ -3527,21 +3498,6 @@ cold fn ArrayAssignCommand::to_ast_string(usize layer) const throws -> String
          (m_is_append ? "+=(...)" : "=(...)") + "]";
 }
 
-fn ArrayAssignCommand::redirect_to(usize d, String &f, bool duplicate) throws
-    -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
-}
-
-fn ArrayAssignCommand::append_to(usize d, String &f, bool duplicate) throws
-    -> void
-{
-  redirect_to(d, f, duplicate);
-}
-
 fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   /* The element words expand here, so a runtime warning from them carets this
@@ -3894,24 +3850,6 @@ cold fn RedirectedCommand::register_defined_functions(
   /* The redirected command runs in the current shell, so a function defined in
      it is registered before the ordered walk. */
   m_child->register_defined_functions(actx);
-}
-
-fn RedirectedCommand::append_to(usize d, String &f, bool duplicate) throws
-    -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
-}
-
-fn RedirectedCommand::redirect_to(usize d, String &f, bool duplicate) throws
-    -> void
-{
-  unused(d);
-  unused(f);
-  unused(duplicate);
-  throw ErrorWithLocation{source_location(), "Not implemented (Expressions)"};
 }
 
 fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64

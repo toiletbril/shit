@@ -144,6 +144,10 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
   return static_cast<i64>(value);
 }
 
+/* Defined below the parser, declared here so parse_primary reads a number
+   literal through the same lexer the cached-token path uses. */
+static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize;
+
 /* A recursive-descent evaluator for $((...)), following C operator precedence,
    that resolves and assigns shell variables through the context. */
 class ArithmeticParser
@@ -641,59 +645,11 @@ public:
       return value;
     }
     if (pos < source.length && lexer::is_number(source[pos])) {
-      /* The literal starts at pos and runs while its digits are valid in the
-         radix the prefix selects, matching the prefix and the consumed length
-         that base-0 strtoll reported. The utils parsers take no base and report
-         no consumed length, so the run is measured here and the matching parser
-         runs on the scanned slice. */
-      let const rest = source.substring(pos);
-
-      /* The base#digits form selects an explicit radix from 2 to 64, so 16#ff
-         is 255 and 2#101 is 5. The decimal run before the # is the base and the
-         digits after it read in that base, with a-z worth 10 to 35, A-Z worth
-         36 to 61 above base 36 or the same as a-z at or below it, @ worth 62,
-         and _ worth 63. */
-      if (const usize base_length = count_leading_digits(rest, 10);
-          base_length > 0 && base_length < rest.length &&
-          rest[base_length] == '#')
-      {
-        const i64 base =
-            parse_arithmetic_operand(rest.substring_of_length(0, base_length));
-        if (base < 2 || base > 64)
-          fail("an arithmetic base must be between 2 and 64");
-        auto digit_value = [base](char c) -> i64 {
-          if (c >= '0' && c <= '9') return c - '0';
-          if (c >= 'a' && c <= 'z') return c - 'a' + 10;
-          if (c >= 'A' && c <= 'Z')
-            return base <= 36 ? c - 'A' + 10 : c - 'A' + 36;
-          if (c == '@') return 62;
-          if (c == '_') return 63;
-          return -1;
-        };
-        i64 value = 0;
-        usize i = base_length + 1;
-        while (i < rest.length) {
-          const i64 digit = digit_value(rest[i]);
-          if (digit < 0 || digit >= base) break;
-          value = value * base + digit;
-          i++;
-        }
-        pos += i;
-        return value;
-      }
-
-      usize consumed = 0;
-      if (rest.length >= 2 && rest[0] == '0' &&
-          (rest[1] == 'x' || rest[1] == 'X'))
-        consumed = 2 + count_leading_digits(rest.substring(2), 16);
-      else if (rest.length >= 1 && rest[0] == '0')
-        consumed = count_leading_digits(rest, 8);
-      else
-        consumed = count_leading_digits(rest, 10);
-
-      let const value =
-          parse_arithmetic_operand(rest.substring_of_length(0, consumed));
-      pos += consumed;
+      /* A number literal reads through the shared lexer, which measures the
+         base#digits radix form, a 0x hex, a 0 octal, or a decimal run and
+         reports the bytes it consumed. */
+      i64 value = 0;
+      pos += lex_arith_number(source.substring(pos), &value);
       return value;
     }
     if (pos < source.length && lexer::is_variable_name_start(source[pos])) {

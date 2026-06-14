@@ -286,8 +286,12 @@ public:
 
   virtual fn is_assignment() const wontthrow -> bool;
 
-  virtual fn append_to(usize d, String &f, bool duplicate) throws -> void = 0;
-  virtual fn redirect_to(usize d, String &f, bool duplicate) throws -> void = 0;
+  /* Most command nodes carry no redirection of their own, since the parser
+     wraps a redirected command in a RedirectedCommand, so the default throws
+     the unsupported error and only a node that means to take a target
+     overrides it. */
+  virtual fn append_to(usize d, String &f, bool duplicate) throws -> void;
+  virtual fn redirect_to(usize d, String &f, bool duplicate) throws -> void;
 
 protected:
   bool m_is_async{false};
@@ -314,9 +318,6 @@ public:
       -> void override;
 
   fn as_assign_command() const wontthrow -> const AssignCommand * override;
-
-  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
-  fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -401,9 +402,6 @@ public:
       -> Maybe<bool> override;
 
   fn as_simple_command() const wontthrow -> const SimpleCommand * override;
-
-  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
-  fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -498,9 +496,6 @@ public:
 
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
-
-  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
-  fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -830,9 +825,6 @@ public:
   fn to_string() const throws -> String override;
   fn to_ast_string(usize layer = 0) const throws -> String override;
 
-  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
-  fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
-
   fn analyze(AnalysisContext &actx, bool is_unconditional) const throws
       -> void override;
 
@@ -861,9 +853,6 @@ public:
       -> void override;
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
-
-  fn append_to(usize d, String &f, bool duplicate) throws -> void override;
-  fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;

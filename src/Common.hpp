@@ -136,9 +136,6 @@ public:
 
 #define sub_sat(a, b) ((a) > (b) ? (a) - (b) : 0)
 
-/* The length of statically allocated array. */
-#define countof(arr) (sizeof(arr) / sizeof(*(arr)))
-
 /* Move a value, reading as taking ownership out of the source. */
 #define steal std::move
 
@@ -174,15 +171,13 @@ public:
    line. A branch is hinted with the literal [[likely]]/[[unlikely]] where it
    occurs. */
 #if T__HAS_GCC_EXTENSIONS
-#define cold     [[gnu::cold]]
-#define hot      [[gnu::hot]]
-#define flatten  [[gnu::flatten]]
-#define noinline [[gnu::noinline]]
+#define cold    [[gnu::cold]]
+#define hot     [[gnu::hot]]
+#define flatten [[gnu::flatten]]
 #else
 #define cold
 #define hot
 #define flatten
-#define noinline
 #endif
 
 namespace shit {
