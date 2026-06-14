@@ -2801,6 +2801,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 static fn word_names_existing_path(StringView word) throws -> bool
 {
   if (word.is_empty()) return false;
+  /* A word that opens with a dash is an option, not a path, so it never reaches
+     the filesystem. This keeps a flag-heavy line off a stat per option on every
+     keystroke, since the highlighter runs each keystroke. */
+  if (word[0] == '-') return false;
   if (word[0] == '~') {
     if (Maybe<String> expanded = expand_command_tilde(word);
         expanded.has_value())
