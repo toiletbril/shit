@@ -1,0 +1,7 @@
+== cobra-style values split off the description:
+dupa.ts.net
+void.ts.net
+== a value with no description is unchanged:
+plainvalue
+== a parenthesis inside a value is left whole:
+file(1).txt

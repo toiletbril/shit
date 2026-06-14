@@ -2419,12 +2419,55 @@ static pure fn entry_is_unrequested_dash_word(
    the -F function runs only on an explicit tab so the ghost does not run it on
    every keystroke. None means no spec applied, so the caller completes
    filenames, which is also the result when a -o default spec found nothing. */
+/* Splits a cobra-style completion entry, the value then two spaces then a
+   parenthesized description, into the value and the description. The value
+   joins the candidate list and the description joins the same map the --help
+   and man stages fill, so every source renders through one dimmed column. A
+   plain entry with no such description passes through as the value alone. The
+   description opens after a space, so a value that itself holds a parenthesis,
+   such as a filename, is left whole. */
+static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
+                              StringMap<String> &descriptions) throws -> void
+{
+  let const paren = entry.find_character('(');
+  if (paren.has_value() && *paren > 0 && entry[*paren - 1] == ' ' &&
+      entry[entry.length - 1] == ')')
+  {
+    let name = entry.substring_of_length(0, *paren);
+    while (!name.is_empty() && name[name.length - 1] == ' ')
+      name = name.substring_of_length(0, name.length - 1);
+    let const description =
+        entry.substring_of_length(*paren + 1, entry.length - *paren - 2);
+    if (!name.is_empty()) {
+      candidates.push(String{name});
+      if (!description.is_empty()) descriptions.set(name, String{description});
+      return;
+    }
+  }
+  candidates.push(String{entry});
+}
+
 static fn complete_from_spec(StringView line, StringView token, usize cursor,
-                             bool for_listing, EvalContext &context) throws
+                             bool for_listing, EvalContext &context,
+                             StringMap<String> &descriptions) throws
     -> Maybe<ArrayList<String>>
 {
   let const command = command_word_of(line);
   if (command.is_empty()) return None;
+
+  /* A cobra-style completion function truncates its description to COLUMNS and
+     drops it when the width is too small, so the width is set wide for the
+     function run and restored after. The whole description then arrives for
+     shit's own dimmed column rather than a truncated parenthesized one. */
+  let const saved_columns = context.get_variable_value("COLUMNS");
+  context.set_shell_variable("COLUMNS", "100000");
+  defer
+  {
+    if (saved_columns.has_value())
+      context.set_shell_variable("COLUMNS", saved_columns->view());
+    else
+      context.unset_shell_variable("COLUMNS");
+  };
   /* The surface name wins when it has a spec of its own, so a complete -F on
      the exact name still applies. Otherwise the name resolves through an
      alias and a symlink, so g for a g='git' alias reads git's spec. */
@@ -2468,7 +2511,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
       for (const String &entry : reply) {
         if (entry_is_unrequested_dash_word(entry.view(), wants_dash_entries))
           continue;
-        loaded.push_managed(entry.view());
+        push_spec_candidate(entry.view(), loaded, descriptions);
       }
       /* An empty reply never claims the completion, so the cascade falls to
          the filesystem the way bash-completion's -o default behaves, and a
@@ -2509,7 +2552,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     for (const String &entry : reply) {
       if (entry_is_unrequested_dash_word(entry.view(), should_offer_dash_words))
         continue;
-      candidates.push_managed(entry.view());
+      push_spec_candidate(entry.view(), candidates, descriptions);
     }
   }
 
@@ -2714,8 +2757,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
                                                for_listing, context);
     }
     if (!from_stage.has_value() && !is_posix_completion)
-      from_stage =
-          complete_from_spec(line, token, cursor, for_listing, context);
+      from_stage = complete_from_spec(line, token, cursor, for_listing, context,
+                                      descriptions);
     if (from_stage.has_value())
       candidates = steal(*from_stage);
     else
