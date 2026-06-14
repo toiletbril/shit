@@ -40,7 +40,7 @@
 
 #define SHIT_VER_MAJOR 0
 #define SHIT_VER_MINOR 0
-#define SHIT_VER_PATCH 7
+#define SHIT_VER_PATCH 8
 #define SHIT_VER_EXTRA "beta"
 
 /* The version as a compile-time string, so the startup does not rebuild it from
