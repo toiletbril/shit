@@ -519,7 +519,8 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
     /* The text is unchanged, so the cached tree runs against its own retained
        text rather than reparsing the hook. */
     run_script_contents(PROMPT_COMMAND_CACHED_TEXT, context, ast_arena,
-                        StringView{"PROMPT_COMMAND"}, PROMPT_COMMAND_CACHED_AST);
+                        StringView{"PROMPT_COMMAND"},
+                        PROMPT_COMMAND_CACHED_AST);
   } else {
     /* A new or changed hook parses once into the prompt arena, which is reset
        first so the previous hook's tree is reclaimed. The freshly parsed tree

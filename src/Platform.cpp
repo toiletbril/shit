@@ -351,7 +351,6 @@ static const pid_t PARENT_SHELL_PID = getpid();
 
 fn is_child_process() wontthrow -> bool { return getpid() != PARENT_SHELL_PID; }
 
-
 fn is_running_setuid() wontthrow -> bool
 {
   return geteuid() != getuid() || getegid() != getgid();
@@ -988,7 +987,6 @@ fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
   lseek(fd, 0, SEEK_SET);
   return fd;
 }
-
 
 fn wait_and_monitor_process(process pid) throws -> i32
 {
@@ -1812,7 +1810,6 @@ fn is_child_process() wontthrow -> bool
   return GetCurrentProcessId() != PARENT_SHELL_PID;
 }
 
-
 /* Windows has no setuid or setgid notion, so the shell is never privileged in
    this sense and always reads its config. */
 fn is_running_setuid() wontthrow -> bool { return false; }
@@ -2246,7 +2243,6 @@ fn write_to_temp_file(StringView content) -> Maybe<descriptor>
   SetFilePointer(handle, 0, nullptr, FILE_BEGIN);
   return handle;
 }
-
 
 fn wait_and_monitor_process(process p) -> i32
 {

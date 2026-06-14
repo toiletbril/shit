@@ -947,7 +947,8 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
    per launch, and the caller validates only the candidates the token matches.
    may_read is false on the ghost path, which then trusts a cached verdict and
    skips an unread candidate rather than scanning a page on a keystroke. */
-static fn man_subcommand_page_is_valid(StringView command, StringView subcommand,
+static fn man_subcommand_page_is_valid(StringView command,
+                                       StringView subcommand,
                                        bool may_read) throws -> bool
 {
   let page_name = String{command};
@@ -1142,7 +1143,8 @@ static fn parse_manpage_option_entries(StringView text) throws
   usize i = 0;
   while (i < view.length) {
     let line_end = i;
-    while (line_end < view.length && view[line_end] != '\n') line_end++;
+    while (line_end < view.length && view[line_end] != '\n')
+      line_end++;
     let const raw = view.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
@@ -1197,8 +1199,8 @@ static fn parse_manpage_option_entries(StringView text) throws
   let seen = HashSet{heap_allocator()};
   for (usize j = 0; j < view.length; j++) {
     let const at_word_start = j == 0 || view[j - 1] == ' ' ||
-                               view[j - 1] == '\t' || view[j - 1] == '\n' ||
-                               view[j - 1] == '(' || view[j - 1] == '[';
+                              view[j - 1] == '\t' || view[j - 1] == '\n' ||
+                              view[j - 1] == '(' || view[j - 1] == '[';
     if (view[j] != '-' || !at_word_start) continue;
     let end = j;
     while (end < view.length &&
@@ -1214,9 +1216,9 @@ static fn parse_manpage_option_entries(StringView text) throws
     if (flag.length >= 2 && has_letter && !seen.contains(flag)) {
       seen.add(flag);
       let const description = descriptions.find(flag);
-      entries.push(help_entry{
-          String{flag},
-          description != nullptr ? String{description->view()} : String{}});
+      entries.push(help_entry{String{flag}, description != nullptr
+                                                ? String{description->view()}
+                                                : String{}});
     }
     j = end;
   }
@@ -1430,8 +1432,7 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
 static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
-  if (let const cached = MANPAGE_OPTION_CACHE.find(page_name))
-    return *cached;
+  if (let const cached = MANPAGE_OPTION_CACHE.find(page_name)) return *cached;
   let parsed = ArrayList<help_entry>{};
   try {
     let const page = context.capture_command_substitution(
@@ -1516,9 +1517,9 @@ static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
   for (usize i = 0; i < absolute_path.length; i++)
     if (absolute_path[i] == '/') last_slash = i;
   if (last_slash == absolute_path.length) return false;
-  let const directory =
-      last_slash == 0 ? StringView{"/"}
-                      : absolute_path.substring_of_length(0, last_slash);
+  let const directory = last_slash == 0
+                            ? StringView{"/"}
+                            : absolute_path.substring_of_length(0, last_slash);
   return os::directory_is_trusted_for_exec(Path{directory});
 }
 
@@ -1650,13 +1651,13 @@ static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
   if (name.is_empty()) return false;
   let const first = name[0];
   let const starts_word = (first >= 'a' && first <= 'z') ||
-                           (first >= 'A' && first <= 'Z') ||
-                           (first >= '0' && first <= '9');
+                          (first >= 'A' && first <= 'Z') ||
+                          (first >= '0' && first <= '9');
   if (!starts_word) return false;
   for (usize i = 0; i < name.length; i++) {
     let const c = name[i];
     let const ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                    (c >= '0' && c <= '9') || c == '-' || c == '_';
+                   (c >= '0' && c <= '9') || c == '-' || c == '_';
     if (!ok) return false;
   }
   return true;
@@ -2920,8 +2921,7 @@ static fn simple_dollar_name(StringView line, usize i,
   if (line[i + 1] == '{') {
     if (expansion_end < i + 3 || line[expansion_end - 1] != '}')
       return shit::None;
-    let inner =
-        line.substring_of_length(i + 2, expansion_end - (i + 2) - 1);
+    let inner = line.substring_of_length(i + 2, expansion_end - (i + 2) - 1);
     if (inner.is_empty()) return shit::None;
     for (usize k = 0; k < inner.length; k++)
       if (!is_highlight_name_char(inner[k])) return shit::None;
