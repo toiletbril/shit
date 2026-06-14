@@ -189,26 +189,28 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     /* Each candidate carries its description, looked up by candidate text since
        the engine keyed the map that way to survive the sort. A candidate with
        no description points at the empty string, so the array stays aligned by
-       index with the candidates. */
+       index with the candidates. The whole build is skipped when no description
+       was produced, the common case for a filesystem or command-name
+       completion, so a per-keystroke completion pays nothing for it. */
     COMPLETION_DESCRIPTIONS.clear();
     COMPLETION_DESCRIPTION_POINTERS.clear();
-    bool any_description = false;
-    for (const shit::String &candidate : COMPLETION_CANDIDATES) {
-      if (const shit::String *found = result.descriptions.find(candidate.view());
-          found != nullptr) {
-        COMPLETION_DESCRIPTIONS.push(shit::String{found->view()});
-        any_description = true;
-      } else {
-        COMPLETION_DESCRIPTIONS.push(shit::String{});
+    out->descriptions = nullptr;
+    if (result.descriptions.count() > 0) {
+      for (const shit::String &candidate : COMPLETION_CANDIDATES) {
+        if (const shit::String *found =
+                result.descriptions.find(candidate.view());
+            found != nullptr)
+          COMPLETION_DESCRIPTIONS.push(shit::String{found->view()});
+        else
+          COMPLETION_DESCRIPTIONS.push(shit::String{});
       }
+      for (const shit::String &description : COMPLETION_DESCRIPTIONS)
+        COMPLETION_DESCRIPTION_POINTERS.push(description.c_str());
+      out->descriptions = COMPLETION_DESCRIPTION_POINTERS.begin();
     }
-    for (const shit::String &description : COMPLETION_DESCRIPTIONS)
-      COMPLETION_DESCRIPTION_POINTERS.push(description.c_str());
 
     out->candidates = COMPLETION_CANDIDATE_POINTERS.begin();
     out->count = COMPLETION_CANDIDATE_POINTERS.count();
-    out->descriptions =
-        any_description ? COMPLETION_DESCRIPTION_POINTERS.begin() : nullptr;
     out->longest_common_prefix = COMPLETION_LCP.c_str();
     /* The engine reports the token span in bytes, so convert each boundary to a
        codepoint index for toiletline, which replaces the span in codepoints. */
