@@ -2602,11 +2602,24 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   /* The replaced span covers the whole word the cursor sits inside, from the
      token start to the token end, so a cursor in the middle of a word replaces
      the word cleanly rather than keeping the bytes to its right. */
-  let const token_start = find_token_start(line, cursor);
+  let token_start = find_token_start(line, cursor);
   let const token_end = find_token_end(line, cursor);
-  let const token =
-      line.substring_of_length(token_start, token_end - token_start);
+  let token = line.substring_of_length(token_start, token_end - token_start);
   let const is_command = is_in_command_position(line, token_start);
+
+  /* An option-value word such as --exit-node=host completes only the value
+     after the equals sign, so the candidate replaces the value and keeps the
+     flag rather than overwriting the whole --flag= prefix. The value opens
+     with no dash, so the option-name stages defer and the word reaches the
+     spec and the filesystem, the way bash splits on the equals through
+     COMP_WORDBREAKS. A command-position word is left whole, since an
+     assignment such as name=value is its own token there. */
+  if (!is_command && token.length >= 2 && token[0] == '-')
+    if (let const equals = token.find_character('='); equals.has_value()) {
+      token_start = token_start + *equals + 1;
+      token = line.substring_of_length(token_start, token_end - token_start);
+    }
+
   let const token_is_glob = token_has_glob_metacharacter(token);
 
   /* A command-position token that names a path component is a program given by
