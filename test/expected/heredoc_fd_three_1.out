@@ -1,0 +1,21 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "awk" "{print}" "/proc/self/fd/3"]
+[Word
+  Unquoted "awk"
+]
+[Word
+  Literal "{print}"
+]
+[Word
+  Unquoted "/proc/self/fd/3"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "EOF"
+]
+awk: can't open file /proc/self/fd/3
+ source line number 1
+[Code 2]
