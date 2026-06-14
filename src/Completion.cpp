@@ -1439,6 +1439,10 @@ static fn command_prefers_help_over_manpage(StringView command) throws -> bool
   return argument.has_value() && StringView{*argument} != StringView{"--help"};
 }
 
+/* Defined below, declared here so the man fork can reuse the same trusted
+   directory gate the --help fork uses. */
+static fn command_directory_is_trusted(StringView absolute_path) throws -> bool;
+
 /* The option flags a manpage documents, parsed once and cached under the page
    name. The man invocation is the general path that works for any command on
    the host, so the completer is not limited to a hardcoded set of tools. */
@@ -1447,9 +1451,26 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
 {
   if (let const cached = MANPAGE_OPTION_CACHE.find(page_name)) return *cached;
   let parsed = ArrayList<help_entry>{};
+  /* man forks only when it resolves into a trusted directory such as /usr/bin,
+     so an alias, a function, or a man planted in a world-writable directory is
+     never run. The resolved absolute path runs in place of the bare name, so
+     the command substitution cannot reresolve it through PATH, while the shell
+     still applies the 2>/dev/null redirection. A man in an untrusted directory
+     or no man at all caches the empty list, so the page never forks twice. */
+  let const man_paths = utils::search_program_path("man");
+  if (man_paths.is_empty() ||
+      !command_directory_is_trusted(man_paths[0].text().view()))
+  {
+    LOG(verbosity::Debug,
+        "skipping the man fork for '%.*s' because man is absent or untrusted",
+        static_cast<int>(page_name.length), page_name.data);
+    MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
+    return *MANPAGE_OPTION_CACHE.find(page_name);
+  }
   try {
     let const page = context.capture_command_substitution(
-        String{"man "} + String{page_name} + " 2>/dev/null");
+        String{man_paths[0].text().view()} + " " + String{page_name} +
+        " 2>/dev/null");
     parsed = parse_manpage_option_entries(page.view());
   } catch (...) {
     LOG(verbosity::Debug, "swallowed a man invocation failure for '%.*s'",
