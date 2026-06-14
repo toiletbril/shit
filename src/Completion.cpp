@@ -61,7 +61,7 @@ static pure fn is_unmatched_closing_paren(StringView line,
 static pure fn token_has_glob_metacharacter(StringView token) wontthrow -> bool
 {
   for (usize i = 0; i < token.length; i++) {
-    const char c = token[i];
+    let const c = token[i];
     if (c == '*' || c == '?' || c == '[') return true;
   }
   return false;
@@ -81,7 +81,7 @@ static pure fn is_token_boundary(char c) wontthrow -> bool
 static pure fn find_token_start(StringView line, usize cursor) wontthrow
     -> usize
 {
-  usize start = cursor;
+  let start = cursor;
   while (start > 0 && !is_token_boundary(line[start - 1]))
     start--;
   return start;
@@ -92,7 +92,7 @@ static pure fn find_token_start(StringView line, usize cursor) wontthrow
    the whole word rather than the bytes left of the cursor only. */
 static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
 {
-  usize end = cursor;
+  let end = cursor;
   while (end < line.length && !is_token_boundary(line[end]))
     end++;
   return end;
@@ -145,7 +145,7 @@ static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
 static pure fn is_in_command_position(StringView line,
                                       usize token_start) wontthrow -> bool
 {
-  usize i = token_start;
+  let i = token_start;
   for (;;) {
     while (i > 0 && is_word_separator(line[i - 1]))
       i--;
@@ -157,7 +157,7 @@ static pure fn is_in_command_position(StringView line,
       return true;
     /* The word right before is examined, and a transparent keyword prefix is
        stepped over so the word after time or ! is still a command word. */
-    usize word_start = i;
+    let word_start = i;
     while (word_start > 0 && !is_word_separator(line[word_start - 1]) &&
            !is_command_separator(line[word_start - 1]))
       word_start--;
@@ -187,8 +187,8 @@ static pure forceinline fn skip_blanks(StringView text, usize from) throws
 /* The view with its leading and trailing blanks removed. */
 static pure forceinline fn trim_blanks(StringView text) throws -> StringView
 {
-  const usize start = skip_blanks(text, 0);
-  usize end = text.length;
+  let const start = skip_blanks(text, 0);
+  let end = text.length;
   while (end > start && is_blank(text[end - 1]))
     end--;
   return text.substring_of_length(start, end - start);
@@ -297,7 +297,7 @@ static fn path_command_names() throws -> const ArrayList<String> &
 
   /* The helper above already stored the live PATH value, so the rebuild
      walks the cached copy. */
-  const StringView current = CACHED_COMPLETION_PATH.view();
+  let const current = CACHED_COMPLETION_PATH.view();
   CACHED_PATH_COMMANDS.clear();
   usize segment_start = 0;
   for (usize i = 0; i <= current.length; i++) {
@@ -360,7 +360,7 @@ struct path_token
 
 static pure fn split_path_token(StringView token) wontthrow -> path_token
 {
-  usize last_separator = token.length;
+  let last_separator = token.length;
   for (usize i = 0; i < token.length; i++) {
     if (token[i] == '/') last_separator = i;
   }
@@ -389,12 +389,12 @@ static fn resolve_listing_directory(StringView directory_part,
     while (name_end < directory_part.length && directory_part[name_end] != '/')
       name_end++;
     let const name = directory_part.substring_of_length(1, name_end - 1);
-    Maybe<Path> home = name.is_empty() ? os::get_home_directory()
-                                       : os::get_home_for_user(name);
+    let home = name.is_empty() ? os::get_home_directory()
+                               : os::get_home_for_user(name);
     if (home.has_value()) {
       let resolved = home->clone();
       /* Drop the name and the separator after it, then append the rest. */
-      usize rest_start = name_end;
+      let rest_start = name_end;
       if (rest_start < directory_part.length &&
           directory_part[rest_start] == '/')
       {
@@ -435,7 +435,7 @@ static fn complete_filesystem(StringView token,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory);
 
-  Maybe<ArrayList<String>> entries = Path::read_directory(listing_directory);
+  let entries = Path::read_directory(listing_directory);
   if (!entries.has_value()) return candidates;
 
   for (const String &entry : *entries) {
@@ -487,7 +487,7 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory);
 
-  Maybe<ArrayList<String>> entries = Path::read_directory(listing_directory);
+  let entries = Path::read_directory(listing_directory);
   if (!entries.has_value()) return candidates;
 
   /* Every byte of the basename pattern is an active glob position, since the
@@ -545,7 +545,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
 
   /* Strip the leading '$' and an optional '{', so the rest is the partial name.
      The brace form is reproduced on every candidate. */
-  bool has_brace = token.length >= 2 && token[1] == '{';
+  let has_brace = token.length >= 2 && token[1] == '{';
   usize name_start = has_brace ? 2 : 1;
   let const prefix = token.substring(name_start);
 
@@ -616,7 +616,7 @@ static fn command_word_of(StringView line) wontthrow -> StringView
   usize i = 0;
   usize open_parens = 0;
   for (usize k = 0; k < line.length; k++) {
-    const char c = line[k];
+    let const c = line[k];
     if (c == '(') {
       open_parens++;
     } else if (c == ')') {
@@ -633,10 +633,10 @@ static fn command_word_of(StringView line) wontthrow -> StringView
   for (;;) {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
       i++;
-    const usize start = i;
+    let const start = i;
     while (i < line.length && line[i] != ' ' && line[i] != '\t')
       i++;
-    const StringView word = line.substring_of_length(start, i - start);
+    let const word = line.substring_of_length(start, i - start);
     if (word.is_empty() || !is_transparent_command_prefix(word)) return word;
   }
 }
@@ -662,7 +662,7 @@ static fn resolve_completion_alias(StringView command,
     usize i = 0;
     while (i < expanded.length && (expanded[i] == ' ' || expanded[i] == '\t'))
       i++;
-    const usize start = i;
+    let const start = i;
     while (i < expanded.length && expanded[i] != ' ' && expanded[i] != '\t')
       i++;
     let const first = expanded.substring_of_length(start, i - start);
@@ -695,12 +695,12 @@ static fn split_completion_words(StringView line, usize cursor,
 {
   let words = ArrayList<String>{};
   usize i = 0;
-  bool found = false;
+  let found = false;
   while (i < line.length) {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
       i++;
     if (i >= line.length) break;
-    const usize start = i;
+    let const start = i;
     while (i < line.length && line[i] != ' ' && line[i] != '\t')
       i++;
     if (cursor >= start && cursor <= i) {
@@ -805,7 +805,7 @@ static fn manpage_section1_directories() throws -> ArrayList<Path>
     return directories;
   }
 
-  const StringView value = manpath->view();
+  let const value = manpath->view();
   usize segment_start = 0;
   for (usize i = 0; i <= value.length; i++) {
     if (i != value.length && value[i] != os::PATH_DELIMITER) continue;
@@ -852,7 +852,7 @@ static fn build_man_subcommand_index() throws -> void
   for (const Path &directory : manpage_section1_directories()) {
     LOG(verbosity::Info, "scanning man1 directory '%s'",
         directory.text().c_str());
-    Maybe<ArrayList<String>> entries = Path::read_directory(directory);
+    let entries = Path::read_directory(directory);
     if (!entries.has_value()) {
       LOG(verbosity::Debug, "directory '%s' is unreadable, skipping",
           directory.text().c_str());
@@ -906,9 +906,9 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
     }
     if (!is_inside_synopsis) continue;
     for (usize j = 0; j < line.length; j++) {
-      const char byte = line[j];
+      let const byte = line[j];
       if (byte == '\\' && j + 1 < line.length) {
-        const char escaped = line[j + 1];
+        let const escaped = line[j + 1];
         if (escaped == 'f') {
           j += 2;
         } else if (escaped == '-') {
@@ -1028,7 +1028,7 @@ static fn second_word_of(StringView line) wontthrow -> Maybe<StringView>
 {
   let const command = command_word_of(line);
   if (command.is_empty()) return None;
-  usize i = static_cast<usize>(command.data - line.data) + command.length;
+  let i = static_cast<usize>(command.data - line.data) + command.length;
   while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
     i++;
   let const start = i;
@@ -1141,7 +1141,7 @@ static fn parse_manpage_option_entries(StringView text) throws
   usize pending_indent = 0;
   usize i = 0;
   while (i < view.length) {
-    usize line_end = i;
+    let line_end = i;
     while (line_end < view.length && view[line_end] != '\n') line_end++;
     let const raw = view.substring_of_length(i, line_end - i);
     i = line_end + 1;
@@ -1512,7 +1512,7 @@ static StringMap<bool> HELP_PARSED{heap_allocator()};
    hardcoded list of system bins. */
 static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
 {
-  usize last_slash = absolute_path.length;
+  let last_slash = absolute_path.length;
   for (usize i = 0; i < absolute_path.length; i++)
     if (absolute_path[i] == '/') last_slash = i;
   if (last_slash == absolute_path.length) return false;
@@ -1586,7 +1586,7 @@ static fn parse_help_option_entries(StringView text) throws
   let seen = HashSet{heap_allocator()};
   usize i = 0;
   while (i < text.length) {
-    usize line_end = i;
+    let line_end = i;
     while (line_end < text.length && text[line_end] != '\n')
       line_end++;
     let const raw = text.substring_of_length(i, line_end - i);
@@ -1672,8 +1672,8 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
     if (trimmed.length < suffix.length) return false;
     let const offset = trimmed.length - suffix.length;
     for (usize i = 0; i < suffix.length; i++) {
-      char a = trimmed[offset + i];
-      char b = suffix[i];
+      let a = trimmed[offset + i];
+      let b = suffix[i];
       if (a >= 'A' && a <= 'Z') a = static_cast<char>(a - 'A' + 'a');
       if (b >= 'A' && b <= 'Z') b = static_cast<char>(b - 'A' + 'a');
       if (a != b) return false;
@@ -1698,7 +1698,7 @@ static fn parse_help_subcommands(StringView text) throws
   let in_section = false;
   usize i = 0;
   while (i < text.length) {
-    usize line_end = i;
+    let line_end = i;
     while (line_end < text.length && text[line_end] != '\n')
       line_end++;
     let const raw = text.substring_of_length(i, line_end - i);
@@ -1830,10 +1830,10 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
 static fn previous_settled_word(StringView line, usize token_start) wontthrow
     -> StringView
 {
-  usize end = token_start;
+  let end = token_start;
   while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
     end--;
-  usize start = end;
+  let start = end;
   while (start > 0 && line[start - 1] != ' ' && line[start - 1] != '\t')
     start--;
   return line.substring_of_length(start, end - start);
@@ -1858,7 +1858,7 @@ static fn settled_option_value(StringView line, StringView option) throws
   usize cword = 0;
   let const words = split_completion_words(line, line.length, cword);
   for (usize i = 1; i < words.count(); i++) {
-    const StringView word = words[i].view();
+    let const word = words[i].view();
     if (word == option && i + 1 < words.count() && i + 1 != cword)
       return String{words[i + 1].view()};
     if (word.length > option.length && word.starts_with(option))
@@ -1875,14 +1875,14 @@ static fn parse_make_database_targets(StringView database) throws
     -> ArrayList<String>
 {
   let targets = ArrayList<String>{};
-  bool in_files_section = false;
-  bool skip_next_rule = false;
+  let in_files_section = false;
+  let skip_next_rule = false;
   usize i = 0;
   while (i < database.length) {
-    usize end = i;
+    let end = i;
     while (end < database.length && database[end] != '\n')
       end++;
-    const StringView text = database.substring_of_length(i, end - i);
+    let const text = database.substring_of_length(i, end - i);
     i = end + 1;
 
     if (text.starts_with(StringView{"# Files"})) {
@@ -1918,14 +1918,14 @@ static fn parse_colon_led_names(StringView listing) throws -> ArrayList<String>
   let names = ArrayList<String>{};
   usize i = 0;
   while (i < listing.length) {
-    usize end = i;
+    let end = i;
     while (end < listing.length && listing[end] != '\n')
       end++;
-    const StringView text = listing.substring_of_length(i, end - i);
+    let const text = listing.substring_of_length(i, end - i);
     i = end + 1;
     let const colon = text.find_character(':');
     if (!colon.has_value() || *colon == 0) continue;
-    const StringView name = text.substring_of_length(0, *colon);
+    let const name = text.substring_of_length(0, *colon);
     if (name.find_character(' ').has_value()) continue;
     names.push(String{name});
   }
@@ -1948,7 +1948,7 @@ static fn parse_package_json_scripts(StringView text) throws
       break;
     }
   if (!found) return scripts;
-  usize i = at + section.length;
+  let i = at + section.length;
   while (i < text.length && text[i] != '{')
     i++;
   if (i >= text.length) return scripts;
@@ -1956,9 +1956,9 @@ static fn parse_package_json_scripts(StringView text) throws
   usize depth = 1;
   let expecting_key = true;
   while (i < text.length && depth > 0) {
-    const char byte = text[i];
+    let const byte = text[i];
     if (byte == '"') {
-      const usize start = ++i;
+      let const start = ++i;
       while (i < text.length && text[i] != '"') {
         if (text[i] == '\\') i++;
         i++;
@@ -2001,13 +2001,13 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   if (Maybe<String> config = utils::read_entire_file(config_path.text());
       config.has_value())
   {
-    const StringView text = config->view();
+    let const text = config->view();
     usize i = 0;
     while (i < text.length) {
-      usize end = i;
+      let end = i;
       while (end < text.length && text[end] != '\n')
         end++;
-      StringView row = text.substring_of_length(i, end - i);
+      let row = text.substring_of_length(i, end - i);
       i = end + 1;
       while (!row.is_empty() && (row[0] == ' ' || row[0] == '\t'))
         row = row.substring(1);
@@ -2021,10 +2021,10 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
       while (k < row.length) {
         while (k < row.length && (row[k] == ' ' || row[k] == '\t'))
           k++;
-        const usize start = k;
+        let const start = k;
         while (k < row.length && row[k] != ' ' && row[k] != '\t')
           k++;
-        const StringView name = row.substring_of_length(start, k - start);
+        let const name = row.substring_of_length(start, k - start);
         if (!name.find_character('*').has_value() &&
             !name.find_character('?').has_value() &&
             !name.find_character('!').has_value())
@@ -2038,13 +2038,13 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   if (Maybe<String> known = utils::read_entire_file(known_hosts_path.text());
       known.has_value())
   {
-    const StringView text = known->view();
+    let const text = known->view();
     usize i = 0;
     while (i < text.length) {
-      usize end = i;
+      let end = i;
       while (end < text.length && text[end] != '\n')
         end++;
-      const StringView row = text.substring_of_length(i, end - i);
+      let const row = text.substring_of_length(i, end - i);
       i = end + 1;
       /* A hashed row opens with |1| and hides its host on purpose. */
       if (row.is_empty() || row[0] == '#' || row[0] == '|') continue;
@@ -2052,11 +2052,11 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
       while (field_end < row.length && row[field_end] != ' ' &&
              row[field_end] != '\t')
         field_end++;
-      StringView field = row.substring_of_length(0, field_end);
+      let field = row.substring_of_length(0, field_end);
       /* The first field can list host,host and carry a [host]:port form. */
       while (!field.is_empty()) {
         let const comma = field.find_character(',');
-        StringView host =
+        let host =
             comma.has_value() ? field.substring_of_length(0, *comma) : field;
         field = comma.has_value() ? field.substring(*comma + 1) : StringView{};
         if (host.length > 2 && host[0] == '[') {
@@ -2081,7 +2081,7 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
 {
   let const mtime = source_file.modification_time();
   if (!mtime.has_value()) return nullptr;
-  const StringView key = source_file.text().view();
+  let const key = source_file.text().view();
   if (const cached_target_list *cached = BUILD_TARGET_CACHE.find(key);
       cached != nullptr && cached->mtime == *mtime)
     return &cached->targets;
@@ -2102,7 +2102,7 @@ static fn complete_from_build_tools(StringView line, StringView token,
 {
   if (!for_listing) return None;
   if (!token.is_empty() && token[0] == '-') return None;
-  const StringView command = command_word_of(line);
+  let const command = command_word_of(line);
   if (command.is_empty()) return None;
 
   let const capture = [&](const String &source) throws -> String {
@@ -2179,17 +2179,17 @@ static fn complete_from_build_tools(StringView line, StringView token,
       invocation += " --target help 2>/dev/null";
       /* The help lists one "... name" row per target. */
       let names = ArrayList<String>{};
-      const String help = capture(invocation);
-      const StringView text = help.view();
+      let const help = capture(invocation);
+      let const text = help.view();
       usize i = 0;
       while (i < text.length) {
-        usize end = i;
+        let end = i;
         while (end < text.length && text[end] != '\n')
           end++;
-        const StringView row = text.substring_of_length(i, end - i);
+        let const row = text.substring_of_length(i, end - i);
         i = end + 1;
         if (!row.starts_with(StringView{"... "})) continue;
-        StringView name = row.substring(4);
+        let name = row.substring(4);
         if (let const space = name.find_character(' '); space.has_value())
           name = name.substring_of_length(0, *space);
         if (!name.is_empty()) names.push(String{name});
@@ -2273,7 +2273,7 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
         per_kind_candidates[index].push(steal(with_dash));
       }
     } else {
-      const ArrayList<Flag *> *flags = builtin_flag_list(*builtin_kind);
+      let const flags = builtin_flag_list(*builtin_kind);
       if (flags == nullptr) return nullptr;
       append_flag_forms(*flags, per_kind_candidates[index]);
       if (*builtin_kind == Builtin::Kind::Set) {
@@ -2301,7 +2301,7 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
                                       EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
-  const StringView command = command_word_of(line);
+  let const command = command_word_of(line);
   if (command.is_empty()) return None;
 
   let const builtin_kind = search_builtin(command);
@@ -2324,7 +2324,7 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
 
   /* set -o and set +o name an option by long name, no dash on the operand. */
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Set) {
-    const StringView previous = previous_settled_word(line, token_start);
+    let const previous = previous_settled_word(line, token_start);
     if (previous == "-o" || previous == "+o") {
       for (const StringView name : shell_option_names(true))
         push_matching(name);
@@ -2387,7 +2387,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
                              bool for_listing, EvalContext &context) throws
     -> Maybe<ArrayList<String>>
 {
-  const StringView command = command_word_of(line);
+  let const command = command_word_of(line);
   if (command.is_empty()) return None;
   /* The surface name wins when it has a spec of its own, so a complete -F on
      the exact name still applies. Otherwise the name resolves through an
@@ -2504,10 +2504,10 @@ static fn command_substitution_body_start(StringView line, usize cursor) throws
     -> usize
 {
   let frames = ArrayList<completion_sub_frame>{};
-  bool in_single_quote = false;
+  let in_single_quote = false;
   usize i = 0;
   while (i < cursor) {
-    const char c = line[i];
+    let const c = line[i];
     if (in_single_quote) {
       if (c == '\'') in_single_quote = false;
       i++;
@@ -2560,24 +2560,24 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
      for x in $(git che all offer git's subcommands rather than the outer
      command's arguments. The offset maps the replaced token span back to the
      full line for the caller. */
-  const usize completion_offset = command_substitution_body_start(line, cursor);
+  let const completion_offset = command_substitution_body_start(line, cursor);
   line = line.substring(completion_offset);
   cursor -= completion_offset;
 
   /* The replaced span covers the whole word the cursor sits inside, from the
      token start to the token end, so a cursor in the middle of a word replaces
      the word cleanly rather than keeping the bytes to its right. */
-  const usize token_start = find_token_start(line, cursor);
-  const usize token_end = find_token_end(line, cursor);
-  const StringView token =
+  let const token_start = find_token_start(line, cursor);
+  let const token_end = find_token_end(line, cursor);
+  let const token =
       line.substring_of_length(token_start, token_end - token_start);
-  const bool is_command = is_in_command_position(line, token_start);
-  const bool token_is_glob = token_has_glob_metacharacter(token);
+  let const is_command = is_in_command_position(line, token_start);
+  let const token_is_glob = token_has_glob_metacharacter(token);
 
   /* A command-position token that names a path component is a program given by
      path rather than a bare command word, so it completes against the
      filesystem the way dash does instead of the command name sets. */
-  const bool token_has_path_separator = token.find_character('/').has_value();
+  let const token_has_path_separator = token.find_character('/').has_value();
 
   TRACELN("complete line '%.*s' cursor %zu token '%.*s' command %d",
           static_cast<int>(line.length), line.data, cursor,
@@ -2586,7 +2586,7 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   /* A glob word with the cursor right after it expands inline to its file
      matches, even in command position, the way the shell expands it before
      running a command. */
-  const bool inline_glob = token_is_glob && cursor == token_end;
+  let const inline_glob = token_is_glob && cursor == token_end;
 
   let candidates = ArrayList<String>{};
   /* Filled only by the --help option and subcommand stages, keyed by candidate
@@ -2705,7 +2705,7 @@ static fn expand_command_tilde(StringView word) throws -> Maybe<String>
   let const slash = word.find_character('/');
   let const user = slash.has_value() ? word.substring_of_length(1, *slash - 1)
                                      : word.substring(1);
-  Maybe<Path> home =
+  let home =
       user.is_empty() ? os::get_home_directory() : os::get_home_for_user(user);
   if (!home.has_value()) return None;
   let expanded = home->clone();
@@ -2812,7 +2812,7 @@ static pure fn is_highlight_word_break(char c) wontthrow -> bool
 static pure fn scan_dollar_expansion(StringView line, usize dollar,
                                      usize end) wontthrow -> usize
 {
-  usize i = dollar + 1;
+  let i = dollar + 1;
   if (i >= end) return i;
 
   let const c = line[i];
@@ -2920,7 +2920,7 @@ static fn simple_dollar_name(StringView line, usize i,
   if (line[i + 1] == '{') {
     if (expansion_end < i + 3 || line[expansion_end - 1] != '}')
       return shit::None;
-    StringView inner =
+    let inner =
         line.substring_of_length(i + 2, expansion_end - (i + 2) - 1);
     if (inner.is_empty()) return shit::None;
     for (usize k = 0; k < inner.length; k++)
@@ -2940,7 +2940,7 @@ static fn dollar_name_is_set(StringView name, const HashSet &known_vars) throws
   if (name.is_empty()) return true;
   if (name.length == 1 && !is_highlight_name_start(name[0])) return true;
 
-  bool all_digits = true;
+  let all_digits = true;
   for (usize k = 0; k < name.length; k++)
     if (name[k] < '0' || name[k] > '9') {
       all_digits = false;
@@ -2962,8 +2962,8 @@ static fn color_dollar(StringView line, usize i, usize end,
 {
   if (i + 1 < end && line[i + 1] == '(') {
     usize depth = 0;
-    usize close = end;
-    usize j = i + 1;
+    let close = end;
+    let j = i + 1;
     for (; j < end; j++) {
       if (line[j] == '(')
         depth++;
@@ -2986,7 +2986,7 @@ static fn color_dollar(StringView line, usize i, usize end,
   }
   let const expansion_end = scan_dollar_expansion(line, i, end);
   if (expansion_end > i) {
-    StringView sgr = colors::ansi::CYAN;
+    let sgr = colors::ansi::CYAN;
     if (Maybe<StringView> name = simple_dollar_name(line, i, expansion_end);
         name.has_value() && !dollar_name_is_set(*name, known_vars))
       sgr = colors::ansi::BOLD_RED;
@@ -3008,12 +3008,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
   };
 
   let stack = ArrayList<highlight_construct>{bump_allocator(HIGHLIGHT_ARENA)};
-  bool command_position = true;
-  bool expecting_in = false;
-  bool for_variable_pending = false;
-  bool for_do_expected = false;
+  let command_position = true;
+  let expecting_in = false;
+  let for_variable_pending = false;
+  let for_do_expected = false;
 
-  usize i = begin;
+  let i = begin;
   while (i < end) {
     let const c = line[i];
 
@@ -3042,9 +3042,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         c == ')' || c == '{' || c == '}')
     {
       let const operator_start = i;
-      bool has_separator = false;
-      bool has_redirect = false;
-      bool has_opener = false;
+      let has_separator = false;
+      let has_redirect = false;
+      let has_opener = false;
       while (i < end) {
         let const o = line[i];
         if (o == '|' || o == '&' || o == ';') {
@@ -3091,7 +3091,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         /* literal_start tracks the start of the current yellow run, which
            begins at the opening quote and resumes after every expansion. */
         i++;
-        usize literal_start = i - 1;
+        let literal_start = i - 1;
         while (i < end && line[i] != '"') {
           if (line[i] == '\\' && i + 1 < end) {
             i += 2;
@@ -3184,11 +3184,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (command_position && plain && !is_assignment) {
-      bool is_keyword = true;
-      bool keyword_ok = true;
-      bool next_is_command = true;
-      bool opens_in = false;
-      bool opens_for_variable = false;
+      let is_keyword = true;
+      let keyword_ok = true;
+      let next_is_command = true;
+      let opens_in = false;
+      let opens_for_variable = false;
       if (word == "if") {
         stack.push(highlight_construct::If);
       } else if (word == "while" || word == "until") {
@@ -3287,16 +3287,16 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
     return true;
   };
 
-  bool bind_next = false;
+  let bind_next = false;
   usize i = 0;
   while (i < line.length) {
     while (i < line.length && is_separator(line[i]))
       i++;
-    const usize start = i;
+    let const start = i;
     while (i < line.length && !is_separator(line[i]))
       i++;
     if (i == start) break;
-    const StringView token = line.substring_of_length(start, i - start);
+    let const token = line.substring_of_length(start, i - start);
 
     if (bind_next) {
       if (is_identifier(token)) known_vars.add(token);
@@ -3304,7 +3304,7 @@ static fn add_line_bound_variables(StringView line, HashSet &known_vars) throws
     } else if (Maybe<usize> equals = token.find_character('=');
                equals.has_value() && equals.value() > 0)
     {
-      StringView name = token.substring_of_length(0, equals.value());
+      let name = token.substring_of_length(0, equals.value());
       /* An array-element assignment binds the base name, so arr[0]=1 makes arr
          known rather than the invalid name arr[0. */
       if (Maybe<usize> bracket = name.find_character('['); bracket.has_value())
