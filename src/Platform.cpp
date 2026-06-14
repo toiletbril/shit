@@ -42,6 +42,47 @@
 extern char **environ;
 #endif
 
+/* The async-signal flag machinery is identical on every platform, so it lives
+   in one block the POSIX and the Windows sections below both share rather than
+   defining it twice. */
+namespace shit {
+namespace os {
+
+volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
+volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
+volatile sig_atomic_t SIGNAL_PENDING = 0;
+
+/* One pending flag per signal number, set by the trap handler and cleared by
+   the drain. The size covers every real-time and standard signal the platform
+   defines, with a fixed bound so the array stays a flat block the handler may
+   touch async-safely. */
+static constexpr i32 SIGNAL_FLAG_COUNT = 128;
+static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
+
+/* Whether the signal number indexes the pending-flag array, so a trap call on
+   an out-of-range number is a no-op rather than an out-of-bounds write. */
+static fn is_trappable_signal(i32 signal_number) wontthrow -> bool
+{
+  return signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT;
+}
+
+/* Report and clear the lowest pending per-signal flag, or zero when none is
+   set. The fast SIGNAL_PENDING flag is owned by the drain, which clears it
+   before consuming, so this only reports the per-signal flags. */
+fn take_pending_signal() wontthrow -> i32
+{
+  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
+    if (PENDING_SIGNAL_FLAGS[number] != 0) {
+      PENDING_SIGNAL_FLAGS[number] = 0;
+      return number;
+    }
+  }
+  return 0;
+}
+
+} /* namespace os */
+} /* namespace shit */
+
 #if SHIT_PLATFORM_IS POSIX
 
 namespace shit {
@@ -1185,8 +1226,6 @@ static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t
 
 #define make_sigset(...) make_sigset_impl(__VA_ARGS__, -1)
 
-volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
-
 static fn sigchild_handler(int n, siginfo_t *siginfo, void *ctx) wontthrow
     -> void
 {
@@ -1216,8 +1255,6 @@ fn reset_signal_handlers() throws -> void
      is cleared here alongside the handler reset. */
   INTERRUPT_REQUESTED = 0;
 }
-
-volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
 
 static fn handle_interrupt(int s) wontthrow -> void
 {
@@ -1251,27 +1288,18 @@ fn set_default_signal_handlers() throws -> void
   check_syscall(sigaction(SIGINT, &si, nullptr));
 }
 
-volatile sig_atomic_t SIGNAL_PENDING = 0;
-
-/* One pending flag per signal number, set by the trap handler and cleared by
-   the drain. The size covers every real-time and standard signal the platform
-   defines, with a fixed bound so the array stays a flat block the handler may
-   touch async-safely. */
-static constexpr i32 SIGNAL_FLAG_COUNT = 128;
-static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
-
 static fn handle_trapped_signal(int signal_number) wontthrow -> void
 {
   /* Recording the arrival is the only async-safe action. The evaluator drains
      the flag at the next command boundary and runs the trap action there. */
-  if (signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT)
+  if (is_trappable_signal(signal_number))
     PENDING_SIGNAL_FLAGS[signal_number] = 1;
   SIGNAL_PENDING = 1;
 }
 
 fn set_trap_handler(i32 signal_number) throws -> void
 {
-  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  if (!is_trappable_signal(signal_number)) return;
 
   LOG(verbosity::Info, "installing the trap handler for signal %d",
       signal_number);
@@ -1290,7 +1318,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 
 fn set_trap_ignore(i32 signal_number) throws -> void
 {
-  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  if (!is_trappable_signal(signal_number)) return;
   LOG(verbosity::Info, "ignoring signal %d", signal_number);
   struct sigaction sa = {};
   sa.sa_handler = SIG_IGN;
@@ -1299,7 +1327,7 @@ fn set_trap_ignore(i32 signal_number) throws -> void
 
 fn clear_trap_handler(i32 signal_number) throws -> void
 {
-  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  if (!is_trappable_signal(signal_number)) return;
   LOG(verbosity::Info, "clearing the trap for signal %d", signal_number);
   struct sigaction sa = {};
   /* SIGINT returns to the shell's own interrupt handler so a Ctrl-C still
@@ -1310,19 +1338,6 @@ fn clear_trap_handler(i32 signal_number) throws -> void
   else
     sa.sa_handler = SIG_DFL;
   check_syscall(sigaction(signal_number, &sa, nullptr));
-}
-
-fn take_pending_signal() wontthrow -> i32
-{
-  /* The fast SIGNAL_PENDING flag is owned by the drain, which clears it before
-     consuming, so this only reports and clears the per-signal flags. */
-  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
-    if (PENDING_SIGNAL_FLAGS[number] != 0) {
-      PENDING_SIGNAL_FLAGS[number] = 0;
-      return number;
-    }
-  }
-  return 0;
 }
 
 fn monotonic_nanos() wontthrow -> u64
@@ -2470,12 +2485,6 @@ fn last_system_error_message() -> String
   return err;
 }
 
-volatile sig_atomic_t INTERRUPT_REQUESTED = 0;
-
-/* Windows has no SIGCHLD, so the flag exists for the shared readers and
-   stays down. */
-volatile sig_atomic_t CHILD_STATE_CHANGED = 0;
-
 static fn handle_interrupt(int s) -> void
 {
   unused(s);
@@ -2510,14 +2519,9 @@ fn reset_signal_handlers() -> void
   INTERRUPT_REQUESTED = 0;
 }
 
-volatile sig_atomic_t SIGNAL_PENDING = 0;
-
-static constexpr i32 SIGNAL_FLAG_COUNT = 128;
-static volatile sig_atomic_t PENDING_SIGNAL_FLAGS[SIGNAL_FLAG_COUNT] = {};
-
 static fn handle_trapped_signal(int signal_number) -> void
 {
-  if (signal_number > 0 && signal_number < SIGNAL_FLAG_COUNT)
+  if (is_trappable_signal(signal_number))
     PENDING_SIGNAL_FLAGS[signal_number] = 1;
   SIGNAL_PENDING = 1;
   /* The C runtime resets the disposition to default before the handler runs, so
@@ -2528,36 +2532,23 @@ static fn handle_trapped_signal(int signal_number) -> void
 
 fn set_trap_handler(i32 signal_number) -> void
 {
-  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  if (!is_trappable_signal(signal_number)) return;
   signal(signal_number, handle_trapped_signal);
 }
 
 fn set_trap_ignore(i32 signal_number) -> void
 {
-  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  if (!is_trappable_signal(signal_number)) return;
   signal(signal_number, SIG_IGN);
 }
 
 fn clear_trap_handler(i32 signal_number) -> void
 {
-  if (signal_number <= 0 || signal_number >= SIGNAL_FLAG_COUNT) return;
+  if (!is_trappable_signal(signal_number)) return;
   if (signal_number == SIGINT)
     signal(signal_number, handle_interrupt);
   else
     signal(signal_number, SIG_DFL);
-}
-
-fn take_pending_signal() wontthrow -> i32
-{
-  /* The fast SIGNAL_PENDING flag is owned by the drain, which clears it before
-     consuming, so this only reports and clears the per-signal flags. */
-  for (i32 number = 1; number < SIGNAL_FLAG_COUNT; number++) {
-    if (PENDING_SIGNAL_FLAGS[number] != 0) {
-      PENDING_SIGNAL_FLAGS[number] = 0;
-      return number;
-    }
-  }
-  return 0;
 }
 
 fn monotonic_nanos() wontthrow -> u64
