@@ -123,8 +123,7 @@ public:
   {
     if (const Value *existing = find(key))
       return *const_cast<Value *>(existing);
-    set_value(key, steal(default_value));
-    return *const_cast<Value *>(find(key));
+    return *set_value(key, steal(default_value));
   }
 
   /* Store a String value built from a view, the form the variable store and the
@@ -210,7 +209,7 @@ private:
     Value value{};
   };
 
-  hot fn set_value(StringView key, Value value) throws -> void
+  hot fn set_value(StringView key, Value value) throws -> Value *
   {
     /* Tombstones count toward the load, so the table rehashes before a probe
        chain fills with deleted slots. That keeps an Empty slot reachable on
@@ -229,13 +228,12 @@ private:
           slot.key == key)
       {
         slot.value = steal(value);
-        return;
+        return &slot.value;
       }
       if (slot.state == slot::Empty) {
         let const target = first_tombstone != m_capacity ? first_tombstone : i;
         if (first_tombstone != m_capacity) m_tombstones--;
-        place(target, key, wanted, steal(value));
-        return;
+        return place(target, key, wanted, steal(value));
       }
       if (slot.state == slot::Tombstone && first_tombstone == m_capacity)
         first_tombstone = i;
@@ -246,14 +244,15 @@ private:
        this, but reuse a found tombstone rather than lose the insertion. */
     if (first_tombstone != m_capacity) {
       m_tombstones--;
-      place(first_tombstone, key, wanted, steal(value));
+      return place(first_tombstone, key, wanted, steal(value));
     }
+    unreachable();
   }
 
   /* The caller already computed the packed key for its probe, so it is passed
      in rather than recomputed from the key bytes here. */
   fn place(usize index, StringView key, const PackedStringKey &packed,
-           Value value) throws -> void
+           Value value) throws -> Value *
   {
     let &slot = m_slots[index];
     slot.key = String{m_allocator, key};
@@ -261,6 +260,7 @@ private:
     slot.value = steal(value);
     slot.state = slot::Occupied;
     m_count++;
+    return &slot.value;
   }
 
   cold fn rehash(usize new_capacity) throws -> void
