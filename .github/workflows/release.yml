@@ -1,0 +1,109 @@
+name: Release
+
+# Manual dispatch only, so a release build never runs on a push. With a tag the
+# three binaries are attached to a GitHub release, without one they are left as
+# downloadable workflow artifacts.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish the release under, such as 0.0.8-beta. Leave empty to only upload the build artifacts.'
+        required: false
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-amd64:
+    name: Build / linux amd64
+    runs-on: ubuntu-24.04
+    env:
+      CXX: clang++-18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up clang and lld
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18 all
+          sudo ln -sf /usr/bin/lld-18    /usr/local/bin/lld
+          sudo ln -sf /usr/bin/ld.lld-18 /usr/local/bin/ld.lld
+      - name: Build the release binary
+        run: rm -f shit && make MODE=rel shit
+      - name: Stage the artifact
+        run: |
+          mkdir -p dist
+          cp shit dist/shit-linux-amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shit-linux-amd64
+          path: dist/shit-linux-amd64
+
+  windows-amd64:
+    name: Build / windows amd64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up the mingw cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64
+      - name: Cross-build the release binary
+        run: rm -f shit.exe && make TARGET=Windows_NT MODE=rel shit
+      - name: Stage the artifact
+        run: |
+          mkdir -p dist
+          cp shit.exe dist/shit-windows-amd64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shit-windows-amd64
+          path: dist/shit-windows-amd64.exe
+
+  macos-arm64:
+    name: Build / apple arm64
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up llvm
+        run: brew install llvm lld
+      - name: Build the release binary
+        run: |
+          LLVM_BIN="$(brew --prefix llvm)/bin"
+          rm -f shit && make MODE=rel CXX="$LLVM_BIN/clang++" shit
+      - name: Stage the artifact
+        run: |
+          mkdir -p dist
+          cp shit dist/shit-darwin-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shit-darwin-arm64
+          path: dist/shit-darwin-arm64
+
+  release:
+    name: Release / Publish
+    needs: [linux-amd64, windows-amd64, macos-arm64]
+    if: ${{ inputs.tag != '' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/shit-linux-amd64
+            dist/shit-windows-amd64.exe
+            dist/shit-darwin-arm64

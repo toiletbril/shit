@@ -133,11 +133,12 @@ CXXFLAGS += \
 ifneq ($(TARGET), Windows_NT)
 # TODO: windows optimization fucks up the RAM.
 CXXFLAGS += \
-	-static-pie \
 	-O3
 endif
 ifeq ($(TARGET), Linux)
+# macOS ld64 has no fully static link, so static-pie stays Linux-only.
 CXXFLAGS += \
+	-static-pie \
 	-nostdlib++
 LINK_LIBS += -lsupc++
 endif
