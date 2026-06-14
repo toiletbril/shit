@@ -165,11 +165,13 @@ fn read_entire_standard_input() throws -> String;
 /* Read one line from a descriptor, without the trailing newline. Returns
    None at end of input with no bytes read. The read builtin passes the
    command's input descriptor so a redirection or a heredoc is honored.
-   was_newline_terminated reports whether a newline ended the line, false when
-   end of input ended it, so the read builtin returns a non-zero status for an
-   unterminated final line. */
-fn read_line_from_fd(os::descriptor fd, bool &was_newline_terminated) throws
-    -> Maybe<String>;
+   was_delimiter_terminated reports whether the delimiter ended the line, false
+   when end of input ended it, so the read builtin returns a non-zero status for
+   an unterminated final line. The delimiter defaults to a newline, and read -d
+   passes the first byte of its argument, or a NUL byte for an empty argument so
+   the input is slurped whole. */
+fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
+                     char delimiter = '\n') throws -> Maybe<String>;
 
 fn initialize_path_map() throws -> void;
 

@@ -72,6 +72,7 @@ globstar
 == read flags:
 --help
 -a
+-d
 -n
 -p
 -r

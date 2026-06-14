@@ -26,6 +26,9 @@ FLAG(READ_PROMPT, String, 'p', "",
 FLAG(READ_TIMEOUT, String, 't', "", "Time out after the given seconds.");
 FLAG(READ_NCHARS, String, 'n', "", "Read at most the given number of bytes.");
 FLAG(READ_SILENT, Bool, 's', "", "Do not echo the input from a terminal.");
+FLAG(READ_DELIM, String, 'd', "",
+     "Read until the first byte of the given delimiter instead of a newline, "
+     "or until a NUL byte when the delimiter is empty.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_BUILTIN_FLAGS(Read);
@@ -70,12 +73,23 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
     return names[first_operand + index];
   };
 
+  /* read -d reads until the first byte of its argument rather than a newline,
+     and an empty argument reads until a NUL byte, which has no occurrence in
+     ordinary text so the whole input is slurped. A bash-completion script reads
+     a compgen run this way, with read -d '' and IFS set to a newline, to load
+     every candidate into one array. */
+  let const delimiter =
+      FLAG_READ_DELIM.is_set()
+          ? (FLAG_READ_DELIM.value().is_empty() ? '\0'
+                                                : FLAG_READ_DELIM.value()[0])
+          : '\n';
+
   /* The command's input descriptor honors a redirection or a heredoc on the
      read, falling back to the shell's standard input when none is present. The
      line is copied into a heap String for the splitting below. */
   let was_newline_terminated = false;
-  let const read_line = utils::read_line_from_fd(ec.in_fd.value_or(SHIT_STDIN),
-                                                 was_newline_terminated);
+  let const read_line = utils::read_line_from_fd(
+      ec.in_fd.value_or(SHIT_STDIN), was_newline_terminated, delimiter);
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)
       cxt.set_shell_variable(operand_name(i), "");

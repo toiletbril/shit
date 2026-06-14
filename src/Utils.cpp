@@ -1656,8 +1656,8 @@ fn read_entire_standard_input() throws -> String
   return contents;
 }
 
-fn read_line_from_fd(os::descriptor fd, bool &was_newline_terminated) throws
-    -> Maybe<String>
+fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
+                     char delimiter) throws -> Maybe<String>
 {
   let line = String{};
   bool read_any_byte = false;
@@ -1666,17 +1666,17 @@ fn read_line_from_fd(os::descriptor fd, bool &was_newline_terminated) throws
     Maybe<usize> read_count = os::read_fd(fd, &one_byte, 1);
     if (!read_count || *read_count == 0) break;
     read_any_byte = true;
-    if (one_byte == '\n') {
-      was_newline_terminated = true;
+    if (one_byte == static_cast<u8>(delimiter)) {
+      was_delimiter_terminated = true;
       return line;
     }
     line.push(one_byte);
   }
 
-  /* The loop fell out at end of input, so no newline ended the line. The read
+  /* The loop fell out at end of input, so no delimiter ended the line. The read
      builtin maps an unterminated final line to a non-zero status while still
      assigning the bytes it read, the way dash does. */
-  was_newline_terminated = false;
+  was_delimiter_terminated = false;
 
   if (!read_any_byte) return None;
 
