@@ -140,6 +140,11 @@ struct local_binding
      mark so a fresh local starts with no attributes the way bash localizes,
      and leaving the scope puts the caller's mark back. */
   bool previous_was_integer{false};
+  /* The read-only mark the name carried in the caller, saved and restored the
+     same way, so a local -r marks only this scope and the caller's later
+     reassignment, or a second call to the same function, is not rejected as
+     read-only. */
+  bool previous_was_readonly{false};
 };
 
 /* A background job, one entry in the job table. The id is the number jobs and
@@ -677,6 +682,9 @@ public:
   /* readonly marks a variable so a later assignment to it fails. The set is
      usually empty, so set_shell_variable only scans it when it is not. */
   fn mark_readonly(StringView name) throws -> void;
+  /* Drop a name's read-only mark, used when a local shadows a read-only caller
+     name so the fresh local starts writable. */
+  fn unmark_readonly(StringView name) throws -> void;
   fn is_readonly(StringView name) const wontthrow -> bool;
   fn readonly_names() const throws -> ArrayList<String>;
 

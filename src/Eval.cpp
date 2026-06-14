@@ -293,6 +293,13 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     m_integer_names.add(binding.name.view());
   else
     m_integer_names.remove(binding.name.view());
+  /* The read-only mark the caller held is restored, and a local -r mark made in
+     this scope drops, written directly since the noexcept defer this runs under
+     must not throw. */
+  if (binding.previous_was_readonly)
+    m_readonly_names.add(binding.name.view());
+  else
+    m_readonly_names.remove(binding.name.view());
 }
 
 fn EvalContext::set_indexed_array(StringView name,

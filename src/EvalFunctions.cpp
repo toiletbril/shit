@@ -278,6 +278,11 @@ fn EvalContext::mark_readonly(StringView name) throws -> void
   m_readonly_names.add(name);
 }
 
+fn EvalContext::unmark_readonly(StringView name) throws -> void
+{
+  m_readonly_names.remove(name);
+}
+
 fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 {
   return m_readonly_names.contains(name);

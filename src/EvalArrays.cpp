@@ -456,11 +456,18 @@ fn EvalContext::declare_local(StringView name) throws -> void
   let const previous_was_integer = is_integer_variable(name);
   if (previous_was_integer) unmark_integer(name);
 
+  /* The read-only mark is dropped the same way, so a local shadowing a
+     read-only caller name starts writable, and a local -r that marks this scope
+     does not leak past it to reject a later reassignment or a second call to
+     the same function. */
+  let const previous_was_readonly = is_readonly(name);
+  if (previous_was_readonly) unmark_readonly(name);
+
   m_local_scopes.back().push(local_binding{
       String{name}, get_variable_value(name), steal(previous_array),
       previous_was_associative, steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
-      previous_was_integer});
+      previous_was_integer, previous_was_readonly});
 }
 
 hot fn EvalContext::expand_variable(StringView name) const throws -> String
