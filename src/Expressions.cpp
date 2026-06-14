@@ -853,111 +853,162 @@ static fn redirection_open_mode(Redirection::Kind kind,
   }
 }
 
+/* What a single redirection resolves to before any descriptor is placed. */
+enum class redirection_outcome
+{
+  Heredoc,     /* opened_fd holds a staged temp body for target_fd */
+  OpenedFile,  /* opened_fd holds a freshly opened file for target_fd */
+  BothStreams, /* opened_fd opens like >file, fd 1 and fd 2 both follow it */
+  Duplicate,   /* dup_from_fd names the source, or DUP_FD_CLOSE for the close */
+};
+
+/* The unplaced result of one redirection, the opened descriptor or the
+   duplication source, with the target fd. opened_fd is owned by the caller,
+   which places it and closes it. dup_from_fd is the duplication source, the
+   close marker, or the target itself for a self copy. */
+struct resolved_redirection
+{
+  redirection_outcome kind{};
+  i32 target_fd{-1};
+  os::descriptor opened_fd{};
+  i32 dup_from_fd{-1};
+};
+
+/* Resolve one redirection to an unplaced outcome, the shared open-and-stage
+   work the three redirection sites repeat, so each keeps only its own
+   descriptor placement. A heredoc or here-string body is staged to a temp
+   file, a duplication settles to its source descriptor or its both-streams
+   filename open, and a file target opens in the kind's mode. The descriptor
+   returned is the caller's to place and to close. A failure throws a located
+   error, and open_or_stage_failed, when given, is set true only for the open,
+   stage, and ambiguous-target failures the simple-command path recovers from,
+   so a duplication-resolve or a word-expansion error stays fatal. */
+static fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
+                              SourceLocation fallback_location,
+                              bool *open_or_stage_failed = nullptr) throws
+    -> resolved_redirection
+{
+  if (redir.kind == Redirection::Kind::Heredoc ||
+      redir.kind == Redirection::Kind::HereString)
+  {
+    let body = String{};
+    if (redir.kind == Redirection::Kind::Heredoc) {
+      ASSERT(redir.heredoc_body != nullptr);
+      body = redir.heredoc_body->clone();
+      if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
+    } else {
+      ASSERT(redir.target != nullptr);
+      body = cxt.expand_word_for_assignment(
+          static_cast<const tokens::WordToken *>(redir.target)->word());
+      body += "\n";
+    }
+
+    let opened = os::write_to_temp_file(body);
+    if (!opened) {
+      if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+      throw ErrorWithLocation{redir.target != nullptr
+                                  ? redir.target->source_location()
+                                  : fallback_location,
+                              "Could not stage the heredoc body: " +
+                                  os::last_system_error_message()};
+    }
+    return resolved_redirection{redirection_outcome::Heredoc, redir.fd,
+                                opened.take(), -1};
+  }
+
+  if (redir.kind == Redirection::Kind::DuplicateOutput ||
+      redir.kind == Redirection::Kind::DuplicateInput)
+  {
+    let resolved = resolve_duplication(redir, cxt);
+    /* The both-streams filename opens like >file and points the standard error
+       after it, the pair bash builds for the csh >&file spelling. */
+    if (resolved.both_streams_file.has_value()) {
+      let opened = os::open_file_descriptor(
+          *resolved.both_streams_file,
+          redirection_open_mode(Redirection::Kind::TruncateOutput,
+                                cxt.no_clobber()));
+      if (!opened) {
+        if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+        throw ErrorWithLocation{redir.target->source_location(),
+                                "Could not open '" + *resolved.both_streams_file +
+                                    "': " + os::last_system_error_message()};
+      }
+      return resolved_redirection{redirection_outcome::BothStreams, 1,
+                                  opened.take(), -1};
+    }
+    return resolved_redirection{redirection_outcome::Duplicate, redir.fd, {},
+                                resolved.fd};
+  }
+
+  ASSERT(redir.target != nullptr);
+
+  ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
+  target_tokens.push(redir.target);
+  /* The path is opened right here and the field is never stored, so it expands
+     onto the scratch arena the command reclaims rather than the heap. */
+  const ArrayList<String> target =
+      cxt.process_args(target_tokens, /*args_are_transient=*/true);
+  if (target.count() != 1) {
+    if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+    throw ErrorWithLocation{redir.target->source_location(),
+                            "Redirection target is not a single file"};
+  }
+
+  let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
+
+  const String &target_path = target[0];
+  let opened = os::open_file_descriptor(target_path, mode);
+  if (!opened) {
+    if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
+    throw ErrorWithLocation{redir.target->source_location(),
+                            "Could not open '" + target_path +
+                                "': " + os::last_system_error_message()};
+  }
+  return resolved_redirection{redirection_outcome::OpenedFile, redir.fd,
+                              opened.take(), -1};
+}
+
 fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                                         EvalContext &cxt) const throws -> void
 {
   LOG(verbosity::Debug, "applying %zu redirections to the pipeline stage",
       m_redirections.count());
   for (const Redirection &redir : m_redirections) {
-    if (redir.kind == Redirection::Kind::Heredoc) {
-      ASSERT(redir.heredoc_body != nullptr);
-
-      let body = redir.heredoc_body->clone();
-      if (redir.heredoc_expand) {
-        body = cxt.expand_heredoc_body(body);
-      }
-
-      let opened = os::write_to_temp_file(body);
-      if (!opened)
-        throw Error{"Could not stage the heredoc body: " +
-                    os::last_system_error_message()};
-
+    let const r = resolve_redirection(redir, cxt, source_location());
+    switch (r.kind) {
+    /* A heredoc or here-string fills the stage's standard input slot, the only
+       slot a staged body can take. */
+    case redirection_outcome::Heredoc:
       if (ec.in_fd) os::close_fd(*ec.in_fd);
-      ec.in_fd = opened.take();
-      continue;
-    }
-
-    if (redir.kind == Redirection::Kind::HereString) {
-      ASSERT(redir.target != nullptr);
-      String body = cxt.expand_word_for_assignment(
-          static_cast<const tokens::WordToken *>(redir.target)->word());
-      body += "\n";
-
-      let opened = os::write_to_temp_file(body);
-      if (!opened)
-        throw Error{"Could not stage the here-string: " +
-                    os::last_system_error_message()};
-
-      if (ec.in_fd) os::close_fd(*ec.in_fd);
-      ec.in_fd = opened.take();
-      continue;
-    }
-
-    if (redir.kind == Redirection::Kind::DuplicateOutput ||
-        redir.kind == Redirection::Kind::DuplicateInput)
-    {
-      let const resolved = resolve_duplication(redir, cxt);
-      /* The both-streams filename opens like >file and points the standard
-         error after it, the pair bash builds for the csh >&file spelling. */
-      if (resolved.both_streams_file.has_value()) {
-        let opened = os::open_file_descriptor(
-            *resolved.both_streams_file,
-            redirection_open_mode(Redirection::Kind::TruncateOutput,
-                                  cxt.no_clobber()));
-        if (!opened) {
-          throw ErrorWithLocation{redir.target->source_location(),
-                                  "Could not open '" +
-                                      *resolved.both_streams_file +
-                                      "': " + os::last_system_error_message()};
-        }
-        assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, 1, opened.take());
-        ec.dup_err_to_out = true;
-        ec.dup_out_to_err_came_last = false;
-        continue;
-      }
-      const i32 from_fd = resolved.fd;
+      ec.in_fd = r.opened_fd;
+      break;
+    /* The both-streams filename takes the output slot and the standard error
+       follows it through the cross-route flag. */
+    case redirection_outcome::BothStreams:
+      assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, 1, r.opened_fd);
+      ec.dup_err_to_out = true;
+      ec.dup_out_to_err_came_last = false;
+      break;
+    case redirection_outcome::OpenedFile:
+      assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, r.target_fd,
+                         r.opened_fd);
+      break;
+    case redirection_outcome::Duplicate:
       /* A self copy changes nothing. The standard cross-routing keeps the flag
          fast path. An arbitrary descriptor or the close form is not represented
          by the stage's three descriptor slots and is left to the compound path.
        */
-      if (from_fd == redir.fd) {
+      if (r.dup_from_fd == r.target_fd) {
         /* Self copy is a no-op. */
-      } else if (redir.fd == 2 && from_fd == 1) {
+      } else if (r.target_fd == 2 && r.dup_from_fd == 1) {
         ec.dup_err_to_out = true;
         ec.dup_out_to_err_came_last = false;
-      } else if (redir.fd == 1 && from_fd == 2) {
+      } else if (r.target_fd == 1 && r.dup_from_fd == 2) {
         ec.dup_out_to_err = true;
         ec.dup_out_to_err_came_last = true;
       }
-      continue;
+      break;
     }
-
-    ASSERT(redir.target != nullptr);
-
-    ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
-    target_tokens.push(redir.target);
-    /* The path is opened right here and the field is never stored, so it
-       expands onto the scratch arena the command reclaims rather than the
-       heap. */
-    const ArrayList<String> target =
-        cxt.process_args(target_tokens, /*args_are_transient=*/true);
-    if (target.count() != 1) {
-      throw ErrorWithLocation{redir.target->source_location(),
-                              "Redirection target is not a single file"};
-    }
-
-    let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
-
-    const String &target_path = target[0];
-    let opened = os::open_file_descriptor(target_path, mode);
-    if (!opened) {
-      throw ErrorWithLocation{redir.target->source_location(),
-                              "Could not open '" + target_path +
-                                  "': " + os::last_system_error_message()};
-    }
-    const os::descriptor file_fd = opened.take();
-
-    assign_standard_fd(ec.in_fd, ec.out_fd, ec.err_fd, redir.fd, file_fd);
   }
 }
 
@@ -1125,31 +1176,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   bool redirection_open_failed = false;
   try {
     for (const Redirection &redir : m_redirections) {
-      /* A heredoc body becomes the standard input through an anonymous temp
-         file, expanded when the delimiter was unquoted. */
-      if (redir.kind == Redirection::Kind::Heredoc ||
-          redir.kind == Redirection::Kind::HereString)
-      {
-        let body = String{};
-        if (redir.kind == Redirection::Kind::Heredoc) {
-          ASSERT(redir.heredoc_body != nullptr);
-          body = redir.heredoc_body->clone();
-          if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
-        } else {
-          ASSERT(redir.target != nullptr);
-          body = cxt.expand_word_for_assignment(
-              static_cast<const tokens::WordToken *>(redir.target)->word());
-          body += "\n";
-        }
-
-        let opened = os::write_to_temp_file(body);
-        if (!opened) {
-          redirection_open_failed = true;
-          throw ErrorWithLocation{source_location(),
-                                  "Could not stage the heredoc body: " +
-                                      os::last_system_error_message()};
-        }
-
+      let const r = resolve_redirection(redir, cxt, source_location(),
+                                        &redirection_open_failed);
+      switch (r.kind) {
+      case redirection_outcome::Heredoc: {
+        const os::descriptor body_fd = r.opened_fd;
         /* A bare exec heredoc points the shell's standard input at the staged
            body for good and drops the temporary descriptor. Inside an
            in-process subshell the move is backed up first, so it stays
@@ -1157,7 +1188,6 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (is_bare_exec) {
           cxt.snapshot_subshell_descriptor(redir.fd);
           shit::flush();
-          const os::descriptor body_fd = opened.take();
           os::replace_descriptor(redir.fd, body_fd);
 #if SHIT_PLATFORM_IS WIN32
           /* A Windows descriptor is a HANDLE, so the staged body is compared
@@ -1168,7 +1198,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 #else
           if (body_fd != redir.fd) os::close_fd(body_fd);
 #endif
-          continue;
+          break;
         }
 
         /* A heredoc on the standard input takes the in_fd slot. A numbered
@@ -1178,11 +1208,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            same way a duplication onto an arbitrary descriptor is. */
         if (redir.fd == 0) {
           if (redirect_in_fd) os::close_fd(*redirect_in_fd);
-          redirect_in_fd = opened.take();
-          continue;
+          redirect_in_fd = body_fd;
+          break;
         }
 
-        const os::descriptor body_fd = opened.take();
         /* The temp file already lands on fd N when mkstemp handed back that
            very number, since the standard descriptors took the lower slots. The
            generic save then dup2 would back up the body itself and leave it
@@ -1201,69 +1230,51 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         if (body_is_target_fd) {
           dup_saved_descriptors.push(
               os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
-          continue;
+          break;
         }
         dup_saved_descriptors.push(
             os::save_and_replace_descriptor(redir.fd, body_fd));
         os::close_fd(body_fd);
-        continue;
+        break;
       }
 
-      /* A duplication like 2>&1 routes one descriptor to another without a
-         file. The descriptor may come from a dynamic word such as >&$5,
-         resolved here.
-       */
-      if (redir.kind == Redirection::Kind::DuplicateOutput ||
-          redir.kind == Redirection::Kind::DuplicateInput)
-      {
-        let resolved = resolve_duplication(redir, cxt);
-
-        /* The both-streams filename opens like >file, lands on the standard
-           output, and the standard error follows it, the pair bash builds
-           for the csh >&file spelling. The bare exec form keeps both moves
-           for good the way its file redirect does. */
-        if (resolved.both_streams_file.has_value()) {
-          let opened = os::open_file_descriptor(
-              *resolved.both_streams_file,
-              redirection_open_mode(Redirection::Kind::TruncateOutput,
-                                    cxt.no_clobber()));
-          if (!opened) {
-            redirection_open_failed = true;
-            throw ErrorWithLocation{
-                redir.target->source_location(),
-                "Could not open '" + *resolved.both_streams_file +
-                    "': " + os::last_system_error_message()};
-          }
-          const os::descriptor file_fd = opened.take();
-          shit::flush();
-          if (is_bare_exec) {
-            cxt.snapshot_subshell_descriptor(1);
-            cxt.snapshot_subshell_descriptor(2);
-            const bool out_ok = os::replace_descriptor(1, file_fd);
-            const bool err_ok = os::replace_descriptor(2, file_fd);
-            os::close_fd(file_fd);
-            if (!out_ok || !err_ok) {
-              redirection_open_failed = true;
-              throw ErrorWithLocation{redir.target->source_location(),
-                                      "Bad file descriptor"};
-            }
-            continue;
-          }
-          const os::saved_descriptor saved_out =
-              os::save_and_replace_descriptor(1, file_fd);
-          dup_saved_descriptors.push(saved_out);
-          const os::saved_descriptor saved_err =
-              os::save_and_replace_descriptor(2, file_fd);
-          dup_saved_descriptors.push(saved_err);
+      case redirection_outcome::BothStreams: {
+        /* The both-streams filename lands on the standard output and the
+           standard error follows it, the pair bash builds for the csh >&file
+           spelling. The bare exec form keeps both moves for good the way its
+           file redirect does. */
+        const os::descriptor file_fd = r.opened_fd;
+        shit::flush();
+        if (is_bare_exec) {
+          cxt.snapshot_subshell_descriptor(1);
+          cxt.snapshot_subshell_descriptor(2);
+          const bool out_ok = os::replace_descriptor(1, file_fd);
+          const bool err_ok = os::replace_descriptor(2, file_fd);
           os::close_fd(file_fd);
-          if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
+          if (!out_ok || !err_ok) {
             redirection_open_failed = true;
             throw ErrorWithLocation{redir.target->source_location(),
                                     "Bad file descriptor"};
           }
-          continue;
+          break;
         }
-        const i32 from_fd = resolved.fd;
+        const os::saved_descriptor saved_out =
+            os::save_and_replace_descriptor(1, file_fd);
+        dup_saved_descriptors.push(saved_out);
+        const os::saved_descriptor saved_err =
+            os::save_and_replace_descriptor(2, file_fd);
+        dup_saved_descriptors.push(saved_err);
+        os::close_fd(file_fd);
+        if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
+          redirection_open_failed = true;
+          throw ErrorWithLocation{redir.target->source_location(),
+                                  "Bad file descriptor"};
+        }
+        break;
+      }
+
+      case redirection_outcome::Duplicate: {
+        const i32 from_fd = r.dup_from_fd;
 
         /* A bare exec applies a duplication to the shell's own descriptor for
            good, so the copy or the close stays in effect for every later
@@ -1276,7 +1287,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
           if (from_fd == Redirection::DUP_FD_CLOSE) {
             os::close_shell_fd(redir.fd);
-            continue;
+            break;
           }
 
           /* A duplication onto a closed or invalid descriptor, as in exec 6>&9
@@ -1293,13 +1304,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
             throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
                                                   ": Bad file descriptor"};
           }
-          continue;
+          break;
         }
 
         /* A descriptor copied onto itself, as in 1>&1, changes nothing. */
         if (from_fd == redir.fd) {
           /* Self copy is a no-op. */
-          continue;
+          break;
         }
 
         /* A cross-route between the standard output and error, as in 2>&1,
@@ -1315,7 +1326,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           dup_saved_descriptors.push(os::save_and_replace_descriptor(
               redir.fd, os::descriptor_for_shell_fd(redir.fd)));
           os::close_fd(os::descriptor_for_shell_fd(redir.fd));
-          continue;
+          break;
         }
 
         const os::saved_descriptor saved = os::save_and_replace_descriptor(
@@ -1332,96 +1343,74 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
                                                 ": Bad file descriptor"};
         }
-        continue;
+        break;
       }
 
-      ASSERT(redir.target != nullptr);
-
-      ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
-      target_tokens.push(redir.target);
-      /* The path is opened right here and the field is never stored, so it
-         expands onto the scratch arena the command reclaims rather than the
-         heap. */
-      const ArrayList<String> target =
-          cxt.process_args(target_tokens, /*args_are_transient=*/true);
-      if (target.count() != 1) {
-        /* An ambiguous redirect, the target expanding to more or fewer than one
-           word, fails the command rather than the shell, the way dash does. */
-        redirection_open_failed = true;
-        throw ErrorWithLocation{redir.target->source_location(),
-                                "Redirection target is not a single file"};
-      }
-
-      let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
-
-      const String &target_path = target[0];
-      let opened = os::open_file_descriptor(target_path, mode);
-      if (!opened) {
-        redirection_open_failed = true;
-        throw ErrorWithLocation{redir.target->source_location(),
-                                "Could not open '" + target_path +
-                                    "': " + os::last_system_error_message()};
-      }
-      const os::descriptor file_fd = opened.take();
-
-      /* A bare exec points the shell's own descriptor at the opened file for
-         good, then drops the temporary descriptor the open returned. The dup2
-         onto fd N replaces whatever fd N held before, so a second exec onto the
-         same number closes the earlier file rather than leaking it. The flush
-         keeps buffered output on the original descriptor before it moves. */
-      if (is_bare_exec) {
-        cxt.snapshot_subshell_descriptor(redir.fd);
-        shit::flush();
-        const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
+      case redirection_outcome::OpenedFile: {
+        const os::descriptor file_fd = r.opened_fd;
+        /* A bare exec points the shell's own descriptor at the opened file for
+           good, then drops the temporary descriptor the open returned. The dup2
+           onto fd N replaces whatever fd N held before, so a second exec onto
+           the same number closes the earlier file rather than leaking it. The
+           flush keeps buffered output on the original descriptor before it
+           moves. */
+        if (is_bare_exec) {
+          cxt.snapshot_subshell_descriptor(redir.fd);
+          shit::flush();
+          const bool was_replaced = os::replace_descriptor(redir.fd, file_fd);
 #if SHIT_PLATFORM_IS WIN32
-        /* A Windows descriptor is a HANDLE, so the opened file is compared
-           against the handle that now occupies the shell slot rather than
-           against the bare fd number. */
-        if (file_fd != os::descriptor_for_shell_fd(redir.fd))
-          os::close_fd(file_fd);
+          /* A Windows descriptor is a HANDLE, so the opened file is compared
+             against the handle that now occupies the shell slot rather than
+             against the bare fd number. */
+          if (file_fd != os::descriptor_for_shell_fd(redir.fd))
+            os::close_fd(file_fd);
 #else
-        if (file_fd != redir.fd) os::close_fd(file_fd);
+          if (file_fd != redir.fd) os::close_fd(file_fd);
 #endif
-        if (!was_replaced) {
-          redirection_open_failed = true;
-          throw ErrorWithLocation{redir.target->source_location(),
-                                  utils::int_to_text(redir.fd) +
-                                      ": Bad file descriptor"};
+          if (!was_replaced) {
+            redirection_open_failed = true;
+            throw ErrorWithLocation{redir.target->source_location(),
+                                    utils::int_to_text(redir.fd) +
+                                        ": Bad file descriptor"};
+          }
+          break;
         }
-        continue;
-      }
 
-      /* Every file redirect, the standard input, output, and error included, is
-         staged onto the real shell fd N in source order so a later 2>&1 copies
-         the descriptor fd N points at now rather than the one the spawn would
-         place last. A redirect onto fd 1 or fd 2 mutates the shell's own
-         standard output or error in place, so the buffered output is flushed
-         first to land on the original descriptor. open returns the lowest free
-         fd, which is at least three while fds 0, 1, and 2 hold the shell's
-         stdio, so the file never lands on a standard fd itself. The higher fd,
-         such as 3>file, takes the same in-order path the numbered heredoc and
-         the compound redirect path use. */
-      if (redir.fd == 1 || redir.fd == 2) shit::flush();
+        /* Every file redirect, the standard input, output, and error included,
+           is staged onto the real shell fd N in source order so a later 2>&1
+           copies the descriptor fd N points at now rather than the one the
+           spawn would place last. A redirect onto fd 1 or fd 2 mutates the
+           shell's own standard output or error in place, so the buffered output
+           is flushed first to land on the original descriptor. open returns the
+           lowest free fd, which is at least three while fds 0, 1, and 2 hold
+           the shell's stdio, so the file never lands on a standard fd itself.
+           The higher fd, such as 3>file, takes the same in-order path the
+           numbered heredoc and the compound redirect path use. */
+        if (redir.fd == 1 || redir.fd == 2) shit::flush();
 #if SHIT_PLATFORM_IS WIN32
-      /* A Windows descriptor is a HANDLE, so the opened file never shares the
-         identity of a bare fd number and the save then replace path runs. */
-      const bool file_is_target_fd =
-          file_fd == os::descriptor_for_shell_fd(redir.fd);
+        /* A Windows descriptor is a HANDLE, so the opened file never shares the
+           identity of a bare fd number and the save then replace path runs. */
+        const bool file_is_target_fd =
+            file_fd == os::descriptor_for_shell_fd(redir.fd);
 #else
-      const bool file_is_target_fd = file_fd == redir.fd;
+        const bool file_is_target_fd = file_fd == redir.fd;
 #endif
-      if (file_is_target_fd) {
-        /* open returned fd N itself, since fd N was the lowest free descriptor,
-           so the file already sits on its target. The generic save then dup2
-           would back up the file and the close would shut fd N, leaving the
-           child without it, so the collision is recorded for restore without a
-           close, the same way the numbered heredoc handles it. */
-        dup_saved_descriptors.push(
-            os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
-      } else {
-        dup_saved_descriptors.push(
-            os::save_and_replace_descriptor(redir.fd, file_fd));
-        os::close_fd(file_fd);
+        if (file_is_target_fd) {
+          /* open returned fd N itself, since fd N was the lowest free
+             descriptor, so the file already sits on its target. The generic
+             save then dup2 would back up the file and the close would shut fd
+             N, leaving the child without it, so the collision is recorded for
+             restore without a close, the same way the numbered heredoc handles
+             it. */
+          dup_saved_descriptors.push(
+              os::saved_descriptor{.shell_fd = redir.fd, .was_open = false});
+        } else {
+          dup_saved_descriptors.push(
+              os::save_and_replace_descriptor(redir.fd, file_fd));
+          os::close_fd(file_fd);
+        }
+        break;
+      }
       }
     }
   } catch (const ErrorWithLocation &redirection_error) {
@@ -3896,84 +3885,46 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   shit::flush();
 
   for (const Redirection &redir : m_redirections) {
-    /* A heredoc body becomes the standard input through an anonymous temp file,
-       expanded when the delimiter was unquoted. */
-    if (redir.kind == Redirection::Kind::Heredoc ||
-        redir.kind == Redirection::Kind::HereString)
-    {
-      let body = String{};
-      if (redir.kind == Redirection::Kind::Heredoc) {
-        ASSERT(redir.heredoc_body != nullptr);
-        body = redir.heredoc_body->clone();
-        if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
-      } else {
-        ASSERT(redir.target != nullptr);
-        body = cxt.expand_word_for_assignment(
-            static_cast<const tokens::WordToken *>(redir.target)->word());
-        body += "\n";
-      }
-
-      let opened = os::write_to_temp_file(body);
-      if (!opened)
-        throw Error{"Could not stage the heredoc body: " +
-                    os::last_system_error_message()};
-
-      const os::descriptor temp_fd = opened.take();
+    let const r = resolve_redirection(redir, cxt, source_location());
+    switch (r.kind) {
+    /* A staged heredoc body and an opened file both dup onto the target shell
+       descriptor for the compound's duration, the opened copy closing at once
+       since the dup keeps a live one. */
+    case redirection_outcome::Heredoc:
+    case redirection_outcome::OpenedFile:
       saved_descriptors.push(
-          os::save_and_replace_descriptor(redir.fd, temp_fd));
-      os::close_fd(temp_fd);
-      continue;
-    }
-
-    /* A duplication like 2>&1 points one shell descriptor at another, with no
-       file opened. The descriptor may come from a dynamic word such as >&$5. */
-    if (redir.kind == Redirection::Kind::DuplicateOutput ||
-        redir.kind == Redirection::Kind::DuplicateInput)
-    {
-      let const resolved = resolve_duplication(redir, cxt);
-
-      /* The both-streams filename opens like >file onto the standard output
-         and the standard error follows it for the compound's duration, the
-         pair bash builds for the csh >&file spelling. */
-      if (resolved.both_streams_file.has_value()) {
-        let opened = os::open_file_descriptor(
-            *resolved.both_streams_file,
-            redirection_open_mode(Redirection::Kind::TruncateOutput,
-                                  cxt.no_clobber()));
-        if (!opened) {
-          throw ErrorWithLocation{redir.target->source_location(),
-                                  "Could not open '" +
-                                      *resolved.both_streams_file +
-                                      "': " + os::last_system_error_message()};
-        }
-        const os::descriptor file_fd = opened.take();
-        const os::saved_descriptor saved_out =
-            os::save_and_replace_descriptor(1, file_fd);
-        saved_descriptors.push(saved_out);
-        const os::saved_descriptor saved_err =
-            os::save_and_replace_descriptor(2, file_fd);
-        saved_descriptors.push(saved_err);
-        os::close_fd(file_fd);
-        if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
-          throw ErrorWithLocation{redir.target->source_location(),
-                                  "Bad file descriptor"};
-        }
-        continue;
+          os::save_and_replace_descriptor(r.target_fd, r.opened_fd));
+      os::close_fd(r.opened_fd);
+      break;
+    /* The both-streams file points fd 1 at it and fd 2 follows for the
+       compound's duration. */
+    case redirection_outcome::BothStreams: {
+      const os::saved_descriptor saved_out =
+          os::save_and_replace_descriptor(1, r.opened_fd);
+      saved_descriptors.push(saved_out);
+      const os::saved_descriptor saved_err =
+          os::save_and_replace_descriptor(2, r.opened_fd);
+      saved_descriptors.push(saved_err);
+      os::close_fd(r.opened_fd);
+      if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
+        throw ErrorWithLocation{redir.target->source_location(),
+                                "Bad file descriptor"};
       }
-      const i32 from_fd = resolved.fd;
-
+      break;
+    }
+    case redirection_outcome::Duplicate: {
       /* The close form backs the descriptor up, then closes it. The backup is
          saved so restore reopens it when the compound command finishes. */
-      if (from_fd == Redirection::DUP_FD_CLOSE) {
+      if (r.dup_from_fd == Redirection::DUP_FD_CLOSE) {
         saved_descriptors.push(os::save_and_replace_descriptor(
-            redir.fd, os::descriptor_for_shell_fd(redir.fd)));
-        os::close_fd(os::descriptor_for_shell_fd(redir.fd));
-        continue;
+            r.target_fd, os::descriptor_for_shell_fd(r.target_fd)));
+        os::close_fd(os::descriptor_for_shell_fd(r.target_fd));
+        break;
       }
 
-      const os::descriptor source = os::descriptor_for_shell_fd(from_fd);
+      const os::descriptor source = os::descriptor_for_shell_fd(r.dup_from_fd);
       const os::saved_descriptor saved =
-          os::save_and_replace_descriptor(redir.fd, source);
+          os::save_and_replace_descriptor(r.target_fd, source);
       saved_descriptors.push(saved);
       /* A duplication onto a closed or invalid descriptor, as in { echo hi; }
          >&7 with fd 7 closed, fails the dup2. The compound command fails with a
@@ -3983,41 +3934,12 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         const SourceLocation location = redir.target != nullptr
                                             ? redir.target->source_location()
                                             : source_location();
-        throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
+        throw ErrorWithLocation{location, utils::int_to_text(r.dup_from_fd) +
                                               ": Bad file descriptor"};
       }
-      continue;
+      break;
     }
-
-    ASSERT(redir.target != nullptr);
-
-    ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
-    target_tokens.push(redir.target);
-    /* The path is opened right here and the field is never stored, so it
-       expands onto the scratch arena the command reclaims rather than the
-       heap. */
-    const ArrayList<String> target =
-        cxt.process_args(target_tokens, /*args_are_transient=*/true);
-    if (target.count() != 1) {
-      throw ErrorWithLocation{redir.target->source_location(),
-                              "Redirection target is not a single file"};
     }
-
-    let mode = redirection_open_mode(redir.kind, cxt.no_clobber());
-
-    const String &target_path = target[0];
-    let opened = os::open_file_descriptor(target_path, mode);
-    if (!opened) {
-      throw ErrorWithLocation{redir.target->source_location(),
-                              "Could not open '" + target_path +
-                                  "': " + os::last_system_error_message()};
-    }
-    const os::descriptor file_fd = opened.take();
-
-    /* The dup leaves a live copy on the shell descriptor, so the opened file
-       descriptor itself is closed at once to avoid leaking it. */
-    saved_descriptors.push(os::save_and_replace_descriptor(redir.fd, file_fd));
-    os::close_fd(file_fd);
   }
 
   const i64 result = m_child->evaluate(cxt);
