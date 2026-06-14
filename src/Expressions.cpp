@@ -1719,17 +1719,33 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        skips its checks. The defining mood drives the strictness too, while an
        explicit set -u rides through apply_strictness_for_mood. The caller's
        state returns when the call ends. */
+    /* The common case is a function defined and called in the same mood, so the
+       swap only happens when the defining state actually differs from the live
+       state. A matching call pays one map lookup and three comparisons and skips
+       the capture, the defer, and the four setters entirely. */
     let const *const definition_info =
         cxt.function_definition_info_of(program_name.view());
-    let const saved_runtime_state = cxt.capture_runtime_state();
-    defer { cxt.restore_runtime_state(saved_runtime_state); };
-    if (definition_info != nullptr) {
+    let const needs_state_swap =
+        definition_info != nullptr &&
+        (static_cast<mimic_mood>(definition_info->defining_mood) !=
+             cxt.mood() ||
+         definition_info->defining_warnings != cxt.warnings_enabled() ||
+         definition_info->defining_diagnostics_disabled !=
+             cxt.diagnostics_disabled());
+    Maybe<runtime_state> saved_runtime_state = None;
+    if (needs_state_swap) {
+      saved_runtime_state = cxt.capture_runtime_state();
       cxt.set_mood(static_cast<mimic_mood>(definition_info->defining_mood));
       cxt.set_warnings_enabled(definition_info->defining_warnings);
       cxt.set_diagnostics_disabled(
           definition_info->defining_diagnostics_disabled);
       cxt.apply_strictness_for_mood();
     }
+    defer
+    {
+      if (saved_runtime_state.has_value())
+        cxt.restore_runtime_state(*saved_runtime_state);
+    };
 
     /* A located error thrown from the body carries an absolute position into
        the file that defined the function. The top-level handler renders

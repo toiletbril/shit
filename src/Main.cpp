@@ -1250,6 +1250,14 @@ fn main(int argc, char **argv) -> int
   if (!context.mood_set_explicitly()) context.set_mood(session_mood);
   context.apply_strictness_for_mood();
 
+  /* The profiles and rc files sourced through run_source each retained a heap
+     copy of their whole text and their parsed tree, held until the next
+     top-level command clears them. With the startup chain finished, that text
+     is dropped now rather than carried through the idle prompt, since a function
+     a profile defined keeps its body in the function arena and its source in an
+     owned copy, so nothing live indexes the dropped buffers. */
+  context.clear_retained_sources();
+
   /* A simple return cannot be used after this point, since we need a special
    * cleanup for toiletline. utils::quit() should be used instead. */
   for (;;) {
