@@ -1130,10 +1130,13 @@ fn main(int argc, char **argv) -> int
        bash setup loads. With -l it reads /etc/profile then the first existing
        of
        ~/.bash_profile, ~/.bash_login, and ~/.profile, the bash login order. An
-       interactive shell reads ~/.bashrc. The shit rc and the POSIX ENV are
-       skipped, since the intent is to initialize from the bash files. */
+       interactive shell reads ~/.bashrc. The POSIX ENV is skipped, since the
+       intent is to initialize from the bash files. The shit rc still loads
+       after them, so a shit-native interactive config such as the prompt and
+       the aliases applies on top of the bash setup. */
     if (is_login_shell) source_bash_login_files(context, ast_arena);
     if (should_be_interactive) source_bash_rc();
+    if (should_be_interactive) source_home_file(".shitrc", context, ast_arena);
   } else {
     /* A login shell reads the login files of the shell it emulates. Bash mode
        reads the bash login order, so --bash-compatible -l or a bash invocation
