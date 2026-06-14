@@ -1,0 +1,9 @@
+== inside $( ):
+alpha
+== inside backticks:
+beta
+== inside a for-head substitution:
+gamma
+== filesystem still completes inside a substitution:
+/tmp/shit_cis_dir/onlyfile
+== arithmetic is not a command body:

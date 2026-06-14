@@ -1812,11 +1812,86 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
   return candidates;
 }
 
+/* One open command substitution while scanning toward the cursor. A $( body and
+   a backtick body are tracked the same, the kind only decides which closer ends
+   it. */
+struct completion_sub_frame
+{
+  usize body_start;
+  bool is_backtick;
+};
+
+/* The byte offset where the innermost still-open command substitution body
+   begins at the cursor, or zero when the cursor sits outside one. A $( and a
+   backtick open a body, a matching ) and the next backtick close it, so
+   completion inside echo $(git che re-roots to the inner git line and offers
+   git's subcommands rather than the outer command's arguments. An arithmetic
+   $(( carries no command, so its body never re-roots, and a single-quoted run
+   is literal, so its contents open nothing. */
+static fn command_substitution_body_start(StringView line, usize cursor) throws
+    -> usize
+{
+  let frames = ArrayList<completion_sub_frame>{};
+  bool in_single_quote = false;
+  usize i = 0;
+  while (i < cursor) {
+    const char c = line[i];
+    if (in_single_quote) {
+      if (c == '\'') in_single_quote = false;
+      i++;
+      continue;
+    }
+    if (c == '\\') {
+      i += 2;
+      continue;
+    }
+    if (c == '\'') {
+      in_single_quote = true;
+      i++;
+      continue;
+    }
+    if (c == '`') {
+      if (!frames.is_empty() && frames.back().is_backtick)
+        frames.pop_back();
+      else
+        frames.push(completion_sub_frame{i + 1, true});
+      i++;
+      continue;
+    }
+    if (c == '$' && i + 1 < cursor && line[i + 1] == '(') {
+      if (i + 2 < cursor && line[i + 2] == '(') {
+        i += 3;
+        continue;
+      }
+      frames.push(completion_sub_frame{i + 2, false});
+      i += 2;
+      continue;
+    }
+    if (c == ')') {
+      if (!frames.is_empty() && !frames.back().is_backtick)
+        frames.pop_back();
+      i++;
+      continue;
+    }
+    i++;
+  }
+  return frames.is_empty() ? 0 : frames.back().body_start;
+}
+
 flatten fn complete(StringView line, usize cursor, EvalContext &context,
                     const Path &base_directory, bool for_listing) throws
     -> completion_result
 {
   if (cursor > line.length) cursor = line.length;
+
+  /* When the cursor sits inside a command substitution, completion re-roots to
+     the substitution's own command line, so echo $(git che and `git che and
+     for x in $(git che all offer git's subcommands rather than the outer
+     command's arguments. The offset maps the replaced token span back to the
+     full line for the caller. */
+  const usize completion_offset = command_substitution_body_start(line, cursor);
+  line = line.substring(completion_offset);
+  cursor -= completion_offset;
 
   /* The replaced span covers the whole word the cursor sits inside, from the
      token start to the token end, so a cursor in the middle of a word replaces
@@ -1928,7 +2003,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
   }
 
   return completion_result{
-      steal(candidates), steal(longest_common_prefix), token_start, token_end,
+      steal(candidates),       steal(longest_common_prefix),
+      token_start + completion_offset, token_end + completion_offset,
       is_command,
   };
 }
