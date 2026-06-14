@@ -528,10 +528,7 @@ static fn shorten_path_with_ellipsis(StringView path, usize max_length) throws
 
 /* The branch the \G and \g prompt segments render, shared with the
    SHIT_GIT_BRANCH dynamic variable through utils. */
-static fn git_branch() throws -> String
-{
-  return utils::current_git_branch();
-}
+static fn git_branch() throws -> String { return utils::current_git_branch(); }
 
 /* A human duration for the \D prompt segment, quiet under a few milliseconds,
    then milliseconds, then seconds with one decimal. */
@@ -708,7 +705,6 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
   return out;
 }
 
-
 /* The PS1 expansion from the previous prompt, reusable only while every value
    it read is unchanged. The scanner below collects every name a pure
    parameter-only template references, the cache stores those names with the
@@ -759,12 +755,10 @@ static fn scan_prompt_template_inputs(
       usize j = i + 2;
       /* A brace followed by whitespace or a pipe is the funsub, a command
          with unknowable inputs. */
-      if (j < text.length &&
-          (text[j] == ' ' || text[j] == '\t' || text[j] == '\n' ||
-           text[j] == '|'))
+      if (j < text.length && (text[j] == ' ' || text[j] == '\t' ||
+                              text[j] == '\n' || text[j] == '|'))
         return false;
-      if (j < text.length && (text[j] == '#' || text[j] == '!'))
-        j++;
+      if (j < text.length && (text[j] == '#' || text[j] == '!')) j++;
       usize name_start = j;
       while (j < text.length && is_name_byte(text[j]))
         j++;

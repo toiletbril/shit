@@ -126,9 +126,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        names the window after it rather than after the shell. A background
        command, a non-interactive run, or a pipeline keeps the shell's group.
      */
-    const bool is_foreground_job =
-        !is_async && cxt.shell_is_interactive() &&
-        os::shell_has_controlling_terminal();
+    const bool is_foreground_job = !is_async && cxt.shell_is_interactive() &&
+                                   os::shell_has_controlling_terminal();
 
     os::process p = SHIT_INVALID_PROCESS;
     try {

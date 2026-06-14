@@ -1086,8 +1086,7 @@ public:
      and function definitions persist. A break, continue, or return is
      consumed inside it, while an exit stays pending and ends the shell after
      the surrounding command, the way bash exits from a funsub. */
-  fn capture_function_substitution(const WordSegment &segment) throws
-      -> String;
+  fn capture_function_substitution(const WordSegment &segment) throws -> String;
 
   /* The $(< file) shorthand reads the named file directly the way bash does,
      when the substitution body is only an input redirection naming one word

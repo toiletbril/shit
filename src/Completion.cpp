@@ -111,20 +111,20 @@ static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
    for and case stay opaque since a variable or a subject word follows them,
    and in stays opaque since patterns or operands follow it. */
 static constexpr StaticStringMap<bool>::entry TRANSPARENT_PREFIX_ENTRIES[] = {
-    {SSK("!"), true},
-    {SSK("time"), true},
-    {SSK("if"), true},
-    {SSK("then"), true},
-    {SSK("else"), true},
-    {SSK("elif"), true},
-    {SSK("while"), true},
-    {SSK("until"), true},
-    {SSK("do"), true},
-    {SSK("{"), true},
-    {SSK("sudo"), true},
-    {SSK("doas"), true},
-    {SSK("env"), true},
-    {SSK("nice"), true},
+    {SSK("!"),       true},
+    {SSK("time"),    true},
+    {SSK("if"),      true},
+    {SSK("then"),    true},
+    {SSK("else"),    true},
+    {SSK("elif"),    true},
+    {SSK("while"),   true},
+    {SSK("until"),   true},
+    {SSK("do"),      true},
+    {SSK("{"),       true},
+    {SSK("sudo"),    true},
+    {SSK("doas"),    true},
+    {SSK("env"),     true},
+    {SSK("nice"),    true},
     {SSK("command"), true},
     {SSK("builtin"), true},
 };
@@ -623,10 +623,10 @@ static fn command_word_of(StringView line) wontthrow -> StringView
 /* Expand a command name through alias definitions only, the first word of each
    expansion, bounded so a cyclic alias terminates. Symlinks are left alone, so
    a name that dispatches on its argv[0] such as a busybox or rustup link keeps
-   the surface name the user typed, which the --help fork runs so the multiplexer
-   answers as that name. */
-static fn resolve_completion_alias(StringView command, EvalContext &context)
-    throws -> String
+   the surface name the user typed, which the --help fork runs so the
+   multiplexer answers as that name. */
+static fn resolve_completion_alias(StringView command,
+                                   EvalContext &context) throws -> String
 {
   let name = String{command};
   for (int depth = 0; depth < 8; depth++) {
@@ -1110,176 +1110,176 @@ static fn parse_manpage_options(StringView text) throws -> ArrayList<String>
    than sixteen bytes cannot key the packed map, so it is left out. */
 static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
     {
-        {SSK("ffmpeg"), "--help full"},
-        {SSK("ffprobe"), "--help full"},
-        {SSK("ffplay"), "--help full"},
-        {SSK("cargo"), "--help"},
-        {SSK("rustup"), "--help"},
-        {SSK("rustc"), "--help"},
-        {SSK("rustfmt"), "--help"},
-        {SSK("go"), "--help"},
-        {SSK("npm"), "--help"},
-        {SSK("pnpm"), "--help"},
-        {SSK("yarn"), "--help"},
-        {SSK("deno"), "--help"},
-        {SSK("bun"), "--help"},
-        {SSK("node"), "--help"},
-        {SSK("pip"), "--help"},
-        {SSK("pip3"), "--help"},
-        {SSK("docker"), "--help"},
-        {SSK("podman"), "--help"},
-        {SSK("kubectl"), "--help"},
-        {SSK("helm"), "--help"},
-        {SSK("gh"), "--help"},
-        {SSK("glab"), "--help"},
-        {SSK("terraform"), "--help"},
-        {SSK("cmake"), "--help"},
-        {SSK("ninja"), "--help"},
-        {SSK("meson"), "--help"},
-        {SSK("jq"), "--help"},
-        {SSK("yq"), "--help"},
-        {SSK("rg"), "--help"},
-        {SSK("fd"), "--help"},
-        {SSK("bat"), "--help"},
-        {SSK("fzf"), "--help"},
-        {SSK("zig"), "--help"},
-        {SSK("poetry"), "--help"},
-        {SSK("pipx"), "--help"},
-        {SSK("uv"), "--help"},
-        {SSK("just"), "--help"},
-        {SSK("hugo"), "--help"},
-        {SSK("pandoc"), "--help"},
-        {SSK("delta"), "--help"},
-        {SSK("dust"), "--help"},
-        {SSK("starship"), "--help"},
-        {SSK("gofmt"), "--help"},
-        {SSK("magick"), "--help"},
-        {SSK("convert"), "--help"},
+        {SSK("ffmpeg"),       "--help full"},
+        {SSK("ffprobe"),      "--help full"},
+        {SSK("ffplay"),       "--help full"},
+        {SSK("cargo"),        "--help"     },
+        {SSK("rustup"),       "--help"     },
+        {SSK("rustc"),        "--help"     },
+        {SSK("rustfmt"),      "--help"     },
+        {SSK("go"),           "--help"     },
+        {SSK("npm"),          "--help"     },
+        {SSK("pnpm"),         "--help"     },
+        {SSK("yarn"),         "--help"     },
+        {SSK("deno"),         "--help"     },
+        {SSK("bun"),          "--help"     },
+        {SSK("node"),         "--help"     },
+        {SSK("pip"),          "--help"     },
+        {SSK("pip3"),         "--help"     },
+        {SSK("docker"),       "--help"     },
+        {SSK("podman"),       "--help"     },
+        {SSK("kubectl"),      "--help"     },
+        {SSK("helm"),         "--help"     },
+        {SSK("gh"),           "--help"     },
+        {SSK("glab"),         "--help"     },
+        {SSK("terraform"),    "--help"     },
+        {SSK("cmake"),        "--help"     },
+        {SSK("ninja"),        "--help"     },
+        {SSK("meson"),        "--help"     },
+        {SSK("jq"),           "--help"     },
+        {SSK("yq"),           "--help"     },
+        {SSK("rg"),           "--help"     },
+        {SSK("fd"),           "--help"     },
+        {SSK("bat"),          "--help"     },
+        {SSK("fzf"),          "--help"     },
+        {SSK("zig"),          "--help"     },
+        {SSK("poetry"),       "--help"     },
+        {SSK("pipx"),         "--help"     },
+        {SSK("uv"),           "--help"     },
+        {SSK("just"),         "--help"     },
+        {SSK("hugo"),         "--help"     },
+        {SSK("pandoc"),       "--help"     },
+        {SSK("delta"),        "--help"     },
+        {SSK("dust"),         "--help"     },
+        {SSK("starship"),     "--help"     },
+        {SSK("gofmt"),        "--help"     },
+        {SSK("magick"),       "--help"     },
+        {SSK("convert"),      "--help"     },
         /* Compilers and binary tools. */
-        {SSK("clang"), "--help"},
-        {SSK("clang++"), "--help"},
-        {SSK("gcc"), "--help"},
-        {SSK("g++"), "--help"},
-        {SSK("cc"), "--help"},
-        {SSK("c++"), "--help"},
-        {SSK("clang-format"), "--help"},
-        {SSK("clang-tidy"), "--help"},
-        {SSK("gdb"), "--help"},
-        {SSK("lldb"), "--help"},
-        {SSK("objdump"), "--help"},
-        {SSK("readelf"), "--help"},
-        {SSK("nm"), "--help"},
-        {SSK("strip"), "--help"},
-        {SSK("ar"), "--help"},
-        {SSK("ld"), "--help"},
-        {SSK("lld"), "--help"},
-        {SSK("valgrind"), "--help"},
-        {SSK("cppcheck"), "--help"},
-        {SSK("ccache"), "--help"},
+        {SSK("clang"),        "--help"     },
+        {SSK("clang++"),      "--help"     },
+        {SSK("gcc"),          "--help"     },
+        {SSK("g++"),          "--help"     },
+        {SSK("cc"),           "--help"     },
+        {SSK("c++"),          "--help"     },
+        {SSK("clang-format"), "--help"     },
+        {SSK("clang-tidy"),   "--help"     },
+        {SSK("gdb"),          "--help"     },
+        {SSK("lldb"),         "--help"     },
+        {SSK("objdump"),      "--help"     },
+        {SSK("readelf"),      "--help"     },
+        {SSK("nm"),           "--help"     },
+        {SSK("strip"),        "--help"     },
+        {SSK("ar"),           "--help"     },
+        {SSK("ld"),           "--help"     },
+        {SSK("lld"),          "--help"     },
+        {SSK("valgrind"),     "--help"     },
+        {SSK("cppcheck"),     "--help"     },
+        {SSK("ccache"),       "--help"     },
         /* Language runtimes and their toolchains. */
-        {SSK("python"), "--help"},
-        {SSK("python3"), "--help"},
-        {SSK("ruby"), "--help"},
-        {SSK("perl"), "--help"},
-        {SSK("lua"), "--help"},
-        {SSK("php"), "--help"},
-        {SSK("julia"), "--help"},
-        {SSK("java"), "--help"},
-        {SSK("javac"), "--help"},
-        {SSK("kotlin"), "--help"},
-        {SSK("kotlinc"), "--help"},
-        {SSK("scala"), "--help"},
-        {SSK("dotnet"), "--help"},
-        {SSK("dart"), "--help"},
-        {SSK("swift"), "--help"},
-        {SSK("swiftc"), "--help"},
-        {SSK("elixir"), "--help"},
-        {SSK("mix"), "--help"},
-        {SSK("ocaml"), "--help"},
-        {SSK("crystal"), "--help"},
-        {SSK("nim"), "--help"},
-        {SSK("cabal"), "--help"},
-        {SSK("stack"), "--help"},
-        {SSK("opam"), "--help"},
-        {SSK("ghc"), "--help"},
-        {SSK("tsc"), "--help"},
-        {SSK("esbuild"), "--help"},
-        {SSK("prettier"), "--help"},
-        {SSK("eslint"), "--help"},
-        {SSK("biome"), "--help"},
-        {SSK("vite"), "--help"},
+        {SSK("python"),       "--help"     },
+        {SSK("python3"),      "--help"     },
+        {SSK("ruby"),         "--help"     },
+        {SSK("perl"),         "--help"     },
+        {SSK("lua"),          "--help"     },
+        {SSK("php"),          "--help"     },
+        {SSK("julia"),        "--help"     },
+        {SSK("java"),         "--help"     },
+        {SSK("javac"),        "--help"     },
+        {SSK("kotlin"),       "--help"     },
+        {SSK("kotlinc"),      "--help"     },
+        {SSK("scala"),        "--help"     },
+        {SSK("dotnet"),       "--help"     },
+        {SSK("dart"),         "--help"     },
+        {SSK("swift"),        "--help"     },
+        {SSK("swiftc"),       "--help"     },
+        {SSK("elixir"),       "--help"     },
+        {SSK("mix"),          "--help"     },
+        {SSK("ocaml"),        "--help"     },
+        {SSK("crystal"),      "--help"     },
+        {SSK("nim"),          "--help"     },
+        {SSK("cabal"),        "--help"     },
+        {SSK("stack"),        "--help"     },
+        {SSK("opam"),         "--help"     },
+        {SSK("ghc"),          "--help"     },
+        {SSK("tsc"),          "--help"     },
+        {SSK("esbuild"),      "--help"     },
+        {SSK("prettier"),     "--help"     },
+        {SSK("eslint"),       "--help"     },
+        {SSK("biome"),        "--help"     },
+        {SSK("vite"),         "--help"     },
         /* Package managers. */
-        {SSK("apt"), "--help"},
-        {SSK("apt-get"), "--help"},
-        {SSK("dnf"), "--help"},
-        {SSK("pacman"), "--help"},
-        {SSK("zypper"), "--help"},
-        {SSK("apk"), "--help"},
-        {SSK("brew"), "--help"},
-        {SSK("flatpak"), "--help"},
-        {SSK("snap"), "--help"},
-        {SSK("nix"), "--help"},
-        {SSK("conda"), "--help"},
-        {SSK("mamba"), "--help"},
-        {SSK("gem"), "--help"},
-        {SSK("composer"), "--help"},
+        {SSK("apt"),          "--help"     },
+        {SSK("apt-get"),      "--help"     },
+        {SSK("dnf"),          "--help"     },
+        {SSK("pacman"),       "--help"     },
+        {SSK("zypper"),       "--help"     },
+        {SSK("apk"),          "--help"     },
+        {SSK("brew"),         "--help"     },
+        {SSK("flatpak"),      "--help"     },
+        {SSK("snap"),         "--help"     },
+        {SSK("nix"),          "--help"     },
+        {SSK("conda"),        "--help"     },
+        {SSK("mamba"),        "--help"     },
+        {SSK("gem"),          "--help"     },
+        {SSK("composer"),     "--help"     },
         /* Version control. */
-        {SSK("hg"), "--help"},
-        {SSK("svn"), "--help"},
-        {SSK("jj"), "--help"},
-        {SSK("fossil"), "--help"},
+        {SSK("hg"),           "--help"     },
+        {SSK("svn"),          "--help"     },
+        {SSK("jj"),           "--help"     },
+        {SSK("fossil"),       "--help"     },
         /* Modern command-line tools. */
-        {SSK("eza"), "--help"},
-        {SSK("lsd"), "--help"},
-        {SSK("procs"), "--help"},
-        {SSK("sd"), "--help"},
-        {SSK("hyperfine"), "--help"},
-        {SSK("tokei"), "--help"},
-        {SSK("watchexec"), "--help"},
-        {SSK("entr"), "--help"},
-        {SSK("direnv"), "--help"},
-        {SSK("zoxide"), "--help"},
-        {SSK("atuin"), "--help"},
-        {SSK("broot"), "--help"},
-        {SSK("btm"), "--help"},
-        {SSK("gitui"), "--help"},
-        {SSK("dive"), "--help"},
-        {SSK("k9s"), "--help"},
-        {SSK("kubectx"), "--help"},
-        {SSK("kubens"), "--help"},
-        {SSK("kustomize"), "--help"},
-        {SSK("skaffold"), "--help"},
+        {SSK("eza"),          "--help"     },
+        {SSK("lsd"),          "--help"     },
+        {SSK("procs"),        "--help"     },
+        {SSK("sd"),           "--help"     },
+        {SSK("hyperfine"),    "--help"     },
+        {SSK("tokei"),        "--help"     },
+        {SSK("watchexec"),    "--help"     },
+        {SSK("entr"),         "--help"     },
+        {SSK("direnv"),       "--help"     },
+        {SSK("zoxide"),       "--help"     },
+        {SSK("atuin"),        "--help"     },
+        {SSK("broot"),        "--help"     },
+        {SSK("btm"),          "--help"     },
+        {SSK("gitui"),        "--help"     },
+        {SSK("dive"),         "--help"     },
+        {SSK("k9s"),          "--help"     },
+        {SSK("kubectx"),      "--help"     },
+        {SSK("kubens"),       "--help"     },
+        {SSK("kustomize"),    "--help"     },
+        {SSK("skaffold"),     "--help"     },
         /* Cloud and infrastructure. */
-        {SSK("doctl"), "--help"},
-        {SSK("flyctl"), "--help"},
-        {SSK("pulumi"), "--help"},
-        {SSK("packer"), "--help"},
-        {SSK("vault"), "--help"},
-        {SSK("consul"), "--help"},
-        {SSK("nomad"), "--help"},
-        {SSK("vercel"), "--help"},
+        {SSK("doctl"),        "--help"     },
+        {SSK("flyctl"),       "--help"     },
+        {SSK("pulumi"),       "--help"     },
+        {SSK("packer"),       "--help"     },
+        {SSK("vault"),        "--help"     },
+        {SSK("consul"),       "--help"     },
+        {SSK("nomad"),        "--help"     },
+        {SSK("vercel"),       "--help"     },
         /* Network and transfer. */
-        {SSK("curl"), "--help"},
-        {SSK("wget"), "--help"},
-        {SSK("httpie"), "--help"},
-        {SSK("xh"), "--help"},
-        {SSK("aria2c"), "--help"},
-        {SSK("rsync"), "--help"},
-        {SSK("rclone"), "--help"},
+        {SSK("curl"),         "--help"     },
+        {SSK("wget"),         "--help"     },
+        {SSK("httpie"),       "--help"     },
+        {SSK("xh"),           "--help"     },
+        {SSK("aria2c"),       "--help"     },
+        {SSK("rsync"),        "--help"     },
+        {SSK("rclone"),       "--help"     },
         /* Text and data. */
-        {SSK("mlr"), "--help"},
-        {SSK("dasel"), "--help"},
-        {SSK("gron"), "--help"},
-        {SSK("fx"), "--help"},
-        {SSK("xsv"), "--help"},
+        {SSK("mlr"),          "--help"     },
+        {SSK("dasel"),        "--help"     },
+        {SSK("gron"),         "--help"     },
+        {SSK("fx"),           "--help"     },
+        {SSK("xsv"),          "--help"     },
         /* System. */
-        {SSK("systemctl"), "--help"},
-        {SSK("journalctl"), "--help"},
-        {SSK("nmcli"), "--help"},
-        {SSK("buildah"), "--help"},
-        {SSK("skopeo"), "--help"},
-        {SSK("dedoc"), "--help"},
-        {SSK("typst"), "--help"},
+        {SSK("systemctl"),    "--help"     },
+        {SSK("journalctl"),   "--help"     },
+        {SSK("nmcli"),        "--help"     },
+        {SSK("buildah"),      "--help"     },
+        {SSK("skopeo"),       "--help"     },
+        {SSK("dedoc"),        "--help"     },
+        {SSK("typst"),        "--help"     },
 };
 static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
     HELP_ALLOWLIST_ENTRIES,
@@ -1435,9 +1435,11 @@ static fn help_text_for(StringView command) throws -> StringView
     const StringView argument_view = StringView{*help_argument};
     usize i = 0;
     while (i < argument_view.length) {
-      while (i < argument_view.length && argument_view[i] == ' ') i++;
+      while (i < argument_view.length && argument_view[i] == ' ')
+        i++;
       const usize start = i;
-      while (i < argument_view.length && argument_view[i] != ' ') i++;
+      while (i < argument_view.length && argument_view[i] != ' ')
+        i++;
       if (i > start)
         argv.push(String{argument_view.substring_of_length(start, i - start)});
     }
@@ -1467,7 +1469,8 @@ static fn parse_help_option_entries(StringView text) throws
   usize i = 0;
   while (i < text.length) {
     usize line_end = i;
-    while (line_end < text.length && text[line_end] != '\n') line_end++;
+    while (line_end < text.length && text[line_end] != '\n')
+      line_end++;
     const StringView raw = text.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
@@ -1489,7 +1492,8 @@ static fn parse_help_option_entries(StringView text) throws
     StringView description = StringView{};
     if (gap < raw.length) {
       usize d = gap;
-      while (d < raw.length && (raw[d] == ' ' || raw[d] == '\t')) d++;
+      while (d < raw.length && (raw[d] == ' ' || raw[d] == '\t'))
+        d++;
       usize d_end = raw.length;
       while (d_end > d && (raw[d_end - 1] == ' ' || raw[d_end - 1] == '\t'))
         d_end--;
@@ -1505,8 +1509,8 @@ static fn parse_help_option_entries(StringView text) throws
       while (k < option_part.length && option_part[k] != ' ' &&
              option_part[k] != ',')
         k++;
-      StringView flag = option_part.substring_of_length(token_start,
-                                                        k - token_start);
+      StringView flag =
+          option_part.substring_of_length(token_start, k - token_start);
       if (let const equals = flag.find_character('='); equals.has_value())
         flag = flag.substring_of_length(0, *equals);
       if (flag.length >= 2 && flag[0] == '-' && !seen.contains(flag)) {
@@ -1536,9 +1540,9 @@ static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
 {
   if (name.is_empty()) return false;
   const char first = name[0];
-  const bool starts_word =
-      (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') ||
-      (first >= '0' && first <= '9');
+  const bool starts_word = (first >= 'a' && first <= 'z') ||
+                           (first >= 'A' && first <= 'Z') ||
+                           (first >= '0' && first <= '9');
   if (!starts_word) return false;
   for (usize i = 0; i < name.length; i++) {
     const char c = name[i];
@@ -1586,7 +1590,8 @@ static fn parse_help_subcommands(StringView text) throws
   usize i = 0;
   while (i < text.length) {
     usize line_end = i;
-    while (line_end < text.length && text[line_end] != '\n') line_end++;
+    while (line_end < text.length && text[line_end] != '\n')
+      line_end++;
     const StringView raw = text.substring_of_length(i, line_end - i);
     i = line_end + 1;
 
@@ -2444,8 +2449,7 @@ static fn command_substitution_body_start(StringView line, usize cursor) throws
       continue;
     }
     if (c == ')') {
-      if (!frames.is_empty() && !frames.back().is_backtick)
-        frames.pop_back();
+      if (!frames.is_empty() && !frames.back().is_backtick) frames.pop_back();
       i++;
       continue;
     }
@@ -2554,9 +2558,8 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       from_stage =
           complete_from_builtin_flags(line, token, token_start, context);
     if (!from_stage.has_value() && context.mood() == mimic_mood::Default) {
-      from_stage =
-          complete_from_man_subcommands(line, token, token_start, for_listing,
-                                        context);
+      from_stage = complete_from_man_subcommands(line, token, token_start,
+                                                 for_listing, context);
       if (!from_stage.has_value())
         from_stage = complete_from_help_subcommands(
             line, token, token_start, for_listing, context, descriptions);

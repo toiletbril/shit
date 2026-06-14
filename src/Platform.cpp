@@ -631,8 +631,8 @@ fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
   return owner_is_trusted && others_cannot_write;
 }
 
-fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos)
-    wontthrow -> Maybe<String>
+fn capture_program_output(const ArrayList<String> &argv,
+                          u64 timeout_nanos) wontthrow -> Maybe<String>
 {
   if (argv.is_empty()) return None;
 
@@ -1729,8 +1729,8 @@ fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
   return false;
 }
 
-fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos)
-    wontthrow -> Maybe<String>
+fn capture_program_output(const ArrayList<String> &argv,
+                          u64 timeout_nanos) wontthrow -> Maybe<String>
 {
   /* The --help completion fork is off on Windows until the timed capture is
      ported, so nothing is captured. */

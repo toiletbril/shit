@@ -466,18 +466,19 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
    That accepts a user tool directory such as ~/.cargo/bin while rejecting a
    world-writable directory such as /tmp or a path an attacker could prepend.
    False when the directory cannot be stat'd. On Windows it returns false, so
-   the --help completion fork stays off until a Windows ownership check lands. */
+   the --help completion fork stays off until a Windows ownership check lands.
+ */
 fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool;
 
 /* Run argv as a child, capturing its standard output and standard error, and
    return that text. The child's standard input is the null device so a program
    that would page or prompt reads end-of-file and exits. The capture is bounded
-   by timeout_nanos, and a child still running at the deadline is killed and None
-   is returned, so a slow or hung --help never freezes the prompt. None also on a
-   spawn or pipe failure. On Windows it returns None until a Windows
+   by timeout_nanos, and a child still running at the deadline is killed and
+   None is returned, so a slow or hung --help never freezes the prompt. None
+   also on a spawn or pipe failure. On Windows it returns None until a Windows
    implementation lands. */
-fn capture_program_output(const ArrayList<String> &argv, u64 timeout_nanos)
-    wontthrow -> Maybe<String>;
+fn capture_program_output(const ArrayList<String> &argv,
+                          u64 timeout_nanos) wontthrow -> Maybe<String>;
 
 /* Hand the controlling terminal to the given process's group, so it becomes
    the foreground job tmux reports, ignoring SIGTTOU across the change. A no-op

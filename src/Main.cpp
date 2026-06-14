@@ -397,11 +397,10 @@ static fn run_script_contents(const String &script_contents,
        shell or environment variable, an update rather than a leak. The
        query is lazy, so the analysis pays nothing per chunk for it. */
     if (run_analysis &&
-        !analyze_ast(ast, script_contents, context.function_names(),
-                     context.alias_names(), &context,
-                     FLAG_WARNINGS.is_enabled(),
-                     FLAG_WARNINGS.is_enabled() &&
-                         context.shell_is_interactive()))
+        !analyze_ast(
+            ast, script_contents, context.function_names(),
+            context.alias_names(), &context, FLAG_WARNINGS.is_enabled(),
+            FLAG_WARNINGS.is_enabled() && context.shell_is_interactive()))
     {
       exit_code = EXIT_FAILURE;
     } else if (context.no_exec()) {
@@ -480,8 +479,7 @@ static fn run_script_contents(const String &script_contents,
    which keeps the prompt escapes and the next command reading the real values
    rather than the ones the hook left behind. An empty or unset PROMPT_COMMAND
    runs nothing. */
-static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena)
-    -> void
+static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 {
   Maybe<String> command = context.get_variable_value("PROMPT_COMMAND");
   if (!command.has_value() || command->is_empty()) return;
@@ -638,7 +636,8 @@ fn main(int argc, char **argv) -> int
       let const c = i < view.length ? view[i] : ' ';
       if (c == ' ' || c == '\t' || c == '\n') {
         if (i > token_start) {
-          let const token = view.substring_of_length(token_start, i - token_start);
+          let const token =
+              view.substring_of_length(token_start, i - token_start);
           if (skip_next_command_word) {
             skip_next_command_word = false;
           } else if (token == "-c") {
