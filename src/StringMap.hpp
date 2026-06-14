@@ -167,7 +167,8 @@ public:
       /* The packed compare rejects a mismatch in two words before the byte
          compare, the same fast reject find and set_value use. */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
-          slot.key == key) {
+          slot.key == key)
+      {
         /* Free the stored key and value but keep the slot objects alive, so a
            later place into this tombstone assigns into a live object rather
            than one whose lifetime already ended. */

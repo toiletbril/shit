@@ -3904,17 +3904,17 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
 /* The operators an expression may hold, longest first so the scan munches
    maximally, <<= before << before <. */
 static const StringView ARITH_OPERATORS[] = {
-    "<<=", ">>=", "**", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
-    "++",  "--",  "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "(",
-    ")",   ",",   "?",  ":",  "+",  "-",  "*",  "/",  "%",  "<",  ">",
-    "=",   "&",   "|",  "^",  "!",  "~",
+    "<<=", ">>=", "**", "<<", ">>", "<=", ">=", "==", "!=", "&&",
+    "||",  "++",  "--", "+=", "-=", "*=", "/=", "%=", "&=", "|=",
+    "^=",  "(",   ")",  ",",  "?",  ":",  "+",  "-",  "*",  "/",
+    "%",   "<",   ">",  "=",  "&",  "|",  "^",  "!",  "~",
 };
 
 /* Lexes the whole arithmetic expression into tokens once. A number carries its
    value, a name and an operator carry a view into the source, and an array
    subscript carries the balanced raw bytes between its brackets. */
-static fn tokenize_arithmetic(StringView src, ArrayList<arith_token> &out) throws
-    -> void
+static fn tokenize_arithmetic(StringView src,
+                              ArrayList<arith_token> &out) throws -> void
 {
   usize i = 0;
   while (i < src.length) {
@@ -3936,8 +3936,9 @@ static fn tokenize_arithmetic(StringView src, ArrayList<arith_token> &out) throw
       i++;
       while (i < src.length && lexer::is_variable_name(src[i]))
         i++;
-      out.push(arith_token{arith_token::kind::name, 0,
-                           src.substring_of_length(name_start, i - name_start)});
+      out.push(
+          arith_token{arith_token::kind::name, 0,
+                      src.substring_of_length(name_start, i - name_start)});
       if (i < src.length && src[i] == '[') {
         i++;
         let const inner_start = i;
@@ -3951,9 +3952,9 @@ static fn tokenize_arithmetic(StringView src, ArrayList<arith_token> &out) throw
         }
         if (depth != 0)
           throw Error{"Arithmetic: expected ']' after an array subscript"};
-        out.push(arith_token{arith_token::kind::subscript, 0,
-                             src.substring_of_length(inner_start,
-                                                     i - inner_start)});
+        out.push(
+            arith_token{arith_token::kind::subscript, 0,
+                        src.substring_of_length(inner_start, i - inner_start)});
         i++;
       }
       continue;
@@ -3992,12 +3993,13 @@ static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
 
 /* True when every token is a plain arithmetic token, so the fast path can
    evaluate it with no assignment, branch, or short-circuit to order. */
-static pure fn arith_tokens_are_simple(const ArrayList<arith_token> &toks)
-    wontthrow -> bool
+static pure fn
+arith_tokens_are_simple(const ArrayList<arith_token> &toks) wontthrow -> bool
 {
   for (const arith_token &t : toks) {
     if (t.k == arith_token::kind::subscript) return false;
-    if (t.k == arith_token::kind::op && arith_op_is_complex(t.text)) return false;
+    if (t.k == arith_token::kind::op && arith_op_is_complex(t.text))
+      return false;
   }
   return true;
 }
@@ -4110,7 +4112,8 @@ public:
   {
     depth++;
     defer { depth--; };
-    if (depth > MAX_DEPTH) throw Error{"Arithmetic: expression nested too deeply"};
+    if (depth > MAX_DEPTH)
+      throw Error{"Arithmetic: expression nested too deeply"};
 
     if (at_op("+")) {
       ti++;
