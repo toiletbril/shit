@@ -18,7 +18,9 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "b"]
   [CompoundListCondition, None]
-    [SimpleCommand "wc" "-l"]
+    [Pipeline]
+      [SimpleCommand "wc" "-l"]
+      [SimpleCommand "tr" "-d" " "]
   [CompoundListCondition, None]
     [RedirectedCommand]
       [ForLoop "n"]
@@ -88,6 +90,15 @@
 ]
 [Word
   Unquoted "/tmp/shit_compound_redir.txt"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal " "
 ]
 [Word
   Unquoted "for"
