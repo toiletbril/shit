@@ -571,6 +571,22 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   return result;
 }
 
+fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
+{
+  struct stat directory_stat;
+  if (stat(directory.c_str(), &directory_stat) != 0) return false;
+  /* Only a directory the current user or root owns is trusted, so a directory
+     owned by another user, which that user could swap a binary into, never
+     qualifies. */
+  const bool owner_is_trusted =
+      directory_stat.st_uid == 0 || directory_stat.st_uid == geteuid();
+  /* A directory writable by group or other lets someone other than the owner
+     drop a binary in, so it is rejected even when the owner is trusted. */
+  const bool others_cannot_write =
+      (directory_stat.st_mode & (S_IWGRP | S_IWOTH)) == 0;
+  return owner_is_trusted && others_cannot_write;
+}
+
 fn give_controlling_terminal_to(process p) wontthrow -> void
 {
   if (!shell_has_controlling_terminal()) return;
@@ -1587,6 +1603,15 @@ fn reclaim_controlling_terminal() wontthrow -> void {}
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
 {
   return path.clone();
+}
+
+fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool
+{
+  /* Windows ownership and ACL checks differ from the POSIX owner and mode bits,
+     so until a Windows check lands no directory is trusted and the --help
+     completion fork stays off. */
+  unused(directory);
+  return false;
 }
 
 fn descriptor_for_shell_fd(i32 shell_fd) wontthrow -> os::descriptor

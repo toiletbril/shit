@@ -1,3 +1,7 @@
-== untrusted command offers no --help options:
+== a binary in a trusted directory offers its --help options:
+--marker-option
+== and was forked:
+forked
+== a binary in a world-writable directory offers nothing:
 == and was never forked:
 not forked

@@ -461,6 +461,14 @@ fn shell_has_controlling_terminal() wontthrow -> bool;
    path cannot be resolved. On Windows it returns the input unchanged. */
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
 
+/* Whether the directory is safe to run a binary from for its --help text, so it
+   is owned by root or the current user and is not writable by group or other.
+   That accepts a user tool directory such as ~/.cargo/bin while rejecting a
+   world-writable directory such as /tmp or a path an attacker could prepend.
+   False when the directory cannot be stat'd. On Windows it returns false, so
+   the --help completion fork stays off until a Windows ownership check lands. */
+fn directory_is_trusted_for_exec(const Path &directory) wontthrow -> bool;
+
 /* Hand the controlling terminal to the given process's group, so it becomes
    the foreground job tmux reports, ignoring SIGTTOU across the change. A no-op
    without a controlling terminal. reclaim_controlling_terminal takes it back

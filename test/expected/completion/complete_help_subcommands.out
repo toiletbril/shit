@@ -1,0 +1,5 @@
+== subcommands in subcommand position:
+check
+clean
+== option after a dash:
+--verbose

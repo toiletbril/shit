@@ -620,8 +620,13 @@ static fn command_word_of(StringView line) wontthrow -> StringView
    g='git' alias consults git, and a vi that links to nvim reads nvim's
    options. The alias walk is bounded against a cycle, and a name that
    resolves to nothing returns unchanged. */
-static fn resolve_completion_command(StringView command,
-                                     EvalContext &context) throws -> String
+/* Expand a command name through alias definitions only, the first word of each
+   expansion, bounded so a cyclic alias terminates. Symlinks are left alone, so
+   a name that dispatches on its argv[0] such as a busybox or rustup link keeps
+   the surface name the user typed, which the --help fork runs so the multiplexer
+   answers as that name. */
+static fn resolve_completion_alias(StringView command, EvalContext &context)
+    throws -> String
 {
   let name = String{command};
   for (int depth = 0; depth < 8; depth++) {
@@ -638,6 +643,13 @@ static fn resolve_completion_command(StringView command,
     if (first.is_empty() || first == name.view()) break;
     name = String{first};
   }
+  return name;
+}
+
+static fn resolve_completion_command(StringView command,
+                                     EvalContext &context) throws -> String
+{
+  let name = resolve_completion_alias(command, context);
   /* A name holding a slash is a path already, otherwise it is searched on
      PATH, then the located file's symlinks are followed to the real target. */
   let const located = utils::search_program_path(name.view());
@@ -1172,47 +1184,44 @@ static fn complete_from_manpage(StringView line, StringView token,
   return matches;
 }
 
-/* The options a command's --help text documents, parsed once and cached under
-   the command name. The cache key is the resolved command name. */
+/* A command's --help text, the option flags it lists, and the subcommands it
+   lists, each cached under the resolved command name. The raw text caches so
+   the options and the subcommands parse from one fork rather than two. */
+static StringMap<String> HELP_TEXT_CACHE{heap_allocator()};
 static StringMap<ArrayList<String>> HELP_OPTION_CACHE{heap_allocator()};
+static StringMap<ArrayList<String>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
 
-/* The directories a --help fork is allowed to run a binary from. A command that
-   resolves outside them never forks, so a program in the working directory or
-   another untrusted place is never executed for its --help text. */
-static const StringView TRUSTED_HELP_DIRECTORIES[] = {
-    StringView{"/bin"},          StringView{"/usr/bin"},
-    StringView{"/usr/local/bin"}, StringView{"/sbin"},
-    StringView{"/usr/sbin"},      StringView{"/opt/homebrew/bin"},
-    StringView{"/opt/local/bin"},
-};
-
-/* Whether the directory the absolute path sits in is one of the trusted set. */
-static fn command_directory_is_trusted(StringView absolute_path) wontthrow
-    -> bool
+/* Whether the directory the resolved binary sits in is safe to fork for its
+   --help text. The check is permission-based rather than a fixed list, so a
+   user tool directory such as ~/.cargo/bin or ~/.local/bin is trusted while a
+   world-writable directory such as /tmp or a path an attacker prepended is not.
+   shit derives completions with no config, so the directory set cannot be a
+   hardcoded list of system bins. */
+static fn command_directory_is_trusted(StringView absolute_path) throws -> bool
 {
   usize last_slash = absolute_path.length;
   for (usize i = 0; i < absolute_path.length; i++)
     if (absolute_path[i] == '/') last_slash = i;
   if (last_slash == absolute_path.length) return false;
-  const StringView directory = absolute_path.substring_of_length(0, last_slash);
-  for (const StringView &trusted : TRUSTED_HELP_DIRECTORIES)
-    if (directory == trusted) return true;
-  return false;
+  const StringView directory =
+      last_slash == 0 ? StringView{"/"}
+                      : absolute_path.substring_of_length(0, last_slash);
+  return os::directory_is_trusted_for_exec(Path{directory});
 }
 
-/* The option flags a command's --help text lists, for a command that resolves
-   into a trusted directory and has no manpage to read. The resolved absolute
-   path runs, not the bare name, so an alias or a function never shadows the
-   trusted binary, the trusted-directory gate keeps the fork off any program in
-   an untrusted place, and stdin is closed so a binary that would page or prompt
-   reads end-of-file and exits rather than hanging the prompt. The parse reuses
-   the manpage flag scanner since the option syntax is the same. */
-static fn help_options_for(StringView command, EvalContext &context) throws
-    -> const ArrayList<String> &
+/* A command's raw --help text, captured once for a command that resolves into a
+   trusted directory. The resolved absolute path runs, not the bare name, so an
+   alias or a function never shadows the trusted binary, the trusted-directory
+   gate keeps the fork off any program in an untrusted place, and stdin is
+   closed so a binary that would page or prompt reads end-of-file and exits
+   rather than hanging the prompt. An untrusted or unresolved command caches the
+   empty string, so it never forks twice. */
+static fn help_text_for(StringView command, EvalContext &context) throws
+    -> StringView
 {
-  if (const ArrayList<String> *cached = HELP_OPTION_CACHE.find(command))
-    return *cached;
-  let parsed = ArrayList<String>{};
+  if (const String *cached = HELP_TEXT_CACHE.find(command))
+    return cached->view();
+  let text = String{};
   try {
     let const paths = utils::search_program_path(command);
     if (!paths.is_empty() &&
@@ -1226,18 +1235,140 @@ static fn help_options_for(StringView command, EvalContext &context) throws
         help_argument = StringView{*custom};
       const String command_line = String{paths[0].text().view()} + " " +
                                   help_argument + " </dev/null 2>&1";
-      LOG(verbosity::Debug, "forking --help for '%.*s'",
+      LOG(verbosity::Debug, "forking '%.*s' for its --help text",
           static_cast<int>(command.length), command.data);
-      const String help_text =
-          context.capture_command_substitution(command_line);
-      parsed = parse_manpage_options(help_text.view());
+      text = context.capture_command_substitution(command_line);
     }
   } catch (...) {
     LOG(verbosity::Debug, "swallowed a --help invocation failure for '%.*s'",
         static_cast<int>(command.length), command.data);
   }
+  HELP_TEXT_CACHE.set(command, steal(text));
+  return HELP_TEXT_CACHE.find(command)->view();
+}
+
+/* The option flags a command's --help text lists, parsed once and cached. The
+   parse reuses the manpage flag scanner since the option syntax is the same. */
+static fn help_options_for(StringView command, EvalContext &context) throws
+    -> const ArrayList<String> &
+{
+  if (const ArrayList<String> *cached = HELP_OPTION_CACHE.find(command))
+    return *cached;
+  let parsed = parse_manpage_options(help_text_for(command, context));
   HELP_OPTION_CACHE.set(command, steal(parsed));
   return *HELP_OPTION_CACHE.find(command);
+}
+
+/* Whether a name reads as a subcommand rather than a fragment of a description,
+   so it is non-empty, opens with a letter or a digit, and carries only the
+   characters a subcommand uses. */
+static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
+{
+  if (name.is_empty()) return false;
+  const char first = name[0];
+  const bool starts_word =
+      (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') ||
+      (first >= '0' && first <= '9');
+  if (!starts_word) return false;
+  for (usize i = 0; i < name.length; i++) {
+    const char c = name[i];
+    const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') || c == '-' || c == '_';
+    if (!ok) return false;
+  }
+  return true;
+}
+
+/* Whether a header line opens a subcommand section, so any line that reads
+   "Commands:", "Available Commands:", "Subcommands:", and the like, matched
+   case-insensitively on the "commands:" or "subcommands:" tail. */
+static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
+{
+  if (trimmed.is_empty() || trimmed[trimmed.length - 1] != ':') return false;
+  let const ends_with_ignoring_case = [&](StringView suffix) {
+    if (trimmed.length < suffix.length) return false;
+    const usize offset = trimmed.length - suffix.length;
+    for (usize i = 0; i < suffix.length; i++) {
+      char a = trimmed[offset + i];
+      char b = suffix[i];
+      if (a >= 'A' && a <= 'Z') a = static_cast<char>(a - 'A' + 'a');
+      if (b >= 'A' && b <= 'Z') b = static_cast<char>(b - 'A' + 'a');
+      if (a != b) return false;
+    }
+    return true;
+  };
+  return ends_with_ignoring_case(StringView{"commands:"}) ||
+         ends_with_ignoring_case(StringView{"subcommands:"});
+}
+
+/* The subcommands a --help text lists under a commands section. cargo and other
+   tools with subcommands but no manpage list them under a "Commands:" header as
+   indented "name<spaces>description" or "name, alias<spaces>description" lines.
+   The scan reads the first token of each indented line under such a header,
+   drops options and the ... continuation marker, and stops at a blank line or
+   a line that returns to the left margin. */
+static fn parse_help_subcommands(StringView text) throws -> ArrayList<String>
+{
+  let subcommands = ArrayList<String>{};
+  let seen = HashSet{heap_allocator()};
+  bool in_section = false;
+  usize i = 0;
+  while (i < text.length) {
+    usize line_end = i;
+    while (line_end < text.length && text[line_end] != '\n') line_end++;
+    const StringView raw = text.substring_of_length(i, line_end - i);
+    i = line_end + 1;
+
+    usize trim_start = 0;
+    while (trim_start < raw.length &&
+           (raw[trim_start] == ' ' || raw[trim_start] == '\t'))
+      trim_start++;
+    usize trim_end = raw.length;
+    while (trim_end > trim_start &&
+           (raw[trim_end - 1] == ' ' || raw[trim_end - 1] == '\t'))
+      trim_end--;
+    const StringView trimmed =
+        raw.substring_of_length(trim_start, trim_end - trim_start);
+
+    if (line_opens_subcommand_section(trimmed)) {
+      in_section = true;
+      continue;
+    }
+    if (!in_section) continue;
+    if (trimmed.is_empty()) {
+      in_section = false;
+      continue;
+    }
+    /* A line that returns to the left margin ends the section, and may open a
+       new one of its own. */
+    if (trim_start == 0) {
+      in_section = line_opens_subcommand_section(trimmed);
+      continue;
+    }
+
+    usize name_end = 0;
+    while (name_end < trimmed.length && trimmed[name_end] != ' ' &&
+           trimmed[name_end] != '\t' && trimmed[name_end] != ',')
+      name_end++;
+    const StringView name = trimmed.substring_of_length(0, name_end);
+    if (!is_plausible_subcommand_name(name)) continue;
+    if (!seen.contains(name)) {
+      seen.add(name);
+      subcommands.push(String{name});
+    }
+  }
+  return subcommands;
+}
+
+/* The subcommands a command's --help text lists, parsed once and cached. */
+static fn help_subcommands_for(StringView command, EvalContext &context) throws
+    -> const ArrayList<String> &
+{
+  if (const ArrayList<String> *cached = HELP_SUBCOMMAND_CACHE.find(command))
+    return *cached;
+  let parsed = parse_help_subcommands(help_text_for(command, context));
+  HELP_SUBCOMMAND_CACHE.set(command, steal(parsed));
+  return *HELP_SUBCOMMAND_CACHE.find(command);
 }
 
 /* Completes an option token from the command's --help text, the fallback after
@@ -1255,13 +1386,48 @@ static fn complete_from_help(StringView line, StringView token,
       surface_command.find_character('/').has_value())
     return None;
 
-  let const resolved = resolve_completion_command(surface_command, context);
+  /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
+     surface name, so the --help fork dispatches on the typed argv[0]. */
+  let const resolved = resolve_completion_alias(surface_command, context);
   const ArrayList<String> &options = help_options_for(resolved.view(), context);
   if (options.is_empty()) return None;
 
   let matches = ArrayList<String>{};
   for (const String &option : options)
     if (option.view().starts_with(token)) matches.push(String{option.view()});
+  if (matches.is_empty()) return None;
+  return matches;
+}
+
+/* Completes a subcommand token from the command's --help text, for a tool such
+   as cargo that lists subcommands but has no manpage to read them from. The
+   subcommand-position, explicit-tab, and dash gates match the manpage
+   subcommand stage, so this never fires on an option token or for the ghost. */
+static fn complete_from_help_subcommands(StringView line, StringView token,
+                                         usize token_start, bool for_listing,
+                                         EvalContext &context) throws
+    -> Maybe<ArrayList<String>>
+{
+  if (!for_listing) return None;
+  if (!token.is_empty() && token[0] == '-') return None;
+  if (token.find_character('/').has_value()) return None;
+  if (!is_first_argument_token(line, token_start)) return None;
+  const StringView surface_command = command_word_of(line);
+  if (surface_command.is_empty() ||
+      surface_command.find_character('/').has_value())
+    return None;
+
+  /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
+     surface name, so the --help fork dispatches on the typed argv[0]. */
+  let const resolved = resolve_completion_alias(surface_command, context);
+  const ArrayList<String> &subcommands =
+      help_subcommands_for(resolved.view(), context);
+  if (subcommands.is_empty()) return None;
+
+  let matches = ArrayList<String>{};
+  for (const String &subcommand : subcommands)
+    if (subcommand.view().starts_with(token))
+      matches.push(String{subcommand.view()});
   if (matches.is_empty()) return None;
   return matches;
 }
@@ -2092,6 +2258,9 @@ flatten fn complete(StringView line, usize cursor, EvalContext &context,
       from_stage =
           complete_from_man_subcommands(line, token, token_start, for_listing,
                                         context);
+      if (!from_stage.has_value())
+        from_stage = complete_from_help_subcommands(line, token, token_start,
+                                                    for_listing, context);
       if (!from_stage.has_value())
         from_stage = complete_from_manpage(line, token, for_listing, context);
       if (!from_stage.has_value())
