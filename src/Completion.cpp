@@ -717,9 +717,10 @@ static StringMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
    synopsis validation read the page source directly instead of forking man
    per candidate. */
 static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
-/* The commands whose candidate lists already went through the synopsis
-   validation, so the page reads are paid once per command per launch. */
-static HashSet MAN_VALIDATED_COMMANDS{heap_allocator()};
+/* The synopsis verdict for each command-subcommand page, keyed by the page
+   name, so a page is read at most once per launch and only when the token
+   matches its subcommand. */
+static StringMap<bool> MAN_SUBCOMMAND_PAGE_VALID{heap_allocator()};
 static bool MAN_SUBCOMMAND_INDEX_IS_BUILT = false;
 
 /* The man1 directories of the host, the $MANPATH entries when the variable is
@@ -884,86 +885,72 @@ static fn cleaned_synopsis_of_page(StringView source) throws -> String
   return synopsis;
 }
 
-/* Drops every candidate whose own page never writes the space-separated
-   command-subcommand form in its synopsis. A true subcommand page such as
-   git-commit.1 opens its synopsis with `git commit`, while a standalone
-   dashed tool such as ssh-keygen.1 only ever writes its literal dashed name,
-   so the standalone tools fall out with no per-program list. A page that
-   cannot be read or is compressed keeps its candidate, gated by the
-   head-page rule alone. */
-static fn validate_subcommands_for(StringView command) throws -> void
+/* Whether the command-subcommand page documents the space-separated form in
+   its synopsis, so a real subcommand page such as git-commit.1 that opens its
+   synopsis with `git commit` survives, while a standalone dashed tool such as
+   ssh-keygen.1 that only writes its literal dashed name does not. A page that
+   cannot be read or is compressed keeps its candidate on the head-page rule
+   alone. The verdict is cached per page name, so a page is read at most once
+   per launch, and the caller validates only the candidates the token matches.
+   may_read is false on the ghost path, which then trusts a cached verdict and
+   skips an unread candidate rather than scanning a page on a keystroke. */
+static fn man_subcommand_page_is_valid(StringView command, StringView subcommand,
+                                       bool may_read) throws -> bool
 {
-  if (MAN_VALIDATED_COMMANDS.contains(command)) return;
-  MAN_VALIDATED_COMMANDS.add(command);
-  ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(command);
-  if (subcommands == nullptr) return;
-  LOG(verbosity::Info, "validating %zu subcommand pages of '%.*s'",
-      subcommands->count(), static_cast<int>(command.length), command.data);
+  let page_name = String{command};
+  page_name.push('-');
+  page_name.append(subcommand);
+  if (const bool *cached = MAN_SUBCOMMAND_PAGE_VALID.find(page_name.view()))
+    return *cached;
+  if (!may_read) return false;
 
-  let surviving = ArrayList<String>{};
-  for (const String &subcommand : *subcommands) {
-    let page_name = String{command};
-    page_name.push('-');
-    page_name.append(subcommand.view());
-    const String *file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
-    if (file_path == nullptr) continue;
-
-    /* A compressed page cannot be scanned without a decompressor, so the
-       candidate stays on the head-page rule alone, with no read at all. The
-       suffix carries the verdict for every compression strip_man1_suffix
-       admits, which the gzip magic alone would miss. */
-    let const path_view = file_path->view();
-    let is_compressed_page = false;
-    for (const StringView tail : {StringView{".gz"}, StringView{".xz"},
-                                  StringView{".zst"}, StringView{".bz2"}})
-    {
-      if (path_view.length > tail.length &&
-          path_view.substring(path_view.length - tail.length) == tail)
-      {
-        is_compressed_page = true;
-        break;
-      }
-    }
-    if (is_compressed_page) {
-      surviving.push(String{subcommand.view()});
-      continue;
-    }
-
-    Maybe<String> source = utils::read_entire_file(file_path->view());
-    if (!source.has_value()) {
-      surviving.push(String{subcommand.view()});
-      continue;
-    }
-    /* A page that is one .so redirect reads its target once, relative to the
-       man root above the section directory. */
-    if (source->view().starts_with(".so ")) {
-      let const rest = source->view().substring(4);
-      usize target_end = 0;
-      while (target_end < rest.length && rest[target_end] != '\n' &&
-             rest[target_end] != ' ')
-        target_end++;
-      let target = Path{file_path->view()}.parent().parent();
-      target.push_component(rest.substring_of_length(0, target_end));
-      source = utils::read_entire_file(target.text().view());
-      if (!source.has_value()) {
-        surviving.push(String{subcommand.view()});
-        continue;
-      }
-    }
-
-    let const synopsis = cleaned_synopsis_of_page(source->view());
-    let needle = String{command};
-    needle.push(' ');
-    needle.append(subcommand.view());
-    if (synopsis.find_substring(needle.view()).has_value())
-      surviving.push(String{subcommand.view()});
-    else
-      LOG(verbosity::All, "dropped '%s', no space form in its synopsis",
-          page_name.c_str());
+  const String *file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
+  if (file_path == nullptr) {
+    MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), false);
+    return false;
   }
-  LOG(verbosity::Info, "%zu of %zu subcommands survived the synopsis check",
-      surviving.count(), subcommands->count());
-  *subcommands = steal(surviving);
+
+  /* A compressed page cannot be scanned without a decompressor, so the
+     candidate stays on the head-page rule alone, with no read at all. */
+  let const path_view = file_path->view();
+  for (const StringView tail : {StringView{".gz"}, StringView{".xz"},
+                                StringView{".zst"}, StringView{".bz2"}})
+    if (path_view.length > tail.length &&
+        path_view.substring(path_view.length - tail.length) == tail)
+    {
+      MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
+      return true;
+    }
+
+  Maybe<String> source = utils::read_entire_file(file_path->view());
+  if (!source.has_value()) {
+    MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
+    return true;
+  }
+  /* A page that is one .so redirect reads its target once, relative to the man
+     root above the section directory. */
+  if (source->view().starts_with(".so ")) {
+    let const rest = source->view().substring(4);
+    usize target_end = 0;
+    while (target_end < rest.length && rest[target_end] != '\n' &&
+           rest[target_end] != ' ')
+      target_end++;
+    let target = Path{file_path->view()}.parent().parent();
+    target.push_component(rest.substring_of_length(0, target_end));
+    source = utils::read_entire_file(target.text().view());
+    if (!source.has_value()) {
+      MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), true);
+      return true;
+    }
+  }
+
+  let const synopsis = cleaned_synopsis_of_page(source->view());
+  let needle = String{command};
+  needle.push(' ');
+  needle.append(subcommand);
+  const bool valid = synopsis.find_substring(needle.view()).has_value();
+  MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), valid);
+  return valid;
 }
 
 /* Whether the token at token_start is the line's first argument, the word
@@ -1026,20 +1013,21 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
   let const resolved = resolve_completion_command(surface_command, context);
   const StringView command = resolved.view();
 
-  if (!MAN_SUBCOMMAND_INDEX_IS_BUILT ||
-      !MAN_VALIDATED_COMMANDS.contains(command))
-  {
+  if (!MAN_SUBCOMMAND_INDEX_IS_BUILT) {
     if (!for_listing) return None;
-    if (!MAN_SUBCOMMAND_INDEX_IS_BUILT) build_man_subcommand_index();
-    validate_subcommands_for(command);
+    build_man_subcommand_index();
   }
 
   const ArrayList<String> *subcommands = MAN_SUBCOMMAND_INDEX.find(command);
   if (subcommands == nullptr || subcommands->is_empty()) return None;
 
+  /* Only the candidates the token matches are validated, so a token that
+     matches no subcommand, such as a typo, reads no page at all and the prompt
+     does not stall on a command with a hundred subcommand pages. */
   let matches = ArrayList<String>{};
   for (const String &subcommand : *subcommands)
-    if (subcommand.view().starts_with(token))
+    if (subcommand.view().starts_with(token) &&
+        man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
       matches.push(String{subcommand.view()});
   LOG(verbosity::Debug, "%zu subcommands of '%.*s' match token '%.*s'",
       matches.count(), static_cast<int>(command.length), command.data,
@@ -1717,6 +1705,17 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
   let const resolved = resolve_completion_alias(surface_command, context);
+
+  /* A command the man index already lists subcommands for, such as kubectl or
+     git, never forks --help to relist them, since the man stage that ran before
+     this one is the authoritative source. The fork is reserved for a tool like
+     cargo that has subcommands but no man pages. */
+  if (MAN_SUBCOMMAND_INDEX_IS_BUILT) {
+    const ArrayList<String> *man_subcommands =
+        MAN_SUBCOMMAND_INDEX.find(resolved.view());
+    if (man_subcommands != nullptr && !man_subcommands->is_empty()) return None;
+  }
+
   const ArrayList<help_entry> &subcommands =
       help_subcommands_for(resolved.view());
   if (subcommands.is_empty()) return None;
