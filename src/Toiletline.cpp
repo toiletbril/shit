@@ -183,6 +183,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     COMPLETION_LCP = steal(result.longest_common_prefix);
 
     COMPLETION_CANDIDATE_POINTERS.clear();
+    COMPLETION_CANDIDATE_POINTERS.reserve(COMPLETION_CANDIDATES.count());
     for (const shit::String &candidate : COMPLETION_CANDIDATES)
       COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
 
@@ -196,6 +197,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     COMPLETION_DESCRIPTION_POINTERS.clear();
     out->descriptions = nullptr;
     if (result.descriptions.count() > 0) {
+      COMPLETION_DESCRIPTIONS.reserve(COMPLETION_CANDIDATES.count());
       for (const shit::String &candidate : COMPLETION_CANDIDATES) {
         if (const shit::String *found =
                 result.descriptions.find(candidate.view());
@@ -204,6 +206,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
         else
           COMPLETION_DESCRIPTIONS.push(shit::String{});
       }
+      COMPLETION_DESCRIPTION_POINTERS.reserve(COMPLETION_DESCRIPTIONS.count());
       for (const shit::String &description : COMPLETION_DESCRIPTIONS)
         COMPLETION_DESCRIPTION_POINTERS.push(description.c_str());
       out->descriptions = COMPLETION_DESCRIPTION_POINTERS.begin();
