@@ -1279,6 +1279,7 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {PackedStringKey::from_literal("buildah"),      "--help"},
         {PackedStringKey::from_literal("skopeo"),       "--help"},
         {PackedStringKey::from_literal("dedoc"),        "--help"},
+        {PackedStringKey::from_literal("typst"),        "--help"},
 };
 static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
     HELP_ALLOWLIST_ENTRIES,
