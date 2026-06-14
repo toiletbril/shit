@@ -698,6 +698,25 @@ struct help_entry
   String description;
 };
 
+/* Keeps the entries whose name opens with the token, returns their names, and
+   carries each kept entry's description into the menu's descriptions map. The
+   option and subcommand stages share this since they all match a help_entry
+   list against the token the user has typed. */
+static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
+                                    StringView token,
+                                    StringMap<String> &descriptions) throws
+    -> ArrayList<String>
+{
+  let matches = ArrayList<String>{};
+  for (const help_entry &entry : entries)
+    if (entry.name.view().starts_with(token)) {
+      matches.push(String{entry.name.view()});
+      if (!entry.description.is_empty())
+        descriptions.set(entry.name.view(), String{entry.description.view()});
+    }
+  return matches;
+}
+
 /* The options parsed out of a manpage with their descriptions, cached per
    command so a second tab on the same command pays no man fork. An empty list
    is cached too, so a command with no manpage or no options is not retried. */
@@ -1454,23 +1473,19 @@ static fn complete_from_manpage(StringView line, StringView token,
       manpage_options_for(page_name.view(), context);
   if (options.is_empty()) return None;
 
-  let matches = ArrayList<String>{};
-  for (const help_entry &option : options)
-    if (option.name.view().starts_with(token)) {
-      matches.push(String{option.name.view()});
-      if (!option.description.is_empty())
-        descriptions.set(option.name.view(), String{option.description.view()});
-    }
+  let matches = matches_from_help_entries(options, token, descriptions);
   if (matches.is_empty()) return None;
   return matches;
 }
 
-/* A command's --help text, the option flags it lists, and the subcommands it
-   lists, each cached under the resolved command name. The raw text caches so
-   the options and the subcommands parse from one fork rather than two. */
-static StringMap<String> HELP_TEXT_CACHE{heap_allocator()};
+/* The option flags a command's --help text lists, and the subcommands it
+   lists, each cached under the resolved command name. One fork parses both, so
+   the raw text frees right after parsing rather than living for the session.
+   The forked set records a command whose --help ran, so a command that yields
+   no options and no subcommands still never forks twice. */
 static StringMap<ArrayList<help_entry>> HELP_OPTION_CACHE{heap_allocator()};
 static StringMap<ArrayList<help_entry>> HELP_SUBCOMMAND_CACHE{heap_allocator()};
+static StringMap<bool> HELP_PARSED{heap_allocator()};
 
 /* Whether the directory the resolved binary sits in is safe to fork for its
    --help text. The check is permission-based rather than a fixed list, so a
@@ -1504,10 +1519,8 @@ static constexpr u64 HELP_FORK_TIMEOUT_NANOS = 1'000'000'000;
    would page or prompt reads end-of-file and exits. The capture is bounded by
    the timeout, and a command that fails any of these caches the empty string,
    so it never forks twice. */
-static fn help_text_for(StringView command) throws -> StringView
+static fn help_text_for(StringView command) throws -> String
 {
-  if (const String *cached = HELP_TEXT_CACHE.find(command))
-    return cached->view();
   let text = String{};
   /* The allowlist entry carries the help argument, so ffmpeg forks --help full
      rather than the summary-only --help. A command not on the list never
@@ -1539,8 +1552,7 @@ static fn help_text_for(StringView command) throws -> StringView
         output.has_value())
       text = steal(*output);
   }
-  HELP_TEXT_CACHE.set(command, steal(text));
-  return HELP_TEXT_CACHE.find(command)->view();
+  return text;
 }
 
 /* The dash-options a --help text lists, each paired with the description in the
@@ -1611,14 +1623,27 @@ static fn parse_help_option_entries(StringView text) throws
   return entries;
 }
 
+static fn parse_help_subcommands(StringView text) throws
+    -> ArrayList<help_entry>;
+
+/* Forks the command's --help once, parses both the options and the
+   subcommands out of the one capture, and frees the raw text. The forked set
+   gates the fork, so a second tab on the same command reads the parsed caches
+   without forking and without holding the whole --help text for the session. */
+static fn ensure_help_parsed(StringView command) throws -> void
+{
+  if (HELP_PARSED.find(command) != nullptr) return;
+  let const text = help_text_for(command);
+  HELP_OPTION_CACHE.set(command, parse_help_option_entries(text.view()));
+  HELP_SUBCOMMAND_CACHE.set(command, parse_help_subcommands(text.view()));
+  HELP_PARSED.set(command, true);
+}
+
 /* The options a command's --help text lists, parsed once and cached. */
 static fn help_options_for(StringView command) throws
     -> const ArrayList<help_entry> &
 {
-  if (const ArrayList<help_entry> *cached = HELP_OPTION_CACHE.find(command))
-    return *cached;
-  let parsed = parse_help_option_entries(help_text_for(command));
-  HELP_OPTION_CACHE.set(command, steal(parsed));
+  ensure_help_parsed(command);
   return *HELP_OPTION_CACHE.find(command);
 }
 
@@ -1744,10 +1769,7 @@ static fn parse_help_subcommands(StringView text) throws
 static fn help_subcommands_for(StringView command) throws
     -> const ArrayList<help_entry> &
 {
-  if (const ArrayList<help_entry> *cached = HELP_SUBCOMMAND_CACHE.find(command))
-    return *cached;
-  let parsed = parse_help_subcommands(help_text_for(command));
-  HELP_SUBCOMMAND_CACHE.set(command, steal(parsed));
+  ensure_help_parsed(command);
   return *HELP_SUBCOMMAND_CACHE.find(command);
 }
 
@@ -1773,13 +1795,7 @@ static fn complete_from_help(StringView line, StringView token,
   const ArrayList<help_entry> &options = help_options_for(resolved.view());
   if (options.is_empty()) return None;
 
-  let matches = ArrayList<String>{};
-  for (const help_entry &option : options)
-    if (option.name.view().starts_with(token)) {
-      matches.push(String{option.name.view()});
-      if (!option.description.is_empty())
-        descriptions.set(option.name.view(), String{option.description.view()});
-    }
+  let matches = matches_from_help_entries(options, token, descriptions);
   if (matches.is_empty()) return None;
   return matches;
 }
@@ -1821,14 +1837,7 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
       help_subcommands_for(resolved.view());
   if (subcommands.is_empty()) return None;
 
-  let matches = ArrayList<String>{};
-  for (const help_entry &subcommand : subcommands)
-    if (subcommand.name.view().starts_with(token)) {
-      matches.push(String{subcommand.name.view()});
-      if (!subcommand.description.is_empty())
-        descriptions.set(subcommand.name.view(),
-                         String{subcommand.description.view()});
-    }
+  let matches = matches_from_help_entries(subcommands, token, descriptions);
   if (matches.is_empty()) return None;
   return matches;
 }
