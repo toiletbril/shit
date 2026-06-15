@@ -18,7 +18,7 @@ rc=127
 === an existing builtin name routes to the builtin ===
 routed via shitbox
 === unknown utility errors ===
-shit: 1:1: error: Builtin 'shitbox': shitbox has no utility named 'nope'.
+shit: 1:1: error: shitbox has no utility named 'nope'.
      1 |  shitbox nope
        |  ^~~~~~~~~~~~ here.
 rc=1

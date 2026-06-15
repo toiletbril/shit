@@ -8,7 +8,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a1l] [path ...]");
+HELP_SYNOPSIS_DECL("[-a1lh] [path ...]");
 
 HELP_DESCRIPTION_DECL(
     "The ls utility lists the names in each directory operand, or the current "
@@ -18,6 +18,8 @@ FLAG(LS_ALL, Bool, 'a', "", "List entries whose name starts with a dot.");
 FLAG(LS_ONE, Bool, '1', "", "List one entry per line, the default.");
 FLAG(LS_LONG, Bool, 'l', "",
      "Print a type letter and the byte size before each name.");
+FLAG(LS_HUMAN, Bool, 'h', "",
+     "With -l, print the size in a human-readable form such as 4.0K.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -41,7 +43,8 @@ static fn format_entry(const Path &entry, StringView name) throws -> String
   String line{};
   line.push(type);
   line += ' ';
-  line += utils::uint_to_text(size);
+  line += FLAG_LS_HUMAN.is_enabled() ? format_human_size(size)
+                                     : utils::uint_to_text(size);
   line += ' ';
   line += name;
   line += '\n';

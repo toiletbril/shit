@@ -189,6 +189,11 @@ fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>;
    print in. */
 fn sort_string_list(ArrayList<String> &items) wontthrow -> void;
 
+/* A byte count in the human-readable form ls -h and du -h print, the largest
+   1024-based unit whose value is below 1024, with one decimal below ten and a
+   K, M, G, or T suffix. A value below 1024 prints as the plain byte count. */
+fn format_human_size(u64 bytes) throws -> String;
+
 /* Resolve a signal spelling to its number for pkill and killall, a decimal
    number directly or a name such as TERM or SIGKILL through the platform table.
    An empty spelling is the TERM default. */

@@ -6,13 +6,15 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-f] source ... destination");
+HELP_SYNOPSIS_DECL("[-fv] source ... destination");
 
 HELP_DESCRIPTION_DECL(
     "The mv utility renames each source to the destination. When more than one "
-    "source is given the destination must be a directory.");
+    "source is given the destination must be a directory. With -v it names each "
+    "move as it happens.");
 
 FLAG(MV_FORCE, Bool, 'f', "", "Overwrite an existing destination.");
+FLAG(MV_VERBOSE, Bool, 'v', "", "Print the name of each move as it happens.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -33,14 +35,16 @@ fn util_mv(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (operands.count() < 2)
-    throw Error{"mv expects a source and a destination"};
+    throw Error{"mv: a source and a destination operand are required"};
 
   let const destination = operands[operands.count() - 1].view();
   let const destination_is_directory = Path{destination}.is_directory();
 
   if (operands.count() > 2 && !destination_is_directory)
-    throw Error{"mv: target '" + String{destination} + "' is not a directory"};
+    throw Error{"mv: the destination '" + String{destination} +
+                "' is not a directory, so it cannot hold several sources"};
 
+  let output = String{};
   i32 status = 0;
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
@@ -53,12 +57,17 @@ fn util_mv(const ExecContext &ec, EvalContext &cxt,
 
     if (!os::rename_path(source, target.view())) {
       report_soft_shitbox_error(ec, cxt,
-                                "mv: cannot move '" + String{source} +
+                                "mv: unable to move '" + String{source} +
                                     "' to '" + target +
-                                    "': " + os::last_system_error_message());
+                                    "' because " +
+                                    os::last_system_error_message());
       status = 1;
+      continue;
     }
+    if (FLAG_MV_VERBOSE.is_enabled())
+      output += "renamed '" + String{source} + "' -> '" + target + "'\n";
   }
+  ec.print_to_stdout(output);
   return status;
 }
 

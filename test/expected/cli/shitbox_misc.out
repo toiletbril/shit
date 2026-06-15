@@ -1,7 +1,7 @@
 --- sleep zero ---
 rc=0
 --- sleep bad duration ---
-shit: 1:1: error: Builtin 'shitbox': sleep: invalid duration 'abc'.
+shit: 1:1: error: sleep: invalid duration 'abc'.
      1 |  shitbox sleep abc
        |  ^~~~~~~~~~~~~~~~~ here.
 rc=1
@@ -11,7 +11,7 @@ rc=0
 --- env applies the assignment ---
 SHITBOX_TESTVAR=present
 --- pkill with no pattern ---
-shit: 1:1: error: Builtin 'shitbox': pkill expects one pattern.
+shit: 1:1: error: pkill expects one pattern.
      1 |  shitbox pkill
        |  ^~~~~~~~~~~~~ here.
 rc=1

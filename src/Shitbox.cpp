@@ -6,6 +6,7 @@
 #include "Eval.hpp"
 #include "ResolvedCommand.hpp"
 #include "Trace.hpp"
+#include "Utils.hpp"
 
 #include <algorithm>
 
@@ -94,8 +95,18 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
   for (usize i = name_index; i < ec.args().count(); i++)
     shifted.push(ec.args()[i].clone());
 
-  if (let const chosen = find_util(name); chosen.has_value())
-    return run_util(*chosen, ec, cxt, shifted);
+  if (let const chosen = find_util(name); chosen.has_value()) {
+    /* A utility error is rendered as a located error in every mood, so the bash
+       mood shows the same caret the default mood does rather than the soft line
+       the builtin dispatch would print. The shitbox utilities are a shit
+       feature, so they read best with the located form the way the builtins do
+       in the default mood. */
+    try {
+      return run_util(*chosen, ec, cxt, shifted);
+    } catch (const Error &error) {
+      throw ErrorWithLocation{ec.source_location(), error.message()};
+    }
+  }
 
   /* A name that is not a shitbox utility but is a shell builtin, such as echo
      or printf, routes to that builtin rather than getting a second
@@ -109,7 +120,9 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
     return execute_builtin(steal(routed), cxt);
   }
 
-  throw Error{"shitbox has no utility named '" + String{name} + "'"};
+  throw ErrorWithLocation{ec.source_location(),
+                          "shitbox has no utility named '" + String{name} +
+                              "'"};
 }
 
 fn run_as_multicall(StringView util_name, ArrayList<String> operands,
@@ -210,13 +223,43 @@ fn sort_string_list(ArrayList<String> &items) wontthrow -> void
             [](const String &a, const String &b) { return a < b; });
 }
 
+fn format_human_size(u64 bytes) throws -> String
+{
+  /* A value below 1024 prints as the plain byte count with no suffix, the way
+     ls -h and du -h show a small size. */
+  if (bytes < 1024) return utils::uint_to_text(bytes);
+
+  static const char units[] = {'K', 'M', 'G', 'T', 'P'};
+  double value = static_cast<double>(bytes);
+  usize unit = 0;
+  while (value >= 1024.0 && unit + 1 < sizeof(units)) {
+    value /= 1024.0;
+    unit++;
+  }
+
+  String out{};
+  /* A scaled value below ten keeps one decimal, the way coreutils renders 1.5K,
+     while a larger value rounds to a whole number such as 23K. */
+  if (value < 10.0) {
+    let const tenths = static_cast<u64>(value * 10.0 + 0.5);
+    out += utils::uint_to_text(tenths / 10);
+    out += '.';
+    out += utils::uint_to_text(tenths % 10);
+  } else {
+    out += utils::uint_to_text(static_cast<u64>(value + 0.5));
+  }
+  out.push(units[unit - 1]);
+  return out;
+}
+
 fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void
 {
-  if (cxt.is_bash_compatible()) {
-    print_error("shit: " + String{message} + "\n");
-    return;
-  }
+  /* A keep-going utility error renders the located caret in every mood, the
+     same form a thrown utility error gets, so a bad operand in a list reads the
+     same whether the mood is the default or the bash one. The fallback line is
+     for the rare case with no source to caret against, such as the multicall
+     entry. */
   const ErrorWithLocation located{ec.source_location(), message};
   if (const String *source = cxt.current_source(); source != nullptr)
     show_message(located.to_string(source->view()));

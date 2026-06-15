@@ -7,16 +7,17 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-s] [path ...]");
+HELP_SYNOPSIS_DECL("[-sh] [path ...]");
 
 HELP_DESCRIPTION_DECL(
     "The du utility prints the total byte size of each path, descending into a "
     "directory and summing its files. The -s summary is the only mode and is "
-    "the default.");
+    "the default. With -h the size is printed in a human-readable form.");
 
 FLAG(DU_SUMMARY, Bool, 's', "",
-     "Print only the total for each path, the "
-     "default.");
+     "Print only the total for each path, the default.");
+FLAG(DU_HUMAN, Bool, 'h', "",
+     "Print the size in a human-readable form such as 4.0K or 1.5M.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 namespace shit {
@@ -72,7 +73,9 @@ fn util_du(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    output += utils::uint_to_text(total_size(path)).view();
+    let const total = total_size(path);
+    output += FLAG_DU_HUMAN.is_enabled() ? format_human_size(total)
+                                         : utils::uint_to_text(total);
     output += '\t';
     output += target;
     output += '\n';

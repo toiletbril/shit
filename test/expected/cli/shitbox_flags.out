@@ -1,0 +1,20 @@
+--- du -s prints bytes ---
+1892	big.txt
+--- du -sh is human-readable ---
+1.8K	big.txt
+--- ls -l prints bytes ---
+- 1892 big.txt
+--- ls -lh is human-readable ---
+- 1.8K big.txt
+--- cp -v names the copy ---
+'big.txt' -> 'copy.txt'
+--- mv -v names the move ---
+renamed 'copy.txt' -> 'moved.txt'
+--- utility error is located in the bash mood ---
+shit: 1:1: error: cp: a source and a destination operand are required.
+     1 |  shitbox cp
+       |  ^~~~~~~~~~ here.
+--- and a missing operand is located in the bash mood ---
+shit: 1:1: error: ls: cannot access '/no/such/path': no such file or directory.
+     1 |  shitbox ls /no/such/path
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~ here.
