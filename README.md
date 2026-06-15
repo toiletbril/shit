@@ -48,6 +48,13 @@ an unmatched glob in a profile never aborts the login.
 --init-moods=shit,bash` in it and every **shit** starts that way, while a flag
 on the command line still wins.
 
+A broken flag left in `SHIT_FLAGS`, such as one removed across an upgrade, would
+otherwise kill every new terminal and lock you out. When standard input is a
+terminal **shit** prints the error, prints `shit: Entering rescue.`, drops the
+broken config, skips the rc chain, and gives you a default prompt to fix the
+config from. A non-interactive run still exits with the usage status the way
+`dash` does.
+
 ## Additional bull**shit**
 
 Modern interactive mode, heavily inspired by
