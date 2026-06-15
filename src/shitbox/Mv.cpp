@@ -32,8 +32,7 @@ fn util_mv(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.count() < 2)
-    throw Error{"mv: a source and a destination operand are required"};
+  if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
   let const destination = operands[operands.count() - 1].view();
   let const destination_is_directory = Path{destination}.is_directory();

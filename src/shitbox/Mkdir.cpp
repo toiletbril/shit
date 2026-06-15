@@ -41,7 +41,7 @@ fn util_mkdir(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.is_empty()) throw Error{"mkdir expects a directory name"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   let const make_parents = FLAG_MKDIR_PARENTS.is_enabled();
   i32 status = 0;

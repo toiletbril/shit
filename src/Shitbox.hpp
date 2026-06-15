@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Builtin.hpp"
 #include "Cli.hpp"
 #include "Common.hpp"
 #include "Maybe.hpp"
@@ -55,48 +56,50 @@ enum class Util : u8
   Kill,
   Ps,
   Make,
+  Find,
 };
 
 inline constexpr StaticStringMap<Util>::entry SHITBOX_ENTRIES[] = {
-    {PackedStringKey::from_literal("ls"),       Util::Ls      },
-    {PackedStringKey::from_literal("ln"),       Util::Ln      },
-    {PackedStringKey::from_literal("rm"),       Util::Rm      },
-    {PackedStringKey::from_literal("mkdir"),    Util::Mkdir   },
-    {PackedStringKey::from_literal("rmdir"),    Util::Rmdir   },
-    {PackedStringKey::from_literal("cp"),       Util::Cp      },
-    {PackedStringKey::from_literal("mv"),       Util::Mv      },
-    {PackedStringKey::from_literal("cat"),      Util::Cat     },
-    {PackedStringKey::from_literal("tee"),      Util::Tee     },
-    {PackedStringKey::from_literal("touch"),    Util::Touch   },
-    {PackedStringKey::from_literal("basename"), Util::Basename},
-    {PackedStringKey::from_literal("dirname"),  Util::Dirname },
-    {PackedStringKey::from_literal("realpath"), Util::Realpath},
-    {PackedStringKey::from_literal("du"),       Util::Du      },
-    {PackedStringKey::from_literal("head"),     Util::Head    },
-    {PackedStringKey::from_literal("tail"),     Util::Tail    },
-    {PackedStringKey::from_literal("wc"),       Util::Wc      },
-    {PackedStringKey::from_literal("seq"),      Util::Seq     },
-    {PackedStringKey::from_literal("tr"),       Util::Tr      },
-    {PackedStringKey::from_literal("grep"),     Util::Grep    },
-    {PackedStringKey::from_literal("sort"),     Util::Sort    },
-    {PackedStringKey::from_literal("uniq"),     Util::Uniq    },
-    {PackedStringKey::from_literal("sleep"),    Util::Sleep   },
-    {PackedStringKey::from_literal("env"),      Util::Env     },
-    {PackedStringKey::from_literal("yes"),      Util::Yes     },
-    {PackedStringKey::from_literal("pkill"),    Util::Pkill   },
-    {PackedStringKey::from_literal("killall"),  Util::Killall },
-    {PackedStringKey::from_literal("kill"),     Util::Kill    },
-    {PackedStringKey::from_literal("ps"),       Util::Ps      },
-    {PackedStringKey::from_literal("make"),     Util::Make    },
+    {SSK("ls"),       Util::Ls      },
+    {SSK("ln"),       Util::Ln      },
+    {SSK("rm"),       Util::Rm      },
+    {SSK("mkdir"),    Util::Mkdir   },
+    {SSK("rmdir"),    Util::Rmdir   },
+    {SSK("cp"),       Util::Cp      },
+    {SSK("mv"),       Util::Mv      },
+    {SSK("cat"),      Util::Cat     },
+    {SSK("tee"),      Util::Tee     },
+    {SSK("touch"),    Util::Touch   },
+    {SSK("basename"), Util::Basename},
+    {SSK("dirname"),  Util::Dirname },
+    {SSK("realpath"), Util::Realpath},
+    {SSK("du"),       Util::Du      },
+    {SSK("head"),     Util::Head    },
+    {SSK("tail"),     Util::Tail    },
+    {SSK("wc"),       Util::Wc      },
+    {SSK("seq"),      Util::Seq     },
+    {SSK("tr"),       Util::Tr      },
+    {SSK("grep"),     Util::Grep    },
+    {SSK("sort"),     Util::Sort    },
+    {SSK("uniq"),     Util::Uniq    },
+    {SSK("sleep"),    Util::Sleep   },
+    {SSK("env"),      Util::Env     },
+    {SSK("yes"),      Util::Yes     },
+    {SSK("pkill"),    Util::Pkill   },
+    {SSK("killall"),  Util::Killall },
+    {SSK("kill"),     Util::Kill    },
+    {SSK("ps"),       Util::Ps      },
+    {SSK("make"),     Util::Make    },
+    {SSK("find"),     Util::Find    },
 };
 
 inline constexpr StaticStringMap<Util> SHITBOX_UTILS{
     SHITBOX_ENTRIES, sizeof(SHITBOX_ENTRIES) / sizeof(SHITBOX_ENTRIES[0])};
 
 /* The number of Util values, the bound of the per-utility flag-list table.
-   Make is the last enumerator. */
+   Find is the last enumerator. */
 inline constexpr usize SHITBOX_UTIL_COUNT =
-    static_cast<usize>(Util::Make) + 1;
+    static_cast<usize>(Util::Find) + 1;
 
 /* The FLAG_LIST of a utility, registered at static-init time by the
    REGISTER_SHITBOX_UTIL_FLAGS line in its file, so the completion engine offers
@@ -208,6 +211,7 @@ SHITBOX_DECLARE_UTIL(util_killall);
 SHITBOX_DECLARE_UTIL(util_kill);
 SHITBOX_DECLARE_UTIL(util_ps);
 SHITBOX_DECLARE_UTIL(util_make);
+SHITBOX_DECLARE_UTIL(util_find);
 
 /* Shared helpers the utilities lean on, so each utility file stays small.
    read_fd_to_string slurps a descriptor, read_named_or_stdin opens a path or

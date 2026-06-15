@@ -363,6 +363,14 @@ fn shit_binary_flag_list() wontthrow -> const ArrayList<Flag *> &;
 fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                              StringView message) throws -> void;
 
+/* The located missing-argument error a builtin or a utility prints when a
+   required operand is absent, shown with the same caret in every mood and
+   followed by a note that names the help. The program_name is the builtin name
+   for a builtin and the utility name for a shitbox utility, since a routed
+   utility reads shitbox as its program. Returns the usage status 2. */
+fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
+                      StringView program_name) throws -> i32;
+
 /* The optional first integer argument of a builtin such as exit, return, break,
    continue, and shift, or default_value when no argument is given. A malformed
    argument propagates its parse error to the caller. */

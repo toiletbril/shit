@@ -37,6 +37,8 @@ fn util_seq(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
+
   i64 first = 1;
   i64 increment = 1;
   i64 last = 0;

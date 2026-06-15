@@ -212,12 +212,16 @@ fn signal_names() throws -> const ArrayList<StringView> &;
    invalid handle when the process is gone or not permitted. */
 fn process_from_pid(i64 pid) wontthrow -> process;
 
-/* One live process the shitbox pkill and killall utilities match against, its
-   numeric id and the basename of its command. The list is read once per run. */
+/* One live process the shitbox pkill, killall, and ps utilities read, its
+   numeric id, the basename of its command, the owner uid, and the full command
+   line. The list is read once per run. The command line is empty for a process
+   that exposes none, such as a kernel thread. */
 struct process_entry
 {
   i64 pid{0};
   String name{};
+  u32 owner_id{0};
+  String command_line{};
 };
 
 /* Every process the current user can see, for the shitbox pkill and killall
@@ -234,6 +238,46 @@ fn remove_directory(StringView path) wontthrow -> bool;
 fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
+
+/* The metadata one lstat returns, for the shitbox ls long format to render a row
+   without a syscall per field. stat_path fills it and returns false when the
+   path cannot be read. The mode carries the type and the permission bits in the
+   POSIX st_mode layout, and a symlink reports its own status rather than the
+   target it points at. */
+struct file_status
+{
+  u32 mode{0};
+  u64 link_count{0};
+  u32 owner_id{0};
+  u32 group_id{0};
+  u64 size{0};
+  i64 modification_time{0};
+  u64 blocks{0};
+};
+
+fn stat_path(StringView path, file_status &status) wontthrow -> bool;
+
+/* The ten-character permission string for a mode, the type letter and the three
+   rwx triplets the ls long format prints, such as drwxr-xr-x. The setuid,
+   setgid, and sticky bits render as s, s, and t in the execute slots. */
+fn format_mode_string(u32 mode) throws -> String;
+
+/* The single type letter for a mode, d for a directory, l for a symlink, c, b,
+   p, or s for the device, fifo, and socket types, and - for a regular file. The
+   shitbox find utility reads it from one stat to decide a -type match and
+   whether to descend, without a second syscall. */
+fn file_type_letter(u32 mode) wontthrow -> char;
+
+/* The user name for a numeric uid and the group name for a numeric gid, read
+   directly from /etc/passwd and /etc/group the way get_current_user reads the
+   passwd file, so the static build stays free of getpwuid and getgrgid. None
+   when the id has no entry. */
+fn uid_to_username(u32 uid) throws -> Maybe<String>;
+fn gid_to_groupname(u32 gid) throws -> Maybe<String>;
+
+/* Format a unix timestamp into the local-time string the format spells, for the
+   shitbox ls long format. Empty when localtime fails. */
+fn format_timestamp(i64 unix_time, const char *format) throws -> String;
 
 /* Sleep for the given seconds, for the shitbox sleep utility. A fractional
    value sleeps the whole and the fractional part together. */

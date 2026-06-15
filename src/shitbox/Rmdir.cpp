@@ -26,7 +26,7 @@ fn util_rmdir(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.is_empty()) throw Error{"rmdir expects a directory name"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   i32 status = 0;
   for (const String &operand : operands) {

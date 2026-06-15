@@ -1,0 +1,51 @@
+--- builtin kill with no target ---
+shit: 1:1: error: kill: Not enough arguments.
+     1 |  kill
+       |  ^~~~ here.
+shit: note: kill --help for more info.
+rc=2
+--- builtin getopts with no arguments ---
+shit: 1:1: error: getopts: Not enough arguments.
+     1 |  getopts
+       |  ^~~~~~~ here.
+shit: note: getopts --help for more info.
+rc=2
+--- builtin let with no expression ---
+shit: 1:1: warning: A let runs arithmetic as a command, use the ((...)) compound so the operands need no quoting.
+     1 |  let
+       |  ^~~ here.
+shit: 1:1: error: let: Not enough arguments.
+     1 |  let
+       |  ^~~ here.
+shit: note: let --help for more info.
+rc=2
+--- calc with no expression ---
+shit: 1:1: error: calc: Not enough arguments.
+     1 |  calc
+       |  ^~~~ here.
+shit: note: calc --help for more info.
+rc=2
+--- shitbox cp with one operand ---
+shit: 1:1: error: cp: Not enough arguments.
+     1 |  shitbox cp onlyone
+       |  ^~~~~~~~~~~~~~~~~~ here.
+shit: note: cp --help for more info.
+rc=2
+--- shitbox grep with no pattern ---
+shit: 1:1: error: grep: Not enough arguments.
+     1 |  shitbox grep
+       |  ^~~~~~~~~~~~ here.
+shit: note: grep --help for more info.
+rc=2
+--- the note is located in the bash mood too ---
+shit: 1:1: error: kill: Not enough arguments.
+     1 |  shitbox kill
+       |  ^~~~~~~~~~~~ here.
+shit: note: kill --help for more info.
+rc=2
+--- and in the sh mood ---
+shit: 1:1: error: mkdir: Not enough arguments.
+     1 |  shitbox mkdir
+       |  ^~~~~~~~~~~~~ here.
+shit: note: mkdir --help for more info.
+rc=2

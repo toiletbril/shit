@@ -29,7 +29,7 @@ fn util_realpath(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.is_empty()) throw Error{"realpath expects a path"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   let output = String{};
   for (const String &operand : operands) {

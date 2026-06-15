@@ -42,7 +42,7 @@ fn util_kill(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (first_target >= args.count())
-    throw Error{"kill: a process id is required"};
+    return report_usage_error(ec, cxt, args[0].view());
 
   i32 status = 0;
   for (usize i = first_target; i < args.count(); i++) {

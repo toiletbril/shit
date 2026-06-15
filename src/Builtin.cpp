@@ -187,6 +187,25 @@ fn report_soft_builtin_error(const ExecContext &ec, EvalContext &cxt,
                 "\n");
 }
 
+fn report_usage_error(const ExecContext &ec, EvalContext &cxt,
+                      StringView program_name) throws -> i32
+{
+  /* A missing required argument reads the same located caret in every mood, the
+     shit feature form, rather than the soft unlocated line the bash mood gives a
+     thrown builtin error. The trailing note points the reader at the per-command
+     help the way a compiler points past an error at a hint. The fallback line is
+     for the rare case with no source to caret against, such as the multicall
+     entry. */
+  const ErrorWithLocation located{ec.source_location(),
+                                  String{program_name} + ": Not enough arguments"};
+  if (const String *source = cxt.current_source(); source != nullptr)
+    show_message(located.to_string(source->view()));
+  else
+    print_error(String{"shit: "} + program_name + ": Not enough arguments.\n");
+  show_message(Note{String{program_name} + " --help for more info"}.to_string());
+  return 2;
+}
+
 fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
     -> i64
 {

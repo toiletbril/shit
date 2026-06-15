@@ -1593,6 +1593,100 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
   return ::symlink(target_string.c_str(), link_string.c_str()) == 0;
 }
 
+fn stat_path(StringView path, file_status &status) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  /* lstat reports a symlink as itself rather than following it, so the ls long
+     format shows the l type the way coreutils does without -L. */
+  if (::lstat(path_string.c_str(), &info) != 0) return false;
+  status.mode = static_cast<u32>(info.st_mode);
+  status.link_count = static_cast<u64>(info.st_nlink);
+  status.owner_id = static_cast<u32>(info.st_uid);
+  status.group_id = static_cast<u32>(info.st_gid);
+  status.size = static_cast<u64>(info.st_size);
+  status.modification_time = static_cast<i64>(info.st_mtime);
+  status.blocks = static_cast<u64>(info.st_blocks);
+  return true;
+}
+
+fn file_type_letter(u32 mode) wontthrow -> char
+{
+  const mode_t bits = static_cast<mode_t>(mode);
+  if (S_ISDIR(bits)) return 'd';
+  if (S_ISLNK(bits)) return 'l';
+  if (S_ISCHR(bits)) return 'c';
+  if (S_ISBLK(bits)) return 'b';
+  if (S_ISFIFO(bits)) return 'p';
+  if (S_ISSOCK(bits)) return 's';
+  return '-';
+}
+
+fn format_mode_string(u32 mode) throws -> String
+{
+  const mode_t bits = static_cast<mode_t>(mode);
+  String result{};
+  result.push(file_type_letter(mode));
+  result.push((bits & S_IRUSR) != 0 ? 'r' : '-');
+  result.push((bits & S_IWUSR) != 0 ? 'w' : '-');
+  result.push((bits & S_ISUID) != 0 ? ((bits & S_IXUSR) != 0 ? 's' : 'S')
+                                    : ((bits & S_IXUSR) != 0 ? 'x' : '-'));
+  result.push((bits & S_IRGRP) != 0 ? 'r' : '-');
+  result.push((bits & S_IWGRP) != 0 ? 'w' : '-');
+  result.push((bits & S_ISGID) != 0 ? ((bits & S_IXGRP) != 0 ? 's' : 'S')
+                                    : ((bits & S_IXGRP) != 0 ? 'x' : '-'));
+  result.push((bits & S_IROTH) != 0 ? 'r' : '-');
+  result.push((bits & S_IWOTH) != 0 ? 'w' : '-');
+  result.push((bits & S_ISVTX) != 0 ? ((bits & S_IXOTH) != 0 ? 't' : 'T')
+                                    : ((bits & S_IXOTH) != 0 ? 'x' : '-'));
+  return result;
+}
+
+/* The field 0 name of the first colon line whose field at id_field_index equals
+   the wanted id, read from the named database. The passwd and group files share
+   the colon layout, with the id in field 2 of each, so one reader serves both. */
+static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
+                            usize id_field_index) throws -> Maybe<String>
+{
+  let const contents = utils::read_entire_file(database_path);
+  if (!contents) return shit::None;
+  let const wanted = utils::uint_to_text(static_cast<u64>(wanted_id));
+  let const text = contents->view();
+  usize line_start_position = 0;
+  for (usize i = 0; i <= text.length; i++) {
+    if (i != text.length && text[i] != '\n') continue;
+    let const line =
+        text.substring_of_length(line_start_position, i - line_start_position);
+    line_start_position = i + 1;
+    if (passwd_field(line, id_field_index) != wanted.view()) continue;
+    let const name = passwd_field(line, 0);
+    if (!name.is_empty()) return String{name};
+  }
+  return shit::None;
+}
+
+fn uid_to_username(u32 uid) throws -> Maybe<String>
+{
+  return lookup_name_by_id("/etc/passwd", uid, 2);
+}
+
+fn gid_to_groupname(u32 gid) throws -> Maybe<String>
+{
+  return lookup_name_by_id("/etc/group", gid, 2);
+}
+
+fn format_timestamp(i64 unix_time, const char *format) throws -> String
+{
+  time_t when = static_cast<time_t>(unix_time);
+  struct tm *local = ::localtime(&when);
+  if (local == nullptr) return String{};
+  char buffer[128];
+  usize written = ::strftime(buffer, sizeof(buffer), format, local);
+  return String{
+      StringView{buffer, written}
+  };
+}
+
 fn sleep_for_seconds(double seconds) wontthrow -> void
 {
   if (seconds <= 0.0) return;
@@ -1645,6 +1739,59 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
     process_entry process{};
     process.pid = parsed.value();
     process.name = steal(command_name);
+
+    /* The status file names the owner on its Uid line, the real uid first, so
+       ps can render the owner the way it does. A process that has gone since the
+       directory scan leaves the owner at zero. */
+    const String status_path = "/proc/" + name + "/status";
+    if (Maybe<String> status = utils::read_entire_file(status_path.view());
+        status.has_value())
+    {
+      let const text = status->view();
+      usize status_line_start = 0;
+      for (usize i = 0; i <= text.length; i++) {
+        if (i != text.length && text[i] != '\n') continue;
+        let const line =
+            text.substring_of_length(status_line_start, i - status_line_start);
+        status_line_start = i + 1;
+        /* The Uid line reads "Uid:\t<real>\t<effective>...", so the first run of
+           digits after the tab is the real uid. */
+        if (line.length < 5 || line.substring_of_length(0, 5) != StringView{"Uid:\t"})
+          continue;
+        usize cursor = 5;
+        usize digit_end = cursor;
+        while (digit_end < line.length && line[digit_end] >= '0' &&
+               line[digit_end] <= '9')
+          digit_end++;
+        let const uid_text = line.substring_of_length(cursor, digit_end - cursor);
+        if (let const uid = utils::parse_decimal_integer(uid_text); !uid.is_error())
+          process.owner_id = static_cast<u32>(uid.value());
+        break;
+      }
+    }
+
+    /* The cmdline file holds the full argument vector with a NUL after each
+       argument, so the separators become spaces for the listing. A kernel thread
+       exposes an empty cmdline, so the bracketed command name stands in the way
+       ps shows it. */
+    const String cmdline_path = "/proc/" + name + "/cmdline";
+    if (Maybe<String> cmdline = utils::read_entire_file(cmdline_path.view());
+        cmdline.has_value() && !cmdline->is_empty())
+    {
+      String command_line{};
+      for (usize i = 0; i < cmdline->count(); i++) {
+        let const byte = cmdline->view()[i];
+        if (byte == '\0') {
+          if (i + 1 < cmdline->count()) command_line += ' ';
+        } else {
+          command_line.push(byte);
+        }
+      }
+      process.command_line = steal(command_line);
+    } else {
+      process.command_line = "[" + process.name + "]";
+    }
+
     processes.push(steal(process));
   }
   return processes;
@@ -2801,6 +2948,76 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
                              flags) != 0;
 }
 
+fn stat_path(StringView path, file_status &status) wontthrow -> bool
+{
+  const String path_string{path};
+  struct stat info{};
+  /* Windows has no lstat, so a symlink reports the target it resolves to, the
+     closest the platform comes to the POSIX behavior. */
+  if (::stat(path_string.c_str(), &info) != 0) return false;
+  status.mode = static_cast<u32>(info.st_mode);
+  status.link_count = static_cast<u64>(info.st_nlink);
+  status.owner_id = static_cast<u32>(info.st_uid);
+  status.group_id = static_cast<u32>(info.st_gid);
+  status.size = static_cast<u64>(info.st_size);
+  status.modification_time = static_cast<i64>(info.st_mtime);
+  /* Windows stat carries no block count, so the 512-byte blocks are derived
+     from the size for the ls total line. */
+  status.blocks = (static_cast<u64>(info.st_size) + 511) / 512;
+  return true;
+}
+
+fn format_mode_string(u32 mode) throws -> String
+{
+  /* Windows stat exposes only the read, write, and execute bits for the owner,
+     mirrored across the group and other triplets so the column keeps its width.
+     The directory bit gives the type letter. */
+  const bool is_readable = (mode & 0000400u) != 0;
+  const bool is_writable = (mode & 0000200u) != 0;
+  const bool is_executable = (mode & 0000100u) != 0;
+
+  String result{};
+  result.push(file_type_letter(mode));
+  for (usize triplet = 0; triplet < 3; triplet++) {
+    result.push(is_readable ? 'r' : '-');
+    result.push(is_writable ? 'w' : '-');
+    result.push(is_executable ? 'x' : '-');
+  }
+  return result;
+}
+
+fn file_type_letter(u32 mode) wontthrow -> char
+{
+  /* Windows stat distinguishes only the directory bit from a regular file. */
+  return (mode & 0040000u) != 0 ? 'd' : '-';
+}
+
+fn uid_to_username(u32 uid) throws -> Maybe<String>
+{
+  /* Windows names users through the security database rather than a passwd
+     file, so ls falls back to the numeric id. */
+  unused(uid);
+  return shit::None;
+}
+
+fn gid_to_groupname(u32 gid) throws -> Maybe<String>
+{
+  unused(gid);
+  return shit::None;
+}
+
+fn format_timestamp(i64 unix_time, const char *format) throws -> String
+{
+  time_t when = static_cast<time_t>(unix_time);
+  struct tm *local = ::localtime(&when);
+  if (local == nullptr) return String{};
+  char buffer[128];
+  usize written = ::strftime(buffer, sizeof(buffer), format, local);
+  return String{
+      StringView{buffer, written}
+  };
+}
+
 fn sleep_for_seconds(double seconds) wontthrow -> void
 {
   if (seconds <= 0.0) return;
@@ -2821,6 +3038,9 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
     process_entry process{};
     process.pid = static_cast<i64>(entry.th32ProcessID);
     process.name = String{StringView{entry.szExeFile}};
+    /* The snapshot exposes the executable name rather than the full argument
+       vector, so the command line stands in as that name. */
+    process.command_line = process.name.clone();
     processes.push(steal(process));
   } while (Process32Next(snapshot, &entry) != 0);
   return processes;

@@ -3,8 +3,8 @@ a
 nums.txt
 --- ls a ---
 b
---- ls -l sym ---
-l 6 sym
+--- ls -l sym (mode nlink size name) ---
+lrwxrwxrwx 1 8 sym
 --- ls after operations ---
 a
 moved.txt

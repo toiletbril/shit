@@ -45,6 +45,7 @@ fn util_pkill(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() != 1) throw Error{"pkill expects one pattern"};
 
   let const pattern = operands[0].view();

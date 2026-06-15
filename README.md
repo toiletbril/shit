@@ -69,7 +69,15 @@ every builtin from `bash` and POSIX standard, with the addition of:
 - `bench` -- built-in benchmark infrastructure inspired by Performance
   Optimizer Observation Platform ([poop](https://github.com/andrewrk/poop) for
   short)
+- `calc` -- an arithmetic evaluator that prints in 128 bits in the default mood
 - and more
+
+It also bundles a busybox-style set of coreutilities behind the `shitbox`
+builtin, so a machine with only a compiler can run a configure and a make under
+shit. The set covers `ls`, `cp`, `mv`, `find`, `grep`, `ps`, `make`, and more.
+`ls` lays its output in terminal-sized columns and follows coreutils under `-l`,
+`sleep` reads the GNU duration suffixes, and `find` walks a tree with `-name`,
+`-type`, `-maxdepth`, and `-mindepth`.
 
 # Development
 

@@ -37,7 +37,7 @@ i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* operands[0] is the program name the way every builtin reads it, so the
      expressions start at index one. */
-  if (operands.count() < 2) throw Error{"calc was given no expression"};
+  if (operands.count() < 2) return report_usage_error(ec, cxt, ec.program());
 
   LOG(Debug, "calc evaluating %zu arithmetic expressions",
       operands.count() - 1);

@@ -31,6 +31,7 @@ fn util_killall(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() != 1) throw Error{"killall expects one process name"};
 
   let const wanted = operands[0].view();

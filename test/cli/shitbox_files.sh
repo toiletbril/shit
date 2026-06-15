@@ -16,8 +16,10 @@ echo "--- ls a ---"
 "$BIN" -c 'shitbox mv copy.txt moved.txt'
 "$BIN" -c 'shitbox touch stamp'
 "$BIN" -c 'shitbox ln -s nums.txt sym'
-echo "--- ls -l sym ---"
-"$BIN" -c 'shitbox ls -l sym'
+# The owner, the group, and the time of a long row vary by machine, so only the
+# mode, the link count, the size, and the name are kept for a stable golden.
+echo "--- ls -l sym (mode nlink size name) ---"
+"$BIN" -c 'shitbox ls -l sym' | awk '{print $1, $2, $5, $NF}'
 echo "--- ls after operations ---"
 "$BIN" -c 'shitbox ls'
 echo "--- du -s nums.txt ---"

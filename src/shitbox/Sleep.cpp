@@ -3,15 +3,18 @@
 #include "../Eval.hpp"
 #include "../Shitbox.hpp"
 
+#include <cmath>
 #include <cstdlib>
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("seconds");
+HELP_SYNOPSIS_DECL("duration ...");
 
 HELP_DESCRIPTION_DECL(
-    "The sleep utility pauses for the given number of seconds, which may carry "
-    "a fractional part.");
+    "The sleep utility pauses for the sum of the given durations. A duration is "
+    "a number with an optional fractional part and an optional unit suffix, s "
+    "for seconds and the default, m for minutes, h for hours, and d for days. "
+    "The word inf or infinity pauses until a signal arrives.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -24,22 +27,63 @@ namespace shitbox {
 fn util_sleep(const ExecContext &ec, EvalContext &cxt,
               const ArrayList<String> &args) throws -> i32
 {
-  unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.count() != 1)
-    throw Error{"sleep expects one duration in seconds"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
-  const String number{operands[0].view()};
-  char *end = nullptr;
-  let const seconds = std::strtod(number.c_str(), &end);
-  if (end == number.c_str() || *end != '\0' || seconds < 0.0)
-    throw Error{"sleep: invalid duration '" + number + "'"};
+  double total_seconds = 0.0;
+  bool should_sleep_forever = false;
+  for (const String &operand : operands) {
+    let const duration = operand.view();
+    if (duration == "inf" || duration == "infinity") {
+      should_sleep_forever = true;
+      continue;
+    }
 
-  os::sleep_for_seconds(seconds);
+    const String number{duration};
+    const char *start = number.c_str();
+    char *end = nullptr;
+    let const value = std::strtod(start, &end);
+    /* strtod also accepts a hex float, a nan, and an inf, none of which GNU
+       sleep takes, so a duration is rejected unless it parsed a finite,
+       non-negative decimal number. A nan compares false against zero, so it
+       needs the explicit finite check rather than the sign test alone. */
+    const char *digits = start;
+    if (*digits == '+' || *digits == '-') digits++;
+    const bool is_hex_prefix =
+        digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X');
+    if (end == start || is_hex_prefix || !std::isfinite(value) || value < 0.0)
+      throw Error{"sleep: invalid duration '" + number + "'"};
+
+    /* A single trailing unit suffix scales the value the way GNU sleep reads
+       1h or 40s, with no suffix meaning seconds. */
+    double unit_multiplier = 1.0;
+    if (*end != '\0' && *(end + 1) == '\0') {
+      switch (*end) {
+      case 's': unit_multiplier = 1.0; break;
+      case 'm': unit_multiplier = 60.0; break;
+      case 'h': unit_multiplier = 60.0 * 60.0; break;
+      case 'd': unit_multiplier = 60.0 * 60.0 * 24.0; break;
+      default: throw Error{"sleep: invalid duration '" + number + "'"};
+      }
+    } else if (*end != '\0') {
+      throw Error{"sleep: invalid duration '" + number + "'"};
+    }
+
+    total_seconds += value * unit_multiplier;
+  }
+
+  /* An infinite sleep pauses until a signal arrives, so it loops on a day-long
+     interval rather than computing a finite total. */
+  if (should_sleep_forever) {
+    while (true)
+      os::sleep_for_seconds(60.0 * 60.0 * 24.0);
+  }
+
+  os::sleep_for_seconds(total_seconds);
   return 0;
 }
 

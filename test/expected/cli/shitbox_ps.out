@@ -1,0 +1,8 @@
+--- plain ps header ---
+  PID CMD
+--- aux header has the USER and COMMAND columns ---
+header ok
+--- aux lists the running shell ---
+self ok
+--- -aux selects the same wide listing ---
+dash aux ok

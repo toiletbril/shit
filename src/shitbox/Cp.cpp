@@ -98,8 +98,7 @@ fn util_cp(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.count() < 2)
-    throw Error{"cp: a source and a destination operand are required"};
+  if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
   let const recursive =
       FLAG_CP_RECURSIVE_R.is_enabled() || FLAG_CP_RECURSIVE_UPPER.is_enabled();

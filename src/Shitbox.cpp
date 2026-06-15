@@ -94,6 +94,7 @@ fn run_util(Util chosen, const ExecContext &ec, EvalContext &cxt,
   case Util::Kill: return util_kill(ec, cxt, args);
   case Util::Ps: return util_ps(ec, cxt, args);
   case Util::Make: return util_make(ec, cxt, args);
+  case Util::Find: return util_find(ec, cxt, args);
   }
   unreachable("unhandled shitbox utility of kind %d", ENUM(chosen));
 }
@@ -121,6 +122,13 @@ fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
        in the default mood. */
     try {
       return run_util(*chosen, ec, cxt, shifted);
+    } catch (const ErrorWithLocation &error) {
+      /* A flag-parse error carries a caret offset into the utility's own
+         argument vector, which does not line up with the whole command the
+         top-level handler renders against, so the caret would land on the wrong
+         token. Re-pointing it at the command location puts the caret under the
+         whole invocation the way the utility's thrown errors render. */
+      throw ErrorWithLocation{ec.source_location(), error.message()};
     } catch (const Error &error) {
       throw ErrorWithLocation{ec.source_location(), error.message()};
     }

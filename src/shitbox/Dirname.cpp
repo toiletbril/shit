@@ -29,7 +29,7 @@ fn util_dirname(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.is_empty()) throw Error{"dirname expects a path"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   let const parent = Path{operands[0].view()}.parent();
   /* A path with no separator names a file in the current directory, so the

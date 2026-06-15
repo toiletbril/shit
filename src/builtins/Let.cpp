@@ -33,8 +33,7 @@ i32 Let::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  if (ec.args().count() < 2)
-    throw Error{"Unable to evaluate let because it was given no expression"};
+  if (ec.args().count() < 2) return report_usage_error(ec, cxt, ec.program());
 
   /* Each argument is one expression, evaluated in order so an earlier
      assignment is visible to a later one, and the last value decides the

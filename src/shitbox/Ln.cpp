@@ -31,7 +31,7 @@ fn util_ln(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.count() < 2) throw Error{"ln expects a target and a link name"};
+  if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
   let const target = operands[0].view();
   let const link = operands[1].view();

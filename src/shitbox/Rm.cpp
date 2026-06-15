@@ -53,7 +53,8 @@ fn util_rm(const ExecContext &ec, EvalContext &cxt,
   let const recursive =
       FLAG_RM_RECURSIVE_R.is_enabled() || FLAG_RM_RECURSIVE_UPPER.is_enabled();
 
-  if (operands.is_empty() && !force) throw Error{"rm expects a path"};
+  if (operands.is_empty() && !force)
+    return report_usage_error(ec, cxt, args[0].view());
 
   i32 status = 0;
   for (const String &operand : operands) {

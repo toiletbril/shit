@@ -60,7 +60,7 @@ fn util_tr(const ExecContext &ec, EvalContext &cxt,
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   let const deleting = FLAG_TR_DELETE.is_enabled();
-  if (operands.is_empty()) throw Error{"tr expects a set of bytes"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (!deleting && operands.count() < 2)
     throw Error{"tr expects two sets unless -d is given"};
 

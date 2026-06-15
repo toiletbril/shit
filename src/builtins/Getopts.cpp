@@ -40,9 +40,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  if (args.count() < 3)
-    throw Error{"Unable to parse options because an optstring and a name "
-                "argument are required"};
+  if (args.count() < 3) return report_usage_error(ec, cxt, ec.program());
 
   let const &optstring = args[1];
   let const &name = args[2];

@@ -230,7 +230,8 @@ The utilities are
 .BR ls ", " ln ", " rm ", " mkdir ", " rmdir ", " cp ", " mv ", " cat ", "
 .BR tee ", " touch ", " basename ", " dirname ", " realpath ", " du ", " head ", "
 .BR tail ", " wc ", " seq ", " tr ", " grep ", " sort ", " uniq ", " sleep ", "
-.BR env ", " yes ", " pkill ", " killall ", " kill ", " ps ", and " make .
+.BR env ", " yes ", " pkill ", " killall ", " kill ", " ps ", " find ", and "
+.BR make .
 Each takes a small set of flags. The bundled make reads a Makefile, expands its
 variables, and runs each recipe through the shell. It handles single-level
 pattern rules such as
@@ -238,13 +239,43 @@ pattern rules such as
 with the automatic variables $@, $<, and $^, and has no chained implicit rules
 and no parallelism.
 .PP
-The
+A few utilities follow their coreutils counterparts closely.
+.B ls
+lays the names out in columns sized to the terminal, falls back to one name per
+line when the output is not a terminal, and prints the mode, owner, group, size,
+and time under
+.BR \-l .
+.B sleep
+accepts a unit suffix on each duration, s for seconds, m for minutes, h for
+hours, and d for days, the word inf for an unbounded pause, and more than one
+duration to sum.
+.B "ps aux"
+prints the owner, the process id, and the full command line of every process.
+.B find
+walks each path and prints every entry, with
+.BR \-name ", " \-type ", " \-maxdepth ", and " \-mindepth
+to filter the walk.
+.SH SHIT BUILTINS
+These builtins are unique to shit and have no counterpart in bash or dash.
+.TP
 .B calc
-builtin evaluates each argument as an arithmetic expression and prints the value
-of the last one, with the same operators and located errors the shell arithmetic
-uses. In the default mood it computes in 128 bits, so a result wider than a
-signed 64-bit integer prints in full, while the bash and posix moods keep the
-64-bit wrap.
+Evaluate each argument as an arithmetic expression and print the value of the
+last one, with the same operators and located errors the shell arithmetic uses.
+In the default mood it computes in 128 bits, so a result wider than a signed
+64-bit integer prints in full, while the bash and posix moods keep the 64-bit
+wrap.
+.TP
+.B bench
+Run each command repeatedly as a measured child and print a summary of the wall
+time, the peak resident set, and the available perf counters as mean, standard
+deviation, and range. With more than one command it prints each later command
+against the first as a relative speed.
+.TP
+.B z
+Change to a frequently visited directory ranked by a frecency store at
+~/.shit_directory_history, which weights each directory by its visit count and
+how recently it was seen. The operands join into one query that matches a
+directory by case insensitive substring.
 .SH EXIT STATUS
 The shell exits with the status of the last command it ran. A usage error such as
 an unknown flag in a non-interactive run exits with status 2.

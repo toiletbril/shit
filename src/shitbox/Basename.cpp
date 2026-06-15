@@ -29,7 +29,7 @@ fn util_basename(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.is_empty()) throw Error{"basename expects a path"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   /* The path is held in a named local so its filename view does not dangle
      past a temporary. */

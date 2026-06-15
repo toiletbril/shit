@@ -61,7 +61,7 @@ fn util_grep(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.is_empty()) throw Error{"grep expects a pattern"};
+  if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   let const pattern = operands[0].view();
   let const ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();

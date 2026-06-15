@@ -17,7 +17,8 @@ shit: 1:1: error: Builtin 'calc': Arithmetic: division by zero.
      1 |  calc "5 / 0"
        |  ^~~~~~~~~~~~ here.
 === no expression ===
-shit: 1:1: error: Builtin 'calc': calc was given no expression.
+shit: 1:1: error: calc: Not enough arguments.
      1 |  calc
        |  ^~~~ here.
-rc=1
+shit: note: calc --help for more info.
+rc=2
