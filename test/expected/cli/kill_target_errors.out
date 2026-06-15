@@ -1,0 +1,25 @@
+== no target is required:
+shit: 1:1: error: Builtin 'kill': Unable to send the signal because a job or a process id is required.
+     1 |  kill
+       |  ^~~~ here.
+rc=1
+== an unknown signal name is rejected:
+shit: 1:1: error: Builtin 'kill': 'BOGUSSIG' is not a valid signal.
+     1 |  kill -BOGUSSIG 123
+       |  ^~~~~~~~~~~~~~~~~~ here.
+rc=1
+== an unknown job is reported:
+shit: 1:1: error: Builtin 'kill': '%999' is not a known job.
+     1 |  kill %999
+       |  ^~~~~~~~~ here.
+rc=1
+== a non-numeric job is rejected:
+shit: 1:1: error: Builtin 'kill': '%abc' is not a valid job or process id.
+     1 |  kill %abc
+       |  ^~~~~~~~~ here.
+rc=1
+== a non-numeric pid is rejected:
+shit: 1:1: error: Builtin 'kill': 'notanumber' is not a valid job or process id.
+     1 |  kill notanumber
+       |  ^~~~~~~~~~~~~~~ here.
+rc=1

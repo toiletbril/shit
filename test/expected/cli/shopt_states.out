@@ -1,0 +1,27 @@
+== a default option queries off:
+nullglob            	off
+rc=1
+== set then query:
+nullglob            	on
+rc=0
+== unset then query:
+nullglob            	off
+rc=1
+== -q is silent and reports off through the status:
+rc=1
+== -q reports on through the status:
+rc=0
+== -p prints the replayable form when off:
+shopt -u nullglob
+== -p prints the replayable form when on:
+shopt -s nullglob
+== an unknown name is an error:
+shit: 1:1: error: Builtin 'shopt': unknown shopt option 'bogusopt'.
+     1 |  shopt bogusopt
+       |  ^~~~~~~~~~~~~~ here.
+rc=1
+== an unknown name under -q is silent:
+rc=1
+== -o queries a set option name:
+noexec              	off
+rc=1

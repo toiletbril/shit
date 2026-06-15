@@ -1,0 +1,13 @@
+== a missing command with a slash exits 127:
+shit: exec: '/nonexistent/cmd': not found
+rc=127
+== a missing command on the PATH exits 127:
+shit: exec: 'nonexistent_cmd_xyz': not found
+rc=127
+== a non-executable file exits 126:
+shit: Unable to execute 'TMPDIR/notexec' because Permission denied
+rc=126
+== exec replaces the shell and runs the command:
+replaced
+== exec in a command substitution runs as a child:
+[sub]

@@ -1,0 +1,9 @@
+== a query matches the seeded directory:
+TMPDIR
+== a query with no match errors:
+shit: 1:1: error: Builtin 'z': z: no matching directory for 'no_such_dir_xyz'.
+     1 |  z no_such_dir_xyz
+       |  ^~~~~~~~~~~~~~~~~ here.
+rc=1
+== a higher-ranked but removed entry is skipped:
+TMPDIR

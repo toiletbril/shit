@@ -1,0 +1,14 @@
+== list shows a name marked with a value:
+readonly x='5'
+== reassignment of a read-only name is rejected:
+shit: 1:15: error: Unable to assign 'x' because it is read only.
+     1 |  readonly x=5; x=6
+       |                ^~~ here.
+rc=1
+== a bare name marks the current value:
+shit: 1:19: error: Unable to assign 'y' because it is read only.
+     1 |  y=hi; readonly y; y=bye
+       |                    ^~~~~ here.
+rc=1
+== a bare-marked name appears in the list:
+readonly z='1'

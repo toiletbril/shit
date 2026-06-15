@@ -1,0 +1,31 @@
+== set -e aborts before the next command:
+rc=1
+== set +e lets the run continue:
+reached
+rc=0
+== an unknown mood is rejected:
+shit: 1:1: error: Builtin 'set': unknown --mood value 'badmood', expected 'shit', 'bash', or 'sh'.
+     1 |  set --mood badmood
+       |  ^~~~~~~~~~~~~~~~~~ here.
+rc=1
+== set -o lists the option states:
+set +o errexit
+set +o xtrace
+set -o nounset
+set -o pipefail
+set +o allexport
+set +o noclobber
+set +o noglob
+set +o noexec
+set +o monitor
+set -o failglob
+set +o notify
+set +o hashall
+set +o verbose
+set +o keyword
+set +o functrace
+set +o braceexpand
+set +o force-warnings
+set +o mimicry
+set -o force-diagnostics
+set +o no-diagnostics

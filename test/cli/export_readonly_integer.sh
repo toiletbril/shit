@@ -1,0 +1,7 @@
+unset SHIT_FLAGS
+# export of a read-only name fails, and export of an integer-marked name stores
+# the evaluated arithmetic value in the environment a child reads.
+echo "== export of a read-only name fails:"
+"$BIN" -c 'readonly x=old; export x=new'; echo "rc=$?"
+echo "== export of an integer-marked name stores the evaluated value:"
+"$BIN" -c 'declare -i n=3+4; export n; echo "$n"'

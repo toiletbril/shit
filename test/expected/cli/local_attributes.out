@@ -1,0 +1,17 @@
+== local outside a function is an error:
+shit: 1:1: warning: A local outside a function has no scope to bind, declare the variable plainly or move it into a function.
+     1 |  local x=5
+       |  ^~~~~ here.
+shit: 1:1: error: Builtin 'local': Unable to declare a local variable outside a function.
+     1 |  local x=5
+       |  ^~~~~~~~~ here.
+rc=1
+== local -i evaluates an integer assignment:
+7
+== local -a declares an indexed array:
+xy
+== local -A declares an associative array:
+val
+== a local shadows an outer value and restores it:
+inner
+outer

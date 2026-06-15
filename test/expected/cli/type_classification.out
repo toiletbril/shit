@@ -1,0 +1,27 @@
+== -t keyword:
+keyword
+== -t builtin:
+builtin
+== -t alias:
+alias
+== -t function:
+function
+== -t conditional bracket keyword:
+keyword
+== default keyword spelling:
+for is a shell keyword
+== default builtin spelling:
+echo is a shell builtin
+== default alias spelling:
+g is an alias for git
+== default function spelling:
+f is a shell function
+== -a lists a keyword with no file:
+for is a shell keyword
+== -p stays silent for a builtin:
+rc=0
+== -t stays silent for a missing name:
+rc=1
+== a missing name reports not found:
+missing_xyz: not found
+rc=1

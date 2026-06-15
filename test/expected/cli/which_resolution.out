@@ -1,0 +1,20 @@
+== a builtin name:
+shit: 1:1: warning: The which command is non-standard, use command -v for a portable lookup.
+     1 |  which echo
+       |  ^~~~~ here.
+echo
+== an absent name exits 1 with no output:
+shit: 1:1: warning: The which command is non-standard, use command -v for a portable lookup.
+     1 |  which definitely_absent_xyz
+       |  ^~~~~ here.
+rc=1
+== a program resolved in a temp PATH:
+shit: 1:1: warning: The which command is non-standard, use command -v for a portable lookup.
+     1 |  which mytool
+       |  ^~~~~ here.
+TMPDIR/mytool
+== -a lists every match in the temp PATH:
+shit: 1:1: warning: The which command is non-standard, use command -v for a portable lookup.
+     1 |  which -a mytool
+       |  ^~~~~ here.
+TMPDIR/mytool

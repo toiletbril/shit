@@ -1,0 +1,4 @@
+== an unclosed bracket stays literal in the bash mood:
+a[b
+== tilde plus expands to PWD:
+TMPDIR
