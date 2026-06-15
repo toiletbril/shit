@@ -102,6 +102,8 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
 
     let const text = read_up_to_lines(fd, count);
     if (was_opened) os::close_fd(fd);
+    /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
+    if (os::INTERRUPT_REQUESTED) return 130;
 
     let output = String{};
     if (should_print_headers) {

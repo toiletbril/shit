@@ -94,6 +94,8 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
+  /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
+  if (os::INTERRUPT_REQUESTED) return 130;
   let output = String{};
   output.reserve(input.count());
   for (usize i = 0; i < input.count(); i++) {

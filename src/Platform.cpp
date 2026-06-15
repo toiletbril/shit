@@ -127,10 +127,16 @@ hot fn read_fd(os::descriptor fd, void *buf, usize size) wontthrow
 {
   for (;;) {
     ssize_t r = read(fd, buf, size);
-    /* A signal that lands while the read blocks, such as SIGCHLD from a job
-       that changes state, interrupts the call. Retry so the reader does not
-       mistake the interruption for end of input. */
-    if (r == -1 && errno == EINTR) continue;
+    /* A signal that lands while the read blocks interrupts the call. A SIGINT
+       sets INTERRUPT_REQUESTED, so the read returns to the caller, which
+       reports the interrupt, rather than retrying and freezing the way a
+       stdin-reading utility would on a Ctrl-C. Any other interrupting signal
+       such as a SIGCHLD from a job that changes state retries, so the reader
+       does not mistake the interruption for end of input. */
+    if (r == -1 && errno == EINTR) {
+      if (INTERRUPT_REQUESTED) return shit::None;
+      continue;
+    }
     if (r == -1) return shit::None;
     return static_cast<usize>(r);
   }

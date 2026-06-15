@@ -94,6 +94,8 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   i32 status = 0;
   for (const StringView &source : sources) {
     Maybe<String> content = read_named_or_stdin(ec, source);
+    /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
+    if (os::INTERRUPT_REQUESTED) return 130;
     if (!content.has_value()) {
       report_soft_shitbox_error(ec, cxt,
                                 "wc: " + String{source} + ": " +

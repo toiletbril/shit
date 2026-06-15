@@ -34,6 +34,8 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
+  /* A Ctrl-C during the read returns 130 rather than freezing the utility. */
+  if (os::INTERRUPT_REQUESTED) return 130;
 
   ec.print_to_stdout(input.view());
 
