@@ -1815,7 +1815,12 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
     let const parsed = utils::parse_decimal_integer(name);
     if (parsed.is_error()) continue;
 
-    const String comm_path = "/proc/" + name + "/comm";
+    /* The three /proc files share the same per-pid prefix, built once here
+       rather than reconcatenated for each. comm names the process for ps, for
+       killall, and for pkill, so it is read for every process rather than only
+       the kernel-thread fallback. */
+    const String proc_pid = "/proc/" + name;
+    const String comm_path = proc_pid + "/comm";
     Maybe<String> comm = utils::read_entire_file(comm_path.view());
     if (!comm.has_value()) continue;
     /* The comm file ends with a newline the listing does not want. */
@@ -1830,7 +1835,7 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
     /* The status file names the owner on its Uid line, the real uid first, so
        ps can render the owner the way it does. A process that has gone since
        the directory scan leaves the owner at zero. */
-    const String status_path = "/proc/" + name + "/status";
+    const String status_path = proc_pid + "/status";
     if (Maybe<String> status = utils::read_entire_file(status_path.view());
         status.has_value())
     {
@@ -1864,7 +1869,7 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
        argument, so the separators become spaces for the listing. A kernel
        thread exposes an empty cmdline, so the bracketed command name stands in
        the way ps shows it. */
-    const String cmdline_path = "/proc/" + name + "/cmdline";
+    const String cmdline_path = proc_pid + "/cmdline";
     if (Maybe<String> cmdline = utils::read_entire_file(cmdline_path.view());
         cmdline.has_value() && !cmdline->is_empty())
     {

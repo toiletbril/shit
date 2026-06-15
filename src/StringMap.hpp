@@ -25,7 +25,11 @@ public:
 
   cold StringMap(const StringMap &other) : m_allocator(other.m_allocator)
   {
-    rehash(other.m_capacity == 0 ? 16 : other.m_capacity);
+    /* An empty source allocates no bucket array, so copying an unused table,
+       the common case when a subshell snapshot saves a map no command touched,
+       costs nothing until the first insert grows it lazily. */
+    if (other.m_count == 0) return;
+    rehash(other.m_capacity);
     for (usize i = 0; i < other.m_capacity; i++) {
       if (other.m_slots[i].state == slot::Occupied)
         set_value(other.m_slots[i].key.view(), Value{other.m_slots[i].value});
