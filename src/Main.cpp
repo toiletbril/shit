@@ -803,6 +803,26 @@ fn main(int argc, char **argv) -> int
       spliced_argv.is_empty() ? argv : spliced_argv.begin();
   let const parse_argc =
       spliced_argv.is_empty() ? argc : static_cast<int>(spliced_argv.count());
+
+  /* A terminal that launches the shell with a broken flag config, such as a
+     removed flag left in SHIT_FLAGS, must not exit and lock the user out of the
+     pane. When standard input is a terminal the shell drops to a rescue prompt
+     on default settings instead, so the config can be fixed from inside. The
+     rc chain is skipped in rescue so a broken rc does not compound the failure.
+     A non-interactive run keeps the usage exit the way dash does. */
+  bool rescue_mode = false;
+  let const enter_rescue = [&]() {
+    shit::show_message("Entering rescue.");
+    rescue_mode = true;
+    shit::reset_flags(FLAG_LIST);
+    try {
+      file_names = shit::parse_flags(FLAG_LIST, argc, argv);
+    } catch (...) {
+      shit::reset_flags(FLAG_LIST);
+      file_names = shit::ArrayList<shit::String>{};
+    }
+  };
+
   try {
     file_names = shit::parse_flags(FLAG_LIST, parse_argc, parse_argv);
   } catch (const shit::ErrorWithLocation &e) {
@@ -810,12 +830,14 @@ fn main(int argc, char **argv) -> int
        reader sees which argument the parser rejected. */
     shit::show_message(
         e.to_string(shit::join_command_line(parse_argc, parse_argv)));
-    return 2;
+    if (!shit::os::is_stdin_a_tty()) return 2;
+    enter_rescue();
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
-    /* A flag error is a usage error, so the shell exits with the POSIX usage
-       status rather than success, matching dash. */
-    return 2;
+    /* A flag error is a usage error, so a non-interactive shell exits with the
+       POSIX usage status rather than success, matching dash. */
+    if (!shit::os::is_stdin_a_tty()) return 2;
+    enter_rescue();
   }
 
   /* --dumb is the union of -P, -T, and --no-diagnostics, so it enables those
@@ -1217,9 +1239,9 @@ fn main(int argc, char **argv) -> int
      mood swapped per flavor so a bash rc parses under the bash grammar. A
      privileged shell sources nothing, the way bash's privileged mode leaves the
      profiles and rc files unread. */
-  if (is_privileged) {
-    LOG(Info,
-        "skipping every startup config file in privileged mode");
+  if (is_privileged || rescue_mode) {
+    LOG(Info, "skipping every startup config file in %s mode",
+        rescue_mode ? "rescue" : "privileged");
   } else {
     /* --no-init-diagnostics turns diagnostics and warnings off for the duration
        of the init sourcing, so a -W shell loads a lax bash config without
