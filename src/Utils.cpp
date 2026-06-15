@@ -329,6 +329,14 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
   for (usize i = 0; i < children.count(); i++)
     stage_status[child_stage[i]] = os::wait_and_monitor_process(children[i]);
 
+  /* PIPESTATUS exposes each stage's status by position, so a script reads a
+     non-last stage's status the way bash publishes it after a pipeline. */
+  let pipe_status = ArrayList<String>{heap_allocator()};
+  pipe_status.reserve(stage_count);
+  for (usize i = 0; i < stage_count; i++)
+    pipe_status.push(int_to_text(stage_status[i], heap_allocator()));
+  cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
+
   /* pipefail reports the rightmost stage that failed, or zero when every stage
      succeeded. Otherwise the pipeline reports the last stage alone. */
   if (cxt.pipefail()) {

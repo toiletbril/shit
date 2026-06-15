@@ -2399,6 +2399,14 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   for (let const child : children)
     stage_status.push(os::wait_and_monitor_process(child));
 
+  /* PIPESTATUS exposes each stage's status by position, the same way the
+     all-simple pipeline path publishes it, so a compound pipeline reads it too. */
+  let pipe_status = ArrayList<String>{heap_allocator()};
+  pipe_status.reserve(stage_status.count());
+  for (usize i = 0; i < stage_status.count(); i++)
+    pipe_status.push(utils::int_to_text(stage_status[i], heap_allocator()));
+  cxt.set_indexed_array("PIPESTATUS", steal(pipe_status));
+
   i32 ret = stage_status.is_empty() ? 0 : stage_status.back();
   if (cxt.pipefail()) {
     ret = 0;

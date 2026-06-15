@@ -412,30 +412,6 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
       String spec = "%";
       i++;
 
-      /* bash %(datefmt)T formats a time through strftime. The format sits in
-         parentheses where the conversion letter would be, followed by T, and
-         the operand is the epoch seconds, -1 for now and -2 for the shell
-         start. It is recognized before the flag and width scan so the scan does
-         not consume a * operand that the time conversion owns. */
-      if (cxt.bash_additions_enabled() && i < fmt.length() && fmt[i] == '(') {
-        usize close = i + 1;
-        while (close < fmt.length() && fmt[close] != ')')
-          close++;
-        if (close + 1 < fmt.length() && fmt[close + 1] == 'T') {
-          let const date_format =
-              fmt.view().substring_of_length(i + 1, close - i - 1);
-          let const has_operand = operand_index < operand_count;
-          let const epoch =
-              has_operand ? parse_printf_integer(do_operand_at(operand_index))
-                          : -1;
-          out += os::format_local_time(date_format, epoch);
-          operand_index++;
-          consumed_a_conversion = true;
-          i = close + 1;
-          continue;
-        }
-      }
-
       while (i < fmt.length() && std::strchr("-+ 0#", fmt[i]) != nullptr)
         spec.push(fmt[i++]);
       if (i < fmt.length() && fmt[i] == '*') {
@@ -453,6 +429,34 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
         } else {
           while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
             spec.push(fmt[i++]);
+        }
+      }
+
+      /* bash %(datefmt)T formats a time through strftime. The format sits in
+         parentheses where the conversion letter would be, followed by T, and
+         the operand is the epoch seconds, -1 for now and -2 for the shell
+         start. A field width sits before the ( the way bash reads it, so the
+         scanned spec pads the formatted time as a string. */
+      if (cxt.bash_additions_enabled() && i < fmt.length() && fmt[i] == '(') {
+        usize close = i + 1;
+        while (close < fmt.length() && fmt[close] != ')')
+          close++;
+        if (close + 1 < fmt.length() && fmt[close + 1] == 'T') {
+          let const date_format =
+              fmt.view().substring_of_length(i + 1, close - i - 1);
+          let const has_operand = operand_index < operand_count;
+          let const epoch =
+              has_operand ? parse_printf_integer(do_operand_at(operand_index))
+                          : -1;
+          let const formatted = os::format_local_time(date_format, epoch);
+          if (spec == "%")
+            out += formatted;
+          else
+            append_conversion(out, spec, 's', formatted);
+          operand_index++;
+          consumed_a_conversion = true;
+          i = close + 1;
+          continue;
         }
       }
       if (i >= fmt.length()) {

@@ -238,6 +238,10 @@ fn remove_directory(StringView path) wontthrow -> bool;
 fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
+/* The target a symlink points at, the raw link text rather than the resolved
+   path, so cp can recreate the link as it stands. None when the path is not a
+   symlink or cannot be read. */
+fn read_symlink(StringView path) wontthrow -> Maybe<String>;
 
 /* The metadata one lstat returns, for the shitbox ls long format to render a
    row without a syscall per field. stat_path fills it and returns false when

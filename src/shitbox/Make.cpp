@@ -443,6 +443,18 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
     if (command.is_empty()) continue;
     if (!is_silent) ec.print_to_stdout(command + "\n");
 
+    /* A recipe runs the way GNU make runs it under /bin/sh, with the strict
+       toggles off, so an unmatched glob or an unset variable in a recipe does
+       not abort the build the way the default mood would. The prior runtime is
+       restored on the way out, including an unwinding throw. */
+    let const saved_runtime = runtime_state::capture(cxt);
+    runtime_state recipe_runtime = saved_runtime;
+    recipe_runtime.failglob = false;
+    recipe_runtime.error_unset = false;
+    recipe_runtime.are_warnings_enabled = false;
+    recipe_runtime.restore(cxt);
+    defer { saved_runtime.restore(cxt); };
+
     let const status = cxt.run_source(command.view(), "make", true,
                                       ec.source_location(), StringView{"make"});
     if (status != 0 && !should_ignore_errors)

@@ -83,6 +83,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
   bool should_print = false;
   bool should_mark_integer_attribute = false;
   bool should_unmark_integer_attribute = false;
+  bool should_mark_readonly = false;
   bool should_restrict_to_functions = false;
   bool should_print_function_names_only = false;
 
@@ -114,9 +115,13 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         should_restrict_to_functions = true;
         should_print_function_names_only = true;
         break;
+      case 'r':
+        /* bash refuses to drop the read-only attribute, so the +r form is left
+           as a silent no-op rather than unmarking. */
+        if (!is_remove_form) should_mark_readonly = true;
+        break;
       /* The remaining attribute letters carry no backing behavior yet and are
          accepted so a script that sets them keeps running. */
-      case 'r':
       case 'g':
       case 'l':
       case 'u':
@@ -326,6 +331,11 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
         cxt.mark_exported(name);
       }
     }
+
+    /* The read-only mark applies after the assignment, so declare -r v=1 stores
+       the value first and then locks it, the way bash rejects only a later
+       write rather than the declaration's own assignment. */
+    if (should_mark_readonly) cxt.mark_readonly(name);
   }
 
   return 0;

@@ -3096,6 +3096,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                                ArrayList<highlight_span> &spans,
                                const HashSet &known_vars) throws -> void;
 
+/* Color the inside of a $(( )) as arithmetic rather than a command line. */
+static fn color_arithmetic(StringView line, usize begin, usize end,
+                           EvalContext &context,
+                           ArrayList<highlight_span> &spans,
+                           const HashSet &known_vars) throws -> void;
+
 /* Whether the plain word names a path that exists on disk, a tilde prefix
    expanded the way the evaluator expands it. The highlighter paints such an
    argument cyan, so a real file or directory stands apart from a typo, which
@@ -3114,6 +3120,65 @@ static fn word_names_existing_path(StringView word) throws -> bool
     return false;
   }
   return Path{word}.exists();
+}
+
+/* Color a path-like argument by segment, the on-disk prefix cyan and the
+   partial trailing segment yellow. A word that is not path-like, a plain name
+   with no slash that does not resolve, is left in the default color so an
+   ordinary argument such as a subcommand is not painted. Returns whether the
+   word was treated as a path. */
+static fn color_path_argument(usize word_start, StringView word,
+                              ArrayList<highlight_span> &spans) throws -> bool
+{
+  if (word.is_empty() || word[0] == '-') return false;
+
+  let const has_slash = word.find_character('/').has_value();
+  let const has_tilde = word[0] == '~';
+  let const has_dot_prefix =
+      word.length >= 2 && word[0] == '.' &&
+      (word[1] == '/' || (word.length >= 3 && word[1] == '.' && word[2] == '/'));
+
+  /* A bare word with no path shape is only treated as a path when it resolves
+     on disk, so an ordinary argument keeps its default color. */
+  if (!has_slash && !has_tilde && !has_dot_prefix &&
+      !word_names_existing_path(word))
+  {
+    return false;
+  }
+
+  /* The longest leading run of segments whose joined prefix exists on disk
+     bounds the cyan span. The trailing slash rides with the prefix, so src/
+     colors through the separator. The prefix is monotonic on the filesystem, a
+     deeper path cannot exist when a shallower one does not, so the last existing
+     boundary is the answer. */
+  usize existing_end = 0;
+  for (usize scan = 1; scan <= word.length; scan++) {
+    let const at_boundary = scan == word.length || word[scan] == '/';
+    if (!at_boundary) continue;
+
+    let const typed_prefix = word.substring_of_length(0, scan);
+    let exists = false;
+    if (has_tilde) {
+      if (Maybe<String> expanded = expand_command_tilde(typed_prefix);
+          expanded.has_value())
+        exists = Path{expanded->view()}.exists();
+    } else {
+      exists = Path{typed_prefix}.exists();
+    }
+
+    if (exists)
+      existing_end =
+          scan < word.length && word[scan] == '/' ? scan + 1 : scan;
+  }
+
+  if (existing_end > 0)
+    spans.push(highlight_span{word_start, word_start + existing_end,
+                              colors::ansi::CYAN});
+  if (existing_end < word.length)
+    spans.push(highlight_span{word_start + existing_end,
+                              word_start + word.length, colors::ansi::YELLOW});
+
+  return true;
 }
 
 /* The plain variable name a $ expansion references when it is a simple $name or
@@ -3166,6 +3231,33 @@ static fn color_dollar(StringView line, usize i, usize end,
                        ArrayList<highlight_span> &spans, EvalContext &context,
                        const HashSet &known_vars) throws -> usize
 {
+  /* $(( ... )) is arithmetic, not a command substitution, so its inside colors
+     as an expression of bare names, numbers, and operators rather than a
+     command line. The two opening and two closing parens frame the bytes the
+     arithmetic colorer reads. */
+  if (i + 2 < end && line[i + 1] == '(' && line[i + 2] == '(') {
+    usize depth = 0;
+    let close = end;
+    let j = i + 1;
+    for (; j < end; j++) {
+      if (line[j] == '(')
+        depth++;
+      else if (line[j] == ')') {
+        depth--;
+        if (depth == 0) {
+          close = j;
+          j++;
+          break;
+        }
+      }
+    }
+    let const inner_begin = i + 3 < end ? i + 3 : end;
+    let const inner_end =
+        close >= 1 && close - 1 > inner_begin ? close - 1 : inner_begin;
+    color_arithmetic(line, inner_begin, inner_end, context, spans, known_vars);
+    return j;
+  }
+
   if (i + 1 < end && line[i + 1] == '(') {
     usize depth = 0;
     let close = end;
@@ -3199,6 +3291,57 @@ static fn color_dollar(StringView line, usize i, usize end,
     spans.push(highlight_span{i, expansion_end, sgr});
   }
   return expansion_end;
+}
+
+static fn color_arithmetic(StringView line, usize begin, usize end,
+                           EvalContext &context,
+                           ArrayList<highlight_span> &spans,
+                           const HashSet &known_vars) throws -> void
+{
+  usize i = begin;
+  while (i < end) {
+    let const c = line[i];
+
+    /* A nested $name or $(( )) inside the expression colors through the dollar
+       colorer the same as anywhere else. */
+    if (c == '$') {
+      let const next = color_dollar(line, i, end, spans, context, known_vars);
+      i = next > i ? next : i + 1;
+      continue;
+    }
+
+    /* A bare name is a variable read, colored cyan the way a $name is, since
+       arithmetic reads a name without the leading dollar. */
+    if (is_highlight_name_start(c)) {
+      let const name_start = i;
+      while (i < end && is_highlight_name_char(line[i]))
+        i++;
+      spans.push(highlight_span{name_start, i, colors::ansi::CYAN});
+      continue;
+    }
+
+    /* A number keeps the default color, the digits and the base separators
+       consumed as one run so an operator does not start mid-number. */
+    if (c >= '0' && c <= '9') {
+      while (i < end && (is_highlight_name_char(line[i]) || line[i] == '.'))
+        i++;
+      continue;
+    }
+
+    if (lexer::is_whitespace(c)) {
+      i++;
+      continue;
+    }
+
+    /* Any other run is an operator or a paren, colored bold. The run stops at a
+       name, a number, whitespace, or a dollar, so it advances at least one byte
+       and the loop cannot stall. */
+    let const operator_start = i;
+    while (i < end && line[i] != '$' && !is_highlight_name_start(line[i]) &&
+           !(line[i] >= '0' && line[i] <= '9') && !lexer::is_whitespace(line[i]))
+      i++;
+    spans.push(highlight_span{operator_start, i, colors::ansi::BOLD});
+  }
 }
 
 /* Color one command line, the window [begin, end). A command substitution
@@ -3467,13 +3610,10 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     /* An argument, an expansion-built command, or an assignment prefix. The
        inner spans stand. An assignment prefix keeps the next word in command
        position, an expansion-built command moves past it. A plain argument that
-       names an existing path is painted cyan, since a real path stands apart
-       from a typo there. */
-    if (!command_position && plain && !is_assignment &&
-        word_names_existing_path(word))
-    {
-      do_push(word_start, word_end, colors::ansi::CYAN);
-    }
+       looks like a path colors per segment, the on-disk prefix cyan and the
+       partial tail yellow. */
+    if (!command_position && plain && !is_assignment)
+      color_path_argument(word_start, word, spans);
     for (let const &inner : word_spans)
       do_push(inner.start, inner.end, inner.sgr);
     if (command_position && !is_assignment) command_position = false;

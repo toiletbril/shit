@@ -491,6 +491,11 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
 
 fn EvalContext::report_unset_reference(StringView name) throws -> void
 {
+  /* A [[ -v name ]] existence test expands its operand only to read whether it
+     is set, so the warning stays silent there the way bash does not nounset on
+     the operand of -v. */
+  if (m_suppress_unset_warning) return;
+
   /* -W downgrades the mood-seeded fatality to a warning so the run proceeds,
      while an explicit set -u keeps the abort the script asked for. A lenient
      run without -W expands the name to empty in silence. */
@@ -1447,7 +1452,10 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_enable_path_expansion,
                              m_enable_echo,
                              m_enable_echo_expanded,
-                             m_environment_undo_log.count()};
+                             m_environment_undo_log.count(),
+                             runtime_state::capture(*this),
+                             m_no_clobber,
+                             m_export_all};
 }
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
@@ -1469,6 +1477,13 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_enable_path_expansion = snapshot.is_path_expansion_enabled;
   m_enable_echo = snapshot.is_echo_enabled;
   m_enable_echo_expanded = snapshot.is_echo_expanded_enabled;
+
+  /* The mood, the strictness toggles, noclobber, and allexport revert with the
+     same rule, so a set -o pipefail, a set -u, a set -o noclobber, a set -a, or
+     a set --mood inside the subshell or the command substitution dies with it. */
+  snapshot.runtime.restore(*this);
+  m_no_clobber = snapshot.no_clobber;
+  m_export_all = snapshot.export_all;
 
   /* A readonly or a declare -i inside the subshell or the command substitution
      stays inside it, so the parent's name sets come back whole and a later
@@ -1551,8 +1566,11 @@ fn EvalContext::option_flags_string() const throws -> String
   let flags = String{};
   if (m_error_exit) flags += 'e';
   if (!m_enable_path_expansion) flags += 'f';
+  if (export_all()) flags += 'a';
   if (m_enable_echo) flags += 'v';
   if (m_enable_echo_expanded) flags += 'x';
+  if (error_unset()) flags += 'u';
+  if (no_clobber()) flags += 'C';
   if (m_shell_is_interactive) flags += 'i';
 
   return flags;

@@ -167,9 +167,9 @@ constexpr usize GLOBSTAR_MAX_DEPTH = 256;
    trailing component every file and directory is collected, which are the final
    matches. A hidden entry is skipped the way bash globstar skips a dotfile. */
 fn collect_globstar_paths(const Path &dir, StringView relative,
-                          bool directories_only, bool include_base, usize depth,
-                          Allocator allocator, ArrayList<String> &out) throws
-    -> void
+                          bool directories_only, bool should_match_dotfiles,
+                          bool include_base, usize depth, Allocator allocator,
+                          ArrayList<String> &out) throws -> void
 {
   LOG(All,
       "collecting globstar paths under the relative path '%.*s', depth %zu",
@@ -182,7 +182,7 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
 
   for (let const &entry : *entries) {
     let const name = entry.view();
-    if (!name.is_empty() && name[0] == '.') continue;
+    if (!should_match_dotfiles && !name.is_empty() && name[0] == '.') continue;
 
     let child_dir = dir;
     child_dir.push_component(name);
@@ -197,9 +197,13 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
 
     if (!directories_only || is_dir)
       out.push(String{allocator, child_relative.view()});
-    if (is_dir)
+    /* A directory symlink is a match but is not descended into, so a self or a
+       parent symlink does not spin the walk to the depth cap the way following
+       it would. */
+    if (is_dir && !child_dir.is_symbolic_link())
       collect_globstar_paths(child_dir, child_relative.view(), directories_only,
-                             false, depth + 1, allocator, out);
+                             should_match_dotfiles, false, depth + 1, allocator,
+                             out);
   }
 }
 
@@ -271,8 +275,9 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
 
       let const directory_position = slash_after.has_value();
       let relatives = ArrayList<String>{scratch};
-      collect_globstar_paths(base, StringView{""}, directory_position, true, 0,
-                             scratch, relatives);
+      collect_globstar_paths(base, StringView{""}, directory_position,
+                             is_shopt_enabled("dotglob"), true, 0, scratch,
+                             relatives);
 
       /* As a trailing ** each collected file or directory is a final match, the
          prefix the user wrote joined to the relative path. The base directory

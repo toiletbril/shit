@@ -242,36 +242,6 @@ struct function_definition_info
   bool were_diagnostics_disabled_at_definition{false};
 };
 
-struct eval_state_snapshot
-{
-  StringMap<String> shell_variables;
-  StringMap<const Expression *> functions;
-  StringMap<String> function_sources;
-  /* The definition position mappings ride the snapshot beside the sources,
-     so a function the isolated run defined does not leave a stale mapping
-     behind that disagrees with the restored function table. */
-  StringMap<function_definition_info> function_definition_infos;
-  StringMap<String> aliases;
-  ArrayList<String> positional_params;
-  Path working_directory;
-  StringMap<String> traps;
-  /* The read-only and integer name sets ride the snapshot too, so a readonly or
-     a declare -i inside a subshell or a command substitution dies with the
-     child rather than leaking its mark to the parent. The exported set is
-     already covered by the environment undo log rewound below. */
-  HashSet readonly_names;
-  HashSet integer_names;
-  bool error_exit;
-  bool is_path_expansion_enabled;
-  bool is_echo_enabled;
-  bool is_echo_expanded_enabled;
-  /* The length of the environment undo log when the snapshot was taken, the
-     point restore_state rewinds the process environment back to. A subshell
-     that writes no exported name leaves the log untouched, so the restore is a
-     single length comparison. */
-  usize environment_undo_mark;
-};
-
 /* Record a visit to a directory in the frecency store at
    ~/.shit_directory_history, for the z smart-cd builtin. Called after a
    successful cd. */
@@ -314,6 +284,43 @@ struct runtime_state
       -> runtime_state;
   /* Write this snapshot back into a context. */
   fn restore(EvalContext &context) const wontthrow -> void;
+};
+
+struct eval_state_snapshot
+{
+  StringMap<String> shell_variables;
+  StringMap<const Expression *> functions;
+  StringMap<String> function_sources;
+  /* The definition position mappings ride the snapshot beside the sources,
+     so a function the isolated run defined does not leave a stale mapping
+     behind that disagrees with the restored function table. */
+  StringMap<function_definition_info> function_definition_infos;
+  StringMap<String> aliases;
+  ArrayList<String> positional_params;
+  Path working_directory;
+  StringMap<String> traps;
+  /* The read-only and integer name sets ride the snapshot too, so a readonly or
+     a declare -i inside a subshell or a command substitution dies with the
+     child rather than leaking its mark to the parent. The exported set is
+     already covered by the environment undo log rewound below. */
+  HashSet readonly_names;
+  HashSet integer_names;
+  bool error_exit;
+  bool is_path_expansion_enabled;
+  bool is_echo_enabled;
+  bool is_echo_expanded_enabled;
+  /* The length of the environment undo log when the snapshot was taken, the
+     point restore_state rewinds the process environment back to. A subshell
+     that writes no exported name leaves the log untouched, so the restore is a
+     single length comparison. */
+  usize environment_undo_mark;
+  /* The mood and the strictness toggles, the noclobber flag, and the allexport
+     flag ride the snapshot too, so a set -o pipefail, a set -u, a set -o
+     noclobber, a set -a, or a set --mood inside a subshell or a command
+     substitution dies with the child rather than leaking to the parent. */
+  runtime_state runtime;
+  bool no_clobber;
+  bool export_all;
 };
 
 /* A programmable-completion spec the complete builtin registers for a command.
@@ -845,6 +852,17 @@ public:
   fn set_error_unset_explicit(bool enabled) wontthrow -> void
   {
     m_runtime.error_unset_explicit = enabled;
+  }
+  /* A [[ -v name ]] existence test must stay silent about an unset operand, so
+     the conditional sets this around the operand expansion and
+     report_unset_reference honors it. */
+  fn set_suppress_unset_warning(bool enabled) wontthrow -> void
+  {
+    m_suppress_unset_warning = enabled;
+  }
+  pure fn suppresses_unset_warning() const wontthrow -> bool
+  {
+    return m_suppress_unset_warning;
   }
   /* -W keeps a run going past a strict error by reporting it as a warning. The
      analysis stage reads the static flag, the runtime checks below read this
@@ -1556,6 +1574,7 @@ protected:
   bool m_mood_set_explicitly{false};
   bool m_no_clobber{false};
   bool m_export_all{false};
+  bool m_suppress_unset_warning{false};
   bool m_no_exec{false};
   bool m_mimicry{false};
   /* The nesting of mimicked scripts, bounded so a script that mimics another
@@ -1691,6 +1710,10 @@ protected:
      negative index counts from the end. */
   fn apply_array_subscript(StringView name, StringView subscript) throws
       -> String;
+  /* One past the highest set index of an array, across the dense run and any
+     sparse element, so a negative subscript counts back from the true end the
+     way bash does even when the last element lives in a gap. */
+  fn array_negative_index_base(StringView name) const throws -> i64;
 
   /* Expand the bash ${!body} form. When body ends with * or @ it lists the
      variable names that start with the prefix, sorted and space joined.

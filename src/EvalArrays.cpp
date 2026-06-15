@@ -387,7 +387,8 @@ fn EvalContext::unset_array_element(StringView name,
   if (ArrayList<String> *array = m_indexed_arrays.find(name)) {
     const i64 index = evaluate_arithmetic(subscript);
     const i64 array_count = static_cast<i64>(array->count());
-    const i64 resolved = index < 0 ? index + array_count : index;
+    const i64 resolved =
+        index < 0 ? index + array_negative_index_base(name) : index;
     if (resolved < 0) return;
     /* An element inside the dense run leaves a hole at its index the way bash
        does, rather than renumbering the tail. The elements after it move to the
@@ -480,11 +481,35 @@ fn EvalContext::declare_local(StringView name) throws -> void
       previous_was_associative, steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
       previous_was_integer, previous_was_readonly});
+
+  /* The live array forms are cleared so a local array starts empty rather than
+     showing the caller's elements, and the saved caller state comes back on the
+     scope pop. The scalar value is left in place, so a value-less local of a
+     scalar name keeps the caller's value the way this shell already does. */
+  m_indexed_arrays.erase(name);
+  clear_sparse_array(name);
+  clear_associative_array(name);
 }
 
 hot fn EvalContext::expand_variable(StringView name) const throws -> String
 {
   return get_variable_value(name).value_or(String{});
+}
+
+fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
+{
+  i64 base = 0;
+  if (let const *array = m_indexed_arrays.find(name))
+    base = static_cast<i64>(array->count());
+
+  for (const sparse_array_entry &entry : collect_sparse_array_entries(
+           m_sparse_array_values, name, scratch_allocator()))
+  {
+    let const past_index = static_cast<i64>(entry.index) + 1;
+    if (past_index > base) base = past_index;
+  }
+
+  return base;
 }
 
 fn EvalContext::apply_array_subscript(StringView name,
@@ -585,7 +610,7 @@ fn EvalContext::apply_array_subscript(StringView name,
     return String{scratch_allocator()};
   }
   const i64 array_count = static_cast<i64>(array->count());
-  if (index < 0) index += array_count;
+  if (index < 0) index += array_negative_index_base(name);
   if (index < 0 || index >= array_count) {
     /* A subscript past the dense end may name a sparsely-held far element. */
     if (index >= 0) {

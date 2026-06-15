@@ -165,12 +165,21 @@ struct ConditionalEvaluator
         regexec(compiled, value_text.c_str(), group_count, matches.begin(), 0);
     LOG(All, "the =~ regex %s the value",
         match_result == 0 ? "matched" : "did not match");
-    if (match_result != 0) {
+    if (match_result == REG_NOMATCH) {
       /* bash clears BASH_REMATCH on a non-match, so a later read does not see a
          prior match's captures. */
       cxt.set_indexed_array("BASH_REMATCH",
                             ArrayList<String>{heap_allocator()});
       return false;
+    }
+    if (match_result != 0) {
+      /* A genuine engine failure such as REG_ESPACE is an error rather than a
+         clean no-match, so it surfaces with the engine's own message instead of
+         reading as false. */
+      char error_text[256];
+      regerror(match_result, compiled, error_text, sizeof(error_text));
+      throw Error{"Unable to match the =~ pattern because " +
+                  String{error_text}};
     }
 
     let rematch = ArrayList<String>{heap_allocator()};
@@ -302,7 +311,13 @@ struct ConditionalEvaluator
     {
       pos += 2;
       if (is_skipping) return false;
+      /* The -v existence test reads whether its operand is set, so the
+         unset-variable diagnostic stays silent while the operand and its
+         subscript expand, the way bash does not nounset the operand of -v. */
+      const bool is_existence_test = first_literal.view() == "-v";
+      if (is_existence_test) cxt.set_suppress_unset_warning(true);
       const String operand = operand_value(elements[pos - 1]);
+      if (is_existence_test) cxt.set_suppress_unset_warning(false);
       return eval_unary(first_literal.view(), operand.view());
     }
 

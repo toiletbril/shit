@@ -67,9 +67,28 @@ static fn copy_path(const ExecContext &ec, StringView source,
                     bool is_verbose) throws -> void
 {
   let const source_path = Path{source};
-  /* A symlink is copied as a leaf rather than descended into, the way rm and du
-     guard their recursion, so a symlink that points back into the tree does not
-     drive an unbounded walk. */
+
+  /* A symlink is recreated at the destination rather than having its target
+     copied, so cp -r preserves the link and a dangling link does not fail the
+     copy the way reading its target would. A platform that cannot read the link
+     falls through and copies the target contents instead. */
+  if (source_path.is_symbolic_link()) {
+    if (let const target = os::read_symlink(source)) {
+      if (!os::create_symlink(target->view(), destination)) {
+        throw Error{"cp: unable to create the symlink '" + String{destination} +
+                    "' because " + os::last_system_error_message()};
+      }
+
+      if (is_verbose)
+        ec.print_to_stdout("'" + String{source} + "' -> '" +
+                           String{destination} + "'\n");
+
+      return;
+    }
+  }
+
+  /* A real directory is descended into under -r. A symlink is excluded here so
+     a link that points back into the tree does not drive an unbounded walk. */
   if (source_path.is_directory() && !source_path.is_symbolic_link()) {
     if (!is_recursive)
       throw Error{"cp: '" + String{source} +

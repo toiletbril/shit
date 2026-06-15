@@ -1653,6 +1653,17 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
   return ::symlink(target_string.c_str(), link_string.c_str()) == 0;
 }
 
+fn read_symlink(StringView path) wontthrow -> Maybe<String>
+{
+  const String path_string{path};
+  char buffer[4096];
+  let const length = ::readlink(path_string.c_str(), buffer, sizeof(buffer) - 1);
+  if (length < 0) return shit::None;
+  return String{
+      StringView{buffer, static_cast<usize>(length)}
+  };
+}
+
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
 {
   const String path_string{path};
@@ -3039,6 +3050,14 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
     flags |= 0x1 /* SYMBOLIC_LINK_FLAG_DIRECTORY */;
   return CreateSymbolicLinkA(link_string.c_str(), target_string.c_str(),
                              flags) != 0;
+}
+
+fn read_symlink(StringView path) wontthrow -> Maybe<String>
+{
+  /* Reading a reparse point needs a device control call this layer does not
+     wrap, so cp on Windows copies a symlink's contents rather than the link. */
+  unused(path);
+  return shit::None;
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
