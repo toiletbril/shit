@@ -24,6 +24,14 @@ static constexpr char DIRECTORY_SEPARATOR = '\\';
 static constexpr char DIRECTORY_SEPARATOR = '/';
 #endif
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#define ST_MTIME_SEC(st)  ((st).st_mtimespec.tv_sec)
+#define ST_MTIME_NSEC(st) ((st).st_mtimespec.tv_nsec)
+#else
+#define ST_MTIME_SEC(st)  ((st).st_mtim.tv_sec)
+#define ST_MTIME_NSEC(st) ((st).st_mtim.tv_nsec)
+#endif
+
 /* A forward slash is always a separator so a POSIX-style path keeps working
    everywhere, and a backslash is one on Windows too. */
 static pure fn is_directory_separator(char c) wontthrow -> bool
@@ -271,9 +279,9 @@ fn Path::is_newer_than(const Path &other) const wontthrow -> bool
   /* The seconds are compared first and the nanoseconds break a tie, the same
      st_mtim ordering dash compares so two files written in the same second
      still order by their finer timestamp. */
-  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
-    return a.st_mtim.tv_sec > b.st_mtim.tv_sec;
-  return a.st_mtim.tv_nsec > b.st_mtim.tv_nsec;
+  if (ST_MTIME_SEC(a) != ST_MTIME_SEC(b))
+    return ST_MTIME_SEC(a) > ST_MTIME_SEC(b);
+  return ST_MTIME_NSEC(a) > ST_MTIME_NSEC(b);
 }
 
 fn Path::is_older_than(const Path &other) const wontthrow -> bool
@@ -281,9 +289,9 @@ fn Path::is_older_than(const Path &other) const wontthrow -> bool
   struct stat a{}, b{};
   if (::stat(m_text.c_str(), &a) != 0) return false;
   if (::stat(other.m_text.c_str(), &b) != 0) return false;
-  if (a.st_mtim.tv_sec != b.st_mtim.tv_sec)
-    return a.st_mtim.tv_sec < b.st_mtim.tv_sec;
-  return a.st_mtim.tv_nsec < b.st_mtim.tv_nsec;
+  if (ST_MTIME_SEC(a) != ST_MTIME_SEC(b))
+    return ST_MTIME_SEC(a) < ST_MTIME_SEC(b);
+  return ST_MTIME_NSEC(a) < ST_MTIME_NSEC(b);
 }
 
 fn Path::is_readable() const wontthrow -> bool

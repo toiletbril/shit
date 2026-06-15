@@ -29,6 +29,11 @@
 #include <sys/syscall.h>
 #endif
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/ioctl.h>
+#include <sys/termios.h>
+#endif
+
 /* posix_spawn takes the child environment as an envp argument. The shell passes
    its own process environment, which prefix assignments mutate before the spawn
    and restore after, so the declaration of environ is needed here. */
