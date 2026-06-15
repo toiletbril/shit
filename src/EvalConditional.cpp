@@ -340,7 +340,16 @@ struct ConditionalEvaluator
             let active = ArrayList<bool>{cxt.scratch_allocator()};
             const String pattern =
                 operand_pattern_masked(elements[pos - 1], active);
-            return regex_match(left.view(), pattern.view(), active);
+            /* A malformed regex throws without a location, so the caret is
+               pointed at the regex operand rather than the bare [[. */
+            try {
+              return regex_match(left.view(), pattern.view(), active);
+            } catch (const Error &err) {
+              const conditional_element &operand = elements[pos - 1];
+              if (operand.word != nullptr)
+                throw relocate_error(err, operand.word->source_location());
+              throw;
+            }
           }
           const String right = operand_value(elements[pos - 1]);
           return eval_binary(left.view(), op.view(), right.view());
@@ -439,9 +448,14 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws -> regex_t *
   regex_t compiled;
   if (regcomp(&compiled, pattern_text.c_str(), REG_EXTENDED) != 0) {
     /* bash returns status 2 for a malformed regex, which the conditional turns
-       into an evaluation error. */
-    throw Error{"Unable to evaluate the [[ ]] because the regular expression "
-                "is invalid"};
+       into an evaluation error. The pattern is named so the message points at
+       the offending expression, and the caller relocates the caret onto the
+       regex operand. */
+    let message = String{scratch_allocator()};
+    message += "Unable to evaluate the [[ ]] because the regular expression '";
+    message += pattern;
+    message += "' is invalid";
+    throw Error{message.view()};
   }
   m_regex_cache.set(pattern, CompiledRegex{compiled});
   return m_regex_cache.find(pattern)->get();
