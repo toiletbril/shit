@@ -20,8 +20,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_basename(const ExecContext &ec, EvalContext &cxt,
-                 const ArrayList<String> &args) throws -> i32
+Basename::Basename() = default;
+
+pure Utility::Kind Basename::kind() const wontthrow { return Kind::Basename; }
+
+fn Basename::execute(const ExecContext &ec, EvalContext &cxt,
+                     const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -40,7 +44,9 @@ fn util_basename(const ExecContext &ec, EvalContext &cxt,
     if (suffix.length < name.length &&
         name.substring_of_length(name.length - suffix.length, suffix.length) ==
             suffix)
+    {
       name = name.substring_of_length(0, name.length - suffix.length);
+    }
   }
 
   ec.print_to_stdout(String{name} + "\n");

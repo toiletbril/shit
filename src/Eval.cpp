@@ -787,6 +787,60 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     if (first_byte == 'B' && name == "BASHPID") {
       return utils::int_to_text(os::get_shell_process_id());
     }
+    if (first_byte == 'P' && name == "PPID") {
+      return utils::int_to_text(os::get_parent_process_id());
+    }
+    if (first_byte == 'U' && name == "UID") {
+      return utils::int_to_text(os::get_real_user_id());
+    }
+    if (first_byte == 'E' && name == "EUID") {
+      return utils::int_to_text(os::get_effective_user_id());
+    }
+    /* The host name, computed once per read like the other dynamic names. */
+    if (first_byte == 'H' && name == "HOSTNAME") {
+      if (let host = os::get_hostname(); host.has_value()) return steal(*host);
+      return String{heap_allocator()};
+    }
+    /* A monotonic millisecond count, immune to a wall-clock jump, the bash
+       BASH_MONOSECONDS variable. */
+    if (first_byte == 'B' && name == "BASH_MONOSECONDS") {
+      return utils::int_to_text(
+          static_cast<i64>(os::monotonic_nanos() / 1000000ULL));
+    }
+    /* $0 of the running shell or script, the bash BASH_ARGV0 read and write
+       handle. Only the read side is provided. */
+    if (first_byte == 'B' && name == "BASH_ARGV0") {
+      return String{heap_allocator(), m_shell_name.view()};
+    }
+    /* The -c command string, set only on the -c path, so a script or an
+       interactive session reads it unset the way bash does. */
+    if (first_byte == 'B' && name == "BASH_EXECUTION_STRING" &&
+        !m_execution_string.is_empty())
+    {
+      return String{heap_allocator(), m_execution_string.view()};
+    }
+    /* The primary group id. The array form ${GROUPS[@]} is not modelled, so the
+       scalar read yields the real gid the way ${GROUPS} does. */
+    if (first_byte == 'G' && name == "GROUPS") {
+      return utils::int_to_text(os::get_real_group_id());
+    }
+    /* The machine hardware name and the longer build triple, the way bash
+       reports HOSTTYPE and MACHTYPE. CHILD_MAX is intentionally left to the
+       user, since bash reads it empty until it is assigned. */
+    if (first_byte == 'H' && name == "HOSTTYPE") {
+      return os::machine_type();
+    }
+    if (first_byte == 'M' && name == "MACHTYPE") {
+      return os::machine_type() + "-unknown-linux-gnu";
+    }
+    /* A fresh 32-bit value per read, the bash SRANDOM. It mixes the clock with
+       the rand source so a run that never seeds RANDOM still varies. */
+    if (first_byte == 'S' && name == "SRANDOM") {
+      let const value = static_cast<u32>(os::realtime_microseconds()) ^
+                        (static_cast<u32>(std::rand()) << 16) ^
+                        static_cast<u32>(std::rand());
+      return utils::int_to_text(static_cast<i64>(value));
+    }
     /* OSTYPE names the platform the way bash compiles it in, the read a
        config such as bash_completion branches on. */
     if (first_byte == 'O' && name == "OSTYPE") {
@@ -813,6 +867,15 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         return String{
             heap_allocator(),
             m_source_frames[m_source_frames.count() - 1].source_path.view()};
+      /* Inside a function the source is the file the function was defined in,
+         the way bash sets BASH_SOURCE[0], so a sourced completion function
+         resolves a helper beside its own script from the directory prefix. */
+      if (funcname_frame_count() > 0) {
+        let const *info =
+            m_function_definition_infos.find(funcname_frame_at(0));
+        if (info != nullptr && !info->filename.is_empty())
+          return String{heap_allocator(), info->filename.view()};
+      }
       /* A script-file run roots the stack at the script itself, so outside
          any dot-source the scalar reads as $0, the way bash sets
          BASH_SOURCE[0] for an executed file. The envman style probe
@@ -1740,8 +1803,8 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
   }
 }
 
-fn ExecContext::make_from(SourceLocation location,
-                          ArrayList<String> &&args) throws -> ExecContext
+fn ExecContext::make_from(SourceLocation location, ArrayList<String> &&args,
+                          mimic_mood mood) throws -> ExecContext
 {
   ASSERT(args.count() > 0);
 
@@ -1779,6 +1842,17 @@ fn ExecContext::make_from(SourceLocation location,
       LOG(Debug, "resolved '%s' to the program '%s'", program.c_str(),
           resolved_program_path->text().c_str());
       kind = ResolvedCommand::from_program(steal(*resolved_program_path));
+    } else if (mood == mimic_mood::Default &&
+               shitbox::find_util(program.view()).has_value())
+    {
+      /* In the default mood a coreutil falls back to the bundled shitbox
+         implementation when PATH has no binary of that name, so a bare system
+         runs ls or grep without one installed. A PATH program still wins,
+         because this branch is reached only when the PATH search found
+         nothing. */
+      LOG(Debug, "no program matches '%s', using the shitbox utility",
+          program.c_str());
+      kind = ResolvedCommand::from_builtin(Builtin::Kind::Shitbox);
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
       /* A close builtin or PATH program is offered as a did-you-mean hint, so a

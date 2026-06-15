@@ -28,6 +28,11 @@ String default_prompt_template();
    the second pass reused while the decoded prompt is unchanged. */
 String build_prompt(shit::EvalContext &context);
 
+/* Expand the backslash prompt escapes in an arbitrary string, the engine behind
+   the ${var@P} parameter transform, with the current user and working directory
+   filled in. */
+String expand_prompt_template(StringView prompt, shit::EvalContext &context);
+
 /* Register the shell completion engine as the line editor's TAB and ghost-text
    source, reading names and the filesystem through the given context. Called
    only on the interactive path, so a non-interactive run never enables it.

@@ -33,8 +33,12 @@ static fn make_one(StringView path, bool ignore_existing) throws -> bool
   return false;
 }
 
-fn util_mkdir(const ExecContext &ec, EvalContext &cxt,
-              const ArrayList<String> &args) throws -> i32
+Mkdir::Mkdir() = default;
+
+pure Utility::Kind Mkdir::kind() const wontthrow { return Kind::Mkdir; }
+
+fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
+                  const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -43,10 +47,10 @@ fn util_mkdir(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
-  let const make_parents = FLAG_MKDIR_PARENTS.is_enabled();
+  let const should_make_parents = FLAG_MKDIR_PARENTS.is_enabled();
   i32 status = 0;
   for (const String &operand : operands) {
-    if (make_parents) {
+    if (should_make_parents) {
       /* Each prefix of the path is created in turn, so a/b/c builds a, then
          a/b, then a/b/c, with an existing prefix passed over. */
       let const text = operand.view();

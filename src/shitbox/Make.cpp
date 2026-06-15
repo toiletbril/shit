@@ -25,6 +25,8 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(MAKE_FILE, String, 'f', "file",
      "Read the named file instead of Makefile.");
+FLAG(MAKE_DIR, String, 'C', "directory",
+     "Change to this directory before reading the Makefile.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_SHITBOX_UTIL_FLAGS(Make);
@@ -183,8 +185,8 @@ static fn split_words(StringView text) throws -> ArrayList<String>
 /* Expand $(NAME) and ${NAME} against the makefile variables and the process
    environment, repeating until no reference remains or the depth cap is hit, so
    a variable whose value names another variable resolves too. */
-static fn expand(const makefile &mk, StringView text, usize depth) throws
-    -> String
+static fn expand(EvalContext &cxt, const makefile &mk, StringView text,
+                 usize depth) throws -> String
 {
   String result{};
   usize i = 0;
@@ -192,20 +194,41 @@ static fn expand(const makefile &mk, StringView text, usize depth) throws
     if (text[i] == '$' && i + 1 < text.length &&
         (text[i + 1] == '(' || text[i + 1] == '{'))
     {
-      let const close = text[i + 1] == '(' ? ')' : '}';
+      /* The close scan balances nested parentheses so a $(dir $(VAR)) or a
+         $(shell cmd $(VAR)) reads to its own close rather than the first one.
+       */
+      let const open = text[i + 1];
+      let const close = open == '(' ? ')' : '}';
       usize j = i + 2;
-      while (j < text.length && text[j] != close)
+      usize nesting = 1;
+      while (j < text.length) {
+        if (text[j] == open)
+          nesting++;
+        else if (text[j] == close && --nesting == 0)
+          break;
         j++;
+      }
       let const name = text.substring_of_length(i + 2, j - (i + 2));
-      if (const String *value = mk.find_variable(name); value != nullptr) {
+      if (name.length > 6 && name.substring_of_length(0, 6) == "shell ") {
+        /* The $(shell cmd) function runs the command and substitutes its
+           output, the way GNU make reads $(shell uname) or $(shell nproc). The
+           argument is expanded first so an inner $(VAR) reaches the command. */
+        let const command = expand(cxt, mk, name.substring(6), depth + 1);
+        result += cxt.capture_command_substitution(command).view();
+      } else if (const String *value = mk.find_variable(name); value != nullptr)
+      {
         if (depth < 16)
-          result += expand(mk, value->view(), depth + 1).view();
+          result += expand(cxt, mk, value->view(), depth + 1).view();
         else
           result += value->view();
       } else if (Maybe<String> from_env = os::get_environment_variable(name);
                  from_env.has_value())
       {
         result += from_env->view();
+      } else if (name == "MAKE") {
+        /* $(MAKE) names the make program for a recursive build, so it re-enters
+           the bundled make rather than an external one. */
+        result += "shitbox make";
       }
       i = j < text.length ? j + 1 : j;
     } else if (text[i] == '$' && i + 1 < text.length && text[i + 1] == '$') {
@@ -235,21 +258,22 @@ static fn apply_assignment(makefile &mk, StringView name_part,
                            StringView operator_and_value) throws -> void
 {
   StringView value = operator_and_value.substring(1);
-  char op = ' ';
+  char operator_character = ' ';
   if (!name_part.is_empty()) {
     let const last = name_part[name_part.length - 1];
     if (last == ':' || last == '?' || last == '+') {
-      op = last;
+      operator_character = last;
       name_part = name_part.substring_of_length(0, name_part.length - 1);
     }
   }
+
   let const name = trim(name_part);
   let const trimmed_value = trim(value);
 
   for (make_variable &variable : mk.variables) {
     if (variable.name != name) continue;
-    if (op == '?') return;
-    if (op == '+') {
+    if (operator_character == '?') return;
+    if (operator_character == '+') {
       variable.value += " ";
       variable.value += trimmed_value;
     } else {
@@ -348,7 +372,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
 
   if (const make_rule *rule = mk.find_rule(goal); rule != nullptr) {
     for (const String &prerequisite : rule->prerequisites) {
-      let const expanded = expand(mk, prerequisite.view(), 0);
+      let const expanded = expand(cxt, mk, prerequisite.view(), 0);
       for (const String &word : split_words(expanded.view()))
         prerequisites.push(word.clone());
     }
@@ -361,7 +385,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
       ArrayList<String> candidate{};
       for (const String &prerequisite : pattern.prerequisites) {
         let const substituted = substitute_stem(prerequisite.view(), *stem);
-        let const expanded = expand(mk, substituted.view(), 0);
+        let const expanded = expand(cxt, mk, substituted.view(), 0);
         for (const String &word : split_words(expanded.view()))
           candidate.push(word.clone());
       }
@@ -400,13 +424,13 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
 
   for (const String &recipe : *recipe_lines) {
     StringView body = recipe.view();
-    bool silent = false;
-    bool ignore_errors = false;
+    bool is_silent = false;
+    bool should_ignore_errors = false;
     /* A leading @ silences the echo and a leading - ignores a failure, in
        either order, the way make reads the recipe prefixes. */
     while (!body.is_empty() && (body[0] == '@' || body[0] == '-')) {
-      if (body[0] == '@') silent = true;
-      if (body[0] == '-') ignore_errors = true;
+      if (body[0] == '@') is_silent = true;
+      if (body[0] == '-') should_ignore_errors = true;
       body = body.substring(1);
     }
 
@@ -415,13 +439,13 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
        expansion would not touch is resolved here. */
     let const with_autos =
         substitute_automatic(body, goal, first_prereq, all_prereqs.view());
-    let const command = expand(mk, with_autos.view(), 0);
+    let const command = expand(cxt, mk, with_autos.view(), 0);
     if (command.is_empty()) continue;
-    if (!silent) ec.print_to_stdout(command + "\n");
+    if (!is_silent) ec.print_to_stdout(command + "\n");
 
     let const status = cxt.run_source(command.view(), "make", true,
                                       ec.source_location(), StringView{"make"});
-    if (status != 0 && !ignore_errors)
+    if (status != 0 && !should_ignore_errors)
       throw Error{"make: recipe for target '" + String{goal} +
                   "' failed with status " +
                   utils::int_to_text(status, heap_allocator())};
@@ -432,13 +456,51 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt,
 
 } /* namespace */
 
-fn util_make(const ExecContext &ec, EvalContext &cxt,
-             const ArrayList<String> &args) throws -> i32
+Make::Make() = default;
+
+pure Utility::Kind Make::kind() const wontthrow { return Kind::Make; }
+
+fn Make::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args);
+  /* The -j parallel flag is accepted and ignored since the build runs
+     serially, so a bare -j or a -jN is dropped before flag parsing rather than
+     read as a target. */
+  ArrayList<String> filtered{};
+  for (const String &arg : args) {
+    let const text = arg.view();
+    bool is_jobs_flag = text == "-j";
+    if (!is_jobs_flag && text.length > 2 && text[0] == '-' && text[1] == 'j') {
+      is_jobs_flag = true;
+      for (usize k = 2; k < text.length; k++)
+        if (text[k] < '0' || text[k] > '9') {
+          is_jobs_flag = false;
+          break;
+        }
+    }
+    if (!is_jobs_flag) filtered.push(arg.clone());
+  }
+
+  let const operands = parse_util_operands(FLAG_LIST, filtered);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
+
+  /* -C changes to the directory before the Makefile is read, restored when the
+     util returns so a recursive make from a recipe leaves the parent cwd
+     unchanged. */
+  Maybe<Path> saved_directory;
+  if (FLAG_MAKE_DIR.is_set()) {
+    saved_directory = Path::current_directory();
+    if (Path::set_current_directory(Path{FLAG_MAKE_DIR.value()}).is_error())
+      throw Error{"make: cannot change to directory '" +
+                  String{FLAG_MAKE_DIR.value()} + "'"};
+  }
+  defer
+  {
+    if (saved_directory.has_value())
+      static_cast<void>(Path::set_current_directory(*saved_directory));
+  };
 
   String makefile_path{};
   if (FLAG_MAKE_FILE.is_set()) {

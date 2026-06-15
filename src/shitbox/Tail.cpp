@@ -21,21 +21,26 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_tail(const ExecContext &ec, EvalContext &cxt,
-             const ArrayList<String> &args) throws -> i32
+Tail::Tail() = default;
+
+pure Utility::Kind Tail::kind() const wontthrow { return Kind::Tail; }
+
+fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  i64 count = 10;
+  i64 line_count = 10;
   if (FLAG_TAIL_LINES.is_set()) {
     let const parsed = utils::parse_decimal_integer(FLAG_TAIL_LINES.value());
     if (parsed.is_error() || parsed.value() < 0)
       throw Error{"tail: invalid line count '" +
                   String{FLAG_TAIL_LINES.value()} + "'"};
-    count = parsed.value();
+
+    line_count = parsed.value();
   }
 
   ArrayList<StringView> sources{};
@@ -45,7 +50,7 @@ fn util_tail(const ExecContext &ec, EvalContext &cxt,
     for (const String &operand : operands)
       sources.push(operand.view());
 
-  let const print_headers = sources.count() > 1;
+  let const should_print_headers = sources.count() > 1;
   let output = String{};
   i32 status = 0;
   for (usize s = 0; s < sources.count(); s++) {
@@ -57,15 +62,18 @@ fn util_tail(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
-    if (print_headers) {
+
+    if (should_print_headers) {
       if (s > 0) output += '\n';
       output += "==> ";
       output += sources[s];
       output += " <==\n";
     }
+
     let const lines = split_keep_newlines(content->view());
-    let const want = static_cast<usize>(count);
-    let const start = lines.count() > want ? lines.count() - want : 0;
+    let const wanted_count = static_cast<usize>(line_count);
+    let const start =
+        lines.count() > wanted_count ? lines.count() - wanted_count : 0;
     for (usize i = start; i < lines.count(); i++)
       output += lines[i];
   }

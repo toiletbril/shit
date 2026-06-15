@@ -27,21 +27,29 @@ namespace shitbox {
 static fn is_assignment(StringView text) wontthrow -> bool
 {
   let const equals = text.find_character('=');
-  if (!equals.has_value() || *equals == 0) return false;
-  for (usize i = 0; i < *equals; i++) {
-    let const c = text[i];
-    let const is_name = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                        (c >= '0' && c <= '9') || c == '_';
-    if (!is_name) return false;
-    if (i == 0 && c >= '0' && c <= '9') return false;
+  if (!equals.has_value() || *equals == 0) {
+    return false;
   }
+
+  for (usize i = 0; i < *equals; i++) {
+    let const character = text[i];
+    let const is_name = (character >= 'a' && character <= 'z') ||
+                        (character >= 'A' && character <= 'Z') ||
+                        (character >= '0' && character <= '9') ||
+                        character == '_';
+    if (!is_name) return false;
+    if (i == 0 && character >= '0' && character <= '9') {
+      return false;
+    }
+  }
+
   return true;
 }
 
 static fn print_environment(const ExecContext &ec) throws -> void
 {
   let output = String{};
-  for (const String &name : os::environment_names()) {
+  for (let const &name : os::environment_names()) {
     let const value = os::get_environment_variable(name.view());
     output += name.view();
     output += '=';
@@ -51,8 +59,12 @@ static fn print_environment(const ExecContext &ec) throws -> void
   ec.print_to_stdout(output);
 }
 
-fn util_env(const ExecContext &ec, EvalContext &cxt,
-            const ArrayList<String> &args) throws -> i32
+Env::Env() = default;
+
+pure Utility::Kind Env::kind() const wontthrow { return Kind::Env; }
+
+fn Env::execute(const ExecContext &ec, EvalContext &cxt,
+                const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };

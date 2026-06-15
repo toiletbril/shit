@@ -32,11 +32,11 @@ static fn is_blank(char c) wontthrow -> bool
 
 /* One file's count line, the selected fields right-justified in eight columns
    each, with the name appended when one is given. */
-static fn format_counts(u64 lines, u64 words, u64 bytes, bool show_lines,
-                        bool show_words, bool show_bytes,
+static fn format_counts(u64 lines, u64 words, u64 bytes, bool should_show_lines,
+                        bool should_show_words, bool should_show_bytes,
                         StringView name) throws -> String
 {
-  let const field = [](u64 value) throws -> String {
+  let const do_field = [](u64 value) throws -> String {
     let const digits = utils::uint_to_text(value);
     String padded{};
     for (usize i = digits.count(); i < 8; i++)
@@ -44,33 +44,40 @@ static fn format_counts(u64 lines, u64 words, u64 bytes, bool show_lines,
     padded += digits.view();
     return padded;
   };
+
   String line{};
-  if (show_lines) line += field(lines);
-  if (show_words) line += field(words);
-  if (show_bytes) line += field(bytes);
+  if (should_show_lines) line += do_field(lines);
+  if (should_show_words) line += do_field(words);
+  if (should_show_bytes) line += do_field(bytes);
+
   if (!name.is_empty()) {
     line += ' ';
     line += name;
   }
+
   line += '\n';
   return line;
 }
 
-fn util_wc(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Wc::Wc() = default;
+
+pure Utility::Kind Wc::kind() const wontthrow { return Kind::Wc; }
+
+fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  bool show_lines = FLAG_WC_LINES.is_enabled();
-  bool show_words = FLAG_WC_WORDS.is_enabled();
-  bool show_bytes = FLAG_WC_BYTES.is_enabled();
-  if (!show_lines && !show_words && !show_bytes) {
-    show_lines = true;
-    show_words = true;
-    show_bytes = true;
+  bool should_show_lines = FLAG_WC_LINES.is_enabled();
+  bool should_show_words = FLAG_WC_WORDS.is_enabled();
+  bool should_show_bytes = FLAG_WC_BYTES.is_enabled();
+  if (!should_show_lines && !should_show_words && !should_show_bytes) {
+    should_show_lines = true;
+    should_show_words = true;
+    should_show_bytes = true;
   }
 
   ArrayList<StringView> sources{};
@@ -97,28 +104,31 @@ fn util_wc(const ExecContext &ec, EvalContext &cxt,
     u64 lines = 0;
     u64 words = 0;
     u64 bytes = content->count();
-    bool in_word = false;
+    bool is_in_word = false;
     for (usize i = 0; i < content->count(); i++) {
       let const c = content->view()[i];
       if (c == '\n') lines++;
       if (is_blank(c)) {
-        in_word = false;
-      } else if (!in_word) {
-        in_word = true;
+        is_in_word = false;
+      } else if (!is_in_word) {
+        is_in_word = true;
         words++;
       }
     }
+
     total_lines += lines;
     total_words += words;
     total_bytes += bytes;
+
     let const name = source == "-" ? StringView{} : source;
-    output += format_counts(lines, words, bytes, show_lines, show_words,
-                            show_bytes, name);
+    output += format_counts(lines, words, bytes, should_show_lines,
+                            should_show_words, should_show_bytes, name);
   }
 
   if (sources.count() > 1)
-    output += format_counts(total_lines, total_words, total_bytes, show_lines,
-                            show_words, show_bytes, StringView{"total"});
+    output += format_counts(total_lines, total_words, total_bytes,
+                            should_show_lines, should_show_words,
+                            should_show_bytes, StringView{"total"});
 
   ec.print_to_stdout(output);
   return status;

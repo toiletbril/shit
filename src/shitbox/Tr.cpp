@@ -26,7 +26,8 @@ namespace shitbox {
 /* Expand a set with a-z ranges into the flat run of bytes it names, so a-c
    becomes abc. A descending range such as c-a expands in reverse to cba the way
    GNU tr reads it. The bounds are read as unsigned bytes and the walk runs over
-   an int, so a range that touches the 0 or 255 edge does not overflow a char. */
+   an int, so a range that touches the 0 or 255 edge does not overflow a char.
+ */
 static fn expand_set(StringView set) throws -> String
 {
   String expanded{};
@@ -50,8 +51,12 @@ static fn expand_set(StringView set) throws -> String
   return expanded;
 }
 
-fn util_tr(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Tr::Tr() = default;
+
+pure Utility::Kind Tr::kind() const wontthrow { return Kind::Tr; }
+
+fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -59,13 +64,14 @@ fn util_tr(const ExecContext &ec, EvalContext &cxt,
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  let const deleting = FLAG_TR_DELETE.is_enabled();
+  let const is_deleting = FLAG_TR_DELETE.is_enabled();
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-  if (!deleting && operands.count() < 2)
+
+  if (!is_deleting && operands.count() < 2)
     throw Error{"tr expects two sets unless -d is given"};
 
   let const set1 = expand_set(operands[0].view());
-  let const set2 = deleting ? String{} : expand_set(operands[1].view());
+  let const set2 = is_deleting ? String{} : expand_set(operands[1].view());
 
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
   let output = String{};
@@ -76,7 +82,7 @@ fn util_tr(const ExecContext &ec, EvalContext &cxt,
       output.push(c);
       continue;
     }
-    if (deleting) continue;
+    if (is_deleting) continue;
     /* A byte past the end of set2 maps to its last byte, the way tr pads the
        shorter set with its final character. */
     let const index = *found < set2.count() ? *found : set2.count() - 1;

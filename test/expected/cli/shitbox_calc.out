@@ -9,11 +9,11 @@
 === variable read ===
 42
 === located parse error ===
-shit: 1:1: error: Builtin 'calc': Arithmetic: unexpected character.
+shit: 1:1: error: Builtin 'calc': cannot evaluate '1 +', Arithmetic: unexpected character.
      1 |  calc "1 +"
        |  ^~~~~~~~~~ here.
 === located division by zero ===
-shit: 1:1: error: Builtin 'calc': Arithmetic: division by zero.
+shit: 1:1: error: Builtin 'calc': cannot evaluate '5 / 0', Arithmetic: division by zero.
      1 |  calc "5 / 0"
        |  ^~~~~~~~~~~~ here.
 === no expression ===

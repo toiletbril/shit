@@ -29,7 +29,7 @@ namespace shitbox {
    is pulled in, and name the copy on the verbose output. Throws a located error
    naming the path that failed. */
 static fn copy_file(const ExecContext &ec, StringView source,
-                    StringView destination, bool verbose) throws -> void
+                    StringView destination, bool is_verbose) throws -> void
 {
   let const in_fd = os::open_file_descriptor(source, os::file_open_mode::Read);
   if (!in_fd.has_value())
@@ -51,46 +51,55 @@ static fn copy_file(const ExecContext &ec, StringView source,
       throw Error{"cp: a read of '" + String{source} + "' failed"};
     if (*read_count == 0) break;
     let const written = os::write_fd(*out_fd, buffer, *read_count);
-    if (!written.has_value() || *written != *read_count)
+    if (!written.has_value() || *written != *read_count) {
       throw Error{"cp: a write to '" + String{destination} + "' failed"};
+    }
   }
 
-  if (verbose)
+  if (is_verbose)
     ec.print_to_stdout("'" + String{source} + "' -> '" + String{destination} +
                        "'\n");
 }
 
 /* Copy a file or, with the recursive flag, a whole directory tree. */
 static fn copy_path(const ExecContext &ec, StringView source,
-                    StringView destination, bool recursive, bool verbose) throws
-    -> void
+                    StringView destination, bool is_recursive,
+                    bool is_verbose) throws -> void
 {
   let const source_path = Path{source};
   /* A symlink is copied as a leaf rather than descended into, the way rm and du
      guard their recursion, so a symlink that points back into the tree does not
      drive an unbounded walk. */
   if (source_path.is_directory() && !source_path.is_symbolic_link()) {
-    if (!recursive)
+    if (!is_recursive)
       throw Error{"cp: '" + String{source} +
                   "' is a directory, pass -r to copy it"};
+
     os::make_directory(destination, 0777);
     Maybe<ArrayList<String>> names = Path::read_directory(source_path);
     if (!names.has_value())
       throw Error{"cp: unable to read the directory '" + String{source} + "'"};
-    for (const String &name : *names) {
+
+    for (let const &name : *names) {
       let const child_source = PathBuilder{source}.append(name.view()).build();
       let const child_destination =
           PathBuilder{destination}.append(name.view()).build();
-      copy_path(ec, child_source.text().view(),
-                child_destination.text().view(), recursive, verbose);
+      copy_path(ec, child_source.text().view(), child_destination.text().view(),
+                is_recursive, is_verbose);
     }
+
     return;
   }
-  copy_file(ec, source, destination, verbose);
+
+  copy_file(ec, source, destination, is_verbose);
 }
 
-fn util_cp(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Cp::Cp() = default;
+
+pure Utility::Kind Cp::kind() const wontthrow { return Kind::Cp; }
+
+fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -100,15 +109,16 @@ fn util_cp(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
-  let const recursive =
+  let const is_recursive =
       FLAG_CP_RECURSIVE_R.is_enabled() || FLAG_CP_RECURSIVE_UPPER.is_enabled();
-  let const verbose = FLAG_CP_VERBOSE.is_enabled();
+  let const is_verbose = FLAG_CP_VERBOSE.is_enabled();
   let const destination = operands[operands.count() - 1].view();
   let const destination_is_directory = Path{destination}.is_directory();
 
-  if (operands.count() > 2 && !destination_is_directory)
+  if (operands.count() > 2 && !destination_is_directory) {
     throw Error{"cp: the destination '" + String{destination} +
                 "' is not a directory, so it cannot hold several sources"};
+  }
 
   for (usize i = 0; i + 1 < operands.count(); i++) {
     let const source = operands[i].view();
@@ -117,11 +127,12 @@ fn util_cp(const ExecContext &ec, EvalContext &cxt,
     if (destination_is_directory) {
       let const leaf = Path{source}.filename();
       let const target = PathBuilder{destination}.append(leaf).build();
-      copy_path(ec, source, target.text().view(), recursive, verbose);
+      copy_path(ec, source, target.text().view(), is_recursive, is_verbose);
     } else {
-      copy_path(ec, source, destination, recursive, verbose);
+      copy_path(ec, source, destination, is_recursive, is_verbose);
     }
   }
+
   return 0;
 }
 

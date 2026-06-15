@@ -35,7 +35,7 @@ static fn total_size(const Path &path) throws -> u64
     u64 sum = 0;
     Maybe<ArrayList<String>> names = Path::read_directory(path);
     if (names.has_value())
-      for (const String &name : *names) {
+      for (let const &name : *names) {
         let const child =
             PathBuilder{path.text().view()}.append(name.view()).build();
         sum += total_size(child);
@@ -45,8 +45,12 @@ static fn total_size(const Path &path) throws -> u64
   return path.file_size().value_or(0);
 }
 
-fn util_du(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Du::Du() = default;
+
+pure Utility::Kind Du::kind() const wontthrow { return Kind::Du; }
+
+fn Du::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -57,12 +61,12 @@ fn util_du(const ExecContext &ec, EvalContext &cxt,
   if (operands.is_empty())
     targets.push(StringView{"."});
   else
-    for (const String &operand : operands)
+    for (let const &operand : operands)
       targets.push(operand.view());
 
   let output = String{};
   i32 status = 0;
-  for (const StringView &target : targets) {
+  for (let const &target : targets) {
     let const path = Path{target};
     if (!path.exists()) {
       report_soft_shitbox_error(ec, cxt,

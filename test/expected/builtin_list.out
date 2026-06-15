@@ -7,7 +7,7 @@
 [Word
   Unquoted "-l"
 ]
-shit has 57 builtins:
+shit has 55 builtins:
 
   .          :          [          alias      bench      bg         break
   builtin    calc       cd         command    compgen    complete   compopt
@@ -16,6 +16,5 @@ shit has 57 builtins:
   local      mapfile    newgrp     printf     pwd        read       readarray
   readonly   return     set        shift      shitbox    shopt      source
   test       time       times      trap       true       type       typeset
-  ulimit     umask      unalias    unset      wait       which      whoami
-  z
+  ulimit     umask      unalias    unset      wait       z
 [Code 0]

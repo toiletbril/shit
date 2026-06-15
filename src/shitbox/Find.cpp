@@ -8,13 +8,15 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[path ...] [-name glob] [-type fdl] [-maxdepth n] [-mindepth n]");
+HELP_SYNOPSIS_DECL(
+    "[path ...] [-name glob] [-type fdl] [-maxdepth n] [-mindepth n]");
 
 HELP_DESCRIPTION_DECL(
     "The find utility walks each path operand, or the current directory when "
     "none is given, and prints every entry under it. The -name predicate keeps "
     "the entries whose final component matches a glob, -type keeps a file, a "
-    "directory, or a symlink, and -maxdepth and -mindepth bound the walk depth.");
+    "directory, or a symlink, and -maxdepth and -mindepth bound the walk "
+    "depth.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -25,9 +27,9 @@ namespace shit {
 namespace shitbox {
 
 /* The predicates one find invocation filters on, parsed once from the command
-   line and read at every entry the walk visits. The name pattern points into the
-   argument that spelled it, and glob_active marks every byte of that pattern as a
-   live metacharacter the way an unquoted glob acts. */
+   line and read at every entry the walk visits. The name pattern points into
+   the argument that spelled it, and glob_active marks every byte of that
+   pattern as a live metacharacter the way an unquoted glob acts. */
 struct find_options
 {
   bool has_name{false};
@@ -38,32 +40,40 @@ struct find_options
   i64 min_depth{0};
 };
 
-/* Whether the entry of this type at this depth satisfies every predicate, so the
-   walk prints it. The depth bounds come first, then the type, then the name
+/* Whether the entry of this type at this depth satisfies every predicate, so
+   the walk prints it. The depth bounds come first, then the type, then the name
    glob. The type letter comes from the one stat the walk already took, where a
    regular file reads as a dash the way the mode string spells it. */
 static fn find_entry_matches(char type_letter, StringView filename, usize depth,
                              const find_options &options) throws -> bool
 {
   if (static_cast<i64>(depth) < options.min_depth) return false;
-  if (options.max_depth >= 0 && static_cast<i64>(depth) > options.max_depth)
+  if (options.max_depth >= 0 && static_cast<i64>(depth) > options.max_depth) {
     return false;
+  }
 
-  if (options.type_filter == 'f' && type_letter != '-') return false;
-  if (options.type_filter == 'd' && type_letter != 'd') return false;
-  if (options.type_filter == 'l' && type_letter != 'l') return false;
-
-  if (options.has_name &&
-      !utils::glob_matches(options.name_pattern, filename, *options.glob_active,
-                           0))
+  if (options.type_filter == 'f' && type_letter != '-') {
     return false;
+  }
+  if (options.type_filter == 'd' && type_letter != 'd') {
+    return false;
+  }
+  if (options.type_filter == 'l' && type_letter != 'l') {
+    return false;
+  }
+
+  if (options.has_name && !utils::glob_matches(options.name_pattern, filename,
+                                               *options.glob_active, 0))
+  {
+    return false;
+  }
 
   return true;
 }
 
-/* Print the entry when it matches, then descend into a directory while the depth
-   stays under the maximum. The children are walked in sorted order so the output
-   is stable. */
+/* Print the entry when it matches, then descend into a directory while the
+   depth stays under the maximum. The children are walked in sorted order so the
+   output is stable. */
 static fn find_walk(const Path &path, StringView display, usize depth,
                     const find_options &options, String &output) throws -> void
 {
@@ -82,18 +92,21 @@ static fn find_walk(const Path &path, StringView display, usize depth,
     output += '\n';
   }
 
-  const bool may_descend =
+  const bool should_descend =
       options.max_depth < 0 || static_cast<i64>(depth) < options.max_depth;
-  if (!may_descend || type_letter != 'd') return;
+  if (!should_descend || type_letter != 'd') {
+    return;
+  }
 
   Maybe<ArrayList<String>> names = Path::read_directory(path);
   if (!names.has_value()) return;
   sort_string_list(*names);
 
-  for (const String &child_name : *names) {
+  for (let const &child_name : *names) {
     String child_display{display};
-    if (!child_display.is_empty() && child_display.back() != '/')
+    if (!child_display.is_empty() && child_display.back() != '/') {
       child_display += '/';
+    }
     child_display += child_name.view();
     let const child_path = Path{child_display.view()};
     find_walk(child_path, child_display.view(), depth + 1, options, output);
@@ -107,15 +120,21 @@ static fn parse_depth_argument(const ArrayList<String> &args, usize index,
 {
   if (index >= args.count())
     throw Error{"find: " + String{predicate} + " expects a number"};
-  let const parsed = utils::parse_decimal_integer(args[index].view());
-  if (parsed.is_error())
+
+  let const parsed_value = utils::parse_decimal_integer(args[index].view());
+  if (parsed_value.is_error())
     throw Error{"find: " + String{predicate} + " expects a number, got '" +
                 args[index] + "'"};
-  return parsed.value();
+
+  return parsed_value.value();
 }
 
-fn util_find(const ExecContext &ec, EvalContext &cxt,
-             const ArrayList<String> &args) throws -> i32
+Find::Find() = default;
+
+pure Utility::Kind Find::kind() const wontthrow { return Kind::Find; }
+
+fn Find::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
 
@@ -156,7 +175,9 @@ fn util_find(const ExecContext &ec, EvalContext &cxt,
       let const type = args[index + 1].view();
       if (type.length != 1 ||
           (type[0] != 'f' && type[0] != 'd' && type[0] != 'l'))
+      {
         throw Error{"find: -type expects one of f, d, or l"};
+      }
       options.type_filter = type[0];
       index++;
     } else if (predicate == "-maxdepth") {
@@ -181,12 +202,11 @@ fn util_find(const ExecContext &ec, EvalContext &cxt,
 
   let output = String{};
   i32 status = 0;
-  for (const StringView &root : roots) {
+  for (let const &root : roots) {
     let const root_path = Path{root};
     if (!root_path.exists()) {
-      report_soft_shitbox_error(ec, cxt,
-                                "find: '" + String{root} +
-                                    "': no such file or directory");
+      report_soft_shitbox_error(
+          ec, cxt, "find: '" + String{root} + "': no such file or directory");
       status = 1;
       continue;
     }

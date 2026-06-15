@@ -41,33 +41,38 @@ static fn remove_path(StringView path, bool recursive) throws -> bool
   return os::remove_file(path);
 }
 
-fn util_rm(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Rm::Rm() = default;
+
+pure Utility::Kind Rm::kind() const wontthrow { return Kind::Rm; }
+
+fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
-  let const force = FLAG_RM_FORCE.is_enabled();
-  let const recursive =
+  let const should_force = FLAG_RM_FORCE.is_enabled();
+  let const is_recursive =
       FLAG_RM_RECURSIVE_R.is_enabled() || FLAG_RM_RECURSIVE_UPPER.is_enabled();
 
-  if (operands.is_empty() && !force)
+  if (operands.is_empty() && !should_force) {
     return report_usage_error(ec, cxt, args[0].view());
+  }
 
   i32 status = 0;
   for (const String &operand : operands) {
     if (!Path{operand.view()}.exists()) {
-      if (force) continue;
+      if (should_force) continue;
       report_soft_shitbox_error(ec, cxt,
                                 "rm: cannot remove '" + operand +
                                     "': no such file or directory");
       status = 1;
       continue;
     }
-    if (!remove_path(operand.view(), recursive)) {
-      if (force) continue;
+    if (!remove_path(operand.view(), is_recursive)) {
+      if (should_force) continue;
       report_soft_shitbox_error(ec, cxt,
                                 "rm: cannot remove '" + operand +
                                     "': " + os::last_system_error_message());

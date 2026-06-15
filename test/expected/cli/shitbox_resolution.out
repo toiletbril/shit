@@ -2,7 +2,12 @@
 1
 2
 3
-=== bare name off, empty PATH, not found ===
+=== default mood, empty PATH, falls back to shitbox ===
+1
+2
+3
+rc=0
+=== sh mood, empty PATH, not found ===
 shit: 1:8: error: Program 'seq' wasn't found, did you mean 'set'?.
      1 |  PATH=; seq 3
        |         ^~~~~ here.

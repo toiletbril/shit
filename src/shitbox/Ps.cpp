@@ -22,18 +22,19 @@ namespace shit {
 namespace shitbox {
 
 /* One uid resolved to its name once, so a listing with many processes owned by
-   the same user reads the passwd file once per distinct uid rather than once per
-   process. */
+   the same user reads the passwd file once per distinct uid rather than once
+   per process. */
 struct uid_name_cache_entry
 {
   u32 uid{0};
   String name{};
 };
 
-/* The owner name for a uid, served from the cache when seen before and read from
-   the passwd file and remembered otherwise. A uid with no passwd entry caches
-   and returns its numeric form. */
-static fn owner_name_for_uid(u32 uid, ArrayList<uid_name_cache_entry> &cache) throws
+/* The owner name for a uid, served from the cache when seen before and read
+   from the passwd file and remembered otherwise. A uid with no passwd entry
+   caches and returns its numeric form. */
+static fn owner_name_for_uid(u32 uid,
+                             ArrayList<uid_name_cache_entry> &cache) throws
     -> String
 {
   for (const uid_name_cache_entry &entry : cache)
@@ -45,8 +46,8 @@ static fn owner_name_for_uid(u32 uid, ArrayList<uid_name_cache_entry> &cache) th
   return name;
 }
 
-/* The wide aux listing, the owner and the pid and the full command line of every
-   process in space-aligned columns. */
+/* The wide aux listing, the owner and the pid and the full command line of
+   every process in space-aligned columns. */
 static fn render_aux(const ArrayList<os::process_entry> &processes,
                      String &output) throws -> void
 {
@@ -56,6 +57,7 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
 
   usize user_width = 4; /* the USER header */
   usize pid_width = 3;  /* the PID header */
+
   for (const os::process_entry &process : processes) {
     String owner = owner_name_for_uid(process.owner_id, uid_cache);
     if (owner.count() > user_width) user_width = owner.count();
@@ -89,8 +91,12 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
   }
 }
 
-fn util_ps(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Ps::Ps() = default;
+
+pure Utility::Kind Ps::kind() const wontthrow { return Kind::Ps; }
+
+fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
 
@@ -99,10 +105,10 @@ fn util_ps(const ExecContext &ec, EvalContext &cxt,
      as an unknown flag. */
   ArrayList<String> flag_args{};
   flag_args.reserve(args.count());
-  bool show_aux = false;
+  bool should_show_aux = false;
   for (usize i = 0; i < args.count(); i++) {
     if (i > 0 && args[i].view() == "-aux") {
-      show_aux = true;
+      should_show_aux = true;
       continue;
     }
     flag_args.push(args[i].clone());
@@ -114,12 +120,12 @@ fn util_ps(const ExecContext &ec, EvalContext &cxt,
   SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   for (const String &operand : operands)
-    if (operand.view() == "aux") show_aux = true;
+    if (operand.view() == "aux") should_show_aux = true;
 
   let const processes = os::enumerate_processes();
 
   let output = String{};
-  if (show_aux) {
+  if (should_show_aux) {
     render_aux(processes, output);
     ec.print_to_stdout(output);
     return 0;

@@ -2,13 +2,13 @@
 
 #include "Arena.hpp"
 #include "Builtin.hpp"
-#include "Shitbox.hpp"
 #include "Colors.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
 #include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "Shitbox.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -2405,7 +2405,7 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   {
     let const is_shitbox_builtin =
         builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Shitbox;
-    Maybe<shitbox::Util> util_for_flags;
+    Maybe<shitbox::Utility::Kind> util_for_flags;
     bool offer_util_names = false;
     if (is_shitbox_builtin) {
       if (previous_settled_word(line, token_start) == command) {

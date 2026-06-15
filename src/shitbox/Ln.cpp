@@ -22,8 +22,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_ln(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Ln::Ln() = default;
+
+pure Utility::Kind Ln::kind() const wontthrow { return Kind::Ln; }
+
+fn Ln::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -41,9 +45,10 @@ fn util_ln(const ExecContext &ec, EvalContext &cxt,
 
   if (FLAG_LN_FORCE.is_enabled()) os::remove_file(link);
 
-  if (!os::create_symlink(target, link))
+  if (!os::create_symlink(target, link)) {
     throw Error{"ln: cannot create symbolic link '" + String{link} +
                 "': " + os::last_system_error_message()};
+  }
 
   return 0;
 }

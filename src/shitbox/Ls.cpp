@@ -14,7 +14,8 @@ HELP_SYNOPSIS_DECL("[-a1lh] [path ...]");
 HELP_DESCRIPTION_DECL(
     "The ls utility lists the names in each directory operand, or the current "
     "directory when none is given. The default lays the names out in columns "
-    "sized to the terminal, and falls back to one name per line when the output "
+    "sized to the terminal, and falls back to one name per line when the "
+    "output "
     "is not a terminal.");
 
 FLAG(LS_ALL, Bool, 'a', "", "List entries whose name starts with a dot.");
@@ -37,8 +38,8 @@ static constexpr usize COLUMN_GAP = 2;
 
 /* One long-format row split into its fields, kept apart so the listing can
    right-justify the link count and the size and left-justify the owner and the
-   group against the widest entry in the same directory. The blocks ride along so
-   the total line sums them without a second stat. */
+   group against the widest entry in the same directory. The blocks ride along
+   so the total line sums them without a second stat. */
 struct long_entry
 {
   String mode_string{};
@@ -51,17 +52,17 @@ struct long_entry
   u64 blocks{0};
 };
 
-/* One numeric id resolved to its name once, so a listing with many entries owned
-   by the same user or group reads the passwd or group file once per distinct id
-   rather than once per entry. */
+/* One numeric id resolved to its name once, so a listing with many entries
+   owned by the same user or group reads the passwd or group file once per
+   distinct id rather than once per entry. */
 struct id_name_entry
 {
   u32 id{0};
   String name{};
 };
 
-/* The owner name for a uid, served from the cache when seen before and read from
-   the passwd file and remembered otherwise. An id with no entry caches and
+/* The owner name for a uid, served from the cache when seen before and read
+   from the passwd file and remembered otherwise. An id with no entry caches and
    returns its numeric form. */
 static fn cached_owner_name(u32 uid, ArrayList<id_name_entry> &cache) throws
     -> String
@@ -188,8 +189,8 @@ static fn column_width(const ArrayList<usize> &widths, usize column_index,
 /* Append the names laid out in columns sized to the terminal, packed column by
    column the way coreutils fills the grid down then across. One name per line
    when the output is not a terminal or -1 is given. */
-static fn render_columns(const ArrayList<StringView> &names, String &output) throws
-    -> void
+static fn render_columns(const ArrayList<StringView> &names,
+                         String &output) throws -> void
 {
   const usize count = names.count();
   if (count == 0) return;
@@ -243,8 +244,8 @@ static fn render_columns(const ArrayList<StringView> &names, String &output) thr
       output += names[index];
       /* The last filled column on the row needs no trailing pad, so the
          padding is added only when a further column holds an entry. */
-      const bool has_next = (c + 1 < best_columns) &&
-                            ((c + 1) * rows + r < count);
+      const bool has_next =
+          (c + 1 < best_columns) && ((c + 1) * rows + r < count);
       if (has_next)
         for (usize p = widths[index]; p < column_widths[c] + COLUMN_GAP; p++)
           output += ' ';
@@ -264,8 +265,12 @@ static fn long_total_blocks(const ArrayList<long_entry> &entries) throws
   return "total " + utils::uint_to_text(total_512_blocks / 2);
 }
 
-fn util_ls(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Ls::Ls() = default;
+
+pure Utility::Kind Ls::kind() const wontthrow { return Kind::Ls; }
+
+fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -281,7 +286,7 @@ fn util_ls(const ExecContext &ec, EvalContext &cxt,
       targets.push(operand.view());
 
   let output = String{};
-  let const print_headers = targets.count() > 1;
+  let const should_print_headers = targets.count() > 1;
   /* The owner and the group caches outlive the target loop, so a multi-target
      long listing resolves each distinct id once across every directory. */
   ArrayList<id_name_entry> uid_cache{};
@@ -321,15 +326,15 @@ fn util_ls(const ExecContext &ec, EvalContext &cxt,
     }
     sort_string_list(*names);
 
-    if (print_headers) {
+    if (should_print_headers) {
       if (t > 0) output += '\n';
       output += target;
       output += ":\n";
     }
 
     ArrayList<StringView> visible_names{};
-    /* The dot and dot-dot entries are not in the directory read, so -a adds them
-       up front the way coreutils lists them before the rest. */
+    /* The dot and dot-dot entries are not in the directory read, so -a adds
+       them up front the way coreutils lists them before the rest. */
     if (FLAG_LS_ALL.is_enabled()) {
       visible_names.push(StringView{"."});
       visible_names.push(StringView{".."});

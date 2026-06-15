@@ -35,8 +35,13 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const shift_count = parse_optional_integer_arg(ec, 1);
 
   let const &params = cxt.positional_params();
-  if (shift_count < 0 || static_cast<usize>(shift_count) > params.count())
+  if (shift_count < 0 || static_cast<usize>(shift_count) > params.count()) {
+    /* shift_verbose makes an over-range count print a diagnostic, the way bash
+       does under the option, while a plain run stays quiet and only fails. */
+    if (cxt.is_shopt_enabled("shift_verbose"))
+      report_soft_builtin_error(ec, cxt, "shift count out of range");
     return 1;
+  }
 
   LOG(All, "shift dropping %lld of %zu positional parameters",
       static_cast<long long>(shift_count), params.count());

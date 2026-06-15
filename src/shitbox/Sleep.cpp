@@ -11,7 +11,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("duration ...");
 
 HELP_DESCRIPTION_DECL(
-    "The sleep utility pauses for the sum of the given durations. A duration is "
+    "The sleep utility pauses for the sum of the given durations. A duration "
+    "is "
     "a number with an optional fractional part and an optional unit suffix, s "
     "for seconds and the default, m for minutes, h for hours, and d for days. "
     "The word inf or infinity pauses until a signal arrives.");
@@ -24,8 +25,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_sleep(const ExecContext &ec, EvalContext &cxt,
-              const ArrayList<String> &args) throws -> i32
+Sleep::Sleep() = default;
+
+pure Utility::Kind Sleep::kind() const wontthrow { return Kind::Sleep; }
+
+fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
+                  const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -46,7 +51,8 @@ fn util_sleep(const ExecContext &ec, EvalContext &cxt,
     const String number{duration};
     const char *start = number.c_str();
     char *end = nullptr;
-    let const value = std::strtod(start, &end);
+    let const seconds_value = std::strtod(start, &end);
+
     /* strtod also accepts a hex float, a nan, and an inf, none of which GNU
        sleep takes, so a duration is rejected unless it parsed a finite,
        non-negative decimal number. A nan compares false against zero, so it
@@ -55,7 +61,8 @@ fn util_sleep(const ExecContext &ec, EvalContext &cxt,
     if (*digits == '+' || *digits == '-') digits++;
     const bool is_hex_prefix =
         digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X');
-    if (end == start || is_hex_prefix || !std::isfinite(value) || value < 0.0)
+    if (end == start || is_hex_prefix || !std::isfinite(seconds_value) ||
+        seconds_value < 0.0)
       throw Error{"sleep: invalid duration '" + number + "'"};
 
     /* A single trailing unit suffix scales the value the way GNU sleep reads
@@ -73,18 +80,22 @@ fn util_sleep(const ExecContext &ec, EvalContext &cxt,
       throw Error{"sleep: invalid duration '" + number + "'"};
     }
 
-    total_seconds += value * unit_multiplier;
+    total_seconds += seconds_value * unit_multiplier;
   }
 
   /* An infinite sleep pauses until a signal arrives, so it loops on a day-long
      interval rather than computing a finite total. */
   if (should_sleep_forever) {
-    while (true)
+    while (!os::INTERRUPT_REQUESTED)
       os::sleep_for_seconds(60.0 * 60.0 * 24.0);
+    return 130;
   }
 
   os::sleep_for_seconds(total_seconds);
-  return 0;
+
+  /* A Ctrl-C that cut the sleep short reports the interrupted status the way
+     bash does, 128 plus SIGINT. */
+  return os::INTERRUPT_REQUESTED ? 130 : 0;
 }
 
 } /* namespace shitbox */

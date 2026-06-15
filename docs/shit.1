@@ -224,14 +224,17 @@ flag or
 .B "set \-o shitbox"
 the utility names resolve directly as commands without the prefix, and a builtin
 still wins over a utility while a utility wins over a program on PATH. A binary
-whose name is a utility, such as a symlink named ls, acts as that utility.
+whose name is a utility, such as a symlink named ls, acts as that utility. In
+the default shit mood a bare utility name also falls back to the bundled utility
+when PATH holds no binary of that name, so a missing system coreutil is filled
+in, while a PATH binary still takes precedence.
 .PP
 The utilities are
 .BR ls ", " ln ", " rm ", " mkdir ", " rmdir ", " cp ", " mv ", " cat ", "
 .BR tee ", " touch ", " basename ", " dirname ", " realpath ", " du ", " head ", "
 .BR tail ", " wc ", " seq ", " tr ", " grep ", " sort ", " uniq ", " sleep ", "
-.BR env ", " yes ", " pkill ", " killall ", " kill ", " ps ", " find ", and "
-.BR make .
+.BR env ", " yes ", " pkill ", " killall ", " ps ", " find ", " make ", "
+.BR which ", and " whoami .
 Each takes a small set of flags. The bundled make reads a Makefile, expands its
 variables, and runs each recipe through the shell. It handles single-level
 pattern rules such as

@@ -890,6 +890,15 @@ static fn strip_ansi_color(StringView text) throws -> String
   return out;
 }
 
+fn expand_prompt_template(StringView prompt, EvalContext &context) throws
+    -> String
+{
+  let const working_directory = Path::current_directory().text();
+  let const user = os::get_current_user().value_or(String{"???"});
+  return expand_prompt_escapes(prompt, user.view(), working_directory.view(),
+                               context);
+}
+
 fn build_prompt(EvalContext &context) -> String
 {
   let const full_pwd = Path::current_directory().text().clone();

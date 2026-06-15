@@ -99,6 +99,12 @@ fn EvalContext::expand_path_once(const glob_field &field,
        the POSIX rule the dotglob tests record. */
     if (glob[0] != '.' && !filename.is_empty() && filename[0] == '.') continue;
 
+    /* globskipdots, on by default since bash 5.3, keeps . and .. out of a match
+       even when the pattern itself starts with a dot. */
+    if ((filename == "." || filename == "..") &&
+        is_shopt_enabled("globskipdots"))
+      continue;
+
     if (utils::glob_matches(glob, filename, field.glob_active, stem_start,
                             extglob_enabled()))
     {

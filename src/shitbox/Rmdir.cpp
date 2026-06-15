@@ -18,8 +18,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_rmdir(const ExecContext &ec, EvalContext &cxt,
-              const ArrayList<String> &args) throws -> i32
+Rmdir::Rmdir() = default;
+
+pure Utility::Kind Rmdir::kind() const wontthrow { return Kind::Rmdir; }
+
+fn Rmdir::execute(const ExecContext &ec, EvalContext &cxt,
+                  const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };

@@ -1,14 +1,19 @@
-# The shitbox builtin is always present, while the bare utility names resolve as
-# commands only under the --enable-shitbox flag or set -o shitbox. An empty PATH
-# isolates the resolution from the system coreutils, so the off case is a clean
-# command-not-found rather than a system binary.
+# The shitbox builtin prefix always works. In the default mood a bare coreutil
+# name falls back to the shitbox utility when PATH has no binary of that name,
+# while the sh mood reports a command not found. The --enable-shitbox flag and
+# set -o shitbox turn on the applet mode where a bare name beats a PATH binary.
+# An empty PATH isolates the resolution from the system coreutils.
 unset SHIT_FLAGS
 
 echo "=== shitbox prefix always works ==="
 "$BIN" -c 'shitbox seq 3'
 
-echo "=== bare name off, empty PATH, not found ==="
-"$BIN" -c 'PATH=; seq 3' 2>&1
+echo "=== default mood, empty PATH, falls back to shitbox ==="
+"$BIN" -c 'PATH=; seq 3'
+echo "rc=$?"
+
+echo "=== sh mood, empty PATH, not found ==="
+"$BIN" --mood sh -c 'PATH=; seq 3' 2>&1
 echo "rc=$?"
 
 echo "=== set -o shitbox turns bare names on ==="

@@ -39,14 +39,28 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   usize first_target = 1;
   let signal_number = os::signal_number_from_name("TERM").value_or(15);
 
-  /* A leading -name or -number names the signal to send. */
+  /* A leading -name or -number names the signal to send. A numeric form such as
+     -9 names the number directly, while a name such as -KILL or -SIGTERM
+     resolves through the platform table. */
   if (args.count() > 1 && args[1].length() > 1 && args[1][0] == '-') {
     let const name = String{args[1].substring(1)};
-    let const resolved = os::signal_number_from_name(name);
-    if (!resolved) throw Error{"'" + name + "' is not a valid signal"};
-    LOG(Debug, "kill resolved signal '%s' to number %d", name.c_str(),
-        *resolved);
-    signal_number = *resolved;
+    if (let const parsed_signal = utils::parse_decimal_integer(name.view());
+        !parsed_signal.is_error() && !name.is_empty() && name[0] >= '0' &&
+        name[0] <= '9')
+    {
+      /* The all-digits guard rejects a doubled minus such as --9, which would
+         otherwise parse as the negative signal -9 and reach kill with an
+         invalid number. */
+      signal_number = static_cast<i32>(parsed_signal.value());
+    } else if (let const resolved = os::signal_number_from_name(name);
+               resolved.has_value())
+    {
+      LOG(Debug, "kill resolved signal '%s' to number %d", name.c_str(),
+          *resolved);
+      signal_number = *resolved;
+    } else {
+      throw Error{"'" + name + "' is not a valid signal"};
+    }
     first_target = 2;
   }
 

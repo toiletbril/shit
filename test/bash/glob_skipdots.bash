@@ -1,0 +1,11 @@
+#!/bin/bash
+# globskipdots, on by default since bash 5.3, keeps . and .. out of a dot glob.
+# The temp directory holds one hidden and one plain entry, so the .* glob lists
+# the hidden entry alone and the * glob lists the plain one.
+d=$(mktemp -d)
+touch "$d/.hidden" "$d/visible"
+cd "$d" || exit 1
+echo .*
+echo *
+cd / || exit 1
+rm -rf "$d"

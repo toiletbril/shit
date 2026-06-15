@@ -227,10 +227,19 @@ pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
   /* The shopt names bash ships enabled. globstar stays off the way bash
      ships it, and the glob engine reads its live value. */
   static const StringView DEFAULT_ON_SHOPT_NAMES[] = {
-      "progcomp",        "promptvars",         "sourcepath",
-      "extquote",        "complete_fullquote", "hostcomplete",
-      "cmdhist",         "checkwinsize",       "force_fignore",
-      "globasciiranges", "expand_aliases",     "interactive_comments",
+      "progcomp",
+      "promptvars",
+      "sourcepath",
+      "extquote",
+      "complete_fullquote",
+      "hostcomplete",
+      "cmdhist",
+      "checkwinsize",
+      "force_fignore",
+      "globasciiranges",
+      "globskipdots",
+      "expand_aliases",
+      "interactive_comments",
   };
   for (const StringView default_name : DEFAULT_ON_SHOPT_NAMES)
     if (name == default_name) return true;

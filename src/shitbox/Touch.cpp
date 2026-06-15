@@ -21,8 +21,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_touch(const ExecContext &ec, EvalContext &cxt,
-              const ArrayList<String> &args) throws -> i32
+Touch::Touch() = default;
+
+pure Utility::Kind Touch::kind() const wontthrow { return Kind::Touch; }
+
+fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
+                  const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -45,8 +49,10 @@ fn util_touch(const ExecContext &ec, EvalContext &cxt,
       status = 1;
       continue;
     }
+
     os::close_fd(*fd);
   }
+
   return status;
 }
 

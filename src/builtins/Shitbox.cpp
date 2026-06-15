@@ -16,7 +16,8 @@ HELP_SYNOPSIS_DECL("[utility] [arg ...]");
 
 HELP_DESCRIPTION_DECL(
     "Run a bundled coreutility. With the --enable-shitbox flag or set -o "
-    "shitbox the utility names resolve directly as commands without the prefix, "
+    "shitbox the utility names resolve directly as commands without the "
+    "prefix, "
     "and a name that is already a builtin runs that builtin.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help and list the utilities.");

@@ -42,12 +42,31 @@ i32 Calc::execute(ExecContext &ec, EvalContext &cxt) const throws
   LOG(Debug, "calc evaluating %zu arithmetic expressions",
       operands.count() - 1);
 
-  /* Each argument is one expression, evaluated in order so an earlier value
-     feeds a later read, and the last result is printed. */
-  String result{};
+  /* The arguments join into one expression so `calc 1 + 2` reads as a single
+     arithmetic expression rather than three separate ones, the way a desk
+     calculator and a bare $(( )) do. */
+  String expression{};
+  for (usize i = 1; i < operands.count(); i++) {
+    if (i > 1) expression += ' ';
+    expression += operands[i].view();
+  }
+
   bool nonzero = false;
-  for (usize i = 1; i < operands.count(); i++)
-    result = cxt.evaluate_arithmetic_wide(operands[i].view(), nonzero);
+  String result{};
+  try {
+    result = cxt.evaluate_arithmetic_wide(expression.view(), nonzero);
+  } catch (const ErrorWithLocation &error) {
+    /* The evaluator caret points into the joined expression, which is not the
+       command text the top-level handler renders against, so the failure is
+       reported as a clear named message that quotes the expression instead. */
+    report_soft_builtin_error(
+        ec, cxt, "cannot evaluate '" + expression + "', " + error.message());
+    return 1;
+  } catch (const Error &error) {
+    report_soft_builtin_error(
+        ec, cxt, "cannot evaluate '" + expression + "', " + error.message());
+    return 1;
+  }
 
   result += '\n';
   ec.print_to_stdout(result);

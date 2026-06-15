@@ -967,6 +967,13 @@ public:
   fn set_mood(mimic_mood mood) wontthrow -> void { m_runtime.mood = mood; }
   pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
 
+  /* The -c command string, the source of BASH_EXECUTION_STRING, set by Main on
+     the -c path and left empty otherwise so the variable reads unset. */
+  fn set_execution_string(StringView text) throws -> void
+  {
+    m_execution_string = String{heap_allocator(), text};
+  }
+
   /* Seed the nounset, pipefail, and failglob strictness from the active mood,
      so the strict default mood runs strict and a compatibility mood runs lax,
      the way the named shell does. An explicit set -u, set -o pipefail, or set
@@ -1456,6 +1463,7 @@ protected:
   u64 m_last_command_duration_ns{0};
 
   String m_shell_name{};
+  String m_execution_string{};
   ArrayList<String> m_positional_params{heap_allocator()};
   Maybe<i64> m_last_background_pid{};
   StringMap<const Expression *> m_functions{heap_allocator()};
@@ -1665,6 +1673,8 @@ protected:
      first character and a doubled one touches every character, and an optional
      glob after the operator limits which characters are affected. */
   fn apply_case_modification(StringView name, StringView spec) throws -> String;
+
+  fn apply_parameter_transform(StringView name, char op) throws -> String;
   /* The value-only core of the case modification, shared with the array element
      paths. */
   fn apply_case_modification_to_value(StringView value, StringView spec) throws
@@ -1721,8 +1731,8 @@ protected:
 class ExecContext
 {
 public:
-  static fn make_from(SourceLocation location, ArrayList<String> &&args) throws
-      -> ExecContext;
+  static fn make_from(SourceLocation location, ArrayList<String> &&args,
+                      mimic_mood mood) throws -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution and

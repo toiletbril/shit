@@ -239,11 +239,11 @@ fn remove_file(StringView path) wontthrow -> bool;
 fn rename_path(StringView from, StringView to) wontthrow -> bool;
 fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
 
-/* The metadata one lstat returns, for the shitbox ls long format to render a row
-   without a syscall per field. stat_path fills it and returns false when the
-   path cannot be read. The mode carries the type and the permission bits in the
-   POSIX st_mode layout, and a symlink reports its own status rather than the
-   target it points at. */
+/* The metadata one lstat returns, for the shitbox ls long format to render a
+   row without a syscall per field. stat_path fills it and returns false when
+   the path cannot be read. The mode carries the type and the permission bits in
+   the POSIX st_mode layout, and a symlink reports its own status rather than
+   the target it points at. */
 struct file_status
 {
   u32 mode{0};
@@ -364,6 +364,20 @@ fn is_child_process() wontthrow -> bool;
 /* The process id of the shell itself, for $$. */
 fn get_shell_process_id() wontthrow -> i64;
 
+/* The parent process id, and the real and effective user ids, the source of the
+   bash PPID, UID, and EUID variables. */
+fn get_parent_process_id() wontthrow -> i64;
+fn get_real_user_id() wontthrow -> i64;
+fn get_effective_user_id() wontthrow -> i64;
+fn get_real_group_id() wontthrow -> i64;
+
+/* The configured child-process limit, the source of CHILD_MAX. */
+fn child_max() wontthrow -> i64;
+
+/* The machine hardware name from uname, the source of HOSTTYPE and the stem of
+   MACHTYPE. */
+fn machine_type() throws -> String;
+
 /* The OSTYPE name bash compiles in, so the dynamic variable reads the
    platform a config branches on. */
 inline fn ostype_name() wontthrow -> StringView
@@ -463,6 +477,11 @@ fn monotonic_nanos() wontthrow -> u64;
 /* The wall clock in microseconds since the Unix epoch, the source of the bash
    EPOCHREALTIME variable. */
 fn realtime_microseconds() wontthrow -> u64;
+
+/* Format a time through strftime in the local zone, the source of the printf
+   %(fmt)T conversion. A negative epoch renders the current time, the bash -1
+   and -2 forms. */
+fn format_local_time(StringView format, i64 epoch) throws -> String;
 
 /* The terminal's column and row count, the source of COLUMNS and LINES. False
    when there is no terminal or the size is unknown, leaving the outputs

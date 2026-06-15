@@ -20,8 +20,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_sort(const ExecContext &ec, EvalContext &cxt,
-             const ArrayList<String> &args) throws -> i32
+Sort::Sort() = default;
+
+pure Utility::Kind Sort::kind() const wontthrow { return Kind::Sort; }
+
+fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -46,6 +50,7 @@ fn util_sort(const ExecContext &ec, EvalContext &cxt,
       status = 2;
       continue;
     }
+
     for (const StringView &line : split_keep_newlines(content->view())) {
       let const body = !line.is_empty() && line[line.length - 1] == '\n'
                            ? line.substring_of_length(0, line.length - 1)
@@ -69,6 +74,7 @@ fn util_sort(const ExecContext &ec, EvalContext &cxt,
     }
 
   ec.print_to_stdout(output);
+
   return status;
 }
 

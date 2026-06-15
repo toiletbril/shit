@@ -22,39 +22,47 @@ namespace shit {
 
 namespace shitbox {
 
-static fn lower(char c) wontthrow -> char
+static fn lower(char character) wontthrow -> char
 {
-  return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+  return (character >= 'A' && character <= 'Z')
+             ? static_cast<char>(character - 'A' + 'a')
+             : character;
 }
 
 /* Whether haystack contains needle as a substring, optionally folding letter
    case, the fixed-string match grep does without a regex engine. */
 static fn contains(StringView haystack, StringView needle,
-                   bool ignore_case) wontthrow -> bool
+                   bool should_ignore_case) wontthrow -> bool
 {
   if (needle.length == 0) return true;
   if (needle.length > haystack.length) return false;
+
   for (usize start = 0; start + needle.length <= haystack.length; start++) {
-    bool matched = true;
+    bool is_matched = true;
     for (usize k = 0; k < needle.length; k++) {
-      char a = haystack[start + k];
-      char b = needle[k];
-      if (ignore_case) {
-        a = lower(a);
-        b = lower(b);
+      char haystack_char = haystack[start + k];
+      char needle_char = needle[k];
+      if (should_ignore_case) {
+        haystack_char = lower(haystack_char);
+        needle_char = lower(needle_char);
       }
-      if (a != b) {
-        matched = false;
+      if (haystack_char != needle_char) {
+        is_matched = false;
         break;
       }
     }
-    if (matched) return true;
+    if (is_matched) return true;
   }
+
   return false;
 }
 
-fn util_grep(const ExecContext &ec, EvalContext &cxt,
-             const ArrayList<String> &args) throws -> i32
+Grep::Grep() = default;
+
+pure Utility::Kind Grep::kind() const wontthrow { return Kind::Grep; }
+
+fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -64,8 +72,8 @@ fn util_grep(const ExecContext &ec, EvalContext &cxt,
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
   let const pattern = operands[0].view();
-  let const ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
-  let const invert = FLAG_GREP_INVERT.is_enabled();
+  let const should_ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
+  let const should_invert = FLAG_GREP_INVERT.is_enabled();
 
   ArrayList<StringView> sources{};
   if (operands.count() == 1)
@@ -74,11 +82,11 @@ fn util_grep(const ExecContext &ec, EvalContext &cxt,
     for (usize i = 1; i < operands.count(); i++)
       sources.push(operands[i].view());
 
-  let const print_names = sources.count() > 1;
+  let const should_print_names = sources.count() > 1;
   let output = String{};
-  bool any_match = false;
+  bool has_any_match = false;
   i32 status = 0;
-  for (const StringView &source : sources) {
+  for (let const &source : sources) {
     Maybe<String> content = read_named_or_stdin(ec, source);
     if (!content.has_value()) {
       report_soft_shitbox_error(ec, cxt,
@@ -87,27 +95,29 @@ fn util_grep(const ExecContext &ec, EvalContext &cxt,
       status = 2;
       continue;
     }
-    for (const StringView &line : split_keep_newlines(content->view())) {
+    for (let const &line : split_keep_newlines(content->view())) {
       /* The newline is excluded from the match so a pattern does not have to
          account for it, but it is kept on the printed line. */
-      let const had_newline = !line.is_empty() && line[line.length - 1] == '\n';
+      let const has_newline = !line.is_empty() && line[line.length - 1] == '\n';
       let const body =
-          had_newline ? line.substring_of_length(0, line.length - 1) : line;
-      let const hit = contains(body, pattern, ignore_case);
-      if (hit == invert) continue;
-      any_match = true;
-      if (print_names) {
+          has_newline ? line.substring_of_length(0, line.length - 1) : line;
+      let const is_match = contains(body, pattern, should_ignore_case);
+      if (is_match == should_invert) continue;
+
+      has_any_match = true;
+      if (should_print_names) {
         output += source;
         output += ':';
       }
       output += line;
-      if (!had_newline) output += '\n';
+      if (!has_newline) output += '\n';
     }
   }
 
   ec.print_to_stdout(output);
   if (status == 2) return 2;
-  return any_match ? 0 : 1;
+
+  return has_any_match ? 0 : 1;
 }
 
 } /* namespace shitbox */

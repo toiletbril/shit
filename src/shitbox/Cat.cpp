@@ -35,8 +35,12 @@ static fn number_prefix(i64 line_number) throws -> String
   return prefix;
 }
 
-fn util_cat(const ExecContext &ec, EvalContext &cxt,
-            const ArrayList<String> &args) throws -> i32
+Cat::Cat() = default;
+
+pure Utility::Kind Cat::kind() const wontthrow { return Kind::Cat; }
+
+fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
+                const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -47,13 +51,13 @@ fn util_cat(const ExecContext &ec, EvalContext &cxt,
   if (operands.is_empty())
     sources.push(StringView{"-"});
   else
-    for (const String &operand : operands)
+    for (let const &operand : operands)
       sources.push(operand.view());
 
   let output = String{};
   i64 line_number = 1;
   i32 status = 0;
-  for (const StringView &source : sources) {
+  for (let const &source : sources) {
     Maybe<String> content = read_named_or_stdin(ec, source);
     if (!content.has_value()) {
       report_soft_shitbox_error(ec, cxt,
@@ -66,7 +70,7 @@ fn util_cat(const ExecContext &ec, EvalContext &cxt,
       output += content->view();
       continue;
     }
-    for (const StringView &line : split_keep_newlines(content->view())) {
+    for (let const &line : split_keep_newlines(content->view())) {
       output += number_prefix(line_number);
       output += line;
       line_number++;

@@ -30,21 +30,28 @@ namespace shitbox {
 static fn read_up_to_lines(os::descriptor fd, i64 max_lines) throws -> String
 {
   String out{};
-  i64 lines = 0;
+  i64 line_count = 0;
   char buffer[4096];
-  while (lines < max_lines) {
+  while (line_count < max_lines) {
     let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
-    if (!read_count.has_value() || *read_count == 0) break;
-    for (usize i = 0; i < *read_count && lines < max_lines; i++) {
+    if (!read_count.has_value() || *read_count == 0) {
+      break;
+    }
+    for (usize i = 0; i < *read_count && line_count < max_lines; i++) {
       out.push(buffer[i]);
-      if (buffer[i] == '\n') lines++;
+      if (buffer[i] == '\n') line_count++;
     }
   }
+
   return out;
 }
 
-fn util_head(const ExecContext &ec, EvalContext &cxt,
-             const ArrayList<String> &args) throws -> i32
+Head::Head() = default;
+
+pure Utility::Kind Head::kind() const wontthrow { return Kind::Head; }
+
+fn Head::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -53,11 +60,13 @@ fn util_head(const ExecContext &ec, EvalContext &cxt,
 
   i64 count = 10;
   if (FLAG_HEAD_LINES.is_set()) {
-    let const parsed = utils::parse_decimal_integer(FLAG_HEAD_LINES.value());
-    if (parsed.is_error() || parsed.value() < 0)
+    let const parsed_value =
+        utils::parse_decimal_integer(FLAG_HEAD_LINES.value());
+    if (parsed_value.is_error() || parsed_value.value() < 0) {
       throw Error{"head: invalid line count '" +
                   String{FLAG_HEAD_LINES.value()} + "'"};
-    count = parsed.value();
+    }
+    count = parsed_value.value();
   }
 
   ArrayList<StringView> sources{};
@@ -67,37 +76,38 @@ fn util_head(const ExecContext &ec, EvalContext &cxt,
     for (const String &operand : operands)
       sources.push(operand.view());
 
-  let const print_headers = sources.count() > 1;
+  let const should_print_headers = sources.count() > 1;
   i32 status = 0;
-  for (usize s = 0; s < sources.count(); s++) {
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
     /* The input descriptor is read directly so a regular file or a pipe is read
        only as far as the requested lines, rather than slurped whole. */
     os::descriptor fd;
-    bool opened = false;
-    if (sources[s] == "-") {
+    bool was_opened = false;
+    if (sources[source_index] == "-") {
       fd = ec.in_fd.value_or(SHIT_STDIN);
     } else {
-      let const opened_fd =
-          os::open_file_descriptor(sources[s], os::file_open_mode::Read);
+      let const opened_fd = os::open_file_descriptor(sources[source_index],
+                                                     os::file_open_mode::Read);
       if (!opened_fd.has_value()) {
         report_soft_shitbox_error(ec, cxt,
-                                  "head: cannot open '" + String{sources[s]} +
+                                  "head: cannot open '" +
+                                      String{sources[source_index]} +
                                       "': " + os::last_system_error_message());
         status = 1;
         continue;
       }
       fd = *opened_fd;
-      opened = true;
+      was_opened = true;
     }
 
     let const text = read_up_to_lines(fd, count);
-    if (opened) os::close_fd(fd);
+    if (was_opened) os::close_fd(fd);
 
     let output = String{};
-    if (print_headers) {
-      if (s > 0) output += '\n';
+    if (should_print_headers) {
+      if (source_index > 0) output += '\n';
       output += "==> ";
-      output += sources[s];
+      output += sources[source_index];
       output += " <==\n";
     }
     output += text.view();

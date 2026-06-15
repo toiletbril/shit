@@ -290,21 +290,21 @@ private:
 };
 
 inline constexpr StaticStringMap<Token::Kind>::entry KEYWORD_ENTRIES[] = {
-    {PackedStringKey::from_literal("if"),       Token::Kind::If      },
-    {PackedStringKey::from_literal("then"),     Token::Kind::Then    },
-    {PackedStringKey::from_literal("else"),     Token::Kind::Else    },
-    {PackedStringKey::from_literal("elif"),     Token::Kind::Elif    },
-    {PackedStringKey::from_literal("fi"),       Token::Kind::Fi      },
-    {PackedStringKey::from_literal("when"),     Token::Kind::When    },
-    {PackedStringKey::from_literal("case"),     Token::Kind::Case    },
-    {PackedStringKey::from_literal("esac"),     Token::Kind::Esac    },
-    {PackedStringKey::from_literal("while"),    Token::Kind::While   },
-    {PackedStringKey::from_literal("for"),      Token::Kind::For     },
-    {PackedStringKey::from_literal("done"),     Token::Kind::Done    },
-    {PackedStringKey::from_literal("until"),    Token::Kind::Until   },
-    {PackedStringKey::from_literal("time"),     Token::Kind::Time    },
-    {PackedStringKey::from_literal("do"),       Token::Kind::Do      },
-    {PackedStringKey::from_literal("function"), Token::Kind::Function},
+    {SSK("if"),       Token::Kind::If      },
+    {SSK("then"),     Token::Kind::Then    },
+    {SSK("else"),     Token::Kind::Else    },
+    {SSK("elif"),     Token::Kind::Elif    },
+    {SSK("fi"),       Token::Kind::Fi      },
+    {SSK("when"),     Token::Kind::When    },
+    {SSK("case"),     Token::Kind::Case    },
+    {SSK("esac"),     Token::Kind::Esac    },
+    {SSK("while"),    Token::Kind::While   },
+    {SSK("for"),      Token::Kind::For     },
+    {SSK("done"),     Token::Kind::Done    },
+    {SSK("until"),    Token::Kind::Until   },
+    {SSK("time"),     Token::Kind::Time    },
+    {SSK("do"),       Token::Kind::Do      },
+    {SSK("function"), Token::Kind::Function},
 };
 
 inline constexpr StaticStringMap<Token::Kind> KEYWORDS{

@@ -1,8 +1,8 @@
-#include "../Builtin.hpp"
 #include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
@@ -11,7 +11,7 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[-a] program [program ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The which builtin prints how each named program resolves, naming it a "
+    "The which utility prints how each named program resolves, naming it a "
     "shell builtin or printing its PATH location. With -a it prints every PATH "
     "match instead of the first. The status is non-zero when no name "
     "resolves.");
@@ -19,28 +19,29 @@ HELP_DESCRIPTION_DECL(
 FLAG(ALL, Bool, 'a', "all", "Show all matches.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_BUILTIN_FLAGS(Which);
+REGISTER_SHITBOX_UTIL_FLAGS(Which);
 
 namespace shit {
 
+namespace shitbox {
+
 Which::Which() = default;
 
-pure Builtin::Kind Which::kind() const wontthrow { return Kind::Which; }
+pure Utility::Kind Which::kind() const wontthrow { return Kind::Which; }
 
-i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn Which::execute(const ExecContext &ec, EvalContext &cxt,
+                  const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
 
-  let const args = PARSE_BUILTIN_ARGS(ec);
+  let const operands = parse_util_operands(FLAG_LIST, args);
+  defer { reset_flags(FLAG_LIST); };
 
-  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
-
-  ASSERT(!args.is_empty());
+  SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   let output = String{};
 
-  for (usize i = 1; i < args.count(); i++) {
-    let const &program_name = args[i];
+  for (let const &program_name : operands) {
     LOG(Debug, "which resolving '%s' against builtins and PATH",
         program_name.c_str());
     if (search_builtin(program_name.view()).has_value()) {
@@ -59,7 +60,6 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
           output += '\n';
         }
       } else {
-        ASSERT(paths.count() > 0);
         output += paths[0].text();
         output += '\n';
       }
@@ -68,7 +68,9 @@ i32 Which::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   ec.print_to_stdout(output);
 
-  return (output.is_empty()) ? 1 : 0;
+  return output.is_empty() ? 1 : 0;
 }
+
+} /* namespace shitbox */
 
 } /* namespace shit */

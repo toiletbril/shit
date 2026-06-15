@@ -21,8 +21,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_tee(const ExecContext &ec, EvalContext &cxt,
-            const ArrayList<String> &args) throws -> i32
+Tee::Tee() = default;
+
+pure Utility::Kind Tee::kind() const wontthrow { return Kind::Tee; }
+
+fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
+                const ArrayList<String> &args) const throws -> i32
 {
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
@@ -48,6 +52,7 @@ fn util_tee(const ExecContext &ec, EvalContext &cxt,
     unused(written);
     os::close_fd(*fd);
   }
+
   return status;
 }
 

@@ -63,9 +63,9 @@ complete -o filenames -F _shit_complete shit
 # utility names, and completing a later argument offers that utility's flags or
 # a file. The bare utility names are left to the system completions, since this
 # script runs under a normal bash where ls and the rest are the real tools.
-_shitbox_utils="basename cat cp dirname du env find grep head kill killall ln \
+_shitbox_utils="basename cat cp dirname du env find grep head killall ln \
 ls make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee touch tr \
-uniq wc yes"
+uniq wc which whoami yes"
 
 _shitbox_util_flags()
 {

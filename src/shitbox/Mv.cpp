@@ -10,7 +10,8 @@ HELP_SYNOPSIS_DECL("[-fv] source ... destination");
 
 HELP_DESCRIPTION_DECL(
     "The mv utility renames each source to the destination. When more than one "
-    "source is given the destination must be a directory. With -v it names each "
+    "source is given the destination must be a directory. With -v it names "
+    "each "
     "move as it happens.");
 
 FLAG(MV_FORCE, Bool, 'f', "", "Overwrite an existing destination.");
@@ -23,8 +24,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_mv(const ExecContext &ec, EvalContext &cxt,
-           const ArrayList<String> &args) throws -> i32
+Mv::Mv() = default;
+
+pure Utility::Kind Mv::kind() const wontthrow { return Kind::Mv; }
+
+fn Mv::execute(const ExecContext &ec, EvalContext &cxt,
+               const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -37,9 +42,10 @@ fn util_mv(const ExecContext &ec, EvalContext &cxt,
   let const destination = operands[operands.count() - 1].view();
   let const destination_is_directory = Path{destination}.is_directory();
 
-  if (operands.count() > 2 && !destination_is_directory)
+  if (operands.count() > 2 && !destination_is_directory) {
     throw Error{"mv: the destination '" + String{destination} +
                 "' is not a directory, so it cannot hold several sources"};
+  }
 
   let output = String{};
   i32 status = 0;
@@ -55,8 +61,7 @@ fn util_mv(const ExecContext &ec, EvalContext &cxt,
     if (!os::rename_path(source, target.view())) {
       report_soft_shitbox_error(ec, cxt,
                                 "mv: unable to move '" + String{source} +
-                                    "' to '" + target +
-                                    "' because " +
+                                    "' to '" + target + "' because " +
                                     os::last_system_error_message());
       status = 1;
       continue;

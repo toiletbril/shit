@@ -1,6 +1,7 @@
-#include "../Builtin.hpp"
+#include "../Cli.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
+#include "../Shitbox.hpp"
 #include "../Trace.hpp"
 
 FLAG_LIST_DECL();
@@ -8,26 +9,31 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("");
 
 HELP_DESCRIPTION_DECL(
-    "The whoami builtin prints the name of the current user. The status is "
+    "The whoami utility prints the name of the current user. The status is "
     "non-zero when the user cannot be determined.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
-REGISTER_BUILTIN_FLAGS(WhoAmI);
+REGISTER_SHITBOX_UTIL_FLAGS(WhoAmI);
 
 namespace shit {
 
+namespace shitbox {
+
 WhoAmI::WhoAmI() = default;
 
-pure Builtin::Kind WhoAmI::kind() const wontthrow { return Kind::WhoAmI; }
+pure Utility::Kind WhoAmI::kind() const wontthrow { return Kind::WhoAmI; }
 
-i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const throws
+fn WhoAmI::execute(const ExecContext &ec, EvalContext &cxt,
+                   const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
 
-  let const args = PARSE_BUILTIN_ARGS(ec);
+  let const operands = parse_util_operands(FLAG_LIST, args);
+  unused(operands);
+  defer { reset_flags(FLAG_LIST); };
 
-  if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   LOG(Debug, "whoami printing the current user name");
 
@@ -42,5 +48,7 @@ i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   return 1;
 }
+
+} /* namespace shitbox */
 
 } /* namespace shit */

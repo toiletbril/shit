@@ -33,6 +33,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
 
@@ -1140,19 +1141,19 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
   if (bare.starts_with("SIG")) bare = String{bare.substring(3)};
 
   static constexpr StaticStringMap<i32>::entry NAME_ENTRIES[] = {
-      {PackedStringKey::from_literal("HUP"),  SIGHUP },
-      {PackedStringKey::from_literal("INT"),  SIGINT },
-      {PackedStringKey::from_literal("QUIT"), SIGQUIT},
-      {PackedStringKey::from_literal("KILL"), SIGKILL},
-      {PackedStringKey::from_literal("TERM"), SIGTERM},
-      {PackedStringKey::from_literal("STOP"), SIGSTOP},
-      {PackedStringKey::from_literal("TSTP"), SIGTSTP},
-      {PackedStringKey::from_literal("CONT"), SIGCONT},
-      {PackedStringKey::from_literal("USR1"), SIGUSR1},
-      {PackedStringKey::from_literal("USR2"), SIGUSR2},
-      {PackedStringKey::from_literal("ABRT"), SIGABRT},
-      {PackedStringKey::from_literal("ALRM"), SIGALRM},
-      {PackedStringKey::from_literal("PIPE"), SIGPIPE},
+      {SSK("HUP"),  SIGHUP },
+      {SSK("INT"),  SIGINT },
+      {SSK("QUIT"), SIGQUIT},
+      {SSK("KILL"), SIGKILL},
+      {SSK("TERM"), SIGTERM},
+      {SSK("STOP"), SIGSTOP},
+      {SSK("TSTP"), SIGTSTP},
+      {SSK("CONT"), SIGCONT},
+      {SSK("USR1"), SIGUSR1},
+      {SSK("USR2"), SIGUSR2},
+      {SSK("ABRT"), SIGABRT},
+      {SSK("ALRM"), SIGALRM},
+      {SSK("PIPE"), SIGPIPE},
   };
   static constexpr StaticStringMap<i32> NAMES{
       NAME_ENTRIES, sizeof(NAME_ENTRIES) / sizeof(NAME_ENTRIES[0])};
@@ -1360,12 +1361,56 @@ fn monotonic_nanos() wontthrow -> u64
          static_cast<u64>(now.tv_nsec);
 }
 
+fn get_parent_process_id() wontthrow -> i64
+{
+  return static_cast<i64>(getppid());
+}
+
+fn get_real_user_id() wontthrow -> i64 { return static_cast<i64>(getuid()); }
+
+fn get_effective_user_id() wontthrow -> i64
+{
+  return static_cast<i64>(geteuid());
+}
+
+fn get_real_group_id() wontthrow -> i64 { return static_cast<i64>(getgid()); }
+
+fn child_max() wontthrow -> i64
+{
+  return static_cast<i64>(sysconf(_SC_CHILD_MAX));
+}
+
+fn machine_type() throws -> String
+{
+  struct utsname info{};
+  if (uname(&info) != 0) return String{"unknown"};
+  return String{
+      StringView{info.machine, std::strlen(info.machine)}
+  };
+}
+
 fn realtime_microseconds() wontthrow -> u64
 {
   struct timespec now{};
   if (clock_gettime(CLOCK_REALTIME, &now) != 0) return 0;
   return static_cast<u64>(now.tv_sec) * 1000000ULL +
          static_cast<u64>(now.tv_nsec) / 1000ULL;
+}
+
+fn format_local_time(StringView format, i64 epoch) throws -> String
+{
+  /* A negative epoch is the current time, so a fixed value renders a fixed time
+     while the bash -1 and -2 magic values track the clock. */
+  const time_t when = epoch < 0 ? time(nullptr) : static_cast<time_t>(epoch);
+  struct tm broken_down{};
+  localtime_r(&when, &broken_down);
+  let const format_string = String{format};
+  char buffer[512];
+  let const written =
+      strftime(buffer, sizeof(buffer), format_string.c_str(), &broken_down);
+  return String{
+      StringView{buffer, written}
+  };
 }
 
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
@@ -1644,7 +1689,8 @@ fn format_mode_string(u32 mode) throws -> String
 
 /* The field 0 name of the first colon line whose field at id_field_index equals
    the wanted id, read from the named database. The passwd and group files share
-   the colon layout, with the id in field 2 of each, so one reader serves both. */
+   the colon layout, with the id in field 2 of each, so one reader serves both.
+ */
 static fn lookup_name_by_id(StringView database_path, u32 wanted_id,
                             usize id_field_index) throws -> Maybe<String>
 {
@@ -1695,10 +1741,13 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
   requested.tv_nsec = static_cast<long>(
       (seconds - static_cast<double>(requested.tv_sec)) * 1000000000.0);
   /* A signal can cut the sleep short, so the remaining time is slept again
-     until the whole interval has passed. */
+     until the whole interval has passed, unless the shell's interrupt fired, in
+     which case the sleep returns at once so a Ctrl-C reaches the caller. */
   struct timespec remaining;
-  while (nanosleep(&requested, &remaining) == -1 && errno == EINTR)
+  while (nanosleep(&requested, &remaining) == -1 && errno == EINTR) {
+    if (INTERRUPT_REQUESTED) break;
     requested = remaining;
+  }
 }
 
 fn enumerate_processes() throws -> ArrayList<process_entry>
@@ -1741,8 +1790,8 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
     process.name = steal(command_name);
 
     /* The status file names the owner on its Uid line, the real uid first, so
-       ps can render the owner the way it does. A process that has gone since the
-       directory scan leaves the owner at zero. */
+       ps can render the owner the way it does. A process that has gone since
+       the directory scan leaves the owner at zero. */
     const String status_path = "/proc/" + name + "/status";
     if (Maybe<String> status = utils::read_entire_file(status_path.view());
         status.has_value())
@@ -1754,26 +1803,29 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
         let const line =
             text.substring_of_length(status_line_start, i - status_line_start);
         status_line_start = i + 1;
-        /* The Uid line reads "Uid:\t<real>\t<effective>...", so the first run of
-           digits after the tab is the real uid. */
-        if (line.length < 5 || line.substring_of_length(0, 5) != StringView{"Uid:\t"})
+        /* The Uid line reads "Uid:\t<real>\t<effective>...", so the first run
+           of digits after the tab is the real uid. */
+        if (line.length < 5 ||
+            line.substring_of_length(0, 5) != StringView{"Uid:\t"})
           continue;
         usize cursor = 5;
         usize digit_end = cursor;
         while (digit_end < line.length && line[digit_end] >= '0' &&
                line[digit_end] <= '9')
           digit_end++;
-        let const uid_text = line.substring_of_length(cursor, digit_end - cursor);
-        if (let const uid = utils::parse_decimal_integer(uid_text); !uid.is_error())
+        let const uid_text =
+            line.substring_of_length(cursor, digit_end - cursor);
+        if (let const uid = utils::parse_decimal_integer(uid_text);
+            !uid.is_error())
           process.owner_id = static_cast<u32>(uid.value());
         break;
       }
     }
 
     /* The cmdline file holds the full argument vector with a NUL after each
-       argument, so the separators become spaces for the listing. A kernel thread
-       exposes an empty cmdline, so the bracketed command name stands in the way
-       ps shows it. */
+       argument, so the separators become spaces for the listing. A kernel
+       thread exposes an empty cmdline, so the bracketed command name stands in
+       the way ps shows it. */
     const String cmdline_path = "/proc/" + name + "/cmdline";
     if (Maybe<String> cmdline = utils::read_entire_file(cmdline_path.view());
         cmdline.has_value() && !cmdline->is_empty())
@@ -2808,6 +2860,18 @@ fn monotonic_nanos() wontthrow -> u64
          (remainder * 1000000000ULL) / static_cast<u64>(frequency.QuadPart);
 }
 
+fn get_parent_process_id() wontthrow -> i64 { return 0; }
+
+fn get_real_user_id() wontthrow -> i64 { return 0; }
+
+fn get_effective_user_id() wontthrow -> i64 { return 0; }
+
+fn get_real_group_id() wontthrow -> i64 { return 0; }
+
+fn child_max() wontthrow -> i64 { return 0; }
+
+fn machine_type() throws -> String { return String{"x86_64"}; }
+
 fn realtime_microseconds() wontthrow -> u64
 {
   FILETIME file_time;
@@ -2821,6 +2885,20 @@ fn realtime_microseconds() wontthrow -> u64
   const u64 epoch_offset_100ns = 116444736000000000ULL;
   if (ticks.QuadPart < epoch_offset_100ns) return 0;
   return (ticks.QuadPart - epoch_offset_100ns) / 10ULL;
+}
+
+fn format_local_time(StringView format, i64 epoch) throws -> String
+{
+  const time_t when = epoch < 0 ? time(nullptr) : static_cast<time_t>(epoch);
+  struct tm broken_down{};
+  localtime_s(&broken_down, &when);
+  let const format_string = String{format};
+  char buffer[512];
+  let const written =
+      strftime(buffer, sizeof(buffer), format_string.c_str(), &broken_down);
+  return String{
+      StringView{buffer, written}
+  };
 }
 
 fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow

@@ -36,8 +36,12 @@ fn resolve_shitbox_signal(StringView spelled) throws -> i32
   return *named;
 }
 
-fn util_pkill(const ExecContext &ec, EvalContext &cxt,
-              const ArrayList<String> &args) throws -> i32
+Pkill::Pkill() = default;
+
+pure Utility::Kind Pkill::kind() const wontthrow { return Kind::Pkill; }
+
+fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
+                  const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -54,16 +58,16 @@ fn util_pkill(const ExecContext &ec, EvalContext &cxt,
 
   let const self_pid = os::get_shell_process_id();
   let const processes = os::enumerate_processes();
-  bool any_signaled = false;
+  bool did_signal_any = false;
   for (const os::process_entry &process : processes) {
     if (process.pid == self_pid) continue;
     if (process.name.find_substring(pattern, 0).has_value()) {
       if (os::signal_process(os::process_from_pid(process.pid), signal_number))
-        any_signaled = true;
+        did_signal_any = true;
     }
   }
 
-  return any_signaled ? 0 : 1;
+  return did_signal_any ? 0 : 1;
 }
 
 } /* namespace shitbox */

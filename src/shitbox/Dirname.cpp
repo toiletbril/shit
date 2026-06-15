@@ -20,8 +20,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_dirname(const ExecContext &ec, EvalContext &cxt,
-                const ArrayList<String> &args) throws -> i32
+Dirname::Dirname() = default;
+
+pure Utility::Kind Dirname::kind() const wontthrow { return Kind::Dirname; }
+
+fn Dirname::execute(const ExecContext &ec, EvalContext &cxt,
+                    const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -36,6 +40,7 @@ fn util_dirname(const ExecContext &ec, EvalContext &cxt,
      directory is the dot the way dirname reports. */
   let const text = parent.is_empty() ? StringView{"."} : parent.text().view();
   ec.print_to_stdout(String{text} + "\n");
+
   return 0;
 }
 

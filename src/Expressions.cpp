@@ -10,6 +10,7 @@
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
 #include "Platform.hpp"
+#include "Shitbox.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Trace.hpp"
@@ -225,6 +226,10 @@ fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
 {
   if (name.is_empty()) return false;
   if (search_builtin(name.view()).has_value()) return true;
+  /* The analysis prepass runs only in the default mood, which is exactly where
+     a coreutil falls back to its shitbox implementation, so a shitbox utility
+     name resolves here even when PATH has no binary of that name. */
+  if (shitbox::find_util(name.view()).has_value()) return true;
   if (name.find_character('/').has_value()) {
     /* A leading tilde is expanded first, since the runtime expands it before
        resolving the command. */
@@ -1835,7 +1840,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         is_cache_valid
             ? ExecContext::from_resolved(source_location(), *m_resolved_kind,
                                          steal(program_args))
-            : ExecContext::make_from(source_location(), steal(program_args));
+            : ExecContext::make_from(source_location(), steal(program_args),
+                                     cxt.mood());
   } catch (const CommandNotFound &e) {
     report_command_not_found(cxt, e);
     cxt.set_last_exit_status(127);
@@ -1844,13 +1850,24 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   let ec = resolved_ec.take();
 
   if (!is_cache_valid) {
-    if (ec.is_builtin())
-      m_resolved_kind = ResolvedCommand::from_builtin(ec.builtin_kind());
-    else
-      m_resolved_kind = ResolvedCommand::from_program(ec.program_path());
-    /* The argument vector moved into the context, so the cached name reads from
-       it there rather than from the now-emptied local. */
-    m_resolved_name = ec.program();
+    /* A bare name that resolved to the shitbox builtin did so through the
+       mood-gated fallback or the runtime shitbox toggle, both of which can
+       differ between runs of this node, so that resolution is not memoized and
+       the next run resolves afresh under the live mood. */
+    Maybe<ResolvedCommand> to_cache;
+    if (ec.is_builtin()) {
+      if (ec.builtin_kind() != Builtin::Kind::Shitbox)
+        to_cache = ResolvedCommand::from_builtin(ec.builtin_kind());
+    } else {
+      to_cache = ResolvedCommand::from_program(ec.program_path());
+    }
+
+    if (to_cache.has_value()) {
+      m_resolved_kind = to_cache;
+      /* The argument vector moved into the context, so the cached name reads
+         from it there rather than from the now-emptied local. */
+      m_resolved_name = ec.program();
+    }
   }
 
   /* A heredoc on the standard input passes its staged descriptor through the
@@ -2499,8 +2516,8 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
        instead would wrongly make the not-found stage govern the pipeline. */
     Maybe<ExecContext> stage_ec;
     try {
-      stage_ec =
-          ExecContext::make_from(e->source_location(), steal(stage_args));
+      stage_ec = ExecContext::make_from(e->source_location(), steal(stage_args),
+                                        cxt.mood());
     } catch (const CommandNotFound &not_found) {
       report_command_not_found(cxt, not_found);
       /* The stage still applies its own redirections, the way bash and dash
@@ -4283,24 +4300,24 @@ cold fn args_have_short_flag(const ArrayList<const Token *> &args,
    and SC2217 for the redirect. The value is unused, the membership is the
    answer. */
 constexpr StaticStringMap<bool>::entry NON_STDIN_READER_ENTRIES[] = {
-    {PackedStringKey::from_literal("rm"),       true},
-    {PackedStringKey::from_literal("echo"),     true},
-    {PackedStringKey::from_literal("printf"),   true},
-    {PackedStringKey::from_literal("true"),     true},
-    {PackedStringKey::from_literal("false"),    true},
-    {PackedStringKey::from_literal("mkdir"),    true},
-    {PackedStringKey::from_literal("rmdir"),    true},
-    {PackedStringKey::from_literal("touch"),    true},
-    {PackedStringKey::from_literal("chmod"),    true},
-    {PackedStringKey::from_literal("chown"),    true},
-    {PackedStringKey::from_literal("cp"),       true},
-    {PackedStringKey::from_literal("mv"),       true},
-    {PackedStringKey::from_literal("ln"),       true},
-    {PackedStringKey::from_literal("kill"),     true},
-    {PackedStringKey::from_literal("basename"), true},
-    {PackedStringKey::from_literal("dirname"),  true},
-    {PackedStringKey::from_literal("sleep"),    true},
-    {PackedStringKey::from_literal("unlink"),   true},
+    {SSK("rm"),       true},
+    {SSK("echo"),     true},
+    {SSK("printf"),   true},
+    {SSK("true"),     true},
+    {SSK("false"),    true},
+    {SSK("mkdir"),    true},
+    {SSK("rmdir"),    true},
+    {SSK("touch"),    true},
+    {SSK("chmod"),    true},
+    {SSK("chown"),    true},
+    {SSK("cp"),       true},
+    {SSK("mv"),       true},
+    {SSK("ln"),       true},
+    {SSK("kill"),     true},
+    {SSK("basename"), true},
+    {SSK("dirname"),  true},
+    {SSK("sleep"),    true},
+    {SSK("unlink"),   true},
 };
 constexpr StaticStringMap<bool> NON_STDIN_READERS{
     NON_STDIN_READER_ENTRIES,
@@ -4309,19 +4326,19 @@ constexpr StaticStringMap<bool> NON_STDIN_READERS{
 /* The top-level system directories rm -r must never aim at, the SC2114
    table. */
 constexpr StaticStringMap<bool>::entry SYSTEM_DIRECTORY_ENTRIES[] = {
-    {PackedStringKey::from_literal("/"),     true},
-    {PackedStringKey::from_literal("/bin"),  true},
-    {PackedStringKey::from_literal("/boot"), true},
-    {PackedStringKey::from_literal("/dev"),  true},
-    {PackedStringKey::from_literal("/etc"),  true},
-    {PackedStringKey::from_literal("/home"), true},
-    {PackedStringKey::from_literal("/lib"),  true},
-    {PackedStringKey::from_literal("/proc"), true},
-    {PackedStringKey::from_literal("/root"), true},
-    {PackedStringKey::from_literal("/sbin"), true},
-    {PackedStringKey::from_literal("/sys"),  true},
-    {PackedStringKey::from_literal("/usr"),  true},
-    {PackedStringKey::from_literal("/var"),  true},
+    {SSK("/"),     true},
+    {SSK("/bin"),  true},
+    {SSK("/boot"), true},
+    {SSK("/dev"),  true},
+    {SSK("/etc"),  true},
+    {SSK("/home"), true},
+    {SSK("/lib"),  true},
+    {SSK("/proc"), true},
+    {SSK("/root"), true},
+    {SSK("/sbin"), true},
+    {SSK("/sys"),  true},
+    {SSK("/usr"),  true},
+    {SSK("/var"),  true},
 };
 constexpr StaticStringMap<bool> SYSTEM_DIRECTORIES{
     SYSTEM_DIRECTORY_ENTRIES,

@@ -24,6 +24,14 @@ public:
   const entry *entries;
   usize entry_count;
 
+  /* consteval forces the table to be built at compile time, so a static map is
+     a constant with no runtime initialization and a stray runtime construction
+     fails to compile rather than packing the keys at run time. */
+  consteval StaticStringMap(const entry *table, usize count) wontthrow
+      : entries(table),
+        entry_count(count)
+  {}
+
   hot mustuse fn find(StringView text) const throws -> Maybe<Value>
   {
     if (text.count() > 16) return None;

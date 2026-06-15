@@ -28,8 +28,12 @@ static fn parse_integer(StringView text) throws -> i64
   return parsed.value();
 }
 
-fn util_seq(const ExecContext &ec, EvalContext &cxt,
-            const ArrayList<String> &args) throws -> i32
+Seq::Seq() = default;
+
+pure Utility::Kind Seq::kind() const wontthrow { return Kind::Seq; }
+
+fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
+                const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);

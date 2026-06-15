@@ -18,105 +18,124 @@ class EvalContext;
 /* The shitbox subsystem is a busybox-style set of small coreutils hosted by the
    shitbox builtin, so a bare system with only a compiler can run a configure
    and a make under shit. The utilities mirror the builtin registry, a frozen
-   StaticStringMap from a name to a Util, dispatched through a switch. A utility
-   is reached three ways. The shitbox builtin runs `shitbox ls`, the bare name
-   ls resolves directly when the toggle is on, and a binary renamed to ls acts
-   as the utility through the multicall entry. */
+   StaticStringMap from a name to a Utility::Kind, dispatched through a switch
+   to the matching Utility class. A utility is reached three ways. The shitbox
+   builtin runs `shitbox ls`, the bare name ls resolves directly when the toggle
+   is on, and a binary renamed to ls acts as the utility through the multicall
+   entry. */
 namespace shitbox {
 
-enum class Util : u8
+class Utility
 {
-  Ls,
-  Ln,
-  Rm,
-  Mkdir,
-  Rmdir,
-  Cp,
-  Mv,
-  Cat,
-  Tee,
-  Touch,
-  Basename,
-  Dirname,
-  Realpath,
-  Du,
-  Head,
-  Tail,
-  Wc,
-  Seq,
-  Tr,
-  Grep,
-  Sort,
-  Uniq,
-  Sleep,
-  Env,
-  Yes,
-  Pkill,
-  Killall,
-  Kill,
-  Ps,
-  Make,
-  Find,
+public:
+  enum class Kind : uint8_t
+  {
+    Ls,
+    Ln,
+    Rm,
+    Mkdir,
+    Rmdir,
+    Cp,
+    Mv,
+    Cat,
+    Tee,
+    Touch,
+    Basename,
+    Dirname,
+    Realpath,
+    Du,
+    Head,
+    Tail,
+    Wc,
+    Seq,
+    Tr,
+    Grep,
+    Sort,
+    Uniq,
+    Sleep,
+    Env,
+    Yes,
+    Pkill,
+    Killall,
+    Ps,
+    Make,
+    Find,
+    Which,
+    WhoAmI,
+  };
+
+  pure virtual Kind kind() const wontthrow = 0;
+  virtual i32 execute(const ExecContext &ec, EvalContext &cxt,
+                      const ArrayList<String> &args) const throws = 0;
+
+  virtual ~Utility() = default;
+
+protected:
+  Utility();
 };
 
-inline constexpr StaticStringMap<Util>::entry SHITBOX_ENTRIES[] = {
-    {SSK("ls"),       Util::Ls      },
-    {SSK("ln"),       Util::Ln      },
-    {SSK("rm"),       Util::Rm      },
-    {SSK("mkdir"),    Util::Mkdir   },
-    {SSK("rmdir"),    Util::Rmdir   },
-    {SSK("cp"),       Util::Cp      },
-    {SSK("mv"),       Util::Mv      },
-    {SSK("cat"),      Util::Cat     },
-    {SSK("tee"),      Util::Tee     },
-    {SSK("touch"),    Util::Touch   },
-    {SSK("basename"), Util::Basename},
-    {SSK("dirname"),  Util::Dirname },
-    {SSK("realpath"), Util::Realpath},
-    {SSK("du"),       Util::Du      },
-    {SSK("head"),     Util::Head    },
-    {SSK("tail"),     Util::Tail    },
-    {SSK("wc"),       Util::Wc      },
-    {SSK("seq"),      Util::Seq     },
-    {SSK("tr"),       Util::Tr      },
-    {SSK("grep"),     Util::Grep    },
-    {SSK("sort"),     Util::Sort    },
-    {SSK("uniq"),     Util::Uniq    },
-    {SSK("sleep"),    Util::Sleep   },
-    {SSK("env"),      Util::Env     },
-    {SSK("yes"),      Util::Yes     },
-    {SSK("pkill"),    Util::Pkill   },
-    {SSK("killall"),  Util::Killall },
-    {SSK("kill"),     Util::Kill    },
-    {SSK("ps"),       Util::Ps      },
-    {SSK("make"),     Util::Make    },
-    {SSK("find"),     Util::Find    },
+inline constexpr StaticStringMap<Utility::Kind>::entry SHITBOX_ENTRIES[] = {
+    {SSK("ls"),       Utility::Kind::Ls      },
+    {SSK("ln"),       Utility::Kind::Ln      },
+    {SSK("rm"),       Utility::Kind::Rm      },
+    {SSK("mkdir"),    Utility::Kind::Mkdir   },
+    {SSK("rmdir"),    Utility::Kind::Rmdir   },
+    {SSK("cp"),       Utility::Kind::Cp      },
+    {SSK("mv"),       Utility::Kind::Mv      },
+    {SSK("cat"),      Utility::Kind::Cat     },
+    {SSK("tee"),      Utility::Kind::Tee     },
+    {SSK("touch"),    Utility::Kind::Touch   },
+    {SSK("basename"), Utility::Kind::Basename},
+    {SSK("dirname"),  Utility::Kind::Dirname },
+    {SSK("realpath"), Utility::Kind::Realpath},
+    {SSK("du"),       Utility::Kind::Du      },
+    {SSK("head"),     Utility::Kind::Head    },
+    {SSK("tail"),     Utility::Kind::Tail    },
+    {SSK("wc"),       Utility::Kind::Wc      },
+    {SSK("seq"),      Utility::Kind::Seq     },
+    {SSK("tr"),       Utility::Kind::Tr      },
+    {SSK("grep"),     Utility::Kind::Grep    },
+    {SSK("sort"),     Utility::Kind::Sort    },
+    {SSK("uniq"),     Utility::Kind::Uniq    },
+    {SSK("sleep"),    Utility::Kind::Sleep   },
+    {SSK("env"),      Utility::Kind::Env     },
+    {SSK("yes"),      Utility::Kind::Yes     },
+    {SSK("pkill"),    Utility::Kind::Pkill   },
+    {SSK("killall"),  Utility::Kind::Killall },
+    {SSK("ps"),       Utility::Kind::Ps      },
+    {SSK("make"),     Utility::Kind::Make    },
+    {SSK("find"),     Utility::Kind::Find    },
+    {SSK("which"),    Utility::Kind::Which   },
+    {SSK("whoami"),   Utility::Kind::WhoAmI  },
 };
 
-inline constexpr StaticStringMap<Util> SHITBOX_UTILS{
+inline constexpr StaticStringMap<Utility::Kind> SHITBOX_UTILS{
     SHITBOX_ENTRIES, sizeof(SHITBOX_ENTRIES) / sizeof(SHITBOX_ENTRIES[0])};
 
-/* The number of Util values, the bound of the per-utility flag-list table.
-   Find is the last enumerator. */
+/* The number of Utility::Kind values, the bound of the per-utility flag-list
+   table. WhoAmI is the last enumerator. */
 inline constexpr usize SHITBOX_UTIL_COUNT =
-    static_cast<usize>(Util::Find) + 1;
+    static_cast<usize>(Utility::Kind::WhoAmI) + 1;
 
 /* The FLAG_LIST of a utility, registered at static-init time by the
    REGISTER_SHITBOX_UTIL_FLAGS line in its file, so the completion engine offers
    a utility's flags the way it offers a builtin's. A utility with no
    registration reads back null. */
-fn register_shitbox_util_flags(Util chosen,
-                               const ArrayList<Flag *> *flags) wontthrow -> void;
-fn shitbox_util_flag_list(Util chosen) wontthrow -> const ArrayList<Flag *> *;
+fn register_shitbox_util_flags(Utility::Kind chosen,
+                               const ArrayList<Flag *> *flags) wontthrow
+    -> void;
+fn shitbox_util_flag_list(Utility::Kind chosen) wontthrow
+    -> const ArrayList<Flag *> *;
 
 #define REGISTER_SHITBOX_UTIL_FLAGS(util)                                      \
-  static uchar t__shitbox_flag_registrar = (shit::shitbox::                    \
-       register_shitbox_util_flags(shit::shitbox::Util::util, &FLAG_LIST),     \
-                                            0)
+  static uchar t__shitbox_flag_registrar =                                     \
+      (shit::shitbox::register_shitbox_util_flags(                             \
+           shit::shitbox::Utility::Kind::util, &FLAG_LIST),                    \
+       0)
 
 /* The utility named, or None when the name is not a shitbox utility. The
    command resolver and the multicall entry both ask through this. */
-fn find_util(StringView name) throws -> Maybe<Util>;
+fn find_util(StringView name) throws -> Maybe<Utility::Kind>;
 
 /* Every shitbox utility name, recovered once from the table, for command
    completion to offer them alongside the builtins. */
@@ -147,7 +166,7 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
    utility name, so flag parsing treats it as the program name the way a builtin
    reads ec.args(). The context carries the descriptors and the print helpers.
  */
-fn run_util(Util chosen, const ExecContext &ec, EvalContext &cxt,
+fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
             const ArrayList<String> &args) throws -> i32;
 
 /* Parse a utility's flags and return its real operands, the parse result with
@@ -177,41 +196,93 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
     }                                                                          \
   } while (false)
 
-#define SHITBOX_DECLARE_UTIL(name)                                             \
-  fn name(const ExecContext &ec, EvalContext &cxt,                             \
-          const ArrayList<String> &args) throws -> i32
+/* The dispatch mirrors the builtin one. U_CASE constructs the utility and runs
+   it, UTILITY_SWITCH_CASES lists every one, and UTILITY_STRUCT declares a class
+   per utility deriving from Utility, the same shape as B_CASE,
+   BUILTIN_SWITCH_CASES, and BUILTIN_STRUCT. */
+#define U_CASE(util)                                                           \
+  case Utility::Kind::util: {                                                  \
+    util utility;                                                              \
+    return utility.execute(ec, cxt, args);                                     \
+  }
 
-SHITBOX_DECLARE_UTIL(util_ls);
-SHITBOX_DECLARE_UTIL(util_ln);
-SHITBOX_DECLARE_UTIL(util_rm);
-SHITBOX_DECLARE_UTIL(util_mkdir);
-SHITBOX_DECLARE_UTIL(util_rmdir);
-SHITBOX_DECLARE_UTIL(util_cp);
-SHITBOX_DECLARE_UTIL(util_mv);
-SHITBOX_DECLARE_UTIL(util_cat);
-SHITBOX_DECLARE_UTIL(util_tee);
-SHITBOX_DECLARE_UTIL(util_touch);
-SHITBOX_DECLARE_UTIL(util_basename);
-SHITBOX_DECLARE_UTIL(util_dirname);
-SHITBOX_DECLARE_UTIL(util_realpath);
-SHITBOX_DECLARE_UTIL(util_du);
-SHITBOX_DECLARE_UTIL(util_head);
-SHITBOX_DECLARE_UTIL(util_tail);
-SHITBOX_DECLARE_UTIL(util_wc);
-SHITBOX_DECLARE_UTIL(util_seq);
-SHITBOX_DECLARE_UTIL(util_tr);
-SHITBOX_DECLARE_UTIL(util_grep);
-SHITBOX_DECLARE_UTIL(util_sort);
-SHITBOX_DECLARE_UTIL(util_uniq);
-SHITBOX_DECLARE_UTIL(util_sleep);
-SHITBOX_DECLARE_UTIL(util_env);
-SHITBOX_DECLARE_UTIL(util_yes);
-SHITBOX_DECLARE_UTIL(util_pkill);
-SHITBOX_DECLARE_UTIL(util_killall);
-SHITBOX_DECLARE_UTIL(util_kill);
-SHITBOX_DECLARE_UTIL(util_ps);
-SHITBOX_DECLARE_UTIL(util_make);
-SHITBOX_DECLARE_UTIL(util_find);
+#define UTILITY_SWITCH_CASES()                                                 \
+  U_CASE(Ls);                                                                  \
+  U_CASE(Ln);                                                                  \
+  U_CASE(Rm);                                                                  \
+  U_CASE(Mkdir);                                                               \
+  U_CASE(Rmdir);                                                               \
+  U_CASE(Cp);                                                                  \
+  U_CASE(Mv);                                                                  \
+  U_CASE(Cat);                                                                 \
+  U_CASE(Tee);                                                                 \
+  U_CASE(Touch);                                                               \
+  U_CASE(Basename);                                                            \
+  U_CASE(Dirname);                                                             \
+  U_CASE(Realpath);                                                            \
+  U_CASE(Du);                                                                  \
+  U_CASE(Head);                                                                \
+  U_CASE(Tail);                                                                \
+  U_CASE(Wc);                                                                  \
+  U_CASE(Seq);                                                                 \
+  U_CASE(Tr);                                                                  \
+  U_CASE(Grep);                                                                \
+  U_CASE(Sort);                                                                \
+  U_CASE(Uniq);                                                                \
+  U_CASE(Sleep);                                                               \
+  U_CASE(Env);                                                                 \
+  U_CASE(Yes);                                                                 \
+  U_CASE(Pkill);                                                               \
+  U_CASE(Killall);                                                             \
+  U_CASE(Ps);                                                                  \
+  U_CASE(Make);                                                                \
+  U_CASE(Find);                                                                \
+  U_CASE(Which);                                                               \
+  U_CASE(WhoAmI)
+
+#define UTILITY_STRUCT(u)                                                      \
+  class u : public Utility                                                     \
+  {                                                                            \
+  public:                                                                      \
+    u();                                                                       \
+                                                                               \
+    pure Kind kind() const wontthrow override;                                 \
+    i32 execute(const ExecContext &ec, EvalContext &cxt,                       \
+                const ArrayList<String> &args) const throws override;          \
+  };
+
+UTILITY_STRUCT(Ls);
+UTILITY_STRUCT(Ln);
+UTILITY_STRUCT(Rm);
+UTILITY_STRUCT(Mkdir);
+UTILITY_STRUCT(Rmdir);
+UTILITY_STRUCT(Cp);
+UTILITY_STRUCT(Mv);
+UTILITY_STRUCT(Cat);
+UTILITY_STRUCT(Tee);
+UTILITY_STRUCT(Touch);
+UTILITY_STRUCT(Basename);
+UTILITY_STRUCT(Dirname);
+UTILITY_STRUCT(Realpath);
+UTILITY_STRUCT(Du);
+UTILITY_STRUCT(Head);
+UTILITY_STRUCT(Tail);
+UTILITY_STRUCT(Wc);
+UTILITY_STRUCT(Seq);
+UTILITY_STRUCT(Tr);
+UTILITY_STRUCT(Grep);
+UTILITY_STRUCT(Sort);
+UTILITY_STRUCT(Uniq);
+UTILITY_STRUCT(Sleep);
+UTILITY_STRUCT(Env);
+UTILITY_STRUCT(Yes);
+UTILITY_STRUCT(Pkill);
+UTILITY_STRUCT(Killall);
+UTILITY_STRUCT(Ps);
+UTILITY_STRUCT(Make);
+UTILITY_STRUCT(Find);
+UTILITY_STRUCT(Which);
+UTILITY_STRUCT(WhoAmI);
 
 /* Shared helpers the utilities lean on, so each utility file stays small.
    read_fd_to_string slurps a descriptor, read_named_or_stdin opens a path or

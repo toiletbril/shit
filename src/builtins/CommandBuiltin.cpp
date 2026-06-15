@@ -127,7 +127,8 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      error unwind and abort the shell. */
   Maybe<ExecContext> sub;
   try {
-    sub = ExecContext::make_from(ec.source_location(), steal(operand_args));
+    sub = ExecContext::make_from(ec.source_location(), steal(operand_args),
+                                 cxt.mood());
   } catch (const CommandNotFound &not_found) {
     LOG(Debug, "command swallowed a not-found error: %s",
         not_found.message().c_str());

@@ -404,11 +404,15 @@ static fn run_script_contents(const String &script_contents,
        startup, so a non-snapping run behaves exactly as before. */
     /* The skip reads the context's diagnostics flag rather than only the
        static one, so set -o no-diagnostics flips the stage at runtime. */
+    /* --debug-optimizer forces the prepass to run whatever the mood, since its
+       whole purpose is to trace the prepass, so an interactive session that
+       settled into bash mood through its rc still shows the optimizer trace. */
     let const run_analysis =
         precompiled_ast == nullptr &&
-        (!(context.is_bash_compatible() || context.is_posix_mode()) ||
-         FLAG_WARNINGS.is_enabled()) &&
-        !context.diagnostics_disabled();
+        (FLAG_DEBUG_OPTIMIZER.is_enabled() ||
+         ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
+           FLAG_WARNINGS.is_enabled()) &&
+          !context.diagnostics_disabled()));
     LOG(Debug, "the analysis stage %s for this chunk",
         run_analysis ? "runs" : "is skipped");
     /* An interactive -W chunk runs right away and the runtime resolution
@@ -969,9 +973,16 @@ fn main(int argc, char **argv) -> int
      to source, in order, and defaults to the session mood. An invalid spelling
      in either is a usage error the way an unknown flag is. */
   if (FLAG_MOOD.is_set() && !shit::parse_mood_name(FLAG_MOOD.value())) {
-    shit::show_message("Unknown --mood value '" +
-                       shit::String{FLAG_MOOD.value()} +
-                       "', expected one of 'shit', 'bash', or 'sh'.");
+    /* The bad value is rendered with a caret, the located form the rest of the
+       diagnostics use, against a one-line source built from the flag. */
+    shit::String source = "--mood ";
+    let const value_position = source.count();
+    source += FLAG_MOOD.value();
+    shit::show_message(shit::ErrorWithLocation{
+        shit::SourceLocation{value_position, FLAG_MOOD.value().length},
+        "Unknown --mood value, expected one of 'shit', 'bash', or 'sh'"
+    }
+                           .to_string(source.view()));
     return 2;
   }
   let const session_mood = shit::resolve_session_mood();
@@ -992,8 +1003,15 @@ fn main(int argc, char **argv) -> int
       if (name.is_empty()) continue;
       shit::Maybe<shit::mimic_mood> parsed_mood = shit::parse_mood_name(name);
       if (!parsed_mood.has_value()) {
-        shit::show_message("Unknown --init-moods value '" + shit::String{name} +
-                           "', expected one of 'shit', 'bash', or 'sh'.");
+        shit::String source = "--init-moods ";
+        let const value_position = source.count();
+        source += name;
+        shit::show_message(shit::ErrorWithLocation{
+            shit::SourceLocation{value_position, name.length},
+            "Unknown --init-moods value, expected one of 'shit', 'bash', "
+            "or 'sh'"
+        }
+                               .to_string(source.view()));
         return 2;
       }
       init_moods.push(*parsed_mood);
@@ -1378,6 +1396,7 @@ fn main(int argc, char **argv) -> int
       } else if (should_execute_commands) {
         shit::StringView command_view = FLAG_COMMAND.next();
         script_contents = shit::String{command_view};
+        context.set_execution_string(command_view);
         LOG(Info, "taking the next -c command string, %zu bytes",
             script_contents.count());
         if (FLAG_COMMAND.at_end()) should_quit = true;

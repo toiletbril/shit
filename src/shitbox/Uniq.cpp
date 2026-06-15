@@ -33,8 +33,12 @@ static fn count_prefix(u64 run_length) throws -> String
   return prefix;
 }
 
-fn util_uniq(const ExecContext &ec, EvalContext &cxt,
-             const ArrayList<String> &args) throws -> i32
+Uniq::Uniq() = default;
+
+pure Utility::Kind Uniq::kind() const wontthrow { return Kind::Uniq; }
+
+fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -48,15 +52,15 @@ fn util_uniq(const ExecContext &ec, EvalContext &cxt,
     throw Error{"uniq: cannot read '" + String{source} +
                 "': " + os::last_system_error_message()};
 
-  let const show_count = FLAG_UNIQ_COUNT.is_enabled();
+  let const should_show_count = FLAG_UNIQ_COUNT.is_enabled();
   let output = String{};
-  bool have_previous = false;
+  bool has_previous = false;
   StringView previous{};
   u64 run_length = 0;
 
-  let const flush = [&]() throws -> void {
-    if (!have_previous) return;
-    if (show_count) output += count_prefix(run_length);
+  let const do_flush = [&]() throws -> void {
+    if (!has_previous) return;
+    if (should_show_count) output += count_prefix(run_length);
     output += previous;
     output += '\n';
   };
@@ -65,16 +69,18 @@ fn util_uniq(const ExecContext &ec, EvalContext &cxt,
     let const body = !line.is_empty() && line[line.length - 1] == '\n'
                          ? line.substring_of_length(0, line.length - 1)
                          : line;
-    if (have_previous && body == previous) {
+    if (has_previous && body == previous) {
       run_length++;
       continue;
     }
-    flush();
+
+    do_flush();
     previous = body;
     run_length = 1;
-    have_previous = true;
+    has_previous = true;
   }
-  flush();
+
+  do_flush();
 
   ec.print_to_stdout(output);
   return 0;

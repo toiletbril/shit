@@ -26,7 +26,9 @@ fn set_shitbox_names_enabled(bool enabled) wontthrow -> void
   g_shitbox_names_enabled = enabled;
 }
 
-flatten fn find_util(StringView name) throws -> Maybe<Util>
+Utility::Utility() = default;
+
+flatten fn find_util(StringView name) throws -> Maybe<Utility::Kind>
 {
   return SHITBOX_UTILS.find(name);
 }
@@ -34,15 +36,17 @@ flatten fn find_util(StringView name) throws -> Maybe<Util>
 /* The per-utility flag lists, a zero-initialized table immune to static-init
    order, filled by each utility file's registrar after its FLAG_LIST is built,
    since both sit in the same translation unit in order. */
-static const ArrayList<Flag *> *SHITBOX_UTIL_FLAG_LISTS[SHITBOX_UTIL_COUNT] = {};
+static const ArrayList<Flag *> *SHITBOX_UTIL_FLAG_LISTS[SHITBOX_UTIL_COUNT] =
+    {};
 
-fn register_shitbox_util_flags(Util chosen,
+fn register_shitbox_util_flags(Utility::Kind chosen,
                                const ArrayList<Flag *> *flags) wontthrow -> void
 {
   SHITBOX_UTIL_FLAG_LISTS[static_cast<usize>(chosen)] = flags;
 }
 
-fn shitbox_util_flag_list(Util chosen) wontthrow -> const ArrayList<Flag *> *
+fn shitbox_util_flag_list(Utility::Kind chosen) wontthrow
+    -> const ArrayList<Flag *> *
 {
   return SHITBOX_UTIL_FLAG_LISTS[static_cast<usize>(chosen)];
 }
@@ -51,50 +55,20 @@ fn util_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
     let collected = ArrayList<String>{};
-    for (const StaticStringMap<Util>::entry &entry : SHITBOX_ENTRIES)
+    for (const StaticStringMap<Utility::Kind>::entry &entry : SHITBOX_ENTRIES)
       collected.push(entry.key.to_string());
     return collected;
   }();
   return names;
 }
 
-fn run_util(Util chosen, const ExecContext &ec, EvalContext &cxt,
+fn run_util(Utility::Kind chosen, const ExecContext &ec, EvalContext &cxt,
             const ArrayList<String> &args) throws -> i32
 {
   LOG(Debug, "dispatching shitbox utility %d with %zu arguments", ENUM(chosen),
       args.count());
   switch (chosen) {
-  case Util::Ls: return util_ls(ec, cxt, args);
-  case Util::Ln: return util_ln(ec, cxt, args);
-  case Util::Rm: return util_rm(ec, cxt, args);
-  case Util::Mkdir: return util_mkdir(ec, cxt, args);
-  case Util::Rmdir: return util_rmdir(ec, cxt, args);
-  case Util::Cp: return util_cp(ec, cxt, args);
-  case Util::Mv: return util_mv(ec, cxt, args);
-  case Util::Cat: return util_cat(ec, cxt, args);
-  case Util::Tee: return util_tee(ec, cxt, args);
-  case Util::Touch: return util_touch(ec, cxt, args);
-  case Util::Basename: return util_basename(ec, cxt, args);
-  case Util::Dirname: return util_dirname(ec, cxt, args);
-  case Util::Realpath: return util_realpath(ec, cxt, args);
-  case Util::Du: return util_du(ec, cxt, args);
-  case Util::Head: return util_head(ec, cxt, args);
-  case Util::Tail: return util_tail(ec, cxt, args);
-  case Util::Wc: return util_wc(ec, cxt, args);
-  case Util::Seq: return util_seq(ec, cxt, args);
-  case Util::Tr: return util_tr(ec, cxt, args);
-  case Util::Grep: return util_grep(ec, cxt, args);
-  case Util::Sort: return util_sort(ec, cxt, args);
-  case Util::Uniq: return util_uniq(ec, cxt, args);
-  case Util::Sleep: return util_sleep(ec, cxt, args);
-  case Util::Env: return util_env(ec, cxt, args);
-  case Util::Yes: return util_yes(ec, cxt, args);
-  case Util::Pkill: return util_pkill(ec, cxt, args);
-  case Util::Killall: return util_killall(ec, cxt, args);
-  case Util::Kill: return util_kill(ec, cxt, args);
-  case Util::Ps: return util_ps(ec, cxt, args);
-  case Util::Make: return util_make(ec, cxt, args);
-  case Util::Find: return util_find(ec, cxt, args);
+    UTILITY_SWITCH_CASES();
   }
   unreachable("unhandled shitbox utility of kind %d", ENUM(chosen));
 }
@@ -265,9 +239,9 @@ fn format_human_size(u64 bytes) throws -> String
     unit++;
   }
 
-  /* Rounding the scaled value can reach 1024, which belongs in the next unit, so
-     a value that would render as 1024K crosses over to 1.0M when a larger unit
-     is available. */
+  /* Rounding the scaled value can reach 1024, which belongs in the next unit,
+     so a value that would render as 1024K crosses over to 1.0M when a larger
+     unit is available. */
   if (value >= 1023.5 && unit < sizeof(units)) {
     value /= 1024.0;
     unit++;
@@ -276,7 +250,8 @@ fn format_human_size(u64 bytes) throws -> String
   String out{};
   /* A scaled value below ten keeps one decimal, the way coreutils renders 1.5K,
      while a larger value rounds to a whole number such as 23K. A one-decimal
-     value that rounds up to ten drops the decimal so it reads 10K, not 10.0K. */
+     value that rounds up to ten drops the decimal so it reads 10K, not 10.0K.
+   */
   let const tenths = static_cast<u64>(value * 10.0 + 0.5);
   if (value < 10.0 && tenths < 100) {
     out += utils::uint_to_text(tenths / 10);

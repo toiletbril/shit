@@ -18,8 +18,12 @@ namespace shit {
 
 namespace shitbox {
 
-fn util_yes(const ExecContext &ec, EvalContext &cxt,
-            const ArrayList<String> &args) throws -> i32
+Yes::Yes() = default;
+
+pure Utility::Kind Yes::kind() const wontthrow { return Kind::Yes; }
+
+fn Yes::execute(const ExecContext &ec, EvalContext &cxt,
+                const ArrayList<String> &args) const throws -> i32
 {
   unused(cxt);
   let const operands = parse_util_operands(FLAG_LIST, args);
@@ -40,11 +44,16 @@ fn util_yes(const ExecContext &ec, EvalContext &cxt,
   /* The bytes go straight to the command's output, so a reader such as head
      that closes its end breaks the write and ends the loop rather than the
      utility spinning forever. */
-  let const out = ec.out_fd.value_or(SHIT_STDOUT);
+  let const out_fd = ec.out_fd.value_or(SHIT_STDOUT);
   for (;;) {
-    let const written = os::write_fd(out, line.view().data, line.count());
+    /* A Ctrl-C at the terminal sets the shell's interrupt flag, so the loop
+       checks it each pass and stops rather than spinning forever. */
+    if (os::INTERRUPT_REQUESTED) return 130;
+
+    let const written = os::write_fd(out_fd, line.view().data, line.count());
     if (!written.has_value() || *written == 0) break;
   }
+
   return 0;
 }
 

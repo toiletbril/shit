@@ -6,6 +6,7 @@
 #include "Lexer.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -663,6 +664,14 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     return apply_case_modification(name, rest);
   }
 
+  /* ${name@op} is a bash parameter transform, Q U u L E A a. The sh mood has no
+     such form, so it falls through to the ordinary modifier handling. */
+  if (!is_colon_form && rest[0] == '@' && rest.length >= 2 &&
+      mood() != mimic_mood::Posix && name != "@" && name != "*")
+  {
+    return apply_parameter_transform(name, rest[1]);
+  }
+
   let const op = rest[op_index];
   let const is_doubled = (op_index + 1 < rest.length &&
                           rest[op_index + 1] == op && (op == '#' || op == '%'));
@@ -985,6 +994,160 @@ fn EvalContext::pattern_replace_value(const String &value,
     }
   }
   return out;
+}
+
+/* Quote a value so it reads back as one shell word, the way the bash ${var@Q}
+   transform does. An empty value becomes '', a value with a control byte
+   becomes the $'...' form, and anything else is wrapped in single quotes with
+   an embedded quote written as the '\'' break-out. bash single-quotes the value
+   whole rather than the selective backslash escaping printf %q does. */
+static fn append_shell_quoted(String &out, StringView arg) throws -> void
+{
+  if (arg.is_empty()) {
+    out += "''";
+    return;
+  }
+
+  bool has_control_byte = false;
+  for (usize i = 0; i < arg.length; i++) {
+    let const byte = static_cast<unsigned char>(arg[i]);
+    if (byte < 0x20 || byte == 0x7f) {
+      has_control_byte = true;
+      break;
+    }
+  }
+
+  if (has_control_byte) {
+    out += "$'";
+    for (usize i = 0; i < arg.length; i++) {
+      let const character = arg[i];
+      switch (character) {
+      case '\a': out += "\\a"; break;
+      case '\b': out += "\\b"; break;
+      case '\t': out += "\\t"; break;
+      case '\n': out += "\\n"; break;
+      case '\v': out += "\\v"; break;
+      case '\f': out += "\\f"; break;
+      case '\r': out += "\\r"; break;
+      case '\'': out += "\\'"; break;
+      case '\\': out += "\\\\"; break;
+      default: {
+        let const byte = static_cast<unsigned char>(character);
+        if (byte < 0x20 || byte == 0x7f) {
+          out.push('\\');
+          out.push(static_cast<char>('0' + ((byte >> 6) & 7)));
+          out.push(static_cast<char>('0' + ((byte >> 3) & 7)));
+          out.push(static_cast<char>('0' + (byte & 7)));
+        } else {
+          out.push(character);
+        }
+        break;
+      }
+      }
+    }
+    out += "'";
+    return;
+  }
+
+  out.push('\'');
+  for (usize i = 0; i < arg.length; i++) {
+    if (arg[i] == '\'')
+      out += "'\\''";
+    else
+      out.push(arg[i]);
+  }
+  out.push('\'');
+}
+
+/* The ${var@op} transform, a bash 5.3 family. Q quotes for reuse, U u L change
+   the case, E expands backslash escapes, A prints an assignment that recreates
+   the value, and a lists the attribute letters. An operator with no handler
+   yields the plain expansion. */
+fn EvalContext::apply_parameter_transform(StringView name, char op) throws
+    -> String
+{
+  let const value = get_variable_value(name);
+  if (m_runtime.error_unset && !value.has_value())
+    throw_script_fatal("Unable to expand '" + name +
+                       "' because the parameter is not set");
+
+  /* An unset variable transforms to the empty string the way bash does, so
+     ${unset@Q} is empty rather than the '' an empty-but-set value yields. */
+  if (!value.has_value()) return String{scratch_allocator()};
+
+  let const text = value->view();
+
+  let out = String{scratch_allocator()};
+  switch (op) {
+  case 'U':
+    for (usize i = 0; i < text.length; i++)
+      out.push(
+          static_cast<char>(std::toupper(static_cast<unsigned char>(text[i]))));
+    return out;
+  case 'L':
+    for (usize i = 0; i < text.length; i++)
+      out.push(
+          static_cast<char>(std::tolower(static_cast<unsigned char>(text[i]))));
+    return out;
+  case 'u':
+    for (usize i = 0; i < text.length; i++) {
+      char character = text[i];
+      if (i == 0)
+        character = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(character)));
+      out.push(character);
+    }
+    return out;
+  case 'Q':
+  case 'K':
+  case 'k':
+    /* On a bare name K and k quote the value the way Q does, matching bash,
+       which reads element zero here. The key-and-value listing is the
+       ${a[@]@K} array-field form, handled on the element path. */
+    append_shell_quoted(out, text);
+    return out;
+  case 'P':
+    /* Expand the value as a prompt string, the PS1 backslash escapes such as
+       \u, \h, \w, \n, and \$. */
+    return toiletline::expand_prompt_template(text, *this);
+  case 'A':
+    out.append(name);
+    out += '=';
+    append_shell_quoted(out, text);
+    return out;
+  case 'E':
+    for (usize i = 0; i < text.length; i++) {
+      if (text[i] != '\\' || i + 1 >= text.length) {
+        out.push(text[i]);
+        continue;
+      }
+      i++;
+      switch (text[i]) {
+      case 'n': out.push('\n'); break;
+      case 't': out.push('\t'); break;
+      case 'r': out.push('\r'); break;
+      case 'a': out.push('\a'); break;
+      case 'b': out.push('\b'); break;
+      case 'f': out.push('\f'); break;
+      case 'v': out.push('\v'); break;
+      case 'e': out.push('\x1b'); break;
+      case '\\': out.push('\\'); break;
+      case '\'': out.push('\''); break;
+      case '"': out.push('"'); break;
+      default:
+        out.push('\\');
+        out.push(text[i]);
+        break;
+      }
+    }
+    return out;
+  case 'a':
+    if (lookup_indexed_array(name) != nullptr) out.push('a');
+    if (is_readonly(name)) out.push('r');
+    if (is_exported(name)) out.push('x');
+    return out;
+  default: return expand_variable(name);
+  }
 }
 
 fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
