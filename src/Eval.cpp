@@ -1487,7 +1487,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 
   /* The mood, the strictness toggles, noclobber, and allexport revert with the
      same rule, so a set -o pipefail, a set -u, a set -o noclobber, a set -a, or
-     a set --mood inside the subshell or the command substitution dies with it. */
+     a set --mood inside the subshell or the command substitution dies with it.
+   */
   snapshot.runtime.restore(*this);
   m_no_clobber = snapshot.no_clobber;
   m_export_all = snapshot.export_all;

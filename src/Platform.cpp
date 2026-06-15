@@ -1664,7 +1664,8 @@ fn read_symlink(StringView path) wontthrow -> Maybe<String>
   for (;;) {
     ArrayList<char> buffer{};
     buffer.reserve(capacity);
-    let const length = ::readlink(path_string.c_str(), buffer.begin(), capacity);
+    let const length =
+        ::readlink(path_string.c_str(), buffer.begin(), capacity);
     if (length < 0) return shit::None;
     if (static_cast<usize>(length) < capacity)
       return String{
@@ -1795,10 +1796,12 @@ static fn nth_space_field(StringView text, usize index) wontthrow -> StringView
   usize field = 0;
   usize i = 0;
   while (i < text.length) {
-    while (i < text.length && (text[i] == ' ' || text[i] == '\n')) i++;
+    while (i < text.length && (text[i] == ' ' || text[i] == '\n'))
+      i++;
     if (i >= text.length) break;
     let const start = i;
-    while (i < text.length && text[i] != ' ' && text[i] != '\n') i++;
+    while (i < text.length && text[i] != ' ' && text[i] != '\n')
+      i++;
     if (field == index) return text.substring_of_length(start, i - start);
     field++;
   }

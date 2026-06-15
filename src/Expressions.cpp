@@ -1149,9 +1149,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           ? cxt.find_function(program_args[0])
           : nullptr;
 
-  const bool is_bare_exec =
-      program_args.count() == 1 && program_args[0] == "exec" &&
-      command_word_function == nullptr;
+  const bool is_bare_exec = program_args.count() == 1 &&
+                            program_args[0] == "exec" &&
+                            command_word_function == nullptr;
 
   /* Whether the command word resolves to a POSIX special builtin not shadowed
      by a function. It decides both that a redirection error exits the shell
@@ -2409,7 +2409,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     stage_status.push(os::wait_and_monitor_process(child));
 
   /* PIPESTATUS exposes each stage's status by position, the same way the
-     all-simple pipeline path publishes it, so a compound pipeline reads it too. */
+     all-simple pipeline path publishes it, so a compound pipeline reads it too.
+   */
   let pipe_status = ArrayList<String>{heap_allocator()};
   pipe_status.reserve(stage_status.count());
   for (usize i = 0; i < stage_status.count(); i++)

@@ -76,21 +76,21 @@ fn EvalContext::clear_sparse_array(StringView name) throws -> void
   let indices = ArrayList<usize>{scratch_allocator()};
   let const prefix = sparse_array_key(name, 0, scratch_allocator());
   let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
-  m_sparse_array_values.for_each([&](StringView key,
-                                     const String &value) throws {
-    unused(value);
-    if (key.length <= name_prefix.length ||
-        key.substring_of_length(0, name_prefix.length) != name_prefix)
-    {
-      return;
-    }
-    if (let const parsed =
-            utils::parse_decimal_integer(key.substring(name_prefix.length));
-        !parsed.is_error() && parsed.value() >= 0)
-    {
-      indices.push(static_cast<usize>(parsed.value()));
-    }
-  });
+  m_sparse_array_values.for_each(
+      [&](StringView key, const String &value) throws {
+        unused(value);
+        if (key.length <= name_prefix.length ||
+            key.substring_of_length(0, name_prefix.length) != name_prefix)
+        {
+          return;
+        }
+        if (let const parsed =
+                utils::parse_decimal_integer(key.substring(name_prefix.length));
+            !parsed.is_error() && parsed.value() >= 0)
+        {
+          indices.push(static_cast<usize>(parsed.value()));
+        }
+      });
 
   for (const usize index : indices)
     m_sparse_array_values.erase(
@@ -526,22 +526,22 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
      copied and no list is built, since only the maximum is wanted. */
   let const prefix = sparse_array_key(name, 0, scratch_allocator());
   let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
-  m_sparse_array_values.for_each([&](StringView key,
-                                     const String &value) throws {
-    unused(value);
-    if (key.length <= name_prefix.length ||
-        key.substring_of_length(0, name_prefix.length) != name_prefix)
-    {
-      return;
-    }
-    if (let const parsed =
-            utils::parse_decimal_integer(key.substring(name_prefix.length));
-        !parsed.is_error() && parsed.value() >= 0)
-    {
-      let const past_index = static_cast<i64>(parsed.value()) + 1;
-      if (past_index > base) base = past_index;
-    }
-  });
+  m_sparse_array_values.for_each(
+      [&](StringView key, const String &value) throws {
+        unused(value);
+        if (key.length <= name_prefix.length ||
+            key.substring_of_length(0, name_prefix.length) != name_prefix)
+        {
+          return;
+        }
+        if (let const parsed =
+                utils::parse_decimal_integer(key.substring(name_prefix.length));
+            !parsed.is_error() && parsed.value() >= 0)
+        {
+          let const past_index = static_cast<i64>(parsed.value()) + 1;
+          if (past_index > base) base = past_index;
+        }
+      });
 
   return base;
 }

@@ -312,11 +312,11 @@ struct ConditionalEvaluator
       pos += 2;
       if (is_skipping) return false;
       /* The -v existence test reads whether its operand is set, so the
-         unset-variable diagnostic stays silent while the operand, its subscript,
-         and the test itself expand, the way bash does not nounset the operand of
-         -v. The prior value is saved and a defer restores it, so a throw from the
-         operand expansion cannot strand the suppression on and a nested -v test
-         puts back the outer value rather than clearing it. */
+         unset-variable diagnostic stays silent while the operand, its
+         subscript, and the test itself expand, the way bash does not nounset
+         the operand of -v. The prior value is saved and a defer restores it, so
+         a throw from the operand expansion cannot strand the suppression on and
+         a nested -v test puts back the outer value rather than clearing it. */
       const bool is_existence_test = first_literal.view() == "-v";
       const bool saved_suppress_unset = cxt.suppresses_unset_warning();
       if (is_existence_test) cxt.set_suppress_unset_warning(true);

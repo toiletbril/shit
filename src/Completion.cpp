@@ -1276,181 +1276,191 @@ static fn parse_manpage_option_entries(StringView text) throws
    than sixteen bytes cannot key the packed map, so it is left out. */
 static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
     {
-        {SSK("ffmpeg"),       "--help full"},
-        {SSK("ffprobe"),      "--help full"},
-        {SSK("ffplay"),       "--help full"},
-        {SSK("cargo"),        "--help"     },
-        {SSK("tailscale"),    "--help"     },
-        {SSK("rustup"),       "--help"     },
-        {SSK("rustc"),        "--help"     },
-        {SSK("rustfmt"),      "--help"     },
-        {SSK("go"),           "--help"     },
-        {SSK("npm"),          "--help"     },
-        {SSK("pnpm"),         "--help"     },
-        {SSK("yarn"),         "--help"     },
-        {SSK("deno"),         "--help"     },
-        {SSK("bun"),          "--help"     },
-        {SSK("node"),         "--help"     },
-        {SSK("pip"),          "--help"     },
-        {SSK("pip3"),         "--help"     },
-        {SSK("docker"),       "--help"     },
-        {SSK("podman"),       "--help"     },
-        {SSK("kubectl"),      "--help"     },
-        {SSK("helm"),         "--help"     },
-        {SSK("gh"),           "--help"     },
-        {SSK("glab"),         "--help"     },
-        {SSK("terraform"),    "--help"     },
-        {SSK("cmake"),        "--help"     },
-        {SSK("ninja"),        "--help"     },
-        {SSK("meson"),        "--help"     },
-        {SSK("jq"),           "--help"     },
-        {SSK("yq"),           "--help"     },
-        {SSK("rg"),           "--help"     },
-        {SSK("fd"),           "--help"     },
-        {SSK("bat"),          "--help"     },
-        {SSK("fzf"),          "--help"     },
-        {SSK("zig"),          "--help"     },
-        {SSK("poetry"),       "--help"     },
-        {SSK("pipx"),         "--help"     },
-        {SSK("uv"),           "--help"     },
-        {SSK("just"),         "--help"     },
-        {SSK("hugo"),         "--help"     },
-        {SSK("pandoc"),       "--help"     },
-        {SSK("delta"),        "--help"     },
-        {SSK("dust"),         "--help"     },
-        {SSK("starship"),     "--help"     },
-        {SSK("gofmt"),        "--help"     },
-        {SSK("magick"),       "--help"     },
-        {SSK("convert"),      "--help"     },
+        {SSK("ffmpeg"),            "--help full"},
+        {SSK("ffprobe"),           "--help full"},
+        {SSK("ffplay"),            "--help full"},
+        {SSK("cargo"),             "--help"     },
+        {SSK("tailscale"),         "--help"     },
+        {SSK("rustup"),            "--help"     },
+        {SSK("rustc"),             "--help"     },
+        {SSK("rustfmt"),           "--help"     },
+        {SSK("go"),                "--help"     },
+        {SSK("npm"),               "--help"     },
+        {SSK("pnpm"),              "--help"     },
+        {SSK("yarn"),              "--help"     },
+        {SSK("deno"),              "--help"     },
+        {SSK("bun"),               "--help"     },
+        {SSK("node"),              "--help"     },
+        {SSK("pip"),               "--help"     },
+        {SSK("pip3"),              "--help"     },
+        {SSK("docker"),            "--help"     },
+        {SSK("podman"),            "--help"     },
+        {SSK("kubectl"),           "--help"     },
+        {SSK("helm"),              "--help"     },
+        {SSK("gh"),                "--help"     },
+        {SSK("glab"),              "--help"     },
+        {SSK("terraform"),         "--help"     },
+        {SSK("cmake"),             "--help"     },
+        {SSK("ninja"),             "--help"     },
+        {SSK("meson"),             "--help"     },
+        {SSK("jq"),                "--help"     },
+        {SSK("yq"),                "--help"     },
+        {SSK("rg"),                "--help"     },
+        {SSK("fd"),                "--help"     },
+        {SSK("bat"),               "--help"     },
+        {SSK("fzf"),               "--help"     },
+        {SSK("zig"),               "--help"     },
+        {SSK("poetry"),            "--help"     },
+        {SSK("pipx"),              "--help"     },
+        {SSK("uv"),                "--help"     },
+        {SSK("just"),              "--help"     },
+        {SSK("hugo"),              "--help"     },
+        {SSK("pandoc"),            "--help"     },
+        {SSK("delta"),             "--help"     },
+        {SSK("dust"),              "--help"     },
+        {SSK("starship"),          "--help"     },
+        {SSK("gofmt"),             "--help"     },
+        {SSK("magick"),            "--help"     },
+        {SSK("convert"),           "--help"     },
         /* Compilers and binary tools. */
-        {SSK("clang"),        "--help"     },
-        {SSK("clang++"),      "--help"     },
-        {SSK("gcc"),          "--help"     },
-        {SSK("g++"),          "--help"     },
-        {SSK("cc"),           "--help"     },
-        {SSK("c++"),          "--help"     },
-        {SSK("clang-format"), "--help"     },
-        {SSK("clang-tidy"),   "--help"     },
-        {SSK("gdb"),          "--help"     },
-        {SSK("lldb"),         "--help"     },
-        {SSK("objdump"),      "--help"     },
-        {SSK("readelf"),      "--help"     },
-        {SSK("nm"),           "--help"     },
-        {SSK("strip"),        "--help"     },
-        {SSK("ar"),           "--help"     },
-        {SSK("ld"),           "--help"     },
-        {SSK("lld"),          "--help"     },
-        {SSK("valgrind"),     "--help"     },
-        {SSK("cppcheck"),     "--help"     },
-        {SSK("ccache"),       "--help"     },
+        {SSK("clang"),             "--help"     },
+        {SSK("clang++"),           "--help"     },
+        {SSK("gcc"),               "--help"     },
+        {SSK("g++"),               "--help"     },
+        {SSK("cc"),                "--help"     },
+        {SSK("c++"),               "--help"     },
+        {SSK("clang-format"),      "--help"     },
+        {SSK("clang-tidy"),        "--help"     },
+        {SSK("gdb"),               "--help"     },
+        {SSK("lldb"),              "--help"     },
+        {SSK("objdump"),           "--help"     },
+        {SSK("readelf"),           "--help"     },
+        {SSK("nm"),                "--help"     },
+        {SSK("strip"),             "--help"     },
+        {SSK("ar"),                "--help"     },
+        {SSK("ld"),                "--help"     },
+        {SSK("lld"),               "--help"     },
+        {SSK("valgrind"),          "--help"     },
+        {SSK("cppcheck"),          "--help"     },
+        {SSK("ccache"),            "--help"     },
+        {SSK("adb"),               "--help"     },
+        {SSK("fastboot"),          "--help"     },
+        {SSK("waydroid"),          "--help"     },
         /* Language runtimes and their toolchains. */
-        {SSK("python"),       "--help"     },
-        {SSK("python3"),      "--help"     },
-        {SSK("ruby"),         "--help"     },
-        {SSK("perl"),         "--help"     },
-        {SSK("lua"),          "--help"     },
-        {SSK("php"),          "--help"     },
-        {SSK("julia"),        "--help"     },
-        {SSK("java"),         "--help"     },
-        {SSK("javac"),        "--help"     },
-        {SSK("kotlin"),       "--help"     },
-        {SSK("kotlinc"),      "--help"     },
-        {SSK("scala"),        "--help"     },
-        {SSK("dotnet"),       "--help"     },
-        {SSK("dart"),         "--help"     },
-        {SSK("swift"),        "--help"     },
-        {SSK("swiftc"),       "--help"     },
-        {SSK("elixir"),       "--help"     },
-        {SSK("mix"),          "--help"     },
-        {SSK("ocaml"),        "--help"     },
-        {SSK("crystal"),      "--help"     },
-        {SSK("nim"),          "--help"     },
-        {SSK("cabal"),        "--help"     },
-        {SSK("stack"),        "--help"     },
-        {SSK("opam"),         "--help"     },
-        {SSK("ghc"),          "--help"     },
-        {SSK("tsc"),          "--help"     },
-        {SSK("esbuild"),      "--help"     },
-        {SSK("prettier"),     "--help"     },
-        {SSK("eslint"),       "--help"     },
-        {SSK("biome"),        "--help"     },
-        {SSK("vite"),         "--help"     },
+        {SSK("python"),            "--help"     },
+        {SSK("python3"),           "--help"     },
+        {SSK("ruby"),              "--help"     },
+        {SSK("perl"),              "--help"     },
+        {SSK("lua"),               "--help"     },
+        {SSK("php"),               "--help"     },
+        {SSK("julia"),             "--help"     },
+        {SSK("java"),              "--help"     },
+        {SSK("javac"),             "--help"     },
+        {SSK("kotlin"),            "--help"     },
+        {SSK("kotlinc"),           "--help"     },
+        {SSK("scala"),             "--help"     },
+        {SSK("dotnet"),            "--help"     },
+        {SSK("dart"),              "--help"     },
+        {SSK("swift"),             "--help"     },
+        {SSK("swiftc"),            "--help"     },
+        {SSK("elixir"),            "--help"     },
+        {SSK("mix"),               "--help"     },
+        {SSK("ocaml"),             "--help"     },
+        {SSK("crystal"),           "--help"     },
+        {SSK("nim"),               "--help"     },
+        {SSK("cabal"),             "--help"     },
+        {SSK("stack"),             "--help"     },
+        {SSK("opam"),              "--help"     },
+        {SSK("ghc"),               "--help"     },
+        {SSK("tsc"),               "--help"     },
+        {SSK("esbuild"),           "--help"     },
+        {SSK("prettier"),          "--help"     },
+        {SSK("eslint"),            "--help"     },
+        {SSK("biome"),             "--help"     },
+        {SSK("vite"),              "--help"     },
+        {SSK("ansible"),           "--help"     },
+        {SSK("ansible-config"),    "--help"     },
+        {SSK("ansible-console"),   "--help"     },
+        {SSK("ansible-doc"),       "--help"     },
+        {SSK("ansible-galaxy"),    "--help"     },
+        {SSK("ansible-inventory"), "--help"     },
+        {SSK("ansible-playbook"),  "--help"     },
+        {SSK("ansible-pull"),      "--help"     },
+        {SSK("ansible-test"),      "--help"     },
+        {SSK("ansible-vault"),     "--help"     },
+        {SSK("typst"),             "--help"     },
         /* Package managers. */
-        {SSK("apt"),          "--help"     },
-        {SSK("apt-get"),      "--help"     },
-        {SSK("dnf"),          "--help"     },
-        {SSK("pacman"),       "--help"     },
-        {SSK("zypper"),       "--help"     },
-        {SSK("apk"),          "--help"     },
-        {SSK("brew"),         "--help"     },
-        {SSK("flatpak"),      "--help"     },
-        {SSK("snap"),         "--help"     },
-        {SSK("nix"),          "--help"     },
-        {SSK("conda"),        "--help"     },
-        {SSK("mamba"),        "--help"     },
-        {SSK("gem"),          "--help"     },
-        {SSK("composer"),     "--help"     },
+        {SSK("apt"),               "--help"     },
+        {SSK("apt-get"),           "--help"     },
+        {SSK("dnf"),               "--help"     },
+        {SSK("pacman"),            "--help"     },
+        {SSK("zypper"),            "--help"     },
+        {SSK("apk"),               "--help"     },
+        {SSK("brew"),              "--help"     },
+        {SSK("flatpak"),           "--help"     },
+        {SSK("snap"),              "--help"     },
+        {SSK("nix"),               "--help"     },
+        {SSK("conda"),             "--help"     },
+        {SSK("mamba"),             "--help"     },
+        {SSK("gem"),               "--help"     },
+        {SSK("composer"),          "--help"     },
         /* Version control. */
-        {SSK("hg"),           "--help"     },
-        {SSK("svn"),          "--help"     },
-        {SSK("jj"),           "--help"     },
-        {SSK("fossil"),       "--help"     },
+        {SSK("hg"),                "--help"     },
+        {SSK("svn"),               "--help"     },
+        {SSK("jj"),                "--help"     },
+        {SSK("fossil"),            "--help"     },
         /* Modern command-line tools. */
-        {SSK("eza"),          "--help"     },
-        {SSK("lsd"),          "--help"     },
-        {SSK("procs"),        "--help"     },
-        {SSK("sd"),           "--help"     },
-        {SSK("hyperfine"),    "--help"     },
-        {SSK("tokei"),        "--help"     },
-        {SSK("watchexec"),    "--help"     },
-        {SSK("entr"),         "--help"     },
-        {SSK("direnv"),       "--help"     },
-        {SSK("zoxide"),       "--help"     },
-        {SSK("atuin"),        "--help"     },
-        {SSK("broot"),        "--help"     },
-        {SSK("btm"),          "--help"     },
-        {SSK("gitui"),        "--help"     },
-        {SSK("dive"),         "--help"     },
-        {SSK("k9s"),          "--help"     },
-        {SSK("kubectx"),      "--help"     },
-        {SSK("kubens"),       "--help"     },
-        {SSK("kustomize"),    "--help"     },
-        {SSK("skaffold"),     "--help"     },
+        {SSK("eza"),               "--help"     },
+        {SSK("lsd"),               "--help"     },
+        {SSK("procs"),             "--help"     },
+        {SSK("sd"),                "--help"     },
+        {SSK("hyperfine"),         "--help"     },
+        {SSK("tokei"),             "--help"     },
+        {SSK("watchexec"),         "--help"     },
+        {SSK("entr"),              "--help"     },
+        {SSK("direnv"),            "--help"     },
+        {SSK("zoxide"),            "--help"     },
+        {SSK("atuin"),             "--help"     },
+        {SSK("broot"),             "--help"     },
+        {SSK("btm"),               "--help"     },
+        {SSK("gitui"),             "--help"     },
+        {SSK("dive"),              "--help"     },
+        {SSK("k9s"),               "--help"     },
+        {SSK("kubectx"),           "--help"     },
+        {SSK("kubens"),            "--help"     },
+        {SSK("kustomize"),         "--help"     },
+        {SSK("skaffold"),          "--help"     },
         /* Cloud and infrastructure. */
-        {SSK("doctl"),        "--help"     },
-        {SSK("flyctl"),       "--help"     },
-        {SSK("pulumi"),       "--help"     },
-        {SSK("packer"),       "--help"     },
-        {SSK("vault"),        "--help"     },
-        {SSK("consul"),       "--help"     },
-        {SSK("nomad"),        "--help"     },
-        {SSK("vercel"),       "--help"     },
+        {SSK("doctl"),             "--help"     },
+        {SSK("flyctl"),            "--help"     },
+        {SSK("pulumi"),            "--help"     },
+        {SSK("packer"),            "--help"     },
+        {SSK("vault"),             "--help"     },
+        {SSK("consul"),            "--help"     },
+        {SSK("nomad"),             "--help"     },
+        {SSK("vercel"),            "--help"     },
         /* Network and transfer. */
-        {SSK("curl"),         "--help"     },
-        {SSK("wget"),         "--help"     },
-        {SSK("httpie"),       "--help"     },
-        {SSK("xh"),           "--help"     },
-        {SSK("aria2c"),       "--help"     },
-        {SSK("rsync"),        "--help"     },
-        {SSK("rclone"),       "--help"     },
+        {SSK("curl"),              "--help"     },
+        {SSK("wget"),              "--help"     },
+        {SSK("httpie"),            "--help"     },
+        {SSK("xh"),                "--help"     },
+        {SSK("aria2c"),            "--help"     },
+        {SSK("rsync"),             "--help"     },
+        {SSK("rclone"),            "--help"     },
+        {SSK("openvpn"),           "--help"     },
         /* Text and data. */
-        {SSK("mlr"),          "--help"     },
-        {SSK("dasel"),        "--help"     },
-        {SSK("gron"),         "--help"     },
-        {SSK("fx"),           "--help"     },
-        {SSK("xsv"),          "--help"     },
+        {SSK("mlr"),               "--help"     },
+        {SSK("dasel"),             "--help"     },
+        {SSK("gron"),              "--help"     },
+        {SSK("fx"),                "--help"     },
+        {SSK("xsv"),               "--help"     },
         /* System. */
-        {SSK("systemctl"),    "--help"     },
-        {SSK("journalctl"),   "--help"     },
-        {SSK("nmcli"),        "--help"     },
-        {SSK("buildah"),      "--help"     },
-        {SSK("skopeo"),       "--help"     },
-        {SSK("dedoc"),        "--help"     },
-        {SSK("typst"),        "--help"     },
-        {SSK("adb"),          "--help"     },
-        {SSK("fastboot"),     "--help"     },
-        {SSK("waydroid"),     "--help"     },
-        {SSK("openvpn"),      "--help"     },
+        {SSK("systemctl"),         "--help"     },
+        {SSK("journalctl"),        "--help"     },
+        {SSK("nmcli"),             "--help"     },
+        {SSK("buildah"),           "--help"     },
+        {SSK("skopeo"),            "--help"     },
+        {SSK("dedoc"),             "--help"     },
 };
 static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
     HELP_ALLOWLIST_ENTRIES,
@@ -2979,8 +2989,8 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
 /* Whether the word is a strict prefix of some command name, a builtin, a
    function, an alias, or a PATH program, so an unfinished command colors yellow
    while it could still complete rather than red. */
-static fn command_word_prefixes_any(StringView word, EvalContext &context)
-    throws -> bool
+static fn command_word_prefixes_any(StringView word,
+                                    EvalContext &context) throws -> bool
 {
   if (word.is_empty()) return false;
   /* A path word is judged by the filesystem, not the command-name sets, so it
@@ -3161,8 +3171,8 @@ static fn word_names_existing_path(StringView word) throws -> bool
    entry that begins with that segment, so a path being typed toward a real file
    colors yellow rather than red. */
 static fn path_partial_prefixes_entry(StringView word, usize existing_end,
-                                      StringView partial,
-                                      bool has_tilde) throws -> bool
+                                      StringView partial, bool has_tilde) throws
+    -> bool
 {
   if (partial.is_empty()) return false;
 
@@ -3203,10 +3213,10 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
 /* Color a path-like argument by segment. The resolved on-disk prefix is cyan.
    The first segment past it is yellow when it prefixes a real entry of its
    directory, so it could still complete, and red when nothing begins with it. A
-   deeper segment after an unresolved one cannot exist, so it is red. A word that
-   is not path-like, a plain name with no slash that does not resolve, is left in
-   the default color so an ordinary argument such as a subcommand is not painted.
-   Returns whether the word was treated as a path. */
+   deeper segment after an unresolved one cannot exist, so it is red. A word
+   that is not path-like, a plain name with no slash that does not resolve, is
+   left in the default color so an ordinary argument such as a subcommand is not
+   painted. Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
                               ArrayList<highlight_span> &spans) throws -> bool
 {
@@ -3216,7 +3226,8 @@ static fn color_path_argument(usize word_start, StringView word,
   let const has_tilde = word[0] == '~';
   let const has_dot_prefix =
       word.length >= 2 && word[0] == '.' &&
-      (word[1] == '/' || (word.length >= 3 && word[1] == '.' && word[2] == '/'));
+      (word[1] == '/' ||
+       (word.length >= 3 && word[1] == '.' && word[2] == '/'));
 
   /* A bare word with no path shape is only treated as a path when it resolves
      on disk, so an ordinary argument keeps its default color. */
@@ -3263,8 +3274,8 @@ static fn color_path_argument(usize word_start, StringView word,
   if (existing_end >= word.length) return true;
 
   /* The first segment past the resolved prefix is the part being typed. It is
-     yellow when it prefixes a real entry of its directory and red otherwise, and
-     any deeper segment after it cannot exist so it is red. */
+     yellow when it prefixes a real entry of its directory and red otherwise,
+     and any deeper segment after it cannot exist so it is red. */
   usize segment_end = existing_end;
   while (segment_end < word.length && word[segment_end] != '/')
     segment_end++;
@@ -3454,7 +3465,8 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
        and the loop cannot stall. */
     let const operator_start = i;
     while (i < end && line[i] != '$' && !is_highlight_name_start(line[i]) &&
-           !(line[i] >= '0' && line[i] <= '9') && !lexer::is_whitespace(line[i]))
+           !(line[i] >= '0' && line[i] <= '9') &&
+           !lexer::is_whitespace(line[i]))
       i++;
     spans.push(highlight_span{operator_start, i, colors::ansi::BOLD});
   }
@@ -3720,17 +3732,18 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       /* A command name. A path-shaped command colors per segment like a path
          argument, the existing prefix bright cyan and the part being typed cyan
-         or red. A plain command name is bright blue when it resolves, blue while
-         it still prefixes some command name so it could complete, and red once
-         it prefixes nothing. */
+         or red. A plain command name is bright blue when it resolves, blue
+         while it still prefixes some command name so it could complete, and red
+         once it prefixes nothing. */
       if (word.find_character('/').has_value()) {
         color_path_argument(word_start, word, spans);
       } else {
         let const command_color =
             first_word_resolves(word, context)
                 ? colors::ansi::BRIGHT_BLUE
-                : (command_word_prefixes_any(word, context) ? colors::ansi::BLUE
-                                                            : colors::ansi::RED);
+                : (command_word_prefixes_any(word, context)
+                       ? colors::ansi::BLUE
+                       : colors::ansi::RED);
         do_push(word_start, word_end, command_color);
       }
       command_position = false;
