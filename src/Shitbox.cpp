@@ -232,16 +232,27 @@ fn format_human_size(u64 bytes) throws -> String
   static const char units[] = {'K', 'M', 'G', 'T', 'P'};
   double value = static_cast<double>(bytes);
   usize unit = 0;
-  while (value >= 1024.0 && unit + 1 < sizeof(units)) {
+  /* The condition reads unit, not unit + 1, so the last unit P is reachable
+     rather than the scan stopping a unit early. */
+  while (value >= 1024.0 && unit < sizeof(units)) {
+    value /= 1024.0;
+    unit++;
+  }
+
+  /* Rounding the scaled value can reach 1024, which belongs in the next unit, so
+     a value that would render as 1024K crosses over to 1.0M when a larger unit
+     is available. */
+  if (value >= 1023.5 && unit < sizeof(units)) {
     value /= 1024.0;
     unit++;
   }
 
   String out{};
   /* A scaled value below ten keeps one decimal, the way coreutils renders 1.5K,
-     while a larger value rounds to a whole number such as 23K. */
-  if (value < 10.0) {
-    let const tenths = static_cast<u64>(value * 10.0 + 0.5);
+     while a larger value rounds to a whole number such as 23K. A one-decimal
+     value that rounds up to ten drops the decimal so it reads 10K, not 10.0K. */
+  let const tenths = static_cast<u64>(value * 10.0 + 0.5);
+  if (value < 10.0 && tenths < 100) {
     out += utils::uint_to_text(tenths / 10);
     out += '.';
     out += utils::uint_to_text(tenths % 10);

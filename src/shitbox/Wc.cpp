@@ -60,11 +60,7 @@ fn util_wc(const ExecContext &ec, EvalContext &cxt,
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
-  if (FLAG_HELP.is_enabled()) {
-    print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
-                    FLAG_LIST);
-    return 0;
-  }
+  SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   bool show_lines = FLAG_WC_LINES.is_enabled();
   bool show_words = FLAG_WC_WORDS.is_enabled();

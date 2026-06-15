@@ -33,11 +33,7 @@ fn util_seq(const ExecContext &ec, EvalContext &cxt,
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
-  if (FLAG_HELP.is_enabled()) {
-    print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
-                    FLAG_LIST);
-    return 0;
-  }
+  SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   i64 first = 1;
   i64 increment = 1;
@@ -58,15 +54,20 @@ fn util_seq(const ExecContext &ec, EvalContext &cxt,
   if (increment == 0) throw Error{"seq: the increment must not be zero"};
 
   let output = String{};
+  /* The step is guarded against signed overflow before it is taken, so a range
+     that reaches the integer bounds, such as seq up to the maximum, ends rather
+     than wrapping or tripping the sanitizer. */
   if (increment > 0)
     for (i64 value = first; value <= last; value += increment) {
       output += utils::int_to_text(value, heap_allocator()).view();
       output += '\n';
+      if (value > INT64_MAX - increment) break;
     }
   else
     for (i64 value = first; value >= last; value += increment) {
       output += utils::int_to_text(value, heap_allocator()).view();
       output += '\n';
+      if (value < INT64_MIN - increment) break;
     }
 
   ec.print_to_stdout(output);

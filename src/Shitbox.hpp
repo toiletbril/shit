@@ -139,6 +139,19 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
                    StringView description,
                    const ArrayList<Flag *> &flags) throws -> void;
 
+/* Show a utility's help and return zero when its --help flag is set, the mirror
+   of the builtin SHOW_BUILTIN_HELP_AND_RETURN so each utility states the check
+   once. It reads the file's FLAG_HELP, HELP_SYNOPSIS, HELP_DESCRIPTION, and
+   FLAG_LIST, and names the utility from args[0]. */
+#define SHITBOX_SHOW_HELP_AND_RETURN(ec, args)                                 \
+  do {                                                                         \
+    if (FLAG_HELP.is_enabled()) {                                              \
+      shit::shitbox::print_util_help((ec), (args)[0].view(), HELP_SYNOPSIS[0], \
+                                     HELP_DESCRIPTION, FLAG_LIST);             \
+      return 0;                                                                \
+    }                                                                          \
+  } while (false)
+
 #define SHITBOX_DECLARE_UTIL(name)                                             \
   fn name(const ExecContext &ec, EvalContext &cxt,                             \
           const ArrayList<String> &args) throws -> i32

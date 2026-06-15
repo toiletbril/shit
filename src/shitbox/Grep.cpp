@@ -57,11 +57,7 @@ fn util_grep(const ExecContext &ec, EvalContext &cxt,
   let const operands = parse_util_operands(FLAG_LIST, args);
   defer { reset_flags(FLAG_LIST); };
 
-  if (FLAG_HELP.is_enabled()) {
-    print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
-                    FLAG_LIST);
-    return 0;
-  }
+  SHITBOX_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.is_empty()) throw Error{"grep expects a pattern"};
 
