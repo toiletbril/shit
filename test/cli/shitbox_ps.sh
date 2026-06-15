@@ -7,7 +7,7 @@ echo "--- plain ps header ---"
 "$BIN" -c 'shitbox ps' | head -1
 
 echo "--- aux header has the USER and COMMAND columns ---"
-if "$BIN" -c 'shitbox ps aux' | head -1 | grep -qE '^USER +PID COMMAND$'; then
+if "$BIN" -c 'shitbox ps aux' | head -1 | grep -qE '^USER +PID +VSZ +RSS STAT COMMAND$'; then
     echo "header ok"
 else
     echo "header bad"
@@ -21,7 +21,7 @@ else
 fi
 
 echo "--- -aux selects the same wide listing ---"
-if "$BIN" -c 'shitbox ps -aux' | head -1 | grep -qE '^USER +PID COMMAND$'; then
+if "$BIN" -c 'shitbox ps -aux' | head -1 | grep -qE '^USER +PID +VSZ +RSS STAT COMMAND$'; then
     echo "dash aux ok"
 else
     echo "dash aux bad"

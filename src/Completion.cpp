@@ -3631,8 +3631,12 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_variable_pending) {
       for_variable_pending = false;
       command_position = false;
+      /* The loop variable is a name being assigned, so a valid one is cyan the
+         way a variable reads, and a malformed one is bold red. */
       if (!plain || !is_plain_identifier(word))
         do_push(word_start, word_end, colors::ansi::BOLD_RED);
+      else
+        do_push(word_start, word_end, colors::ansi::CYAN);
       continue;
     }
 

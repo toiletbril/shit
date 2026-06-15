@@ -222,12 +222,23 @@ struct process_entry
   String name{};
   u32 owner_id{0};
   String command_line{};
+  /* The BSD aux columns, filled only when resource stats are requested and left
+     zero otherwise. virtual_kib and resident_kib are kibibytes, state is the
+     single status letter R/S/D/Z/T, and cpu_ticks is the user plus system time
+     in clock ticks. */
+  u64 virtual_kib{0};
+  u64 resident_kib{0};
+  char state{'?'};
+  u64 cpu_ticks{0};
 };
 
 /* Every process the current user can see, for the shitbox pkill and killall
    utilities to match a name against. Empty on a platform with no process
-   listing, such as a non-Linux POSIX without a /proc filesystem. */
-fn enumerate_processes() throws -> ArrayList<process_entry>;
+   listing, such as a non-Linux POSIX without a /proc filesystem. The resource
+   stats, the memory, the state, and the cpu time, are read only when asked,
+   since pkill and killall match a name and do not need them. */
+fn enumerate_processes(bool include_resource_stats = false) throws
+    -> ArrayList<process_entry>;
 
 /* The filesystem mutations the shitbox coreutils run. Each returns false on
    failure with the reason left in last_system_error_message, so the calling

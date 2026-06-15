@@ -46,8 +46,29 @@ static fn owner_name_for_uid(u32 uid,
   return name;
 }
 
-/* The wide aux listing, the owner and the pid and the full command line of
-   every process in space-aligned columns. */
+/* Append text left-justified in a field of the given width, padding after. */
+static fn append_left(String &output, StringView text, usize width) throws
+    -> void
+{
+  output += text;
+  for (usize i = text.length; i < width; i++)
+    output += ' ';
+}
+
+/* Append text right-justified in a field of the given width, padding before. */
+static fn append_right(String &output, StringView text, usize width) throws
+    -> void
+{
+  for (usize i = text.length; i < width; i++)
+    output += ' ';
+  output += text;
+}
+
+/* The BSD aux listing, the owner, the pid, the virtual and resident memory in
+   kibibytes, the process state, and the full command line of every process in
+   space-aligned columns. The %CPU, %MEM, TTY, and START columns of a full ps
+   are omitted, since they need a sampling pass and a controlling-terminal map
+   this listing does not gather. */
 static fn render_aux(const ArrayList<os::process_entry> &processes,
                      String &output) throws -> void
 {
@@ -57,34 +78,46 @@ static fn render_aux(const ArrayList<os::process_entry> &processes,
 
   usize user_width = 4; /* the USER header */
   usize pid_width = 3;  /* the PID header */
+  usize vsz_width = 3;  /* the VSZ header */
+  usize rss_width = 3;  /* the RSS header */
 
   for (const os::process_entry &process : processes) {
     String owner = owner_name_for_uid(process.owner_id, uid_cache);
     if (owner.count() > user_width) user_width = owner.count();
-    let const pid_text = utils::int_to_text(process.pid);
-    if (pid_text.count() > pid_width) pid_width = pid_text.count();
+    if (utils::int_to_text(process.pid).count() > pid_width)
+      pid_width = utils::int_to_text(process.pid).count();
+    if (utils::uint_to_text(process.virtual_kib).count() > vsz_width)
+      vsz_width = utils::uint_to_text(process.virtual_kib).count();
+    if (utils::uint_to_text(process.resident_kib).count() > rss_width)
+      rss_width = utils::uint_to_text(process.resident_kib).count();
     owners.push(steal(owner));
   }
 
-  output += "USER";
-  for (usize i = 4; i < user_width; i++)
-    output += ' ';
+  append_left(output, "USER", user_width);
   output += ' ';
-  for (usize i = 3; i < pid_width; i++)
-    output += ' ';
-  output += "PID COMMAND\n";
+  append_right(output, "PID", pid_width);
+  output += ' ';
+  append_right(output, "VSZ", vsz_width);
+  output += ' ';
+  append_right(output, "RSS", rss_width);
+  output += " STAT COMMAND\n";
 
   for (usize i = 0; i < processes.count(); i++) {
     const os::process_entry &process = processes[i];
-    output += owners[i].view();
-    for (usize p = owners[i].count(); p < user_width; p++)
-      output += ' ';
+    append_left(output, owners[i].view(), user_width);
     output += ' ';
-    let const pid_text = utils::int_to_text(process.pid);
-    for (usize p = pid_text.count(); p < pid_width; p++)
-      output += ' ';
-    output += pid_text.view();
+    append_right(output, utils::int_to_text(process.pid).view(), pid_width);
     output += ' ';
+    append_right(output, utils::uint_to_text(process.virtual_kib).view(),
+                 vsz_width);
+    output += ' ';
+    append_right(output, utils::uint_to_text(process.resident_kib).view(),
+                 rss_width);
+    output += ' ';
+    /* The state is one letter padded to the four-wide STAT field plus a
+       trailing separator space. */
+    output += process.state;
+    output += "    ";
     output += process.command_line.is_empty() ? process.name.view()
                                               : process.command_line.view();
     output += '\n';
@@ -107,9 +140,26 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   flag_args.reserve(args.count());
   bool should_show_aux = false;
   for (usize i = 0; i < args.count(); i++) {
-    if (i > 0 && args[i].view() == "-aux") {
-      should_show_aux = true;
-      continue;
+    let const argument = args[i].view();
+    /* A dashed bundle of only a, u, x, and w is the classic ps spelling rather
+       than this shell's single-letter flags, so it is recognized here. The a,
+       u, and x select the aux view, and the w widths are accepted since the
+       command line already prints in full. */
+    if (i > 0 && argument.length > 1 && argument[0] == '-') {
+      bool only_ps_options = true;
+      for (usize k = 1; k < argument.length; k++)
+        if (argument[k] != 'a' && argument[k] != 'u' && argument[k] != 'x' &&
+            argument[k] != 'w')
+        {
+          only_ps_options = false;
+          break;
+        }
+      if (only_ps_options) {
+        for (usize k = 1; k < argument.length; k++)
+          if (argument[k] == 'a' || argument[k] == 'u' || argument[k] == 'x')
+            should_show_aux = true;
+        continue;
+      }
     }
     flag_args.push(args[i].clone());
   }
@@ -122,7 +172,7 @@ fn Ps::execute(const ExecContext &ec, EvalContext &cxt,
   for (const String &operand : operands)
     if (operand.view() == "aux") should_show_aux = true;
 
-  let const processes = os::enumerate_processes();
+  let const processes = os::enumerate_processes(should_show_aux);
 
   let output = String{};
   if (should_show_aux) {

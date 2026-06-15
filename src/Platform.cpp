@@ -1788,7 +1788,25 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
   }
 }
 
-fn enumerate_processes() throws -> ArrayList<process_entry>
+/* The index-th whitespace-separated field of a line, empty when the line has
+   too few fields, for reading the space-delimited /proc stat files. */
+static fn nth_space_field(StringView text, usize index) wontthrow -> StringView
+{
+  usize field = 0;
+  usize i = 0;
+  while (i < text.length) {
+    while (i < text.length && (text[i] == ' ' || text[i] == '\n')) i++;
+    if (i >= text.length) break;
+    let const start = i;
+    while (i < text.length && text[i] != ' ' && text[i] != '\n') i++;
+    if (field == index) return text.substring_of_length(start, i - start);
+    field++;
+  }
+  return StringView{};
+}
+
+fn enumerate_processes(bool include_resource_stats) throws
+    -> ArrayList<process_entry>
 {
   ArrayList<process_entry> processes{};
   /* The process list is read from /proc, the Linux and Cosmopolitan way. A
@@ -1885,6 +1903,54 @@ fn enumerate_processes() throws -> ArrayList<process_entry>
       process.command_line = steal(command_line);
     } else {
       process.command_line = "[" + process.name + "]";
+    }
+
+    if (include_resource_stats) {
+      /* /proc/<pid>/stat holds the state and the cpu time. The comm field is
+         parenthesized and may contain spaces and parens, so the fields are read
+         after the last ')', where the state is first and the user and system
+         times are the twelfth and thirteenth. */
+      if (Maybe<String> stat =
+              utils::read_entire_file((proc_pid + "/stat").view());
+          stat.has_value())
+      {
+        let const text = stat->view();
+        usize after_comm = text.length;
+        for (usize i = text.length; i > 0; i--)
+          if (text[i - 1] == ')') {
+            after_comm = i;
+            break;
+          }
+        if (after_comm < text.length) {
+          let const fields = text.substring(after_comm);
+          let const state = nth_space_field(fields, 0);
+          if (!state.is_empty()) process.state = state[0];
+          if (let const utime =
+                  utils::parse_decimal_integer(nth_space_field(fields, 11));
+              !utime.is_error())
+            process.cpu_ticks += static_cast<u64>(utime.value());
+          if (let const stime =
+                  utils::parse_decimal_integer(nth_space_field(fields, 12));
+              !stime.is_error())
+            process.cpu_ticks += static_cast<u64>(stime.value());
+        }
+      }
+      /* /proc/<pid>/statm gives the sizes in pages, the first the virtual size
+         and the second the resident set. */
+      if (Maybe<String> statm =
+              utils::read_entire_file((proc_pid + "/statm").view());
+          statm.has_value())
+      {
+        let const page_kib = static_cast<u64>(sysconf(_SC_PAGESIZE)) / 1024;
+        if (let const size =
+                utils::parse_decimal_integer(nth_space_field(statm->view(), 0));
+            !size.is_error())
+          process.virtual_kib = static_cast<u64>(size.value()) * page_kib;
+        if (let const resident =
+                utils::parse_decimal_integer(nth_space_field(statm->view(), 1));
+            !resident.is_error())
+          process.resident_kib = static_cast<u64>(resident.value()) * page_kib;
+      }
     }
 
     processes.push(steal(process));
@@ -3153,8 +3219,12 @@ fn sleep_for_seconds(double seconds) wontthrow -> void
   Sleep(static_cast<DWORD>(seconds * 1000.0));
 }
 
-fn enumerate_processes() throws -> ArrayList<process_entry>
+fn enumerate_processes(bool include_resource_stats) throws
+    -> ArrayList<process_entry>
 {
+  /* The Windows snapshot carries no per-process resource stats this layer
+     reads, so the flag is accepted and the BSD columns stay zero. */
+  unused(include_resource_stats);
   ArrayList<process_entry> processes{};
   HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   if (snapshot == INVALID_HANDLE_VALUE) return processes;
