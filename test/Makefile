@@ -78,12 +78,6 @@ cli_%: expected/cli/%.out
 
 cli_tests: $(CLI_NAMES)
 
-cli_refill:
-	for f in $(CLI_INPUT:cli/%.sh=%); do \
-		printf "	%-64s $$f.out\n" cli/$$f.sh; \
-		BIN=$(BIN) sh cli/$$f.sh > expected/cli/$$f.out 2>&1; \
-	done || true
-
 # The completion suite drives the engine through --debug-complete-at, the
 # driver only a debug build compiles in, so the whole suite skips cleanly on
 # a release binary. Each test prints candidates with stderr dropped, since
@@ -114,10 +108,24 @@ completion_refill:
 		BIN=$(BIN) sh completion/$$f.sh > expected/completion/$$f.out 2>/dev/null; \
 	done || true
 
+# REFILL names the tests to regenerate, space separated, and defaults to every
+# test. A name regenerates only the suite whose input file exists, so it refills
+# the main golden when shit/NAME.shit is present and the cli golden when
+# cli/NAME.sh is present, and an unknown name is a quiet no-op. The main suite
+# and the cli suite refill together, since the cli goldens used to need a
+# separate target.
+REFILL ?=
+
 refill:
-	for f in $(TEST_NAMES); do \
+	for f in $${REFILL:-$(TEST_NAMES)}; do \
+		[ -f shit/$$f.shit ] || continue; \
 		printf "	%-64s $$f.out\n" $$f.shit; \
 		cat shit/$$f.shit | $(BIN) $(BIN_FLAGS) - > expected/$$f.out 2>&1; \
+	done || true
+	for f in $${REFILL:-$(CLI_INPUT:cli/%.sh=%)}; do \
+		[ -f cli/$$f.sh ] || continue; \
+		printf "	%-64s cli/$$f.out\n" cli/$$f.sh; \
+		BIN=$(BIN) sh cli/$$f.sh > expected/cli/$$f.out 2>&1; \
 	done || true
 
 # Run each posix script through the shell and through dash, then diff their
@@ -135,8 +143,8 @@ dashdiff bashdiff mimicrydiff: SHELL := bash
 # A NAME_1.sh variant marks NAME.sh flaky across dash versions, the same
 # accepted-alternative idea the bashdiff _1.bash files carry.
 # The default mood is stricter than dash, a failing pipeline stage aborts and an
-# unmatched glob is fatal, so the dash comparison runs shit in POSIX mode with -P
-# where those strictnesses are off and the behavior tracks dash.
+# unmatched glob is fatal, so the dash comparison runs shit with --mood sh where
+# those strictnesses are off and the behavior tracks dash.
 dashdiff: $(BIN)
 	@for f in $(SH_COMPAT); do \
 		s="$$($(BIN) --mood sh "$$f" 2>/dev/null; printf X)"; s="$${s%X}"; \
@@ -275,4 +283,4 @@ bench:
 		rm -f "$$d" "$$b" "$$z" "$$g" "$$s" "$$bb" "$$sb" "$$zb" "$$zs"'
 
 .PHONY: test clean run_tests refill dashdiff bashdiff mimicrydiff bench \
-		completion_tests completion_refill cli_tests cli_refill
+		completion_tests completion_refill cli_tests
