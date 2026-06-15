@@ -327,6 +327,13 @@ fn EvalContext::set_indexed_array(StringView name,
   m_indexed_arrays.set(name, steal(values));
 }
 
+fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
+{
+  let single = ArrayList<String>{heap_allocator()};
+  single.push(utils::int_to_text(status, heap_allocator()));
+  set_indexed_array("PIPESTATUS", steal(single));
+}
+
 fn EvalContext::append_indexed_array(StringView name,
                                      ArrayList<String> values) throws -> void
 {

@@ -1451,6 +1451,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* dash reports a redirection failure with status 2, the value a script
        reads in $? after the failed command. */
     cxt.set_last_exit_status(2);
+    cxt.publish_single_pipe_status(2);
     return 2;
   }
 
@@ -1520,7 +1521,13 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     for (let const &assignment : m_array_args)
       for (let const token : assignment.elements)
         ran_substitution = ran_substitution || do_token_ran_substitution(token);
-    if (!ran_substitution) cxt.set_last_exit_status(0);
+    /* A bare assignment or redirection with no substitution is status zero and
+       publishes a one-element PIPESTATUS. When a substitution ran, its own last
+       command already set PIPESTATUS, so it is left in place. */
+    if (!ran_substitution) {
+      cxt.set_last_exit_status(0);
+      cxt.publish_single_pipe_status(0);
+    }
     return cxt.last_exit_status();
   }
 
@@ -1851,6 +1858,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   } catch (const CommandNotFound &e) {
     report_command_not_found(cxt, e);
     cxt.set_last_exit_status(127);
+    cxt.publish_single_pipe_status(127);
     return 127;
   }
   let ec = resolved_ec.take();
@@ -1951,6 +1959,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   }
 
   cxt.set_last_exit_status(static_cast<i32>(ret));
+  cxt.publish_single_pipe_status(static_cast<i32>(ret));
   return ret;
 }
 

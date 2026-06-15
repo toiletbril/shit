@@ -3254,11 +3254,12 @@ static fn color_path_argument(usize word_start, StringView word,
     }
   }
 
+  /* The resolved prefix exists on disk, so it is bright cyan. */
   if (existing_end > 0)
     spans.push(highlight_span{word_start, word_start + existing_end,
-                              colors::ansi::CYAN});
+                              colors::ansi::BRIGHT_CYAN});
 
-  /* A fully resolved path is entirely cyan, nothing remains to color. */
+  /* A fully resolved path is entirely bright cyan, nothing remains to color. */
   if (existing_end >= word.length) return true;
 
   /* The first segment past the resolved prefix is the part being typed. It is
@@ -3270,9 +3271,12 @@ static fn color_path_argument(usize word_start, StringView word,
 
   let const partial =
       word.substring_of_length(existing_end, segment_end - existing_end);
+  /* A tail that prefixes a real entry could still complete, so it is normal
+     cyan against the bright cyan of the part that exists, and red when nothing
+     begins with it. */
   let const tail_color =
       path_partial_prefixes_entry(word, existing_end, partial, has_tilde)
-          ? colors::ansi::YELLOW
+          ? colors::ansi::CYAN
           : colors::ansi::RED;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
                             tail_color});
@@ -3710,15 +3714,21 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         continue;
       }
 
-      /* A command name. A resolved command is blue the way fish paints one. An
-         unfinished one is yellow while it still prefixes some command name, so
-         it could complete, and red once it prefixes nothing. */
-      let const command_color =
-          first_word_resolves(word, context)
-              ? colors::ansi::BLUE
-              : (command_word_prefixes_any(word, context) ? colors::ansi::YELLOW
-                                                          : colors::ansi::RED);
-      do_push(word_start, word_end, command_color);
+      /* A command name. A path-shaped command colors per segment like a path
+         argument, the existing prefix bright cyan and the part being typed cyan
+         or red. A plain command name is bright blue when it resolves, blue while
+         it still prefixes some command name so it could complete, and red once
+         it prefixes nothing. */
+      if (word.find_character('/').has_value()) {
+        color_path_argument(word_start, word, spans);
+      } else {
+        let const command_color =
+            first_word_resolves(word, context)
+                ? colors::ansi::BRIGHT_BLUE
+                : (command_word_prefixes_any(word, context) ? colors::ansi::BLUE
+                                                            : colors::ansi::RED);
+        do_push(word_start, word_end, command_color);
+      }
       command_position = false;
       continue;
     }
@@ -3730,7 +3740,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
        segment, the on-disk prefix cyan, the rest yellow or red. */
     if (!command_position && plain && !is_assignment) {
       if (!word.is_empty() && word[0] == '-')
-        do_push(word_start, word_end, colors::ansi::DIM);
+        do_push(word_start, word_end, colors::ansi::GRAY);
       else
         color_path_argument(word_start, word, spans);
     }

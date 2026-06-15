@@ -438,6 +438,11 @@ public:
      element zero the way bash treats $a as ${a[0]}. */
   fn set_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
+  /* Publish a one-element PIPESTATUS for a simple command, the way bash
+     refreshes it after every foreground command so a later ${PIPESTATUS[0]}
+     reads this command rather than a stale pipeline. A pipeline publishes its
+     own multi-element array instead. */
+  fn publish_single_pipe_status(i32 status) throws -> void;
   fn append_indexed_array(StringView name, ArrayList<String> values) throws
       -> void;
   fn set_array_element(StringView name, usize index, StringView value) throws
