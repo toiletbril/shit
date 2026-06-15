@@ -1707,10 +1707,13 @@ static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
 
 /* Whether a header line opens a subcommand section, so any line that reads
    "Commands:", "Available Commands:", "Subcommands:", and the like, matched
-   case-insensitively on the "commands:" or "subcommands:" tail. */
+   case-insensitively on the "commands:" or "subcommands:" tail. A bare all-caps
+   header with no colon, such as tailscale's "SUBCOMMANDS", also opens a section,
+   matched only when the whole line is the single word so a description that ends
+   in the word "commands" does not open one. */
 static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
 {
-  if (trimmed.is_empty() || trimmed[trimmed.length - 1] != ':') return false;
+  if (trimmed.is_empty()) return false;
   let const ends_with_ignoring_case = [&](StringView suffix) {
     if (trimmed.length < suffix.length) return false;
     let const offset = trimmed.length - suffix.length;
@@ -1723,8 +1726,14 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
     }
     return true;
   };
-  return ends_with_ignoring_case(StringView{"commands:"}) ||
-         ends_with_ignoring_case(StringView{"subcommands:"});
+  if (trimmed[trimmed.length - 1] == ':')
+    return ends_with_ignoring_case(StringView{"commands:"}) ||
+           ends_with_ignoring_case(StringView{"subcommands:"});
+  let const equals_ignoring_case = [&](StringView word) {
+    return trimmed.length == word.length && ends_with_ignoring_case(word);
+  };
+  return equals_ignoring_case(StringView{"commands"}) ||
+         equals_ignoring_case(StringView{"subcommands"});
 }
 
 /* The subcommands a --help text lists under a commands section. cargo and other

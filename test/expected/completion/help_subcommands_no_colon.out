@@ -1,0 +1,7 @@
+== subcommands under a colon-less header:
+down
+exit-node
+set
+up
+== a flags header at the margin ends the section:
+--help
