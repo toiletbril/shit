@@ -25,9 +25,9 @@ inline const StringView BLUE = "\x1b[34m";
    hue rather than a heavier weight. */
 inline const StringView BRIGHT_BLUE = "\x1b[94m";
 inline const StringView BRIGHT_CYAN = "\x1b[96m";
-/* A mid gray for a flag argument, brighter than the dim attribute so it reads
-   as a distinct subdued tone rather than a faded one. */
-inline const StringView GRAY = "\x1b[38;5;245m";
+/* A light gray for a flag argument, bright enough to read clearly while still
+   reading as a subdued tone rather than a faded one. */
+inline const StringView GRAY = "\x1b[38;5;250m";
 inline const StringView BOLD_RED = "\x1b[1;31m";
 inline const StringView BOLD_GREEN = "\x1b[1;32m";
 inline const StringView BOLD_YELLOW = "\x1b[1;33m";
