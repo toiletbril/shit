@@ -374,6 +374,47 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   return names;
 }
 
+cold fn Path::read_directory_typed(const Path &dir) throws
+    -> Maybe<ArrayList<directory_child>>
+{
+  let const handle = ::opendir(dir.c_str());
+  if (handle == nullptr) return None;
+
+  let entries = ArrayList<directory_child>{};
+  for (;;) {
+    errno = 0;
+    let const entry = ::readdir(handle);
+    if (entry == nullptr) {
+      if (errno != 0) {
+        ::closedir(handle);
+        return None;
+      }
+      break;
+    }
+
+    let const name = StringView{entry->d_name};
+    if (name == StringView{"."} || name == StringView{".."}) continue;
+
+    /* readdir carries the type on most filesystems, so a directory or a regular
+       file is known without a stat. A symlink and an unknown type still need a
+       stat from the caller, the latter on a filesystem that does not fill
+       d_type. */
+    entry_kind kind = entry_kind::Unknown;
+    switch (entry->d_type) {
+    case DT_DIR: kind = entry_kind::Directory; break;
+    case DT_REG: kind = entry_kind::Regular; break;
+    case DT_LNK: kind = entry_kind::Symlink; break;
+    case DT_UNKNOWN: kind = entry_kind::Unknown; break;
+    default: kind = entry_kind::Other; break;
+    }
+
+    entries.push(directory_child{String{name}, kind});
+  }
+
+  ::closedir(handle);
+  return entries;
+}
+
 #elif SHIT_PLATFORM_IS WIN32
 
 cold fn Path::exists() const wontthrow -> bool
@@ -533,6 +574,21 @@ cold fn Path::read_directory(const Path &dir) throws -> Maybe<ArrayList<String>>
   LOG(All, "read %zu entries from the directory '%s'", names.count(),
       dir.c_str());
   return names;
+}
+
+cold fn Path::read_directory_typed(const Path &dir) throws
+    -> Maybe<ArrayList<directory_child>>
+{
+  /* Windows carries no readdir type, so the names are read the plain way and
+     each child is left Unknown for the caller to stat. */
+  Maybe<ArrayList<String>> names = read_directory(dir);
+  if (!names.has_value()) return None;
+
+  let entries = ArrayList<directory_child>{};
+  entries.reserve(names->count());
+  for (String &name : *names)
+    entries.push(directory_child{steal(name), entry_kind::Unknown});
+  return entries;
 }
 
 #endif

@@ -106,6 +106,27 @@ public:
   cold mustuse static fn read_directory(const Path &dir) throws
       -> Maybe<ArrayList<String>>;
 
+  /* The type the directory read already knew for a child, so a caller skips a
+     stat for an entry the filesystem typed. Unknown means the caller must stat
+     to learn the type. */
+  enum class entry_kind : u8
+  {
+    Unknown,
+    Directory,
+    Regular,
+    Symlink,
+    Other,
+  };
+  struct directory_child
+  {
+    String name;
+    entry_kind kind;
+  };
+  /* Like read_directory but carrying each child's type from the read, for a
+     caller such as the globstar walk that would otherwise stat every entry. */
+  cold mustuse static fn read_directory_typed(const Path &dir) throws
+      -> Maybe<ArrayList<directory_child>>;
+
 private:
   String m_text{};
 };

@@ -177,16 +177,34 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
   if (directories_only && include_base) out.push(String{allocator, relative});
   if (depth >= GLOBSTAR_MAX_DEPTH) return;
 
-  let const entries = Path::read_directory(dir);
+  let const entries = Path::read_directory_typed(dir);
   if (!entries.has_value()) return;
 
   for (let const &entry : *entries) {
-    let const name = entry.view();
+    let const name = entry.name.view();
     if (!should_match_dotfiles && !name.is_empty() && name[0] == '.') continue;
 
     let child_dir = dir;
     child_dir.push_component(name);
-    let const is_dir = child_dir.is_directory();
+
+    /* The directory read already typed most entries, so a stat is paid only for
+       a symlink, to learn whether it points at a directory, and for an entry
+       the filesystem left untyped. */
+    bool is_dir = false;
+    bool is_link = false;
+    switch (entry.kind) {
+    case Path::entry_kind::Directory: is_dir = true; break;
+    case Path::entry_kind::Symlink:
+      is_link = true;
+      is_dir = child_dir.is_directory();
+      break;
+    case Path::entry_kind::Regular:
+    case Path::entry_kind::Other: break;
+    case Path::entry_kind::Unknown:
+      is_link = child_dir.is_symbolic_link();
+      is_dir = child_dir.is_directory();
+      break;
+    }
 
     let child_relative = String{allocator};
     if (!relative.is_empty()) {
@@ -200,7 +218,7 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
     /* A directory symlink is a match but is not descended into, so a self or a
        parent symlink does not spin the walk to the depth cap the way following
        it would. */
-    if (is_dir && !child_dir.is_symbolic_link())
+    if (is_dir && !is_link)
       collect_globstar_paths(child_dir, child_relative.view(), directories_only,
                              should_match_dotfiles, false, depth + 1, allocator,
                              out);
