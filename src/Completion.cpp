@@ -1447,6 +1447,10 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("skopeo"),       "--help"     },
         {SSK("dedoc"),        "--help"     },
         {SSK("typst"),        "--help"     },
+        {SSK("adb"),          "--help"     },
+        {SSK("fastboot"),     "--help"     },
+        {SSK("waydroid"),     "--help"     },
+        {SSK("openvpn"),      "--help"     },
 };
 static constexpr StaticStringMap<const char *> HELP_ALLOWLIST{
     HELP_ALLOWLIST_ENTRIES,

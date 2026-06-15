@@ -626,6 +626,12 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         if (has_separator) separator = ifs.first_character();
       }
       let joined = String{};
+      usize joined_length = 0;
+      for (usize i = 0; i < m_positional_params.count(); i++)
+        joined_length += m_positional_params[i].count();
+      if (has_separator && m_positional_params.count() > 1)
+        joined_length += m_positional_params.count() - 1;
+      joined.reserve(joined_length);
       for (usize i = 0; i < m_positional_params.count(); i++) {
         if (i > 0 && has_separator) joined.push(separator);
         joined.append(m_positional_params[i].view());
@@ -990,6 +996,11 @@ fn EvalContext::remove_alias(StringView name) throws -> bool
   LOG(All, "removing alias '%.*s'", static_cast<int>(name.length), name.data);
   m_aliases.erase(name);
   return true;
+}
+
+pure fn EvalContext::has_aliases() const wontthrow -> bool
+{
+  return m_aliases.count() != 0;
 }
 
 fn EvalContext::get_alias(StringView name) const throws -> Maybe<String>

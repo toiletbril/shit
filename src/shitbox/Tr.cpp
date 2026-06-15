@@ -73,20 +73,37 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
   let const set1 = expand_set(operands[0].view());
   let const set2 = is_deleting ? String{} : expand_set(operands[1].view());
 
+  /* A 256-entry table turns the per-byte set1 lookup into one indexed read, so
+     a large input runs in a single pass over its bytes rather than a scan of
+     set1 for every byte. The first occurrence of a byte in set1 wins, matching
+     the earlier find_character which returned the first index. A byte past the
+     end of set2 maps to its last byte, the way tr pads the shorter set with its
+     final character. */
+  bool is_in_set1[256] = {};
+  unsigned char translation[256];
+  for (usize i = 0; i < 256; i++)
+    translation[i] = static_cast<unsigned char>(i);
+  for (usize i = 0; i < set1.count(); i++) {
+    let const from = static_cast<unsigned char>(set1.view()[i]);
+    if (is_in_set1[from]) continue;
+    is_in_set1[from] = true;
+    if (!is_deleting && set2.count() > 0) {
+      let const index = i < set2.count() ? i : set2.count() - 1;
+      translation[from] = static_cast<unsigned char>(set2.view()[index]);
+    }
+  }
+
   let const input = read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
   let output = String{};
+  output.reserve(input.count());
   for (usize i = 0; i < input.count(); i++) {
-    let const c = input.view()[i];
-    let const found = set1.find_character(c);
-    if (!found.has_value()) {
-      output.push(c);
+    let const c = static_cast<unsigned char>(input.view()[i]);
+    if (!is_in_set1[c]) {
+      output.push(static_cast<char>(c));
       continue;
     }
     if (is_deleting) continue;
-    /* A byte past the end of set2 maps to its last byte, the way tr pads the
-       shorter set with its final character. */
-    let const index = *found < set2.count() ? *found : set2.count() - 1;
-    output.push(set2.view()[index]);
+    output.push(static_cast<char>(translation[c]));
   }
 
   ec.print_to_stdout(output);

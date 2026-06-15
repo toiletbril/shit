@@ -1382,11 +1382,17 @@ fn child_max() wontthrow -> i64
 
 fn machine_type() throws -> String
 {
-  struct utsname info{};
-  if (uname(&info) != 0) return String{"unknown"};
-  return String{
-      StringView{info.machine, std::strlen(info.machine)}
-  };
+  /* The machine name does not change during a process lifetime, so the uname
+     call runs once and every later $MACHTYPE or $HOSTTYPE read copies the
+     cached value rather than issuing the syscall again. */
+  static const String cached = []() -> String {
+    struct utsname info{};
+    if (uname(&info) != 0) return String{"unknown"};
+    return String{
+        StringView{info.machine, std::strlen(info.machine)}
+    };
+  }();
+  return cached;
 }
 
 fn realtime_microseconds() wontthrow -> u64

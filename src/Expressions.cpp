@@ -1050,6 +1050,8 @@ namespace {
 fn expand_command_aliases(EvalContext &cxt, ArrayList<String> &args) throws
     -> void
 {
+  if (!cxt.has_aliases()) return;
+
   HashSet already_expanded{heap_allocator()};
 
   while (!args.is_empty()) {
@@ -1142,9 +1144,14 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      function shadows any command, so a shadowing function takes the ordinary
      path. The redirection loop below routes each entry to the permanent path
      instead of the temporary save and restore path when this is set. */
+  const Expression *command_word_function =
+      (!program_args.is_empty() && cxt.has_functions())
+          ? cxt.find_function(program_args[0])
+          : nullptr;
+
   const bool is_bare_exec =
       program_args.count() == 1 && program_args[0] == "exec" &&
-      !(cxt.has_functions() && cxt.find_function(program_args[0]) != nullptr);
+      command_word_function == nullptr;
 
   /* Whether the command word resolves to a POSIX special builtin not shadowed
      by a function. It decides both that a redirection error exits the shell
@@ -1152,8 +1159,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      it is computed once here and read on both paths. An empty command word, a
      bare redirection or assignment line, is not a special builtin. */
   const bool command_is_special_builtin =
-      !program_args.is_empty() &&
-      !(cxt.has_functions() && cxt.find_function(program_args[0]) != nullptr) &&
+      !program_args.is_empty() && command_word_function == nullptr &&
       is_special_builtin_name(program_args[0].view());
 
   /* Open the redirection targets. A redirection takes effect even when the
@@ -3855,8 +3861,7 @@ RedirectedCommand::RedirectedCommand(SourceLocation location,
                                      ArrayList<Redirection> &&redirections)
     : Command(location), m_child(child)
 {
-  for (let const &redir : redirections)
-    m_redirections.push(redir);
+  m_redirections = steal(redirections);
 }
 
 /* The child and the redirection target tokens live in the arena, torn down once

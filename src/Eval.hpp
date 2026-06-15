@@ -641,6 +641,7 @@ public:
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
   fn find_function(StringView name) const wontthrow -> const Expression *;
   pure fn has_functions() const wontthrow -> bool;
+  pure fn has_aliases() const wontthrow -> bool;
   fn unset_function(StringView name) throws -> void;
   fn clear_functions() wontthrow -> void;
 
