@@ -58,11 +58,16 @@ struct makefile
   ArrayList<make_variable> variables;
   ArrayList<make_rule> rules;
   ArrayList<make_rule> pattern_rules;
+  /* A name to array-index map, so a $(NAME) lookup is one hash probe rather
+     than a scan of every variable, which a recipe pays once per reference per
+     line. The array keeps the values so a value can still be appended in
+     place. */
+  StringMap<usize> variable_index{heap_allocator()};
 
   fn find_variable(StringView name) const throws -> const String *
   {
-    for (const make_variable &variable : variables)
-      if (variable.name == name) return &variable.value;
+    if (let const *index = variable_index.find(name))
+      return &variables[*index].value;
     return nullptr;
   }
 
@@ -270,8 +275,8 @@ static fn apply_assignment(makefile &mk, StringView name_part,
   let const name = trim(name_part);
   let const trimmed_value = trim(value);
 
-  for (make_variable &variable : mk.variables) {
-    if (variable.name != name) continue;
+  if (let const *index = mk.variable_index.find(name)) {
+    make_variable &variable = mk.variables[*index];
     if (operator_character == '?') return;
     if (operator_character == '+') {
       variable.value += " ";
@@ -281,6 +286,7 @@ static fn apply_assignment(makefile &mk, StringView name_part,
     }
     return;
   }
+  mk.variable_index.set(name, mk.variables.count());
   mk.variables.push(make_variable{String{name}, String{trimmed_value}});
 }
 
