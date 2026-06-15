@@ -2976,6 +2976,41 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   return resolves;
 }
 
+/* Whether the word is a strict prefix of some command name, a builtin, a
+   function, an alias, or a PATH program, so an unfinished command colors yellow
+   while it could still complete rather than red. */
+static fn command_word_prefixes_any(StringView word, EvalContext &context)
+    throws -> bool
+{
+  if (word.is_empty()) return false;
+  /* A path word is judged by the filesystem, not the command-name sets, so it
+     does not pick up a yellow from an unrelated PATH program. */
+  if (word.find_character('/').has_value()) return false;
+
+  let const has_prefix = [&](StringView name) -> bool {
+    return name.length >= word.length &&
+           name.substring_of_length(0, word.length) == word;
+  };
+
+  for (let const &builtin_name : builtin_names())
+    if (has_prefix(builtin_name.view())) return true;
+
+  bool found = false;
+  context.function_names().for_each([&](StringView name) {
+    if (!found && has_prefix(name)) found = true;
+  });
+  if (found) return true;
+  context.alias_names().for_each([&](StringView name) {
+    if (!found && has_prefix(name)) found = true;
+  });
+  if (found) return true;
+
+  for (let const &command_name : path_command_names())
+    if (has_prefix(command_name.view())) return true;
+
+  return false;
+}
+
 fn command_word_resolves(StringView line, EvalContext &context) throws -> bool
 {
   let const word = command_word_of(line);
@@ -3122,11 +3157,56 @@ static fn word_names_existing_path(StringView word) throws -> bool
   return Path{word}.exists();
 }
 
-/* Color a path-like argument by segment, the on-disk prefix cyan and the
-   partial trailing segment yellow. A word that is not path-like, a plain name
-   with no slash that does not resolve, is left in the default color so an
-   ordinary argument such as a subcommand is not painted. Returns whether the
-   word was treated as a path. */
+/* Whether the directory holding a path's first unresolved segment contains an
+   entry that begins with that segment, so a path being typed toward a real file
+   colors yellow rather than red. */
+static fn path_partial_prefixes_entry(StringView word, usize existing_end,
+                                      StringView partial,
+                                      bool has_tilde) throws -> bool
+{
+  if (partial.is_empty()) return false;
+
+  /* The directory to scan is the resolved prefix, or the filesystem root for an
+     absolute path and the current directory for a relative one when nothing
+     resolved yet. */
+  String directory{};
+  if (existing_end > 0) {
+    let const prefix = word.substring_of_length(0, existing_end);
+    if (has_tilde) {
+      if (Maybe<String> expanded = expand_command_tilde(prefix))
+        directory = steal(*expanded);
+      else
+        return false;
+    } else {
+      directory = String{prefix};
+    }
+  } else if (word[0] == '/') {
+    directory = String{"/"};
+  } else {
+    directory = String{"."};
+  }
+
+  Maybe<ArrayList<String>> entries =
+      Path::read_directory(Path{directory.view()});
+  if (!entries.has_value()) return false;
+
+  for (let const &entry : *entries)
+    if (entry.count() >= partial.length &&
+        entry.view().substring_of_length(0, partial.length) == partial)
+    {
+      return true;
+    }
+
+  return false;
+}
+
+/* Color a path-like argument by segment. The resolved on-disk prefix is cyan.
+   The first segment past it is yellow when it prefixes a real entry of its
+   directory, so it could still complete, and red when nothing begins with it. A
+   deeper segment after an unresolved one cannot exist, so it is red. A word that
+   is not path-like, a plain name with no slash that does not resolve, is left in
+   the default color so an ordinary argument such as a subcommand is not painted.
+   Returns whether the word was treated as a path. */
 static fn color_path_argument(usize word_start, StringView word,
                               ArrayList<highlight_span> &spans) throws -> bool
 {
@@ -3177,9 +3257,28 @@ static fn color_path_argument(usize word_start, StringView word,
   if (existing_end > 0)
     spans.push(highlight_span{word_start, word_start + existing_end,
                               colors::ansi::CYAN});
-  if (existing_end < word.length)
-    spans.push(highlight_span{word_start + existing_end,
-                              word_start + word.length, colors::ansi::YELLOW});
+
+  /* A fully resolved path is entirely cyan, nothing remains to color. */
+  if (existing_end >= word.length) return true;
+
+  /* The first segment past the resolved prefix is the part being typed. It is
+     yellow when it prefixes a real entry of its directory and red otherwise, and
+     any deeper segment after it cannot exist so it is red. */
+  usize segment_end = existing_end;
+  while (segment_end < word.length && word[segment_end] != '/')
+    segment_end++;
+
+  let const partial =
+      word.substring_of_length(existing_end, segment_end - existing_end);
+  let const tail_color =
+      path_partial_prefixes_entry(word, existing_end, partial, has_tilde)
+          ? colors::ansi::YELLOW
+          : colors::ansi::RED;
+  spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
+                            tail_color});
+  if (segment_end < word.length)
+    spans.push(highlight_span{word_start + segment_end,
+                              word_start + word.length, colors::ansi::RED});
 
   return true;
 }
@@ -3255,8 +3354,11 @@ static fn color_dollar(StringView line, usize i, usize end,
       }
     }
     let const inner_begin = i + 3 < end ? i + 3 : end;
-    let const inner_end =
-        close >= 1 && close - 1 > inner_begin ? close - 1 : inner_begin;
+    /* A terminated $(( )) stops before its two closing parens, while an
+       unterminated one still being typed colors through to the end so the body
+       is not dropped from a half-typed line. */
+    let inner_end = close < end && close >= 1 ? close - 1 : end;
+    if (inner_end < inner_begin) inner_end = inner_begin;
     color_arithmetic(line, inner_begin, inner_end, context, spans, known_vars);
     return j;
   }
@@ -3319,7 +3421,14 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       let const name_start = i;
       while (i < end && is_highlight_name_char(line[i]))
         i++;
-      spans.push(highlight_span{name_start, i, colors::ansi::CYAN});
+      /* A name reads as a variable in arithmetic, cyan when it is set and bold
+         red when it is not, since an undefined name evaluates to zero rather
+         than naming anything. */
+      let const name = line.substring_of_length(name_start, i - name_start);
+      spans.push(highlight_span{name_start, i,
+                                dollar_name_is_set(name, known_vars)
+                                    ? colors::ansi::CYAN
+                                    : colors::ansi::BOLD_RED});
       continue;
     }
 
@@ -3331,7 +3440,7 @@ static fn color_arithmetic(StringView line, usize begin, usize end,
       continue;
     }
 
-    if (lexer::is_whitespace(c)) {
+    if (lexer::is_whitespace(c) || c == '\n') {
       i++;
       continue;
     }
@@ -3601,22 +3710,30 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         continue;
       }
 
-      /* A command name. A resolved command is blue the way fish paints one,
-         an unresolved one is red. */
-      do_push(word_start, word_end,
-              first_word_resolves(word, context) ? colors::ansi::BLUE
-                                                 : colors::ansi::RED);
+      /* A command name. A resolved command is blue the way fish paints one. An
+         unfinished one is yellow while it still prefixes some command name, so
+         it could complete, and red once it prefixes nothing. */
+      let const command_color =
+          first_word_resolves(word, context)
+              ? colors::ansi::BLUE
+              : (command_word_prefixes_any(word, context) ? colors::ansi::YELLOW
+                                                          : colors::ansi::RED);
+      do_push(word_start, word_end, command_color);
       command_position = false;
       continue;
     }
 
     /* An argument, an expansion-built command, or an assignment prefix. The
        inner spans stand. An assignment prefix keeps the next word in command
-       position, an expansion-built command moves past it. A plain argument that
-       looks like a path colors per segment, the on-disk prefix cyan and the
-       partial tail yellow. */
-    if (!command_position && plain && !is_assignment)
-      color_path_argument(word_start, word, spans);
+       position, an expansion-built command moves past it. A flag dims to a
+       subtle gray, and a plain argument that looks like a path colors per
+       segment, the on-disk prefix cyan, the rest yellow or red. */
+    if (!command_position && plain && !is_assignment) {
+      if (!word.is_empty() && word[0] == '-')
+        do_push(word_start, word_end, colors::ansi::DIM);
+      else
+        color_path_argument(word_start, word, spans);
+    }
     for (let const &inner : word_spans)
       do_push(inner.start, inner.end, inner.sgr);
     if (command_position && !is_assignment) command_position = false;

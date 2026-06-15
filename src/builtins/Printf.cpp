@@ -469,6 +469,14 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
         out += '%';
         continue;
       }
+      /* A '(' that did not open a valid %(fmt)T time conversion, a missing or
+         misplaced ) or trailing T, is emitted literally so a malformed format
+         consumes no operand the way a real conversion would. */
+      if (conv == '(') {
+        out += spec;
+        out += '(';
+        continue;
+      }
 
       let const &arg = do_operand_at(operand_index);
       if (conv == 'b') {

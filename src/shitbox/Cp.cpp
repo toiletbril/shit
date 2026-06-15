@@ -114,6 +114,9 @@ static fn copy_path(const ExecContext &ec, StringView source,
     return;
   }
 
+  /* A destination that is itself a symlink is removed first, so the copy writes
+     a new file rather than following the link and truncating its target. */
+  if (Path{destination}.is_symbolic_link()) os::remove_file(destination);
   copy_file(ec, source, destination, is_verbose);
 }
 
@@ -148,7 +151,10 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
     /* A copy into a directory keeps the source basename, so cp a b dir/ writes
        dir/a and dir/b. */
     if (destination_is_directory) {
-      let const leaf = Path{source}.filename();
+      /* The Path is held in a named local so the basename view does not dangle
+         into a destroyed temporary while the builder reads it. */
+      let const source_path = Path{source};
+      let const leaf = source_path.filename();
       let const target = PathBuilder{destination}.append(leaf).build();
       copy_path(ec, source, target.text().view(), is_recursive, is_verbose);
     } else {

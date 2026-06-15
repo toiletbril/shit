@@ -1656,12 +1656,24 @@ fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
 fn read_symlink(StringView path) wontthrow -> Maybe<String>
 {
   const String path_string{path};
-  char buffer[4096];
-  let const length = ::readlink(path_string.c_str(), buffer, sizeof(buffer) - 1);
-  if (length < 0) return shit::None;
-  return String{
-      StringView{buffer, static_cast<usize>(length)}
-  };
+  /* A target longer than the buffer cannot be told apart from an exact fit, so
+     the buffer grows until readlink no longer fills it, which is the signal the
+     result is complete rather than truncated. The cap bounds a pathological
+     filesystem. */
+  usize capacity = 256;
+  for (;;) {
+    ArrayList<char> buffer{};
+    buffer.reserve(capacity);
+    let const length = ::readlink(path_string.c_str(), buffer.begin(), capacity);
+    if (length < 0) return shit::None;
+    if (static_cast<usize>(length) < capacity)
+      return String{
+          StringView{buffer.begin(), static_cast<usize>(length)}
+      };
+
+    if (capacity >= (1U << 20)) return shit::None;
+    capacity *= 2;
+  }
 }
 
 fn stat_path(StringView path, file_status &status) wontthrow -> bool
