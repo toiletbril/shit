@@ -255,6 +255,12 @@ struct eval_state_snapshot
   ArrayList<String> positional_params;
   Path working_directory;
   StringMap<String> traps;
+  /* The read-only and integer name sets ride the snapshot too, so a readonly or
+     a declare -i inside a subshell or a command substitution dies with the
+     child rather than leaking its mark to the parent. The exported set is
+     already covered by the environment undo log rewound below. */
+  HashSet readonly_names;
+  HashSet integer_names;
   bool error_exit;
   bool enable_path_expansion;
   bool enable_echo;

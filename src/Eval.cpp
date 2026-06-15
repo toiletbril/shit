@@ -1328,6 +1328,8 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
                              m_positional_params,
                              Path::current_directory(),
                              m_traps,
+                             m_readonly_names,
+                             m_integer_names,
                              m_error_exit,
                              m_enable_path_expansion,
                              m_enable_echo,
@@ -1355,6 +1357,12 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_enable_path_expansion = snapshot.enable_path_expansion;
   m_enable_echo = snapshot.enable_echo;
   m_enable_echo_expanded = snapshot.enable_echo_expanded;
+
+  /* A readonly or a declare -i inside the subshell or the command substitution
+     stays inside it, so the parent's name sets come back whole and a later
+     reassignment in the parent is not rejected by a mark the child made. */
+  m_readonly_names = steal(snapshot.readonly_names);
+  m_integer_names = steal(snapshot.integer_names);
 
   /* A trap installed inside the subshell stays inside it. The parent's table is
      restored whole, so an EXIT trap the parent set survives and an EXIT trap
