@@ -10,26 +10,37 @@ HELP_SYNOPSIS_DECL("[-d] set1 [set2]");
 HELP_DESCRIPTION_DECL(
     "The tr utility reads standard input and translates the bytes in set1 to "
     "the matching bytes in set2, or with -d deletes the bytes in set1. A range "
-    "such as a-z expands to every byte between its ends.");
+    "such as a-z, or a descending one such as z-a, expands to every byte "
+    "between its ends.");
 
 FLAG(TR_DELETE, Bool, 'd', "",
      "Delete the bytes in set1 instead of translating.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
+
+REGISTER_SHITBOX_UTIL_FLAGS(Tr);
 
 namespace shit {
 
 namespace shitbox {
 
 /* Expand a set with a-z ranges into the flat run of bytes it names, so a-c
-   becomes abc. */
+   becomes abc. A descending range such as c-a expands in reverse to cba the way
+   GNU tr reads it. The bounds are read as unsigned bytes and the walk runs over
+   an int, so a range that touches the 0 or 255 edge does not overflow a char. */
 static fn expand_set(StringView set) throws -> String
 {
   String expanded{};
   usize i = 0;
   while (i < set.length) {
-    if (i + 2 < set.length && set[i + 1] == '-' && set[i] <= set[i + 2]) {
-      for (char c = set[i]; c <= set[i + 2]; c++)
-        expanded.push(c);
+    if (i + 2 < set.length && set[i + 1] == '-') {
+      let const low = static_cast<int>(static_cast<unsigned char>(set[i]));
+      let const high = static_cast<int>(static_cast<unsigned char>(set[i + 2]));
+      if (low <= high)
+        for (int c = low; c <= high; c++)
+          expanded.push(static_cast<char>(c));
+      else
+        for (int c = low; c >= high; c--)
+          expanded.push(static_cast<char>(c));
       i += 3;
     } else {
       expanded.push(set[i]);

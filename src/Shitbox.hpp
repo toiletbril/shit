@@ -52,6 +52,8 @@ enum class Util : u8
   Yes,
   Pkill,
   Killall,
+  Kill,
+  Ps,
   Make,
 };
 
@@ -83,11 +85,31 @@ inline constexpr StaticStringMap<Util>::entry SHITBOX_ENTRIES[] = {
     {PackedStringKey::from_literal("yes"),      Util::Yes     },
     {PackedStringKey::from_literal("pkill"),    Util::Pkill   },
     {PackedStringKey::from_literal("killall"),  Util::Killall },
+    {PackedStringKey::from_literal("kill"),     Util::Kill    },
+    {PackedStringKey::from_literal("ps"),       Util::Ps      },
     {PackedStringKey::from_literal("make"),     Util::Make    },
 };
 
 inline constexpr StaticStringMap<Util> SHITBOX_UTILS{
     SHITBOX_ENTRIES, sizeof(SHITBOX_ENTRIES) / sizeof(SHITBOX_ENTRIES[0])};
+
+/* The number of Util values, the bound of the per-utility flag-list table.
+   Make is the last enumerator. */
+inline constexpr usize SHITBOX_UTIL_COUNT =
+    static_cast<usize>(Util::Make) + 1;
+
+/* The FLAG_LIST of a utility, registered at static-init time by the
+   REGISTER_SHITBOX_UTIL_FLAGS line in its file, so the completion engine offers
+   a utility's flags the way it offers a builtin's. A utility with no
+   registration reads back null. */
+fn register_shitbox_util_flags(Util chosen,
+                               const ArrayList<Flag *> *flags) wontthrow -> void;
+fn shitbox_util_flag_list(Util chosen) wontthrow -> const ArrayList<Flag *> *;
+
+#define REGISTER_SHITBOX_UTIL_FLAGS(util)                                      \
+  static uchar t__shitbox_flag_registrar = (shit::shitbox::                    \
+       register_shitbox_util_flags(shit::shitbox::Util::util, &FLAG_LIST),     \
+                                            0)
 
 /* The utility named, or None when the name is not a shitbox utility. The
    command resolver and the multicall entry both ask through this. */
@@ -183,6 +205,8 @@ SHITBOX_DECLARE_UTIL(util_env);
 SHITBOX_DECLARE_UTIL(util_yes);
 SHITBOX_DECLARE_UTIL(util_pkill);
 SHITBOX_DECLARE_UTIL(util_killall);
+SHITBOX_DECLARE_UTIL(util_kill);
+SHITBOX_DECLARE_UTIL(util_ps);
 SHITBOX_DECLARE_UTIL(util_make);
 
 /* Shared helpers the utilities lean on, so each utility file stays small.

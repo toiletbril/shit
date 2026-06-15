@@ -22,3 +22,18 @@ shit: 1:1: error: killall: no_such_process_xyz_123: no process found.
      1 |  shitbox killall no_such_process_xyz_123
        |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
 rc=1
+--- kill with no pid ---
+shit: 1:1: error: kill: a process id is required.
+     1 |  shitbox kill
+       |  ^~~~~~~~~~~~ here.
+rc=1
+--- kill with a non-numeric pid ---
+shit: 1:1: error: kill: 'notapid' is not a process id.
+     1 |  shitbox kill notapid
+       |  ^~~~~~~~~~~~~~~~~~~~ here.
+rc=1
+--- ps prints the header ---
+  PID CMD
+rc=0
+--- list prints the utility count ---
+      30

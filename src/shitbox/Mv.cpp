@@ -17,6 +17,8 @@ FLAG(MV_FORCE, Bool, 'f', "", "Overwrite an existing destination.");
 FLAG(MV_VERBOSE, Bool, 'v', "", "Print the name of each move as it happens.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Mv);
+
 namespace shit {
 
 namespace shitbox {

@@ -12,16 +12,15 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("utility [argument ...]");
+HELP_SYNOPSIS_DECL("[utility] [arg ...]");
 
 HELP_DESCRIPTION_DECL(
-    "The shitbox builtin runs a small bundled coreutility such as ls, mkdir, "
-    "or "
-    "cp, so a system with only a compiler can run a configure and a make under "
-    "shit. With the --enable-shitbox flag or set -o shitbox the utility names "
-    "resolve directly as commands without the shitbox prefix.");
+    "Run a bundled coreutility. With the --enable-shitbox flag or set -o "
+    "shitbox the utility names resolve directly as commands without the prefix, "
+    "and a name that is already a builtin runs that builtin.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help and list the utilities.");
+FLAG(SHITBOX_LIST, Bool, '\0', "list", "List the utility names, one per line.");
 
 REGISTER_BUILTIN_FLAGS(Shitbox);
 
@@ -41,40 +40,43 @@ i32 Shitbox::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (shitbox::find_util(ec.args()[0].view()).has_value())
     return shitbox::dispatch(ec, cxt, 0);
 
-  if (ec.args().count() < 2 || ec.args()[1] == "--help") {
-    /* The listing follows the busybox multi-call form, a banner, the two usage
-       lines, and the defined utilities as a comma-separated block indented with
-       a tab and wrapped, sorted so it reads the same on every run. */
-    let listing = String{};
-    listing += "shitbox multi-call binary.\n\n";
-    listing += "Usage: shitbox UTILITY [ARGUMENT]...\n";
-    listing += "   or: UTILITY [ARGUMENT]...\n\n";
-    listing += "Run a bundled coreutility. With the --enable-shitbox flag or "
-               "set -o shitbox\nthe utility names resolve directly as commands "
-               "without the prefix, and a\nname that is already a builtin runs "
-               "that builtin.\n\n";
-    listing += "Currently defined utilities:\n";
+  /* The sorted utility names, shared by the --list output and the help
+     listing. */
+  let sorted_names = ArrayList<String>{};
+  for (const String &name : shitbox::util_names())
+    sorted_names.push(name.clone());
+  shitbox::sort_string_list(sorted_names);
 
-    ArrayList<String> names{};
-    for (const String &name : shitbox::util_names())
-      names.push(name.clone());
-    shitbox::sort_string_list(names);
-
-    String line{"\t"};
-    for (usize i = 0; i < names.count(); i++) {
-      let piece = names[i].clone();
-      if (i + 1 < names.count()) piece += ",";
-      /* A new line starts once the running one would pass the wrap width, with
-         every line carrying the leading tab. */
-      if (line.count() > 1 && line.count() + piece.count() + 1 > 70) {
-        listing += line.view();
-        listing += '\n';
-        line = "\t";
-      }
-      if (line.count() > 1) line += ' ';
-      line += piece.view();
+  /* --list prints the utility names one per line and nothing else, so a script
+     can read the set without parsing the help text. */
+  if (ec.args().count() >= 2 && ec.args()[1] == "--list") {
+    let names_output = String{};
+    for (const String &name : sorted_names) {
+      names_output += name.view();
+      names_output += '\n';
     }
-    listing += line.view();
+    ec.print_to_stdout(names_output);
+    return 0;
+  }
+
+  if (ec.args().count() < 2 || ec.args()[1] == "--help") {
+    /* The help reads as three sections, the description, the two synopsis
+       lines, and the utilities as a comma-separated block wrapped under the
+       standard indent. */
+    let listing = String{};
+    listing += "DESCRIPTION\n";
+    listing += wrap_text(HELP_DESCRIPTION, HELP_INDENT, HELP_WRAP_WIDTH);
+    listing += "\n\nSYNOPSIS\n";
+    listing += "  shitbox [utility] [arg ...]\n";
+    listing += "  shitbox --list\n";
+    listing += "\nUTILITIES\n";
+
+    let joined_names = String{};
+    for (const String &name : sorted_names) {
+      if (!joined_names.is_empty()) joined_names += ", ";
+      joined_names += name.view();
+    }
+    listing += wrap_text(joined_names.view(), HELP_INDENT, HELP_WRAP_WIDTH);
     listing += '\n';
 
     ec.print_to_stdout(listing);

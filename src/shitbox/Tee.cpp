@@ -15,6 +15,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(TEE_APPEND, Bool, 'a', "", "Append to the files instead of truncating.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Tee);
+
 namespace shit {
 
 namespace shitbox {

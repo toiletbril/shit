@@ -14,6 +14,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(SORT_REVERSE, Bool, 'r', "", "Reverse the order of the output.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Sort);
+
 namespace shit {
 
 namespace shitbox {

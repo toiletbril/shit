@@ -16,6 +16,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(UNIQ_COUNT, Bool, 'c', "", "Prefix each line with the count of its run.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Uniq);
+
 namespace shit {
 
 namespace shitbox {

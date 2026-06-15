@@ -19,6 +19,8 @@ FLAG(CP_RECURSIVE_UPPER, Bool, 'R', "", "Copy directories and their contents.");
 FLAG(CP_VERBOSE, Bool, 'v', "", "Print the name of each copy as it happens.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Cp);
+
 namespace shit {
 
 namespace shitbox {

@@ -15,6 +15,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(TOUCH_NO_CREATE, Bool, 'c', "", "Do not create a file that is missing.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Touch);
+
 namespace shit {
 
 namespace shitbox {

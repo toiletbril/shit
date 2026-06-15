@@ -16,6 +16,8 @@ FLAG(LN_SYMBOLIC, Bool, 's', "", "Create a symbolic link.");
 FLAG(LN_FORCE, Bool, 'f', "", "Remove an existing destination first.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Ln);
+
 namespace shit {
 
 namespace shitbox {

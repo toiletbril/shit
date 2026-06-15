@@ -30,3 +30,18 @@ echo "rc=$?"
 echo "--- killall with no match ---"
 "$BIN" -c 'shitbox killall no_such_process_xyz_123' 2>&1
 echo "rc=$?"
+
+echo "--- kill with no pid ---"
+"$BIN" -c 'shitbox kill' 2>&1
+echo "rc=$?"
+
+echo "--- kill with a non-numeric pid ---"
+"$BIN" -c 'shitbox kill notapid' 2>&1
+echo "rc=$?"
+
+echo "--- ps prints the header ---"
+"$BIN" -c 'shitbox ps | shitbox head -n 1'
+echo "rc=$?"
+
+echo "--- list prints the utility count ---"
+"$BIN" -c 'shitbox --list | shitbox wc -l'

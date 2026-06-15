@@ -16,6 +16,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(CAT_NUMBER, Bool, 'n', "", "Number every output line, starting at one.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Cat);
+
 namespace shit {
 
 namespace shitbox {

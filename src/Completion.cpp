@@ -2,6 +2,7 @@
 
 #include "Arena.hpp"
 #include "Builtin.hpp"
+#include "Shitbox.hpp"
 #include "Colors.hpp"
 #include "Debug.hpp"
 #include "HashSet.hpp"
@@ -339,6 +340,14 @@ static fn complete_command(StringView token, bool token_is_glob,
   for (let const &builtin_name : builtin_names()) {
     add_unique_command(candidates, seen, builtin_name.view(), token,
                        token_is_glob);
+  }
+
+  /* The bundled shitbox utility names resolve as commands when the shitbox
+     option is on, so the command position offers them next to the builtins. */
+  if (shitbox::shitbox_names_enabled()) {
+    for (const String &util_name : shitbox::util_names())
+      add_unique_command(candidates, seen, util_name.view(), token,
+                         token_is_glob);
   }
 
   context.function_names().for_each([&](StringView name) {
@@ -2388,6 +2397,60 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
     }
   let const completes_shell_binary =
       !builtin_kind.has_value() && shell_binary_name == "shit";
+
+  /* The shitbox builtin completes its utility names in the first operand slot
+     and the chosen utility's flags after that, and a bare utility name
+     completes its own flags. The flag forms come from the same registered
+     FLAG_LIST a builtin offers. */
+  {
+    let const is_shitbox_builtin =
+        builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Shitbox;
+    Maybe<shitbox::Util> util_for_flags;
+    bool offer_util_names = false;
+    if (is_shitbox_builtin) {
+      if (previous_settled_word(line, token_start) == command) {
+        if (token.is_empty() || token[0] != '-') offer_util_names = true;
+      } else if (let const second = second_word_of(line); second.has_value()) {
+        util_for_flags = shitbox::find_util(*second);
+      }
+    } else if (!completes_shell_binary && shitbox::shitbox_names_enabled()) {
+      /* A bare utility name completes its own flags only when the shitbox
+         option resolves it as a command, so a plain ls keeps the system ls
+         completion when the option is off. */
+      util_for_flags = shitbox::find_util(command);
+    }
+
+    if (offer_util_names) {
+      let names = ArrayList<String>{};
+      for (const String &name : shitbox::util_names())
+        if (name.view().starts_with(token)) names.push(String{name.view()});
+      if (!names.is_empty()) return names;
+      return None;
+    }
+
+    if (util_for_flags.has_value()) {
+      /* A non-dash operand completes files through the cascade. */
+      if (token.is_empty() || token[0] != '-') return None;
+      let const flags = shitbox::shitbox_util_flag_list(*util_for_flags);
+      if (flags == nullptr) return None;
+      let forms = ArrayList<String>{};
+      for (const Flag *flag : *flags) {
+        if (flag->short_name() != '\0') {
+          let form = String{"-"};
+          form.push(flag->short_name());
+          if (form.view().starts_with(token)) forms.push(steal(form));
+        }
+        if (!flag->long_name().is_empty()) {
+          let form = String{"--"};
+          form += flag->long_name();
+          if (form.view().starts_with(token)) forms.push(steal(form));
+        }
+      }
+      if (forms.is_empty()) return None;
+      return forms;
+    }
+  }
+
   if (!builtin_kind.has_value() && !completes_shell_binary) return None;
 
   let candidates = ArrayList<String>{};

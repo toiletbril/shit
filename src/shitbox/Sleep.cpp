@@ -15,6 +15,8 @@ HELP_DESCRIPTION_DECL(
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Sleep);
+
 namespace shit {
 
 namespace shitbox {

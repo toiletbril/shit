@@ -58,3 +58,58 @@ _shit_complete()
 }
 
 complete -o filenames -F _shit_complete shit
+
+# Completion for the shitbox builtin. Completing the first argument offers the
+# utility names, and completing a later argument offers that utility's flags or
+# a file. The bare utility names are left to the system completions, since this
+# script runs under a normal bash where ls and the rest are the real tools.
+_shitbox_utils="basename cat cp dirname du env grep head kill killall ln ls \
+make mkdir mv pkill ps realpath rm rmdir seq sleep sort tail tee touch tr uniq \
+wc yes"
+
+_shitbox_util_flags()
+{
+    case $1 in
+        ls)            echo "-a -1 -l -h" ;;
+        ln)            echo "-s -f" ;;
+        rm)            echo "-r -R -f" ;;
+        mkdir)         echo "-p" ;;
+        cp)            echo "-r -R -v" ;;
+        mv)            echo "-f -v" ;;
+        cat)           echo "-n" ;;
+        tee)           echo "-a" ;;
+        touch)         echo "-c" ;;
+        du)            echo "-s -h" ;;
+        head|tail)     echo "-n" ;;
+        wc)            echo "-l -w -c" ;;
+        tr)            echo "-d" ;;
+        grep)          echo "-i -v" ;;
+        sort)          echo "-r" ;;
+        uniq)          echo "-c" ;;
+        pkill|killall) echo "-s" ;;
+        make)          echo "-f" ;;
+        *)             echo "" ;;
+    esac
+}
+
+_shitbox_complete()
+{
+    local current_word
+    current_word=${COMP_WORDS[COMP_CWORD]}
+
+    # The first argument names the utility to run.
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "$_shitbox_utils" -- "$current_word") )
+        return
+    fi
+
+    # A later argument completes the chosen utility's flags or a file.
+    local util=${COMP_WORDS[1]}
+    if [[ $current_word == -* ]]; then
+        COMPREPLY=( $(compgen -W "$(_shitbox_util_flags "$util")" -- "$current_word") )
+    else
+        COMPREPLY=( $(compgen -f -- "$current_word") )
+    fi
+}
+
+complete -o filenames -F _shitbox_complete shitbox

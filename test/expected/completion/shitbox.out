@@ -1,0 +1,23 @@
+== shitbox utilities by prefix:
+make
+mkdir
+mv
+== ls flags through shitbox:
+--help
+-1
+-a
+-h
+-l
+== du flags through shitbox:
+--help
+-h
+-s
+== shitbox own flags:
+--help
+--list
+== bare utility flags under set -o shitbox:
+--help
+-1
+-a
+-h
+-l

@@ -20,6 +20,8 @@ FLAG(DU_HUMAN, Bool, 'h', "",
      "Print the size in a human-readable form such as 4.0K or 1.5M.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Du);
+
 namespace shit {
 
 namespace shitbox {

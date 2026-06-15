@@ -38,6 +38,8 @@ apple
 abc
 --- tr -d digits ---
 abc
+--- tr reverse range ---
+zyx
 --- seq into head ---
 1
 2

@@ -15,6 +15,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(TAIL_LINES, String, 'n', "", "Write the last count lines.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Tail);
+
 namespace shit {
 
 namespace shitbox {

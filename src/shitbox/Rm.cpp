@@ -18,6 +18,8 @@ FLAG(RM_RECURSIVE_UPPER, Bool, 'R', "",
 FLAG(RM_FORCE, Bool, 'f', "", "Ignore a missing path and never prompt.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Rm);
+
 namespace shit {
 
 namespace shitbox {

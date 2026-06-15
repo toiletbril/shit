@@ -31,6 +31,22 @@ flatten fn find_util(StringView name) throws -> Maybe<Util>
   return SHITBOX_UTILS.find(name);
 }
 
+/* The per-utility flag lists, a zero-initialized table immune to static-init
+   order, filled by each utility file's registrar after its FLAG_LIST is built,
+   since both sit in the same translation unit in order. */
+static const ArrayList<Flag *> *SHITBOX_UTIL_FLAG_LISTS[SHITBOX_UTIL_COUNT] = {};
+
+fn register_shitbox_util_flags(Util chosen,
+                               const ArrayList<Flag *> *flags) wontthrow -> void
+{
+  SHITBOX_UTIL_FLAG_LISTS[static_cast<usize>(chosen)] = flags;
+}
+
+fn shitbox_util_flag_list(Util chosen) wontthrow -> const ArrayList<Flag *> *
+{
+  return SHITBOX_UTIL_FLAG_LISTS[static_cast<usize>(chosen)];
+}
+
 fn util_names() throws -> const ArrayList<String> &
 {
   static ArrayList<String> names = [] throws {
@@ -75,6 +91,8 @@ fn run_util(Util chosen, const ExecContext &ec, EvalContext &cxt,
   case Util::Yes: return util_yes(ec, cxt, args);
   case Util::Pkill: return util_pkill(ec, cxt, args);
   case Util::Killall: return util_killall(ec, cxt, args);
+  case Util::Kill: return util_kill(ec, cxt, args);
+  case Util::Ps: return util_ps(ec, cxt, args);
   case Util::Make: return util_make(ec, cxt, args);
   }
   unreachable("unhandled shitbox utility of kind %d", ENUM(chosen));

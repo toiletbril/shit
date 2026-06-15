@@ -17,6 +17,8 @@ HELP_DESCRIPTION_DECL(
 FLAG(HEAD_LINES, String, 'n', "", "Write the first count lines.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Head);
+
 namespace shit {
 
 namespace shitbox {

@@ -22,6 +22,8 @@ FLAG(LS_HUMAN, Bool, 'h', "",
      "With -l, print the size in a human-readable form such as 4.0K.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Ls);
+
 namespace shit {
 
 namespace shitbox {

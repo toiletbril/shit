@@ -18,6 +18,8 @@ FLAG(WC_WORDS, Bool, 'w', "", "Print the word count.");
 FLAG(WC_BYTES, Bool, 'c', "", "Print the byte count.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Wc);
+
 namespace shit {
 
 namespace shitbox {

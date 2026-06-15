@@ -16,6 +16,8 @@ FLAG(GREP_IGNORE_CASE, Bool, 'i', "", "Match without regard to letter case.");
 FLAG(GREP_INVERT, Bool, 'v', "", "Print the lines that do not match.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Grep);
+
 namespace shit {
 
 namespace shitbox {

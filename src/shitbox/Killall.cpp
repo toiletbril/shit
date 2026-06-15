@@ -16,6 +16,8 @@ FLAG(KILLALL_SIGNAL, String, 's', "signal",
      "The signal to send, a name such as TERM or a number such as 15.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
+REGISTER_SHITBOX_UTIL_FLAGS(Killall);
+
 namespace shit {
 
 namespace shitbox {
