@@ -1,0 +1,24 @@
+=== shitbox prefix always works ===
+1
+2
+3
+=== bare name off, empty PATH, not found ===
+shit: 1:8: error: Program 'seq' wasn't found, did you mean 'set'?.
+     1 |  PATH=; seq 3
+       |         ^~~~~ here.
+rc=127
+=== set -o shitbox turns bare names on ===
+1
+2
+3
+=== --enable-shitbox turns bare names on ===
+1
+2
+3
+=== an existing builtin name routes to the builtin ===
+routed via shitbox
+=== unknown utility errors ===
+shit: 1:1: error: Builtin 'shitbox': shitbox has no utility named 'nope'.
+     1 |  shitbox nope
+       |  ^~~~~~~~~~~~ here.
+rc=1

@@ -12,6 +12,7 @@
 #include "Parser.hpp"
 #include "Path.hpp"
 #include "Platform.hpp"
+#include "Shitbox.hpp"
 #include "Toiletline.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -111,6 +112,9 @@ FLAG(
     "shell loads a lax bash config quietly yet keeps its checks afterward.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
+FLAG(ENABLE_SHITBOX, Bool, '\0', "enable-shitbox", Shit,
+     "Resolve the bundled shitbox utility names such as ls and mkdir directly "
+     "as commands, the same as set -o shitbox.");
 
 FLAG(AST, Bool, 'A', "show-ast", Debug,
      "Print AST before executing each command.");
@@ -1162,6 +1166,9 @@ fn main(int argc, char **argv) -> int
   context.set_no_clobber(FLAG_NO_CLOBBER.is_enabled());
   context.set_export_all(FLAG_EXPORT_ALL.is_enabled());
   context.set_no_exec(FLAG_NO_EXEC.is_enabled());
+  /* The --enable-shitbox flag turns the bundled utility names into commands for
+     the whole session, the same state set -o shitbox toggles at run time. */
+  context.set_shitbox(FLAG_ENABLE_SHITBOX.is_enabled());
   context.set_failglob(false);
   /* Mimicry is mirrored onto the context, since the execution path in Utils
      reads it there rather than the static flag, which is internal to this file.
@@ -1190,6 +1197,17 @@ fn main(int argc, char **argv) -> int
   for (let listed : init_moods)
     if (listed == shit::mimic_mood::Bash) should_seed_bash_identity = true;
   context.seed_shell_identity_variables(should_seed_bash_identity);
+
+  /* A binary reached through a shitbox utility name, such as a symlink named
+     ls, acts as that utility and exits rather than starting a shell. This is
+     the busybox multicall, so a build that renames the binary gets the
+     coreutility with no prefix. */
+  if (shit::shitbox::find_util(program_basename).has_value()) {
+    LOG(Info, "acting as the shitbox utility '%.*s'",
+        static_cast<int>(program_basename.length), program_basename.data);
+    return shit::shitbox::run_as_multicall(program_basename, file_names.clone(),
+                                           context);
+  }
 
   /* SHLVL counts shell nesting. It is read from the inherited environment,
      incremented, and exported so a child shell continues the count. */

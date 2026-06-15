@@ -1,0 +1,22 @@
+--- ls ---
+a
+nums.txt
+--- ls a ---
+b
+--- ls -l sym ---
+l 6 sym
+--- ls after operations ---
+a
+moved.txt
+nums.txt
+stamp
+sym
+--- du -s nums.txt ---
+6	nums.txt
+--- basename ---
+libfoo
+--- dirname ---
+/usr/local
+--- realpath lexical ---
+/usr/lib
+--- ls a after rmdir ---

@@ -17,6 +17,7 @@ set +o allexport
 set +o noclobber
 set +o noglob
 set +o noexec
+set +o shitbox
 set +o monitor
 set -o failglob
 set +o notify

@@ -1,0 +1,21 @@
+--- yes into head ---
+hi
+hi
+rc=141
+--- large seq into head ---
+1
+2
+3
+rc=141
+--- seq through cat into wc counts every line ---
+      50
+rc=0
+--- seq into grep ---
+1
+10
+11
+12
+--- sort into uniq ---
+a
+b
+c

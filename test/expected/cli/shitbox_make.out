@@ -1,0 +1,12 @@
+--- default goal ---
+echo hello from make
+hello from make
+finished
+--- explicit target ---
+echo hello from make
+hello from make
+--- missing target ---
+shit: 1:1: error: Builtin 'shitbox': make: no rule to make target 'nope'.
+     1 |  shitbox make nope
+       |  ^~~~~~~~~~~~~~~~~ here.
+rc=1

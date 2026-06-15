@@ -28,6 +28,7 @@ OPTION SWITCHES
   -C  noclobber, no-clobber         Refuse to overwrite an existing file through '>'.
   -f  noglob, no-glob               Disable pathname expansion.
   -n  noexec, no-exec               Read and parse commands but do not run them.
+      shitbox                       Resolve the bundled shitbox utility names directly as commands.
   -m  monitor                       Run background jobs in their own process group with notifications.
       failglob                      Fail a command whose glob matches nothing.
   -b  notify                        Report a background job's completion immediately instead of before the next prompt.
@@ -51,7 +52,7 @@ OPTION SWITCHES
   The -o long names:
     errexit, error-exit, xtrace, nounset, no-unset, pipefail, allexport,
     export-all, noclobber, no-clobber, noglob, no-glob, noexec, no-exec,
-    monitor, failglob, notify, hashall, verbose, keyword, functrace,
+    shitbox, monitor, failglob, notify, hashall, verbose, keyword, functrace,
     braceexpand, show-ast, show-lexed-words, show-exit-code, force-warnings,
     mimicry, force-diagnostics, show-stats, no-diagnostics, show-memory, login,
     rcfile

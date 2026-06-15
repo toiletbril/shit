@@ -250,7 +250,7 @@ $(OUT): $(OBJECTS)
 
 dirs: $(DIRS)
 	mkdir -p $(OBJ_DIR)/
-	mkdir -p $(OBJ_DIR)/$<
+	for source_dir in $(DIRS); do mkdir -p $(OBJ_DIR)/$$source_dir; done
 
 shit: dirs
 	$(MAKE) $(OUT)

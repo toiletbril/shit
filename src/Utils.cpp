@@ -237,12 +237,70 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       children.push(child);
       child_stage.push(stage_index);
       last_child = child;
+    } else if (!is_last) {
+#if SHIT_PLATFORM_IS POSIX
+      /* A non-last builtin stage is bash's own subshell, so it forks and runs
+         in the child. The earlier in-process run blocked the shell when the
+         builtin produced more than the pipe buffer, since the next stage that
+         drains the pipe had not started yet, so seq of a large count into head
+         deadlocked. The forked child runs concurrently with its consumer and,
+         with the default signal disposition fork_compound_stage restores, a
+         write to a pipe whose reader has gone ends it through SIGPIPE the way
+         an external producer ends. */
+      const os::process child =
+          os::fork_compound_stage(ec.in_fd, ec.out_fd, ec.err_fd);
+      if (child == 0) {
+        /* fork_compound_stage already placed the pipe ends on the standard
+           descriptors, so the context's own descriptors are cleared and the
+           builtin writes through the inherited standard output. */
+        ec.in_fd = shit::None;
+        ec.out_fd = shit::None;
+        ec.err_fd = shit::None;
+        /* make_pipe marks both ends close-on-exec, which an external stage
+           relies on to drop the read end of its own output pipe at exec. A
+           forked builtin never execs, so the child closes that read end by
+           hand, otherwise the pipe stays open and a write never sees the reader
+           leave, which deadlocks a producer such as seq into head. */
+        if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
+        cxt.set_in_pipeline_stage(true);
+        cxt.enter_subshell();
+        i32 child_status = 0;
+        try {
+          child_status = execute_builtin(steal(ec), cxt);
+        } catch (const ErrorWithLocation &e) {
+          const String *source = cxt.current_source();
+          shit::show_message(
+              e.to_string(source != nullptr ? source->view() : StringView{}));
+          child_status = 1;
+        } catch (const Error &e) {
+          shit::show_message(e.to_string());
+          child_status = 1;
+        } catch (...) {
+          child_status = 1;
+        }
+        shit::flush();
+        os::exit_process_immediately(child_status);
+      }
+      /* The parent keeps no copy of the stage's pipe ends, otherwise the reader
+         never sees the writer close. */
+      ec.close_fds();
+      children.push(child);
+      child_stage.push(stage_index);
+      last_child = child;
+#else
+      /* Windows has no fork, so a non-last builtin stage runs in process as
+         before. A producer larger than the pipe buffer can block there. */
+      cxt.set_in_pipeline_stage(true);
+      defer { cxt.set_in_pipeline_stage(false); };
+      ret = execute_builtin(steal(ec), cxt);
+      stage_status[stage_index] = ret;
+#endif
     } else {
-      /* A builtin runs in this process, so its status stands in for the stage.
-         The pipeline-stage flag rides the call so exec spawns a child rather
-         than replacing the whole shell, since a stage is bash's own subshell.
-         The defer clears it even when the builtin throws, so the flag never
-         leaks into a later command run on the same context. */
+      /* The last builtin stage runs in this process, so a read or a cd in it
+         affects the shell, and its status stands in for the stage. The
+         pipeline-stage flag rides the call so exec spawns a child rather than
+         replacing the whole shell. The defer clears it even when the builtin
+         throws, so the flag never leaks into a later command on the context. */
       cxt.set_in_pipeline_stage(true);
       defer { cxt.set_in_pipeline_stage(false); };
       ret = execute_builtin(steal(ec), cxt);

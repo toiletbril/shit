@@ -1092,4 +1092,377 @@ fn evaluate_constant_arithmetic(StringView expression) throws -> i64
   return parser.parse();
 }
 
+namespace {
+
+/* The calc builtin computes in 128 bits in the default mood, so the compiler's
+   __int128 is used for the value and the unsigned form for the wrapping
+   operators. A compiler without the extension falls back to 64 bits, which the
+   guard at the top of this file already requires, so the fallback never
+   compiles in practice. */
+#if T__HAS_GCC_EXTENSIONS
+using wide_int = __int128;
+using wide_uint = unsigned __int128;
+#else
+using wide_int = i64;
+using wide_uint = u64;
+#endif
+
+/* Read a numeric operand into a 128-bit value, detecting the radix from a 0x or
+   0 prefix the way the 64-bit operand parser does. */
+static pure fn parse_wide_operand(StringView text) wontthrow -> wide_int
+{
+  let body = text;
+  bool is_negative = false;
+  if (body.length > 0 && (body[0] == '+' || body[0] == '-')) {
+    is_negative = body[0] == '-';
+    body = body.substring(1);
+  }
+
+  u32 radix = 10;
+  usize i = 0;
+  if (body.length >= 2 && body[0] == '0' && (body[1] == 'x' || body[1] == 'X'))
+  {
+    radix = 16;
+    i = 2;
+  } else if (body.length >= 1 && body[0] == '0') {
+    radix = 8;
+  }
+
+  wide_uint value = 0;
+  for (; i < body.length; i++) {
+    let const c = body[i];
+    u32 digit;
+    if (c >= '0' && c <= '9')
+      digit = static_cast<u32>(c - '0');
+    else if (c >= 'a' && c <= 'f')
+      digit = static_cast<u32>(c - 'a') + 10;
+    else if (c >= 'A' && c <= 'F')
+      digit = static_cast<u32>(c - 'A') + 10;
+    else
+      break;
+    if (digit >= radix) break;
+    value = value * radix + digit;
+  }
+
+  let const result = static_cast<wide_int>(value);
+  return is_negative ? static_cast<wide_int>(-result) : result;
+}
+
+/* Lex one decimal, hexadecimal, or octal number literal at the front of from
+   into a 128-bit value, returning the bytes consumed. */
+static fn lex_wide_number(StringView from, wide_int *out_value) throws -> usize
+{
+  usize consumed;
+  if (from.length >= 2 && from[0] == '0' && (from[1] == 'x' || from[1] == 'X'))
+    consumed = 2 + count_leading_digits(from.substring(2), 16);
+  else if (from.length >= 1 && from[0] == '0')
+    consumed = count_leading_digits(from, 8);
+  else
+    consumed = count_leading_digits(from, 10);
+  if (consumed == 0) consumed = 1;
+  *out_value = parse_wide_operand(from.substring_of_length(0, consumed));
+  return consumed;
+}
+
+/* The 128-bit value as decimal text, the form calc prints. */
+static fn format_wide(wide_int value) throws -> String
+{
+  let const is_negative = value < 0;
+  /* Negating the minimum would overflow, so the magnitude is taken in the
+     unsigned domain where the wrap is defined. */
+  wide_uint magnitude =
+      is_negative ? static_cast<wide_uint>(0) - static_cast<wide_uint>(value)
+                  : static_cast<wide_uint>(value);
+  char buffer[64];
+  usize position = sizeof(buffer);
+  do {
+    buffer[--position] =
+        static_cast<char>('0' + static_cast<int>(magnitude % 10));
+    magnitude /= 10;
+  } while (magnitude != 0);
+
+  String text{};
+  if (is_negative) text.push('-');
+  text.append(StringView{buffer + position, sizeof(buffer) - position});
+  return text;
+}
+
+/* A recursive-descent evaluator over 128-bit integers for the calc builtin,
+   following C precedence with parentheses, the unary operators, the binary
+   ladder, the comparisons, the logical pair, the ternary, and the comma. It
+   reads shell variables through the context but performs no assignment, so calc
+   stays a pure calculator. */
+class WideArithmeticParser
+{
+public:
+  EvalContext *context;
+  StringView source;
+  usize pos;
+  usize depth{0};
+  static constexpr usize MAX_DEPTH = 512;
+
+  [[noreturn]] cold fn fail(StringView message) throws -> void
+  {
+    throw Error{"Arithmetic: " + message};
+  }
+
+  fn skip_spaces() wontthrow -> void
+  {
+    while (pos < source.length && (source[pos] == ' ' || source[pos] == '\t' ||
+                                   source[pos] == '\n' || source[pos] == '\r'))
+      pos++;
+  }
+
+  fn starts_with(StringView op) wontthrow -> bool
+  {
+    skip_spaces();
+    if (pos + op.length > source.length) return false;
+    for (usize k = 0; k < op.length; k++)
+      if (source[pos + k] != op[k]) return false;
+    return true;
+  }
+
+  fn consume(StringView op) wontthrow -> bool
+  {
+    if (!starts_with(op)) return false;
+    pos += op.length;
+    return true;
+  }
+
+  fn read_variable(StringView name) throws -> wide_int
+  {
+    ASSERT(context != nullptr);
+    if (let const *stored = context->lookup_shell_variable(name)) {
+      if (stored->count() == 0) return 0;
+      return parse_wide_operand(stored->view());
+    }
+    let const value = context->get_variable_value(name);
+    if (!value.has_value() || value->is_empty()) return 0;
+    return parse_wide_operand(value->view());
+  }
+
+  static fn wrap_add(wide_int a, wide_int b) wontthrow -> wide_int
+  {
+    return static_cast<wide_int>(static_cast<wide_uint>(a) +
+                                 static_cast<wide_uint>(b));
+  }
+  static fn wrap_sub(wide_int a, wide_int b) wontthrow -> wide_int
+  {
+    return static_cast<wide_int>(static_cast<wide_uint>(a) -
+                                 static_cast<wide_uint>(b));
+  }
+  static fn wrap_mul(wide_int a, wide_int b) wontthrow -> wide_int
+  {
+    return static_cast<wide_int>(static_cast<wide_uint>(a) *
+                                 static_cast<wide_uint>(b));
+  }
+  fn wrap_power(wide_int base, wide_int exponent) throws -> wide_int
+  {
+    if (exponent < 0) fail("exponent less than 0");
+    wide_uint result = 1;
+    wide_uint factor = static_cast<wide_uint>(base);
+    wide_uint remaining = static_cast<wide_uint>(exponent);
+    while (remaining > 0) {
+      if ((remaining & 1u) != 0) result *= factor;
+      factor *= factor;
+      remaining >>= 1;
+    }
+    return static_cast<wide_int>(result);
+  }
+
+  fn parse() throws -> wide_int
+  {
+    skip_spaces();
+    if (pos == source.length) return 0;
+    let const result = parse_comma();
+    skip_spaces();
+    if (pos != source.length) fail("unexpected trailing characters");
+    return result;
+  }
+
+  fn parse_comma() throws -> wide_int
+  {
+    wide_int result = parse_ternary();
+    while (consume(","))
+      result = parse_ternary();
+    return result;
+  }
+
+  fn parse_ternary() throws -> wide_int
+  {
+    let const condition = parse_binary(1);
+    if (consume("?")) {
+      let const if_true = parse_ternary();
+      if (!consume(":")) fail("expected ':' in a conditional");
+      let const if_false = parse_ternary();
+      return condition != 0 ? if_true : if_false;
+    }
+    return condition;
+  }
+
+  struct binary_operator
+  {
+    char kind;
+    u8 precedence;
+    u8 length;
+  };
+
+  fn peek_binary_operator() wontthrow -> binary_operator
+  {
+    skip_spaces();
+    if (pos >= source.length) return {0, 0, 0};
+    let const a = source[pos];
+    let const b = pos + 1 < source.length ? source[pos + 1] : '\0';
+    switch (a) {
+    case '*':
+      return b == '*' ? binary_operator{'P', 11, 2}
+                      : binary_operator{'*', 10, 1};
+    case '/': return {'/', 10, 1};
+    case '%': return {'%', 10, 1};
+    case '+': return {'+', 9, 1};
+    case '-': return {'-', 9, 1};
+    case '<':
+      if (b == '<') return {'L', 8, 2};
+      if (b == '=') return {'l', 7, 2};
+      return {'<', 7, 1};
+    case '>':
+      if (b == '>') return {'R', 8, 2};
+      if (b == '=') return {'g', 7, 2};
+      return {'>', 7, 1};
+    case '=':
+      return b == '=' ? binary_operator{'e', 6, 2} : binary_operator{0, 0, 0};
+    case '!':
+      return b == '=' ? binary_operator{'n', 6, 2} : binary_operator{0, 0, 0};
+    case '&':
+      return b == '&' ? binary_operator{'A', 2, 2} : binary_operator{'&', 5, 1};
+    case '^': return {'^', 4, 1};
+    case '|':
+      return b == '|' ? binary_operator{'O', 1, 2} : binary_operator{'|', 3, 1};
+    default: return {0, 0, 0};
+    }
+  }
+
+  fn parse_binary(u8 min_precedence) throws -> wide_int
+  {
+    let lhs = parse_unary();
+    for (;;) {
+      let const op = peek_binary_operator();
+      if (op.precedence < min_precedence) return lhs;
+      pos += op.length;
+      let const rhs =
+          parse_binary(op.kind == 'P' ? op.precedence : op.precedence + 1);
+      switch (op.kind) {
+      case 'P': lhs = wrap_power(lhs, rhs); break;
+      case '*': lhs = wrap_mul(lhs, rhs); break;
+      case '/':
+        if (rhs == 0) fail("division by zero");
+        lhs = lhs / rhs;
+        break;
+      case '%':
+        if (rhs == 0) fail("division by zero");
+        lhs = lhs % rhs;
+        break;
+      case '+': lhs = wrap_add(lhs, rhs); break;
+      case '-': lhs = wrap_sub(lhs, rhs); break;
+      case 'L':
+        lhs = static_cast<wide_int>(static_cast<wide_uint>(lhs)
+                                    << (static_cast<wide_uint>(rhs) & 127u));
+        break;
+      case 'R': lhs = lhs >> (static_cast<wide_uint>(rhs) & 127u); break;
+      case '<': lhs = lhs < rhs ? 1 : 0; break;
+      case 'l': lhs = lhs <= rhs ? 1 : 0; break;
+      case '>': lhs = lhs > rhs ? 1 : 0; break;
+      case 'g': lhs = lhs >= rhs ? 1 : 0; break;
+      case 'e': lhs = lhs == rhs ? 1 : 0; break;
+      case 'n': lhs = lhs != rhs ? 1 : 0; break;
+      case '&': lhs = lhs & rhs; break;
+      case '^': lhs = lhs ^ rhs; break;
+      case '|': lhs = lhs | rhs; break;
+      case 'A': lhs = (lhs != 0 && rhs != 0) ? 1 : 0; break;
+      case 'O': lhs = (lhs != 0 || rhs != 0) ? 1 : 0; break;
+      default: unreachable();
+      }
+    }
+  }
+
+  fn parse_unary() throws -> wide_int
+  {
+    skip_spaces();
+    let const first = pos < source.length ? source[pos] : '\0';
+    if (first == '+') {
+      pos++;
+      return parse_unary();
+    }
+    if (first == '-') {
+      pos++;
+      return wrap_sub(0, parse_unary());
+    }
+    if (first == '!') {
+      pos++;
+      return parse_unary() == 0 ? 1 : 0;
+    }
+    if (first == '~') {
+      pos++;
+      return ~parse_unary();
+    }
+    return parse_primary();
+  }
+
+  fn parse_primary() throws -> wide_int
+  {
+    depth++;
+    defer { depth--; };
+    if (depth > MAX_DEPTH) fail("expression nested too deeply");
+
+    skip_spaces();
+    if (consume("(")) {
+      let const value = parse_comma();
+      if (!consume(")")) fail("expected ')'");
+      return value;
+    }
+    if (pos < source.length && lexer::is_number(source[pos])) {
+      wide_int value = 0;
+      pos += lex_wide_number(source.substring(pos), &value);
+      return value;
+    }
+    if (pos < source.length && lexer::is_variable_name_start(source[pos])) {
+      let const name_start = pos;
+      while (pos < source.length && lexer::is_variable_name(source[pos]))
+        pos++;
+      return read_variable(
+          source.substring_of_length(name_start, pos - name_start));
+    }
+    fail("unexpected character");
+  }
+};
+
+} /* namespace */
+
+fn EvalContext::evaluate_arithmetic_wide(StringView expression,
+                                         bool &out_nonzero) throws -> String
+{
+  /* The bash and posix moods keep the 64-bit semantics, so calc reports the
+     same wrap those shells give. Only the default mood widens to 128 bits. */
+  if (mood() != mimic_mood::Default) {
+    let const value = evaluate_arithmetic(expression);
+    out_nonzero = value != 0;
+    return utils::int_to_text(value, heap_allocator());
+  }
+
+  if (!expression.find_character('$').has_value() &&
+      !expression.find_character('`').has_value())
+  {
+    WideArithmeticParser parser{this, expression, 0};
+    let const value = parser.parse();
+    out_nonzero = value != 0;
+    return format_wide(value);
+  }
+
+  let const expanded_word = expand_modifier_word(expression);
+  WideArithmeticParser parser{this, expanded_word.view(), 0};
+  let const value = parser.parse();
+  out_nonzero = value != 0;
+  return format_wide(value);
+}
+
 } /* namespace shit */

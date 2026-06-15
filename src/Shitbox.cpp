@@ -1,0 +1,229 @@
+#include "Shitbox.hpp"
+
+#include "Builtin.hpp"
+#include "Cli.hpp"
+#include "Errors.hpp"
+#include "Eval.hpp"
+#include "ResolvedCommand.hpp"
+#include "Trace.hpp"
+
+#include <algorithm>
+
+namespace shit {
+
+namespace shitbox {
+
+/* The bare-name resolution toggle, mirrored from the set -o shitbox option and
+   the --enable-shitbox flag so the command resolver reads it with no context in
+   scope. */
+static bool g_shitbox_names_enabled = false;
+
+fn shitbox_names_enabled() wontthrow -> bool { return g_shitbox_names_enabled; }
+
+fn set_shitbox_names_enabled(bool enabled) wontthrow -> void
+{
+  g_shitbox_names_enabled = enabled;
+}
+
+flatten fn find_util(StringView name) throws -> Maybe<Util>
+{
+  return SHITBOX_UTILS.find(name);
+}
+
+fn util_names() throws -> const ArrayList<String> &
+{
+  static ArrayList<String> names = [] throws {
+    let collected = ArrayList<String>{};
+    for (const StaticStringMap<Util>::entry &entry : SHITBOX_ENTRIES)
+      collected.push(entry.key.to_string());
+    return collected;
+  }();
+  return names;
+}
+
+fn run_util(Util chosen, const ExecContext &ec, EvalContext &cxt,
+            const ArrayList<String> &args) throws -> i32
+{
+  LOG(Debug, "dispatching shitbox utility %d with %zu arguments", ENUM(chosen),
+      args.count());
+  switch (chosen) {
+  case Util::Ls: return util_ls(ec, cxt, args);
+  case Util::Ln: return util_ln(ec, cxt, args);
+  case Util::Rm: return util_rm(ec, cxt, args);
+  case Util::Mkdir: return util_mkdir(ec, cxt, args);
+  case Util::Rmdir: return util_rmdir(ec, cxt, args);
+  case Util::Cp: return util_cp(ec, cxt, args);
+  case Util::Mv: return util_mv(ec, cxt, args);
+  case Util::Cat: return util_cat(ec, cxt, args);
+  case Util::Tee: return util_tee(ec, cxt, args);
+  case Util::Touch: return util_touch(ec, cxt, args);
+  case Util::Basename: return util_basename(ec, cxt, args);
+  case Util::Dirname: return util_dirname(ec, cxt, args);
+  case Util::Realpath: return util_realpath(ec, cxt, args);
+  case Util::Du: return util_du(ec, cxt, args);
+  case Util::Head: return util_head(ec, cxt, args);
+  case Util::Tail: return util_tail(ec, cxt, args);
+  case Util::Wc: return util_wc(ec, cxt, args);
+  case Util::Seq: return util_seq(ec, cxt, args);
+  case Util::Tr: return util_tr(ec, cxt, args);
+  case Util::Grep: return util_grep(ec, cxt, args);
+  case Util::Sort: return util_sort(ec, cxt, args);
+  case Util::Uniq: return util_uniq(ec, cxt, args);
+  case Util::Sleep: return util_sleep(ec, cxt, args);
+  case Util::Env: return util_env(ec, cxt, args);
+  case Util::Yes: return util_yes(ec, cxt, args);
+  case Util::Pkill: return util_pkill(ec, cxt, args);
+  case Util::Killall: return util_killall(ec, cxt, args);
+  case Util::Make: return util_make(ec, cxt, args);
+  }
+  unreachable("unhandled shitbox utility of kind %d", ENUM(chosen));
+}
+
+fn dispatch(const ExecContext &ec, EvalContext &cxt, usize name_index) throws
+    -> i32
+{
+  ASSERT(name_index < ec.args().count());
+  let const name = ec.args()[name_index].view();
+
+  /* The utility reads itself as the first argument, so a slice from the name
+     onward is copied once and handed over. The copy is small and lets the
+     utility parse flags with the name as the program word the way a builtin
+     reads ec.args(). */
+  ArrayList<String> shifted{};
+  shifted.reserve(ec.args().count() - name_index);
+  for (usize i = name_index; i < ec.args().count(); i++)
+    shifted.push(ec.args()[i].clone());
+
+  if (let const chosen = find_util(name); chosen.has_value())
+    return run_util(*chosen, ec, cxt, shifted);
+
+  /* A name that is not a shitbox utility but is a shell builtin, such as echo
+     or printf, routes to that builtin rather than getting a second
+     implementation, so `shitbox echo hi` runs the echo builtin. The routed
+     context carries the same descriptors the outer command was placed on, so
+     its output follows a redirection or a pipe. */
+  if (let const builtin_kind = search_builtin(name); builtin_kind.has_value()) {
+    let routed = ExecContext::from_resolved(
+        ec.source_location(), ResolvedCommand::from_builtin(*builtin_kind),
+        steal(shifted));
+    return execute_builtin(steal(routed), cxt);
+  }
+
+  throw Error{"shitbox has no utility named '" + String{name} + "'"};
+}
+
+fn run_as_multicall(StringView util_name, ArrayList<String> operands,
+                    EvalContext &cxt) throws -> i32
+{
+  let const chosen = find_util(util_name);
+  ASSERT(chosen.has_value());
+
+  ArrayList<String> args{};
+  args.reserve(operands.count() + 1);
+  args.push(String{util_name});
+  for (String &operand : operands)
+    args.push(steal(operand));
+
+  let ec = ExecContext::from_resolved(
+      SourceLocation{}, ResolvedCommand::from_builtin(Builtin::Kind::Shitbox),
+      steal(args));
+
+  try {
+    return run_util(*chosen, ec, cxt, ec.args());
+  } catch (const Error &e) {
+    print_error("shit: " + String{util_name} + ": " + e.message() + "\n");
+    return 1;
+  }
+}
+
+fn parse_util_operands(const ArrayList<Flag *> &flags,
+                       const ArrayList<String> &args) throws
+    -> ArrayList<String>
+{
+  ArrayList<String> operands = parse_flags_vec(flags, args, 0);
+  /* The first operand is the utility name, the program word parse_flags_vec
+     never reads as a flag, so it is dropped to leave the real arguments. */
+  if (!operands.is_empty()) operands.remove(0);
+  return operands;
+}
+
+fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
+                   StringView description,
+                   const ArrayList<Flag *> &flags) throws -> void
+{
+  let help_text = String{};
+  if (!description.is_empty()) {
+    help_text += "DESCRIPTION\n";
+    help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
+    help_text += "\n\n";
+  }
+  ArrayList<StringView> synopsis_lines{};
+  synopsis_lines.push(synopsis);
+  help_text += make_synopsis(name, synopsis_lines);
+  help_text += '\n';
+  help_text += make_flag_help(flags);
+  help_text += '\n';
+  ec.print_to_stdout(help_text);
+}
+
+fn read_fd_to_string(os::descriptor fd) throws -> String
+{
+  String contents{};
+  char buffer[4096];
+  for (;;) {
+    let const read_count = os::read_fd(fd, buffer, sizeof(buffer));
+    if (!read_count.has_value() || *read_count == 0) break;
+    contents.append(StringView{buffer, *read_count});
+  }
+  return contents;
+}
+
+fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
+    -> Maybe<String>
+{
+  if (path == "-") return read_fd_to_string(ec.in_fd.value_or(SHIT_STDIN));
+
+  let const fd = os::open_file_descriptor(path, os::file_open_mode::Read);
+  if (!fd.has_value()) return None;
+  defer { os::close_fd(*fd); };
+  return read_fd_to_string(*fd);
+}
+
+fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>
+{
+  ArrayList<StringView> lines{};
+  usize start = 0;
+  for (usize i = 0; i < text.length; i++) {
+    if (text[i] == '\n') {
+      lines.push(text.substring_of_length(start, i - start + 1));
+      start = i + 1;
+    }
+  }
+  if (start < text.length)
+    lines.push(text.substring_of_length(start, text.length - start));
+  return lines;
+}
+
+fn sort_string_list(ArrayList<String> &items) wontthrow -> void
+{
+  std::sort(items.begin(), items.end(),
+            [](const String &a, const String &b) { return a < b; });
+}
+
+fn report_soft_shitbox_error(const ExecContext &ec, EvalContext &cxt,
+                             StringView message) throws -> void
+{
+  if (cxt.is_bash_compatible()) {
+    print_error("shit: " + String{message} + "\n");
+    return;
+  }
+  const ErrorWithLocation located{ec.source_location(), message};
+  if (const String *source = cxt.current_source(); source != nullptr)
+    show_message(located.to_string(source->view()));
+  else
+    print_error("shit: " + String{message} + "\n");
+}
+
+} /* namespace shitbox */
+
+} /* namespace shit */

@@ -212,6 +212,33 @@ fn signal_names() throws -> const ArrayList<StringView> &;
    invalid handle when the process is gone or not permitted. */
 fn process_from_pid(i64 pid) wontthrow -> process;
 
+/* One live process the shitbox pkill and killall utilities match against, its
+   numeric id and the basename of its command. The list is read once per run. */
+struct process_entry
+{
+  i64 pid{0};
+  String name{};
+};
+
+/* Every process the current user can see, for the shitbox pkill and killall
+   utilities to match a name against. Empty on a platform with no process
+   listing, such as a non-Linux POSIX without a /proc filesystem. */
+fn enumerate_processes() throws -> ArrayList<process_entry>;
+
+/* The filesystem mutations the shitbox coreutils run. Each returns false on
+   failure with the reason left in last_system_error_message, so the calling
+   utility renders a located error. make_directory takes the permission bits the
+   umask still narrows. */
+fn make_directory(StringView path, u32 mode) wontthrow -> bool;
+fn remove_directory(StringView path) wontthrow -> bool;
+fn remove_file(StringView path) wontthrow -> bool;
+fn rename_path(StringView from, StringView to) wontthrow -> bool;
+fn create_symlink(StringView target, StringView link_path) wontthrow -> bool;
+
+/* Sleep for the given seconds, for the shitbox sleep utility. A fractional
+   value sleeps the whole and the fractional part together. */
+fn sleep_for_seconds(double seconds) wontthrow -> void;
+
 extern const ArrayList<String> OMITTED_SUFFIXES;
 
 fn write_fd(os::descriptor fd, const void *buf, usize size) wontthrow

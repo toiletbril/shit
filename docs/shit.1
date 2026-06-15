@@ -91,6 +91,12 @@ List the shellcheck-style checks the analysis stage reports, then exit.
 .TP
 .BR \-T ", " \-\-no\-completion
 Disable interactive tab completion and ghost-text.
+.TP
+.B \-\-enable\-shitbox
+Resolve the bundled shitbox utility names such as
+.BR ls ", " mkdir ", and " cp
+directly as commands, the same as
+.BR "set \-o shitbox" .
 .SS POSIX
 .TP
 .BR \-c " \fICOMMAND\fR"
@@ -204,6 +210,41 @@ The default command history file.
 .TP
 .I ~/.shit_directory_history
 The default frecency store for the z builtin.
+.SH SHITBOX
+The
+.B shitbox
+builtin hosts a set of small bundled coreutilities, so a system with only a
+compiler can run a configure and a make under shit.
+.B "shitbox ls"
+runs the bundled ls, and a name that is already a builtin, such as
+.BR echo ,
+routes to that builtin. With the
+.B \-\-enable\-shitbox
+flag or
+.B "set \-o shitbox"
+the utility names resolve directly as commands without the prefix, and a builtin
+still wins over a utility while a utility wins over a program on PATH. A binary
+whose name is a utility, such as a symlink named ls, acts as that utility.
+.PP
+The utilities are
+.BR ls ", " ln ", " rm ", " mkdir ", " rmdir ", " cp ", " mv ", " cat ", "
+.BR tee ", " touch ", " basename ", " dirname ", " realpath ", " du ", " head ", "
+.BR tail ", " wc ", " seq ", " tr ", " grep ", " sort ", " uniq ", " sleep ", "
+.BR env ", " yes ", " pkill ", " killall ", and " make .
+Each takes a small set of flags. The bundled make reads a Makefile, expands its
+variables, and runs each recipe through the shell. It handles single-level
+pattern rules such as
+.B "%.o: %.c"
+with the automatic variables $@, $<, and $^, and has no chained implicit rules
+and no parallelism.
+.PP
+The
+.B calc
+builtin evaluates each argument as an arithmetic expression and prints the value
+of the last one, with the same operators and located errors the shell arithmetic
+uses. In the default mood it computes in 128 bits, so a result wider than a
+signed 64-bit integer prints in full, while the bash and posix moods keep the
+64-bit wrap.
 .SH EXIT STATUS
 The shell exits with the status of the last command it ran. A usage error such as
 an unknown flag in a non-interactive run exits with status 2.

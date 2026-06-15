@@ -906,6 +906,12 @@ public:
   /* noexec parses without running, set by -n and set -o noexec. */
   fn set_no_exec(bool enabled) wontthrow -> void;
   pure fn no_exec() const wontthrow -> bool;
+  /* shitbox makes the bundled coreutility names resolve directly as commands,
+     set by --enable-shitbox at startup and set -o shitbox at run time. The
+     command resolver reads a process global the setter mirrors onto, since it
+     runs with no context in scope. */
+  fn set_shitbox(bool enabled) wontthrow -> void;
+  pure fn shitbox() const wontthrow -> bool;
   /* failglob makes a glob that matches no path a hard error, the shell default
      that catches a typo. With it off the unmatched glob expands to its literal
      pattern the way POSIX and dash do, set by --no-fail-glob and set -o
@@ -1168,6 +1174,14 @@ public:
   /* Compute the integer value of a $((...)) or (( )) expression, resolving
      shell variables and applying any assignments inside it. */
   fn evaluate_arithmetic(StringView expression) throws -> i64;
+
+  /* Evaluate an expression for the calc builtin and return its decimal text,
+     setting out_nonzero for the exit status. In the default mood the value is
+     computed in 128 bits through the compiler's __int128, so a result wider
+     than 64 bits prints in full, while the bash and posix moods keep the 64-bit
+     wrap evaluate_arithmetic gives. */
+  fn evaluate_arithmetic_wide(StringView expression, bool &out_nonzero) throws
+      -> String;
 
   /* The same value as evaluate_arithmetic, but a substitution-free expression
      lexes its tokens once onto the segment and re-evaluates from them, so a
@@ -1588,6 +1602,7 @@ protected:
   bool m_monitor{false};
   bool m_notify{false};
   bool m_enable_path_expansion;
+  bool m_shitbox{false};
   bool m_enable_echo;
   bool m_enable_echo_expanded;
   bool m_shell_is_interactive;

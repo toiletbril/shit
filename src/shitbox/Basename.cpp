@@ -1,0 +1,54 @@
+#include "../Cli.hpp"
+#include "../Errors.hpp"
+#include "../Eval.hpp"
+#include "../Path.hpp"
+#include "../Shitbox.hpp"
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("path [suffix]");
+
+HELP_DESCRIPTION_DECL(
+    "The basename utility prints the final component of the path, with a "
+    "trailing suffix removed when one is given.");
+
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
+namespace shit {
+
+namespace shitbox {
+
+fn util_basename(const ExecContext &ec, EvalContext &cxt,
+                 const ArrayList<String> &args) throws -> i32
+{
+  unused(cxt);
+  let const operands = parse_util_operands(FLAG_LIST, args);
+  defer { reset_flags(FLAG_LIST); };
+
+  if (FLAG_HELP.is_enabled()) {
+    print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
+                    FLAG_LIST);
+    return 0;
+  }
+
+  if (operands.is_empty()) throw Error{"basename expects a path"};
+
+  /* The path is held in a named local so its filename view does not dangle
+     past a temporary. */
+  let const path = Path{operands[0].view()};
+  StringView name = path.filename();
+  if (operands.count() > 1) {
+    let const suffix = operands[1].view();
+    if (suffix.length < name.length &&
+        name.substring_of_length(name.length - suffix.length, suffix.length) ==
+            suffix)
+      name = name.substring_of_length(0, name.length - suffix.length);
+  }
+
+  ec.print_to_stdout(String{name} + "\n");
+  return 0;
+}
+
+} /* namespace shitbox */
+
+} /* namespace shit */

@@ -11,6 +11,7 @@
 #include "Path.hpp"
 #include "Platform.hpp"
 #include "ResolvedCommand.hpp"
+#include "Shitbox.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -1252,6 +1253,17 @@ fn EvalContext::set_no_exec(bool enabled) wontthrow -> void
 
 pure fn EvalContext::no_exec() const wontthrow -> bool { return m_no_exec; }
 
+fn EvalContext::set_shitbox(bool enabled) wontthrow -> void
+{
+  LOG(Info, "the shitbox option flips to %s", enabled ? "on" : "off");
+  m_shitbox = enabled;
+  /* The command resolver runs with no context in scope, so the state is
+     mirrored onto the process global it reads. */
+  shitbox::set_shitbox_names_enabled(enabled);
+}
+
+pure fn EvalContext::shitbox() const wontthrow -> bool { return m_shitbox; }
+
 fn EvalContext::set_failglob(bool enabled) wontthrow -> void
 {
   LOG(Info, "the failglob option flips to %s", enabled ? "on" : "off");
@@ -1740,6 +1752,14 @@ fn ExecContext::make_from(SourceLocation location,
 
   if (!program.find_character('/').has_value()) {
     resolved_builtin = search_builtin(program.view());
+
+    /* With the shitbox option on, a bare utility name such as ls resolves to
+       the shitbox builtin, which then runs the utility by that name. A real
+       builtin still wins, and a shitbox utility beats an external program the
+       way a busybox applet does. */
+    if (!resolved_builtin && shitbox::shitbox_names_enabled() &&
+        shitbox::find_util(program.view()).has_value())
+      resolved_builtin = Builtin::Kind::Shitbox;
 
     if (!resolved_builtin) {
       let program_search_paths = utils::search_program_path(program.view());

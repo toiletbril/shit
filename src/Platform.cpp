@@ -14,7 +14,17 @@
 #include <cstdarg>
 #include <cstring>
 
+/* A forked pipeline stage that never execs would run the address-sanitizer leak
+   check at its own exit, which warns or hangs under a seccomp sandbox that
+   blocks ptrace. The parent process reports the real leaks, so the forked child
+   turns the check off. The interface is only present in a sanitizer build. */
+#if defined __SANITIZE_ADDRESS__
+#include <sanitizer/lsan_interface.h>
+#define SHIT_HAS_ADDRESS_SANITIZER 1
+#endif
+
 #if SHIT_PLATFORM_IS POSIX
+#include <dirent.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <pwd.h>
@@ -784,6 +794,13 @@ fn fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
       }
 
       reset_signal_handlers();
+
+#if defined SHIT_HAS_ADDRESS_SANITIZER
+      /* The forked stage exits through _exit, so the leak check should not run
+         here. Disabling it is belt and suspenders against a sandbox that traps
+         the sanitizer's tracer regardless. */
+      __lsan_disable();
+#endif
     } catch (const shit::Error &e) {
       String msg = e.message();
       msg += '\n';
@@ -1013,9 +1030,13 @@ fn wait_and_monitor_process(process pid) throws -> i32
                                 ? String{StringView{sig_str}}
                                 : String{StringView{"Unknown"}};
 
-    /* A plain Ctrl-C prints only a newline, so the verbose report is reserved
-       for any other terminating signal. */
-    if (sig & ~(SIGINT)) {
+    /* A broken pipe is the normal way a producer ends once its consumer stops
+       reading, such as seq into head, so it is reaped silently the way bash and
+       dash do rather than reported as a job event. Ctrl-C prints a bare
+       newline, and every other signal prints the located process message. */
+    if (sig == SIGPIPE) {
+      /* Silent, the expected end of a pipeline producer. */
+    } else if (sig & ~(SIGINT)) {
       shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
                   ", signal " + utils::int_to_text(sig) + "]\n");
     } else {
@@ -1540,6 +1561,95 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
   return result;
 }
 
+fn make_directory(StringView path, u32 mode) wontthrow -> bool
+{
+  const String path_string{path};
+  return ::mkdir(path_string.c_str(), mode) == 0;
+}
+
+fn remove_directory(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return ::rmdir(path_string.c_str()) == 0;
+}
+
+fn remove_file(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return ::unlink(path_string.c_str()) == 0;
+}
+
+fn rename_path(StringView from, StringView to) wontthrow -> bool
+{
+  const String from_string{from};
+  const String to_string{to};
+  return ::rename(from_string.c_str(), to_string.c_str()) == 0;
+}
+
+fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
+{
+  const String target_string{target};
+  const String link_string{link_path};
+  return ::symlink(target_string.c_str(), link_string.c_str()) == 0;
+}
+
+fn sleep_for_seconds(double seconds) wontthrow -> void
+{
+  if (seconds <= 0.0) return;
+  struct timespec requested;
+  requested.tv_sec = static_cast<time_t>(seconds);
+  requested.tv_nsec = static_cast<long>(
+      (seconds - static_cast<double>(requested.tv_sec)) * 1000000000.0);
+  /* A signal can cut the sleep short, so the remaining time is slept again
+     until the whole interval has passed. */
+  struct timespec remaining;
+  while (nanosleep(&requested, &remaining) == -1 && errno == EINTR)
+    requested = remaining;
+}
+
+fn enumerate_processes() throws -> ArrayList<process_entry>
+{
+  ArrayList<process_entry> processes{};
+  /* The process list is read from /proc, the Linux and Cosmopolitan way. A
+     directory whose name is all digits is one process, and its comm file holds
+     the command name the way ps reads it. A platform without /proc opens
+     nothing and reports an empty list. */
+  DIR *proc_dir = ::opendir("/proc");
+  if (proc_dir == nullptr) return processes;
+  defer { ::closedir(proc_dir); };
+
+  for (struct dirent *entry = ::readdir(proc_dir); entry != nullptr;
+       entry = ::readdir(proc_dir))
+  {
+    StringView name{entry->d_name};
+    if (name.is_empty()) continue;
+    bool is_all_digits = true;
+    for (usize i = 0; i < name.length; i++)
+      if (name[i] < '0' || name[i] > '9') {
+        is_all_digits = false;
+        break;
+      }
+    if (!is_all_digits) continue;
+
+    let const parsed = utils::parse_decimal_integer(name);
+    if (parsed.is_error()) continue;
+
+    const String comm_path = "/proc/" + name + "/comm";
+    Maybe<String> comm = utils::read_entire_file(comm_path.view());
+    if (!comm.has_value()) continue;
+    /* The comm file ends with a newline the listing does not want. */
+    String command_name = steal(*comm);
+    while (!command_name.is_empty() && command_name.back() == '\n')
+      command_name.pop_back();
+
+    process_entry process{};
+    process.pid = parsed.value();
+    process.name = steal(command_name);
+    processes.push(steal(process));
+  }
+  return processes;
+}
+
 } /* namespace os */
 
 } /* namespace shit */
@@ -1548,6 +1658,7 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 
 #include <io.h>
 #include <psapi.h>
+#include <tlhelp32.h>
 
 namespace shit {
 
@@ -2645,6 +2756,74 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
   CloseHandle(process_info.hThread);
 
   return result;
+}
+
+fn make_directory(StringView path, u32 mode) wontthrow -> bool
+{
+  unused(mode);
+  const String path_string{path};
+  return CreateDirectoryA(path_string.c_str(), nullptr) != 0;
+}
+
+fn remove_directory(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return RemoveDirectoryA(path_string.c_str()) != 0;
+}
+
+fn remove_file(StringView path) wontthrow -> bool
+{
+  const String path_string{path};
+  return DeleteFileA(path_string.c_str()) != 0;
+}
+
+fn rename_path(StringView from, StringView to) wontthrow -> bool
+{
+  const String from_string{from};
+  const String to_string{to};
+  return MoveFileExA(from_string.c_str(), to_string.c_str(),
+                     MOVEFILE_REPLACE_EXISTING) != 0;
+}
+
+fn create_symlink(StringView target, StringView link_path) wontthrow -> bool
+{
+  const String target_string{target};
+  const String link_string{link_path};
+  /* A symlink to a directory needs the directory flag, so the target is probed
+     once. The unprivileged-create flag lets the call succeed without elevation
+     on a developer-mode Windows. */
+  DWORD flags = 0x2 /* SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE */;
+  const DWORD attributes = GetFileAttributesA(target_string.c_str());
+  if (attributes != INVALID_FILE_ATTRIBUTES &&
+      (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+    flags |= 0x1 /* SYMBOLIC_LINK_FLAG_DIRECTORY */;
+  return CreateSymbolicLinkA(link_string.c_str(), target_string.c_str(),
+                             flags) != 0;
+}
+
+fn sleep_for_seconds(double seconds) wontthrow -> void
+{
+  if (seconds <= 0.0) return;
+  Sleep(static_cast<DWORD>(seconds * 1000.0));
+}
+
+fn enumerate_processes() throws -> ArrayList<process_entry>
+{
+  ArrayList<process_entry> processes{};
+  HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (snapshot == INVALID_HANDLE_VALUE) return processes;
+  defer { CloseHandle(snapshot); };
+
+  PROCESSENTRY32 entry{};
+  entry.dwSize = sizeof(entry);
+  if (Process32First(snapshot, &entry) == 0) return processes;
+  do {
+    process_entry process{};
+    process.pid = static_cast<i64>(entry.th32ProcessID);
+    process.name = String{StringView{entry.szExeFile}};
+    processes.push(steal(process));
+  } while (Process32Next(snapshot, &entry) != 0);
+  return processes;
 }
 
 } /* namespace os */

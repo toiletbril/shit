@@ -1,0 +1,5 @@
+--- binary named ls acts as ls ---
+ls
+one.txt
+two.txt
+rc=0

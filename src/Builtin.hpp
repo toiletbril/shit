@@ -64,6 +64,8 @@ public:
     Z,
     Complete,
     Compgen,
+    Shitbox,
+    Calc,
     Compopt,
   };
 
@@ -134,6 +136,8 @@ inline constexpr StaticStringMap<Builtin::Kind>::entry BUILTIN_ENTRIES[] = {
     {PackedStringKey::from_literal("z"),         Builtin::Kind::Z             },
     {PackedStringKey::from_literal("complete"),  Builtin::Kind::Complete      },
     {PackedStringKey::from_literal("compgen"),   Builtin::Kind::Compgen       },
+    {PackedStringKey::from_literal("shitbox"),   Builtin::Kind::Shitbox       },
+    {PackedStringKey::from_literal("calc"),      Builtin::Kind::Calc          },
     {PackedStringKey::from_literal("compopt"),   Builtin::Kind::Compopt       },
 };
 
@@ -196,6 +200,8 @@ inline constexpr StaticStringMap<Builtin::Kind> BUILTINS{
   B_CASE(Z);                                                                   \
   B_CASE(Complete);                                                            \
   B_CASE(Compgen);                                                             \
+  B_CASE(Shitbox);                                                             \
+  B_CASE(Calc);                                                                \
   B_CASE(Compopt)
 
 #define BUILTIN_STRUCT(b)                                                      \
@@ -257,6 +263,8 @@ BUILTIN_STRUCT(Complete);
 BUILTIN_STRUCT(Compgen);
 BUILTIN_STRUCT(Compopt);
 BUILTIN_STRUCT(Z);
+BUILTIN_STRUCT(Shitbox);
+BUILTIN_STRUCT(Calc);
 
 class Exit : public Builtin
 {

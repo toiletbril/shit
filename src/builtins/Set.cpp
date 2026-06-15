@@ -74,6 +74,8 @@ const SetOption SET_OPTIONS[] = {
      "Disable pathname expansion.", "no-glob"},
     {'n', "noexec", &EvalContext::set_no_exec, &EvalContext::no_exec,
      "Read and parse commands but do not run them.", "no-exec"},
+    {'\0', "shitbox", &EvalContext::set_shitbox, &EvalContext::shitbox,
+     "Resolve the bundled shitbox utility names directly as commands."},
     {'m', "monitor", &EvalContext::set_monitor, &EvalContext::monitor,
      "Run background jobs in their own process group with notifications."},
     /* failglob has no short letter, so '\0' keeps find_option_by_letter from

@@ -1,0 +1,11 @@
+--- default goal builds both through the pattern ---
+echo cc foo.c -o foo.o
+cc foo.c -o foo.o
+echo cc bar.c -o bar.o
+cc bar.c -o bar.o
+--- explicit object target ---
+echo cc foo.c -o foo.o
+cc foo.c -o foo.o
+--- all prerequisites variable ---
+echo all are a b c and first is a
+all are a b c and first is a
