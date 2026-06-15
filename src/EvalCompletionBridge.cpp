@@ -62,22 +62,22 @@ fn EvalContext::run_completion_function(StringView function_name,
   /* A completion function is bash code that reads and writes arrays, COMP_WORDS
      and COMPREPLY above all, so the call evaluates in bash mode whatever the
      interactive session's mode, then the mode is put back. */
-  let const saved_mood = m_mood;
-  m_mood = mimic_mood::Bash;
-  defer { m_mood = saved_mood; };
+  let const saved_mood = m_runtime.mood;
+  m_runtime.mood = mimic_mood::Bash;
+  defer { m_runtime.mood = saved_mood; };
 
   /* bash-completion is written for bash's lax defaults and reads unset names
      such as SHELLOPTS freely, so the mood-seeded strictness relaxes for the
      function run the way the mood does. An explicit set -u or set -o failglob
      is the user's own ask and stays fatal, the same rule -W follows. */
-  let const saved_error_unset = m_error_unset;
-  let const saved_failglob = m_failglob;
-  if (!m_error_unset_explicit) m_error_unset = false;
-  if (!m_failglob_explicit) m_failglob = false;
+  let const saved_error_unset = m_runtime.error_unset;
+  let const saved_failglob = m_runtime.failglob;
+  if (!m_runtime.error_unset_explicit) m_runtime.error_unset = false;
+  if (!m_runtime.failglob_explicit) m_runtime.failglob = false;
   defer
   {
-    m_error_unset = saved_error_unset;
-    m_failglob = saved_failglob;
+    m_runtime.error_unset = saved_error_unset;
+    m_runtime.failglob = saved_failglob;
   };
 
   /* The completion variables bash exposes to the function, the words of the

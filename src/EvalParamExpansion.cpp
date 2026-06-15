@@ -699,7 +699,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
          hide behind the alternate. A plain run stays silent the way bash leaves
          the unset-safe alternate alone, and a set-but-empty name does not warn
          since it carries a value. */
-      if (!is_set && m_warnings_enabled)
+      if (!is_set && m_runtime.warnings_enabled)
         show_runtime_warning_at(
             locate_variable_reference(name),
             "The variable '" + String{name} +
@@ -761,7 +761,7 @@ fn EvalContext::apply_substring_expansion(StringView name,
                                           StringView body) throws -> String
 {
   let const current = get_variable_value(name);
-  if (m_error_unset && !current.has_value())
+  if (m_runtime.error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
   return apply_substring_to_value(current.value_or(String{}).view(), body);
@@ -871,7 +871,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
                                           StringView spec) throws -> String
 {
   let const current = get_variable_value(name);
-  if (m_error_unset && !current.has_value())
+  if (m_runtime.error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
   return pattern_replace_value(current.value_or(String{}), spec);
@@ -983,7 +983,7 @@ fn EvalContext::apply_case_modification(StringView name, StringView spec) throws
     -> String
 {
   let const current = get_variable_value(name);
-  if (m_error_unset && !current.has_value())
+  if (m_runtime.error_unset && !current.has_value())
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
   return apply_case_modification_to_value(current.value_or(String{}).view(),

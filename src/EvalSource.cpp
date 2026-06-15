@@ -57,8 +57,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   /* The mimic mode decides the lexing and the evaluation, so it is set before
      the parse. The parent's mode is put back when the run is isolated, while
      the terminal run leaves it since the shell exits next. */
-  let const previous_mood = m_mood;
-  m_mood = mode;
+  let const previous_mood = m_runtime.mood;
+  m_runtime.mood = mode;
   LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
   /* A mimicked script is a script-file run, so its FUNCNAME bottoms out at
@@ -208,7 +208,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   restore_state(steal(snapshot));
   set_current_source(previous_source, previous_origin);
   m_current_location = previous_location;
-  m_mood = previous_mood;
+  m_runtime.mood = previous_mood;
   m_is_script_run = previous_script_run;
   set_error_unset(previous_error_unset);
   set_pipefail(previous_pipefail);

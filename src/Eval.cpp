@@ -64,28 +64,12 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
 
 fn runtime_state::capture(const EvalContext &context) wontthrow -> runtime_state
 {
-  return runtime_state{context.m_mood,
-                       context.m_warnings_enabled,
-                       context.m_diagnostics_disabled,
-                       context.m_error_unset,
-                       context.m_pipefail,
-                       context.m_failglob,
-                       context.m_error_unset_explicit,
-                       context.m_pipefail_explicit,
-                       context.m_failglob_explicit};
+  return context.m_runtime;
 }
 
 fn runtime_state::restore(EvalContext &context) const wontthrow -> void
 {
-  context.m_mood = mood;
-  context.m_warnings_enabled = warnings_enabled;
-  context.m_diagnostics_disabled = diagnostics_disabled;
-  context.m_error_unset = error_unset;
-  context.m_pipefail = pipefail;
-  context.m_failglob = failglob;
-  context.m_error_unset_explicit = error_unset_explicit;
-  context.m_pipefail_explicit = pipefail_explicit;
-  context.m_failglob_explicit = failglob_explicit;
+  context.m_runtime = *this;
 }
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
@@ -499,10 +483,11 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
   /* -W downgrades the mood-seeded fatality to a warning so the run proceeds,
      while an explicit set -u keeps the abort the script asked for. A lenient
      run without -W expands the name to empty in silence. */
-  if (m_error_unset && (m_error_unset_explicit || !m_warnings_enabled))
+  if (m_runtime.error_unset &&
+      (m_runtime.error_unset_explicit || !m_runtime.warnings_enabled))
     throw_script_fatal("Unable to expand '" + String{name} +
                        "' because the parameter is not set");
-  if (m_error_unset || m_warnings_enabled)
+  if (m_runtime.error_unset || m_runtime.warnings_enabled)
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
                                 "' is not set, it expands to empty, replace "
@@ -515,9 +500,9 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
                               SourceLocation location,
                               StringView message) throws -> void
 {
-  if (fatal && (explicitly_requested || !m_warnings_enabled))
+  if (fatal && (explicitly_requested || !m_runtime.warnings_enabled))
     throw ErrorWithLocation{location, message};
-  if ((fatal || m_warnings_enabled) && !diagnostics_disabled() &&
+  if ((fatal || m_runtime.warnings_enabled) && !diagnostics_disabled() &&
       m_current_source != nullptr)
   {
     try {
@@ -1183,22 +1168,25 @@ fn EvalContext::set_error_unset(bool enabled) wontthrow -> void
 {
   LOG(Info, "the nounset option flips to %s",
       enabled ? "on" : "off");
-  m_error_unset = enabled;
+  m_runtime.error_unset = enabled;
 }
 
 pure fn EvalContext::error_unset() const wontthrow -> bool
 {
-  return m_error_unset;
+  return m_runtime.error_unset;
 }
 
 fn EvalContext::set_pipefail(bool enabled) wontthrow -> void
 {
   LOG(Info, "the pipefail option flips to %s",
       enabled ? "on" : "off");
-  m_pipefail = enabled;
+  m_runtime.pipefail = enabled;
 }
 
-pure fn EvalContext::pipefail() const wontthrow -> bool { return m_pipefail; }
+pure fn EvalContext::pipefail() const wontthrow -> bool
+{
+  return m_runtime.pipefail;
+}
 
 fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
 {
@@ -1257,10 +1245,13 @@ fn EvalContext::set_failglob(bool enabled) wontthrow -> void
 {
   LOG(Info, "the failglob option flips to %s",
       enabled ? "on" : "off");
-  m_failglob = enabled;
+  m_runtime.failglob = enabled;
 }
 
-pure fn EvalContext::failglob() const wontthrow -> bool { return m_failglob; }
+pure fn EvalContext::failglob() const wontthrow -> bool
+{
+  return m_runtime.failglob;
+}
 
 fn EvalContext::enter_condition() wontthrow -> void { m_condition_depth++; }
 
@@ -1534,7 +1525,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
      expands that variable. */
   const Maybe<String> target = get_variable_value(body);
   if (!target.has_value()) {
-    if (m_error_unset)
+    if (m_runtime.error_unset)
       throw_script_fatal("Unable to expand '" + body +
                          "' because the parameter is not set");
     return String{scratch_allocator()};

@@ -37,9 +37,9 @@ fn EvalContext::register_function(StringView name, const Expression *body,
   /* The mood and the diagnostics state are captured so the call restores them,
      letting a function defined in bash mood run bash after a later set --mood,
      and a function defined while diagnostics were off skip its checks. */
-  info.defining_mood = static_cast<u8>(m_mood);
-  info.defining_warnings = m_warnings_enabled;
-  info.defining_diagnostics_disabled = m_diagnostics_disabled;
+  info.defining_mood = static_cast<u8>(m_runtime.mood);
+  info.defining_warnings = m_runtime.warnings_enabled;
+  info.defining_diagnostics_disabled = m_runtime.diagnostics_disabled;
   m_function_definition_infos.set(name, steal(info));
 }
 

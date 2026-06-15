@@ -843,18 +843,18 @@ public:
      seed, so the -W downgrade leaves it fatal. */
   fn set_error_unset_explicit(bool enabled) wontthrow -> void
   {
-    m_error_unset_explicit = enabled;
+    m_runtime.error_unset_explicit = enabled;
   }
   /* -W keeps a run going past a strict error by reporting it as a warning. The
      analysis stage reads the static flag, the runtime checks below read this
      mirror so set -W flips it mid-run too. */
   fn set_warnings_enabled(bool enabled) wontthrow -> void
   {
-    m_warnings_enabled = enabled;
+    m_runtime.warnings_enabled = enabled;
   }
   pure fn warnings_enabled() const wontthrow -> bool
   {
-    return m_warnings_enabled;
+    return m_runtime.warnings_enabled;
   }
   /* A reference to an unset variable, fatal under set -u, downgraded to a
      warning under -W unless the set -u was the script's explicit ask, expanded
@@ -888,7 +888,7 @@ public:
      than a mood seed, so a later mood switch leaves it in place. */
   fn set_pipefail_explicit(bool enabled) wontthrow -> void
   {
-    m_pipefail_explicit = enabled;
+    m_runtime.pipefail_explicit = enabled;
   }
 
   /* noclobber rejects an overwrite of an existing file through a plain >, set
@@ -916,7 +916,7 @@ public:
      a mood seed, so the -W downgrade leaves it fatal. */
   fn set_failglob_explicit(bool enabled) wontthrow -> void
   {
-    m_failglob_explicit = enabled;
+    m_runtime.failglob_explicit = enabled;
   }
   /* True while a test or [ command expands its arguments, so an unmatched
      glob there stays a silent literal and the probe answers false instead of
@@ -938,12 +938,12 @@ public:
      POSIX syntax, such as the (( )) arithmetic command and brace expansion. The
      evaluator reads it for brace expansion and the parser is handed it at
      construction for the (( )) and C-style for syntax. The shell sits in exactly
-     one mood at a time, held as m_mood, and the mood is selected through set_mood
+     one mood at a time, held in m_runtime, and the mood is selected through set_mood
      by the --mood flag and the set --mood builtin. These predicates name the
      active mood for the lexer, the completion, and the globbing. */
   pure fn is_bash_compatible() const wontthrow -> bool
   {
-    return m_mood == mimic_mood::Bash;
+    return m_runtime.mood == mimic_mood::Bash;
   }
 
   /* POSIX mood behaves like dash. The non-posix-breaking bash additions that
@@ -951,14 +951,14 @@ public:
      stay off only here. */
   pure fn is_posix_mode() const wontthrow -> bool
   {
-    return m_mood == mimic_mood::Posix;
+    return m_runtime.mood == mimic_mood::Posix;
   }
 
   /* The mood the lexer reads, the single source of truth for the three moods.
      set_mood changes only the mood, so a caller that wants the strictness moved
      with it calls apply_strictness_for_mood after. */
-  fn set_mood(mimic_mood mood) wontthrow -> void { m_mood = mood; }
-  pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
+  fn set_mood(mimic_mood mood) wontthrow -> void { m_runtime.mood = mood; }
+  pure fn mood() const wontthrow -> mimic_mood { return m_runtime.mood; }
 
   /* Seed the nounset, pipefail, and failglob strictness from the active mood,
      so the strict default mood runs strict and a compatibility mood runs lax,
@@ -967,10 +967,10 @@ public:
      The startup seam and the set --mood builtin both call this. */
   fn apply_strictness_for_mood() wontthrow -> void
   {
-    let const strict = m_mood == mimic_mood::Default;
-    if (!m_error_unset_explicit) set_error_unset(strict);
-    if (!m_pipefail_explicit) set_pipefail(strict);
-    if (!m_failglob_explicit) set_failglob(strict);
+    let const strict = m_runtime.mood == mimic_mood::Default;
+    if (!m_runtime.error_unset_explicit) set_error_unset(strict);
+    if (!m_runtime.pipefail_explicit) set_pipefail(strict);
+    if (!m_runtime.failglob_explicit) set_failglob(strict);
   }
 
   /* Enter the mood and diagnostic state a function was defined in, deriving the
@@ -982,9 +982,9 @@ public:
       -> runtime_state
   {
     let const previous = runtime_state::capture(*this);
-    m_mood = static_cast<mimic_mood>(info.defining_mood);
-    m_warnings_enabled = info.defining_warnings;
-    m_diagnostics_disabled = info.defining_diagnostics_disabled;
+    m_runtime.mood = static_cast<mimic_mood>(info.defining_mood);
+    m_runtime.warnings_enabled = info.defining_warnings;
+    m_runtime.diagnostics_disabled = info.defining_diagnostics_disabled;
     apply_strictness_for_mood();
     return previous;
   }
@@ -1038,11 +1038,11 @@ public:
      enables the stage the way --no-diagnostics disables it. */
   fn set_diagnostics_enabled(bool enabled) wontthrow -> void
   {
-    m_diagnostics_disabled = !enabled;
+    m_runtime.diagnostics_disabled = !enabled;
   }
   pure fn diagnostics_enabled() const wontthrow -> bool
   {
-    return !m_diagnostics_disabled;
+    return !m_runtime.diagnostics_disabled;
   }
   /* Run the script at the resolved program in-process in the matching mode.
      When isolated is true the run is contained in a snapshotted subshell so its
@@ -1054,7 +1054,7 @@ public:
      a feature that POSIX rejects anyway as a pure addition. */
   pure fn extglob_enabled() const wontthrow -> bool
   {
-    return m_mood != mimic_mood::Posix;
+    return m_runtime.mood != mimic_mood::Posix;
   }
 
   /* The bash dynamic variables, FUNCNAME and RANDOM and their kin, exist
@@ -1062,7 +1062,7 @@ public:
      globs follow, so a bash config sources in the default mood too. */
   pure fn bash_dynamic_variables_enabled() const wontthrow -> bool
   {
-    return m_mood != mimic_mood::Posix;
+    return m_runtime.mood != mimic_mood::Posix;
   }
 
   /* The pure bash additions that POSIX rejects outright, brace expansion and
@@ -1070,7 +1070,7 @@ public:
      its own copy of this predicate for the token-level additions. */
   pure fn bash_additions_enabled() const wontthrow -> bool
   {
-    return m_mood != mimic_mood::Posix;
+    return m_runtime.mood != mimic_mood::Posix;
   }
 
   /* The bash shopt option states, set and read by the shopt builtin. A name
@@ -1356,11 +1356,11 @@ public:
      no-diagnostics flips the per-chunk analysis gate at runtime. */
   fn set_diagnostics_disabled(bool disabled) wontthrow -> void
   {
-    m_diagnostics_disabled = disabled;
+    m_runtime.diagnostics_disabled = disabled;
   }
   pure fn diagnostics_disabled() const wontthrow -> bool
   {
-    return m_diagnostics_disabled;
+    return m_runtime.diagnostics_disabled;
   }
 
   /* The startup facts set -o reports read-only, mirrored from the invocation
@@ -1394,7 +1394,6 @@ protected:
   bool m_show_lexed_words{false};
   bool m_show_exit_code{false};
   bool m_memory_stats_enabled{false};
-  bool m_diagnostics_disabled{false};
   bool m_is_login_shell{false};
   bool m_has_custom_rcfile{false};
   usize m_expressions_executed_last{0};
@@ -1521,14 +1520,12 @@ protected:
      and leaves m_current_source or a control_flow::source dangling. */
   ArrayList<String *> m_retained_sources{heap_allocator()};
 
-  bool m_error_unset{false};
-  /* True when the unset strictness came from an explicit set -u rather than a
-     mood seed, and true while -W reports the run's diagnostics as warnings.
-     Both are read by the -W downgrade in report_unset_reference. */
-  bool m_error_unset_explicit{false};
-  bool m_warnings_enabled{false};
-  bool m_pipefail{false};
-  bool m_pipefail_explicit{false};
+  /* The mood and the diagnostic and strictness toggles, grouped as one runtime
+     state so a scope that swaps them for a function call or a mimicked script
+     saves and restores the whole set with one runtime_state copy. failglob
+     defaults on, the strict shell default that catches a typo, the other
+     toggles default off. */
+  runtime_state m_runtime{.failglob = true};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   bool m_mood_set_explicitly{false};
@@ -1539,21 +1536,14 @@ protected:
   /* The nesting of mimicked scripts, bounded so a script that mimics another
      cannot recurse without limit. */
   usize m_mimicry_depth{0};
-  /* The single shell mood, bash, POSIX, or the default strict mood, the one
-     source of truth the lexer and the evaluator read. */
-  mimic_mood m_mood{mimic_mood::Default};
   /* The unix time the shell started, the base $SECONDS counts from. */
   i64 m_shell_start_time{0};
   /* Whether the $RANDOM generator has been seeded, set on the first read so a
      run that never reads RANDOM pays neither the seed nor its syscall. */
   mutable bool m_random_seeded{false};
-  bool m_failglob{true};
   /* True while a test or [ command expands its arguments, so an unmatched
      glob stays a silent literal and the probe answers false. */
   bool m_glob_exempt_for_test{false};
-  /* True when the glob strictness came from an explicit set -o failglob rather
-     than a mood seed, read by the -W downgrade in warn_or_throw. */
-  bool m_failglob_explicit{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
   StringMap<String> m_traps{heap_allocator()};
