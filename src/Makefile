@@ -35,6 +35,16 @@ ifeq ($(WIN), 1)
 TARGET_WINDOWS := 1
 endif
 
+# TARGET_MACOS gates the link flags that differ on Apple's toolchain, where a
+# fully static system link is unsupported and the C++ runtime is libc++ with its
+# own exception runtime rather than libstdc++/libsupc++.
+TARGET_MACOS :=
+ifneq ($(TARGET_WINDOWS), 1)
+ifeq ($(shell uname -s), Darwin)
+TARGET_MACOS := 1
+endif
+endif
+
 ifeq ($(TARGET_WINDOWS), 1)
 OUT := ../shit.exe
 else
@@ -119,7 +129,6 @@ endif
 
 ifeq ($(MODE), rel)
 CXXFLAGS += \
-	-s \
 	-DNDEBUG
 # Link the runtime statically so a -c invocation or a script launch does not
 # pay the dynamic linker on every startup. This nearly halves the startup time.
@@ -130,16 +139,25 @@ CXXFLAGS += \
 # parser's large functions and its whole-program pass needs tens of gigabytes of
 # memory, so the Windows cross path takes -O0 and no LTO instead, which also
 # keeps the cross build from hogging RAM.
-ifneq ($(TARGET_WINDOWS), 1)
+ifeq ($(TARGET_WINDOWS), 1)
 CXXFLAGS += \
+	-s \
+	-O0
+else ifeq ($(TARGET_MACOS), 1)
+# Apple's toolchain has no -static-pie and links libc++ with its own exception
+# runtime, so the static link and the libsupc++-only drop the Linux build takes
+# are left off. -O3 and link-time optimization still apply for a fast binary.
+CXXFLAGS += \
+	-O3 \
+	-flto
+else
+CXXFLAGS += \
+	-s \
 	-O3 \
 	-flto \
 	-static-pie \
 	-nostdlib++
 LINK_LIBS += -lsupc++
-else
-CXXFLAGS += \
-	-O0
 endif
 else ifeq ($(MODE), dbg)
 CXXFLAGS += \
