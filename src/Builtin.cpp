@@ -11,8 +11,8 @@
 namespace shit {
 
 cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
-                               const ArrayList<StringView> &hs,
-                               const ArrayList<Flag *> &fl,
+                               const ArrayList<StringView> &synopsis_lines,
+                               const ArrayList<Flag *> &flags,
                                StringView extra_sections) throws -> void
 {
   ASSERT(!ec.args().is_empty());
@@ -23,9 +23,9 @@ cold fn show_builtin_help_impl(const ExecContext &ec, StringView description,
     help_text += wrap_text(description, HELP_INDENT, HELP_WRAP_WIDTH);
     help_text += "\n\n";
   }
-  help_text += make_synopsis(ec.args()[0].view(), hs);
+  help_text += make_synopsis(ec.args()[0].view(), synopsis_lines);
   help_text += '\n';
-  help_text += make_flag_help(fl);
+  help_text += make_flag_help(flags);
   help_text += '\n';
   /* The per-builtin generated text, the OPTION SWITCHES table of set and the
      OPTION NAMES list of shopt, lands after the flag sections. */
@@ -191,9 +191,9 @@ fn parse_optional_integer_arg(const ExecContext &ec, i64 default_value) throws
     -> i64
 {
   if (ec.args().count() <= 1) return default_value;
-  let const parsed = utils::parse_decimal_integer(ec.args()[1]);
-  if (parsed.is_error()) throw parsed.error();
-  return parsed.value();
+  let const parsed_value = utils::parse_decimal_integer(ec.args()[1]);
+  if (parsed_value.is_error()) throw parsed_value.error();
+  return parsed_value.value();
 }
 
 Builtin::Builtin() = default;

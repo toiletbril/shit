@@ -32,19 +32,20 @@ i32 Shift::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (ec.args().count() > 1 && ec.args()[1] == "--help")
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let const count = parse_optional_integer_arg(ec, 1);
+  let const shift_count = parse_optional_integer_arg(ec, 1);
 
   let const &params = cxt.positional_params();
-  if (count < 0 || static_cast<usize>(count) > params.count()) return 1;
+  if (shift_count < 0 || static_cast<usize>(shift_count) > params.count())
+    return 1;
 
   LOG(All, "shift dropping %lld of %zu positional parameters",
-      static_cast<long long>(count), params.count());
+      static_cast<long long>(shift_count), params.count());
 
   /* ArrayList has no erase, so the kept tail is copied into a fresh list from
-     index count onward. */
+     index shift_count onward. */
   let shifted = ArrayList<String>{heap_allocator()};
-  shifted.reserve(params.count() - static_cast<usize>(count));
-  for (usize i = static_cast<usize>(count); i < params.count(); i++)
+  shifted.reserve(params.count() - static_cast<usize>(shift_count));
+  for (usize i = static_cast<usize>(shift_count); i < params.count(); i++)
     shifted.push_managed(params[i]);
   cxt.set_positional_params(steal(shifted));
   return 0;

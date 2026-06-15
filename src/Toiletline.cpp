@@ -184,7 +184,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 
     COMPLETION_CANDIDATE_POINTERS.clear();
     COMPLETION_CANDIDATE_POINTERS.reserve(COMPLETION_CANDIDATES.count());
-    for (const shit::String &candidate : COMPLETION_CANDIDATES)
+    for (let const &candidate : COMPLETION_CANDIDATES)
       COMPLETION_CANDIDATE_POINTERS.push(candidate.c_str());
 
     /* Each candidate carries its description, looked up by candidate text since
@@ -198,16 +198,16 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
     out->descriptions = nullptr;
     if (result.descriptions.count() > 0) {
       COMPLETION_DESCRIPTIONS.reserve(COMPLETION_CANDIDATES.count());
-      for (const shit::String &candidate : COMPLETION_CANDIDATES) {
-        if (const shit::String *found =
+      for (let const &candidate : COMPLETION_CANDIDATES) {
+        if (const shit::String *found_description =
                 result.descriptions.find(candidate.view());
-            found != nullptr)
-          COMPLETION_DESCRIPTIONS.push(shit::String{found->view()});
+            found_description != nullptr)
+          COMPLETION_DESCRIPTIONS.push(shit::String{found_description->view()});
         else
           COMPLETION_DESCRIPTIONS.push(shit::String{});
       }
       COMPLETION_DESCRIPTION_POINTERS.reserve(COMPLETION_DESCRIPTIONS.count());
-      for (const shit::String &description : COMPLETION_DESCRIPTIONS)
+      for (let const &description : COMPLETION_DESCRIPTIONS)
         COMPLETION_DESCRIPTION_POINTERS.push(description.c_str());
       out->descriptions = COMPLETION_DESCRIPTION_POINTERS.begin();
     }
@@ -259,7 +259,7 @@ fn shit_highlight_callback(const char *buffer, tl_highlight *out) -> int
         shit::completion::highlight_line(line, *COMPLETION_CONTEXT);
 
     size_t filled = 0;
-    for (const shit::completion::highlight_span &span : result) {
+    for (let const &span : result) {
       if (filled >= out->capacity) break;
       out->spans[filled].start = ::tl_utf8_strnlen(buffer, span.start);
       out->spans[filled].end = ::tl_utf8_strnlen(buffer, span.end);
@@ -425,7 +425,6 @@ fn is_active() -> bool { return ::itl_g_is_active; }
 
 fn initialize() -> void
 {
-  /* Load history. */
   if (shit::Maybe<shit::Path> shit_history = history_file_path();
       shit_history.has_value())
   {
@@ -443,16 +442,15 @@ fn initialize() -> void
 
 fn exit() -> void
 {
-  /* Dump history. */
   if (shit::Maybe<shit::Path> shit_history = history_file_path();
       shit_history.has_value())
   {
-    if (int ret = ::tl_history_dump(shit_history->c_str());
-        ret != TL_SUCCESS && ret != -EINVAL)
+    if (int dump_status = ::tl_history_dump(shit_history->c_str());
+        dump_status != TL_SUCCESS && dump_status != -EINVAL)
     {
-      shit::Error e{"Toiletline: Could not dump history: " +
-                    shit::os::last_system_error_message()};
-      shit::show_message(e.to_string());
+      shit::Error error{"Toiletline: Could not dump history: " +
+                        shit::os::last_system_error_message()};
+      shit::show_message(error.to_string());
     }
   }
 
@@ -485,7 +483,9 @@ fn enter_raw_mode() -> void
      up on the session. */
   if (shit::os::reopen_terminal_as_stdin() &&
       ::tl_enter_raw_mode() == TL_SUCCESS)
+  {
     return;
+  }
   throw shit::Error{"Toiletline: Couldn't force the terminal into raw mode"};
 }
 
@@ -574,10 +574,10 @@ static fn prompt_hostname(bool need_full) throws -> String
   String host = os::get_hostname().value_or(
       os::get_environment_variable("HOSTNAME").value_or("localhost"));
   if (need_full) return host;
-  usize dot = 0;
-  while (dot < host.length() && host.view()[dot] != '.')
-    dot++;
-  return String{host.view().substring_of_length(0, dot)};
+  usize dot_index = 0;
+  while (dot_index < host.length() && host.view()[dot_index] != '.')
+    dot_index++;
+  return String{host.view().substring_of_length(0, dot_index)};
 }
 
 /* Collapse a leading home directory to ~ the way bash does, only when the home
@@ -679,11 +679,11 @@ static fn expand_prompt_escapes(StringView prompt, StringView user,
        the terminal takes color. */
     case '?': {
       const i32 status = context.last_exit_status();
-      const bool wants_color = colors::stdout_wants_color();
-      if (wants_color)
+      const bool should_use_color = colors::stdout_wants_color();
+      if (should_use_color)
         out += status == 0 ? colors::ansi::GREEN : colors::ansi::RED;
       out += utils::int_to_text(status);
-      if (wants_color) out += colors::ansi::RESET;
+      if (should_use_color) out += colors::ansi::RESET;
     } break;
     /* The number of background jobs. */
     case 'j':
@@ -734,12 +734,12 @@ static bool PROMPT_CACHE_VALID = false;
 static fn scan_prompt_template_inputs(
     StringView text, shit::ArrayList<prompt_cache_input> &names) throws -> bool
 {
-  auto is_name_byte = [](char c) {
+  let is_name_byte = [](char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
            (c >= '0' && c <= '9') || c == '_';
   };
-  auto add_name = [&](StringView name) throws {
-    for (const prompt_cache_input &known : names)
+  let do_add_name = [&](StringView name) throws {
+    for (let const &known : names)
       if (known.name.view() == name) return;
     let input = prompt_cache_input{};
     input.name = String{name};
@@ -759,13 +759,15 @@ static fn scan_prompt_template_inputs(
          with unknowable inputs. */
       if (j < text.length && (text[j] == ' ' || text[j] == '\t' ||
                               text[j] == '\n' || text[j] == '|'))
+      {
         return false;
+      }
       if (j < text.length && (text[j] == '#' || text[j] == '!')) j++;
       usize name_start = j;
       while (j < text.length && is_name_byte(text[j]))
         j++;
       if (j == name_start) return false;
-      add_name(text.substring_of_length(name_start, j - name_start));
+      do_add_name(text.substring_of_length(name_start, j - name_start));
       /* An = directly or after a colon assigns at expansion time, an input
          the cache cannot key. The other operators only read. */
       if (j < text.length && text[j] == '=') return false;
@@ -778,13 +780,13 @@ static fn scan_prompt_template_inputs(
     while (j < text.length && is_name_byte(text[j]))
       j++;
     if (j > i + 1) {
-      add_name(text.substring_of_length(i + 1, j - i - 1));
+      do_add_name(text.substring_of_length(i + 1, j - i - 1));
       i = j - 1;
       continue;
     }
     /* A special parameter such as $? or $$ reads one byte, keyed like a
        name so a status change misses the cache. */
-    add_name(text.substring_of_length(i + 1, 1));
+    do_add_name(text.substring_of_length(i + 1, 1));
     i++;
   }
   return true;
@@ -897,10 +899,10 @@ fn build_prompt(EvalContext &context) -> String
      fallback path rescans /etc/passwd, which a per-prompt call would repeat on
      every draw in a bare-environment container. */
   static String CACHED_USER{};
-  static bool USER_RESOLVED = false;
-  if (!USER_RESOLVED) {
+  static bool was_user_resolved = false;
+  if (!was_user_resolved) {
     CACHED_USER = os::get_current_user().value_or("???");
-    USER_RESOLVED = true;
+    was_user_resolved = true;
   }
 
   /* The PS1 template, the user's when set, otherwise the built-in default. */
@@ -931,18 +933,18 @@ fn build_prompt(EvalContext &context) -> String
   if (is_cacheable && PROMPT_CACHE_VALID &&
       ps1_template.view() == PROMPT_CACHE_TEMPLATE.view())
   {
-    bool every_input_unchanged = true;
-    for (const prompt_cache_input &input : PROMPT_CACHE_INPUTS) {
+    bool is_every_input_unchanged = true;
+    for (let const &input : PROMPT_CACHE_INPUTS) {
       let current = context.get_variable_value(input.name.view());
       const bool both_unset = !current.has_value() && !input.value.has_value();
       const bool both_equal = current.has_value() && input.value.has_value() &&
                               current->view() == input.value->view();
       if (!both_unset && !both_equal) {
-        every_input_unchanged = false;
+        is_every_input_unchanged = false;
         break;
       }
     }
-    if (every_input_unchanged) {
+    if (is_every_input_unchanged) {
       String rendered =
           expand_prompt_escapes(PROMPT_CACHE_EXPANSION.view(),
                                 CACHED_USER.view(), full_pwd.view(), context);
@@ -969,7 +971,7 @@ fn build_prompt(EvalContext &context) -> String
 
   PROMPT_CACHE_VALID = false;
   if (is_cacheable) {
-    for (prompt_cache_input &input : scanned_inputs)
+    for (let &input : scanned_inputs)
       input.value = context.get_variable_value(input.name.view());
     PROMPT_CACHE_TEMPLATE = ps1_template;
     PROMPT_CACHE_INPUTS = steal(scanned_inputs);

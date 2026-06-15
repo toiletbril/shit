@@ -42,11 +42,11 @@ i32 Let::execute(ExecContext &ec, EvalContext &cxt) const throws
   LOG(Debug, "let evaluating %zu arithmetic expressions",
       ec.args().count() - 1);
 
-  i64 last = 0;
+  i64 last_value = 0;
   for (usize i = 1; i < ec.args().count(); i++)
-    last = cxt.evaluate_arithmetic(ec.args()[i].view());
+    last_value = cxt.evaluate_arithmetic(ec.args()[i].view());
 
-  return last != 0 ? 0 : 1;
+  return last_value != 0 ? 0 : 1;
 }
 
 } /* namespace shit */

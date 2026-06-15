@@ -56,7 +56,7 @@ public:
   /* bash accepts == as a synonym for = in test, while dash and POSIX reject it,
      so the operator is accepted only in the bash mood and rejected otherwise to
      keep the default mood matching dash. */
-  bool bash_compatible;
+  bool is_bash_compatible;
 
   pure const String &current() const wontthrow
   {
@@ -119,7 +119,7 @@ public:
     /* == is a bashism for string equality. bash accepts it, so the bash mood
        treats it as =, while the default and POSIX moods reject it the way dash
        does. The analysis stage also warns on it as SC3014. */
-    if (op == "=" || (op == "==" && bash_compatible)) return left == right;
+    if (op == "=" || (op == "==" && is_bash_compatible)) return left == right;
     if (op == "==") {
       fail("Unable to evaluate the test because '==' is a bashism, use = for "
            "string equality in POSIX mode");
@@ -138,24 +138,24 @@ public:
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
     if (op == "-ot") return Path{left}.is_older_than(Path{right});
 
-    i64 a = 0, b = 0;
+    i64 left_number = 0, right_number = 0;
     if (op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
         op == "-gt" || op == "-ge")
     {
-      let const left_is_integer = parse_integer(left, a);
-      let const right_is_integer = parse_integer(right, b);
+      let const left_is_integer = parse_integer(left, left_number);
+      let const right_is_integer = parse_integer(right, right_number);
       if (!left_is_integer || !right_is_integer) {
         let const &not_a_number = left_is_integer ? right : left;
         fail(StringView{"Unable to compare with '"} + op + "' because '" +
              not_a_number + "' is not an integer");
         return false;
       }
-      if (op == "-eq") return a == b;
-      if (op == "-ne") return a != b;
-      if (op == "-lt") return a < b;
-      if (op == "-le") return a <= b;
-      if (op == "-gt") return a > b;
-      return a >= b;
+      if (op == "-eq") return left_number == right_number;
+      if (op == "-ne") return left_number != right_number;
+      if (op == "-lt") return left_number < right_number;
+      if (op == "-le") return left_number <= right_number;
+      if (op == "-gt") return left_number > right_number;
+      return left_number >= right_number;
     }
     fail(StringView{"Unable to evaluate the test because '"} + op +
          "' is not a known binary operator, expected one of = != < > -eq -ne "
@@ -339,7 +339,6 @@ pure Builtin::Kind Test::kind() const wontthrow { return Kind::Test; }
 
 i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
 {
-
   /* Strip the program name, and for the [ form the required trailing ]. The
      last operand index ends the expression, one before the trailing ] in the
      bracket form. */
@@ -351,7 +350,9 @@ i32 Test::execute(ExecContext &ec, EvalContext &cxt) const throws
      nonempty string and [ --help ] stays an expression. */
   if (arguments.count() == 2 && arguments[1] == "--help" &&
       ec.program() != "[" && !cxt.is_posix_mode() && !cxt.is_bash_compatible())
+  {
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   usize expression_end = arguments.count();
   if (ec.program() == "[") {

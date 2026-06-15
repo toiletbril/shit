@@ -34,9 +34,6 @@ pure fn word_has_brace_candidate(const Word &word) wontthrow -> bool
   return false;
 }
 
-/* The leftmost brace group that holds a top-level comma, the open and close
-   indices with the comma offsets. A { with no matching } or no top-level comma
-   is literal, so the search moves to the next {. */
 /* Parse a signed integer and report the width of its digit run, so a sequence
    such as {01..10} can pad its output to the wider operand. None when the text
    is not a plain optionally-signed integer. */
@@ -51,7 +48,9 @@ fn parse_sequence_integer(StringView text) wontthrow -> Maybe<sequence_integer>
 {
   if (text.is_empty()) return None;
   usize i = 0;
-  if (text[0] == '-' || text[0] == '+') i++;
+  if (text[0] == '-' || text[0] == '+') {
+    i++;
+  }
   const usize digit_start = i;
   for (; i < text.length; i++)
     if (text[i] < '0' || text[i] > '9') return None;
@@ -401,26 +400,29 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
   m_glob_exempt_for_test = is_test_command;
   defer { m_glob_exempt_for_test = previous_glob_exempt; };
 
-  for (const Token *t : args) {
-    let const l = t->source_location();
+  for (const Token *token : args) {
+    let const location = token->source_location();
     try {
       /* A word token is expanded in place. Any other token is wrapped as one
          unquoted literal word, which is the only case that needs a temporary.
        */
       let fallback_word = Word{};
       const Word *word = nullptr;
-      if (t->kind() == Token::Kind::Word) {
-        word = &static_cast<const tokens::WordToken *>(t)->word();
-      } else if (t->kind() == Token::Kind::Assignment) {
-        let const a = static_cast<const tokens::Assignment *>(t);
-        ASSERT(a != nullptr);
+      if (token->kind() == Token::Kind::Word) {
+        word = &static_cast<const tokens::WordToken *>(token)->word();
+      } else if (token->kind() == Token::Kind::Assignment) {
+        let const assignment_token =
+            static_cast<const tokens::Assignment *>(token);
+        ASSERT(assignment_token != nullptr);
         if (is_declaration_command) {
           /* A declaration builtin treats name=value as an assignment, so the
              value expands with no field splitting or globbing, the way a plain
              x=$1 does, rather than splitting into several arguments. */
           let assignment = String{expanded_args.allocator()};
-          assignment.append(a->key().view());
-          if (a->is_append() && (is_local_command || is_declare_command)) {
+          assignment.append(assignment_token->key().view());
+          if (assignment_token->is_append() &&
+              (is_local_command || is_declare_command))
+          {
             /* local creates a fresh local that shadows an outer name, and
                declare may apply the -i attribute on the same command, so the
                name+=value form passes through literally and the builtin
@@ -428,7 +430,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
             assignment += '+';
             assignment += '=';
             assignment.append(
-                expand_word_for_assignment(a->value_word()).view());
+                expand_word_for_assignment(assignment_token->value_word())
+                    .view());
           } else {
             assignment += '=';
             /* The append form name+=value concatenates onto the name's current
@@ -436,14 +439,16 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                way a plain x+=y assignment prepends the prior value. export and
                readonly do not shadow, so the current value is read here
                correctly. */
-            if (a->is_append())
-              assignment.append(
-                  get_variable_value(a->key()).value_or(String{}).view());
+            if (assignment_token->is_append())
+              assignment.append(get_variable_value(assignment_token->key())
+                                    .value_or(String{})
+                                    .view());
             let const expanded_value =
-                expand_word_for_assignment(a->value_word());
+                expand_word_for_assignment(assignment_token->value_word());
             /* An integer name adds rather than concatenates, so the join wraps
                the appended expression for the arithmetic in the store. */
-            if (a->is_append() && is_integer_variable(a->key()))
+            if (assignment_token->is_append() &&
+                is_integer_variable(assignment_token->key()))
               append_integer_expression(assignment, expanded_value.view());
             else
               assignment.append(expanded_value.view());
@@ -455,20 +460,20 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
            ordinary word. Rebuild it as the literal key, an equals sign, and the
            value segments, so the value still expands instead of staying
            literal. */
-        let key_literal = String{StringView{a->key()}};
+        let key_literal = String{StringView{assignment_token->key()}};
         /* A non-declaration command keeps the literal text, so an append form
            such as echo k+=v stays k+=v rather than losing the plus. */
-        if (a->is_append()) key_literal += "+";
+        if (assignment_token->is_append()) key_literal += "+";
         key_literal += "=";
         fallback_word.segments.push(WordSegment{WordSegment::Kind::LiteralText,
                                                 steal(key_literal), false});
-        let const &value = a->value_word();
+        let const &value = assignment_token->value_word();
         for (const WordSegment &value_segment : value.segments)
           fallback_word.segments.push(value_segment);
         word = &fallback_word;
       } else {
         fallback_word.segments.push(WordSegment{WordSegment::Kind::UnquotedText,
-                                                t->raw_string(), false});
+                                                token->raw_string(), false});
         word = &fallback_word;
       }
 
@@ -478,7 +483,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
          takes this path and never enters expand_word or expand_path. */
       auto expand_one_word = [&](const Word &expandable) throws -> void {
         let const plain_kind = expandable.plain_literal_kind();
-        let took_fast_path = false;
+        let did_take_fast_path = false;
         if (plain_kind != Word::PlainLiteral::NotPlain) {
           let literal = String{expanded_args.allocator()};
           for (const WordSegment &segment : expandable.segments)
@@ -487,24 +492,24 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
           /* A single unquoted segment still needs the IFS check, since an IFS
              byte in its text would split it into more than one field. With no
              IFS byte it is one field. */
-          let needs_split = false;
+          let should_split = false;
           if (plain_kind == Word::PlainLiteral::PlainUnquotedOneSegment) {
             for (usize i = 0; i < literal.count(); i++)
               if (is_field_separator(literal[i])) {
-                needs_split = true;
+                should_split = true;
                 break;
               }
           }
 
-          if (!needs_split) {
+          if (!should_split) {
             expanded_args.push(steal(literal));
-            took_fast_path = true;
+            did_take_fast_path = true;
           }
         }
 
-        if (!took_fast_path) {
+        if (!did_take_fast_path) {
           for (glob_field &field : expand_word(expandable)) {
-            for (String &g : expand_path(steal(field), l))
+            for (String &g : expand_path(steal(field), location))
               expanded_args.push_managed(StringView{g.c_str(), g.count()});
           }
         }
@@ -521,7 +526,7 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         expand_one_word(*word);
       }
     } catch (const Error &e) {
-      throw relocate_error(e, l);
+      throw relocate_error(e, location);
     }
   }
 

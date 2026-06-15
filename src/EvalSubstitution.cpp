@@ -36,9 +36,11 @@ fn drain_command_substitution_pipe(void *raw_context) wontthrow -> void
   try {
     char buffer[4096];
     for (;;) {
-      let const n = os::read_fd(drain->read_fd, buffer, sizeof(buffer));
-      if (!n.has_value() || *n == 0) break;
-      drain->captured->append(StringView{buffer, static_cast<usize>(*n)});
+      let const bytes_read =
+          os::read_fd(drain->read_fd, buffer, sizeof(buffer));
+      if (!bytes_read.has_value() || *bytes_read == 0) break;
+      drain->captured->append(
+          StringView{buffer, static_cast<usize>(*bytes_read)});
     }
   } catch (...) {
     LOG(Debug,
@@ -67,7 +69,9 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   Token *after = lexer.next_shell_token();
   if (after != nullptr && after->kind() != Token::Kind::EndOfFile &&
       after->kind() != Token::Kind::Newline)
+  {
     return None;
+  }
 
   let const filename = expand_word_for_assignment(
       static_cast<const tokens::WordToken *>(name)->word());
@@ -500,7 +504,9 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
      command finishes, the way bash exits from a funsub. */
   if (has_pending_control_flow() &&
       pending_control_flow().kind != control_flow::Kind::Exit)
+  {
     clear_control_flow();
+  }
 
   m_shell_is_interactive = was_interactive;
 

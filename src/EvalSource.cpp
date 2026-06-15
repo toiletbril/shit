@@ -75,12 +75,12 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const previous_error_unset = error_unset();
   let const previous_pipefail = pipefail();
   let const previous_failglob = failglob();
-  let const mimic_strict = mode == mimic_mood::Default;
-  set_error_unset(mimic_strict);
-  set_pipefail(mimic_strict);
-  set_failglob(mimic_strict);
+  let const is_mimic_strict = mode == mimic_mood::Default;
+  set_error_unset(is_mimic_strict);
+  set_pipefail(is_mimic_strict);
+  set_failglob(is_mimic_strict);
   LOG(Debug, "seeded the strict options for the %s mimicked run",
-      mimic_strict ? "shit" : "lax");
+      is_mimic_strict ? "shit" : "lax");
 
   let parser = Parser{
       Lexer{String{contents->view()}, *AST_ARENA, false, None, mood()}
@@ -132,11 +132,11 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const render_error = [&](std::exception_ptr error) {
     try {
       std::rethrow_exception(error);
-    } catch (const ErrorWithLocation &e) {
-      show_message(e.to_string(contents->view()));
+    } catch (const ErrorWithLocation &located_error) {
+      show_message(located_error.to_string(contents->view()));
       print_source_backtrace();
-    } catch (const Error &e) {
-      show_message(e.to_string());
+    } catch (const Error &caught_error) {
+      show_message(caught_error.to_string());
       print_source_backtrace();
     }
   };
@@ -359,17 +359,17 @@ fn EvalContext::run_source(StringView source, StringView origin,
       return source_status;
     }
     return last_exit_status();
-  } catch (const ErrorWithLocationAndDetails &e) {
-    show_message(e.to_string(source));
-    show_message(e.details_to_string(source));
+  } catch (const ErrorWithLocationAndDetails &detailed_error) {
+    show_message(detailed_error.to_string(source));
+    show_message(detailed_error.details_to_string(source));
     print_source_backtrace();
     return 1;
-  } catch (const ErrorWithLocation &e) {
-    show_message(e.to_string(source));
+  } catch (const ErrorWithLocation &located_error) {
+    show_message(located_error.to_string(source));
     print_source_backtrace();
     return 1;
-  } catch (const Error &e) {
-    show_message(e.to_string());
+  } catch (const Error &caught_error) {
+    show_message(caught_error.to_string());
     print_source_backtrace();
     return 1;
   }

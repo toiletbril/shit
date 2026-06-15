@@ -96,9 +96,9 @@ public:
   mustuse fn take() throws -> T
   {
     ASSERT(m_has_value);
-    let moved = steal(reference());
+    let taken_value = steal(reference());
     reset();
-    return moved;
+    return taken_value;
   }
 
   /* The value when present, otherwise the fallback. */

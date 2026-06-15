@@ -64,10 +64,10 @@ fn EvalContext::expand_path_once(const glob_field &field,
   }
 
   if (!has_glob) {
-    let copy = glob_field{scratch};
-    copy.text.append(field.text.view());
-    copy.glob_active = field.glob_active;
-    expanded.push(steal(copy));
+    let literal_field = glob_field{scratch};
+    literal_field.text.append(field.text.view());
+    literal_field.glob_active = field.glob_active;
+    expanded.push(steal(literal_field));
     return expanded;
   }
 
@@ -85,7 +85,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
   ASSERT(has_glob);
   ASSERT(!glob.is_empty());
 
-  for (const String &entry_name : *entries) {
+  for (let const &entry_name : *entries) {
     let const filename = entry_name.view();
 
     /* The full path joins the parent and the filename, the way the directory
@@ -174,7 +174,7 @@ fn collect_globstar_paths(const Path &dir, StringView relative,
   let const entries = Path::read_directory(dir);
   if (!entries.has_value()) return;
 
-  for (const String &entry : *entries) {
+  for (let const &entry : *entries) {
     let const name = entry.view();
     if (!name.is_empty() && name[0] == '.') continue;
 
@@ -205,15 +205,15 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
   let const scratch = scratch_allocator();
   let result = ArrayList<glob_field>{scratch};
 
-  for (glob_field &field : fields) {
+  for (let &field : fields) {
     let const text = field.text.view();
 
     /* An empty mask is the all-literal convention, so a field without one holds
        no live glob metacharacter. */
-    let const expand_ch =
+    let const glob_index =
         first_active_glob(text, field.glob_active, extglob_enabled());
 
-    if (!expand_ch) {
+    if (!glob_index) {
       /* No glob remains. This field is a literal suffix appended after an
          earlier glob, so keep it only when it actually exists. A path produced
          purely by globbing came from a directory read and always exists, so it
@@ -224,11 +224,11 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
 
     /* An active glob index came from the mask, so it points inside the text and
        the field carries a mask parallel to the text. */
-    ASSERT(*expand_ch < text.length);
+    ASSERT(*glob_index < text.length);
     ASSERT(field.glob_active.count() == text.length);
 
     let slash_after = Maybe<usize>{};
-    for (usize k = *expand_ch; k < text.length; k++) {
+    for (usize k = *glob_index; k < text.length; k++) {
       if (text.data[k] == '/') {
         slash_after = k;
         break;
@@ -239,7 +239,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
        component runs from the slash before the glob to the slash after it, and
        it is the globstar form only when it is exactly two active stars. */
     usize component_start = 0;
-    for (usize k = *expand_ch; k > 0; k--)
+    for (usize k = *glob_index; k > 0; k--)
       if (text.data[k - 1] == '/') {
         component_start = k;
         break;
@@ -279,7 +279,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
           base_field.text.append(prefix);
           result.push(steal(base_field));
         }
-        for (const String &relative : relatives) {
+        for (let const &relative : relatives) {
           let match_field = glob_field{scratch};
           match_field.text.append(prefix);
           match_field.text.append(relative.view());
@@ -295,7 +295,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
          a stray slash. */
       let const suffix = text.substring(*slash_after + 1);
       let rebuilt = ArrayList<glob_field>{scratch};
-      for (const String &relative : relatives) {
+      for (let const &relative : relatives) {
         let candidate = glob_field{scratch};
         candidate.text.append(prefix);
         if (!relative.view().is_empty()) {
@@ -312,7 +312,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
         rebuilt.push(steal(candidate));
       }
       let recursed = expand_path_recurse(steal(rebuilt));
-      for (glob_field &f : recursed)
+      for (let &f : recursed)
         result.push(steal(f));
       continue;
     }
@@ -320,8 +320,8 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     /* The glob is the last component, so expand it against files and emit the
        matches as is. */
     if (!slash_after) {
-      let once = expand_path_once(field, true);
-      for (glob_field &f : once)
+      let expanded_files = expand_path_once(field, true);
+      for (let &f : expanded_files)
         result.push(steal(f));
       continue;
     }
@@ -330,10 +330,11 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
        suffix after it, building each from a substring rather than copying the
        whole field. */
     let const slash_offset = static_cast<std::ptrdiff_t>(*slash_after);
-    let operating = glob_field{scratch};
-    operating.text.append(StringView{text.data, *slash_after});
+    let directory_component = glob_field{scratch};
+    directory_component.text.append(StringView{text.data, *slash_after});
     for (std::ptrdiff_t k = 0; k < slash_offset; k++)
-      operating.glob_active.push(field.glob_active[static_cast<usize>(k)]);
+      directory_component.glob_active.push(
+          field.glob_active[static_cast<usize>(k)]);
     let removed_suffix = glob_field{scratch};
     removed_suffix.text.append(
         StringView{text.data + *slash_after, text.length - *slash_after});
@@ -341,12 +342,12 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
          k < field.glob_active.count(); k++)
       removed_suffix.glob_active.push(field.glob_active[k]);
 
-    let once = expand_path_once(operating, false);
+    let expanded_directories = expand_path_once(directory_component, false);
 
     /* Bring back the removed suffix and recurse on the expanded entries. Each
        match came back all-literal with an empty mask, so restore its false
        entries before the suffix mask to keep the mask aligned with the text. */
-    for (glob_field &f : once) {
+    for (let &f : expanded_directories) {
       let const matched_length = f.text.count();
       f.text.append(removed_suffix.text.view());
       f.glob_active.clear();
@@ -359,8 +360,8 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     /* The recurse validates each level through the directory read or, for a
        literal suffix, the existence check above, so no extra stat is needed
        here. */
-    let twice = expand_path_recurse(steal(once));
-    for (glob_field &f : twice)
+    let recursed_matches = expand_path_recurse(steal(expanded_directories));
+    for (let &f : recursed_matches)
       result.push(steal(f));
   }
 
@@ -430,7 +431,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
   if (!segment.is_tilde_candidate()) return;
   let const view = segment.text.view();
   let rewritten = String{heap_allocator()};
-  let changed = false;
+  let was_changed = false;
   usize i = 0;
   while (i < view.length) {
     if (view[i] == ':' && i + 1 < view.length && view[i + 1] == '~') {
@@ -447,7 +448,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
           rewritten += ':';
           rewritten.append(directory->view());
           i = prefix_end;
-          changed = true;
+          was_changed = true;
           continue;
         }
       }
@@ -455,7 +456,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
     rewritten += view[i];
     i++;
   }
-  if (changed) {
+  if (was_changed) {
     LOG(All, "rewrote colon tilde prefixes in an assignment value");
     segment.text = steal(rewritten);
   }
@@ -477,9 +478,9 @@ hot fn EvalContext::expand_path(glob_field field,
           .has_value();
 
   if (!has_glob) {
-    let single = ArrayList<String>{scratch};
-    single.push(steal(field.text));
-    return single;
+    let single_result = ArrayList<String>{scratch};
+    single_result.push(steal(field.text));
+    return single_result;
   }
 
   /* The pattern is kept so a glob that matches None falls back to it, since
@@ -492,7 +493,7 @@ hot fn EvalContext::expand_path(glob_field field,
   let fields = expand_path_recurse(steal(input));
 
   let values = ArrayList<String>{scratch};
-  for (glob_field &f : fields)
+  for (let &f : fields)
     values.push(steal(f.text));
 
   /* Sort the matches in byte order, which is the POSIX collating order in the C
@@ -554,7 +555,7 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
 
   let input = ArrayList<glob_field>{scratch};
   input.push(steal(field));
-  for (glob_field &f : expand_path_recurse(steal(input)))
+  for (let &f : expand_path_recurse(steal(input)))
     values.push(steal(f.text));
   utils::sort_ascending(values);
   LOG(Debug, "compgen -G probe matched %zu paths", values.count());

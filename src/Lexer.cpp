@@ -325,15 +325,16 @@ hot flatten fn Lexer::lex_shell_token() throws -> Token *
        pure addition that is active in the default mode as well as bash mode,
        the way [[ ]] and (( )) are. The < or > opens it only when a ( follows
        with no space. */
-    if ((ch == '<' || ch == '>') && chop_character(1) == '(')
+    if ((ch == '<' || ch == '>') && chop_character(1) == '(') {
       t = lex_process_substitution(ch);
-    else if (lexer::is_shell_sentinel(ch))
+    } else if (lexer::is_shell_sentinel(ch)) {
       t = lex_sentinel();
-    else if (lexer::is_part_of_identifier(ch)) [[likely]]
+    } else if (lexer::is_part_of_identifier(ch)) [[likely]] {
       t = lex_identifier();
-    else [[unlikely]]
+    } else [[unlikely]] {
       throw ErrorWithLocation{here(m_cursor_position, 1),
                               "Unexpected character"};
+    }
   } else {
     t = m_arena->create<tokens::EndOfFile>(here(m_cursor_position, 1));
   }
@@ -428,7 +429,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
   /* Append a character to the open segment, starting a new one when the kind
      changes. A variable reference never merges, since each one carries its own
      name. */
-  auto append_char = [&word](WordSegment::Kind kind, char ch) {
+  auto do_append_char = [&word](WordSegment::Kind kind, char ch) {
     if (!word.segments.is_empty() && word.segments.back().kind == kind &&
         kind != WordSegment::Kind::VariableReference)
     {
@@ -441,10 +442,10 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
   };
 
   /* Append a whole run of plain unquoted bytes to the current UnquotedText
-     segment in one String append, the batched form of calling append_char with
-     UnquotedText for each byte. A run only ever extends or starts an
+     segment in one String append, the batched form of calling do_append_char
+     with UnquotedText for each byte. A run only ever extends or starts an
      UnquotedText segment, since the bytes carry no quote and no escape. */
-  auto append_unquoted_run = [&word](StringView run) {
+  auto do_append_unquoted_run = [&word](StringView run) {
     if (!word.segments.is_empty() &&
         word.segments.back().kind == WordSegment::Kind::UnquotedText)
     {
@@ -459,12 +460,14 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
 
   /* The word so far is a bare array name, the left side of a NAME[subscript]
      reference, when it is one unquoted run that reads as a variable name. */
-  auto word_is_plain_array_name = [&word]() -> bool {
+  auto do_word_is_plain_array_name = [&word]() -> bool {
     if (word.segments.count() != 1) return false;
     const WordSegment &segment = word.segments[0];
     if (segment.kind != WordSegment::Kind::UnquotedText ||
         segment.text.is_empty())
+    {
       return false;
+    }
     if (!lexer::is_variable_name_start(segment.text.view()[0])) return false;
     for (usize i = 1; i < segment.text.count(); i++)
       if (!lexer::is_variable_name(segment.text.view()[i])) return false;
@@ -475,7 +478,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
      = or +=, the shape of an array element assignment. The lookahead consumes
      nothing, it only decides whether the bracket run is a protected subscript.
    */
-  auto subscript_closes_with_assignment = [this](usize start) -> bool {
+  auto do_subscript_closes_with_assignment = [this](usize start) -> bool {
     usize offset = start + 1;
     usize depth = 1;
     while (depth > 0) {
@@ -494,8 +497,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
   /* Advance offset past a balanced open and close pair, the one nested inside a
      subscript or an extended-glob group, stopping at the matching close or at
      the end of the source. */
-  auto scan_to_matched_close = [this](usize &offset, char open,
-                                      char close) -> void {
+  auto do_scan_to_matched_close = [this](usize &offset, char open,
+                                         char close) -> void {
     usize depth = 1;
     while (depth > 0) {
       const char c = chop_character(offset);
@@ -525,13 +528,14 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
        word so far is a bare array name and a balanced ] followed by = or +=
        marks this an assignment, so a glob like x[1|2] in argument position is
        left to split the way bash does. */
-    if (!is_inside_quote_or_escape && ch == '[' && word_is_plain_array_name() &&
-        subscript_closes_with_assignment(byte_count))
+    if (!is_inside_quote_or_escape && ch == '[' &&
+        do_word_is_plain_array_name() &&
+        do_subscript_closes_with_assignment(byte_count))
     {
       const let subscript_start = byte_count;
       byte_count++; /* the [ */
-      scan_to_matched_close(byte_count, '[', ']');
-      append_unquoted_run(m_source.view().substring_of_length(
+      do_scan_to_matched_close(byte_count, '[', ']');
+      do_append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + subscript_start, byte_count - subscript_start));
       continue;
     }
@@ -547,8 +551,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
     {
       const let group_start = byte_count;
       byte_count += 2; /* the opener and the ( */
-      scan_to_matched_close(byte_count, '(', ')');
-      append_unquoted_run(m_source.view().substring_of_length(
+      do_scan_to_matched_close(byte_count, '(', ')');
+      do_append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + group_start, byte_count - group_start));
       continue;
     }
@@ -565,20 +569,22 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       /* The run stops before an extended-glob opener such as the ? of ?(, so
          the opener reaches the group capture above on the next turn rather than
          being swallowed as a plain byte. */
-      auto opens_extglob_at = [this](usize offset) -> bool {
+      auto do_opens_extglob_at = [this](usize offset) -> bool {
         const char c = chop_character(offset);
         return (c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&
                chop_character(offset + 1) == '(';
       };
-      while (!opens_extglob_at(byte_count)) {
+      while (!do_opens_extglob_at(byte_count)) {
         byte_count++;
         const char next = chop_character(byte_count);
         /* The run stops before a '[' so the assignment-subscript capture above
            can decide whether to protect the bracket group, the way it stops
            before an extglob opener. */
-        if (next == '[' || !lexer::is_plain_unquoted_run_byte(next)) break;
+        if (next == '[' || !lexer::is_plain_unquoted_run_byte(next)) {
+          break;
+        }
       }
-      append_unquoted_run(m_source.view().substring_of_length(
+      do_append_unquoted_run(m_source.view().substring_of_length(
           m_cursor_position + run_start, byte_count - run_start));
       continue;
     }
@@ -588,7 +594,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
          continues the line and leaves None behind, so the newline byte is
          consumed without appending anything. */
       should_escape = false;
-      if (ch != '\n') append_char(WordSegment::Kind::LiteralText, ch);
+      if (ch != '\n') do_append_char(WordSegment::Kind::LiteralText, ch);
       byte_count++;
       continue;
     }
@@ -601,7 +607,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
               WordSegment{WordSegment::Kind::LiteralText, String{}, false});
         quote_char.reset();
       } else {
-        append_char(WordSegment::Kind::LiteralText, ch);
+        do_append_char(WordSegment::Kind::LiteralText, ch);
         did_quote_enclose_content = true;
       }
       byte_count++;
@@ -621,7 +627,7 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
         {
           should_escape = true;
         } else {
-          append_char(WordSegment::Kind::DoubleQuotedText, '\\');
+          do_append_char(WordSegment::Kind::DoubleQuotedText, '\\');
         }
         byte_count++;
         continue;
@@ -666,31 +672,31 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       if (next == '\'' && bash_additions_enabled()) {
         byte_count++;
         bool did_emit_any = false;
-        auto emit_literal = [&](char byte) {
-          append_char(WordSegment::Kind::LiteralText, byte);
+        auto do_emit_literal = [&](char byte) {
+          do_append_char(WordSegment::Kind::LiteralText, byte);
           did_emit_any = true;
         };
-        auto hex_value = [](char h) -> i32 {
+        auto do_hex_value = [](char h) -> i32 {
           if (h >= '0' && h <= '9') return h - '0';
           if (h >= 'a' && h <= 'f') return h - 'a' + 10;
           if (h >= 'A' && h <= 'F') return h - 'A' + 10;
           return -1;
         };
-        auto emit_codepoint = [&](u32 cp) {
+        auto do_emit_codepoint = [&](u32 cp) {
           if (cp < 0x80) {
-            emit_literal(static_cast<char>(cp));
+            do_emit_literal(static_cast<char>(cp));
           } else if (cp < 0x800) {
-            emit_literal(static_cast<char>(0xC0 | (cp >> 6)));
-            emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
+            do_emit_literal(static_cast<char>(0xC0 | (cp >> 6)));
+            do_emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
           } else if (cp < 0x10000) {
-            emit_literal(static_cast<char>(0xE0 | (cp >> 12)));
-            emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-            emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
+            do_emit_literal(static_cast<char>(0xE0 | (cp >> 12)));
+            do_emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            do_emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
           } else {
-            emit_literal(static_cast<char>(0xF0 | (cp >> 18)));
-            emit_literal(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
-            emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-            emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
+            do_emit_literal(static_cast<char>(0xF0 | (cp >> 18)));
+            do_emit_literal(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+            do_emit_literal(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            do_emit_literal(static_cast<char>(0x80 | (cp & 0x3F)));
           }
         };
 
@@ -705,42 +711,44 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
           byte_count++;
           if (c == '\'') break;
           if (c != '\\') {
-            emit_literal(c);
+            do_emit_literal(c);
             continue;
           }
           const char e = chop_character(byte_count);
           if (e == lexer::CEOF) {
-            emit_literal('\\');
+            do_emit_literal('\\');
             break;
           }
           byte_count++;
           switch (e) {
-          case 'n': emit_literal('\n'); break;
-          case 't': emit_literal('\t'); break;
-          case 'r': emit_literal('\r'); break;
-          case 'a': emit_literal('\a'); break;
-          case 'b': emit_literal('\b'); break;
-          case 'f': emit_literal('\f'); break;
-          case 'v': emit_literal('\v'); break;
+          case 'n': do_emit_literal('\n'); break;
+          case 't': do_emit_literal('\t'); break;
+          case 'r': do_emit_literal('\r'); break;
+          case 'a': do_emit_literal('\a'); break;
+          case 'b': do_emit_literal('\b'); break;
+          case 'f': do_emit_literal('\f'); break;
+          case 'v': do_emit_literal('\v'); break;
           case 'e':
-          case 'E': emit_literal('\x1b'); break;
-          case '\\': emit_literal('\\'); break;
-          case '\'': emit_literal('\''); break;
-          case '"': emit_literal('"'); break;
-          case '?': emit_literal('?'); break;
+          case 'E': do_emit_literal('\x1b'); break;
+          case '\\': do_emit_literal('\\'); break;
+          case '\'': do_emit_literal('\''); break;
+          case '"': do_emit_literal('"'); break;
+          case '?': do_emit_literal('?'); break;
           case 'x': {
             i32 value = 0;
-            i32 digits = 0;
-            while (digits < 2 && hex_value(chop_character(byte_count)) >= 0) {
-              value = value * 16 + hex_value(chop_character(byte_count));
+            i32 digit_count = 0;
+            while (digit_count < 2 &&
+                   do_hex_value(chop_character(byte_count)) >= 0)
+            {
+              value = value * 16 + do_hex_value(chop_character(byte_count));
               byte_count++;
-              digits++;
+              digit_count++;
             }
-            if (digits == 0) {
-              emit_literal('\\');
-              emit_literal('x');
+            if (digit_count == 0) {
+              do_emit_literal('\\');
+              do_emit_literal('x');
             } else {
-              emit_literal(static_cast<char>(value));
+              do_emit_literal(static_cast<char>(value));
             }
           } break;
           case 'c': {
@@ -751,8 +759,8 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
                punctuation. */
             const char k = chop_character(byte_count);
             if (k == lexer::CEOF) {
-              emit_literal('\\');
-              emit_literal('c');
+              do_emit_literal('\\');
+              do_emit_literal('c');
               break;
             }
             byte_count++;
@@ -768,44 +776,46 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             const u8 control =
                 upper == '?' ? static_cast<u8>(0x7fu)
                              : static_cast<u8>(static_cast<u8>(upper) & 0x1fu);
-            emit_literal(static_cast<char>(control));
+            do_emit_literal(static_cast<char>(control));
           } break;
           case 'u':
           case 'U': {
-            const i32 max_digits = e == 'u' ? 4 : 8;
+            const i32 max_digit_count = e == 'u' ? 4 : 8;
             u32 codepoint = 0;
-            i32 digits = 0;
-            while (digits < max_digits &&
-                   hex_value(chop_character(byte_count)) >= 0)
+            i32 digit_count = 0;
+            while (digit_count < max_digit_count &&
+                   do_hex_value(chop_character(byte_count)) >= 0)
             {
               codepoint =
                   codepoint * 16 +
-                  static_cast<u32>(hex_value(chop_character(byte_count)));
+                  static_cast<u32>(do_hex_value(chop_character(byte_count)));
               byte_count++;
-              digits++;
+              digit_count++;
             }
-            if (digits == 0) {
-              emit_literal('\\');
-              emit_literal(e);
+            if (digit_count == 0) {
+              do_emit_literal('\\');
+              do_emit_literal(e);
             } else {
-              emit_codepoint(codepoint);
+              do_emit_codepoint(codepoint);
             }
           } break;
           default:
             if (e >= '0' && e <= '7') {
               i32 value = e - '0';
-              i32 digits = 1;
-              while (digits < 3) {
+              i32 digit_count = 1;
+              while (digit_count < 3) {
                 const char o = chop_character(byte_count);
-                if (o < '0' || o > '7') break;
+                if (o < '0' || o > '7') {
+                  break;
+                }
                 value = value * 8 + (o - '0');
                 byte_count++;
-                digits++;
+                digit_count++;
               }
-              emit_literal(static_cast<char>(value));
+              do_emit_literal(static_cast<char>(value));
             } else {
-              emit_literal('\\');
-              emit_literal(e);
+              do_emit_literal('\\');
+              do_emit_literal(e);
             }
             break;
           }
@@ -1013,7 +1023,9 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
             inner += c;
             for (;;) {
               const let comment_char = chop_character(byte_count);
-              if (comment_char == lexer::CEOF || comment_char == '\n') break;
+              if (comment_char == lexer::CEOF || comment_char == '\n') {
+                break;
+              }
               byte_count++;
               inner += comment_char;
             }
@@ -1201,9 +1213,9 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
                                        steal(special), is_in_double_quotes});
       } else {
         /* A dollar sign that names None stays a literal dollar sign. */
-        append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
-                                        : WordSegment::Kind::UnquotedText,
-                    '$');
+        do_append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
+                                           : WordSegment::Kind::UnquotedText,
+                       '$');
       }
       continue;
     }
@@ -1247,9 +1259,9 @@ flatten hot fn Lexer::lex_identifier() throws -> Token *
       continue;
     }
 
-    append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
-                                    : WordSegment::Kind::UnquotedText,
-                ch);
+    do_append_char(is_in_double_quotes ? WordSegment::Kind::DoubleQuotedText
+                                       : WordSegment::Kind::UnquotedText,
+                   ch);
     byte_count++;
   }
 

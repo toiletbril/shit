@@ -35,7 +35,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
-  let had_error = false;
+  let has_error = false;
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const parts = utils::split_name_value_arg(arg);
@@ -59,7 +59,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (has_new_value) {
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is read-only");
-        had_error = true;
+        has_error = true;
       }
       continue;
     }
@@ -92,7 +92,7 @@ fn Export::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (name == "PATH") utils::set_path_for_resolution(String{value.view()});
   }
 
-  return had_error ? 2 : 0;
+  return has_error ? 2 : 0;
 }
 
 } /* namespace shit */

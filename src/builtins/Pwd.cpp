@@ -32,7 +32,7 @@ i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let p = String{};
+  let output = String{};
   /* The physical form resolves every symlink through getcwd. The logical form,
      the POSIX default, prints PWD so the path keeps the symlinks it was reached
      through, the way bash and dash do, so cd /tmp on a system where /tmp is a
@@ -45,13 +45,13 @@ i32 Pwd::execute(ExecContext &ec, EvalContext &cxt) const throws
       logical_pwd->view()[0] == '/')
   {
     LOG(Debug, "pwd printing the logical directory from PWD");
-    p.append(logical_pwd->view());
+    output.append(logical_pwd->view());
   } else {
     LOG(Debug, "pwd printing the physical directory from getcwd");
-    p.append(Path::current_directory().text());
+    output.append(Path::current_directory().text());
   }
-  p += '\n';
-  ec.print_to_stdout(p);
+  output += '\n';
+  ec.print_to_stdout(output);
   return 0;
 }
 

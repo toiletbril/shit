@@ -91,7 +91,7 @@ const StringView SHOPT_OPTION_NAMES[] = {
 
 bool is_known_shopt_option(StringView name) throws
 {
-  for (const StringView known : SHOPT_OPTION_NAMES)
+  for (let const &known : SHOPT_OPTION_NAMES)
     if (known == name) return true;
   return false;
 }
@@ -113,7 +113,7 @@ String shopt_status_line(StringView name, bool on) throws
 String format_option_names_help() throws
 {
   usize longest = 0;
-  for (const StringView name : SHOPT_OPTION_NAMES)
+  for (let const &name : SHOPT_OPTION_NAMES)
     if (name.length > longest) longest = name.length;
   let const column_width = longest + 2;
   let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
@@ -160,7 +160,7 @@ fn shopt_option_name_list() throws -> const ArrayList<StringView> &
     let collected = ArrayList<StringView>{};
     collected.reserve(sizeof(SHOPT_OPTION_NAMES) /
                       sizeof(SHOPT_OPTION_NAMES[0]));
-    for (const StringView name : SHOPT_OPTION_NAMES)
+    for (let const &name : SHOPT_OPTION_NAMES)
       collected.push(name);
     return collected;
   }();
@@ -179,11 +179,11 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (args.count() > 1 && args[1] == "--help")
     SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(ec, format_option_names_help().view());
 
-  bool enable = false;
-  bool disable = false;
-  bool quiet = false;
-  bool operate_on_set_options = false;
-  bool print_reusable = false;
+  bool should_enable = false;
+  bool should_disable = false;
+  bool is_quiet = false;
+  bool should_operate_on_set_options = false;
+  bool should_print_reusable = false;
   let names = ArrayList<StringView>{heap_allocator()};
 
   for (usize i = 1; i < args.count(); i++) {
@@ -194,15 +194,15 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
     if (arg.length >= 2 && arg[0] == '-') {
       for (usize k = 1; k < arg.length; k++) {
         if (arg[k] == 's')
-          enable = true;
+          should_enable = true;
         else if (arg[k] == 'u')
-          disable = true;
+          should_disable = true;
         else if (arg[k] == 'q')
-          quiet = true;
+          is_quiet = true;
         else if (arg[k] == 'o')
-          operate_on_set_options = true;
+          should_operate_on_set_options = true;
         else if (arg[k] == 'p')
-          print_reusable = true;
+          should_print_reusable = true;
       }
     } else {
       names.push(arg);
@@ -211,20 +211,20 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* -p prints in the replayable command form rather than the status form, so a
      query keeps printing while the line changes shape. */
-  let const format_status_line = [&](StringView name, bool on) throws {
-    return print_reusable
-               ? shopt_reusable_line(name, on, operate_on_set_options)
+  let const do_format_status_line = [&](StringView name, bool on) throws {
+    return should_print_reusable
+               ? shopt_reusable_line(name, on, should_operate_on_set_options)
                : shopt_status_line(name, on);
   };
 
   i32 status = 0;
-  auto reject_unknown = [&](StringView name) throws -> bool {
+  auto do_reject_unknown = [&](StringView name) throws -> bool {
     if (is_known_shopt_option(name)) return false;
     /* A -q probe wants the status without the message, so it stays silent. Any
        other invocation throws a located error the dispatch renders with a caret
        at the command, kept short rather than the long Unable-to-because form.
      */
-    if (quiet) {
+    if (is_quiet) {
       status = 1;
       return true;
     }
@@ -234,20 +234,20 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* shopt -o operates on the set -o options rather than the shopt names, the
      bridge bash provides so the same options answer either builtin. A config
      probes shopt -qo posix to detect the POSIX mode. */
-  if (operate_on_set_options) {
+  if (should_operate_on_set_options) {
     /* A bare shopt -o or shopt -po lists every set option, the way the named
        query prints one. */
     if (names.is_empty()) {
-      if (!quiet)
-        for (const StringView name : shell_option_names(false))
+      if (!is_quiet)
+        for (let const &name : shell_option_names(false))
           if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
-            ec.print_to_stdout(format_status_line(name, *on).view());
+            ec.print_to_stdout(do_format_status_line(name, *on).view());
       return 0;
     }
-    for (const StringView name : names) {
-      if (enable || disable) {
-        if (!apply_shell_option(cxt, name, enable)) {
-          if (quiet)
+    for (let const &name : names) {
+      if (should_enable || should_disable) {
+        if (!apply_shell_option(cxt, name, should_enable)) {
+          if (is_quiet)
             status = 1;
           else
             throw Error{StringView{"unknown shopt option '"} + name + "'"};
@@ -255,9 +255,10 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
       } else if (Maybe<bool> on = query_shell_option(cxt, name); on.has_value())
       {
         if (!*on) status = 1;
-        if (!quiet) ec.print_to_stdout(format_status_line(name, *on).view());
+        if (!is_quiet)
+          ec.print_to_stdout(do_format_status_line(name, *on).view());
       } else {
-        if (quiet)
+        if (is_quiet)
           status = 1;
         else
           throw Error{StringView{"unknown shopt option '"} + name + "'"};
@@ -266,12 +267,12 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
     return status;
   }
 
-  if (enable || disable) {
-    for (const StringView name : names) {
-      if (reject_unknown(name)) continue;
+  if (should_enable || should_disable) {
+    for (let const &name : names) {
+      if (do_reject_unknown(name)) continue;
       LOG(Info, "shopt setting '%.*s' to %s", static_cast<int>(name.length),
-          name.data, enable ? "on" : "off");
-      cxt.set_shopt_option(name, enable);
+          name.data, should_enable ? "on" : "off");
+      cxt.set_shopt_option(name, should_enable);
     }
     return status;
   }
@@ -281,19 +282,19 @@ i32 Shopt::execute(ExecContext &ec, EvalContext &cxt) const throws
      set. A named query prints each option and reports a non-zero status when
      any is off, which the -q form relies on. */
   if (names.is_empty()) {
-    if (!quiet) {
-      for (const StringView name : SHOPT_OPTION_NAMES)
+    if (!is_quiet) {
+      for (let const &name : SHOPT_OPTION_NAMES)
         ec.print_to_stdout(
-            format_status_line(name, cxt.is_shopt_enabled(name)).view());
+            do_format_status_line(name, cxt.is_shopt_enabled(name)).view());
     }
     return 0;
   }
 
-  for (const StringView name : names) {
-    if (reject_unknown(name)) continue;
+  for (let const &name : names) {
+    if (do_reject_unknown(name)) continue;
     const bool on = cxt.is_shopt_enabled(name);
     if (!on) status = 1;
-    if (!quiet) ec.print_to_stdout(format_status_line(name, on).view());
+    if (!is_quiet) ec.print_to_stdout(do_format_status_line(name, on).view());
   }
   return status;
 }

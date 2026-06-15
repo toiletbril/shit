@@ -46,8 +46,8 @@ public:
   fn bytes_capacity() const wontthrow -> usize
   {
     usize total = 0;
-    for (const block &b : m_blocks)
-      total += b.size;
+    for (const block &block : m_blocks)
+      total += block.size;
     return total;
   }
 

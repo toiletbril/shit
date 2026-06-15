@@ -77,14 +77,14 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (args.count() > 1 && args[1] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  bool make_associative = false;
-  bool make_indexed = false;
-  bool do_export = false;
-  bool do_print = false;
-  bool mark_integer_attribute = false;
-  bool unmark_integer_attribute = false;
-  bool restrict_to_functions = false;
-  bool function_names_only = false;
+  bool should_make_associative = false;
+  bool should_make_indexed = false;
+  bool should_export = false;
+  bool should_print = false;
+  bool should_mark_integer_attribute = false;
+  bool should_unmark_integer_attribute = false;
+  bool should_restrict_to_functions = false;
+  bool should_print_function_names_only = false;
 
   usize i = 1;
   for (; i < args.count(); i++) {
@@ -99,20 +99,20 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     let const is_remove_form = arg[0] == '+';
     for (usize c = 1; c < arg.length; c++) {
       switch (arg[c]) {
-      case 'A': make_associative = true; break;
-      case 'a': make_indexed = true; break;
-      case 'x': do_export = true; break;
-      case 'p': do_print = true; break;
+      case 'A': should_make_associative = true; break;
+      case 'a': should_make_indexed = true; break;
+      case 'x': should_export = true; break;
+      case 'p': should_print = true; break;
       case 'i':
         if (is_remove_form)
-          unmark_integer_attribute = true;
+          should_unmark_integer_attribute = true;
         else
-          mark_integer_attribute = true;
+          should_mark_integer_attribute = true;
         break;
-      case 'f': restrict_to_functions = true; break;
+      case 'f': should_restrict_to_functions = true; break;
       case 'F':
-        restrict_to_functions = true;
-        function_names_only = true;
+        should_restrict_to_functions = true;
+        should_print_function_names_only = true;
         break;
       /* The remaining attribute letters carry no backing behavior yet and are
          accepted so a script that sets them keeps running. */
@@ -139,12 +139,12 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
      an existence probe, with a message for -f. Without names, -F lists every
      function as "declare -f NAME" sorted and -f prints every recorded
      definition. */
-  if (restrict_to_functions) {
+  if (should_restrict_to_functions) {
     i32 status = 0;
     if (i >= args.count()) {
-      for (const String &name : cxt.sorted_function_names()) {
+      for (let const &name : cxt.sorted_function_names()) {
         let line = String{};
-        if (function_names_only) {
+        if (should_print_function_names_only) {
           line += "declare -f ";
           line.append(name.view());
         } else if (const String *source = cxt.find_function_source(name.view()))
@@ -159,13 +159,13 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
     for (; i < args.count(); i++) {
       const StringView name = args[i].view();
       if (cxt.find_function(name) == nullptr) {
-        if (!function_names_only)
+        if (!should_print_function_names_only)
           report_soft_builtin_error(
               ec, cxt, StringView{"'"} + name + "' is not a function");
         status = 1;
         continue;
       }
-      if (function_names_only) {
+      if (should_print_function_names_only) {
         let line = String{name};
         line += '\n';
         ec.print_to_stdout(line.view());
@@ -183,7 +183,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* declare -p NAME prints the current declaration of each name in the bash
      syntax, the attribute flag then the name and a quoted value or an array
      literal, so a script can reload the state. An unknown name is an error. */
-  if (do_print) {
+  if (should_print) {
     i32 status = 0;
     for (; i < args.count(); i++) {
       const StringView name = args[i].view();
@@ -282,19 +282,19 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
 
     /* The attribute applies before the assignment, so declare -i x+=3 already
        adds on this command the way bash applies the integer mark first. */
-    if (mark_integer_attribute) cxt.mark_integer(name);
-    if (unmark_integer_attribute) cxt.unmark_integer(name);
+    if (should_mark_integer_attribute) cxt.mark_integer(name);
+    if (should_unmark_integer_attribute) cxt.unmark_integer(name);
 
     LOG(All, "declare applying attributes to '%.*s'",
         static_cast<int>(name.length), name.data);
 
     if (has_subscript && equals.has_value()) {
       cxt.assign_array_element(name, subscript, value, is_append);
-    } else if (make_associative) {
+    } else if (should_make_associative) {
       LOG(All, "declare making '%.*s' an associative array",
           static_cast<int>(name.length), name.data);
       cxt.declare_associative_array(name);
-    } else if (make_indexed) {
+    } else if (should_make_indexed) {
       if (cxt.lookup_indexed_array(name) == nullptr)
         cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
     } else if (equals.has_value()) {
@@ -314,7 +314,7 @@ i32 Declare::execute(ExecContext &ec, EvalContext &cxt) const throws
       } else {
         cxt.set_shell_variable(name, value);
       }
-      if (do_export) {
+      if (should_export) {
         LOG(All, "declare exporting '%.*s' to the environment",
             static_cast<int>(name.length), name.data);
         cxt.record_environment_change(name);

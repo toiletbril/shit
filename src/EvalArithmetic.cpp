@@ -21,20 +21,23 @@ namespace {
 pure fn count_leading_digits(StringView text, u32 radix) wontthrow -> usize
 {
   usize length = 0;
+
   while (length < text.length) {
-    let const c = text[length];
+    let const current_byte = text[length];
     u32 digit;
-    if (c >= '0' && c <= '9')
-      digit = static_cast<u32>(c - '0');
-    else if (c >= 'a' && c <= 'f')
-      digit = static_cast<u32>(c - 'a') + 10;
-    else if (c >= 'A' && c <= 'F')
-      digit = static_cast<u32>(c - 'A') + 10;
-    else
+    if (current_byte >= '0' && current_byte <= '9') {
+      digit = static_cast<u32>(current_byte - '0');
+    } else if (current_byte >= 'a' && current_byte <= 'f') {
+      digit = static_cast<u32>(current_byte - 'a') + 10;
+    } else if (current_byte >= 'A' && current_byte <= 'F') {
+      digit = static_cast<u32>(current_byte - 'A') + 10;
+    } else {
       break;
+    }
     if (digit >= radix) break;
     length++;
   }
+
   return length;
 }
 
@@ -55,7 +58,7 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
     body = body.substring(1);
   }
 
-  let const parsed = [&]() -> ErrorOr<i64> {
+  let const parsed_value = [&]() -> ErrorOr<i64> {
     if (body.length >= 2 && body[0] == '0' &&
         (body[1] == 'x' || body[1] == 'X'))
     {
@@ -63,15 +66,16 @@ pure fn parse_arithmetic_operand(StringView text) wontthrow -> i64
       return utils::parse_hexadecimal_integer(
           digits.substring_of_length(0, count_leading_digits(digits, 16)));
     }
-    if (body.length >= 1 && body[0] == '0')
+    if (body.length >= 1 && body[0] == '0') {
       return utils::parse_octal_integer(
           body.substring_of_length(0, count_leading_digits(body, 8)));
+    }
     return utils::parse_decimal_integer(
         body.substring_of_length(0, count_leading_digits(body, 10)));
   }();
 
-  if (parsed.is_error()) return 0;
-  return is_negative ? -parsed.value() : parsed.value();
+  if (parsed_value.is_error()) return 0;
+  return is_negative ? -parsed_value.value() : parsed_value.value();
 }
 
 /* Signed arithmetic in $((...)) wraps two's-complement the way dash does, so
@@ -140,7 +144,9 @@ pure fn arithmetic_shift_right(i64 lhs, i64 rhs) wontthrow -> i64
   let const count = static_cast<u64>(rhs) & 63u;
   let const is_negative = lhs < 0;
   let value = static_cast<u64>(lhs) >> count;
-  if (is_negative && count > 0) value |= ~(~static_cast<u64>(0) >> count);
+  if (is_negative && count > 0) {
+    value |= ~(~static_cast<u64>(0) >> count);
+  }
   return static_cast<i64>(value);
 }
 
@@ -233,8 +239,9 @@ public:
   fn read_lvalue_name() wontthrow -> StringView
   {
     skip_spaces();
-    if (pos >= source.length || !lexer::is_variable_name_start(source[pos]))
+    if (pos >= source.length || !lexer::is_variable_name_start(source[pos])) {
       return StringView{};
+    }
     let const name_start = pos;
     while (pos < source.length && lexer::is_variable_name(source[pos]))
       pos++;
@@ -424,7 +431,7 @@ public:
           next_byte == '%' || next_byte == '&' || next_byte == '|' ||
           next_byte == '^')
       {
-        for (const auto &[op, kind] : compound_operators) {
+        for (let const &[ op, kind ] : compound_operators) {
           if (consume(op)) {
             let const rhs = parse_assignment();
             let const result =
@@ -495,43 +502,55 @@ public:
   {
     skip_spaces();
     if (pos >= source.length) return {0, 0, 0};
-    let const a = source[pos];
-    let const b = pos + 1 < source.length ? source[pos + 1] : '\0';
-    let const c = pos + 2 < source.length ? source[pos + 2] : '\0';
-    switch (a) {
+    let const first_byte = source[pos];
+    let const second_byte = pos + 1 < source.length ? source[pos + 1] : '\0';
+    let const third_byte = pos + 2 < source.length ? source[pos + 2] : '\0';
+    switch (first_byte) {
     case '*':
-      if (b == '*') return {'P', 11, 2};
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'*', 10, 1};
+      if (second_byte == '*') return {'P', 11, 2};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'*', 10, 1};
     case '/':
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'/', 10, 1};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'/', 10, 1};
     case '%':
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'%', 10, 1};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'%', 10, 1};
     case '+':
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'+', 9, 1};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'+', 9, 1};
     case '-':
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'-', 9, 1};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'-', 9, 1};
     case '<':
-      if (b == '<')
-        return c == '=' ? binary_operator{0, 0, 0} : binary_operator{'L', 8, 2};
-      if (b == '=') return {'l', 7, 2};
+      if (second_byte == '<')
+        return third_byte == '=' ? binary_operator{0, 0, 0}
+                                 : binary_operator{'L', 8, 2};
+      if (second_byte == '=') return {'l', 7, 2};
       return {'<', 7, 1};
     case '>':
-      if (b == '>')
-        return c == '=' ? binary_operator{0, 0, 0} : binary_operator{'R', 8, 2};
-      if (b == '=') return {'g', 7, 2};
+      if (second_byte == '>')
+        return third_byte == '=' ? binary_operator{0, 0, 0}
+                                 : binary_operator{'R', 8, 2};
+      if (second_byte == '=') return {'g', 7, 2};
       return {'>', 7, 1};
     case '=':
-      return b == '=' ? binary_operator{'e', 6, 2} : binary_operator{0, 0, 0};
+      return second_byte == '=' ? binary_operator{'e', 6, 2}
+                                : binary_operator{0, 0, 0};
     case '!':
-      return b == '=' ? binary_operator{'n', 6, 2} : binary_operator{0, 0, 0};
+      return second_byte == '=' ? binary_operator{'n', 6, 2}
+                                : binary_operator{0, 0, 0};
     case '&':
-      if (b == '&') return {'A', 2, 2};
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'&', 5, 1};
+      if (second_byte == '&') return {'A', 2, 2};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'&', 5, 1};
     case '^':
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'^', 4, 1};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'^', 4, 1};
     case '|':
-      if (b == '|') return {'O', 1, 2};
-      return b == '=' ? binary_operator{0, 0, 0} : binary_operator{'|', 3, 1};
+      if (second_byte == '|') return {'O', 1, 2};
+      return second_byte == '=' ? binary_operator{0, 0, 0}
+                                : binary_operator{'|', 3, 1};
     default: return {0, 0, 0};
     }
   }
@@ -675,9 +694,10 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
   {
     let const base =
         parse_arithmetic_operand(from.substring_of_length(0, base_length));
-    if (base < 2 || base > 64)
+    if (base < 2 || base > 64) {
       throw Error{"Arithmetic: an arithmetic base must be between 2 and 64"};
-    let digit_value = [base](char c) -> i64 {
+    }
+    let const do_digit_value = [base](char c) -> i64 {
       if (c >= '0' && c <= '9') return c - '0';
       if (c >= 'a' && c <= 'z') return c - 'a' + 10;
       if (c >= 'A' && c <= 'Z') return base <= 36 ? c - 'A' + 10 : c - 'A' + 36;
@@ -688,8 +708,10 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
     i64 value = 0;
     usize i = base_length + 1;
     while (i < from.length) {
-      let const digit = digit_value(from[i]);
-      if (digit < 0 || digit >= base) break;
+      let const digit = do_digit_value(from[i]);
+      if (digit < 0 || digit >= base) {
+        break;
+      }
       value = value * base + digit;
       i++;
     }
@@ -699,11 +721,13 @@ static fn lex_arith_number(StringView from, i64 *out_value) throws -> usize
 
   usize consumed;
   if (from.length >= 2 && from[0] == '0' && (from[1] == 'x' || from[1] == 'X'))
+  {
     consumed = 2 + count_leading_digits(from.substring(2), 16);
-  else if (from.length >= 1 && from[0] == '0')
+  } else if (from.length >= 1 && from[0] == '0') {
     consumed = count_leading_digits(from, 8);
-  else
+  } else {
     consumed = count_leading_digits(from, 10);
+  }
   if (consumed == 0) consumed = 1;
   *out_value = parse_arithmetic_operand(from.substring_of_length(0, consumed));
   return consumed;
@@ -726,12 +750,14 @@ static fn tokenize_arithmetic(StringView src,
 {
   usize i = 0;
   while (i < src.length) {
-    let const c = src[i];
-    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+    let const current_byte = src[i];
+    if (current_byte == ' ' || current_byte == '\t' || current_byte == '\n' ||
+        current_byte == '\r')
+    {
       i++;
       continue;
     }
-    if (lexer::is_number(c)) {
+    if (lexer::is_number(current_byte)) {
       i64 value = 0;
       let const consumed = lex_arith_number(src.substring(i), &value);
       out.push(arith_token{arith_token::kind::number, value,
@@ -739,7 +765,7 @@ static fn tokenize_arithmetic(StringView src,
       i += consumed;
       continue;
     }
-    if (lexer::is_variable_name_start(c)) {
+    if (lexer::is_variable_name_start(current_byte)) {
       let const name_start = i;
       i++;
       while (i < src.length && lexer::is_variable_name(src[i]))
@@ -767,21 +793,21 @@ static fn tokenize_arithmetic(StringView src,
       }
       continue;
     }
-    bool matched = false;
-    for (const StringView &op : ARITH_OPERATORS) {
+    bool is_matched = false;
+    for (let const &op : ARITH_OPERATORS) {
       if (i + op.length <= src.length &&
           src.substring_of_length(i, op.length) == op)
       {
         out.push(arith_token{arith_token::kind::op, 0,
                              src.substring_of_length(i, op.length)});
         i += op.length;
-        matched = true;
+        is_matched = true;
         break;
       }
     }
     /* An unrecognized byte becomes a one-byte op so the simple evaluator fails
        on it the way the char parser does. */
-    if (!matched) {
+    if (!is_matched) {
       out.push(
           arith_token{arith_token::kind::op, 0, src.substring_of_length(i, 1)});
       i++;
@@ -804,10 +830,11 @@ static pure fn arith_op_is_complex(StringView t) wontthrow -> bool
 static pure fn
 arith_tokens_are_simple(const ArrayList<arith_token> &toks) wontthrow -> bool
 {
-  for (const arith_token &t : toks) {
+  for (let const &t : toks) {
     if (t.k == arith_token::kind::subscript) return false;
-    if (t.k == arith_token::kind::op && arith_op_is_complex(t.text))
+    if (t.k == arith_token::kind::op && arith_op_is_complex(t.text)) {
       return false;
+    }
   }
   return true;
 }
@@ -963,7 +990,9 @@ public:
   {
     let lhs = parse_operand();
     for (;;) {
-      if (ti >= toks.count() || toks[ti].k != arith_token::kind::op) return lhs;
+      if (ti >= toks.count() || toks[ti].k != arith_token::kind::op) {
+        return lhs;
+      }
       let const op = arith_classify_binop(toks[ti].text);
       if (op.precedence < min_precedence) return lhs;
       ti++;
@@ -1025,7 +1054,9 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
      such as d=$((d+1)), takes the cached token path. */
   if (expr.find_character('$').has_value() ||
       expr.find_character('`').has_value())
+  {
     return evaluate_arithmetic(expr);
+  }
 
   if (!segment.arith_tokenized) {
     segment.cached_arith_tokens.clear();

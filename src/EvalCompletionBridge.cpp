@@ -84,7 +84,7 @@ fn EvalContext::run_completion_function(StringView function_name,
      line, the index of the word under the cursor, and the raw line and byte. */
   let comp_words = ArrayList<String>{};
   comp_words.reserve(words.count());
-  for (const String &word : words)
+  for (let const &word : words)
     comp_words.push_managed(word.view());
   set_indexed_array("COMP_WORDS", steal(comp_words));
   set_shell_variable("COMP_CWORD", utils::int_to_text(static_cast<i64>(cword)));
@@ -152,7 +152,7 @@ fn EvalContext::run_completion_function(StringView function_name,
       reply != nullptr)
   {
     result.reserve(reply->count());
-    for (const String &entry : *reply)
+    for (let const &entry : *reply)
       result.push_managed(entry.view());
   }
   LOG(Info, "completion function '%.*s' returned %zu candidates with status %d",

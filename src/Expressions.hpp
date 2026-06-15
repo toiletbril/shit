@@ -30,10 +30,10 @@ public:
      every error as a warning and lets the run proceed, which this flag carries
      into fail(). POSIX mode and bash mode skip the whole stage, so nothing here
      runs at all and the file executes the way dash or bash does. */
-  bool errors_are_warnings{false};
+  bool should_treat_errors_as_warnings{false};
   /* Set once a dot, source, or eval is seen. Those run code the prepass cannot
      see, so a later unresolved command is a warning rather than a failure. */
-  bool saw_runtime_definer{false};
+  bool has_seen_runtime_definer{false};
   /* Names of functions seen so far. A call to one of these resolves, so a
      function defined before its use is not reported as a missing command. */
   HashSet defined_functions{heap_allocator()};
@@ -88,12 +88,12 @@ public:
      reports the same missing command with the same caret and hint, so the
      analysis copy would only double the report at the prompt. A script run
      keeps the check, since it lints branches the run may never reach. */
-  bool silence_unresolved_commands{false};
+  bool should_silence_unresolved_commands{false};
 
   /* The optimizer trace, set by --debug-optimizer. The prepass counts what it
      folds and records, and prints a stable line per decision plus a summary, so
      the optimizer golden tests can assert the behavior of each pass. */
-  bool trace_optimizer{false};
+  bool should_trace_optimizer{false};
   usize optimizer_folded_arithmetic{0};
   usize optimizer_recorded_constants{0};
   usize optimizer_folded_branches{0};
@@ -297,7 +297,7 @@ protected:
   bool m_is_async{false};
   bool m_is_negated{false};
   bool m_is_timed{false};
-  bool m_time_uses_posix_format{false};
+  bool m_is_time_posix_format{false};
   ArrayList<prefix_assignment> m_local_vars{heap_allocator()};
 };
 
@@ -360,11 +360,11 @@ public:
   i32 dup_fd;
   /* For a heredoc, the lexer-owned body and whether it is expanded. */
   const String *heredoc_body;
-  bool heredoc_expand;
+  bool should_expand_heredoc;
   /* True for a bare >&word outside POSIX mode, where a word that expands to
      neither a number nor a dash is the csh both-streams spelling bash reads
      as >word 2>&1, resolved after the expansion the way bash decides it. */
-  bool dup_may_be_filename;
+  bool can_dup_be_filename;
 };
 
 class SimpleCommand : public Command

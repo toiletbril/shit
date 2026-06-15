@@ -59,8 +59,8 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i64 optind = 1;
   if (Maybe<String> value = cxt.get_variable_value("OPTIND"); value.has_value())
   {
-    let const parsed = utils::parse_decimal_integer(*value);
-    optind = parsed.is_error() ? 1 : parsed.value();
+    let const parsed_value = utils::parse_decimal_integer(*value);
+    optind = parsed_value.is_error() ? 1 : parsed_value.value();
   }
 
   LOG(Debug, "getopts parsing into '%s' at OPTIND %lld of %zu operands",
@@ -71,7 +71,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (optind != cxt.getopts_last_optind()) cxt.set_getopts_char_index(1);
   let char_index = cxt.getopts_char_index();
 
-  auto finish = [&](i32 code) -> i32 {
+  let const do_finish = [&](i32 code) -> i32 {
     cxt.set_shell_variable("OPTIND", utils::int_to_text(optind));
     cxt.set_getopts_char_index(char_index);
     cxt.set_getopts_last_optind(optind);
@@ -80,19 +80,19 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (optind < 1 || static_cast<usize>(optind) > operands.count()) {
     cxt.set_shell_variable(name, "?");
-    return finish(1);
+    return do_finish(1);
   }
 
   ASSERT(static_cast<usize>(optind) - 1 < operands.count());
   let const &current = operands[static_cast<usize>(optind) - 1];
   if (current.length() < 2 || current[0] != '-') {
     cxt.set_shell_variable(name, "?");
-    return finish(1);
+    return do_finish(1);
   }
   if (current == "--") {
     optind++;
     cxt.set_shell_variable(name, "?");
-    return finish(1);
+    return do_finish(1);
   }
 
   /* The per-argument index is persisted across calls, so a stale index can run
@@ -107,7 +107,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   option_as_string.push(option);
   let const spec = optstring.find_character(option);
 
-  auto advance_letter = [&]() {
+  let const do_advance_letter = [&]() {
     char_index++;
     if (char_index >= current.length()) {
       optind++;
@@ -116,7 +116,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   if (option == ':' || !spec.has_value()) {
-    advance_letter();
+    do_advance_letter();
     cxt.set_shell_variable(name, "?");
     if (is_silent) {
       cxt.set_shell_variable("OPTARG", option_as_string);
@@ -125,12 +125,12 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       shit::print_error(StringView{"getopts: illegal option -- "} +
                         option_as_string + "\n");
     }
-    return finish(0);
+    return do_finish(0);
   }
 
-  let const wants_argument =
+  let const should_take_argument =
       *spec + 1 < optstring.length() && optstring[*spec + 1] == ':';
-  if (wants_argument) {
+  if (should_take_argument) {
     if (char_index + 1 < current.length()) {
       let const optarg = current.substring(char_index + 1);
       cxt.set_shell_variable("OPTARG", optarg);
@@ -154,18 +154,18 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
             StringView{"getopts: option requires an argument -- "} +
             option_as_string + "\n");
       }
-      return finish(0);
+      return do_finish(0);
     }
     cxt.set_shell_variable(name, option_as_string);
-    return finish(0);
+    return do_finish(0);
   }
 
   /* An option that takes no argument leaves OPTARG unset. */
   LOG(All, "getopts advancing past option '%s'", option_as_string.c_str());
-  advance_letter();
+  do_advance_letter();
   cxt.unset_shell_variable("OPTARG");
   cxt.set_shell_variable(name, option_as_string);
-  return finish(0);
+  return do_finish(0);
 }
 
 } /* namespace shit */

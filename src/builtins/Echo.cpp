@@ -40,7 +40,9 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      may depend on that. */
   if (args.count() == 2 && args[1] == "--help" && !cxt.is_posix_mode() &&
       !cxt.is_bash_compatible())
+  {
     SHOW_BUILTIN_HELP_AND_RETURN(ec);
+  }
 
   LOG(All, "echo printing %zu arguments", args.count() - 1);
 
@@ -52,26 +54,26 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      yet still reads -e, -E, and -n the way bash does, so a bash config that
      runs echo -e in the snapped session prints the way it expects rather than
      leaving a literal -e. The options combine, such as -ne. */
-  let interpret_escapes = !cxt.is_bash_compatible();
+  let should_interpret_escapes = !cxt.is_bash_compatible();
 
   if (!cxt.is_posix_mode()) {
     while (start < args.count()) {
       const StringView arg = args[start].view();
       if (arg.length < 2 || arg[0] != '-') break;
-      bool all_option_letters = true;
+      bool is_all_option_letters = true;
       for (usize k = 1; k < arg.length; k++)
         if (arg[k] != 'n' && arg[k] != 'e' && arg[k] != 'E') {
-          all_option_letters = false;
+          is_all_option_letters = false;
           break;
         }
-      if (!all_option_letters) break;
+      if (!is_all_option_letters) break;
       for (usize k = 1; k < arg.length; k++) {
         if (arg[k] == 'n')
           should_suppress_newline = true;
         else if (arg[k] == 'e')
-          interpret_escapes = true;
+          should_interpret_escapes = true;
         else if (arg[k] == 'E')
-          interpret_escapes = false;
+          should_interpret_escapes = false;
       }
       start++;
     }
@@ -82,41 +84,42 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  let buf = String{};
+  let output = String{};
   let should_stop = false;
 
   for (usize i = start; i < args.count() && !should_stop; i++) {
-    if (i > start) buf += ' ';
+    if (i > start) output += ' ';
 
     let const &arg = args[i];
     for (usize j = 0; j < arg.length(); j++) {
-      if (!interpret_escapes || arg[j] != '\\' || j + 1 >= arg.length()) {
-        buf += arg[j];
+      if (!should_interpret_escapes || arg[j] != '\\' || j + 1 >= arg.length())
+      {
+        output += arg[j];
         continue;
       }
 
       let const escaped = arg[j + 1];
       j++;
       switch (escaped) {
-      case 'a': buf += '\a'; break;
-      case 'b': buf += '\b'; break;
-      case 'f': buf += '\f'; break;
-      case 'n': buf += '\n'; break;
-      case 'r': buf += '\r'; break;
-      case 't': buf += '\t'; break;
-      case 'v': buf += '\v'; break;
+      case 'a': output += '\a'; break;
+      case 'b': output += '\b'; break;
+      case 'f': output += '\f'; break;
+      case 'n': output += '\n'; break;
+      case 'r': output += '\r'; break;
+      case 't': output += '\t'; break;
+      case 'v': output += '\v'; break;
       /* \e and \E are the escape character, a bash extension the shit default
          reads too. dash does not, so POSIX mode leaves them literal. */
       case 'e':
       case 'E':
         if (cxt.is_posix_mode()) {
-          buf += '\\';
-          buf += escaped;
+          output += '\\';
+          output += escaped;
         } else {
-          buf += '\x1b';
+          output += '\x1b';
         }
         break;
-      case '\\': buf += '\\'; break;
+      case '\\': output += '\\'; break;
       /* \c stops all output and drops the trailing newline. */
       case 'c': should_stop = true; break;
       /* \0NNN reads up to three octal digits after the leading zero. */
@@ -130,7 +133,7 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           j++;
           digit_count++;
         }
-        buf += static_cast<char>(value);
+        output += static_cast<char>(value);
       } break;
       /* The bare \NNN form is one to three octal digits with no leading zero,
          so \101 is the byte A the way dash's XSI echo reads it. bash reads
@@ -145,8 +148,8 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       case '6':
       case '7': {
         if (cxt.is_bash_compatible()) {
-          buf += '\\';
-          buf += escaped;
+          output += '\\';
+          output += escaped;
           break;
         }
         i32 value = escaped - '0';
@@ -158,11 +161,11 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           j++;
           digit_count++;
         }
-        buf += static_cast<char>(value);
+        output += static_cast<char>(value);
       } break;
       default:
-        buf += '\\';
-        buf += escaped;
+        output += '\\';
+        output += escaped;
         break;
       }
 
@@ -170,9 +173,9 @@ fn Echo::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  if (!should_suppress_newline && !should_stop) buf += '\n';
+  if (!should_suppress_newline && !should_stop) output += '\n';
 
-  ec.print_to_stdout(buf);
+  ec.print_to_stdout(output);
 
   return 0;
 }

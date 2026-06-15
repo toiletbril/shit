@@ -55,6 +55,7 @@ fn trim_matching(Allocator result_allocator, StringView value,
           return String{result_allocator, value.substring(length)};
       }
     }
+
   } else {
     /* The longest match scans the suffix start up from byte zero and the
        shortest scans down from the end, so the first hit is the wanted start.
@@ -126,35 +127,35 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
 
   /* Append one byte and record whether it may act as a glob metacharacter, so
      the mask stays parallel to out. */
-  auto emit_byte = [&](char byte, bool is_active) {
+  auto do_emit_byte = [&](char byte, bool is_active) {
     out += byte;
     active_out.push(is_active);
   };
 
   /* Append a run of bytes that share one glob-active state, used for an
      expansion result whose every byte takes the same mask. */
-  auto emit_run = [&](StringView bytes, bool is_active) {
+  auto do_emit_run = [&](StringView bytes, bool is_active) {
     out.append(bytes);
     for (usize k = 0; k < bytes.length; k++)
       active_out.push(is_active);
   };
 
-  let in_single_quote = false;
-  let in_double_quote = false;
+  let is_in_single_quote = false;
+  let is_in_double_quote = false;
   for (usize i = 0; i < word.length; i++) {
     /* In a default or a pattern word the quotes are removed, so a quoted
        expansion such as ${x%"$suffix"} matches the value of suffix literally.
        Heredoc bodies keep their quotes and pass remove_quotes as false. */
-    if (remove_quotes && !in_single_quote && word[i] == '"') {
-      in_double_quote = !in_double_quote;
+    if (remove_quotes && !is_in_single_quote && word[i] == '"') {
+      is_in_double_quote = !is_in_double_quote;
       continue;
     }
-    if (remove_quotes && !in_double_quote && word[i] == '\'') {
-      in_single_quote = !in_single_quote;
+    if (remove_quotes && !is_in_double_quote && word[i] == '\'') {
+      is_in_single_quote = !is_in_single_quote;
       continue;
     }
-    if (in_single_quote) {
-      emit_byte(word[i], false);
+    if (is_in_single_quote) {
+      do_emit_byte(word[i], false);
       continue;
     }
 
@@ -170,7 +171,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          dropped, which makes a quoted glob character such as \* match itself. A
          trailing backslash with no following byte is kept literally. */
       if (is_pattern_word && i + 1 < word.length) {
-        emit_byte(word[i + 1], false);
+        do_emit_byte(word[i + 1], false);
         i++;
         continue;
       }
@@ -179,7 +180,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         if (next == '$' || next == '`' || next == '\\' ||
             (remove_quotes && next == '"'))
         {
-          emit_byte(next, false);
+          do_emit_byte(next, false);
           i++;
           continue;
         }
@@ -188,7 +189,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
           continue;
         }
       }
-      emit_byte('\\', false);
+      do_emit_byte('\\', false);
       continue;
     }
 
@@ -211,17 +212,17 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         if (word[j] == '`') break;
         inner += word[j];
       }
-      emit_run(capture_command_substitution(inner), !in_double_quote);
+      do_emit_run(capture_command_substitution(inner), !is_in_double_quote);
       i = j;
       continue;
     }
 
     if (word[i] != '$') {
-      emit_byte(word[i], !in_double_quote);
+      do_emit_byte(word[i], !is_in_double_quote);
       continue;
     }
     if (i + 1 >= word.length) {
-      emit_byte('$', !in_double_quote);
+      do_emit_byte('$', !is_in_double_quote);
       break;
     }
 
@@ -327,7 +328,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         inner += ch;
         j++;
       }
-      emit_run(apply_parameter_expansion(inner), !in_double_quote);
+      do_emit_run(apply_parameter_expansion(inner), !is_in_double_quote);
       i = j;
     } else if (lexer::is_variable_name_start(next)) {
       let name = String{scratch_allocator()};
@@ -343,9 +344,9 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
          the common reference pays no temporary String the way a synthesized
          special name would. */
       if (const String *stored = lookup_shell_variable(name))
-        emit_run(stored->view(), !in_double_quote);
+        do_emit_run(stored->view(), !is_in_double_quote);
       else
-        emit_run(expand_variable(name), !in_double_quote);
+        do_emit_run(expand_variable(name), !is_in_double_quote);
       i = j - 1;
     } else if (next == '(' && i + 2 < word.length && word[i + 2] == '(') {
       /* Arithmetic $((...)), scanned to the matching )). A quote run and a
@@ -386,7 +387,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       }
       /* An arithmetic result is decimal digits and an optional minus, none of
          which can glob, so the bytes are emitted inactive. */
-      emit_run(utils::int_to_text(evaluate_arithmetic(inner)), false);
+      do_emit_run(utils::int_to_text(evaluate_arithmetic(inner)), false);
       i = j - 1;
     } else if (next == '(') {
       /* Command substitution $(...), scanned to the matching ). A quote run and
@@ -422,7 +423,7 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
         }
         inner += ch;
       }
-      emit_run(capture_command_substitution(inner), !in_double_quote);
+      do_emit_run(capture_command_substitution(inner), !is_in_double_quote);
       i = j;
     } else if (next == '?' || next == '@' || next == '*' || next == '#' ||
                next == '$' || next == '!' || next == '-' ||
@@ -431,10 +432,10 @@ fn EvalContext::expand_modifier_word_worker(StringView word,
       let const special_name = StringView{&next, 1};
       if (!get_variable_value(special_name).has_value())
         report_unset_reference(special_name);
-      emit_run(expand_variable(special_name), !in_double_quote);
+      do_emit_run(expand_variable(special_name), !is_in_double_quote);
       i++;
     } else {
-      emit_byte('$', !in_double_quote);
+      do_emit_byte('$', !is_in_double_quote);
     }
   }
   return out;
@@ -461,9 +462,10 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     usize name_end = 0;
     while (name_end < body.length && lexer::is_variable_name(body[name_end]))
       name_end++;
-    if (name_end > 0 && name_end < body.length && body[name_end] == '[')
+    if (name_end > 0 && name_end < body.length && body[name_end] == '[') {
       if (let const close = body.substring(name_end).find_character(']'))
         name_end += *close + 1;
+    }
     if (name_end > 0 && name_end < body.length &&
         !(name_end == body.length - 1 &&
           (body[name_end] == '*' || body[name_end] == '@')))
@@ -564,8 +566,10 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
       if (subscript != "@" && subscript != "*" &&
           (modifier_op == '/' || modifier_op == '#' || modifier_op == '%' ||
            modifier_op == '^' || modifier_op == ','))
+      {
         return apply_value_modifier(
             apply_array_subscript(name, subscript).view(), modifier);
+      }
       /* The test and substring modifiers run against the element with its own
          setness, the way bash answers ${a[i]:-x} and ${a[i]:1:2}, and the =
          form assigns the element back. */
@@ -575,10 +579,11 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
             is_colon && modifier.length > 1 ? modifier[1] : modifier_op;
         let const is_test_form =
             after == '-' || after == '+' || after == '=' || after == '?';
-        if (is_colon && !is_test_form)
+        if (is_colon && !is_test_form) {
           return apply_substring_to_value(
               apply_array_subscript(name, subscript).view(),
               modifier.substring(1));
+        }
         if (is_test_form) {
           let const element_is_set = array_element_is_set(name, subscript);
           let const value = element_is_set
@@ -638,7 +643,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
     const char after_colon = rest[op_index];
     if (after_colon != '-' && after_colon != '=' && after_colon != '+' &&
         after_colon != '?' && name != "@" && name != "*")
+    {
       return apply_substring_expansion(name, rest.substring(1));
+    }
   }
 
   /* ${name/pat/rep} and its // # % variants are bash pattern replacement. They
@@ -652,7 +659,9 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
      comma, or a tilde that toggles. */
   if (!is_colon_form && (rest[0] == '^' || rest[0] == ',' || rest[0] == '~') &&
       name != "@" && name != "*")
+  {
     return apply_case_modification(name, rest);
+  }
 
   let const op = rest[op_index];
   let const is_doubled = (op_index + 1 < rest.length &&
@@ -698,7 +707,7 @@ hot fn EvalContext::apply_parameter_expansion(StringView spec) throws -> String
          hide behind the alternate. A plain run stays silent the way bash leaves
          the unset-safe alternate alone, and a set-but-empty name does not warn
          since it carries a value. */
-      if (!is_set && m_runtime.warnings_enabled)
+      if (!is_set && m_runtime.are_warnings_enabled)
         show_runtime_warning_at(
             locate_variable_reference(name),
             "The variable '" + String{name} +
@@ -739,14 +748,14 @@ fn find_substring_length_separator(StringView body) wontthrow -> usize
   usize paren_depth = 0;
   usize question_depth = 0;
   for (usize i = 0; i < body.length; i++) {
-    const char c = body[i];
-    if (c == '(') {
+    const char character = body[i];
+    if (character == '(') {
       paren_depth++;
-    } else if (c == ')') {
+    } else if (character == ')') {
       if (paren_depth > 0) paren_depth--;
-    } else if (c == '?' && paren_depth == 0) {
+    } else if (character == '?' && paren_depth == 0) {
       question_depth++;
-    } else if (c == ':' && paren_depth == 0) {
+    } else if (character == ':' && paren_depth == 0) {
       if (question_depth > 0)
         question_depth--;
       else
@@ -825,24 +834,24 @@ static fn find_replacement_separator(StringView body) wontthrow -> usize
      expansion itself will read. */
   char quote = 0;
   for (usize i = 0; i < body.length; i++) {
-    let const c = body[i];
+    let const character = body[i];
     if (quote == '\'') {
-      if (c == '\'') quote = 0;
+      if (character == '\'') quote = 0;
       continue;
     }
-    if (c == '\\') {
+    if (character == '\\') {
       i++;
       continue;
     }
     if (quote == '"') {
-      if (c == '"') quote = 0;
+      if (character == '"') quote = 0;
       continue;
     }
-    if (c == '\'' || c == '"') {
-      quote = c;
+    if (character == '\'' || character == '"') {
+      quote = character;
       continue;
     }
-    if (c == '/') return i;
+    if (character == '/') return i;
   }
   return body.length;
 }
@@ -885,17 +894,17 @@ fn EvalContext::pattern_replace_value(const String &value,
      match, and a # or % after the first slash anchors the pattern to the start
      or the end of the value. */
   StringView remainder = spec.substring(1);
-  bool replace_all = false;
-  bool anchor_start = false;
-  bool anchor_end = false;
+  bool should_replace_all = false;
+  bool is_anchored_at_start = false;
+  bool is_anchored_at_end = false;
   if (!remainder.is_empty() && remainder[0] == '/') {
-    replace_all = true;
+    should_replace_all = true;
     remainder = remainder.substring(1);
   } else if (!remainder.is_empty() && remainder[0] == '#') {
-    anchor_start = true;
+    is_anchored_at_start = true;
     remainder = remainder.substring(1);
   } else if (!remainder.is_empty() && remainder[0] == '%') {
-    anchor_end = true;
+    is_anchored_at_end = true;
     remainder = remainder.substring(1);
   }
 
@@ -912,13 +921,14 @@ fn EvalContext::pattern_replace_value(const String &value,
   /* An empty unanchored pattern matches nothing in bash, so the value is
      returned unchanged rather than splicing the replacement between every
      character. The anchored forms still splice at the start or the end. */
-  if (pattern.is_empty() && !anchor_start && !anchor_end) return value;
+  if (pattern.is_empty() && !is_anchored_at_start && !is_anchored_at_end)
+    return value;
 
   let out = String{scratch_allocator()};
 
   /* The start anchor only matches a prefix, so a single longest match at the
      front is replaced and the rest is kept. */
-  if (anchor_start) {
+  if (is_anchored_at_start) {
     if (let const matched = longest_pattern_match_at(
             pattern.view(), pattern_active, value.view(), 0, extglob_enabled()))
     {
@@ -932,7 +942,7 @@ fn EvalContext::pattern_replace_value(const String &value,
 
   /* The end anchor matches a suffix, so the leftmost start whose remainder
      fully matches the pattern names the longest matching suffix to replace. */
-  if (anchor_end) {
+  if (is_anchored_at_end) {
     for (usize start = 0; start <= value.length(); start++) {
       if (utils::glob_matches(pattern.view(), value.view().substring(start),
                               pattern_active, 0, extglob_enabled()))
@@ -953,7 +963,7 @@ fn EvalContext::pattern_replace_value(const String &value,
   usize i = 0;
   while (i < value.length()) {
     Maybe<usize> matched;
-    if (!has_replaced || replace_all)
+    if (!has_replaced || should_replace_all)
       matched = longest_pattern_match_at(pattern.view(), pattern_active,
                                          value.view(), i, extglob_enabled());
     if (matched.has_value()) {
@@ -965,7 +975,7 @@ fn EvalContext::pattern_replace_value(const String &value,
       } else {
         i += *matched;
       }
-      if (!replace_all) {
+      if (!should_replace_all) {
         out.append(value.view().substring(i));
         return out;
       }
@@ -999,8 +1009,8 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
   const char op = spec[0];
   /* A doubled operator touches every matching character, a single one only the
      first. */
-  const bool modify_all = spec.length > 1 && spec[1] == op;
-  const StringView pattern_word = spec.substring(modify_all ? 2 : 1);
+  const bool should_modify_all = spec.length > 1 && spec[1] == op;
+  const StringView pattern_word = spec.substring(should_modify_all ? 2 : 1);
 
   /* An omitted pattern means every character matches, the way bash defaults the
      glob to ?. */
@@ -1015,27 +1025,27 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
 
   let out = String{scratch_allocator()};
   for (usize i = 0; i < value.length; i++) {
-    char c = value[i];
-    const bool affected = modify_all || i == 0;
-    if (affected &&
+    char character = value[i];
+    const bool is_affected = should_modify_all || i == 0;
+    if (is_affected &&
         utils::glob_matches(pattern.view(), value.substring_of_length(i, 1),
                             pattern_active, 0, extglob_enabled()))
     {
-      const unsigned char byte = static_cast<unsigned char>(c);
+      const unsigned char byte = static_cast<unsigned char>(character);
       if (op == '^') {
-        c = static_cast<char>(std::toupper(byte));
+        character = static_cast<char>(std::toupper(byte));
       } else if (op == ',') {
-        c = static_cast<char>(std::tolower(byte));
+        character = static_cast<char>(std::tolower(byte));
       } else {
         /* The tilde toggles, so an upper becomes lower and a lower becomes
            upper, and a non-letter is left alone. */
         if (std::islower(byte) != 0)
-          c = static_cast<char>(std::toupper(byte));
+          character = static_cast<char>(std::toupper(byte));
         else if (std::isupper(byte) != 0)
-          c = static_cast<char>(std::tolower(byte));
+          character = static_cast<char>(std::tolower(byte));
       }
     }
-    out.push(c);
+    out.push(character);
   }
   return out;
 }

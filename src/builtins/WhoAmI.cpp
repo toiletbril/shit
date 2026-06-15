@@ -31,12 +31,12 @@ i32 WhoAmI::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   LOG(Debug, "whoami printing the current user name");
 
-  let p = String{};
+  let output = String{};
 
-  if (let const u = os::get_current_user(); u.has_value()) {
-    p.append(u->view());
-    p += '\n';
-    ec.print_to_stdout(p);
+  if (let const user = os::get_current_user(); user.has_value()) {
+    output.append(user->view());
+    output += '\n';
+    ec.print_to_stdout(output);
     return 0;
   }
 

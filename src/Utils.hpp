@@ -31,21 +31,22 @@ fn sort_ascending(ArrayList<T> &list) throws -> void
   }
 }
 
-fn merge_tokens_to_string(const ArrayList<const Token *> &v) throws -> String;
+fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
+    -> String;
 
 /* Join the argument list into a single space-separated string. The container is
    the ArrayList<String> the exec-argv path now carries, so each element is
    appended through its byte view. */
-inline fn merge_args_to_string(const ArrayList<String> &v) throws -> String
+inline fn merge_args_to_string(const ArrayList<String> &args) throws -> String
 {
-  String r{};
-  for (usize i = 0; i < v.count(); i++) {
-    r.append(v[i].view());
-    if (i + 1 < v.count()) {
-      r.push(' ');
+  String result{};
+  for (usize i = 0; i < args.count(); i++) {
+    result.append(args[i].view());
+    if (i + 1 < args.count()) {
+      result.push(' ');
     }
   }
-  return r;
+  return result;
 }
 
 /* The index of the first matching suffix in the omitted-extension list, or

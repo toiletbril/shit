@@ -15,10 +15,9 @@ HELP_SYNOPSIS_DECL("[query ...]");
 HELP_DESCRIPTION_DECL(
     "The z builtin changes to a frequently visited directory ranked by a "
     "frecency store at ~/.shit_directory_history, which weights each directory "
-    "by its visit "
-    "count and how recently it was seen. The operands join into one query that "
-    "matches a directory by case insensitive substring, and z prints the path "
-    "it jumps to.");
+    "by its visit count and how recently it was seen. The operands join into "
+    "one query that matches a directory by case insensitive substring, and z "
+    "prints the path it jumps to.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
@@ -119,7 +118,7 @@ static fn write_frecency_store(const ArrayList<frecency_entry> &entries) throws
   if (!path) return;
 
   let out = String{};
-  for (const frecency_entry &entry : entries) {
+  for (let const &entry : entries) {
     out.append(entry.path.view());
     out += '\t';
     out.append(utils::int_to_text(entry.rank));
@@ -150,13 +149,13 @@ static fn contains_ignore_case(StringView haystack, StringView needle) wontthrow
 {
   if (needle.is_empty()) return true;
   if (needle.length > haystack.length) return false;
-  let const lower = [](char c) wontthrow -> char {
+  let const do_lower = [](char c) wontthrow -> char {
     return c >= 'A' && c <= 'Z' ? static_cast<char>(c + 32) : c;
   };
   for (usize i = 0; i + needle.length <= haystack.length; i++) {
     bool matched = true;
     for (usize j = 0; j < needle.length; j++) {
-      if (lower(haystack[i + j]) != lower(needle[j])) {
+      if (do_lower(haystack[i + j]) != do_lower(needle[j])) {
         matched = false;
         break;
       }
@@ -174,16 +173,16 @@ fn record_directory_access(StringView directory) throws -> void
 
   let entries = read_frecency_store();
   let const now = now_epoch_seconds();
-  let found = false;
-  for (frecency_entry &entry : entries) {
+  let was_found = false;
+  for (let &entry : entries) {
     if (entry.path.view() == directory) {
       entry.rank += 1;
       entry.last_access = now;
-      found = true;
+      was_found = true;
       break;
     }
   }
-  if (!found) {
+  if (!was_found) {
     entries.push(frecency_entry{String{directory}, 1, now});
     /* When the store overflows its bound, the least-visited of the older
        directories is dropped by overwriting it with the just-added last entry
@@ -226,7 +225,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   const frecency_entry *best = nullptr;
   let best_score = -1.0;
-  for (const frecency_entry &entry : entries) {
+  for (let const &entry : entries) {
     if (!query.is_empty() &&
         !contains_ignore_case(entry.path.view(), query.view()))
       continue;

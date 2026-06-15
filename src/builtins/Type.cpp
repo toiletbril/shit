@@ -51,7 +51,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const force_path = FLAG_TYPE_FORCE_PATH.is_enabled();
 
   let out = String{};
-  bool all_found = true;
+  bool did_find_all = true;
 
   for (usize i = 1; i < args.count(); i++) {
     let const &name = args[i];
@@ -71,7 +71,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
           out += paths[0].text();
         out += "\n";
       } else {
-        all_found = false;
+        did_find_all = false;
       }
       continue;
     }
@@ -81,8 +81,7 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
     StringView word{};
     Maybe<String> alias_value;
     /* The POSIX reserved words plus the bash reserved words shit recognizes,
-       the
-       [[ ]] conditional brackets and the time and function keywords, all
+       the [[ ]] conditional brackets and the time and function keywords, all
        classify as a keyword the way bash reports them. */
     if (utils::is_posix_reserved_word(name.view()) || name.view() == "[[" ||
         name.view() == "]]" || name.view() == "function" ||
@@ -102,9 +101,9 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
     /* -a prints every location, the class word followed by each PATH match,
        which is what type -at does to enumerate a name's resolutions. */
     if (FLAG_TYPE_ALL.is_enabled()) {
-      bool any = false;
+      bool has_any = false;
       if (!word.is_empty()) {
-        any = true;
+        has_any = true;
         if (want_word) {
           out += word;
           out += "\n";
@@ -123,8 +122,8 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
           out += "\n";
         }
       }
-      for (const Path &path : utils::search_program_path(name)) {
-        any = true;
+      for (let const &path : utils::search_program_path(name)) {
+        has_any = true;
         if (want_word) {
           out += "file\n";
         } else if (want_path) {
@@ -137,12 +136,12 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
           out += "\n";
         }
       }
-      if (!any) {
+      if (!has_any) {
         if (!want_word && !want_path) {
           out += name;
           out += ": not found\n";
         }
-        all_found = false;
+        did_find_all = false;
       }
       continue;
     }
@@ -190,12 +189,12 @@ i32 Type::execute(ExecContext &ec, EvalContext &cxt) const throws
         out += name;
         out += ": not found\n";
       }
-      all_found = false;
+      did_find_all = false;
     }
   }
 
   ec.print_to_stdout(out);
-  return all_found ? 0 : 1;
+  return did_find_all ? 0 : 1;
 }
 
 } /* namespace shit */

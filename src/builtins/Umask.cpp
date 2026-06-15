@@ -133,12 +133,12 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  bool print_symbolic = false;
+  bool should_print_symbolic = false;
   Maybe<usize> operand_index;
   for (usize i = 1; i < args.count(); i++) {
     if (args[i] == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
     if (args[i] == "-S") {
-      print_symbolic = true;
+      should_print_symbolic = true;
       continue;
     }
     operand_index = i;
@@ -147,7 +147,7 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (!operand_index.has_value()) {
     const u32 mask = os::get_file_creation_mask();
-    if (print_symbolic) {
+    if (should_print_symbolic) {
       ec.print_to_stdout(mask_to_symbolic(mask) + "\n");
     } else {
       char buffer[8];

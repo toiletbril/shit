@@ -106,9 +106,9 @@ String format_named_values(StringView names, Args &&...args)
 {
   String out{};
   usize index = 0;
-  const usize count = sizeof...(Args);
+  const usize value_count = sizeof...(Args);
 
-  auto append_one = [&](auto &&value) {
+  auto do_append_one = [&](auto &&value) {
     StringView name = names;
     Maybe<usize> comma_position = names.find_character(',');
     if (comma_position.has_value()) {
@@ -130,10 +130,10 @@ String format_named_values(StringView names, Args &&...args)
     out.append(name);
     out.append(StringView{" = "});
     out.append(value_to_log_string(value).view());
-    if (++index < count) out.append(StringView{", "});
+    if (++index < value_count) out.append(StringView{", "});
   };
 
-  (append_one(std::forward<Args>(args)), ...);
+  (do_append_one(std::forward<Args>(args)), ...);
   return out;
 }
 

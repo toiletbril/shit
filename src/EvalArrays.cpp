@@ -42,13 +42,17 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
   sparse.for_each([&](StringView key, const String &value) throws {
     if (key.length <= name_prefix.length ||
         key.substring_of_length(0, name_prefix.length) != name_prefix)
+    {
       return;
+    }
     let const index_text = key.substring(name_prefix.length);
     if (let const parsed = utils::parse_decimal_integer(index_text);
         !parsed.is_error() && parsed.value() >= 0)
+    {
       out.push(sparse_array_entry{
           static_cast<usize>(parsed.value()), String{allocator, value.view()}
       });
+    }
   });
   /* An insertion sort keeps it simple, since a sparse array holds few far
      elements. */
@@ -80,7 +84,9 @@ static fn parse_explicit_array_index(StringView element,
                                      StringView &subscript_out,
                                      StringView &value_out) wontthrow -> bool
 {
-  if (element.length < 3 || element[0] != '[') return false;
+  if (element.length < 3 || element[0] != '[') {
+    return false;
+  }
   for (usize i = 1; i + 1 < element.length; i++) {
     if (element[i] == ']' && element[i + 1] == '=') {
       subscript_out = element.substring_of_length(1, i - 1);
@@ -161,12 +167,12 @@ fn EvalContext::set_array_element(StringView name, usize index,
   m_shell_variables.erase(name);
   ASSERT(dense != nullptr);
 
-  const usize count = dense->count();
-  if (index < count) {
+  const usize dense_count = dense->count();
+  if (index < dense_count) {
     (*dense)[index] = String{heap_allocator(), value};
     return;
   }
-  if (index == count) {
+  if (index == dense_count) {
     /* The write extends the contiguous run, which may make an earlier sparse
        element contiguous too, so any element now at the run's end migrates from
        the sparse map into the dense run. */
@@ -183,7 +189,7 @@ fn EvalContext::set_array_element(StringView name, usize index,
   }
   /* A write past the run's end leaves a gap, so it is held sparsely. */
   LOG(All, "holding element %zu of '%.*s' sparsely past the dense run of %zu",
-      index, static_cast<int>(name.length), name.data, count);
+      index, static_cast<int>(name.length), name.data, dense_count);
   m_sparse_array_values.set(
       sparse_array_key(name, index, scratch_allocator()).view(), value);
 }
@@ -215,8 +221,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
      set_shell_variable gives a scalar. The joined text lives on the scratch
      arena and the stores below copy the decimal result. */
   char integer_result[24];
-  auto integer_element_value = [&](Maybe<String> existing)
-                                   throws -> StringView {
+  auto do_integer_element_value = [&](Maybe<String> existing)
+                                      throws -> StringView {
     let joined = String{scratch_allocator()};
     if (is_append) {
       if (existing.has_value()) joined.append(existing->view());
@@ -234,7 +240,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     if (is_integer_variable(name)) [[unlikely]] {
       set_associative_element(
           name, key.view(),
-          integer_element_value(lookup_associative_element(name, key.view())));
+          do_integer_element_value(
+              lookup_associative_element(name, key.view())));
       return;
     }
     if (is_append) {
@@ -264,7 +271,7 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
         if (static_cast<usize>(index) < array->count())
           existing = String{(*array)[static_cast<usize>(index)].view()};
     set_array_element(name, static_cast<usize>(index),
-                      integer_element_value(steal(existing)));
+                      do_integer_element_value(steal(existing)));
     return;
   }
 
@@ -319,7 +326,9 @@ fn EvalContext::associative_keys(StringView name) const throws
     unused(value);
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
+    {
       keys.push_managed(composite.substring(prefix.count()));
+    }
   });
   return keys;
 }
@@ -333,7 +342,9 @@ fn EvalContext::associative_values(StringView name) const throws
   m_associative_values.for_each([&](StringView composite, const String &value) {
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
+    {
       values.push_managed(value.view());
+    }
   });
   return values;
 }
@@ -349,7 +360,9 @@ fn EvalContext::clear_associative_array(StringView name) throws -> void
   m_associative_values.for_each([&](StringView composite, const String &) {
     if (composite.length >= prefix.count() &&
         composite.substring_of_length(0, prefix.count()) == prefix.view())
+    {
       to_erase.push_managed(composite);
+    }
   });
   for (const String &composite : to_erase)
     m_associative_values.erase(composite.view());
@@ -373,8 +386,8 @@ fn EvalContext::unset_array_element(StringView name,
 
   if (ArrayList<String> *array = m_indexed_arrays.find(name)) {
     const i64 index = evaluate_arithmetic(subscript);
-    const i64 count = static_cast<i64>(array->count());
-    const i64 resolved = index < 0 ? index + count : index;
+    const i64 array_count = static_cast<i64>(array->count());
+    const i64 resolved = index < 0 ? index + array_count : index;
     if (resolved < 0) return;
     /* An element inside the dense run leaves a hole at its index the way bash
        does, rather than renumbering the tail. The elements after it move to the
@@ -382,9 +395,9 @@ fn EvalContext::unset_array_element(StringView name,
        from the removed index on. An element past the dense run already lives in
        the sparse store and is erased by its key. Erasing an absent key is a
        no-op, matching bash unsetting a missing element silently. */
-    if (resolved < count) {
+    if (resolved < array_count) {
       for (usize i = static_cast<usize>(resolved) + 1;
-           i < static_cast<usize>(count); i++)
+           i < static_cast<usize>(array_count); i++)
         m_sparse_array_values.set(
             sparse_array_key(name, i, scratch_allocator()).view(),
             (*array)[i].view());
@@ -493,15 +506,18 @@ fn EvalContext::apply_array_subscript(StringView name,
       }
       let out = String{scratch_allocator()};
       for (usize i = 0; i < depth; i++) {
-        if (i > 0 && has_separator) out.push(separator);
+        if (i > 0 && has_separator) {
+          out.push(separator);
+        }
         out.append(funcname_frame_at(i));
       }
       return out;
     }
     let const index = evaluate_arithmetic(subscript);
-    if (index >= 0 && static_cast<usize>(index) < depth)
+    if (index >= 0 && static_cast<usize>(index) < depth) {
       return String{scratch_allocator(),
                     funcname_frame_at(static_cast<usize>(index))};
+    }
     return String{scratch_allocator()};
   }
 
@@ -522,7 +538,9 @@ fn EvalContext::apply_array_subscript(StringView name,
       let out = String{scratch_allocator()};
       let const values = associative_values(name);
       for (usize i = 0; i < values.count(); i++) {
-        if (i > 0 && has_separator) out.push(separator);
+        if (i > 0 && has_separator) {
+          out.push(separator);
+        }
         out.append(values[i].view());
       }
       return out;
@@ -566,9 +584,9 @@ fn EvalContext::apply_array_subscript(StringView name,
     if (index == 0) return get_variable_value(name).value_or(String{});
     return String{scratch_allocator()};
   }
-  const i64 count = static_cast<i64>(array->count());
-  if (index < 0) index += count;
-  if (index < 0 || index >= count) {
+  const i64 array_count = static_cast<i64>(array->count());
+  if (index < 0) index += array_count;
+  if (index < 0 || index >= array_count) {
     /* A subscript past the dense end may name a sparsely-held far element. */
     if (index >= 0) {
       let probe = String{scratch_allocator(), name};
@@ -623,17 +641,20 @@ fn EvalContext::collect_array_elements(StringView name) const throws
 fn EvalContext::array_element_is_set(StringView name,
                                      StringView subscript) throws -> bool
 {
-  if (subscript == "@" || subscript == "*")
+  if (subscript == "@" || subscript == "*") {
     return !collect_array_elements(name).is_empty();
+  }
   if (is_associative_array(name))
     return lookup_associative_element(name, subscript).has_value();
   /* An indexed subscript is an arithmetic expression, so arr[1+1] resolves the
      way an indexed read would. A negative index counts from the end. */
   const i64 index = evaluate_arithmetic(subscript);
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
-    const i64 count = static_cast<i64>(array->count());
-    const i64 resolved = index < 0 ? index + count : index;
-    if (resolved >= 0 && resolved < count) return true;
+    const i64 array_count = static_cast<i64>(array->count());
+    const i64 resolved = index < 0 ? index + array_count : index;
+    if (resolved >= 0 && resolved < array_count) {
+      return true;
+    }
     /* An index past the dense run may name a sparsely-held element. */
     return resolved >= 0 &&
            m_sparse_array_values.find(
@@ -652,7 +673,7 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
       static_cast<int>(prefix.length), prefix.data);
   let names = ArrayList<String>{heap_allocator()};
   let seen = HashSet{heap_allocator()};
-  auto consider = [&](StringView candidate) throws {
+  auto do_consider = [&](StringView candidate) throws {
     if (candidate.starts_with(prefix) && !seen.contains(candidate)) {
       seen.add(candidate);
       names.push_managed(candidate);
@@ -660,10 +681,10 @@ fn EvalContext::matching_prefix_names(StringView prefix) const throws
   };
   m_shell_variables.for_each([&](StringView variable_name, const String &v) {
     unused(v);
-    consider(variable_name);
+    do_consider(variable_name);
   });
   for (const String &environment_name : os::environment_names())
-    consider(environment_name.view());
+    do_consider(environment_name.view());
   utils::sort_ascending(names);
   return names;
 }

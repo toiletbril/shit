@@ -28,6 +28,7 @@ BumpArena::BumpArena() = default;
 BumpArena::~BumpArena()
 {
   run_destructors_down_to(0);
+
   for (block &block : m_blocks)
     std::free(block.base);
 }
@@ -79,9 +80,11 @@ hot fn BumpArena::allocate(usize size, usize alignment) throws -> void *
 
 hot fn BumpArena::owns(const void *pointer) const wontthrow -> bool
 {
-  let const p = static_cast<const u8 *>(pointer);
+  let const candidate = static_cast<const u8 *>(pointer);
   for (const block &block : m_blocks) {
-    if (p >= block.base && p < block.base + block.size) return true;
+    if (candidate >= block.base && candidate < block.base + block.size) {
+      return true;
+    }
   }
   return false;
 }

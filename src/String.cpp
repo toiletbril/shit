@@ -140,9 +140,12 @@ fn String::operator+=(char c) throws -> String &
 
 hot fn String::operator<(const String &other) const wontthrow -> bool
 {
-  let const shared = m_length < other.m_length ? m_length : other.m_length;
-  let const order =
-      shared == 0 ? 0 : std::memcmp(c_str(), other.c_str(), shared);
+  let const shared_length =
+      m_length < other.m_length ? m_length : other.m_length;
+  let const order = shared_length == 0
+                        ? 0
+                        : std::memcmp(c_str(), other.c_str(), shared_length);
+
   if (order != 0) return order < 0;
   return m_length < other.m_length;
 }
@@ -184,8 +187,9 @@ cold fn String::free_storage() wontthrow -> void
      object. The reset leaves the object a valid empty inline string, which is
      moot in the destructor and required in operator= where the object lives on.
    */
-  if (m_data != nullptr && m_data != m_inline)
+  if (m_data != nullptr && m_data != m_inline) {
     m_allocator.free_array(m_data, m_capacity);
+  }
   reset_to_inline();
 }
 

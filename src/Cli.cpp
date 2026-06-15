@@ -169,7 +169,7 @@ fn parse_flags_vec(const ArrayList<Flag *> &flags,
   let os_argv = ArrayList<const char *>{};
   os_argv.reserve(args.count());
 
-  for (const String &arg : args)
+  for (let const &arg : args)
     os_argv.push(arg.c_str());
 
   return parse_flags(flags, static_cast<int>(os_argv.count()), os_argv.begin(),
@@ -277,11 +277,12 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       if (found) {
         switch (flag->kind()) {
         case Flag::Kind::Bool: {
-          let const fb = static_cast<FlagBool *>(flag);
+          let const bool_flag = static_cast<FlagBool *>(flag);
 
-          fb->toggle();
-          fb->set_position(++position);
-          LOG(All, "toggled the flag '%s'", flag_name(fb, is_long).c_str());
+          bool_flag->toggle();
+          bool_flag->set_position(++position);
+          LOG(All, "toggled the flag '%s'",
+              flag_name(bool_flag, is_long).c_str());
 
           /* Check for combined flags, e.g -vAsn. */
           if (!is_long && *value_offset != '\0') {
@@ -350,23 +351,23 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           throw Error{"Missing space between '-' and other options"};
         } else {
           /* Trim the value before '=' and report unknown flag. */
-          let s = String{};
-          s += "Unknown flag '-";
+          let error_message = String{};
+          error_message += "Unknown flag '-";
 
           if (!is_long) {
-            s.push(*flag_offset);
+            error_message.push(*flag_offset);
           } else {
-            s += "-";
+            error_message += "-";
 
             const StringView flag_sv = flag_offset;
-            let const equals_pos = flag_sv.find_character('=');
+            let const equals_position = flag_sv.find_character('=');
 
-            if (equals_pos)
-              s += flag_sv.substring_of_length(0, equals_pos.value());
+            if (equals_position)
+              error_message += flag_sv.substring_of_length(0, *equals_position);
             else
-              s += flag_sv;
+              error_message += flag_sv;
           }
-          s += "'";
+          error_message += "'";
 
           LOG(Debug, "rejecting the unknown flag in '%s'", argv[i]);
 
@@ -379,7 +380,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           throw ErrorWithLocation{
               SourceLocation{base_position + caret_offset,
                              std::strlen(argv[i])},
-              s
+              error_message
           };
         }
       }
@@ -411,8 +412,8 @@ fn join_command_line(int argc, const char *const *argv) throws -> String
 
 fn reset_flags(const ArrayList<Flag *> &flags) throws -> void
 {
-  for (Flag *f : flags) {
-    f->reset();
+  for (let const flag : flags) {
+    flag->reset();
   }
 }
 
@@ -486,11 +487,11 @@ cold fn make_synopsis(StringView program_name,
 
   s += "SYNOPSIS\n";
 
-  for (StringView l : lines) {
+  for (let const line : lines) {
     s += "  ";
     s += program_name;
     s += ' ';
-    s += l;
+    s += line;
     s += '\n';
   }
 
@@ -545,7 +546,7 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
   static constexpr usize WRAP_WIDTH = 80;
   static constexpr usize TEXT_WIDTH = WRAP_WIDTH - DESCRIPTION_COLUMN;
 
-  let const render_flag = [&](const shit::Flag *f) throws {
+  let const do_render_flag = [&](const shit::Flag *f) throws {
     s += "\n";
 
     /* The whole left part, the short form, the long form, and the value
@@ -621,14 +622,14 @@ cold fn make_flag_help(const ArrayList<Flag *> &flags) throws -> String
       "SHIT OPTIONS", "DEBUG OPTIONS"};
   for (u8 section = 0; section < 6; section++) {
     bool header_printed = false;
-    for (const shit::Flag *f : flags) {
-      if (static_cast<u8>(f->section()) != section) continue;
+    for (let const flag : flags) {
+      if (static_cast<u8>(flag->section()) != section) continue;
       if (!header_printed) {
         if (!s.is_empty()) s += "\n\n";
         s += SECTION_HEADERS[section];
         header_printed = true;
       }
-      render_flag(f);
+      do_render_flag(flag);
     }
   }
 

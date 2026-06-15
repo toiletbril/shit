@@ -21,6 +21,7 @@ fn StringView::find_character(char wanted) const wontthrow -> Maybe<usize>
   let const found =
       std::memchr(data, static_cast<unsigned char>(wanted), length);
   if (found == nullptr) return None;
+
   return static_cast<usize>(static_cast<const char *>(found) - data);
 }
 
@@ -35,6 +36,7 @@ fn StringView::substring_of_length(usize start, usize count) const wontthrow
 {
   if (start >= length) return StringView{data + length, 0};
   usize remaining = length - start;
+
   return StringView{data + start, count < remaining ? count : remaining};
 }
 

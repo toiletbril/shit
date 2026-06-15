@@ -63,7 +63,9 @@ public:
        at most the max divided by sizeof(T). */
     if (sizeof(T) != 0 && count > (static_cast<usize>(-1) / sizeof(T)))
         [[unlikely]]
+    {
       throw std::bad_alloc{};
+    }
     return static_cast<T *>(raw_alloc(count * sizeof(T), alignof(T)));
   }
   template <class T>

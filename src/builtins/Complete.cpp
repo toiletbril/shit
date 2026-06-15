@@ -63,7 +63,7 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* The spec the options build, then registered for each named command. */
   let function_name = String{};
   let word_list = String{};
-  bool use_default = false;
+  bool should_use_default = false;
   bool is_default_completion = false;
   bool should_print_specs = false;
   let commands = ArrayList<String>{};
@@ -103,7 +103,7 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (++i < args.count() &&
           (args[i] == "default" || args[i] == "bashdefault" ||
            args[i] == "dirnames"))
-        use_default = true;
+        should_use_default = true;
       i++;
       continue;
     }
@@ -130,10 +130,10 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      The bash-completion loader probes exactly that, a successful print means
      sourcing the completion file registered something. */
   if (should_print_specs) {
-    let const print_one_spec = [&](StringView command,
-                                   const completion_spec &spec) throws {
+    let const do_print_one_spec = [&](StringView command,
+                                      const completion_spec &spec) throws {
       let line = String{"complete "};
-      if (spec.use_default) line += "-o default ";
+      if (spec.should_use_default) line += "-o default ";
       if (!spec.function_name.is_empty()) {
         line += "-F ";
         line += spec.function_name.view();
@@ -160,42 +160,43 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (commands.is_empty()) {
       cxt.completion_specs().for_each(
           [&](StringView command, const completion_spec &spec) {
-            print_one_spec(command, spec);
+            do_print_one_spec(command, spec);
           });
       return 0;
     }
+
     i32 print_status = 0;
-    for (const String &command : commands) {
+    for (let const &command : commands) {
       const completion_spec *spec = cxt.lookup_completion_spec(command.view());
       if (spec == nullptr) {
         print_status = 1;
         continue;
       }
-      print_one_spec(command.view(), *spec);
+      do_print_one_spec(command.view(), *spec);
     }
     return print_status;
   }
 
   /* The one spec the parsed options describe, built by a single maker so the
      default registration and the per-command ones cannot diverge. */
-  let const make_spec = [&]() throws -> completion_spec {
+  let const do_make_spec = [&]() throws -> completion_spec {
     let spec = completion_spec{};
     spec.function_name = String{heap_allocator(), function_name};
     spec.word_list = String{heap_allocator(), word_list};
-    spec.use_default = use_default;
+    spec.should_use_default = should_use_default;
     return spec;
   };
 
   if (is_default_completion) {
     LOG(Debug, "complete registering the default spec with function '%s'",
         function_name.c_str());
-    cxt.register_default_completion_spec(make_spec());
+    cxt.register_default_completion_spec(do_make_spec());
     return 0;
   }
 
-  for (const String &command : commands) {
+  for (let const &command : commands) {
     LOG(Debug, "complete registering spec for '%s'", command.c_str());
-    cxt.register_completion_spec(command.view(), make_spec());
+    cxt.register_completion_spec(command.view(), do_make_spec());
   }
   return 0;
 }

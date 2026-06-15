@@ -8,14 +8,14 @@ class String;
 
 #if !defined NDEBUG
 #include <cstdio>
-/* fprintf(stderr, ...) */
+/* Print a TRACE-prefixed message with file and line to stderr. */
 #define TRACE(...)                                                             \
   do {                                                                         \
     unused(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
     unused(std::fprintf(stderr, __VA_ARGS__));                                 \
     unused(fflush(stderr));                                                    \
   } while (0)
-/* fprintf(stderr, ... + "\n") */
+/* The same as TRACE with a trailing newline. */
 #define TRACELN(...)                                                           \
   do {                                                                         \
     unused(std::fprintf(stderr, "[TRACE] " __FILE__ ":%d: ", __LINE__));       \
@@ -41,11 +41,11 @@ donteliminate void t__strprintf(StringT &s, const char *fmt, ...)
     va_end(a);
     return;
   }
-  usize n = static_cast<usize>(written);
-  char *b = new char[n + 1];
-  unused(vsnprintf(b, n + 1, fmt, a));
-  s.append(b);
-  delete[] b;
+  usize formatted_length = static_cast<usize>(written);
+  char *formatted_buffer = new char[formatted_length + 1];
+  unused(vsnprintf(formatted_buffer, formatted_length + 1, fmt, a));
+  s.append(formatted_buffer);
+  delete[] formatted_buffer;
   va_end(ac);
   va_end(a);
 }

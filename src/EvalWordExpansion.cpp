@@ -38,7 +38,9 @@ static fn parse_modifier_array_word(StringView word) wontthrow
     inner_word = inner_word.substring_of_length(1, inner_word.length - 2);
   if (inner_word.length < 6 || inner_word[0] != '$' || inner_word[1] != '{' ||
       inner_word[inner_word.length - 1] != '}')
+  {
     return None;
+  }
   let const inner = inner_word.substring_of_length(2, inner_word.length - 3);
   usize name_end = 0;
   while (name_end < inner.length && lexer::is_variable_name(inner[name_end]))
@@ -46,7 +48,9 @@ static fn parse_modifier_array_word(StringView word) wontthrow
   if (name_end == 0 || name_end + 3 != inner.length || inner[name_end] != '[' ||
       (inner[name_end + 1] != '@' && inner[name_end + 1] != '*') ||
       inner[name_end + 2] != ']')
+  {
     return None;
+  }
   return modifier_array_word{inner.substring_of_length(0, name_end),
                              inner[name_end + 1] == '*', is_quoted};
 }
@@ -78,7 +82,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
   let current = glob_field{scratch};
   let has_current = false;
 
-  auto flush = [&]() {
+  auto do_flush = [&]() {
     if (has_current) {
       fields.push(steal(current));
       current = glob_field{scratch};
@@ -86,7 +90,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
     }
   };
 
-  auto append_run = [&](StringView text, bool glob_active) {
+  auto do_append_run = [&](StringView text, bool glob_active) {
     current.text.append(text);
     current.glob_active.reserve(current.glob_active.count() + text.length);
     for (usize k = 0; k < text.length; k++)
@@ -95,9 +99,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
   };
 
   /* A field with no bytes is still pushed, which a non-whitespace IFS delimiter
-     run needs so that an empty field between two delimiters survives. flush
+     run needs so that an empty field between two delimiters survives. do_flush
      alone emits only a started field and so cannot stand in here. */
-  auto emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
+  auto do_emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
 
   /* IFS whitespace folds and a non-whitespace IFS byte delimits one field each,
      matching dash. A single forward pass classifies every byte as a field byte,
@@ -107,7 +111,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
      fields, so a:b yields two fields and a::b yields an empty between them. A
      leading delimiter forces a leading empty field, and a trailing whitespace
      run or a trailing single delimiter leaves no empty field behind. */
-  auto append_split_run = [&](StringView text, bool glob_active) {
+  auto do_append_split_run = [&](StringView text, bool glob_active) {
     usize i = 0;
     while (i < text.length) {
       const char byte = text.data[i];
@@ -115,7 +119,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         usize start = i;
         while (i < text.length && !is_field_separator(text.data[i]))
           i++;
-        append_run(StringView{text.data + start, i - start}, glob_active);
+        do_append_run(StringView{text.data + start, i - start}, glob_active);
         continue;
       }
 
@@ -125,23 +129,24 @@ hot fn EvalContext::expand_word(const Word &word) throws
       usize delimiter_count = 0;
       while (i < text.length && is_field_separator(text.data[i])) {
         const char separator = text.data[i];
-        if (separator != ' ' && separator != '\t' && separator != '\n')
+        if (separator != ' ' && separator != '\t' && separator != '\n') {
           delimiter_count++;
+        }
         i++;
       }
 
       /* The accumulated field ends here whether the run folds or delimits. */
-      flush();
+      do_flush();
       if (delimiter_count == 0) continue;
 
       /* The first delimiter that follows an empty field forces that empty field
          out, so a leading delimiter and a delimiter after another delimiter
          both keep their empty. A delimiter that closes a non-empty field adds
-         no extra empty, since flush already emitted that field. Each further
+         no extra empty, since do_flush already emitted that field. Each further
          delimiter in the run marks one more empty field. */
-      if (!was_field_started) emit_empty_field();
+      if (!was_field_started) do_emit_empty_field();
       for (usize k = 1; k < delimiter_count; k++)
-        emit_empty_field();
+        do_emit_empty_field();
     }
   };
 
@@ -151,21 +156,23 @@ hot fn EvalContext::expand_word(const Word &word) throws
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
-      append_run(segment_text, false);
+      do_append_run(segment_text, false);
       break;
     /* Field splitting applies only to the results of expansions, so literal
        text from the source stays one run even when it holds IFS bytes, the
        way bash and dash keep a-b whole under IFS=-. */
-    case WordSegment::Kind::UnquotedText: append_run(segment_text, true); break;
+    case WordSegment::Kind::UnquotedText:
+      do_append_run(segment_text, true);
+      break;
     case WordSegment::Kind::VariableReference: {
       /* "$@" expands to one field per positional parameter. The first joins any
          preceding text, the last leaves its field open for following text. */
       if (segment.text == "@" && segment.is_in_double_quotes) {
         for (usize i = 0; i < m_positional_params.count(); i++) {
-          if (i > 0) flush();
-          append_run(StringView{m_positional_params[i].data(),
-                                m_positional_params[i].count()},
-                     false);
+          if (i > 0) do_flush();
+          do_append_run(StringView{m_positional_params[i].data(),
+                                   m_positional_params[i].count()},
+                        false);
         }
         break;
       }
@@ -179,10 +186,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
           !segment.is_in_double_quotes)
       {
         for (usize i = 0; i < m_positional_params.count(); i++) {
-          if (i > 0) flush();
-          append_split_run(StringView{m_positional_params[i].data(),
-                                      m_positional_params[i].count()},
-                           true);
+          if (i > 0) do_flush();
+          do_append_split_run(StringView{m_positional_params[i].data(),
+                                         m_positional_params[i].count()},
+                              true);
         }
         break;
       }
@@ -205,19 +212,21 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const ifs = m_field_separators.view();
           let joined = String{scratch_allocator()};
           for (usize i = 0; i < names.count(); i++) {
-            if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+            if (i > 0 && !ifs.is_empty()) {
+              joined.push(ifs[0]);
+            }
             joined.append(names[i].view());
           }
-          append_run(joined, false);
+          do_append_run(joined, false);
         } else if (segment.is_in_double_quotes) {
           for (usize i = 0; i < names.count(); i++) {
-            if (i > 0) flush();
-            append_run(names[i].view(), false);
+            if (i > 0) do_flush();
+            do_append_run(names[i].view(), false);
           }
         } else {
           for (usize i = 0; i < names.count(); i++) {
-            if (i > 0) flush();
-            append_split_run(names[i].view(), true);
+            if (i > 0) do_flush();
+            do_append_split_run(names[i].view(), true);
           }
         }
         break;
@@ -242,19 +251,21 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const ifs = m_field_separators.view();
           let joined = String{scratch_allocator()};
           for (usize i = 0; i < subscripts.count(); i++) {
-            if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+            if (i > 0 && !ifs.is_empty()) {
+              joined.push(ifs[0]);
+            }
             joined.append(subscripts[i].view());
           }
-          append_run(joined, false);
+          do_append_run(joined, false);
         } else if (segment.is_in_double_quotes) {
           for (usize i = 0; i < subscripts.count(); i++) {
-            if (i > 0) flush();
-            append_run(subscripts[i].view(), false);
+            if (i > 0) do_flush();
+            do_append_run(subscripts[i].view(), false);
           }
         } else {
           for (usize i = 0; i < subscripts.count(); i++) {
-            if (i > 0) flush();
-            append_split_run(subscripts[i].view(), true);
+            if (i > 0) do_flush();
+            do_append_split_run(subscripts[i].view(), true);
           }
         }
         break;
@@ -288,19 +299,21 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let const ifs = m_field_separators.view();
             let joined = String{scratch_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+              if (i > 0 && !ifs.is_empty()) {
+                joined.push(ifs[0]);
+              }
               joined.append(elements[i].view());
             }
-            append_run(joined, false);
+            do_append_run(joined, false);
           } else if (segment.is_in_double_quotes) {
             for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0) flush();
-              append_run(elements[i].view(), false);
+              if (i > 0) do_flush();
+              do_append_run(elements[i].view(), false);
             }
           } else {
             for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0) flush();
-              append_split_run(elements[i].view(), true);
+              if (i > 0) do_flush();
+              do_append_split_run(elements[i].view(), true);
             }
           }
           break;
@@ -317,7 +330,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const slice = segment_text.substring(2);
         let const param_count = m_positional_params.count();
         const i64 total = static_cast<i64>(param_count) + 1;
-        auto positional_at = [&](i64 index) wontthrow -> StringView {
+        auto do_positional_at = [&](i64 index) wontthrow -> StringView {
           return index == 0 ? m_shell_name.view()
                             : m_positional_params[static_cast<usize>(index - 1)]
                                   .view();
@@ -347,19 +360,21 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const ifs = m_field_separators.view();
           let joined = String{scratch_allocator()};
           for (i64 j = start; j < end; j++) {
-            if (j > start && !ifs.is_empty()) joined.push(ifs[0]);
-            joined.append(positional_at(j));
+            if (j > start && !ifs.is_empty()) {
+              joined.push(ifs[0]);
+            }
+            joined.append(do_positional_at(j));
           }
-          append_run(joined, false);
+          do_append_run(joined, false);
         } else if (segment.is_in_double_quotes) {
           for (i64 j = start; j < end; j++) {
-            if (j > start) flush();
-            append_run(positional_at(j), false);
+            if (j > start) do_flush();
+            do_append_run(do_positional_at(j), false);
           }
         } else {
           for (i64 j = start; j < end; j++) {
-            if (j > start) flush();
-            append_split_run(positional_at(j), true);
+            if (j > start) do_flush();
+            do_append_split_run(do_positional_at(j), true);
           }
         }
         break;
@@ -414,19 +429,21 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let const ifs = m_field_separators.view();
             let joined = String{scratch_allocator()};
             for (i64 j = start; j < end; j++) {
-              if (j > start && !ifs.is_empty()) joined.push(ifs[0]);
+              if (j > start && !ifs.is_empty()) {
+                joined.push(ifs[0]);
+              }
               joined.append(elements[static_cast<usize>(j)].view());
             }
-            append_run(joined, false);
+            do_append_run(joined, false);
           } else if (segment.is_in_double_quotes) {
             for (i64 j = start; j < end; j++) {
-              if (j > start) flush();
-              append_run(elements[static_cast<usize>(j)].view(), false);
+              if (j > start) do_flush();
+              do_append_run(elements[static_cast<usize>(j)].view(), false);
             }
           } else {
             for (i64 j = start; j < end; j++) {
-              if (j > start) flush();
-              append_split_run(elements[static_cast<usize>(j)].view(), true);
+              if (j > start) do_flush();
+              do_append_split_run(elements[static_cast<usize>(j)].view(), true);
             }
           }
           break;
@@ -462,20 +479,22 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let const ifs = m_field_separators.view();
             let joined = String{scratch_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+              if (i > 0 && !ifs.is_empty()) {
+                joined.push(ifs[0]);
+              }
               joined.append(
                   apply_value_modifier(elements[i].view(), modifier).view());
             }
-            append_run(joined, false);
+            do_append_run(joined, false);
           } else {
             for (usize i = 0; i < elements.count(); i++) {
-              if (i > 0) flush();
+              if (i > 0) do_flush();
               let const modified =
                   apply_value_modifier(elements[i].view(), modifier);
               if (segment.is_in_double_quotes)
-                append_run(modified.view(), false);
+                do_append_run(modified.view(), false);
               else
-                append_split_run(modified.view(), true);
+                do_append_split_run(modified.view(), true);
             }
           }
           break;
@@ -527,24 +546,26 @@ hot fn EvalContext::expand_word(const Word &word) throws
                elements join under the subject's own [*] while a modifier
                word such as "${b[*]}" joins under its inner star, the way
                bash reads each expansion by its own spelling. */
-            auto emit_elements = [&](const ArrayList<String> &values,
-                                     bool quoted, bool star) throws {
+            auto do_emit_elements = [&](const ArrayList<String> &values,
+                                        bool quoted, bool star) throws {
               if (quoted && star) {
                 let const ifs = m_field_separators.view();
                 let joined = String{scratch_allocator()};
                 for (usize i = 0; i < values.count(); i++) {
-                  if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+                  if (i > 0 && !ifs.is_empty()) {
+                    joined.push(ifs[0]);
+                  }
                   joined.append(values[i].view());
                 }
-                append_run(joined, false);
+                do_append_run(joined, false);
                 return;
               }
               for (usize i = 0; i < values.count(); i++) {
-                if (i > 0) flush();
+                if (i > 0) do_flush();
                 if (quoted)
-                  append_run(values[i].view(), false);
+                  do_append_run(values[i].view(), false);
                 else
-                  append_split_run(values[i].view(), true);
+                  do_append_split_run(values[i].view(), true);
               }
             };
 
@@ -553,7 +574,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
                  a set array reads the elements themselves under the outer
                  quoting. */
               if (modifier_op == '-')
-                emit_elements(elements, segment.is_in_double_quotes, is_star);
+                do_emit_elements(elements, segment.is_in_double_quotes,
+                                 is_star);
               break;
             }
 
@@ -565,10 +587,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
             if (let const array_word = parse_modifier_array_word(modifier_word);
                 array_word.has_value())
             {
-              emit_elements(collect_array_elements(array_word->array_name),
-                            array_word->is_quoted ||
-                                segment.is_in_double_quotes,
-                            array_word->is_star);
+              do_emit_elements(collect_array_elements(array_word->array_name),
+                               array_word->is_quoted ||
+                                   segment.is_in_double_quotes,
+                               array_word->is_star);
               break;
             }
             /* Any other word shape, a plain literal alternate such as
@@ -577,9 +599,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
                scalar path would mis-parse as ${a}. */
             let const value = expand_modifier_word(modifier_word);
             if (segment.is_in_double_quotes)
-              append_run(value, false);
+              do_append_run(value, false);
             else
-              append_split_run(value, true);
+              do_append_split_run(value, true);
             break;
           }
         }
@@ -626,17 +648,19 @@ hot fn EvalContext::expand_word(const Word &word) throws
                 let const ifs = m_field_separators.view();
                 let joined = String{scratch_allocator()};
                 for (usize i = 0; i < values.count(); i++) {
-                  if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+                  if (i > 0 && !ifs.is_empty()) {
+                    joined.push(ifs[0]);
+                  }
                   joined.append(values[i].view());
                 }
-                append_run(joined, false);
+                do_append_run(joined, false);
               } else {
                 for (usize i = 0; i < values.count(); i++) {
-                  if (i > 0) flush();
+                  if (i > 0) do_flush();
                   if (emit_quoted)
-                    append_run(values[i].view(), false);
+                    do_append_run(values[i].view(), false);
                   else
-                    append_split_run(values[i].view(), true);
+                    do_append_split_run(values[i].view(), true);
                 }
               }
               break;
@@ -664,9 +688,9 @@ hot fn EvalContext::expand_word(const Word &word) throws
         if (is_plain_name)
           if (let const *stored = lookup_shell_variable(segment_text)) {
             if (segment.is_in_double_quotes)
-              append_run(stored->view(), false);
+              do_append_run(stored->view(), false);
             else
-              append_split_run(stored->view(), true);
+              do_append_split_run(stored->view(), true);
             break;
           }
       }
@@ -674,19 +698,19 @@ hot fn EvalContext::expand_word(const Word &word) throws
          bound directly rather than copied into a second allocation. */
       let const value = apply_parameter_expansion(segment.text.view());
       if (segment.is_in_double_quotes)
-        append_run(value, false);
+        do_append_run(value, false);
       else
         /* An unquoted expansion undergoes field splitting and then pathname
            expansion, so a * or ? from the value is an active glob. */
-        append_split_run(value, true);
+        do_append_split_run(value, true);
     } break;
 
     case WordSegment::Kind::CommandSubstitution: {
       let const output = capture_command_substitution(segment);
       if (segment.is_in_double_quotes)
-        append_run(output, false);
+        do_append_run(output, false);
       else
-        append_split_run(output, true);
+        do_append_split_run(output, true);
     } break;
 
     /* The funsub splices its captured output under the same quote and split
@@ -694,16 +718,16 @@ hot fn EvalContext::expand_word(const Word &word) throws
     case WordSegment::Kind::FunctionSubstitution: {
       let const output = capture_function_substitution(segment);
       if (segment.is_in_double_quotes)
-        append_run(output, false);
+        do_append_run(output, false);
       else
-        append_split_run(output, true);
+        do_append_split_run(output, true);
     } break;
 
     case WordSegment::Kind::ProcessSubstitution: {
       /* The /dev/fd path is a single literal field, so it neither splits on IFS
          nor globs, the way bash substitutes the process substitution. */
       let const path = setup_process_substitution(segment.text.view());
-      append_run(path, false);
+      do_append_run(path, false);
     } break;
 
     case WordSegment::Kind::ArithmeticExpansion: {
@@ -717,14 +741,14 @@ hot fn EvalContext::expand_word(const Word &word) throws
       char buffer[24];
       let const value = utils::int_to_text_into(result, buffer, sizeof(buffer));
       if (segment.is_in_double_quotes)
-        append_run(value, false);
+        do_append_run(value, false);
       else
-        append_split_run(value, false);
+        do_append_split_run(value, false);
     } break;
     }
   }
 
-  flush();
+  do_flush();
 
   return fields;
 }
@@ -813,7 +837,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
 
   /* Append a run of bytes that share one glob-active state, so the mask stays
      parallel to the result the way expand_word builds it. */
-  auto emit_run = [&](StringView bytes, bool is_active) {
+  auto do_emit_run = [&](StringView bytes, bool is_active) {
     result.append(bytes);
     for (usize k = 0; k < bytes.length; k++)
       active_out.push(is_active);
@@ -826,25 +850,27 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
     case WordSegment::Kind::DoubleQuotedText:
       /* A quoted or double-quoted region is a literal member, so its
          metacharacters never act as wildcards. */
-      emit_run(segment_text, false);
+      do_emit_run(segment_text, false);
       break;
-    case WordSegment::Kind::UnquotedText: emit_run(segment_text, true); break;
+    case WordSegment::Kind::UnquotedText:
+      do_emit_run(segment_text, true);
+      break;
     case WordSegment::Kind::VariableReference: {
       let const value = apply_parameter_expansion(segment_text);
-      emit_run(value.view(), !segment.is_in_double_quotes);
+      do_emit_run(value.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::CommandSubstitution: {
       let const output = capture_command_substitution(segment);
-      emit_run(output.view(), !segment.is_in_double_quotes);
+      do_emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::FunctionSubstitution: {
       let const output = capture_function_substitution(segment);
-      emit_run(output.view(), !segment.is_in_double_quotes);
+      do_emit_run(output.view(), !segment.is_in_double_quotes);
     } break;
     case WordSegment::Kind::ProcessSubstitution: {
       /* The /dev/fd path is a literal that does not glob. */
       let const path = setup_process_substitution(segment.text.view());
-      emit_run(path.view(), false);
+      do_emit_run(path.view(), false);
     } break;
     case WordSegment::Kind::ArithmeticExpansion: {
       /* An arithmetic result is decimal digits and a sign, so it carries no
@@ -852,7 +878,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       let const number = segment.folded_arithmetic_result.has_value()
                              ? *segment.folded_arithmetic_result
                              : evaluate_arithmetic_cached(segment);
-      emit_run(utils::int_to_text(number).view(), false);
+      do_emit_run(utils::int_to_text(number).view(), false);
     } break;
     }
   }
@@ -863,12 +889,12 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
                                           bool allow_expansion) throws
     -> ArrayList<String>
 {
-  auto split_plain = [&]() throws -> ArrayList<String> {
+  auto do_split_plain = [&]() throws -> ArrayList<String> {
     let words = ArrayList<String>{};
     usize start = 0;
     for (usize i = 0; i <= wordlist.length; i++) {
-      const char c = i < wordlist.length ? wordlist[i] : ' ';
-      if (c == ' ' || c == '\t' || c == '\n') {
+      const char character = i < wordlist.length ? wordlist[i] : ' ';
+      if (character == ' ' || character == '\t' || character == '\n') {
         if (i > start)
           words.push(String{wordlist.substring_of_length(start, i - start)});
         start = i + 1;
@@ -878,17 +904,18 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   };
 
   /* The ghost path never parses, so it skips even the metacharacter scan. */
-  if (!allow_expansion) return split_plain();
+  if (!allow_expansion) return do_split_plain();
 
   /* A literal list, no expansion or quoting byte anywhere, splits with no
      parse at all, the common -W shape. */
   let needs_expansion = false;
   for (usize i = 0; i < wordlist.length && !needs_expansion; i++) {
-    const char c = wordlist[i];
-    needs_expansion = c == '$' || c == '`' || c == '"' || c == '\'' ||
-                      c == '\\' || c == '~' || c == '{';
+    const char character = wordlist[i];
+    needs_expansion = character == '$' || character == '`' ||
+                      character == '"' || character == '\'' ||
+                      character == '\\' || character == '~' || character == '{';
   }
-  if (!needs_expansion) return split_plain();
+  if (!needs_expansion) return do_split_plain();
 
   /* The list expands by wrapping it in an array literal, so a structural byte
      that would close the literal early and run the rest as a command, a
@@ -904,22 +931,23 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     bool in_backtick = false;
     bool at_word_start = true;
     for (usize i = 0; i < wordlist.length; i++) {
-      const char c = wordlist[i];
+      const char character = wordlist[i];
       if (quote != 0) {
-        if (c == quote) quote = 0;
+        if (character == quote) quote = 0;
         at_word_start = false;
         continue;
       }
-      if (c == '\\') {
+      if (character == '\\') {
         i++;
         at_word_start = false;
         continue;
       }
-      if (c == '\'' || c == '"') {
-        quote = c;
-      } else if (c == '`') {
+      if (character == '\'' || character == '"') {
+        quote = character;
+      } else if (character == '`') {
         in_backtick = !in_backtick;
-      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '(')
+      } else if (character == '$' && i + 1 < wordlist.length &&
+                 wordlist[i + 1] == '(')
       {
         /* $(( opens arithmetic that closes with )), so both parens are
            counted and the )) decrements back to the top level cleanly. */
@@ -930,27 +958,31 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
           paren_depth++;
           i++;
         }
-      } else if (c == '$' && i + 1 < wordlist.length && wordlist[i + 1] == '{')
+      } else if (character == '$' && i + 1 < wordlist.length &&
+                 wordlist[i + 1] == '{')
       {
         brace_depth++;
         i++;
-      } else if (c == ')' && paren_depth > 0) {
+      } else if (character == ')' && paren_depth > 0) {
         paren_depth--;
-      } else if (c == '}' && brace_depth > 0) {
+      } else if (character == '}' && brace_depth > 0) {
         brace_depth--;
       } else if (!in_backtick && paren_depth == 0 && brace_depth == 0) {
-        if (c == ')' || c == '(' || c == ';' || c == '|' || c == '&' ||
-            c == '<' || c == '>' || c == '\n')
+        if (character == ')' || character == '(' || character == ';' ||
+            character == '|' || character == '&' || character == '<' ||
+            character == '>' || character == '\n')
+        {
           return false;
-        if (c == '#' && at_word_start) return false;
+        }
+        if (character == '#' && at_word_start) return false;
       }
-      at_word_start = c == ' ' || c == '\t';
+      at_word_start = character == ' ' || character == '\t';
     }
     return quote == 0 && !in_backtick && paren_depth == 0 && brace_depth == 0;
   };
   if (!is_array_literal_safe()) {
     LOG(Debug, "-W list is not array-literal safe, splitting plain");
-    return split_plain();
+    return do_split_plain();
   }
 
   /* The list expands as an array literal in the current context, so a word
@@ -978,7 +1010,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
   } catch (const ErrorBase &error) {
     LOG(Debug, "-W expansion failed, splitting plain: %s",
         error.message().c_str());
-    return split_plain();
+    return do_split_plain();
   }
   return fields;
 }

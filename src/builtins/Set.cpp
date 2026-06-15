@@ -136,10 +136,13 @@ const SetOption SET_OPTIONS[] = {
    at startup. */
 Maybe<mimic_mood> parse_mood_name(StringView name) throws
 {
-  if (name == "shit" || name == "default") return mimic_mood::Default;
+  if (name == "shit" || name == "default") {
+    return mimic_mood::Default;
+  }
   if (name == "bash") return mimic_mood::Bash;
-  if (name == "sh" || name == "posix" || name == "dash")
+  if (name == "sh" || name == "posix" || name == "dash") {
     return mimic_mood::Posix;
+  }
   return None;
 }
 
@@ -156,7 +159,7 @@ StringView mood_name(mimic_mood mood) throws
 
 const SetOption *find_option_by_letter(char letter) throws
 {
-  for (const SetOption &option : SET_OPTIONS)
+  for (let const &option : SET_OPTIONS)
     if (option.letter == letter) return &option;
   return nullptr;
 }
@@ -166,10 +169,11 @@ const SetOption *find_option_by_name(StringView name) throws
   /* The alias is the command line's --help spelling, so set -o accepts both
      'noglob' and 'no-glob' while the listings print the canonical name a
      portable script replays. */
-  for (const SetOption &option : SET_OPTIONS)
+  for (let const &option : SET_OPTIONS) {
     if (option.name == name ||
         (!option.alias.is_empty() && option.alias == name))
       return &option;
+  }
   return nullptr;
 }
 
@@ -214,7 +218,7 @@ void apply_or_reject_option(EvalContext &cxt, const SetOption &option,
 String list_options(const EvalContext &cxt) throws
 {
   let out = String{};
-  for (const SetOption &option : SET_OPTIONS) {
+  for (let const &option : SET_OPTIONS) {
     if (option.name.starts_with(StringView{"show-"})) continue;
     /* A startup fact cannot be replayed through set -o, so the replay listing
        leaves it out and set -p stays the place that shows it. */
@@ -237,7 +241,7 @@ String format_option_table(const EvalContext *cxt,
      also holds the ", alias" spellings. */
   const usize name_field_width = include_alias_spellings ? 30 : 18;
   let out = String{};
-  for (const SetOption &option : SET_OPTIONS) {
+  for (let const &option : SET_OPTIONS) {
     out += "  ";
     if (option.letter != '\0') {
       out.push('-');
@@ -273,7 +277,7 @@ String format_option_switches_help() throws
   section += format_option_table(nullptr, true);
   section += "\n  The -o long names:\n";
   let listed_names = String{};
-  for (const SetOption &option : SET_OPTIONS) {
+  for (let const &option : SET_OPTIONS) {
     if (!listed_names.is_empty()) listed_names += ", ";
     listed_names += option.name;
     if (!option.alias.is_empty()) {
@@ -303,13 +307,13 @@ fn shell_option_names(bool include_alias_spellings) throws
      keystroke, so both spellings build once. */
   static ArrayList<StringView> canonical = [] throws {
     let names = ArrayList<StringView>{};
-    for (const SetOption &option : SET_OPTIONS)
+    for (let const &option : SET_OPTIONS)
       names.push(option.name);
     return names;
   }();
   static ArrayList<StringView> with_aliases = [] throws {
     let names = ArrayList<StringView>{};
-    for (const SetOption &option : SET_OPTIONS) {
+    for (let const &option : SET_OPTIONS) {
       names.push(option.name);
       if (!option.alias.is_empty()) names.push(option.alias);
     }
@@ -322,7 +326,7 @@ fn shell_option_letters() throws -> const String &
 {
   static String letters = [] throws {
     let collected = String{};
-    for (const SetOption &option : SET_OPTIONS)
+    for (let const &option : SET_OPTIONS)
       if (option.letter != '\0') collected.push(option.letter);
     return collected;
   }();
@@ -347,9 +351,10 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const &args = ec.args();
   ASSERT(!args.is_empty());
 
-  if (args.count() > 1 && args[1] == "--help")
+  if (args.count() > 1 && args[1] == "--help") {
     SHOW_BUILTIN_HELP_EXTRA_AND_RETURN(ec,
                                        format_option_switches_help().view());
+  }
 
   /* set with no arguments lists the shell variables. */
   if (args.count() == 1) {
@@ -363,19 +368,19 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   let operands = ArrayList<String>{heap_allocator()};
-  bool collecting_operands = false;
+  bool is_collecting_operands = false;
   bool should_rebind = false;
 
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
 
-    if (collecting_operands) {
+    if (is_collecting_operands) {
       operands.push_managed(arg);
       continue;
     }
 
     if (arg == "--") {
-      collecting_operands = true;
+      is_collecting_operands = true;
       should_rebind = true;
       continue;
     }
@@ -388,15 +393,15 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
         arg.view().starts_with(StringView{"-M="}))
     {
       StringView value{};
-      bool have_value = false;
+      bool has_value = false;
       if (let const eq = arg.view().find_character('='); eq.has_value()) {
         value = arg.view().substring(*eq + 1);
-        have_value = true;
+        has_value = true;
       } else if (i + 1 < args.count()) {
         value = args[++i].view();
-        have_value = true;
+        has_value = true;
       }
-      if (!have_value) {
+      if (!has_value) {
         ec.print_to_stdout(String{mood_name(cxt.mood())} + "\n");
         continue;
       }
@@ -418,17 +423,17 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
         arg.view().starts_with(StringView{"-L="}))
     {
       StringView value{};
-      bool have_value = false;
+      bool has_value = false;
       if (let const eq = arg.view().find_character('='); eq.has_value()) {
         value = arg.view().substring(*eq + 1);
-        have_value = true;
+        has_value = true;
       } else if (i + 1 < args.count()) {
         value = args[++i].view();
-        have_value = true;
+        has_value = true;
       }
       /* With no value the form reports the moods whose startup files have
          loaded this session, the way set --mood reports the active mood. */
-      if (!have_value) {
+      if (!has_value) {
         let out = String{};
         for (mimic_mood listed :
              {mimic_mood::Default, mimic_mood::Posix, mimic_mood::Bash})
@@ -509,7 +514,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
 
     /* The first non-option argument and everything after it rebinds the
        positional parameters. */
-    collecting_operands = true;
+    is_collecting_operands = true;
     should_rebind = true;
     operands.push_managed(arg);
   }

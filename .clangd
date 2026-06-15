@@ -6,3 +6,27 @@ CompileFlags:
     -Wno-deprecated-declarations,
     -Wno-format,
   ]
+
+Diagnostics:
+  # The project does not use include-what-you-use, so the include cleaner only
+  # adds noise.
+  UnusedIncludes: None
+  MissingIncludes: None
+  ClangTidy:
+    # The repository .clang-tidy is authoritative. These checks fight the house
+    # style and stay off even if an editor merges a broader default set. The
+    # style brackets only the compound-condition ifs, names lambdas do_, prefixes
+    # bools is_/should_/was_/did_/has_, and keeps CamelCase classes.
+    Remove:
+      - readability-identifier-naming
+      - readability-identifier-length
+      - readability-braces-around-statements
+      - readability-magic-numbers
+      - readability-function-cognitive-complexity
+      - modernize-use-trailing-return-type
+      - modernize-use-auto
+      - modernize-use-nodiscard
+      - bugprone-easily-swappable-parameters
+      - bugprone-reserved-identifier
+      - misc-non-private-member-variables-in-classes
+      - misc-use-internal-linkage

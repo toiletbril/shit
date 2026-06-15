@@ -83,7 +83,7 @@ cold fn AnalysisContext::warn(SourceLocation location,
 cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
     -> void
 {
-  if (!trace_optimizer) return;
+  if (!should_trace_optimizer) return;
   print_error("[optimizer] ");
   print_error(message);
   print_error("\n");
@@ -94,7 +94,7 @@ cold fn AnalysisContext::fail(SourceLocation location,
 {
   /* Under -W the analysis still runs but its errors are reported as warnings
      and the run proceeds, so the same call reports without stopping. */
-  if (errors_are_warnings) {
+  if (should_treat_errors_as_warnings) {
     warn(location, message);
     return;
   }
@@ -178,14 +178,16 @@ fn static_command_name(const Token *token) throws -> Maybe<String>
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
 
   let name = String{};
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     /* Any expansion segment makes the name a runtime value, the variable,
        command, arithmetic, process, and function substitutions alike, so
        none of their raw bytes may pass for the program text. */
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText &&
         segment.kind != WordSegment::Kind::UnquotedText)
+    {
       return shit::None;
+    }
     if (segment.kind == WordSegment::Kind::UnquotedText) {
       for (usize i = 0; i < segment.text.count(); i++) {
         if (lexer::is_expandable_char(segment.text[i])) return shit::None;
@@ -256,7 +258,7 @@ struct glob_scan_byte
 fn collect_glob_scan_bytes(const Word &word) throws -> ArrayList<glob_scan_byte>
 {
   ArrayList<glob_scan_byte> bytes{heap_allocator()};
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     const bool is_active = segment.has_live_glob_chars();
     for (usize i = 0; i < segment.text.count(); i++) {
       bytes.push(glob_scan_byte{segment.text[i], is_active});
@@ -295,7 +297,9 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
        '^' before, so it rejected a form the matcher accepts. */
     if (scan < bytes.count() &&
         (bytes[scan].ch == '!' || bytes[scan].ch == '^'))
+    {
       scan++;
+    }
 
     /* The matcher treats a ']' right after '[' or '[^' as a member, then, when
        no further ']' closes the class, falls back to a literal '[' rather than
@@ -338,10 +342,10 @@ fn analyze_ast(const Expression *root, StringView source,
   ASSERT(root != nullptr);
 
   AnalysisContext actx{source};
-  actx.errors_are_warnings = errors_are_warnings;
-  actx.silence_unresolved_commands = silence_unresolved_commands;
+  actx.should_treat_errors_as_warnings = errors_are_warnings;
+  actx.should_silence_unresolved_commands = silence_unresolved_commands;
   actx.eval_context = eval_context;
-  actx.trace_optimizer = trace_optimizer;
+  actx.should_trace_optimizer = trace_optimizer;
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
@@ -366,7 +370,9 @@ fn analyze_ast(const Expression *root, StringView source,
        sh program name. */
     if (first_line.length >= 2 &&
         first_line.substring(first_line.length - 2) == StringView{"sh"})
+    {
       interpreter_is_sh = true;
+    }
     if (contains_dash || (interpreter_is_sh && !contains_bash))
       actx.shebang_is_posix_sh = true;
   }
@@ -383,7 +389,7 @@ fn analyze_ast(const Expression *root, StringView source,
 
   root->analyze(actx, true);
 
-  if (actx.trace_optimizer) {
+  if (actx.should_trace_optimizer) {
     let summary = String{"summary: "};
     summary.append(utils::uint_to_text(actx.optimizer_folded_arithmetic));
     summary.append(" arithmetic folded, ");
@@ -474,14 +480,14 @@ pure fn Command::is_negated() const wontthrow -> bool { return m_is_negated; }
 fn Command::set_timed(bool posix_format) wontthrow -> void
 {
   m_is_timed = true;
-  m_time_uses_posix_format = posix_format;
+  m_is_time_posix_format = posix_format;
 }
 
 pure fn Command::is_timed() const wontthrow -> bool { return m_is_timed; }
 
 pure fn Command::time_uses_posix_format() const wontthrow -> bool
 {
-  return m_time_uses_posix_format;
+  return m_is_time_posix_format;
 }
 
 fn Command::set_local_vars(ArrayList<prefix_assignment> &&vars) throws -> void
@@ -592,24 +598,28 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
       !actx.global_assigned_names.contains(name.view()) &&
       !(actx.eval_context != nullptr &&
         actx.eval_context->get_variable_value(name.view()).has_value()))
+  {
     actx.warn(source_location(),
               StringView{"This assignment to '"} + name +
                   "' in a function has no local, so the value leaks to the "
                   "global scope, declare it with local to keep it inside the "
                   "function");
+  }
 
   /* An unconditional top-level assignment records the name as an existing
      global, so a later function-body assignment to it reads as an update. */
   if (actx.function_scope_depth == 0 && is_unconditional &&
-      !actx.saw_runtime_definer)
+      !actx.has_seen_runtime_definer)
+  {
     actx.global_assigned_names.add(name.view());
+  }
 
   /* A conditional or nested assignment may not run, and a runtime definer such
      as eval or dot may already have changed the name out of view, so neither
      proves the value. The append form NAME+=VALUE depends on the prior value,
      which the prepass does not track. Each of these forgets the name rather
      than record it. */
-  if (!is_unconditional || actx.saw_runtime_definer ||
+  if (!is_unconditional || actx.has_seen_runtime_definer ||
       m_assignment->is_append())
   {
     LOG(All,
@@ -626,7 +636,7 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
         literal->c_str());
     actx.constant_variables.set(name.view(), literal->view());
     actx.optimizer_recorded_constants++;
-    if (actx.trace_optimizer)
+    if (actx.should_trace_optimizer)
       actx.trace_optimizer_line(String{"recorded constant: "} + name + " = " +
                                 *literal);
   } else {
@@ -817,14 +827,15 @@ fn resolve_duplication(const Redirection &redir, EvalContext &cxt) throws
   if (field == "-")
     return resolved_duplication{Redirection::DUP_FD_CLOSE, shit::None};
 
-  let const parsed = utils::parse_decimal_integer(field.view());
-  if (parsed.is_error() || parsed.value() < 0) {
-    if (redir.dup_may_be_filename)
+  let const parsed_descriptor = utils::parse_decimal_integer(field.view());
+  if (parsed_descriptor.is_error() || parsed_descriptor.value() < 0) {
+    if (redir.can_dup_be_filename)
       return resolved_duplication{-1, steal(field)};
     throw ErrorWithLocation{redir.target->source_location(),
                             "'" + field + "' is not a valid descriptor"};
   }
-  return resolved_duplication{static_cast<i32>(parsed.value()), shit::None};
+  return resolved_duplication{static_cast<i32>(parsed_descriptor.value()),
+                              shit::None};
 }
 
 } /* namespace */
@@ -893,7 +904,7 @@ static fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
     if (redir.kind == Redirection::Kind::Heredoc) {
       ASSERT(redir.heredoc_body != nullptr);
       body = redir.heredoc_body->clone();
-      if (redir.heredoc_expand) body = cxt.expand_heredoc_body(body);
+      if (redir.should_expand_heredoc) body = cxt.expand_heredoc_body(body);
     } else {
       ASSERT(redir.target != nullptr);
       body = cxt.expand_word_for_assignment(
@@ -917,26 +928,26 @@ static fn resolve_redirection(const Redirection &redir, EvalContext &cxt,
   if (redir.kind == Redirection::Kind::DuplicateOutput ||
       redir.kind == Redirection::Kind::DuplicateInput)
   {
-    let resolved = resolve_duplication(redir, cxt);
+    let resolved_dup = resolve_duplication(redir, cxt);
     /* The both-streams filename opens like >file and points the standard error
        after it, the pair bash builds for the csh >&file spelling. */
-    if (resolved.both_streams_file.has_value()) {
+    if (resolved_dup.both_streams_file.has_value()) {
       let opened = os::open_file_descriptor(
-          *resolved.both_streams_file,
+          *resolved_dup.both_streams_file,
           redirection_open_mode(Redirection::Kind::TruncateOutput,
                                 cxt.no_clobber()));
       if (!opened) {
         if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
         throw ErrorWithLocation{redir.target->source_location(),
                                 "Could not open '" +
-                                    *resolved.both_streams_file +
+                                    *resolved_dup.both_streams_file +
                                     "': " + os::last_system_error_message()};
       }
       return resolved_redirection{redirection_outcome::BothStreams, 1,
                                   opened.take(), -1};
     }
     return resolved_redirection{
-        redirection_outcome::Duplicate, redir.fd, {}, resolved.fd};
+        redirection_outcome::Duplicate, redir.fd, {}, resolved_dup.fd};
   }
 
   ASSERT(redir.target != nullptr);
@@ -972,7 +983,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
 {
   LOG(Debug, "applying %zu redirections to the pipeline stage",
       m_redirections.count());
-  for (const Redirection &redir : m_redirections) {
+  for (let const &redir : m_redirections) {
     let const r = resolve_redirection(redir, cxt, source_location());
     switch (r.kind) {
     /* A heredoc or here-string fills the stage's standard input slot, the only
@@ -1148,7 +1159,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      output and error is staged in source order onto the real shell fd below
      rather than into a slot. */
   Maybe<os::descriptor> redirect_in_fd;
-  bool redirect_in_fd_handed_off = false;
+  bool was_redirect_in_fd_handed_off = false;
   /* A redirect that points a real shell descriptor at its target around this
      command, a file on fd 1 or fd 2, a cross-route like 2>&1, a duplication
      onto an arbitrary descriptor like >&5, the close form >&-, and a numbered
@@ -1165,18 +1176,18 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   };
   defer
   {
-    if (!redirect_in_fd_handed_off && redirect_in_fd)
+    if (!was_redirect_in_fd_handed_off && redirect_in_fd)
       os::close_fd(*redirect_in_fd);
   };
 
   /* Set just before a redirection resource failure throws, an open that failed
      or a descriptor that is not open, so the catch tells those apart from an
      expansion error in a target word, which must stay fatal. */
-  bool redirection_open_failed = false;
+  bool did_redirection_open_fail = false;
   try {
-    for (const Redirection &redir : m_redirections) {
+    for (let const &redir : m_redirections) {
       let const r = resolve_redirection(redir, cxt, source_location(),
-                                        &redirection_open_failed);
+                                        &did_redirection_open_fail);
       switch (r.kind) {
       case redirection_outcome::Heredoc: {
         const os::descriptor body_fd = r.opened_fd;
@@ -1251,7 +1262,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           const bool err_ok = os::replace_descriptor(2, file_fd);
           os::close_fd(file_fd);
           if (!out_ok || !err_ok) {
-            redirection_open_failed = true;
+            did_redirection_open_fail = true;
             throw ErrorWithLocation{redir.target->source_location(),
                                     "Bad file descriptor"};
           }
@@ -1264,8 +1275,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
             os::save_and_replace_descriptor(2, file_fd);
         dup_saved_descriptors.push(saved_err);
         os::close_fd(file_fd);
-        if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
-          redirection_open_failed = true;
+        if (!saved_out.is_dup2_ok || !saved_err.is_dup2_ok) {
+          did_redirection_open_fail = true;
           throw ErrorWithLocation{redir.target->source_location(),
                                   "Bad file descriptor"};
         }
@@ -1299,7 +1310,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
             const SourceLocation location =
                 redir.target != nullptr ? redir.target->source_location()
                                         : source_location();
-            redirection_open_failed = true;
+            did_redirection_open_fail = true;
             throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
                                                   ": Bad file descriptor"};
           }
@@ -1334,11 +1345,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         /* A duplication onto a closed or invalid descriptor, as in >&5 with fd
            5 closed, fails the dup2. The command fails with a located error
            rather than writing to the original descriptor, matching dash. */
-        if (!saved.dup2_ok) {
+        if (!saved.is_dup2_ok) {
           const SourceLocation location = redir.target != nullptr
                                               ? redir.target->source_location()
                                               : source_location();
-          redirection_open_failed = true;
+          did_redirection_open_fail = true;
           throw ErrorWithLocation{location, utils::int_to_text(from_fd) +
                                                 ": Bad file descriptor"};
         }
@@ -1367,7 +1378,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           if (file_fd != redir.fd) os::close_fd(file_fd);
 #endif
           if (!was_replaced) {
-            redirection_open_failed = true;
+            did_redirection_open_fail = true;
             throw ErrorWithLocation{redir.target->source_location(),
                                     utils::int_to_text(redir.fd) +
                                         ": Bad file descriptor"};
@@ -1416,7 +1427,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* An expansion error in a target word, such as ${x?msg} on an unset name or
        a division by zero, is fatal the way it is anywhere else, so only an open
        or dup failure is caught here. */
-    if (!redirection_open_failed) throw;
+    if (!did_redirection_open_fail) throw;
     /* A redirection that cannot open its target, or names a closed descriptor,
        fails the command rather than the shell, the way dash continues past it.
        A special builtin is the exception, since its redirection error exits a
@@ -1442,7 +1453,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* The assignments commit left to right, each before the next is expanded,
        so a later value reads an earlier same-line one and a repeated name or a
        += accumulates against what the store already holds. */
-    for (const prefix_assignment &var : m_local_vars) {
+    for (let const &var : m_local_vars) {
       const StringView name = var.name.view();
       let value = cxt.expand_word_for_assignment(var.value);
       if (var.is_append) {
@@ -1475,7 +1486,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
     /* A command-less line may also carry bare array assignments, such as the
        pvars=() of flags= pvars=() specs=(), applied after the scalars in source
        order. */
-    for (const array_builtin_assignment &assignment : m_array_args) {
+    for (let const &assignment : m_array_args) {
       ArrayList<String> values = cxt.process_args(assignment.elements);
       cxt.assign_indexed_array_elements(assignment.name, steal(values),
                                         assignment.is_append);
@@ -1484,20 +1495,20 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        leaves the status of the last one, the way bash reports $(false) on its
        own line as 1 and a=$(false) b=$(true) as 0. A line with no
        substitution, a bare redirection or a plain assignment, resets to 0. */
-    let token_ran_substitution = [&](const Token *token) {
+    let do_token_ran_substitution = [&](const Token *token) {
       if (token == nullptr || token->kind() != Token::Kind::Word) return false;
       return static_cast<const tokens::WordToken *>(token)
           ->word()
           .runs_substitution();
     };
     let ran_substitution = false;
-    for (const Token *token : m_args)
-      ran_substitution = ran_substitution || token_ran_substitution(token);
-    for (const prefix_assignment &var : m_local_vars)
+    for (let const token : m_args)
+      ran_substitution = ran_substitution || do_token_ran_substitution(token);
+    for (let const &var : m_local_vars)
       ran_substitution = ran_substitution || var.value.runs_substitution();
-    for (const array_builtin_assignment &assignment : m_array_args)
-      for (const Token *token : assignment.elements)
-        ran_substitution = ran_substitution || token_ran_substitution(token);
+    for (let const &assignment : m_array_args)
+      for (let const token : assignment.elements)
+        ran_substitution = ran_substitution || do_token_ran_substitution(token);
     if (!ran_substitution) cxt.set_last_exit_status(0);
     return cxt.last_exit_status();
   }
@@ -1531,7 +1542,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      one and a repeated name or a += accumulates. The previous environment
      values are saved for the restore on exit, which keeps the prefix temporary
      for this command. */
-  for (const prefix_assignment &var : m_local_vars) {
+  for (let const &var : m_local_vars) {
     const StringView name = var.name.view();
     Maybe<String> previous = os::get_environment_variable(name);
     /* The value expansion throws a plain Error, an unset variable under set -u,
@@ -1658,7 +1669,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           os::save_and_replace_descriptor(0, *redirect_in_fd));
       os::close_fd(*redirect_in_fd);
       redirect_in_fd = shit::None;
-      redirect_in_fd_handed_off = true;
+      was_redirect_in_fd_handed_off = true;
     }
 
     /* The caller's parameters are moved out and restored by moving back, so a
@@ -1727,8 +1738,9 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
         definition_info != nullptr &&
         (static_cast<mimic_mood>(definition_info->defining_mood) !=
              cxt.mood() ||
-         definition_info->defining_warnings != cxt.warnings_enabled() ||
-         definition_info->defining_diagnostics_disabled !=
+         definition_info->were_warnings_enabled_at_definition !=
+             cxt.warnings_enabled() ||
+         definition_info->were_diagnostics_disabled_at_definition !=
              cxt.diagnostics_disabled());
     Maybe<runtime_state> saved_runtime_state = None;
     if (needs_state_swap)
@@ -1748,10 +1760,10 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        keeps the exit status without printing it a second time. An error that
        does not window, such as one already rendered by a nested call, is
        rethrown untouched. */
-    let const window_error = [&](ErrorWithLocation &error)
-                                 throws -> Maybe<StringView> {
+    let const do_window_error = [&](ErrorWithLocation &error)
+                                    throws -> Maybe<StringView> {
       let const resolved = cxt.resolve_render_source(error.location());
-      if (!resolved.windowed || resolved.text == nullptr) return None;
+      if (!resolved.is_windowed || resolved.text == nullptr) return None;
       let rebased = error.location();
       rebased.position = rebased.position - resolved.body_start_position +
                          resolved.header_length;
@@ -1769,7 +1781,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       function_ret = function_body->evaluate(cxt);
     } catch (ErrorWithLocationAndDetails &error) {
       if (!error.was_rendered())
-        if (let const windowed = window_error(error); windowed.has_value()) {
+        if (let const windowed = do_window_error(error); windowed.has_value()) {
           show_message(error.to_string(*windowed));
           show_message(error.details_to_string(*windowed));
           error.set_rendered();
@@ -1777,7 +1789,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       throw;
     } catch (ErrorWithLocation &error) {
       if (!error.was_rendered())
-        if (let const windowed = window_error(error); windowed.has_value()) {
+        if (let const windowed = do_window_error(error); windowed.has_value()) {
           show_message(error.to_string(*windowed));
           error.set_rendered();
         }
@@ -1846,7 +1858,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      and error redirects already took effect in source order on the real shell
      fds above and are restored by the defer, so they need no slot here. */
   if (redirect_in_fd) ec.in_fd = redirect_in_fd;
-  redirect_in_fd_handed_off = true;
+  was_redirect_in_fd_handed_off = true;
 
   const i64 ret = utils::execute_context(steal(ec), cxt, is_async());
 
@@ -1871,17 +1883,19 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      */
     let is_associative_request = false;
     if (is_declare || is_local)
-      for (const Token *arg : m_args) {
+      for (let const arg : m_args) {
         let const text = arg->raw_string();
         if (text.length() >= 2 && text.view()[0] == '-') {
           if (!is_readonly_request &&
               text.view().find_character('r').has_value())
+          {
             is_readonly_request = true;
+          }
           if (text.view().find_character('A').has_value())
             is_associative_request = true;
         }
       }
-    for (const array_builtin_assignment &assignment : m_array_args) {
+    for (let const &assignment : m_array_args) {
       if (is_local || is_function_local) cxt.declare_local(assignment.name);
       ArrayList<String> values = cxt.process_args(assignment.elements);
       if (is_associative_request) {
@@ -1889,7 +1903,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
            and each [key]=value element fills one entry. A bare element with no
            bracketed key becomes a key with an empty value. */
         cxt.declare_associative_array(assignment.name);
-        for (const String &element : values) {
+        for (let const &element : values) {
           const StringView text = element.view();
           if (!text.is_empty() && text[0] == '[') {
             if (let const close = text.find_character(']');
@@ -1970,7 +1984,7 @@ cold fn CompoundList::to_ast_string(usize layer) const throws -> String
   let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]";
-  for (const CompoundListCondition *n : m_nodes) {
+  for (let const n : m_nodes) {
     s += '\n';
     s += pad + EXPRESSION_AST_INDENT + n->to_ast_string(layer + 1);
   }
@@ -2012,7 +2026,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
        operand error, while a script-fatal error, the set -u read and the
        ${name:?} report, still aborts the run. The error renders to stderr
        here since nothing above will see it. */
-    auto run_node = [&]() throws -> i64 {
+    auto do_run_node = [&]() throws -> i64 {
       try {
         return n->evaluate(cxt);
       } catch (const ErrorBase &error) {
@@ -2029,20 +2043,20 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
     };
     switch (n->kind()) {
     case CompoundListCondition::Kind::None:
-      ret = run_node();
+      ret = do_run_node();
       did_execute = true;
       break;
 
     case CompoundListCondition::Kind::Or:
       if (ret != 0) {
-        ret = run_node();
+        ret = do_run_node();
         did_execute = true;
       }
       break;
 
     case CompoundListCondition::Kind::And:
       if (ret == 0) {
-        ret = run_node();
+        ret = do_run_node();
         did_execute = true;
       }
       break;
@@ -2204,7 +2218,7 @@ cold fn Pipeline::to_ast_string(usize layer) const throws -> String
   let const pad = indent_for_layer(layer);
 
   s += pad + "[" + to_string() + "]";
-  for (const Command *e : m_commands) {
+  for (let const e : m_commands) {
     s += '\n';
     s += pad + EXPRESSION_AST_INDENT + e->to_ast_string(layer + 1);
   }
@@ -2327,7 +2341,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
     }
   } catch (...) {
     if (last_stdin != SHIT_INVALID_FD) os::close_fd(last_stdin);
-    for (const os::process child : children) {
+    for (let const child : children) {
       /* The wait reaps the child, so a spawned stage never lingers as a zombie
          when the pipeline aborts. A failure to wait must not mask the original
          error, so it is swallowed here. */
@@ -2359,7 +2373,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
      all succeeded, while the plain case reports the last stage alone. */
   let stage_status = ArrayList<i32>{};
   stage_status.reserve(children.count());
-  for (const os::process child : children)
+  for (let const child : children)
     stage_status.push(os::wait_and_monitor_process(child));
 
   i32 ret = stage_status.is_empty() ? 0 : stage_status.back();
@@ -2396,7 +2410,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
      stage from its argument words alone and the prefix must reach only that
      stage's environment, which the per-stage fork applies in the child. */
   bool has_compound_stage = false;
-  for (const Command *stage : m_commands) {
+  for (let const stage : m_commands) {
     if (!stage->is_simple_command()) {
       has_compound_stage = true;
       break;
@@ -2419,7 +2433,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
      word is checked without expanding, which covers the common name-pipe form,
      and the whole scan is skipped when no function is defined. */
   if (!has_compound_stage && cxt.has_functions()) {
-    for (const Command *stage : m_commands) {
+    for (let const stage : m_commands) {
       const SimpleCommand *simple = static_cast<const SimpleCommand *>(stage);
       if (simple->args().is_empty()) continue;
       const Token *first = simple->args()[0];
@@ -2455,7 +2469,7 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
   };
   ecs.reserve(m_commands.count());
 
-  for (const Command *stage : m_commands) {
+  for (let const stage : m_commands) {
     ASSERT(stage != nullptr);
     ASSERT(stage->is_simple_command());
     const SimpleCommand *e = static_cast<const SimpleCommand *>(stage);
@@ -2495,13 +2509,13 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
          standard output takes the slot ahead of the pipe, so the next stage
          still sees EOF. */
       let unresolved = ExecContext::make_unresolved(e->source_location());
-      bool unresolved_handed_off = false;
+      bool was_unresolved_handed_off = false;
       defer
       {
-        if (!unresolved_handed_off) unresolved.close_fds();
+        if (!was_unresolved_handed_off) unresolved.close_fds();
       };
       e->redirect_exec_context(unresolved, cxt);
-      unresolved_handed_off = true;
+      was_unresolved_handed_off = true;
       ecs.push(steal(unresolved));
       continue;
     }
@@ -2513,13 +2527,13 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
        slots, so the descriptors opened so far are closed on that throw rather
        than leaked, the way the simple command path guards its own descriptors.
        The guard is disarmed once the stage is handed into the pipeline. */
-    bool stage_redirect_handed_off = false;
+    bool was_stage_redirect_handed_off = false;
     defer
     {
-      if (!stage_redirect_handed_off) ec.close_fds();
+      if (!was_stage_redirect_handed_off) ec.close_fds();
     };
     e->redirect_exec_context(ec, cxt);
-    stage_redirect_handed_off = true;
+    was_stage_redirect_handed_off = true;
     ecs.push(steal(ec));
   }
 
@@ -2572,7 +2586,7 @@ cold fn IfClause::to_ast_string(usize layer) const throws -> String
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
   let s = pad + "[" + to_string() + "]";
-  for (const auto &[condition, body] : m_branches) {
+  for (let const &[ condition, body ] : m_branches) {
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
 
@@ -2606,7 +2620,7 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     return 0;
   }
 
-  for (const auto &[condition, body] : m_branches) {
+  for (let const &[ condition, body ] : m_branches) {
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
 
@@ -2640,7 +2654,7 @@ cold fn IfClause::analyze(AnalysisContext &actx,
   /* The first condition runs whenever the if runs. The elif conditions and all
      bodies are conditional, since a branch may not be reached. */
   let is_first_branch = true;
-  for (const auto &[condition, body] : m_branches) {
+  for (let const &[ condition, body ] : m_branches) {
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
 
@@ -2664,7 +2678,7 @@ cold fn IfClause::register_defined_functions(AnalysisContext &actx) const throws
   /* Every branch body and the conditions run in the current shell, so a
      function defined in any of them is callable from a sibling and must be
      registered before the ordered walk warns about a forward reference. */
-  for (const auto &[condition, body] : m_branches) {
+  for (let const &[ condition, body ] : m_branches) {
     ASSERT(condition != nullptr);
     ASSERT(body != nullptr);
     condition->register_defined_functions(actx);
@@ -2913,12 +2927,12 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.leave_loop(); };
 
   i64 ret = 0;
-  bool reprint_menu = true;
+  bool should_reprint_menu = true;
   for (;;) {
     /* The numbered menu and the prompt go to standard error, the way bash keeps
        them out of the command's captured output. The menu reprints only after
        an empty line. */
-    if (reprint_menu) {
+    if (should_reprint_menu) {
       let menu = String{};
       for (usize i = 0; i < values.count(); i++) {
         menu += utils::int_to_text(static_cast<i64>(i + 1));
@@ -2927,7 +2941,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
         menu += '\n';
       }
       shit::print_error(menu.view());
-      reprint_menu = false;
+      should_reprint_menu = false;
     }
     shit::print_error(cxt.get_variable_value("PS3").value_or(String{"#? "}));
 
@@ -2946,7 +2960,7 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     LOG(All, "the select prompt read the reply '%s'", reply.c_str());
     cxt.set_shell_variable("REPLY", reply.view());
     if (reply.is_empty()) {
-      reprint_menu = true;
+      should_reprint_menu = true;
       continue;
     }
 
@@ -3040,7 +3054,7 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.leave_loop(); };
 
   i64 ret = 0;
-  for (const String &value : values) {
+  for (let const &value : values) {
     cxt.set_shell_variable(m_variable_name, value);
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
@@ -3060,13 +3074,15 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
      words rather than lines, so a name with a space breaks apart. A $(cat
      file) is shellcheck SC2013, read the lines with while read -r. A
      $(find ...) is shellcheck SC2044, use find -exec or a read loop. */
-  for (const Token *t : m_words) {
+  for (let const t : m_words) {
     if (t->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(t)->word();
-    for (const WordSegment &segment : word.segments) {
+    for (let const &segment : word.segments) {
       if (segment.kind != WordSegment::Kind::CommandSubstitution ||
           segment.is_in_double_quotes)
+      {
         continue;
+      }
       let const body = segment.text.view();
       usize start = 0;
       while (start < body.length && (body[start] == ' ' || body[start] == '\t'))
@@ -3121,7 +3137,7 @@ cold fn CaseClause::to_ast_string(usize layer) const throws -> String
   let const pad = indent_for_layer(layer);
   let const child_pad = pad + EXPRESSION_AST_INDENT;
   let s = pad + "[" + to_string() + "]";
-  for (const case_item &item : m_items) {
+  for (let const &item : m_items) {
     ASSERT(item.body != nullptr);
     s += "\n" + child_pad + item.body->to_ast_string(layer + 1);
   }
@@ -3143,7 +3159,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A case word and its patterns expand with variables and tilde but no field
      splitting and no pathname globbing, so a pattern keeps its metacharacters
      for matching. */
-  auto expand_no_glob = [&cxt](const Token *t) -> String {
+  auto do_expand_no_glob = [&cxt](const Token *t) -> String {
     ASSERT(t != nullptr);
     if (t->kind() == Token::Kind::Word) {
       /* The subject expansion throws a plain Error, an unset variable under set
@@ -3158,12 +3174,12 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
     return t->raw_string();
   };
 
-  let const subject = expand_no_glob(m_word);
+  let const subject = do_expand_no_glob(m_word);
 
   LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
 
-  auto arm_matches = [&](const case_item &item) throws -> bool {
-    for (const Token *pattern_token : item.patterns) {
+  auto do_arm_matches = [&](const case_item &item) throws -> bool {
+    for (let const pattern_token : item.patterns) {
       /* A pattern keeps its glob metacharacters for matching, yet a quoted or
          escaped metacharacter in the pattern is a literal, so the expansion
          carries a parallel mask the matcher reads. A pattern token that is not
@@ -3198,7 +3214,7 @@ fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
   bool did_run_a_body = false;
   usize i = 0;
   while (i < m_items.count()) {
-    if (!arm_matches(m_items[i])) {
+    if (!do_arm_matches(m_items[i])) {
       i++;
       continue;
     }
@@ -3239,7 +3255,7 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
                             bool is_unconditional) const throws -> void
 {
   unused(is_unconditional);
-  for (const case_item &item : m_items) {
+  for (let const &item : m_items) {
     ASSERT(item.body != nullptr);
     item.body->analyze(actx, false);
   }
@@ -3250,8 +3266,8 @@ cold fn CaseClause::analyze(AnalysisContext &actx,
      UnquotedText segment whose text is *. A quoted '*' matches only a literal
      asterisk, so it is not a default. */
   bool has_default_arm = false;
-  for (const case_item &item : m_items) {
-    for (const Token *pattern : item.patterns) {
+  for (let const &item : m_items) {
+    for (let const pattern : item.patterns) {
       if (pattern->kind() != Token::Kind::Word) continue;
       let const &pattern_word =
           static_cast<const tokens::WordToken *>(pattern)->word();
@@ -3283,7 +3299,7 @@ cold fn CaseClause::register_defined_functions(
 {
   /* Each arm body runs in the current shell when its pattern matches, so a
      function defined in any arm is registered before the ordered walk. */
-  for (const case_item &item : m_items) {
+  for (let const &item : m_items) {
     ASSERT(item.body != nullptr);
     item.body->register_defined_functions(actx);
   }
@@ -3822,7 +3838,7 @@ RedirectedCommand::RedirectedCommand(SourceLocation location,
                                      ArrayList<Redirection> &&redirections)
     : Command(location), m_child(child)
 {
-  for (const Redirection &redir : redirections)
+  for (let const &redir : redirections)
     m_redirections.push(redir);
 }
 
@@ -3905,7 +3921,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
      descriptor, so it is flushed before the descriptors move. */
   shit::flush();
 
-  for (const Redirection &redir : m_redirections) {
+  for (let const &redir : m_redirections) {
     let const r = resolve_redirection(redir, cxt, source_location());
     switch (r.kind) {
     /* A staged heredoc body and an opened file both dup onto the target shell
@@ -3927,7 +3943,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
           os::save_and_replace_descriptor(2, r.opened_fd);
       saved_descriptors.push(saved_err);
       os::close_fd(r.opened_fd);
-      if (!saved_out.dup2_ok || !saved_err.dup2_ok) {
+      if (!saved_out.is_dup2_ok || !saved_err.is_dup2_ok) {
         throw ErrorWithLocation{redir.target->source_location(),
                                 "Bad file descriptor"};
       }
@@ -3951,7 +3967,7 @@ fn RedirectedCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
          >&7 with fd 7 closed, fails the dup2. The compound command fails with a
          located error rather than writing to the original descriptor, matching
          dash. */
-      if (!saved.dup2_ok) {
+      if (!saved.is_dup2_ok) {
         const SourceLocation location = redir.target != nullptr
                                             ? redir.target->source_location()
                                             : source_location();
@@ -4197,11 +4213,13 @@ cold fn is_test_numeric_operator_word(StringView op) wontthrow -> bool
    glob-pattern lints. */
 cold fn word_is_fully_literal(const Word &word) wontthrow -> bool
 {
-  for (const WordSegment &segment : word.segments)
+  for (let const &segment : word.segments)
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::UnquotedText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText)
+    {
       return false;
+    }
   return true;
 }
 
@@ -4253,7 +4271,9 @@ cold fn args_have_short_flag(const ArrayList<const Token *> &args,
     let const view = literal.view();
     if (view.length >= 2 && view[0] == '-' && view[1] != '-' &&
         view.find_character(letter).has_value())
+    {
       return true;
+    }
   }
   return false;
 }
@@ -4331,6 +4351,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      skipped, and the name ends at an = or a [ subscript. */
   if (actx.function_scope_depth > 0 &&
       (name == "local" || name == "declare" || name == "typeset"))
+  {
     for (usize i = 1; i < m_args.count(); i++) {
       let const word = m_args[i]->kind() == Token::Kind::Word
                            ? static_cast<const tokens::WordToken *>(m_args[i])
@@ -4345,6 +4366,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (end > 0)
         actx.function_local_names.add(text.substring_of_length(0, end));
     }
+  }
 
   /* The literal command text, used for the test recognition. A name like [
      holds a glob metacharacter, so static_command_name rejects it, but the test
@@ -4372,18 +4394,18 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         "'%s' may define commands at run time, later resolution failures "
         "degrade to warnings",
         command_literal.c_str());
-    actx.saw_runtime_definer = true;
+    actx.has_seen_runtime_definer = true;
   }
 
   /* A funsub argument, ${ ...; }, runs its body in the current shell, so a
      function it defines persists where the prepass cannot see it, the same
      reason eval degrades a later unresolved command to a warning. */
-  for (const Token *t : m_args) {
+  for (let const t : m_args) {
     if (t->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(t)->word();
-    for (const WordSegment &segment : word.segments) {
+    for (let const &segment : word.segments) {
       if (segment.kind == WordSegment::Kind::FunctionSubstitution) {
-        actx.saw_runtime_definer = true;
+        actx.has_seen_runtime_definer = true;
         break;
       }
     }
@@ -4393,7 +4415,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      into a matcher, so the expansion would throw at run time. The malformed
      pattern is visible from the word bytes alone, so the prepass rejects it
      here at the located word. */
-  for (const Token *t : m_args) {
+  for (let const t : m_args) {
     if (t->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(t)->word();
     if (word_has_malformed_glob_bracket(word)) {
@@ -4413,7 +4435,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
-      for (const WordSegment &segment : word.segments) {
+      for (let const &segment : word.segments) {
         if (segment.kind == WordSegment::Kind::VariableReference &&
             segment.is_split_eligible())
         {
@@ -4457,10 +4479,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const view = flag.view();
       if (view == "-e" || view == "-n" || view == "-E" || view == "-ne" ||
           view == "-en")
+      {
         actx.warn(m_args[1]->source_location(),
                   "An echo " + view +
                       " relies on a bash builtin, the POSIX echo prints the "
                       "flag as text, use printf instead under a sh shebang");
+      }
     }
     if (command_literal == "declare" || command_literal == "typeset")
       actx.warn(m_args[0]->source_location(),
@@ -4481,10 +4505,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 ->word()
                 .to_literal_string()
                 .view() == "-v")
+    {
       actx.warn(m_args[1]->source_location(),
                 "The printf -v form is a bash extension, the POSIX printf "
                 "has no -v, capture the output with a command substitution "
                 "under a sh shebang");
+    }
     /* mapfile and its readarray alias are bash array builtins with no POSIX
        counterpart. This is shellcheck SC3030, read the input with a while
        read loop under a sh shebang. */
@@ -4535,9 +4561,11 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     let const &word = static_cast<const tokens::WordToken *>(m_args[1])->word();
     if (word.segments.count() == 1 &&
         word.segments[0].kind == WordSegment::Kind::CommandSubstitution)
+    {
       actx.warn(m_args[0]->source_location(),
                 "An echo of a command substitution prints what the command "
                 "already prints, run the command on its own instead");
+    }
   }
 
   /* A trap action in double quotes expands its variables and command
@@ -4551,7 +4579,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     let const &action =
         static_cast<const tokens::WordToken *>(m_args[1])->word();
     let action_expands_now = false;
-    for (const WordSegment &segment : action.segments)
+    for (let const &segment : action.segments)
       if (segment.is_in_double_quotes &&
           (segment.kind == WordSegment::Kind::VariableReference ||
            segment.kind == WordSegment::Kind::CommandSubstitution))
@@ -4603,7 +4631,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const &format =
           static_cast<const tokens::WordToken *>(m_args[format_index])->word();
       bool format_has_expansion = false;
-      for (const WordSegment &segment : format.segments) {
+      for (let const &segment : format.segments) {
         if (segment.kind == WordSegment::Kind::VariableReference ||
             segment.kind == WordSegment::Kind::CommandSubstitution)
         {
@@ -4649,7 +4677,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const &value =
           static_cast<const tokens::Assignment *>(m_args[i])->value_word();
       let value_has_substitution = false;
-      for (const WordSegment &segment : value.segments)
+      for (let const &segment : value.segments)
         if (segment.kind == WordSegment::Kind::CommandSubstitution) {
           value_has_substitution = true;
           break;
@@ -4666,7 +4694,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     if (m_args[i]->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
     bool word_has_unquoted_command_substitution = false;
-    for (const WordSegment &segment : word.segments) {
+    for (let const &segment : word.segments) {
       if (segment.kind == WordSegment::Kind::CommandSubstitution &&
           !segment.is_in_double_quotes)
       {
@@ -4778,8 +4806,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       let const view = literal.view();
       let is_in_range = view_is_integer_literal(view) && view[0] != '-';
       if (is_in_range) {
-        let const parsed = utils::parse_decimal_integer(view);
-        is_in_range = !parsed.is_error() && parsed.value() <= 255;
+        let const parsed_code = utils::parse_decimal_integer(view);
+        is_in_range = !parsed_code.is_error() && parsed_code.value() <= 255;
       }
       if (!is_in_range)
         actx.warn(m_args[1]->source_location(),
@@ -4798,10 +4826,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   {
     if (m_args[i]->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
-    for (const WordSegment &segment : word.segments) {
+    for (let const &segment : word.segments) {
       if (segment.kind != WordSegment::Kind::VariableReference ||
           segment.text.view() != "@")
+      {
         continue;
+      }
       if (word.segments.count() == 1 && !segment.is_in_double_quotes) {
         actx.warn(m_args[i]->source_location(),
                   "An unquoted $@ word-splits and globs each argument, "
@@ -4824,7 +4854,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   for (usize i = 0; i < m_args.count(); i++) {
     if (m_args[i]->kind() != Token::Kind::Word) continue;
     let const &word = static_cast<const tokens::WordToken *>(m_args[i])->word();
-    for (const WordSegment &segment : word.segments) {
+    for (let const &segment : word.segments) {
       if (segment.kind != WordSegment::Kind::CommandSubstitution) continue;
       let const body = segment.text.view();
       usize start = 0;
@@ -4860,7 +4890,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
        of a to_literal_string() temporary would dangle past the statement. */
     String read_target{};
     const Token *read_token = nullptr;
-    for (const Redirection &redirection : m_redirections) {
+    for (let const &redirection : m_redirections) {
       if (redirection.kind == Redirection::Kind::DuplicateOutput &&
           redirection.fd == 2 && redirection.dup_fd == 1)
       {
@@ -4897,10 +4927,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                 .to_literal_string();
         if (!read_target.is_empty() &&
             write_target.view() == read_target.view())
+        {
           actx.warn(redirection.target->source_location(),
                     "The command reads and truncates '" + read_target.view() +
                         "' at once, the truncation empties the input before "
                         "it is read, write to a temporary and move it over");
+        }
       }
     }
 
@@ -4908,7 +4940,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         NON_STDIN_READERS.find(command_literal.view()).has_value())
     {
       if (!args_have_stdin_operand(m_args))
-        for (const Redirection &redirection : m_redirections)
+        for (let const &redirection : m_redirections)
           if (redirection.kind == Redirection::Kind::ReadInput ||
               redirection.kind == Redirection::Kind::Heredoc ||
               redirection.kind == Redirection::Kind::HereString)
@@ -5086,14 +5118,16 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           let const right_literal = right.to_literal_string();
           if (right_literal.view().find_character('*').has_value() ||
               right_literal.view().find_character('?').has_value())
+          {
             actx.warn(m_args[i + 1]->source_location(),
                       "[ and test compare strings byte for byte and never "
                       "glob-match, use a case or the [[ ]] form for the "
                       "pattern");
+          }
         }
       }
 
-      for (const WordSegment &segment : word.segments) {
+      for (let const &segment : word.segments) {
         if (segment.kind != WordSegment::Kind::CommandSubstitution) continue;
         if (view_contains(segment.text.view(), StringView{"grep"}) &&
             !view_contains(segment.text.view(), StringView{"grep -c"}))
@@ -5113,10 +5147,12 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (word.segments.count() == 1 &&
           word.segments[0].kind == WordSegment::Kind::VariableReference &&
           word.segments[0].text.view() == "?")
+      {
         actx.warn(m_args[i]->source_location(),
                   "Testing $? checks the exit status indirectly, test the "
                   "command directly with if or && so an intervening command "
                   "cannot clobber the status");
+      }
     }
   }
 
@@ -5127,17 +5163,17 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (m_args[i]->kind() != Token::Kind::Word) continue;
       let const &word =
           static_cast<const tokens::WordToken *>(m_args[i])->word();
-      for (const WordSegment &segment : word.segments) {
+      for (let const &segment : word.segments) {
         if (segment.kind != WordSegment::Kind::VariableReference) continue;
         const StringView referenced{segment.text.data(), segment.text.count()};
-        bool names_a_prefix = false;
-        for (const prefix_assignment &var : m_local_vars) {
+        bool does_name_a_prefix = false;
+        for (let const &var : m_local_vars) {
           if (var.name.view() == referenced) {
-            names_a_prefix = true;
+            does_name_a_prefix = true;
             break;
           }
         }
-        if (names_a_prefix) {
+        if (does_name_a_prefix) {
           let const message =
               StringView{"The assignment prefix does not affect this "
                          "command, '"} +
@@ -5149,7 +5185,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     }
   }
 
-  if (name && !actx.silence_unresolved_commands &&
+  if (name && !actx.should_silence_unresolved_commands &&
       !command_resolves(actx, *name) &&
       !actx.defined_functions.contains(
           StringView{name->data(), name->count()}) &&
@@ -5177,7 +5213,7 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
        there.
        POSIX mode skips the analysis, so the file runs and the runtime
        resolution sets 127 per command the way dash does. */
-    if (actx.saw_runtime_definer)
+    if (actx.has_seen_runtime_definer)
       actx.warn(m_args[0]->source_location(), message);
     else
       actx.fail(m_args[0]->source_location(), message);
@@ -5199,10 +5235,10 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   if (!clears_constants) {
     /* A command substitution runs arbitrary code, so even a neutral builtin
        carrying one forgets the table to stay conservative. */
-    for (const Token *t : m_args) {
+    for (let const t : m_args) {
       if (t->kind() != Token::Kind::Word) continue;
       let const &word = static_cast<const tokens::WordToken *>(t)->word();
-      for (const WordSegment &segment : word.segments) {
+      for (let const &segment : word.segments) {
         if (segment.kind == WordSegment::Kind::CommandSubstitution) {
           clears_constants = true;
           break;
@@ -5217,7 +5253,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   if (!clears_constants &&
       (actx.defined_functions.contains(command_literal.view()) ||
        actx.known_aliases.contains(command_literal.view())))
+  {
     clears_constants = true;
+  }
 
   if (clears_constants) {
     LOG(Debug,
@@ -5252,7 +5290,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
      the caller's unconditional context. */
   let const stage_is_unconditional =
       is_unconditional && m_commands.count() == 1;
-  for (const Command *command : m_commands) {
+  for (let const command : m_commands) {
     ASSERT(command != nullptr);
     command->analyze(actx, stage_is_unconditional);
   }
@@ -5355,9 +5393,11 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
         next_name->view() == "wc" && !next_is_user &&
         next->args().count() == 2 &&
         next->args()[1]->raw_string().view() == "-l")
+    {
       actx.warn(stage->args()[0]->source_location(),
                 "Counting grep output with wc -l runs an extra process, use "
                 "grep -c to count the matching lines directly");
+    }
   }
 
   /* A multi-stage pipeline reads variables in its children and the table cannot
@@ -5400,12 +5440,12 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
      list, the way the runtime would once the whole file is read. Register every
      top-level function name before the ordered walk so a forward or
      cross-branch call does not scan PATH or warn. */
-  for (const CompoundListCondition *node : m_nodes) {
+  for (let const node : m_nodes) {
     ASSERT(node != nullptr);
     node->register_defined_functions(actx);
   }
 
-  for (const CompoundListCondition *node : m_nodes) {
+  for (let const node : m_nodes) {
     ASSERT(node != nullptr);
 
     /* A semicolon or newline node runs whenever the list runs. An && or || node
@@ -5419,7 +5459,7 @@ cold fn CompoundList::analyze(AnalysisContext &actx,
 cold fn CompoundList::register_defined_functions(
     AnalysisContext &actx) const throws -> void
 {
-  for (const CompoundListCondition *node : m_nodes) {
+  for (let const node : m_nodes) {
     ASSERT(node != nullptr);
     node->register_defined_functions(actx);
   }

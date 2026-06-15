@@ -61,16 +61,16 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     let pid = os::process{};
     if (!target.is_empty() && target[0] == '%') {
-      const ErrorOr<i64> parsed =
+      const ErrorOr<i64> parsed_value =
           utils::parse_decimal_integer(StringView{target}.substring(1));
-      if (parsed.is_error()) {
+      if (parsed_value.is_error()) {
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + target_text +
                                       "' is not a valid job or process id");
         status = 1;
         continue;
       }
-      job *const job = cxt.find_job(static_cast<int>(parsed.value()));
+      job *const job = cxt.find_job(static_cast<int>(parsed_value.value()));
       if (job == nullptr) {
         report_soft_builtin_error(
             ec, cxt, StringView{"'"} + target_text + "' is not a known job");
@@ -80,8 +80,8 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       ASSERT(job != nullptr);
       pid = job->pid;
     } else {
-      const ErrorOr<i64> parsed = utils::parse_decimal_integer(target);
-      if (parsed.is_error()) {
+      const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(target);
+      if (parsed_value.is_error()) {
         /* A non-numeric target must not fall through to kill(0), which would
            signal the whole process group including this shell. */
         report_soft_builtin_error(ec, cxt,
@@ -90,7 +90,7 @@ fn Kill::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         status = 1;
         continue;
       }
-      pid = os::process_from_pid(parsed.value());
+      pid = os::process_from_pid(parsed_value.value());
     }
 
     LOG(Debug, "kill sending signal %d to target '%s'", signal_number,

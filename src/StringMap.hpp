@@ -91,7 +91,9 @@ public:
        */
       if (slot.state == slot::Occupied && slot.packed == wanted &&
           slot.key == key) [[likely]]
+      {
         return &slot.value;
+      }
       i = (i + 1) & mask;
     }
     return nullptr;
@@ -236,8 +238,9 @@ private:
         if (first_tombstone != m_capacity) m_tombstones--;
         return place(target, key, wanted, steal(value));
       }
-      if (slot.state == slot::Tombstone && first_tombstone == m_capacity)
+      if (slot.state == slot::Tombstone && first_tombstone == m_capacity) {
         first_tombstone = i;
+      }
       i = (i + 1) & mask;
     }
 

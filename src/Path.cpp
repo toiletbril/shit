@@ -118,13 +118,13 @@ fn Path::push_component(StringView component) throws -> Path &
 
 fn Path::with_extension(StringView new_extension) const throws -> Path
 {
-  let const existing = extension();
+  let const current_extension = extension();
 
-  ASSERT(existing.length <= m_text.count(),
+  ASSERT(current_extension.length <= m_text.count(),
          "extension is a suffix of the path text");
-  let const keep = m_text.count() - existing.length;
+  let const prefix_length = m_text.count() - current_extension.length;
 
-  let result = Path{m_text.substring_of_length(0, keep)};
+  let result = Path{m_text.substring_of_length(0, prefix_length)};
   if (new_extension.length > 0 && new_extension.data[0] != '.')
     result.m_text.push('.');
   result.m_text.append(new_extension);
@@ -136,7 +136,7 @@ cold fn Path::normalized() const throws -> Path
 {
   LOG(Debug, "normalizing the path '%s'", m_text.c_str());
 
-  let const absolute = is_absolute();
+  let const is_absolute_path = is_absolute();
 
   /* Each kept component is a view into the original text, valid for the life of
      this function while the result is assembled. */
@@ -147,34 +147,36 @@ cold fn Path::normalized() const throws -> Path
       i++;
       continue;
     }
-    let const start = i;
+    let const component_start = i;
     while (i < m_text.count() && !is_directory_separator(m_text[i]))
       i++;
-    let const part = m_text.substring_of_length(start, i - start);
-    if (part == StringView{"."}) continue;
-    if (part == StringView{".."}) {
+    let const component =
+        m_text.substring_of_length(component_start, i - component_start);
+    if (component == StringView{"."}) continue;
+    if (component == StringView{".."}) {
       /* A .. pops the last real component, unless none remains or the last was
          itself a .. kept because the path is relative and cannot climb past its
          own start. */
       if (components.count() > 0 && !(components.back() == StringView{".."})) {
         components.pop_back();
-      } else if (!absolute) {
-        components.push(part);
+      } else if (!is_absolute_path) {
+        components.push(component);
       }
       continue;
     }
-    components.push(part);
+    components.push(component);
   }
 
-  let built = String{};
-  if (absolute) built.push(DIRECTORY_SEPARATOR);
-  for (usize c = 0; c < components.count(); c++) {
-    if (c > 0) built.push(DIRECTORY_SEPARATOR);
-    built.append(components[c]);
+  let normalized_text = String{};
+  if (is_absolute_path) normalized_text.push(DIRECTORY_SEPARATOR);
+  for (usize i = 0; i < components.count(); i++) {
+    if (i > 0) normalized_text.push(DIRECTORY_SEPARATOR);
+    normalized_text.append(components[i]);
   }
-  if (built.is_empty())
-    built.append(absolute ? StringView{"/"} : StringView{"."});
-  return Path{built};
+  if (normalized_text.is_empty())
+    normalized_text.append(is_absolute_path ? StringView{"/"}
+                                            : StringView{"."});
+  return Path{normalized_text};
 }
 
 fn Path::to_absolute() const throws -> Path

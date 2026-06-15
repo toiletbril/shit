@@ -243,7 +243,7 @@ struct saved_descriptor
   /* False when the dup2 onto shell_fd failed, as when the target descriptor was
      closed in a duplication like >&5 with fd 5 closed. The caller throws a
      located error and the restore puts shell_fd back unchanged. */
-  bool dup2_ok{true};
+  bool is_dup2_ok{true};
   /* On Windows, the handle this redirection installed in the standard-handle
      slot, so restore closes that exact handle rather than whatever the slot
      holds at restore time, which a later redirection inside the run may have

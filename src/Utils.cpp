@@ -25,17 +25,18 @@ namespace shit {
 
 namespace utils {
 
-fn merge_tokens_to_string(const ArrayList<const Token *> &v) throws -> String
+fn merge_tokens_to_string(const ArrayList<const Token *> &tokens) throws
+    -> String
 {
-  let r = String{};
-  for (const shit::Token *t : v) {
-    ASSERT(t != nullptr);
-    r += t->raw_string();
-    if (t != v.back()) {
-      r += ' ';
+  let result = String{};
+  for (let const token : tokens) {
+    ASSERT(token != nullptr);
+    result += token->raw_string();
+    if (token != tokens.back()) {
+      result += ' ';
     }
   }
-  return r;
+  return result;
 }
 
 fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
@@ -331,11 +332,11 @@ fn string_replace(String &s, const StringView to_replace,
 
 fn lowercase_string(StringView s) throws -> String
 {
-  let l = String{};
-  l.reserve(s.count());
+  let lowered = String{};
+  lowered.reserve(s.count());
   for (usize i = 0; i < s.count(); i++)
-    l.push(static_cast<char>(std::tolower(s[i])));
-  return l;
+    lowered.push(static_cast<char>(std::tolower(s[i])));
+  return lowered;
 }
 
 pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
@@ -344,7 +345,7 @@ pure fn is_posix_reserved_word(StringView word) wontthrow -> bool
       "!",    "{",  "}",   "case", "do", "done", "elif",  "else",
       "esac", "fi", "for", "if",   "in", "then", "until", "while",
   };
-  for (const StringView reserved : RESERVED_WORDS)
+  for (let const reserved : RESERVED_WORDS)
     if (word == reserved) return true;
   return false;
 }
@@ -781,7 +782,7 @@ fn extglob_match_repetition(const ArrayList<extglob_alternative> &alternatives,
 {
   if (min_reps == 0 && extglob_full_match(suffix, str, mask, suffix_offset))
     return true;
-  for (const extglob_alternative &alternative : alternatives) {
+  for (let const &alternative : alternatives) {
     for (usize length = 1; length <= str.count(); length++) {
       if (!extglob_full_match(alternative.pattern,
                               str.substring_of_length(0, length), mask,
@@ -840,7 +841,7 @@ fn extglob_full_match(StringView glob, StringView str,
                                         str, mask, 1);
       case '?':
       case '@':
-        for (const extglob_alternative &alternative : alternatives) {
+        for (let const &alternative : alternatives) {
           for (usize length = head == '?' ? 0 : 1; length <= str.count();
                length++)
           {
@@ -861,7 +862,7 @@ fn extglob_full_match(StringView glob, StringView str,
            match, then the suffix matches the rest. */
         for (usize length = 0; length <= str.count(); length++) {
           bool any_alternative_matches = false;
-          for (const extglob_alternative &alternative : alternatives) {
+          for (let const &alternative : alternatives) {
             if (extglob_full_match(alternative.pattern,
                                    str.substring_of_length(0, length), mask,
                                    alternative.mask_offset))
@@ -1310,9 +1311,9 @@ static fn rebuild_path_cache() throws -> void
   PATH_CACHE.clear();
   PATH_CACHE_IS_STALE = false;
   if (!MAYBE_PATH) return;
-  for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
+  for (let const &dir_string : split_path_dirs(*MAYBE_PATH)) {
     let const directory = Path{dir_string.view()};
-    for (const String &entry_name : directory_listing(directory)) {
+    for (let const &entry_name : directory_listing(directory)) {
       let name = entry_name.clone();
       os::erase_extension_and_get_its_index(name);
       let full_path = directory.clone();
@@ -1381,8 +1382,8 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
      while keeping the first occurrence leaves the search order and the copy a
      command resolves to unchanged. The directory count is small, so a linear
      membership check is cheaper than a set. */
-  let const push_unique = [&](String dir) throws -> void {
-    for (const String &seen : dirs)
+  let const do_push_unique = [&](String dir) throws -> void {
+    for (let const &seen : dirs)
       if (seen.view() == dir.view()) return;
     dirs.push(steal(dir));
   };
@@ -1390,13 +1391,13 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   for (usize i = 0; i < path_var.length; i++) {
     const char ch = path_var.data[i];
     if (ch == os::PATH_DELIMITER) {
-      push_unique(current.is_empty() ? String{"."} : String{current.view()});
+      do_push_unique(current.is_empty() ? String{"."} : String{current.view()});
       current.clear();
     } else {
       current.push(ch);
     }
   }
-  push_unique(current.is_empty() ? String{"."} : String{current.view()});
+  do_push_unique(current.is_empty() ? String{"."} : String{current.view()});
 
   return dirs;
 }
@@ -1435,14 +1436,15 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
   let key = String{program_name};
   os::erase_extension_and_get_its_index(key);
 
-  for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
+  for (let const &dir_string : split_path_dirs(*MAYBE_PATH)) {
     let const directory = Path{dir_string.view()};
 
     let full_path = directory.clone();
     full_path.push_component(program_name);
     let full_path_str = full_path.text().clone();
 
-    /* This file already has an extesion specified? */
+    /* A name with an explicit extension is tried as is, while a bare name tries
+       each omitted suffix in turn. */
     if (os::ext_index explicit_ext =
             os::erase_extension_and_get_its_index(full_path_str);
         explicit_ext == 0)
@@ -1486,10 +1488,10 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
     PATH_CACHE_IS_STALE = false;
   }
 
-  let sp = String{program_name};
+  let program_name_without_extension = String{program_name};
 
   const os::ext_index typed_extension =
-      os::erase_extension_and_get_its_index(sp);
+      os::erase_extension_and_get_its_index(program_name_without_extension);
 
   /* which -a wants every match, so it skips the cache and scans PATH in full.
    */
@@ -1501,7 +1503,8 @@ hot fn search_program_path(StringView program_name, bool find_all) throws
      hit returns the stored absolute path with no stat, the way dash returns a
      hashed location. */
   if (typed_extension == 0) {
-    if (const ArrayList<Path> *const cached = PATH_CACHE.find(sp.view());
+    if (const ArrayList<Path> *const cached =
+            PATH_CACHE.find(program_name_without_extension.view());
         cached != nullptr && cached->count() != 0)
     {
       let result = ArrayList<Path>{};
@@ -1525,26 +1528,27 @@ constexpr usize OSA_ROW_WIDTH = 256;
 static pure fn bounded_osa_distance(StringView a, StringView b,
                                     usize max_distance) wontthrow -> usize
 {
-  const usize la = a.length;
-  const usize lb = b.length;
-  if (la > lb ? la - lb > max_distance : lb - la > max_distance)
+  const usize a_length = a.length;
+  const usize b_length = b.length;
+  if (a_length > b_length ? a_length - b_length > max_distance
+                          : b_length - a_length > max_distance)
     return max_distance + 1;
-  if (la == 0) return lb;
-  if (lb == 0) return la;
-  /* The rolling rows are indexed up to lb, so a candidate longer than the row
-     width is rejected before the rows are reserved. */
-  if (lb + 1 > OSA_ROW_WIDTH) return max_distance + 1;
+  if (a_length == 0) return b_length;
+  if (b_length == 0) return a_length;
+  /* The rolling rows are indexed up to b_length, so a candidate longer than the
+     row width is rejected before the rows are reserved. */
+  if (b_length + 1 > OSA_ROW_WIDTH) return max_distance + 1;
 
   usize previous_previous[OSA_ROW_WIDTH];
   usize previous[OSA_ROW_WIDTH];
   usize current[OSA_ROW_WIDTH];
 
-  for (usize j = 0; j <= lb; j++)
+  for (usize j = 0; j <= b_length; j++)
     previous[j] = j;
-  for (usize i = 1; i <= la; i++) {
+  for (usize i = 1; i <= a_length; i++) {
     current[0] = i;
     usize row_best = current[0];
-    for (usize j = 1; j <= lb; j++) {
+    for (usize j = 1; j <= b_length; j++) {
       const usize cost = a[i - 1] == b[j - 1] ? 0 : 1;
       usize value = previous[j] + 1;
       if (current[j - 1] + 1 < value) value = current[j - 1] + 1;
@@ -1558,12 +1562,12 @@ static pure fn bounded_osa_distance(StringView a, StringView b,
       if (value < row_best) row_best = value;
     }
     if (row_best > max_distance) return max_distance + 1;
-    for (usize j = 0; j <= lb; j++) {
+    for (usize j = 0; j <= b_length; j++) {
       previous_previous[j] = previous[j];
       previous[j] = current[j];
     }
   }
-  return previous[lb];
+  return previous[b_length];
 }
 
 fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
@@ -1581,41 +1585,42 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
   /* Same length and same character multiset, so the candidate is a pure
      transposition of the typed name, the most likely typo. Used to break a tie
      in favor of git over gtf for the input gti. */
-  let const is_anagram = [](StringView a, StringView b) wontthrow -> bool {
+  let const do_check_anagram = [](StringView a, StringView b)
+                                   wontthrow -> bool {
     if (a.length != b.length) return false;
     i32 counts[256] = {0};
     for (usize i = 0; i < a.length; i++) {
       counts[static_cast<u8>(a[i])]++;
       counts[static_cast<u8>(b[i])]--;
     }
-    for (i32 count : counts)
+    for (let const count : counts)
       if (count != 0) return false;
     return true;
   };
 
-  let const consider = [&](StringView candidate) throws -> void {
+  let const do_consider = [&](StringView candidate) throws -> void {
     if (candidate.is_empty() || candidate == name) return;
     const usize distance = bounded_osa_distance(name, candidate, max_distance);
     if (distance > best_distance) return;
-    const bool anagram = is_anagram(name, candidate);
-    if (distance < best_distance || (anagram && !best_is_anagram)) {
+    const bool is_anagram = do_check_anagram(name, candidate);
+    if (distance < best_distance || (is_anagram && !best_is_anagram)) {
       best_distance = distance;
-      best_is_anagram = anagram;
+      best_is_anagram = is_anagram;
       best = String{candidate};
     }
   };
 
-  for (const String &local : local_names)
-    consider(local.view());
-  for (const String &builtin : builtin_names())
-    consider(builtin.view());
+  for (let const &local : local_names)
+    do_consider(local.view());
+  for (let const &builtin : builtin_names())
+    do_consider(builtin.view());
   if (MAYBE_PATH) {
-    for (const String &dir_string : split_path_dirs(*MAYBE_PATH)) {
+    for (let const &dir_string : split_path_dirs(*MAYBE_PATH)) {
       if (Maybe<ArrayList<String>> entries =
               Path::read_directory(Path{dir_string.view()}))
       {
-        for (const String &entry : *entries)
-          consider(entry.view());
+        for (let const &entry : *entries)
+          do_consider(entry.view());
       }
     }
   }
@@ -1668,15 +1673,15 @@ fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
 
   /* The basename of a whitespace-delimited token, dropping any directory path.
    */
-  let const basename_of = [](StringView token) -> StringView {
-    usize slash = token.length;
+  let const do_basename_of = [](StringView token) -> StringView {
+    usize last_slash = token.length;
     for (usize i = 0; i < token.length; i++)
-      if (token[i] == '/') slash = i;
-    return slash == token.length ? token : token.substring(slash + 1);
+      if (token[i] == '/') last_slash = i;
+    return last_slash == token.length ? token : token.substring(last_slash + 1);
   };
   /* Walk the line token by token, splitting on spaces and tabs. */
   usize i = 0;
-  let const next_token = [&]() -> StringView {
+  let const do_next_token = [&]() -> StringView {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
       i++;
     usize const start = i;
@@ -1685,15 +1690,15 @@ fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
     return line.substring_of_length(start, i - start);
   };
 
-  StringView shell = basename_of(next_token());
+  StringView shell = do_basename_of(do_next_token());
   /* The /usr/bin/env form names the shell as the next token, after any env
      options, so the first non-option token is taken. */
   if (shell == "env") {
     for (;;) {
-      let const token = next_token();
+      let const token = do_next_token();
       if (token.length == 0) return None;
       if (token[0] == '-') continue;
-      shell = basename_of(token);
+      shell = do_basename_of(token);
       break;
     }
   }
@@ -1720,12 +1725,12 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
                      char delimiter) throws -> Maybe<String>
 {
   let line = String{};
-  bool read_any_byte = false;
+  bool has_read_any_byte = false;
   for (;;) {
     u8 one_byte = 0;
     Maybe<usize> read_count = os::read_fd(fd, &one_byte, 1);
     if (!read_count || *read_count == 0) break;
-    read_any_byte = true;
+    has_read_any_byte = true;
     if (one_byte == static_cast<u8>(delimiter)) {
       was_delimiter_terminated = true;
       return line;
@@ -1738,7 +1743,7 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
      assigning the bytes it read, the way dash does. */
   was_delimiter_terminated = false;
 
-  if (!read_any_byte) return None;
+  if (!has_read_any_byte) return None;
 
   return line;
 }

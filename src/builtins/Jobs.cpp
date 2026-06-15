@@ -93,10 +93,11 @@ fn resolve_jobspec(const ArrayList<job> &jobs, StringView spec) throws
   if (body == "-")
     return jobs.count() >= 2 ? jobs.count() - 2 : jobs.count() - 1;
 
-  if (let const parsed = utils::parse_decimal_integer(body); !parsed.is_error())
+  if (let const parsed_value = utils::parse_decimal_integer(body);
+      !parsed_value.is_error())
   {
     for (usize i = 0; i < jobs.count(); i++)
-      if (static_cast<i64>(jobs[i].id) == parsed.value()) return i;
+      if (static_cast<i64>(jobs[i].id) == parsed_value.value()) return i;
   }
   return shit::None;
 }
@@ -145,7 +146,7 @@ fn Jobs::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   let out = String{};
-  for (usize index : selected) {
+  for (let index : selected) {
     const job &job = jobs[index];
 
     if (FLAG_JOBS_RUNNING.is_enabled() && job.state != job::State::Running)

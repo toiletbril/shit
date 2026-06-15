@@ -39,8 +39,7 @@ public:
   fn message() const throws -> String;
 
   /* The word printed before the message, Error by default. A warning subclass
-     overrides i
-     t to Warning, so the reporting code reads the severity from the
+     overrides it to Warning, so the reporting code reads the severity from the
      object rather than taking it as an argument. */
   virtual fn severity_word() const wontthrow -> String;
 

@@ -176,7 +176,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   /* A dup2 from a closed or invalid target descriptor fails, as in >&5 with fd
      5 closed. The caller reports the failure so the command fails rather than
      writing to the original descriptor. */
-  result.dup2_ok = dup2(target, shell_fd) != -1;
+  result.is_dup2_ok = dup2(target, shell_fd) != -1;
   return result;
 }
 
@@ -203,7 +203,7 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
       fcntl(shell_fd, F_DUPFD_CLOEXEC, SHELL_BACKUP_FD_FLOOR);
   result.was_open = backup != -1;
   result.saved = backup;
-  result.dup2_ok = true;
+  result.is_dup2_ok = true;
   return result;
 }
 
@@ -256,11 +256,12 @@ fn get_current_user() throws -> Maybe<String>
   if (!contents) return shit::None;
   let const wanted_uid = utils::uint_to_text(static_cast<u64>(getuid()));
   let const text = contents->view();
-  usize line_start = 0;
+  usize line_start_position = 0;
   for (usize i = 0; i <= text.length; i++) {
     if (i != text.length && text[i] != '\n') continue;
-    let const line = text.substring_of_length(line_start, i - line_start);
-    line_start = i + 1;
+    let const line =
+        text.substring_of_length(line_start_position, i - line_start_position);
+    line_start_position = i + 1;
     if (passwd_field(line, 2) != wanted_uid.view()) continue;
     let const name = passwd_field(line, 0);
     if (!name.is_empty()) return String{name};
@@ -276,6 +277,7 @@ fn get_hostname() throws -> Maybe<String>
   char buffer[256];
   if (gethostname(buffer, sizeof(buffer)) != 0) return shit::None;
   buffer[sizeof(buffer) - 1] = '\0';
+
   return String{StringView{buffer}};
 }
 
@@ -295,14 +297,15 @@ fn get_home_directory() throws -> Maybe<Path>
    through NSS is not seen, the accepted tradeoff for the static build. */
 static fn passwd_field(StringView line, usize index) wontthrow -> StringView
 {
-  usize field_start = 0;
+  usize field_start_position = 0;
   usize field_index = 0;
   for (usize i = 0; i <= line.length; i++) {
     if (i != line.length && line[i] != ':') continue;
     if (field_index == index)
-      return line.substring_of_length(field_start, i - field_start);
+      return line.substring_of_length(field_start_position,
+                                      i - field_start_position);
     field_index++;
-    field_start = i + 1;
+    field_start_position = i + 1;
   }
   return StringView{};
 }
@@ -315,11 +318,12 @@ fn get_home_for_user(StringView username) throws -> Maybe<Path>
   if (!contents) return shit::None;
 
   let const text = contents->view();
-  usize line_start = 0;
+  usize line_start_position = 0;
   for (usize i = 0; i <= text.length; i++) {
     if (i != text.length && text[i] != '\n') continue;
-    let const line = text.substring_of_length(line_start, i - line_start);
-    line_start = i + 1;
+    let const line =
+        text.substring_of_length(line_start_position, i - line_start_position);
+    line_start_position = i + 1;
     if (passwd_field(line, 0) != username) continue;
     let const home_field = passwd_field(line, 5);
     if (home_field.is_empty()) return shit::None;
@@ -336,11 +340,12 @@ fn enumerate_users() throws -> ArrayList<String>
   if (!contents) return users;
 
   let const text = contents->view();
-  usize line_start = 0;
+  usize line_start_position = 0;
   for (usize i = 0; i <= text.length; i++) {
     if (i != text.length && text[i] != '\n') continue;
-    let const line = text.substring_of_length(line_start, i - line_start);
-    line_start = i + 1;
+    let const line =
+        text.substring_of_length(line_start_position, i - line_start_position);
+    line_start_position = i + 1;
     let const name = passwd_field(line, 0);
     if (!name.is_empty()) users.push(String{name});
   }
@@ -393,7 +398,6 @@ const ArrayList<String> OMITTED_SUFFIXES = []() {
 
 fn erase_extension_and_get_its_index(String &program_name) throws -> ext_index
 {
-  /* POSIX does not really make use of extensions for executable files. */
   unused(program_name);
   return false;
 }
@@ -496,10 +500,10 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   /* On the ENOEXEC fallback the context's descriptors are handed to the script
      run, which reapplies the command's redirections, so they are not closed
      here. */
-  bool fds_handed_to_fallback = false;
+  bool was_fds_handed_to_fallback = false;
   defer
   {
-    if (!fds_handed_to_fallback) ec.close_fds();
+    if (!was_fds_handed_to_fallback) ec.close_fds();
   };
 
   let const child_args = make_os_args(ec.args());
@@ -591,7 +595,7 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
      check runs before the descriptors are closed, so the script run still sees
      the command's redirections on the context. */
   if (spawn_error == ENOEXEC && allow_script_fallback) {
-    fds_handed_to_fallback = true;
+    was_fds_handed_to_fallback = true;
     throw shit::ExecFormatError{};
   }
 
@@ -612,10 +616,10 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
 {
   /* A null buffer makes realpath allocate one of the right size, freed here
      after the view is copied into the returned Path. */
-  char *resolved = realpath(path.c_str(), nullptr);
-  if (resolved == nullptr) return None;
-  Path result{StringView{resolved}};
-  free(resolved);
+  char *resolved_path = realpath(path.c_str(), nullptr);
+  if (resolved_path == nullptr) return None;
+  Path result{StringView{resolved_path}};
+  free(resolved_path);
   return result;
 }
 
@@ -666,7 +670,7 @@ fn capture_program_output(const ArrayList<String> &argv,
   /* posix_spawn wants a NUL-terminated array of mutable C strings. The argv
      strings outlive the spawn, so pointing at their storage is safe. */
   ArrayList<char *> raw_args{heap_allocator()};
-  for (const String &argument : argv)
+  for (let const &argument : argv)
     raw_args.push(const_cast<char *>(argument.c_str()));
   raw_args.push(nullptr);
 
@@ -686,11 +690,11 @@ fn capture_program_output(const ArrayList<String> &argv,
      at the deadline rather than blocking the prompt. */
   let captured = String{heap_allocator()};
   const u64 deadline_nanos = monotonic_nanos() + timeout_nanos;
-  bool timed_out = false;
+  bool was_timed_out = false;
   for (;;) {
     const u64 now_nanos = monotonic_nanos();
     if (now_nanos >= deadline_nanos) {
-      timed_out = true;
+      was_timed_out = true;
       break;
     }
     int remaining_millis =
@@ -707,7 +711,7 @@ fn capture_program_output(const ArrayList<String> &argv,
       break;
     }
     if (ready == 0) {
-      timed_out = true;
+      was_timed_out = true;
       break;
     }
 
@@ -724,11 +728,11 @@ fn capture_program_output(const ArrayList<String> &argv,
 
   /* A child still running at the deadline is killed so it leaves no zombie, and
      either way it is reaped. */
-  if (timed_out) signal_process(child_pid, SIGKILL);
+  if (was_timed_out) signal_process(child_pid, SIGKILL);
   int wait_status = 0;
   waitpid(child_pid, &wait_status, 0);
 
-  if (timed_out) return None;
+  if (was_timed_out) return None;
   return captured;
 }
 
@@ -1009,7 +1013,8 @@ fn wait_and_monitor_process(process pid) throws -> i32
                                 ? String{StringView{sig_str}}
                                 : String{StringView{"Unknown"}};
 
-    /* Ignore Ctrl-C. */
+    /* A plain Ctrl-C prints only a newline, so the verbose report is reserved
+       for any other terminating signal. */
     if (sig & ~(SIGINT)) {
       shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
                   ", signal " + utils::int_to_text(sig) + "]\n");
@@ -1028,15 +1033,15 @@ fn wait_and_monitor_process(process pid) throws -> i32
     shit::print("[Process " + utils::int_to_text(pid) + ": " + sig_desc +
                 ", signal " + utils::int_to_text(sig) + " and killed]\n");
 
-    /* We can't handle suspended processes yet, so goodbye. */
+    /* A suspended process is not yet handled, so it is killed instead. */
     check_syscall(kill(pid, SIGKILL));
 
     return 128 + SIGKILL;
   } else if (!WIFEXITED(status)) {
-    /* Process was destroyed by otherworldly forces. */
+    /* The process neither exited nor was signalled, so its status is unknown.
+     */
     throw shit::Error{"???: " + last_system_error_message()};
   } else {
-    /* We exited normally. */
     return WEXITSTATUS(status);
   }
 
@@ -1105,9 +1110,9 @@ fn signal_number_from_name(StringView name) throws -> Maybe<i32>
       std::all_of(name.data, name.data + name.length,
                   [](unsigned char c) { return std::isdigit(c) != 0; }))
   {
-    const ErrorOr<i64> parsed = utils::parse_decimal_integer(name);
-    if (parsed.is_error()) return shit::None;
-    return static_cast<i32>(parsed.value());
+    const ErrorOr<i64> parsed_value = utils::parse_decimal_integer(name);
+    if (parsed_value.is_error()) return shit::None;
+    return static_cast<i32>(parsed_value.value());
   }
 
   String bare{name};
@@ -1160,7 +1165,7 @@ static const signal_pair SIGNAL_PAIRS[] = {
 
 fn signal_name_from_number(i32 number) throws -> Maybe<String>
 {
-  for (const signal_pair &pair : SIGNAL_PAIRS)
+  for (let const &pair : SIGNAL_PAIRS)
     if (pair.number == number) return String{pair.name};
   return shit::None;
 }
@@ -1170,7 +1175,7 @@ fn signal_names() throws -> const ArrayList<StringView> &
   static ArrayList<StringView> names = [] throws {
     let collected = ArrayList<StringView>{};
     collected.reserve(sizeof(SIGNAL_PAIRS) / sizeof(SIGNAL_PAIRS[0]));
-    for (const signal_pair &pair : SIGNAL_PAIRS)
+    for (let const &pair : SIGNAL_PAIRS)
       collected.push(pair.name);
     return collected;
   }();
@@ -1184,7 +1189,7 @@ hot fn make_os_args(const ArrayList<String> &args) throws -> os_args
   os_args result{};
   result.reserve(args.count() + 1);
 
-  for (const String &arg : args)
+  for (let const &arg : args)
     result.push(arg.c_str());
 
   result.push(nullptr);
@@ -1497,6 +1502,7 @@ fn fork_exec_wait4(const ArrayList<String> &argv, bool suppress_output,
   /* macOS and the BSDs already report ru_maxrss in bytes. */
   peak_rss_out = static_cast<u64>(usage.ru_maxrss);
 #endif
+
   return true;
 }
 
@@ -1511,23 +1517,23 @@ fn run_measured(const ArrayList<String> &argv, bool suppress_output) throws
 
   i64 status = 0;
   u64 peak_rss = 0;
-  bool forked_ok = false;
+  bool did_fork_ok = false;
 
   const u64 start_nanos = monotonic_nanos();
 
 #if defined __linux__
   result.has_perf = collect_perf_counts(result.perf, [&]() wontthrow {
-    forked_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
+    did_fork_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
   });
   if (!result.has_perf)
-    forked_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
+    did_fork_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
 #else
-  forked_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
+  did_fork_ok = fork_exec_wait4(argv, suppress_output, status, peak_rss);
 #endif
 
   result.wall_nanos = monotonic_nanos() - start_nanos;
 
-  if (!forked_ok) return None;
+  if (!did_fork_ok) return None;
 
   result.exit_status = status;
   result.peak_rss_bytes = peak_rss;
@@ -1626,7 +1632,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
 
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) {
-    result.dup2_ok = false;
+    result.is_dup2_ok = false;
     return result;
   }
 
@@ -1634,7 +1640,7 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
      is reported so the caller fails the command rather than redirecting onto a
      dead handle. */
   if (target == INVALID_HANDLE_VALUE) {
-    result.dup2_ok = false;
+    result.is_dup2_ok = false;
     return result;
   }
 
@@ -1649,12 +1655,12 @@ fn save_and_replace_descriptor(i32 shell_fd, os::descriptor target) wontthrow
   if (DuplicateHandle(GetCurrentProcess(), target, GetCurrentProcess(),
                       &duplicate, 0, TRUE, DUPLICATE_SAME_ACCESS) == 0)
   {
-    result.dup2_ok = false;
+    result.is_dup2_ok = false;
     return result;
   }
   SetStdHandle(*slot, duplicate);
   result.replacement = duplicate;
-  result.dup2_ok = true;
+  result.is_dup2_ok = true;
   return result;
 }
 
@@ -1666,7 +1672,7 @@ fn restore_descriptor(const saved_descriptor &saved) wontthrow -> void
      holds now, since a later redirection inside the run may have replaced it.
      The saved original then returns to the slot, the way the POSIX restore
      closes the backup descriptor it kept. */
-  if (saved.dup2_ok && saved.replacement != INVALID_HANDLE_VALUE)
+  if (saved.is_dup2_ok && saved.replacement != INVALID_HANDLE_VALUE)
     CloseHandle(saved.replacement);
   if (saved.was_open) SetStdHandle(*slot, saved.saved);
 }
@@ -1677,7 +1683,7 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
   result.shell_fd = shell_fd;
   const Maybe<DWORD> slot = std_handle_slot_for_shell_fd(shell_fd);
   if (!slot.has_value()) {
-    result.dup2_ok = false;
+    result.is_dup2_ok = false;
     return result;
   }
   result.saved = GetStdHandle(*slot);
@@ -1685,7 +1691,7 @@ fn save_descriptor(i32 shell_fd) wontthrow -> saved_descriptor
   /* No replacement handle is installed, so the restore only puts the slot
      back. */
   result.replacement = INVALID_HANDLE_VALUE;
-  result.dup2_ok = true;
+  result.is_dup2_ok = true;
   return result;
 }
 
@@ -1839,6 +1845,7 @@ fn terminal_size(u32 &columns, u32 &rows) wontthrow -> bool
   if (width <= 0 || height <= 0) return false;
   columns = static_cast<u32>(width);
   rows = static_cast<u32>(height);
+
   return true;
 }
 
@@ -1905,10 +1912,10 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
 
   startup_info.cb = sizeof(startup_info);
 
-  BOOL needs_handles = ec.in_fd || ec.out_fd || ec.err_fd ||
-                       ec.dup_err_to_out || ec.dup_out_to_err;
+  BOOL should_inherit_handles = ec.in_fd || ec.out_fd || ec.err_fd ||
+                                ec.dup_err_to_out || ec.dup_out_to_err;
 
-  if (needs_handles) startup_info.dwFlags |= STARTF_USESTDHANDLES;
+  if (should_inherit_handles) startup_info.dwFlags |= STARTF_USESTDHANDLES;
 
   startup_info.hStdInput = ec.in_fd.value_or(GetStdHandle(STD_INPUT_HANDLE));
   startup_info.hStdOutput = ec.out_fd.value_or(GetStdHandle(STD_OUTPUT_HANDLE));
@@ -1932,7 +1939,7 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
      parent keeps does not leak into the child and hang the read. Only the
      handles the child actually receives are made inheritable here, mirroring
      how the POSIX path clears close-on-exec on just the dup targets. */
-  if (needs_handles) {
+  if (should_inherit_handles) {
     SetHandleInformation(startup_info.hStdInput, HANDLE_FLAG_INHERIT,
                          HANDLE_FLAG_INHERIT);
     SetHandleInformation(startup_info.hStdOutput, HANDLE_FLAG_INHERIT,
@@ -1945,7 +1952,7 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
      handed over as a mutable pointer rather than a const view. */
   if (CreateProcessA(ec.program_path().c_str(),
                      const_cast<LPSTR>(command_line.data()), nullptr, nullptr,
-                     needs_handles, 0, nullptr, nullptr, &startup_info,
+                     should_inherit_handles, 0, nullptr, nullptr, &startup_info,
                      &process_info) == 0)
   {
     throw ErrorWithLocation{ec.source_location(), last_system_error_message()};
@@ -2123,18 +2130,18 @@ fn redirect_self(const ExecContext &ec) -> void
 
 fn make_pipe() wontthrow -> Maybe<Pipe>
 {
-  SECURITY_ATTRIBUTES att{};
+  SECURITY_ATTRIBUTES attributes{};
 
-  att.nLength = sizeof(SECURITY_ATTRIBUTES);
+  attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
   /* Both ends are non-inheritable, so a child only receives the end execute
      handles explicitly through STARTF_USESTDHANDLES, like close-on-exec. */
-  att.bInheritHandle = FALSE;
-  att.lpSecurityDescriptor = nullptr; /* NOLINT */
+  attributes.bInheritHandle = FALSE;
+  attributes.lpSecurityDescriptor = nullptr; /* NOLINT */
 
   HANDLE in = INVALID_HANDLE_VALUE;
   HANDLE out = INVALID_HANDLE_VALUE;
 
-  if (CreatePipe(&in, &out, &att, 0) == 0) {
+  if (CreatePipe(&in, &out, &attributes, 0) == 0) {
     if (in != INVALID_HANDLE_VALUE) close_fd(in);
     if (out != INVALID_HANDLE_VALUE) close_fd(out);
 
@@ -2284,8 +2291,10 @@ fn signal_process(process p, i32 signal_number) wontthrow -> bool
 {
   /* Windows cannot deliver a POSIX signal, so only a terminate is honored and a
      resume or a stop is a no-op the caller treats as unsupported. */
-  if (signal_number == 9 || signal_number == 15)
+  if (signal_number == 9 || signal_number == 15) {
     return TerminateProcess(p, 1) != 0;
+  }
+
   return false;
 }
 
@@ -2350,40 +2359,41 @@ fn signal_names() throws -> const ArrayList<StringView> &
    and an empty argument is quoted so it is not dropped. */
 static fn append_windows_quoted_arg(String &out, StringView arg) -> void
 {
-  bool needs_quotes = arg.count() == 0;
-  for (usize i = 0; i < arg.count() && !needs_quotes; i++) {
+  bool should_quote_arg = arg.count() == 0;
+  for (usize i = 0; i < arg.count() && !should_quote_arg; i++) {
     const char c = arg[i];
-    if (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '"')
-      needs_quotes = true;
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '"') {
+      should_quote_arg = true;
+    }
   }
-  if (!needs_quotes) {
+  if (!should_quote_arg) {
     out.append(arg);
     return;
   }
 
   out += '"';
   for (usize i = 0; i < arg.count();) {
-    usize backslashes = 0;
+    usize backslash_count = 0;
     while (i < arg.count() && arg[i] == '\\') {
       i++;
-      backslashes++;
+      backslash_count++;
     }
     if (i == arg.count()) {
       /* Trailing backslashes precede the closing quote, so they are doubled to
          stay literal rather than escaping the quote. */
-      for (usize k = 0; k < backslashes * 2; k++)
+      for (usize k = 0; k < backslash_count * 2; k++)
         out += '\\';
       break;
     }
     if (arg[i] == '"') {
       /* The backslashes before a quote are doubled and the quote is escaped. */
-      for (usize k = 0; k < backslashes * 2 + 1; k++)
+      for (usize k = 0; k < backslash_count * 2 + 1; k++)
         out += '\\';
       out += '"';
       i++;
     } else {
       /* Backslashes that do not precede a quote stay literal. */
-      for (usize k = 0; k < backslashes; k++)
+      for (usize k = 0; k < backslash_count; k++)
         out += '\\';
       out += arg[i];
       i++;
@@ -2396,14 +2406,14 @@ fn make_os_args(const ArrayList<String> &args) -> os_args
 {
   ASSERT(args.count() > 0);
 
-  String s{};
-  append_windows_quoted_arg(s, args[0].view());
+  String command_line{};
+  append_windows_quoted_arg(command_line, args[0].view());
   for (usize i = 1; i < args.count(); i++) {
-    s += ' ';
-    append_windows_quoted_arg(s, args[i].view());
+    command_line += ' ';
+    append_windows_quoted_arg(command_line, args[i].view());
   }
 
-  return s;
+  return command_line;
 }
 
 fn last_system_error_message() -> String
@@ -2424,7 +2434,8 @@ fn last_system_error_message() -> String
   }
 
   StringView view{static_cast<char *>(errno_str)};
-  /* I do not want the PERIOD. */
+  /* FormatMessage ends the text with a trailing period and spacing, so the last
+     few bytes are dropped to leave a bare message. */
   if (view.find_character('.') || view.find_character(' ') ||
       view.find_character('\n'))
   {
@@ -2435,9 +2446,9 @@ fn last_system_error_message() -> String
      pushed and a %N insert is replaced with a literal word. */
   String err{};
   for (usize i = 0; i < view.length; i++) {
-    /* Remove stupid inserts. I can't stand Windows */
+    /* FormatMessage leaves a %N placeholder where an argument would go, which
+       this call passes none of, so the placeholder is replaced with a word. */
     if (view[i] == '%' && i + 1 < view.length && isdigit(view[i + 1])) {
-      /* Replace %N bullshit with just "Input". */
       err += StringView{"input"};
       i++;
       continue;
@@ -2448,7 +2459,7 @@ fn last_system_error_message() -> String
   LocalFree(errno_str);
 
   if (err.length() > 0) {
-    /* Capitalize first letter to sound formal. */
+    /* The first letter is capitalized so the message reads as a sentence. */
     String capitalized{};
     capitalized.push(static_cast<char>(toupper(err[0])));
     capitalized += err.substring(1);
@@ -2671,12 +2682,13 @@ fn erase_extension_and_get_its_index(String &program_name) -> ext_index
     {
       const StringView extension = program_name.substring(*extension_pos);
 
-      if (usize i = utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
-          i != utils::NOT_FOUND_INDEX)
+      if (usize found_index =
+              utils::find_pos_in_vec(OMITTED_SUFFIXES, extension);
+          found_index != utils::NOT_FOUND_INDEX)
       {
         program_name =
             String{program_name.substring_of_length(0, *extension_pos)};
-        return i;
+        return found_index;
       }
     }
   }
@@ -2703,11 +2715,12 @@ fn get_shell_process_id() wontthrow -> i64
 
 fn get_file_creation_mask() wontthrow -> u32
 {
-  /* umask only reads through a set, so the old value is read and put back. The
-     macro casts to the platform type, so old passes through as is. */
-  let const old = SHIT_UMASK(0);
-  SHIT_UMASK(old);
-  return static_cast<u32>(old);
+  /* umask only reads through a set, so the previous value is read and put back.
+     The macro casts to the platform type, so the value passes through as is. */
+  let const previous_mask = SHIT_UMASK(0);
+  SHIT_UMASK(previous_mask);
+
+  return static_cast<u32>(previous_mask);
 }
 
 fn set_file_creation_mask(u32 mask) wontthrow -> void { SHIT_UMASK(mask); }

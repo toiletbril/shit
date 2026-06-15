@@ -325,17 +325,19 @@ fn append_relative_line(String &out, StringView name, const metric_stats &first,
 fn parse_count_flag(StringView text, StringView flag_name) throws -> u64
 {
   u64 value = 0;
-  bool saw_digit = false;
+  bool has_seen_digit = false;
   for (usize i = 0; i < text.length; i++) {
     const char c = text[i];
     if (c < '0' || c > '9')
       throw Error{StringView{"--"} + flag_name + " expects a number, got '" +
                   text + "'"};
     value = value * 10 + static_cast<u64>(c - '0');
-    saw_digit = true;
+    has_seen_digit = true;
   }
-  if (!saw_digit)
+
+  if (!has_seen_digit)
     throw Error{StringView{"--"} + flag_name + " expects a number"};
+
   return value;
 }
 
@@ -399,7 +401,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   const u64 duration_nanos = duration_millis * 1000000ULL;
   const u64 start_nanos = os::monotonic_nanos();
   u64 last_progress_nanos = 0;
-  bool perf_seen = false;
+  bool has_perf = false;
 
   for (usize i = 0;; i++) {
     /* A Ctrl-C delivered between samples stops the loop before the next child
@@ -409,12 +411,14 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
       break;
     }
 
-    const bool reached_min = i >= MIN_SAMPLES;
-    const bool reached_run_limit = run_limit.has_value() && i >= *run_limit;
+    const bool has_reached_min = i >= MIN_SAMPLES;
+    const bool has_reached_run_limit = run_limit.has_value() && i >= *run_limit;
     const u64 elapsed_nanos = os::monotonic_nanos() - start_nanos;
-    const bool reached_duration =
+    const bool has_reached_duration =
         !run_limit.has_value() && elapsed_nanos >= duration_nanos;
-    if (reached_min && (reached_run_limit || reached_duration)) break;
+
+    if (has_reached_min && (has_reached_run_limit || has_reached_duration))
+      break;
     if (i >= MAX_SAMPLES) break;
 
     /* The progress repaints on its own interval rather than every sample, so a
@@ -448,7 +452,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
     sample.wall_nanos = static_cast<double>(measured->wall_nanos);
     sample.peak_rss_bytes = static_cast<double>(measured->peak_rss_bytes);
     if (measured->has_perf) {
-      perf_seen = true;
+      has_perf = true;
       sample.cpu_cycles = static_cast<double>(measured->perf.cpu_cycles);
       sample.instructions = static_cast<double>(measured->perf.instructions);
       sample.cache_references =
@@ -464,7 +468,7 @@ fn sample_command(StringView command, Maybe<u64> run_limit, u64 duration_millis,
   if (show_progress) clear_progress();
 
   result.sample_count = samples.count();
-  result.has_perf = perf_seen;
+  result.has_perf = has_perf;
   result.wall_time = compute_stats(
       samples, [](const bench_sample &s) { return s.wall_nanos; });
   result.peak_rss = compute_stats(

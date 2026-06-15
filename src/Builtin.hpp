@@ -299,8 +299,8 @@ fn builtin_flag_list(Builtin::Kind kind) wontthrow -> const ArrayList<Flag *> *;
        0)
 
 void show_builtin_help_impl(const ExecContext &ec, StringView description,
-                            const ArrayList<StringView> &hs,
-                            const ArrayList<Flag *> &fl,
+                            const ArrayList<StringView> &synopsis_lines,
+                            const ArrayList<Flag *> &flags,
                             StringView extra_sections = {}) throws;
 
 #define SHOW_BUILTIN_HELP_AND_RETURN(ec)                                       \

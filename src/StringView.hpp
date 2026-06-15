@@ -49,7 +49,6 @@ public:
   mustuse pure fn starts_with(StringView prefix) const wontthrow -> bool;
 };
 
-/* A growable hash of a byte range, FNV-1a over the short keys a shell uses. */
 /* FNV-1a over the view's bytes, inline since the hash sits inside every map
    probe on the hot variable-lookup path. */
 pure forceinline fn hash_bytes(StringView view) wontthrow -> u64

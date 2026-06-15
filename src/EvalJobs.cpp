@@ -89,10 +89,11 @@ fn EvalContext::format_done_job_notifications(StringView line_ending) throws
     /* The bash current-job marker, '+' for the last entry and '-' for the one
        before it, otherwise a space. */
     char marker = ' ';
-    if (i == m_jobs.count() - 1)
+    if (i == m_jobs.count() - 1) {
       marker = '+';
-    else if (m_jobs.count() >= 2 && i == m_jobs.count() - 2)
+    } else if (m_jobs.count() >= 2 && i == m_jobs.count() - 2) {
       marker = '-';
+    }
 
     out += "[" + utils::int_to_text(job.id) + "]";
     out.push(marker);

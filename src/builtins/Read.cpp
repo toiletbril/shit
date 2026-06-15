@@ -67,7 +67,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   const usize first_operand = 1;
   let const operand_count = has_operands ? names.count() - first_operand : 1;
   const String reply_name = "REPLY";
-  auto operand_name = [&](usize index) -> String {
+  auto do_operand_name = [&](usize index) -> String {
     if (!has_operands) return reply_name;
     ASSERT(first_operand + index < names.count());
     return names[first_operand + index];
@@ -92,44 +92,44 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
       ec.in_fd.value_or(SHIT_STDIN), was_newline_terminated, delimiter);
   if (!read_line) {
     for (usize i = 0; i < operand_count; i++)
-      cxt.set_shell_variable(operand_name(i), "");
+      cxt.set_shell_variable(do_operand_name(i), "");
     return 1;
   }
   let const line = String{StringView{*read_line}};
 
   let const field_separators = cxt.get_variable_value("IFS").value_or(
       String{cxt.scratch_allocator(), " \t\n"});
-  auto is_separator = [&field_separators](char c) {
+  auto do_is_separator = [&field_separators](char c) {
     return field_separators.find_character(c).has_value();
   };
   /* POSIX folds an IFS whitespace run into a single delimiter, while each IFS
      non-whitespace character delimits one field on its own, so an empty field
      can sit between two non-whitespace delimiters. */
-  auto is_ifs_whitespace = [&is_separator](char c) {
-    return (c == ' ' || c == '\t' || c == '\n') && is_separator(c);
+  auto do_is_ifs_whitespace = [&do_is_separator](char c) {
+    return (c == ' ' || c == '\t' || c == '\n') && do_is_separator(c);
   };
-  auto is_ifs_nonwhitespace = [&](char c) {
-    return is_separator(c) && !is_ifs_whitespace(c);
+  auto do_is_ifs_nonwhitespace = [&](char c) {
+    return do_is_separator(c) && !do_is_ifs_whitespace(c);
   };
 
   /* read -a NAME splits the line into every field and stores them in the named
      indexed array rather than into separate scalar variables. */
   if (FLAG_READ_ARRAY.is_set()) {
     let words = ArrayList<String>{heap_allocator()};
-    usize c = 0;
-    while (c < line.length() && is_ifs_whitespace(line[c]))
-      c++;
-    while (c < line.length()) {
-      const usize start = c;
-      while (c < line.length() && !is_separator(line[c]))
-        c++;
-      words.push(String{line.substring_of_length(start, c - start)});
-      while (c < line.length() && is_ifs_whitespace(line[c]))
-        c++;
-      if (c < line.length() && is_ifs_nonwhitespace(line[c])) {
-        c++;
-        while (c < line.length() && is_ifs_whitespace(line[c]))
-          c++;
+    usize cursor = 0;
+    while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+      cursor++;
+    while (cursor < line.length()) {
+      const usize start = cursor;
+      while (cursor < line.length() && !do_is_separator(line[cursor]))
+        cursor++;
+      words.push(String{line.substring_of_length(start, cursor - start)});
+      while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+        cursor++;
+      if (cursor < line.length() && do_is_ifs_nonwhitespace(line[cursor])) {
+        cursor++;
+        while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
+          cursor++;
       }
     }
     cxt.set_indexed_array(FLAG_READ_ARRAY.value(), steal(words));
@@ -139,7 +139,7 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
   usize cursor = 0;
   /* Leading IFS whitespace before the first field is skipped and produces no
      empty field. */
-  while (cursor < line.length() && is_ifs_whitespace(line[cursor]))
+  while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
     cursor++;
 
   for (usize i = 0; i < operand_count; i++) {
@@ -149,26 +149,26 @@ i32 Read::execute(ExecContext &ec, EvalContext &cxt) const throws
          since dash leaves the empty field it introduces inside the remainder.
        */
       let rest = String{line.substring(cursor)};
-      while (!rest.is_empty() && is_ifs_whitespace(rest.back()))
+      while (!rest.is_empty() && do_is_ifs_whitespace(rest.back()))
         rest.pop_back();
-      cxt.set_shell_variable(operand_name(i), rest);
+      cxt.set_shell_variable(do_operand_name(i), rest);
       break;
     }
 
     let const start = cursor;
-    while (cursor < line.length() && !is_separator(line[cursor]))
+    while (cursor < line.length() && !do_is_separator(line[cursor]))
       cursor++;
-    cxt.set_shell_variable(operand_name(i),
+    cxt.set_shell_variable(do_operand_name(i),
                            line.substring_of_length(start, cursor - start));
 
     /* Consume one delimiter. A run of IFS whitespace folds to one, then an
        optional single non-whitespace IFS character, then trailing whitespace,
        so 'x : y' and 'x:y' both split into the same fields. */
-    while (cursor < line.length() && is_ifs_whitespace(line[cursor]))
+    while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
       cursor++;
-    if (cursor < line.length() && is_ifs_nonwhitespace(line[cursor])) {
+    if (cursor < line.length() && do_is_ifs_nonwhitespace(line[cursor])) {
       cursor++;
-      while (cursor < line.length() && is_ifs_whitespace(line[cursor]))
+      while (cursor < line.length() && do_is_ifs_whitespace(line[cursor]))
         cursor++;
     }
   }

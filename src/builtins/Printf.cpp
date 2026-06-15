@@ -80,13 +80,13 @@ void append_escape(String &out, const String &fmt, usize &i) throws
    */
   if (e >= '0' && e <= '7') {
     i32 value = e - '0';
-    usize digits_read = 1;
-    while (digits_read < 3 && i + 1 < fmt.length() && fmt[i + 1] >= '0' &&
+    usize digit_count = 1;
+    while (digit_count < 3 && i + 1 < fmt.length() && fmt[i + 1] >= '0' &&
            fmt[i + 1] <= '7')
     {
       i++;
       value = value * 8 + (fmt[i] - '0');
-      digits_read++;
+      digit_count++;
     }
     out += static_cast<char>(value);
     return;
@@ -96,12 +96,12 @@ void append_escape(String &out, const String &fmt, usize &i) throws
      extension over POSIX. */
   if (e == 'x' && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1])) {
     i32 value = 0;
-    usize digits_read = 0;
-    while (digits_read < 2 && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1]))
+    usize digit_count = 0;
+    while (digit_count < 2 && i + 1 < fmt.length() && is_hex_digit(fmt[i + 1]))
     {
       i++;
       value = value * 16 + hex_digit_value(fmt[i]);
-      digits_read++;
+      digit_count++;
     }
     out += static_cast<char>(value);
     return;
@@ -142,13 +142,13 @@ bool append_b_argument(String &out, const String &arg) throws
        */
       usize digit_index = i + 2;
       i32 value = 0;
-      usize digits_read = 0;
-      while (digits_read < 2 && digit_index < arg.length() &&
+      usize digit_count = 0;
+      while (digit_count < 2 && digit_index < arg.length() &&
              is_hex_digit(arg[digit_index]))
       {
         value = value * 16 + hex_digit_value(arg[digit_index]);
         digit_index++;
-        digits_read++;
+        digit_count++;
       }
       out += static_cast<char>(value);
       i = digit_index - 1;
@@ -160,13 +160,13 @@ bool append_b_argument(String &out, const String &arg) throws
       usize digit_index = i + 1;
       if (arg[digit_index] == '0') digit_index++;
       i32 value = 0;
-      usize digits_read = 0;
-      while (digits_read < 3 && digit_index < arg.length() &&
+      usize digit_count = 0;
+      while (digit_count < 3 && digit_index < arg.length() &&
              arg[digit_index] >= '0' && arg[digit_index] <= '7')
       {
         value = value * 8 + (arg[digit_index] - '0');
         digit_index++;
-        digits_read++;
+        digit_count++;
       }
       out += static_cast<char>(value);
       i = digit_index - 1;
@@ -377,7 +377,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
   let const operand_base = format_index + 1;
   let const operand_count = args.count() - operand_base;
   let const empty_operand = String{};
-  auto operand_at = [&](usize index) wontthrow -> const String & {
+  auto do_operand_at = [&](usize index) wontthrow -> const String & {
     return index < operand_count ? args[operand_base + index] : empty_operand;
   };
 
@@ -388,9 +388,9 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   /* Read the next operand as the integer value of a * field width or precision,
      append its decimal text into the spec, and advance the operand cursor. */
-  auto consume_star = [&](String &spec) throws {
+  auto do_consume_star = [&](String &spec) throws {
     spec.append(
-        utils::int_to_text(parse_printf_integer(operand_at(operand_index)))
+        utils::int_to_text(parse_printf_integer(do_operand_at(operand_index)))
             .view());
     operand_index++;
     consumed_a_conversion = true;
@@ -414,7 +414,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
       while (i < fmt.length() && std::strchr("-+ 0#", fmt[i]) != nullptr)
         spec.push(fmt[i++]);
       if (i < fmt.length() && fmt[i] == '*') {
-        consume_star(spec);
+        do_consume_star(spec);
         i++;
       } else {
         while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
@@ -423,7 +423,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (i < fmt.length() && fmt[i] == '.') {
         spec.push(fmt[i++]);
         if (i < fmt.length() && fmt[i] == '*') {
-          consume_star(spec);
+          do_consume_star(spec);
           i++;
         } else {
           while (i < fmt.length() && fmt[i] >= '0' && fmt[i] <= '9')
@@ -441,7 +441,7 @@ i32 Printf::execute(ExecContext &ec, EvalContext &cxt) const throws
         continue;
       }
 
-      let const &arg = operand_at(operand_index);
+      let const &arg = do_operand_at(operand_index);
       if (conv == 'b') {
         /* %b prints the argument with its backslash escapes expanded, and a \c
            inside it stops the whole printf. */

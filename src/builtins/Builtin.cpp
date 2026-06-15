@@ -53,12 +53,12 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
      a glance what shit carries. */
   if (name == "-l" || name == "--list") {
     let sorted = ArrayList<String>{};
-    for (const String &builtin_name : builtin_names())
+    for (let const &builtin_name : builtin_names())
       sorted.push_managed(builtin_name);
     utils::sort_ascending(sorted);
 
     usize longest = 0;
-    for (const String &builtin_name : sorted)
+    for (let const &builtin_name : sorted)
       if (builtin_name.length() > longest) longest = builtin_name.length();
     let const column_width = longest + 2;
     let const columns = column_width >= 78 ? usize{1} : 78 / column_width;
@@ -71,9 +71,9 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     for (usize i = 0; i < sorted.count(); i++) {
       if (i % columns == 0) out += "  ";
       out += sorted[i].view();
-      let const last_in_row =
+      let const is_last_in_row =
           i % columns == columns - 1 || i + 1 == sorted.count();
-      if (last_in_row) {
+      if (is_last_in_row) {
         out += "\n";
       } else {
         for (usize pad = sorted[i].length(); pad < column_width; pad++)

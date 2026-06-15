@@ -146,7 +146,7 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
      and then the value, the layout dash prints. */
   if (FLAG_ALL.is_enabled()) {
     let out = String{};
-    for (const resource_entry &entry : RESOURCE_TABLE) {
+    for (let const &entry : RESOURCE_TABLE) {
       struct rlimit limit{};
       if (getrlimit(entry.which, &limit) != 0) continue;
       let const label = String{entry.label};

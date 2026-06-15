@@ -38,8 +38,9 @@ fn EvalContext::register_function(StringView name, const Expression *body,
      letting a function defined in bash mood run bash after a later set --mood,
      and a function defined while diagnostics were off skip its checks. */
   info.defining_mood = static_cast<u8>(m_runtime.mood);
-  info.defining_warnings = m_runtime.warnings_enabled;
-  info.defining_diagnostics_disabled = m_runtime.diagnostics_disabled;
+  info.were_warnings_enabled_at_definition = m_runtime.are_warnings_enabled;
+  info.were_diagnostics_disabled_at_definition =
+      m_runtime.are_diagnostics_disabled;
   m_function_definition_infos.set(name, steal(info));
 }
 
@@ -52,37 +53,41 @@ fn EvalContext::function_definition_info_of(StringView name) const wontthrow
 pure fn EvalContext::resolve_render_source(
     SourceLocation location) const wontthrow -> resolved_render_source
 {
-  let resolved = resolved_render_source{};
-  resolved.text = m_current_source;
+  let resolved_source = resolved_render_source{};
+  resolved_source.text = m_current_source;
 
   /* Inside a function call the body's positions index the file that defined
      it, which may not be the current source and may already be freed. When
      the innermost function was defined against another source instance and
      the position falls inside its recorded body span, the stored definition
      copy renders it with the defining file's name and numbering. */
-  if (m_function_call_names.is_empty()) return resolved;
+  if (m_function_call_names.is_empty()) return resolved_source;
   let const innermost = funcname_frame_at(0);
   let const *info = m_function_definition_infos.find(innermost);
   /* The body span check below decides whether to window, not the defining
      source pointer. A freed defining source can have its address reused by the
      current source, so a pointer compare here would falsely read the body as
      belonging to the current source and drop the function's filename. */
-  if (info == nullptr) return resolved;
+  if (info == nullptr) return resolved_source;
   let const *copy = m_function_sources.find(innermost);
-  if (copy == nullptr || copy->count() <= info->header_length) return resolved;
+  if (copy == nullptr || copy->count() <= info->header_length) {
+    return resolved_source;
+  }
   const usize body_length = copy->count() - info->header_length;
   if (location.position < info->body_start_position ||
       location.position >= info->body_start_position + body_length)
-    return resolved;
+  {
+    return resolved_source;
+  }
 
-  resolved.text = copy;
-  resolved.windowed = true;
-  resolved.body_start_position = info->body_start_position;
-  resolved.header_length = info->header_length;
-  resolved.line_offset = info->line_offset;
-  resolved.filename =
+  resolved_source.text = copy;
+  resolved_source.is_windowed = true;
+  resolved_source.body_start_position = info->body_start_position;
+  resolved_source.header_length = info->header_length;
+  resolved_source.line_offset = info->line_offset;
+  resolved_source.filename =
       info->filename.is_empty() ? StringView{} : info->filename.view();
-  return resolved;
+  return resolved_source;
 }
 
 fn EvalContext::find_function_source(StringView name) const wontthrow
@@ -321,8 +326,10 @@ fn EvalContext::append_integer_expression(String &joined,
 {
   joined += '+';
   for (usize i = 0; i < expression.length; i++) {
-    let const c = expression[i];
-    if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+    let const character = expression[i];
+    if (character != ' ' && character != '\t' && character != '\n' &&
+        character != '\r')
+    {
       joined += '(';
       joined.append(expression.substring(i));
       joined += ')';

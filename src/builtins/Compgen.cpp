@@ -99,15 +99,16 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         static_cast<int>(glob_pattern->length), glob_pattern->data,
         static_cast<int>(word.length), word.data);
     let out = String{};
-    let any_matched = false;
-    for (const String &match : cxt.expand_glob_lenient(*glob_pattern)) {
+    let has_any_matched = false;
+    for (let const &match : cxt.expand_glob_lenient(*glob_pattern)) {
       if (word.length != 0 && !match.view().starts_with(word)) continue;
       out.append(match.view());
       out.push('\n');
-      any_matched = true;
+      has_any_matched = true;
     }
-    if (any_matched) ec.print_to_stdout(out.view());
-    return any_matched ? 0 : 1;
+
+    if (has_any_matched) ec.print_to_stdout(out.view());
+    return has_any_matched ? 0 : 1;
   }
 
   /* An unsupported action produces nothing rather than an error, so a
@@ -121,16 +122,16 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      the shared word-list expander, the same path complete -W reads, so the
      bash-completion idiom -W '"${options[@]}"' reaches the caller's array. */
   let out = String{};
-  let any_matched = false;
-  for (const String &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {
+  let has_any_matched = false;
+  for (let const &candidate : cxt.expand_wordlist_to_fields(*wordlist)) {
     if (candidate.is_empty() || !candidate.view().starts_with(word)) continue;
     out.append(candidate.view());
     out.push('\n');
-    any_matched = true;
+    has_any_matched = true;
   }
 
   ec.print_to_stdout(out.view());
-  return any_matched ? 0 : 1;
+  return has_any_matched ? 0 : 1;
 }
 
 } /* namespace shit */

@@ -138,7 +138,9 @@ static pure fn is_transparent_command_prefix(StringView word) wontthrow -> bool
   if (word[0] == '-') return true;
   if (lexer::is_variable_name_start(word[0]) &&
       word.find_character('=').has_value())
+  {
     return true;
+  }
   return TRANSPARENT_PREFIXES.find(word).has_value();
 }
 
@@ -275,7 +277,7 @@ compute_longest_common_prefix(const ArrayList<String> &candidates) throws
    large PATH becomes a one-time cost rather than a per-key one. */
 static String CACHED_COMPLETION_PATH{};
 static ArrayList<String> CACHED_PATH_COMMANDS{};
-static bool CACHED_PATH_COMMANDS_VALID = false;
+static bool is_cached_path_commands_valid = false;
 
 /* Whether the live PATH differs from the cached copy, updating the copy on a
    change. The probe runs on every keystroke, so the value is read as a raw
@@ -292,8 +294,10 @@ static fn environment_path_changed(String &cached_path) throws -> bool
 static fn path_command_names() throws -> const ArrayList<String> &
 {
   if (!environment_path_changed(CACHED_COMPLETION_PATH) &&
-      CACHED_PATH_COMMANDS_VALID)
+      is_cached_path_commands_valid)
+  {
     return CACHED_PATH_COMMANDS;
+  }
 
   /* The helper above already stored the live PATH value, so the rebuild
      walks the cached copy. A directory repeated in PATH is read only once,
@@ -313,11 +317,11 @@ static fn path_command_names() throws -> const ArrayList<String> &
     seen_directories.add(dir_view);
     let const directory = Path{dir_view};
     if (Maybe<ArrayList<String>> entries = Path::read_directory(directory)) {
-      for (String &entry : *entries)
+      for (let &entry : *entries)
         CACHED_PATH_COMMANDS.push(steal(entry));
     }
   }
-  CACHED_PATH_COMMANDS_VALID = true;
+  is_cached_path_commands_valid = true;
   LOG(Info, "rebuilt the path command cache, %zu names",
       CACHED_PATH_COMMANDS.count());
   return CACHED_PATH_COMMANDS;
@@ -332,7 +336,7 @@ static fn complete_command(StringView token, bool token_is_glob,
   TRACELN("completing command position for token '%.*s'",
           static_cast<int>(token.length), token.data);
 
-  for (const String &builtin_name : builtin_names()) {
+  for (let const &builtin_name : builtin_names()) {
     add_unique_command(candidates, seen, builtin_name.view(), token,
                        token_is_glob);
   }
@@ -345,7 +349,7 @@ static fn complete_command(StringView token, bool token_is_glob,
     add_unique_command(candidates, seen, name, token, token_is_glob);
   });
 
-  for (const String &entry : path_command_names())
+  for (let const &entry : path_command_names())
     add_unique_command(candidates, seen, entry.view(), token, token_is_glob);
 
   LOG(All, "collected %zu command candidates for token '%.*s'",
@@ -398,7 +402,7 @@ static fn resolve_listing_directory(StringView directory_part,
     let home = name.is_empty() ? os::get_home_directory()
                                : os::get_home_for_user(name);
     if (home.has_value()) {
-      let resolved = home->clone();
+      let resolved_path = home->clone();
       /* Drop the name and the separator after it, then append the rest. */
       let rest_start = name_end;
       if (rest_start < directory_part.length &&
@@ -407,18 +411,18 @@ static fn resolve_listing_directory(StringView directory_part,
         rest_start++;
       }
       if (rest_start < directory_part.length) {
-        resolved.push_component(directory_part.substring(rest_start));
+        resolved_path.push_component(directory_part.substring(rest_start));
       }
-      return resolved;
+      return resolved_path;
     }
   }
 
   let const directory = Path{directory_part};
   if (directory.is_absolute()) return directory;
 
-  let resolved = base_directory.clone();
-  resolved.push_component(directory_part);
-  return resolved;
+  let resolved_path = base_directory.clone();
+  resolved_path.push_component(directory_part);
+  return resolved_path;
 }
 
 /* Complete a filesystem token. The directory part is listed and every entry
@@ -444,7 +448,7 @@ static fn complete_filesystem(StringView token,
   let entries = Path::read_directory(listing_directory);
   if (!entries.has_value()) return candidates;
 
-  for (const String &entry : *entries) {
+  for (let const &entry : *entries) {
     if (!entry.view().starts_with(parts.basename_part)) continue;
 
     /* A name beginning with a dot stays hidden unless the user typed a leading
@@ -500,7 +504,7 @@ static fn complete_glob(StringView token, const Path &base_directory) throws
      completion token is unquoted. */
   let const glob_active = all_active_glob_mask(parts.basename_part.length);
 
-  for (const String &entry : *entries) {
+  for (let const &entry : *entries) {
     /* A dotfile only matches a pattern the user began with a dot, the way the
        shell hides them from a bare star. */
     if (entry.length() > 0 && entry.view()[0] == '.' &&
@@ -561,7 +565,7 @@ static fn complete_variable(StringView token, EvalContext &context) throws
 
   let seen = HashSet{heap_allocator()};
 
-  let add_name = [&](StringView name) throws -> void {
+  let do_add_name = [&](StringView name) throws -> void {
     if (!name.starts_with(prefix)) return;
     if (seen.contains(name)) return;
     seen.add(name);
@@ -573,10 +577,11 @@ static fn complete_variable(StringView token, EvalContext &context) throws
     candidates.push(steal(candidate));
   };
 
-  context.variable_names().for_each([&](StringView name) { add_name(name); });
+  context.variable_names().for_each(
+      [&](StringView name) { do_add_name(name); });
 
-  for (const String &name : os::environment_names())
-    add_name(name.view());
+  for (let const &name : os::environment_names())
+    do_add_name(name.view());
 
   LOG(All, "%zu variable names match prefix '%.*s'", candidates.count(),
       static_cast<int>(prefix.length), prefix.data);
@@ -599,7 +604,7 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
 {
   let candidates = ArrayList<String>{};
   let const prefix = token.substring(1);
-  for (const String &user : os::enumerate_users()) {
+  for (let const &user : os::enumerate_users()) {
     if (!user.view().starts_with(prefix)) continue;
     let candidate = String{};
     candidate.push('~');
@@ -701,7 +706,7 @@ static fn split_completion_words(StringView line, usize cursor,
 {
   let words = ArrayList<String>{};
   usize i = 0;
-  let found = false;
+  let is_found = false;
   while (i < line.length) {
     while (i < line.length && (line[i] == ' ' || line[i] == '\t'))
       i++;
@@ -711,11 +716,11 @@ static fn split_completion_words(StringView line, usize cursor,
       i++;
     if (cursor >= start && cursor <= i) {
       cword = words.count();
-      found = true;
+      is_found = true;
     }
     words.push(String{line.substring_of_length(start, i - start)});
   }
-  if (!found) {
+  if (!is_found) {
     cword = words.count();
     words.push(String{});
   }
@@ -740,7 +745,7 @@ static fn matches_from_help_entries(const ArrayList<help_entry> &entries,
     -> ArrayList<String>
 {
   let matches = ArrayList<String>{};
-  for (const help_entry &entry : entries)
+  for (let const &entry : entries)
     if (entry.name.view().starts_with(token)) {
       matches.push(String{entry.name.view()});
       if (!entry.description.is_empty())
@@ -780,7 +785,7 @@ static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
    name, so a page is read at most once per launch and only when the token
    matches its subcommand. */
 static StringMap<bool> MAN_SUBCOMMAND_PAGE_VALID{heap_allocator()};
-static bool MAN_SUBCOMMAND_INDEX_IS_BUILT = false;
+static bool is_man_subcommand_index_built = false;
 
 /* The man1 directories of the host, the $MANPATH entries when the variable is
    set and the stock /usr/local and /usr trees otherwise. An empty $MANPATH
@@ -793,21 +798,21 @@ static fn manpage_section1_directories() throws -> ArrayList<Path>
   let directories = ArrayList<Path>{};
   let seen_roots = HashSet{heap_allocator()};
 
-  auto push_man1_of_root = [&](StringView root) {
+  let do_push_man1_of_root = [&](StringView root) {
     if (seen_roots.contains(root)) return;
     seen_roots.add(root);
     let directory = Path{root};
     directory.push_component("man1");
     directories.push(steal(directory));
   };
-  auto push_default_roots = [&]() {
-    push_man1_of_root("/usr/local/share/man");
-    push_man1_of_root("/usr/share/man");
+  let do_push_default_roots = [&]() {
+    do_push_man1_of_root("/usr/local/share/man");
+    do_push_man1_of_root("/usr/share/man");
   };
 
   let const manpath = os::get_environment_variable("MANPATH");
   if (!manpath.has_value() || manpath->is_empty()) {
-    push_default_roots();
+    do_push_default_roots();
     return directories;
   }
 
@@ -819,9 +824,9 @@ static fn manpage_section1_directories() throws -> ArrayList<Path>
         value.substring_of_length(segment_start, i - segment_start);
     segment_start = i + 1;
     if (segment.is_empty())
-      push_default_roots();
+      do_push_default_roots();
     else
-      push_man1_of_root(segment);
+      do_push_man1_of_root(segment);
   }
   return directories;
 }
@@ -832,8 +837,8 @@ static pure fn strip_man1_suffix(StringView entry) wontthrow
     -> Maybe<StringView>
 {
   let name = entry;
-  for (const StringView tail : {StringView{".gz"}, StringView{".xz"},
-                                StringView{".zst"}, StringView{".bz2"}})
+  for (let const tail : {StringView{".gz"}, StringView{".xz"},
+                         StringView{".zst"}, StringView{".bz2"}})
   {
     if (name.length > tail.length &&
         name.substring(name.length - tail.length) == tail)
@@ -854,8 +859,8 @@ static pure fn strip_man1_suffix(StringView entry) wontthrow
    aclocal-1.16 version suffix is no subcommand either. */
 static fn build_man_subcommand_index() throws -> void
 {
-  MAN_SUBCOMMAND_INDEX_IS_BUILT = true;
-  for (const Path &directory : manpage_section1_directories()) {
+  is_man_subcommand_index_built = true;
+  for (let const &directory : manpage_section1_directories()) {
     LOG(Info, "scanning man1 directory '%s'", directory.text().c_str());
     let entries = Path::read_directory(directory);
     if (!entries.has_value()) {
@@ -863,7 +868,7 @@ static fn build_man_subcommand_index() throws -> void
           directory.text().c_str());
       continue;
     }
-    for (const String &entry : *entries) {
+    for (let const &entry : *entries) {
       let const stripped = strip_man1_suffix(entry.view());
       if (!stripped.has_value() || stripped->is_empty()) continue;
       if (MAN_PAGE_FILE_PATHS.find(*stripped) != nullptr) continue;
@@ -971,8 +976,8 @@ static fn man_subcommand_page_is_valid(StringView command,
   /* A compressed page cannot be scanned without a decompressor, so the
      candidate stays on the head-page rule alone, with no read at all. */
   let const path_view = file_path->view();
-  for (const StringView tail : {StringView{".gz"}, StringView{".xz"},
-                                StringView{".zst"}, StringView{".bz2"}})
+  for (let const tail : {StringView{".gz"}, StringView{".xz"},
+                         StringView{".zst"}, StringView{".bz2"}})
     if (path_view.length > tail.length &&
         path_view.substring(path_view.length - tail.length) == tail)
     {
@@ -1068,10 +1073,11 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
     return None;
   /* The subcommands are the resolved target's, so g for a g='git' alias
      lists git's subcommands. */
-  let const resolved = resolve_completion_command(surface_command, context);
-  let const command = resolved.view();
+  let const resolved_name =
+      resolve_completion_command(surface_command, context);
+  let const command = resolved_name.view();
 
-  if (!MAN_SUBCOMMAND_INDEX_IS_BUILT) {
+  if (!is_man_subcommand_index_built) {
     if (!for_listing) return None;
     build_man_subcommand_index();
   }
@@ -1083,10 +1089,12 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
      matches no subcommand, such as a typo, reads no page at all and the prompt
      does not stall on a command with a hundred subcommand pages. */
   let matches = ArrayList<String>{};
-  for (const String &subcommand : *subcommands)
+  for (let const &subcommand : *subcommands)
     if (subcommand.view().starts_with(token) &&
         man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
+    {
       matches.push(String{subcommand.view()});
+    }
   LOG(Debug, "%zu subcommands of '%.*s' match token '%.*s'", matches.count(),
       static_cast<int>(command.length), command.data,
       static_cast<int>(token.length), token.data);
@@ -1149,10 +1157,10 @@ static fn parse_manpage_option_entries(StringView text) throws
   usize pending_indent = 0;
   let pending_description = String{};
 
-  let finalize_pending = [&]() throws -> void {
+  let do_finalize_pending = [&]() throws -> void {
     if (pending_flags.is_empty()) return;
     let const desc = trim_blanks(pending_description.view());
-    for (const String &flag : pending_flags)
+    for (let const &flag : pending_flags)
       if (!desc.is_empty() && descriptions.find(flag.view()) == nullptr)
         descriptions.set(flag.view(), String{desc});
     pending_flags.clear();
@@ -1170,7 +1178,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     let const indent = skip_blanks(raw, 0);
     /* A blank line ends the current option's description block. */
     if (indent >= raw.length) {
-      finalize_pending();
+      do_finalize_pending();
       continue;
     }
 
@@ -1191,7 +1199,7 @@ static fn parse_manpage_option_entries(StringView text) throws
 
     /* Any other line ends the pending block, and a dash line opens a new one.
      */
-    finalize_pending();
+    do_finalize_pending();
     if (raw[indent] != '-') continue;
 
     let gap = raw.length;
@@ -1208,7 +1216,7 @@ static fn parse_manpage_option_entries(StringView text) throws
       pending_description.append(
           trim_blanks(raw.substring_of_length(gap, raw.length - gap)));
   }
-  finalize_pending();
+  do_finalize_pending();
 
   /* The authoritative flag list is the word scan, so the candidate set matches
      the prior behavior, with the description attached where the block pass
@@ -1456,7 +1464,7 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
   if (let const cached = MANPAGE_OPTION_CACHE.find(page_name)) return *cached;
-  let parsed = ArrayList<help_entry>{};
+  let parsed_options = ArrayList<help_entry>{};
   /* man forks only when it resolves into a trusted directory such as /usr/bin,
      so an alias, a function, or a man planted in a world-writable directory is
      never run. The resolved absolute path runs in place of the bare name, so
@@ -1470,19 +1478,19 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     LOG(Debug,
         "skipping the man fork for '%.*s' because man is absent or untrusted",
         static_cast<int>(page_name.length), page_name.data);
-    MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
+    MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
     return *MANPAGE_OPTION_CACHE.find(page_name);
   }
   try {
     let const page = context.capture_command_substitution(
         String{man_paths[0].text().view()} + " " + String{page_name} +
         " 2>/dev/null");
-    parsed = parse_manpage_option_entries(page.view());
+    parsed_options = parse_manpage_option_entries(page.view());
   } catch (...) {
     LOG(Debug, "swallowed a man invocation failure for '%.*s'",
         static_cast<int>(page_name.length), page_name.data);
   }
-  MANPAGE_OPTION_CACHE.set(page_name, steal(parsed));
+  MANPAGE_OPTION_CACHE.set(page_name, steal(parsed_options));
   return *MANPAGE_OPTION_CACHE.find(page_name);
 }
 
@@ -1505,8 +1513,9 @@ static fn complete_from_manpage(StringView line, StringView token,
 
   /* The manpage is the resolved target's, so an aliased or symlinked command
      reads the options of what it really runs. */
-  let const resolved = resolve_completion_command(surface_command, context);
-  let const command = resolved.view();
+  let const resolved_name =
+      resolve_completion_command(surface_command, context);
+  let const command = resolved_name.view();
 
   /* A command that prefers --help reads its options from there rather than the
      manpage, so it skips this stage and the help stage below picks it up. */
@@ -1520,7 +1529,7 @@ static fn complete_from_manpage(StringView line, StringView token,
   if (let const subcommand_word = second_word_of(line);
       subcommand_word.has_value())
   {
-    if (!MAN_SUBCOMMAND_INDEX_IS_BUILT) build_man_subcommand_index();
+    if (!is_man_subcommand_index_built) build_man_subcommand_index();
     let combined = String{command};
     combined.push('-');
     combined.append(*subcommand_word);
@@ -1650,7 +1659,7 @@ static fn parse_help_option_entries(StringView text) throws
     if (gap < raw.length)
       description = trim_blanks(raw.substring_of_length(gap, raw.length - gap));
 
-    for (const String &flag : extract_dash_flags(option_part))
+    for (let const &flag : extract_dash_flags(option_part))
       if (!seen.contains(flag.view())) {
         seen.add(flag.view());
         entries.push(help_entry{String{flag.view()}, String{description}});
@@ -1835,8 +1844,8 @@ static fn complete_from_help(StringView line, StringView token,
 
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
-  let const resolved = resolve_completion_alias(surface_command, context);
-  let const &options = help_options_for(resolved.view());
+  let const resolved_name = resolve_completion_alias(surface_command, context);
+  let const &options = help_options_for(resolved_name.view());
   if (options.is_empty()) return None;
 
   let matches = matches_from_help_entries(options, token, descriptions);
@@ -1865,18 +1874,18 @@ static fn complete_from_help_subcommands(StringView line, StringView token,
 
   /* The alias-only name keeps a multiplexer link such as cargo to rustup at the
      surface name, so the --help fork dispatches on the typed argv[0]. */
-  let const resolved = resolve_completion_alias(surface_command, context);
+  let const resolved_name = resolve_completion_alias(surface_command, context);
 
   /* A command the man index already lists subcommands for, such as kubectl or
      git, never forks --help to relist them, since the man stage that ran before
      this one is the authoritative source. The fork is reserved for a tool like
      cargo that has subcommands but no man pages. */
-  if (MAN_SUBCOMMAND_INDEX_IS_BUILT) {
-    let const man_subcommands = MAN_SUBCOMMAND_INDEX.find(resolved.view());
+  if (is_man_subcommand_index_built) {
+    let const man_subcommands = MAN_SUBCOMMAND_INDEX.find(resolved_name.view());
     if (man_subcommands != nullptr && !man_subcommands->is_empty()) return None;
   }
 
-  let const &subcommands = help_subcommands_for(resolved.view());
+  let const &subcommands = help_subcommands_for(resolved_name.view());
   if (subcommands.is_empty()) return None;
 
   let matches = matches_from_help_entries(subcommands, token, descriptions);
@@ -2001,13 +2010,13 @@ static fn parse_package_json_scripts(StringView text) throws
   let scripts = ArrayList<String>{};
   let const section = StringView{"\"scripts\""};
   usize at = 0;
-  let found = false;
+  let is_found = false;
   for (; at + section.length <= text.length; at++)
     if (text.substring_of_length(at, section.length) == section) {
-      found = true;
+      is_found = true;
       break;
     }
-  if (!found) return scripts;
+  if (!is_found) return scripts;
   let i = at + section.length;
   while (i < text.length && text[i] != '{')
     i++;
@@ -2050,7 +2059,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
   /* known_hosts repeats a host once per key type, so the dedup set keeps the
      scan linear over hundreds of rows. */
   let seen = HashSet{heap_allocator()};
-  let const push_unique = [&](StringView host) throws {
+  let const do_push_unique = [&](StringView host) throws {
     if (host.is_empty() || seen.contains(host)) return;
     seen.add(host);
     hosts.push(String{host});
@@ -2088,7 +2097,9 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
         if (!name.find_character('*').has_value() &&
             !name.find_character('?').has_value() &&
             !name.find_character('!').has_value())
-          push_unique(name);
+        {
+          do_push_unique(name);
+        }
       }
     }
   }
@@ -2123,7 +2134,7 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
           let const close = host.find_character(']');
           if (close.has_value()) host = host.substring_of_length(1, *close - 1);
         }
-        push_unique(host);
+        do_push_unique(host);
       }
     }
   }
@@ -2185,7 +2196,7 @@ static fn complete_from_build_tools(StringView line, StringView token,
     let makefile_name = settled_option_value(line, "-f");
     if (!makefile_name.has_value()) {
       /* GNU make reads these three names in this order. */
-      for (const StringView candidate :
+      for (let const candidate :
            {StringView{"GNUmakefile"}, StringView{"makefile"},
             StringView{"Makefile"}})
       {
@@ -2271,7 +2282,9 @@ static fn complete_from_build_tools(StringView line, StringView token,
        file. A token that carries / or : is a path or a remote spec. */
     if (token.find_character('/').has_value() ||
         token.find_character(':').has_value())
+    {
       return None;
+    }
     owned_targets = collect_ssh_hosts();
   } else {
     return None;
@@ -2279,7 +2292,7 @@ static fn complete_from_build_tools(StringView line, StringView token,
 
   if (targets == nullptr) return None;
   let candidates = ArrayList<String>{};
-  for (const String &target : *targets)
+  for (let const &target : *targets)
     if (target.view().starts_with(token))
       candidates.push(String{target.view()});
   if (candidates.is_empty()) return None;
@@ -2296,13 +2309,13 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
     -> const ArrayList<String> *
 {
   static ArrayList<String> per_kind_candidates[BUILTIN_KIND_COUNT]{};
-  static bool per_kind_built[BUILTIN_KIND_COUNT]{};
+  static bool was_per_kind_built[BUILTIN_KIND_COUNT]{};
   static ArrayList<String> binary_candidates{};
-  static bool binary_built = false;
+  static bool was_binary_built = false;
 
-  let const append_flag_forms = [](const ArrayList<Flag *> &flags,
-                                   ArrayList<String> &out) throws {
-    for (const Flag *flag : flags) {
+  let const do_append_flag_forms = [](const ArrayList<Flag *> &flags,
+                                      ArrayList<String> &out) throws {
+    for (let const flag : flags) {
       if (flag->short_name() != '\0') {
         let short_form = String{"-"};
         short_form.push(flag->short_name());
@@ -2317,17 +2330,17 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
   };
 
   if (!builtin_kind.has_value()) {
-    if (!binary_built) {
-      append_flag_forms(shit_binary_flag_list(), binary_candidates);
-      binary_built = true;
+    if (!was_binary_built) {
+      do_append_flag_forms(shit_binary_flag_list(), binary_candidates);
+      was_binary_built = true;
     }
     return &binary_candidates;
   }
 
   let const index = static_cast<usize>(*builtin_kind);
-  if (!per_kind_built[index]) {
+  if (!was_per_kind_built[index]) {
     if (*builtin_kind == Builtin::Kind::Kill) {
-      for (const StringView name : os::signal_names()) {
+      for (let const name : os::signal_names()) {
         let with_dash = String{"-"};
         with_dash += name;
         per_kind_candidates[index].push(steal(with_dash));
@@ -2335,7 +2348,7 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
     } else {
       let const flags = builtin_flag_list(*builtin_kind);
       if (flags == nullptr) return nullptr;
-      append_flag_forms(*flags, per_kind_candidates[index]);
+      do_append_flag_forms(*flags, per_kind_candidates[index]);
       if (*builtin_kind == Builtin::Kind::Set) {
         const String &letters = shell_option_letters();
         for (usize i = 0; i < letters.count(); i++) {
@@ -2347,7 +2360,7 @@ static fn dash_candidates_for(Maybe<Builtin::Kind> builtin_kind) throws
         per_kind_candidates[index].push(String{"-p"});
       }
     }
-    per_kind_built[index] = true;
+    was_per_kind_built[index] = true;
   }
   return &per_kind_candidates[index];
 }
@@ -2378,7 +2391,7 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   if (!builtin_kind.has_value() && !completes_shell_binary) return None;
 
   let candidates = ArrayList<String>{};
-  let const push_matching = [&](StringView candidate) throws {
+  let const do_push_matching = [&](StringView candidate) throws {
     if (candidate.starts_with(token)) candidates.push(String{candidate});
   };
 
@@ -2386,8 +2399,8 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Set) {
     let const previous = previous_settled_word(line, token_start);
     if (previous == "-o" || previous == "+o") {
-      for (const StringView name : shell_option_names(true))
-        push_matching(name);
+      for (let const name : shell_option_names(true))
+        do_push_matching(name);
       if (!candidates.is_empty()) return candidates;
       return None;
     }
@@ -2396,9 +2409,9 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
     if (previous == "--mood" || previous == "-M" ||
         previous == "--init-moods" || previous == "-L")
     {
-      for (const StringView name :
+      for (let const name :
            {StringView{"shit"}, StringView{"bash"}, StringView{"sh"}})
-        push_matching(name);
+        do_push_matching(name);
       if (!candidates.is_empty()) return candidates;
       return None;
     }
@@ -2408,8 +2421,8 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Shopt &&
       (token.is_empty() || token[0] != '-'))
   {
-    for (const StringView name : shopt_option_name_list())
-      push_matching(name);
+    for (let const name : shopt_option_name_list())
+      do_push_matching(name);
     if (!candidates.is_empty()) return candidates;
     return None;
   }
@@ -2418,10 +2431,10 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Kill &&
       (token.is_empty() || token[0] != '-'))
   {
-    for (const job &background_job : context.jobs()) {
+    for (let const &background_job : context.jobs()) {
       let job_id = String{"%"};
       job_id += utils::int_to_text(background_job.id, heap_allocator());
-      push_matching(job_id.view());
+      do_push_matching(job_id.view());
     }
     if (!candidates.is_empty()) return candidates;
     return None;
@@ -2433,8 +2446,8 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   const ArrayList<String> *dash_candidates = dash_candidates_for(
       completes_shell_binary ? Maybe<Builtin::Kind>{None} : builtin_kind);
   if (dash_candidates == nullptr) return None;
-  for (const String &candidate : *dash_candidates)
-    push_matching(candidate.view());
+  for (let const &candidate : *dash_candidates)
+    do_push_matching(candidate.view());
   if (candidates.is_empty()) return None;
   return candidates;
 }
@@ -2543,7 +2556,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
          function's reply offers options only once the token asks for them. */
       let const wants_dash_entries = !token.is_empty() && token[0] == '-';
       let loaded = ArrayList<String>{};
-      for (const String &entry : reply) {
+      for (let const &entry : reply) {
         if (entry_is_unrequested_dash_word(entry.view(), wants_dash_entries))
           continue;
         push_spec_candidate(entry.view(), loaded, descriptions);
@@ -2567,7 +2580,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     /* The -W list expands the way bash expands it, through the same shared
        path compgen -W reads. The ghost runs on every keystroke and so keeps
        the plain split for a list that would need a parse. */
-    for (const String &word :
+    for (let const &word :
          context.expand_wordlist_to_fields(spec->word_list.view(), for_listing))
     {
       if (entry_is_unrequested_dash_word(word.view(), should_offer_dash_words))
@@ -2584,7 +2597,7 @@ static fn complete_from_spec(StringView line, StringView token, usize cursor,
     let const words = split_completion_words(line, cursor, cword);
     let const reply = context.run_completion_function(
         spec->function_name.view(), words, cword, line, cursor);
-    for (const String &entry : reply) {
+    for (let const &entry : reply) {
       if (entry_is_unrequested_dash_word(entry.view(), should_offer_dash_words))
         continue;
       push_spec_candidate(entry.view(), candidates, descriptions);
@@ -3129,7 +3142,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
                                ArrayList<highlight_span> &spans,
                                const HashSet &known_vars) throws -> void
 {
-  let push = [&](usize start, usize stop, StringView sgr) throws -> void {
+  let do_push = [&](usize start, usize stop, StringView sgr) throws -> void {
     if (start < stop) spans.push(highlight_span{start, stop, sgr});
   };
 
@@ -3157,7 +3170,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     }
 
     if (c == '#') {
-      push(i, end, colors::ansi::DIM);
+      do_push(i, end, colors::ansi::DIM);
       break;
     }
 
@@ -3190,7 +3203,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
           break;
         }
       }
-      push(operator_start, i, colors::ansi::BOLD);
+      do_push(operator_start, i, colors::ansi::BOLD);
       if (has_opener || (has_separator && !has_redirect)) {
         command_position = true;
         expecting_in = false;
@@ -3247,9 +3260,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
         while (i < end && line[i] != '`') {
           if (line[i] == '\\' && i + 1 < end &&
               (line[i + 1] == '`' || line[i + 1] == '$' || line[i + 1] == '\\'))
+          {
             i += 2;
-          else
+          } else {
             i++;
+          }
         }
         let const inner_end = i;
         if (i < end) i++;
@@ -3271,7 +3286,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
     /* A for or case awaits its in, which is the keyword there. */
     if (expecting_in && plain && word == "in") {
-      push(word_start, word_end, colors::ansi::GREEN);
+      do_push(word_start, word_end, colors::ansi::GREEN);
       expecting_in = false;
       for_variable_pending = false;
       command_position = false;
@@ -3291,7 +3306,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       for_variable_pending = false;
       command_position = false;
       if (!plain || !is_plain_identifier(word))
-        push(word_start, word_end, colors::ansi::BOLD_RED);
+        do_push(word_start, word_end, colors::ansi::BOLD_RED);
       continue;
     }
 
@@ -3303,7 +3318,7 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
     if (for_do_expected && command_position) {
       for_do_expected = false;
       if (word != "do") {
-        push(word_start, word_end, colors::ansi::BOLD_RED);
+        do_push(word_start, word_end, colors::ansi::BOLD_RED);
         command_position = false;
         continue;
       }
@@ -3365,8 +3380,8 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       }
 
       if (is_keyword) {
-        push(word_start, word_end,
-             keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
+        do_push(word_start, word_end,
+                keyword_ok ? colors::ansi::GREEN : colors::ansi::BOLD_RED);
         command_position = next_is_command;
         if (opens_in) expecting_in = true;
         if (opens_for_variable) for_variable_pending = true;
@@ -3375,9 +3390,9 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
 
       /* A command name. A resolved command is blue the way fish paints one,
          an unresolved one is red. */
-      push(word_start, word_end,
-           first_word_resolves(word, context) ? colors::ansi::BLUE
-                                              : colors::ansi::RED);
+      do_push(word_start, word_end,
+              first_word_resolves(word, context) ? colors::ansi::BLUE
+                                                 : colors::ansi::RED);
       command_position = false;
       continue;
     }
@@ -3389,9 +3404,11 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
        from a typo there. */
     if (!command_position && plain && !is_assignment &&
         word_names_existing_path(word))
-      push(word_start, word_end, colors::ansi::CYAN);
-    for (const highlight_span &inner : word_spans)
-      push(inner.start, inner.end, inner.sgr);
+    {
+      do_push(word_start, word_end, colors::ansi::CYAN);
+    }
+    for (let const &inner : word_spans)
+      do_push(inner.start, inner.end, inner.sgr);
     if (command_position && !is_assignment) command_position = false;
   }
 }

@@ -38,11 +38,11 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   if (FLAG_HELP.is_enabled()) SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
-  let const unset_function = FLAG_UNSET_FUNCTION.is_enabled();
-  let had_error = false;
+  let const should_unset_function = FLAG_UNSET_FUNCTION.is_enabled();
+  let has_error = false;
   for (usize i = 1; i < names.count(); i++) {
     let const &name = names[i];
-    if (unset_function) {
+    if (should_unset_function) {
       LOG(All, "unset removing function '%s'", name.c_str());
       cxt.unset_function(name);
     } else if (let const bracket = name.view().find_character('[');
@@ -62,7 +62,7 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
             error.message().c_str());
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is read-only");
-        had_error = true;
+        has_error = true;
       }
     } else {
       /* A read-only variable makes unset_shell_variable throw. The remaining
@@ -76,12 +76,12 @@ i32 Unset::execute(ExecContext &ec, EvalContext &cxt) const throws
             error.message().c_str());
         report_soft_builtin_error(ec, cxt,
                                   StringView{"'"} + name + "' is read-only");
-        had_error = true;
+        has_error = true;
       }
     }
   }
 
-  return had_error ? 2 : 0;
+  return has_error ? 2 : 0;
 }
 
 } /* namespace shit */

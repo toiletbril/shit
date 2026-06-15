@@ -66,9 +66,9 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   } else {
     /* Empty cd should go to the home directory. */
-    let const p = os::get_home_directory();
-    if (!p) throw Error{"Unable to determine the home directory"};
-    arg_path.append(p->text());
+    let const home_directory = os::get_home_directory();
+    if (!home_directory) throw Error{"Unable to determine the home directory"};
+    arg_path.append(home_directory->text());
   }
 
   LOG(Info, "cd changing directory to '%s'", arg_path.c_str());
@@ -80,7 +80,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      colon makes, names the current directory. A move reached through a nonempty
      entry prints the directory it landed in, the way dash announces a CDPATH
      move. */
-  bool reached_through_cdpath = false;
+  bool was_reached_through_cdpath = false;
   if (!is_to_previous && ec.args().count() > 1 &&
       cdpath_search_applies(arg_path))
   {
@@ -101,7 +101,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           LOG(Info, "cd resolved '%s' through CDPATH entry '%.*s'",
               arg_path.c_str(), static_cast<int>(entry.length), entry.data);
           target = steal(resolved);
-          reached_through_cdpath = !entry.is_empty();
+          was_reached_through_cdpath = !entry.is_empty();
           break;
         }
         if (end >= entries.length) break;
@@ -144,7 +144,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     record_directory_access(target.text().view());
     /* cd - and a move through a nonempty CDPATH entry report the directory they
        moved to, so a script sees where it landed. A plain cd stays silent. */
-    if (is_to_previous || reached_through_cdpath)
+    if (is_to_previous || was_reached_through_cdpath)
       ec.print_to_stdout(target.text() + "\n");
     return 0;
   }

@@ -17,4 +17,9 @@ Checks: |
   readability-make-member-function-const,
   readability-static-accessed-through-instance,
 
+# The allowlist above is authoritative. A parent or global .clang-tidy must not
+# merge in checks the house style rejects, such as identifier-naming, magic
+# numbers, braces around every statement, or trailing return types.
+InheritParentConfig: false
+
 ...

@@ -169,7 +169,7 @@ static fn run_debug_completion_driver(StringView driver_line,
       completion::complete(driver_line, driver_line.length, context,
                            Path::current_directory(), true);
   let listing = String{};
-  for (const String &candidate : driver_result.candidates) {
+  for (let const &candidate : driver_result.candidates) {
     listing += candidate.view();
     listing += '\n';
   }
@@ -195,10 +195,13 @@ static bool INVOKED_AS_BASH = false;
    returns None so the caller reports the usage error. */
 pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
 {
-  if (name == "shit" || name == "default") return mimic_mood::Default;
+  if (name == "shit" || name == "default") {
+    return mimic_mood::Default;
+  }
   if (name == "bash") return mimic_mood::Bash;
-  if (name == "sh" || name == "posix" || name == "dash")
+  if (name == "sh" || name == "posix" || name == "dash") {
     return mimic_mood::Posix;
+  }
   return None;
 }
 
@@ -209,9 +212,11 @@ pure static fn parse_mood_name(StringView name) wontthrow -> Maybe<mimic_mood>
 pure static fn resolve_session_mood() wontthrow -> mimic_mood
 {
   if (FLAG_MOOD.is_set()) {
-    if (Maybe<mimic_mood> parsed = parse_mood_name(FLAG_MOOD.value());
-        parsed.has_value())
-      return *parsed;
+    if (Maybe<mimic_mood> parsed_mood = parse_mood_name(FLAG_MOOD.value());
+        parsed_mood.has_value())
+    {
+      return *parsed_mood;
+    }
     return mimic_mood::Default;
   }
   if (FLAG_DUMB.is_enabled()) return mimic_mood::Posix;
@@ -246,7 +251,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
   }
   if (FLAG_LIST_CHECKS.is_enabled()) {
     let l = String{"SHELLCHECK CHECKS\n"};
-    for (const shellcheck_check &check : SHELLCHECK_CHECKS) {
+    for (let const &check : SHELLCHECK_CHECKS) {
       l += "  ";
       l += check.code;
       l += "  ";
@@ -254,7 +259,7 @@ static fn print_help_or_version_status(const String &program_path) -> Maybe<int>
       l += '\n';
     }
     l += "\nSTRICTNESS WARNINGS\n";
-    for (const strictness_warning &warning : STRICTNESS_WARNINGS) {
+    for (let const &warning : STRICTNESS_WARNINGS) {
       l += "  ";
       l += warning.name;
       l += '\n';
@@ -361,7 +366,7 @@ static fn run_script_contents(const String &script_contents,
       ast = p.construct_ast(parse_errors);
 
       if (!parse_errors.is_empty()) {
-        for (const shit::String &e : parse_errors)
+        for (let const &e : parse_errors)
           show_message(e);
         context.set_last_exit_status(EXIT_FAILURE);
         return EXIT_FAILURE;
@@ -373,7 +378,7 @@ static fn run_script_contents(const String &script_contents,
       }
 
       if (context.show_lexed_words()) {
-        for (const auto &word : p.debug_words()) {
+        for (let const &word : p.debug_words()) {
           print(word.to_pretty_string());
           print("\n");
         }
@@ -418,7 +423,9 @@ static fn run_script_contents(const String &script_contents,
             FLAG_DEBUG_OPTIMIZER.is_enabled());
     /* A freshly parsed tree that parses and analyzes clean is handed back so a
        caller that wants to reuse it, the PROMPT_COMMAND hook, caches it. */
-    if (!analysis_failed && out_ast != nullptr) *out_ast = ast;
+    if (!analysis_failed && out_ast != nullptr) {
+      *out_ast = ast;
+    }
 
     if (analysis_failed) {
       exit_code = EXIT_FAILURE;
@@ -513,7 +520,9 @@ static Expression *PROMPT_COMMAND_CACHED_AST = nullptr;
 static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
 {
   Maybe<String> command = context.get_variable_value("PROMPT_COMMAND");
-  if (!command.has_value() || command->is_empty()) return;
+  if (!command.has_value() || command->is_empty()) {
+    return;
+  }
 
   LOG(Info, "running the PROMPT_COMMAND hook, %zu bytes", command->count());
 
@@ -606,7 +615,7 @@ static fn source_bash_login_files(EvalContext &context,
   LOG(Info, "sourcing the bash login files in bash order");
   source_file(Path{"/etc/profile"}, context, ast_arena);
   if (Maybe<Path> home = os::get_home_directory(); home.has_value()) {
-    for (const char *name : {".bash_profile", ".bash_login", ".profile"}) {
+    for (let const name : {".bash_profile", ".bash_login", ".profile"}) {
       Path candidate = home->clone();
       candidate.push_component(name);
       if (source_file(candidate, context, ast_arena)) break;
@@ -623,7 +632,7 @@ static fn source_bash_system_rc(EvalContext &context,
                                 BumpArena &ast_arena) throws -> void
 {
   LOG(Info, "looking for the system bashrc");
-  for (const char *path : {"/etc/bash/bashrc", "/etc/bash.bashrc"})
+  for (let const path : {"/etc/bash/bashrc", "/etc/bash.bashrc"})
     if (source_file(Path{path}, context, ast_arena)) break;
 }
 
@@ -659,7 +668,7 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
      grammar and a posix profile with the dash grammar. The caller restores the
      session mood afterward. A missing file is silently skipped. */
   bool did_source_bash_rc = false;
-  for (mimic_mood flavor : moods) {
+  for (let flavor : moods) {
     /* A flavor already on the sourcing stack is skipped, so a set --init-moods
        inside the very ~/.shitrc this is sourcing cannot re-source it and
        recurse until the stack overflows. The bit clears when the flavor
@@ -717,8 +726,9 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
     /* A flavor counts as initialized only when it actually sourced a file, so
        the set --init-moods readout reports what loaded rather than every flavor
        the resolver listed for a non-interactive run that sourced nothing. */
-    if (is_login_shell || should_be_interactive)
+    if (is_login_shell || should_be_interactive) {
       context.mark_mood_initialized(flavor);
+    }
   }
 
   /* The bash programmable completion loads once after a bash rc sourced, so the
@@ -761,17 +771,18 @@ fn main(int argc, char **argv) -> int
     /* A -c in SHIT_FLAGS would splice a command string into every invocation,
        which the variable is not for, so the -c token and the command word
        after it are dropped while a real command-line -c stays untouched. */
-    bool skip_next_command_word = false;
+    bool should_skip_next_command_word = false;
+
     for (usize i = 0; i <= view.length; i++) {
       let const c = i < view.length ? view[i] : ' ';
       if (c == ' ' || c == '\t' || c == '\n') {
         if (i > token_start) {
           let const token =
               view.substring_of_length(token_start, i - token_start);
-          if (skip_next_command_word) {
-            skip_next_command_word = false;
+          if (should_skip_next_command_word) {
+            should_skip_next_command_word = false;
           } else if (token == "-c") {
-            skip_next_command_word = true;
+            should_skip_next_command_word = true;
           } else {
             shit_flags_tokens.push(shit::String{token});
           }
@@ -783,7 +794,7 @@ fn main(int argc, char **argv) -> int
 
   if (!shit_flags_tokens.is_empty() && argc > 0) {
     spliced_argv.push(argv[0]);
-    for (const shit::String &token : shit_flags_tokens)
+    for (let const &token : shit_flags_tokens)
       spliced_argv.push(token.c_str());
     for (int i = 1; i < argc; i++)
       spliced_argv.push(argv[i]);
@@ -800,10 +811,10 @@ fn main(int argc, char **argv) -> int
      on default settings instead, so the config can be fixed from inside. The
      rc chain is skipped in rescue so a broken rc does not compound the failure.
      A non-interactive run keeps the usage exit the way dash does. */
-  bool rescue_mode = false;
-  let const enter_rescue = [&]() {
+  bool is_rescue_mode = false;
+  let const do_enter_rescue = [&]() {
     shit::show_message("Entering rescue.");
-    rescue_mode = true;
+    is_rescue_mode = true;
     shit::reset_flags(FLAG_LIST);
     try {
       file_names = shit::parse_flags(FLAG_LIST, argc, argv);
@@ -828,7 +839,7 @@ fn main(int argc, char **argv) -> int
     if (!(shit::os::is_stdin_a_tty() || shit::os::is_stdout_a_tty())) {
       return 2;
     }
-    enter_rescue();
+    do_enter_rescue();
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
     /* A flag error is a usage error, so a non-interactive shell exits with the
@@ -836,7 +847,7 @@ fn main(int argc, char **argv) -> int
     if (!(shit::os::is_stdin_a_tty() || shit::os::is_stdout_a_tty())) {
       return 2;
     }
-    enter_rescue();
+    do_enter_rescue();
   }
 
   /* --dumb is the union of -P, -T, and --no-diagnostics, so it enables those
@@ -872,7 +883,7 @@ fn main(int argc, char **argv) -> int
         {"all",   shit::verbosity::All  },
     };
     let is_known_level = false;
-    for (const log_level_name &entry : LOG_LEVEL_NAMES)
+    for (let const &entry : LOG_LEVEL_NAMES)
       if (FLAG_LOG.value() == entry.name) {
         shit::LOGGER_VERBOSITY = entry.level;
         is_known_level = true;
@@ -896,11 +907,12 @@ fn main(int argc, char **argv) -> int
     let const log_file_name = shit::String{FLAG_DEBUG_OUTPUT_FILE.value()};
     if (std::FILE *log_file = std::fopen(log_file_name.c_str(), "a");
         log_file != nullptr)
+    {
       shit::LOGGER_OUTPUT = log_file;
+    }
   }
 #endif
 
-  /* Program path is the first argument. Pull it out and get rid of it. */
   let program_path = shit::String{};
 
   if (file_names.count() > 0) {
@@ -925,9 +937,9 @@ fn main(int argc, char **argv) -> int
      dash is inspected once here, dropped before the name is matched the way
      bash strips it to recognize its own invocation name, and read again
      below as the login mark. $0 keeps the dashed spelling. */
-  const bool name_marks_login =
+  const bool does_name_mark_login =
       !program_basename.is_empty() && program_basename[0] == '-';
-  if (name_marks_login) program_basename = program_basename.substring(1);
+  if (does_name_mark_login) program_basename = program_basename.substring(1);
   shit::INVOKED_AS_POSIX_SHELL =
       program_basename == "sh" || program_basename == "dash";
   shit::INVOKED_AS_BASH = program_basename == "bash";
@@ -943,7 +955,9 @@ fn main(int argc, char **argv) -> int
 
   /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
      convention tmux and login use, the same mark the -l flag sets. */
-  if (FLAG_LOGIN.is_enabled() || name_marks_login) is_login_shell = true;
+  if (FLAG_LOGIN.is_enabled() || does_name_mark_login) {
+    is_login_shell = true;
+  }
   LOG(Info, "the shell %s a login shell", is_login_shell ? "is" : "is not");
 
   /* The runtime mood and the startup-file moods. --mood selects the session
@@ -965,39 +979,41 @@ fn main(int argc, char **argv) -> int
        comma-separated name is parsed in turn. */
     usize name_start = 0;
     for (usize j = 0; j <= entry.length; j++) {
-      if (j != entry.length && entry[j] != ',') continue;
+      if (j != entry.length && entry[j] != ',') {
+        continue;
+      }
       shit::StringView name =
           entry.substring_of_length(name_start, j - name_start);
       name_start = j + 1;
       if (name.is_empty()) continue;
-      shit::Maybe<shit::mimic_mood> parsed = shit::parse_mood_name(name);
-      if (!parsed.has_value()) {
+      shit::Maybe<shit::mimic_mood> parsed_mood = shit::parse_mood_name(name);
+      if (!parsed_mood.has_value()) {
         shit::show_message("Unknown --init-moods value '" + shit::String{name} +
                            "', expected one of 'shit', 'bash', or 'sh'.");
         return 2;
       }
-      init_moods.push(*parsed);
+      init_moods.push(*parsed_mood);
     }
   }
 
   /* init-as-bash is the deprecated alias that adds the bash startup files. The
      SHIT_INIT_AS_BASH environment variable enables it when set and not empty.
    */
-  bool init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
-  if (!init_as_bash) {
+  bool should_init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
+  if (!should_init_as_bash) {
     if (shit::Maybe<shit::String> env =
             shit::os::get_environment_variable("SHIT_INIT_AS_BASH");
         env.has_value() && !env->is_empty())
-      init_as_bash = true;
+      should_init_as_bash = true;
   }
 
   /* With no explicit --init-moods the session mood's files source. */
   if (init_moods.is_empty()) init_moods.push(session_mood);
 
   /* The bash alias appends bash when the list does not already carry it. */
-  if (init_as_bash) {
+  if (should_init_as_bash) {
     bool has_bash = false;
-    for (shit::mimic_mood listed : init_moods)
+    for (let listed : init_moods)
       if (listed == shit::mimic_mood::Bash) has_bash = true;
     if (!has_bash) init_moods.push(shit::mimic_mood::Bash);
   }
@@ -1170,10 +1186,10 @@ fn main(int argc, char **argv) -> int
      The shit version above stays present in every mood. A bash session or a
      bash flavor in the init list advertises BASH_VERSION so a bash rc detects
      it. */
-  bool wants_bash_identity = session_mood == shit::mimic_mood::Bash;
-  for (shit::mimic_mood listed : init_moods)
-    if (listed == shit::mimic_mood::Bash) wants_bash_identity = true;
-  context.seed_shell_identity_variables(wants_bash_identity);
+  bool should_seed_bash_identity = session_mood == shit::mimic_mood::Bash;
+  for (let listed : init_moods)
+    if (listed == shit::mimic_mood::Bash) should_seed_bash_identity = true;
+  context.seed_shell_identity_variables(should_seed_bash_identity);
 
   /* SHLVL counts shell nesting. It is read from the inherited environment,
      incremented, and exported so a child shell continues the count. */
@@ -1182,10 +1198,10 @@ fn main(int argc, char **argv) -> int
           shit::os::get_environment_variable("SHLVL");
       inherited.has_value())
   {
-    if (shit::ErrorOr<i64> parsed =
+    if (shit::ErrorOr<i64> parsed_level =
             shit::utils::parse_decimal_integer(inherited->view());
-        !parsed.is_error() && parsed.value() > 0)
-      shell_level = parsed.value();
+        !parsed_level.is_error() && parsed_level.value() > 0)
+      shell_level = parsed_level.value();
   }
   /* A corrupt or absurd inherited level is clamped so the increment cannot
      overflow, the way bash bounds SHLVL to a sane range. */
@@ -1240,9 +1256,9 @@ fn main(int argc, char **argv) -> int
      mood swapped per flavor so a bash rc parses under the bash grammar. A
      privileged shell sources nothing, the way bash's privileged mode leaves the
      profiles and rc files unread. */
-  if (is_privileged || rescue_mode) {
+  if (is_privileged || is_rescue_mode) {
     LOG(Info, "skipping every startup config file in %s mode",
-        rescue_mode ? "rescue" : "privileged");
+        is_rescue_mode ? "rescue" : "privileged");
   } else {
     /* --no-init-diagnostics turns diagnostics and warnings off for the duration
        of the init sourcing, so a -W shell loads a lax bash config without
@@ -1368,7 +1384,7 @@ fn main(int argc, char **argv) -> int
           shit::show_message(
               session_mood == shit::mimic_mood::Posix  ? "POSIX me harder!"
               : session_mood == shit::mimic_mood::Bash ? "Bash me harder!"
-              : init_as_bash                           ? "Bash me harder?"
+              : should_init_as_bash                    ? "Bash me harder?"
                                                        : "Welcome :3");
         } else {
           /* NOTE: avoid this branch if exit_raw_mode() wasn't called
@@ -1471,11 +1487,11 @@ fn main(int argc, char **argv) -> int
        keeps the fork to regain control and emit them. The flag rides only the
        tail position from here, since the compound nodes clear it on every path
        but the terminal simple command. */
-    const bool prints_post_run_trailer =
+    const bool should_print_post_run_trailer =
         context.show_exit_code() || context.stats_enabled();
     context.set_terminal_exec_allowed(
         should_quit && !context.shell_is_interactive() &&
-        !context.has_exit_trap() && !prints_post_run_trailer);
+        !context.has_exit_trap() && !should_print_post_run_trailer);
 
     /* Execute the contents through the shared pipeline. */
     exit_code = run_script_contents(script_contents, context, ast_arena,
@@ -1490,9 +1506,10 @@ fn main(int argc, char **argv) -> int
       /* The completion test driver runs after the staged chunks, so a -c
          that registered specs or sourced a completion file is visible to
          the engine, and the exit code reflects the driver alone. */
-      if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process())
+      if (FLAG_DEBUG_COMPLETE_AT.is_set() && !shit::os::is_child_process()) {
         exit_code = shit::run_debug_completion_driver(
             FLAG_DEBUG_COMPLETE_AT.value(), context);
+      }
 #endif
       LOG(Info, "exiting after the final chunk with code %d", exit_code);
       if (!shit::os::is_child_process()) context.run_exit_trap();

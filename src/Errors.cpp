@@ -182,14 +182,14 @@ cold static fn calc_precise_position(StringView source,
 
 template <class T>
   requires std::is_integral_v<T>
-cold static fn number_string_length(T n) throws -> usize
+cold static fn number_string_length(T value) throws -> usize
 {
-  usize len = 0;
-  while (n > 0) {
-    len++;
-    n /= 10;
+  usize digit_count = 0;
+  while (value > 0) {
+    digit_count++;
+    value /= 10;
   }
-  return len;
+  return digit_count;
 }
 
 cold static fn
@@ -234,8 +234,8 @@ get_context_pointing_to(StringView source, usize byte_position,
   let const context =
       source.substring_of_length(byte_position - start_offset, line_byte_count);
 
-  /* We don't need accidental newlines in the middle of the context.
-   * *pulls hair out* */
+  /* The context is a single line, so a newline inside it would misplace the
+     caret below. */
   ASSERT(!context.find_character('\n').has_value(),
          "'%s', start: %zu, end: %zu", context.data, start_offset,
          line_byte_count);
@@ -437,7 +437,8 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
     result += '.';
     result += color.reset;
   } else {
-    /* It must be trace. Anyway's, we're showing the location next. */
+    /* A trace frame carries no message, so the location alone follows the
+       severity word. */
     result += " location:";
   }
   result += '\n';

@@ -51,7 +51,7 @@ pure fn Word::is_empty() const wontthrow -> bool { return segments.is_empty(); }
 hot fn Word::to_literal_string() const throws -> String
 {
   let result = String{};
-  for (const WordSegment &segment : segments) {
+  for (let const &segment : segments) {
     if (segment.kind == WordSegment::Kind::CommandSubstitution) {
       result += "$(";
       result += segment.text;
@@ -84,8 +84,8 @@ pure fn Word::plain_literal_kind() const wontthrow -> PlainLiteral
 pure fn Word::is_all_ascii_digits() const wontthrow -> bool
 {
   if (segments.is_empty()) return false;
-  bool saw_digit = false;
-  for (const WordSegment &segment : segments) {
+  bool has_seen_digit = false;
+  for (let const &segment : segments) {
     /* An expansion segment contributes a $ or a $(...) wrapper to the literal
        text, so a word holding one is never all digits. */
     if (segment.kind == WordSegment::Kind::VariableReference ||
@@ -98,15 +98,15 @@ pure fn Word::is_all_ascii_digits() const wontthrow -> bool
     for (usize i = 0; i < segment.text.count(); i++) {
       const char c = segment.text[i];
       if (c < '0' || c > '9') return false;
-      saw_digit = true;
+      has_seen_digit = true;
     }
   }
-  return saw_digit;
+  return has_seen_digit;
 }
 
 pure fn Word::runs_substitution() const wontthrow -> bool
 {
-  for (const WordSegment &segment : segments)
+  for (let const &segment : segments)
     if (segment.kind == WordSegment::Kind::CommandSubstitution ||
         segment.kind == WordSegment::Kind::FunctionSubstitution)
       return true;
@@ -116,7 +116,7 @@ pure fn Word::runs_substitution() const wontthrow -> bool
 cold fn Word::to_pretty_string() const throws -> String
 {
   let result = String{"[Word"};
-  for (const WordSegment &segment : segments) {
+  for (let const &segment : segments) {
     result += "\n  ";
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText: result += "Literal"; break;
@@ -181,15 +181,17 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
     -> Maybe<word_assignment_split>
 {
   const WordSegment &first = segments[0];
-  if (first.text.is_empty() || !lexer::is_variable_name_start(first.text[0]))
+  if (first.text.is_empty() || !lexer::is_variable_name_start(first.text[0])) {
     return shit::None;
+  }
 
   usize name_end = 1;
   while (name_end < first.text.count() &&
          lexer::is_variable_name(first.text[name_end]))
     name_end++;
-  if (name_end >= first.text.count() || first.text[name_end] != '[')
+  if (name_end >= first.text.count() || first.text[name_end] != '[') {
     return shit::None;
+  }
 
   let subscript = String{};
   /* The remainder of segment 0 after the open bracket is the literal start of
@@ -200,7 +202,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
   subscript.append(head);
 
   for (usize i = 1; i < segments.count(); i++) {
-    const WordSegment &segment = segments[i];
+    let const &segment = segments[i];
     const bool is_text = segment.kind == WordSegment::Kind::UnquotedText ||
                          segment.kind == WordSegment::Kind::DoubleQuotedText ||
                          segment.kind == WordSegment::Kind::LiteralText;
@@ -210,7 +212,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments) throws
       continue;
     }
 
-    const let close = segment.text.find_character(']');
+    let const close = segment.text.find_character(']');
     if (!close.has_value()) {
       subscript.append(segment.text.view());
       continue;
@@ -258,7 +260,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   const WordSegment &first = segments[0];
   if (first.kind != WordSegment::Kind::UnquotedText) return shit::None;
 
-  const let equals_position = first.text.find_character('=');
+  let const equals_position = first.text.find_character('=');
   if (!equals_position.has_value()) {
     /* The open bracket is the cheap gate that keeps a plain command word off
        the array-element scan, since only a NAME[ word can be an element
@@ -287,13 +289,14 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
      the a[1] in a[1]=x. The subscript is non-empty and runs to the closing
      bracket at the end of the name. */
   if (name_cursor < name_length && first.text[name_cursor] == '[') {
-    if (first.text[name_length - 1] != ']' || name_length - name_cursor < 3)
+    if (first.text[name_length - 1] != ']' || name_length - name_cursor < 3) {
       return shit::None;
+    }
     name_cursor = name_length;
   }
   if (name_cursor != name_length) return shit::None;
 
-  const let name_view = first.text.substring_of_length(0, name_length);
+  let const name_view = first.text.substring_of_length(0, name_length);
   let name = String{name_view};
 
   let value = Word{};

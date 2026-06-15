@@ -238,8 +238,8 @@ struct function_definition_info
      the call. The mood rides as its underlying byte so this struct does not
      need the mimic_mood enum ordered before it. */
   u8 defining_mood{0};
-  bool defining_warnings{false};
-  bool defining_diagnostics_disabled{false};
+  bool were_warnings_enabled_at_definition{false};
+  bool were_diagnostics_disabled_at_definition{false};
 };
 
 struct eval_state_snapshot
@@ -262,9 +262,9 @@ struct eval_state_snapshot
   HashSet readonly_names;
   HashSet integer_names;
   bool error_exit;
-  bool enable_path_expansion;
-  bool enable_echo;
-  bool enable_echo_expanded;
+  bool is_path_expansion_enabled;
+  bool is_echo_enabled;
+  bool is_echo_expanded_enabled;
   /* The length of the environment undo log when the snapshot was taken, the
      point restore_state rewinds the process environment back to. A subshell
      that writes no exported name leaves the log untouched, so the restore is a
@@ -297,8 +297,8 @@ class EvalContext;
 struct runtime_state
 {
   mimic_mood mood{mimic_mood::Default};
-  bool warnings_enabled{false};
-  bool diagnostics_disabled{false};
+  bool are_warnings_enabled{false};
+  bool are_diagnostics_disabled{false};
   bool error_unset{false};
   bool pipefail{false};
   bool failglob{false};
@@ -319,13 +319,13 @@ struct runtime_state
 /* A programmable-completion spec the complete builtin registers for a command.
    The interactive engine consults it when completing an argument to that
    command. function_name is the -F function, word_list is the -W word list, and
-   use_default falls back to filename completion when the spec yields nothing.
- */
+   should_use_default falls back to filename completion when the spec yields
+   nothing. */
 struct completion_spec
 {
   String function_name{};
   String word_list{};
-  bool use_default{false};
+  bool should_use_default{false};
 };
 
 #if SHIT_PLATFORM_IS POSIX
@@ -336,23 +336,23 @@ class CompiledRegex
 {
 public:
   CompiledRegex() = default;
-  explicit CompiledRegex(regex_t compiled) : m_re(compiled), m_owns(true) {}
+  explicit CompiledRegex(regex_t compiled) : m_re(compiled), m_is_owned(true) {}
   ~CompiledRegex()
   {
-    if (m_owns) regfree(&m_re);
+    if (m_is_owned) regfree(&m_re);
   }
   CompiledRegex(CompiledRegex &&other) noexcept
-      : m_re(other.m_re), m_owns(other.m_owns)
+      : m_re(other.m_re), m_is_owned(other.m_is_owned)
   {
-    other.m_owns = false;
+    other.m_is_owned = false;
   }
   fn operator=(CompiledRegex &&other) noexcept -> CompiledRegex &
   {
     if (this != &other) {
-      if (m_owns) regfree(&m_re);
+      if (m_is_owned) regfree(&m_re);
       m_re = other.m_re;
-      m_owns = other.m_owns;
-      other.m_owns = false;
+      m_is_owned = other.m_is_owned;
+      other.m_is_owned = false;
     }
     return *this;
   }
@@ -363,7 +363,7 @@ public:
 
 private:
   regex_t m_re{};
-  bool m_owns{false};
+  bool m_is_owned{false};
 };
 #endif
 
@@ -629,7 +629,7 @@ public:
   struct resolved_render_source
   {
     const String *text{nullptr};
-    bool windowed{false};
+    bool is_windowed{false};
     usize body_start_position{0};
     usize header_length{0};
     usize line_offset{0};
@@ -850,11 +850,11 @@ public:
      mirror so set -W flips it mid-run too. */
   fn set_warnings_enabled(bool enabled) wontthrow -> void
   {
-    m_runtime.warnings_enabled = enabled;
+    m_runtime.are_warnings_enabled = enabled;
   }
   pure fn warnings_enabled() const wontthrow -> bool
   {
-    return m_runtime.warnings_enabled;
+    return m_runtime.are_warnings_enabled;
   }
   /* A reference to an unset variable, fatal under set -u, downgraded to a
      warning under -W unless the set -u was the script's explicit ask, expanded
@@ -984,8 +984,9 @@ public:
   {
     let const previous = runtime_state::capture(*this);
     m_runtime.mood = static_cast<mimic_mood>(info.defining_mood);
-    m_runtime.warnings_enabled = info.defining_warnings;
-    m_runtime.diagnostics_disabled = info.defining_diagnostics_disabled;
+    m_runtime.are_warnings_enabled = info.were_warnings_enabled_at_definition;
+    m_runtime.are_diagnostics_disabled =
+        info.were_diagnostics_disabled_at_definition;
     apply_strictness_for_mood();
     return previous;
   }
@@ -1039,11 +1040,11 @@ public:
      enables the stage the way --no-diagnostics disables it. */
   fn set_diagnostics_enabled(bool enabled) wontthrow -> void
   {
-    m_runtime.diagnostics_disabled = !enabled;
+    m_runtime.are_diagnostics_disabled = !enabled;
   }
   pure fn diagnostics_enabled() const wontthrow -> bool
   {
-    return !m_runtime.diagnostics_disabled;
+    return !m_runtime.are_diagnostics_disabled;
   }
   /* Run the script at the resolved program in-process in the matching mode.
      When isolated is true the run is contained in a snapshotted subshell so its
@@ -1357,11 +1358,11 @@ public:
      no-diagnostics flips the per-chunk analysis gate at runtime. */
   fn set_diagnostics_disabled(bool disabled) wontthrow -> void
   {
-    m_runtime.diagnostics_disabled = disabled;
+    m_runtime.are_diagnostics_disabled = disabled;
   }
   pure fn diagnostics_disabled() const wontthrow -> bool
   {
-    return m_runtime.diagnostics_disabled;
+    return m_runtime.are_diagnostics_disabled;
   }
 
   /* The startup facts set -o reports read-only, mirrored from the invocation

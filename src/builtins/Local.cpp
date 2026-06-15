@@ -54,9 +54,9 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
   /* Leading flags carry the bash attributes. -a declares an indexed array and
      -A an associative one, the rest are accepted without backing behavior so a
      script that sets them keeps running. */
-  bool make_indexed = false;
-  bool make_associative = false;
-  bool mark_integer_attribute = false;
+  bool should_make_indexed = false;
+  bool should_make_associative = false;
+  bool should_mark_integer = false;
   usize first_name = 1;
   for (; first_name < args.count(); first_name++) {
     const StringView arg = args[first_name].view();
@@ -67,9 +67,9 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
     }
     for (usize c = 1; c < arg.length; c++) {
       switch (arg[c]) {
-      case 'a': make_indexed = true; break;
-      case 'A': make_associative = true; break;
-      case 'i': mark_integer_attribute = true; break;
+      case 'a': should_make_indexed = true; break;
+      case 'A': should_make_associative = true; break;
+      case 'i': should_mark_integer = true; break;
       case 'r':
       case 'x':
       case 'l':
@@ -111,11 +111,11 @@ i32 Local::execute(ExecContext &ec, EvalContext &cxt) const throws
     cxt.declare_local(name);
     /* declare_local dropped any inherited integer mark, so -i marks the fresh
        local here and leaving the scope removes it with the binding. */
-    if (mark_integer_attribute) cxt.mark_integer(name);
+    if (should_mark_integer) cxt.mark_integer(name);
 
-    if (make_associative) {
+    if (should_make_associative) {
       cxt.declare_associative_array(name);
-    } else if (make_indexed) {
+    } else if (should_make_indexed) {
       if (cxt.lookup_indexed_array(name) == nullptr)
         cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
     } else if (equals_position.has_value()) {

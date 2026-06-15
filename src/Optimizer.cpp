@@ -71,12 +71,12 @@ pure fn is_identifier_continuation(char byte) wontthrow -> bool
 pure fn is_plain_integer_literal(StringView text) wontthrow -> bool
 {
   if (text.length == 0) return false;
-  usize start = 0;
+  usize start_position = 0;
   if (text[0] == '-') {
     if (text.length == 1) return false;
-    start = 1;
+    start_position = 1;
   }
-  for (usize i = start; i < text.length; i++) {
+  for (usize i = start_position; i < text.length; i++) {
     if (!lexer::is_number(text[i])) return false;
   }
   return true;
@@ -153,7 +153,9 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
   if (operands.count() == 2) {
     let const op = propagated_test_operand_value(operands[0], actx);
     let const arg = propagated_test_operand_value(operands[1], actx);
-    if (!op.has_value() || !arg.has_value()) return None;
+    if (!op.has_value() || !arg.has_value()) {
+      return None;
+    }
     if (*op == "-n") return Maybe<bool>{!arg->is_empty()};
     if (*op == "-z") return Maybe<bool>{arg->is_empty()};
     return None;
@@ -163,7 +165,9 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
     let const lhs = propagated_test_operand_value(operands[0], actx);
     let const op = propagated_test_operand_value(operands[1], actx);
     let const rhs = propagated_test_operand_value(operands[2], actx);
-    if (!lhs.has_value() || !op.has_value() || !rhs.has_value()) return None;
+    if (!lhs.has_value() || !op.has_value() || !rhs.has_value()) {
+      return None;
+    }
     if (*op == "=") return Maybe<bool>{*lhs == *rhs};
     if (*op == "!=") return Maybe<bool>{!(*lhs == *rhs)};
     return None;
@@ -177,7 +181,7 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
 fn literal_word_value(const Word &word) throws -> Maybe<String>
 {
   let value = String{};
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     switch (segment.kind) {
     case WordSegment::Kind::LiteralText:
     case WordSegment::Kind::DoubleQuotedText:
@@ -192,7 +196,9 @@ fn literal_word_value(const Word &word) throws -> Maybe<String>
       for (usize i = 0; i < segment.text.count(); i++) {
         if (lexer::is_expandable_char(segment.text[i])) return None;
       }
-      if (!segment.text.is_empty() && segment.text[0] == '~') return None;
+      if (!segment.text.is_empty() && segment.text[0] == '~') {
+        return None;
+      }
       value.append(segment.text.view());
       break;
     default: return None;
@@ -224,7 +230,7 @@ fn command_word_literal(const Token *token) throws -> Maybe<String>
 
   let const &word = static_cast<const tokens::WordToken *>(token)->word();
   let name = String{};
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText &&
         segment.kind != WordSegment::Kind::UnquotedText)
@@ -317,10 +323,11 @@ fn try_fold_arithmetic_with_constants(StringView expression,
         continue;
       }
 
-      usize start = i;
+      usize start_position = i;
       while (i < expression.length && is_identifier_continuation(expression[i]))
         i++;
-      let const name = StringView{&expression.data[start], i - start};
+      let const name =
+          StringView{&expression.data[start_position], i - start_position};
 
       const String *recorded = actx.constant_variables.find(name);
       if (recorded == nullptr) {
@@ -395,13 +402,15 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
      operands are judged. */
   if (*name == "test" || *name == "[") {
     ArrayList<const Token *> operands{heap_allocator()};
-    usize last = args.count();
+    usize last_index = args.count();
     if (*name == "[") {
       let const closing = literal_word_value(args[args.count() - 1]);
-      if (!closing.has_value() || *closing != "]") return None;
-      last -= 1;
+      if (!closing.has_value() || *closing != "]") {
+        return None;
+      }
+      last_index -= 1;
     }
-    for (usize i = 1; i < last; i++)
+    for (usize i = 1; i < last_index; i++)
       operands.push(args[i]);
     try {
       return constant_test_verdict(operands, actx);
@@ -420,14 +429,18 @@ pure fn word_segment_has_glob_metacharacter(
 {
   for (usize i = 0; i < segment.text.count(); i++) {
     const char c = segment.text[i];
-    if (c == '*' || c == '?' || c == '[') return true;
+    if (c == '*' || c == '?' || c == '[') {
+      return true;
+    }
     /* An extended-glob opener such as @( carries no plain * or ? but still
        globs against names, so it keeps the word off the literal fast path. The
        matcher leaves it literal when extglob is off, so this only costs a rare
        word a directory scan. */
     if ((c == '+' || c == '@' || c == '!') && i + 1 < segment.text.count() &&
         segment.text[i + 1] == '(')
+    {
       return true;
+    }
   }
   return false;
 }
@@ -445,14 +458,15 @@ pure fn classify_plain_literal(const Word &word) wontthrow -> Word::PlainLiteral
     const WordSegment &only = word.segments[0];
     if (word_segment_has_glob_metacharacter(only))
       return Word::PlainLiteral::NotPlain;
-    if (!only.text.is_empty() && only.text[0] == '~')
+    if (!only.text.is_empty() && only.text[0] == '~') {
       return Word::PlainLiteral::NotPlain;
+    }
     return Word::PlainLiteral::PlainUnquotedOneSegment;
   }
 
   /* Literal and double-quoted text never splits, globs, or expands, so a word
      built only from those is one field of its concatenated text. */
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::LiteralText &&
         segment.kind != WordSegment::Kind::DoubleQuotedText)
       return Word::PlainLiteral::NotPlain;
@@ -472,7 +486,7 @@ fn fold_constant_arithmetic_in_word(const Word &word,
                                     AnalysisContext &actx) throws -> bool
 {
   bool did_fold = false;
-  for (const WordSegment &segment : word.segments) {
+  for (let const &segment : word.segments) {
     if (segment.kind != WordSegment::Kind::ArithmeticExpansion) continue;
     if (segment.folded_arithmetic_result.has_value()) continue;
 
@@ -486,7 +500,7 @@ fn fold_constant_arithmetic_in_word(const Word &word,
       segment.folded_arithmetic_result = result;
       did_fold = true;
       actx.optimizer_folded_arithmetic++;
-      if (actx.trace_optimizer)
+      if (actx.should_trace_optimizer)
         actx.trace_optimizer_line(String{"folded constant arithmetic: "} +
                                   String{segment.text.view()} + " = " +
                                   utils::int_to_text(*result));
@@ -518,10 +532,10 @@ fn rule_fold_constant_arithmetic(const Expression *node,
 
   if (const expressions::SimpleCommand *cmd = node->as_simple_command()) {
     bool did_fold = false;
-    for (const Token *t : cmd->args()) {
+    for (let const t : cmd->args()) {
       if (fold_constant_arithmetic_in_token(t, actx)) did_fold = true;
     }
-    for (const expressions::prefix_assignment &var : cmd->local_vars()) {
+    for (let const &var : cmd->local_vars()) {
       if (fold_constant_arithmetic_in_word(var.value, actx)) did_fold = true;
     }
     return did_fold;
@@ -556,7 +570,7 @@ fn rule_dead_branch_elimination(const Expression *node,
       LOG(All, "dead-branch elimination chose branch %zu", i);
       clause->set_folded_branch(i);
       actx.optimizer_folded_branches++;
-      if (actx.trace_optimizer)
+      if (actx.should_trace_optimizer)
         actx.trace_optimizer_line(String{"folded if to branch "} +
                                   utils::int_to_text(static_cast<i64>(i)));
       return true;
@@ -567,7 +581,7 @@ fn rule_dead_branch_elimination(const Expression *node,
   LOG(All, "every if condition is statically false, folding to the else body");
   clause->set_folded_branch(clause->branches().count());
   actx.optimizer_folded_branches++;
-  if (actx.trace_optimizer)
+  if (actx.should_trace_optimizer)
     actx.trace_optimizer_line(String{"folded if to the else body"});
   return true;
 }
@@ -603,7 +617,7 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
       loop->is_until() ? "until" : "while");
   loop->set_folded_to_skip();
   actx.optimizer_folded_loops++;
-  if (actx.trace_optimizer)
+  if (actx.should_trace_optimizer)
     actx.trace_optimizer_line(loop->is_until()
                                   ? String{"folded until loop to a skip"}
                                   : String{"folded while loop to a skip"});
@@ -634,11 +648,11 @@ fn optimize_node(const Expression *node, AnalysisContext &actx) throws -> void
   ASSERT(node != nullptr);
 
   for (usize pass = 0; pass < MAX_OPTIMIZATION_PASSES; pass++) {
-    bool any_rule_fired = false;
-    for (OptimizationRule *rule : OPTIMIZATION_RULES) {
-      if (rule(node, actx)) any_rule_fired = true;
+    bool did_any_rule_fire = false;
+    for (let rule : OPTIMIZATION_RULES) {
+      if (rule(node, actx)) did_any_rule_fire = true;
     }
-    if (!any_rule_fired) return;
+    if (!did_any_rule_fire) return;
     LOG(All,
         "optimization pass %zu fired a rule, running another "
         "pass over the node",

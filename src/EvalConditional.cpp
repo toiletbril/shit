@@ -56,10 +56,11 @@ struct ConditionalEvaluator
      such as == or -f without expanding it. */
   String operand_literal(const conditional_element &e) throws
   {
-    if (e.word != nullptr && e.word->kind() == Token::Kind::Word)
+    if (e.word != nullptr && e.word->kind() == Token::Kind::Word) {
       return static_cast<const tokens::WordToken *>(e.word)
           ->word()
           .to_literal_string();
+    }
     if (e.word != nullptr) return e.word->raw_string();
     return String{heap_allocator()};
   }
@@ -145,8 +146,9 @@ struct ConditionalEvaluator
     let escaped_pattern = String{cxt.scratch_allocator()};
     for (usize i = 0; i < pattern.length; i++) {
       const bool is_literal = i < active.count() && !active[i];
-      if (is_literal && is_regex_metacharacter(pattern[i]))
+      if (is_literal && is_regex_metacharacter(pattern[i])) {
         escaped_pattern += '\\';
+      }
       escaped_pattern += pattern[i];
     }
     /* The pattern compiles once and is reused on later matches through the
@@ -265,20 +267,21 @@ struct ConditionalEvaluator
        bash, so 1+1 and a bare variable name evaluate rather than only a literal
        integer. An empty operand reads as zero the way an arithmetic context
        treats an unset value. */
-    auto to_number = [&](StringView operand) throws -> i64 {
-      for (usize i = 0; i < operand.length; i++)
+    let const do_to_number = [&](StringView operand) throws -> i64 {
+      for (usize i = 0; i < operand.length; i++) {
         if (operand[i] != ' ' && operand[i] != '\t')
           return cxt.evaluate_arithmetic(operand);
+      }
       return 0;
     };
-    const i64 a = to_number(left);
-    const i64 b = to_number(right);
-    if (op == "-eq") return a == b;
-    if (op == "-ne") return a != b;
-    if (op == "-lt") return a < b;
-    if (op == "-le") return a <= b;
-    if (op == "-gt") return a > b;
-    return a >= b;
+    const i64 left_number = do_to_number(left);
+    const i64 right_number = do_to_number(right);
+    if (op == "-eq") return left_number == right_number;
+    if (op == "-ne") return left_number != right_number;
+    if (op == "-lt") return left_number < right_number;
+    if (op == "-le") return left_number <= right_number;
+    if (op == "-gt") return left_number > right_number;
+    return left_number >= right_number;
   }
 
   bool eval_primary() throws
@@ -332,9 +335,9 @@ struct ConditionalEvaluator
             let active = ArrayList<bool>{cxt.scratch_allocator()};
             const String pattern =
                 operand_pattern_masked(elements[pos - 1], active);
-            const bool matched = utils::glob_matches(
+            const bool is_matched = utils::glob_matches(
                 pattern.view(), left.view(), active, 0, cxt.extglob_enabled());
-            return op == "!=" ? !matched : matched;
+            return op == "!=" ? !is_matched : is_matched;
           }
           if (op == "=~") {
             let active = ArrayList<bool>{cxt.scratch_allocator()};
@@ -372,45 +375,45 @@ struct ConditionalEvaluator
     }
     if (!at_end() && kind_at(pos) == Kind::OpenParen) {
       pos++;
-      const bool inner = eval_or();
+      const bool is_inner_true = eval_or();
       if (at_end() || kind_at(pos) != Kind::CloseParen)
         throw Error{"[[: expected ')'"};
       pos++;
-      return inner;
+      return is_inner_true;
     }
     return eval_primary();
   }
 
   bool eval_and() throws
   {
-    bool result = eval_term();
+    bool and_result = eval_term();
     while (!at_end() && kind_at(pos) == Kind::And) {
       pos++;
       /* A false left already decides the and, so the right is parsed without
          evaluation. The skip nests, so an outer skip stays set. */
       const bool was_skipping = is_skipping;
-      is_skipping = is_skipping || !result;
+      is_skipping = is_skipping || !and_result;
       const bool rhs = eval_term();
       is_skipping = was_skipping;
-      result = result && rhs;
+      and_result = and_result && rhs;
     }
-    return result;
+    return and_result;
   }
 
   bool eval_or() throws
   {
-    bool result = eval_and();
+    bool or_result = eval_and();
     while (!at_end() && kind_at(pos) == Kind::Or) {
       pos++;
       /* A true left already decides the or, so the right is parsed without
          evaluation. */
       const bool was_skipping = is_skipping;
-      is_skipping = is_skipping || result;
+      is_skipping = is_skipping || or_result;
       const bool rhs = eval_and();
       is_skipping = was_skipping;
-      result = result || rhs;
+      or_result = or_result || rhs;
     }
-    return result;
+    return or_result;
   }
 };
 
@@ -471,14 +474,15 @@ fn EvalContext::evaluate_conditional(
   LOG(Debug, "evaluating a [[ ]] conditional of %zu elements",
       elements.count());
   let evaluator = ConditionalEvaluator{*this, elements};
-  const bool result = evaluator.eval_or();
-  if (!evaluator.at_end())
+  const bool is_conditional_true = evaluator.eval_or();
+  if (!evaluator.at_end()) {
     throw Error{
         "Unable to evaluate the [[ ]] because the token '" +
         evaluator.unexpected_token() +
         "' came after a complete conditional, so it may be an operator shit "
         "does not support or a missing && or || between two tests"};
-  return result;
+  }
+  return is_conditional_true;
 }
 
 } /* namespace shit */

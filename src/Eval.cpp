@@ -58,7 +58,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   /* Every inherited environment variable is exported, so the set starts from
      the process environment. An assignment then tests this set rather than
      scanning the environment on every write. */
-  for (const String &name : os::environment_names())
+  for (let const &name : os::environment_names())
     m_exported_names.add(name.view());
 }
 
@@ -177,9 +177,10 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   assign_variable(name, value);
 }
 
-fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
+fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
+    -> void
 {
-  if (bash_identity) {
+  if (is_bash_identity) {
     LOG(Info, "seeding the bash identity variables");
     set_shell_variable("BASH_VERSION", "5.2.0(1)-shit");
     /* BASH_VERSINFO is the version broken into its components, the array a
@@ -338,7 +339,7 @@ fn EvalContext::append_indexed_array(StringView name,
     if (is_readonly(name))
       throw Error{"Unable to assign '" + name + "' because it is read only"};
     m_shell_variables.erase(name);
-    for (String &element : values)
+    for (let &element : values)
       existing->push(steal(element));
     return;
   }
@@ -375,24 +376,26 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
      the defining command's sources are freed. A formatting failure is
      swallowed so a diagnostic never becomes an error. */
   try {
-    let const resolved = resolve_render_source(location);
+    let const resolved_source = resolve_render_source(location);
     usize line_offset = 0;
-    if (resolved.windowed) {
-      location.position = location.position - resolved.body_start_position +
-                          resolved.header_length;
-      location.filename = resolved.filename.is_empty()
+    if (resolved_source.is_windowed) {
+      location.position = location.position -
+                          resolved_source.body_start_position +
+                          resolved_source.header_length;
+      location.filename = resolved_source.filename.is_empty()
                               ? Maybe<StringView>{}
-                              : Maybe<StringView>{resolved.filename};
-      line_offset = resolved.line_offset;
+                              : Maybe<StringView>{resolved_source.filename};
+      line_offset = resolved_source.line_offset;
     }
-    if (resolved.text == nullptr || location.position > resolved.text->count())
+    if (resolved_source.text == nullptr ||
+        location.position > resolved_source.text->count())
     {
       show_message(Warning{message}.to_string());
       return;
     }
     let warning = WarningWithLocation{location, message};
     warning.set_line_offset(line_offset);
-    show_message(warning.to_string(resolved.text->view()));
+    show_message(warning.to_string(resolved_source.text->view()));
     /* A warning from a sourced file names the chain that reached it, the
        same frames an error prints, since the user typed no source command
        for an rc chain and the file alone does not say who pulled it in. A
@@ -408,21 +411,23 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
 {
   let const fallback = m_current_location;
   if (name.is_empty()) return fallback;
-  let const resolved = resolve_render_source(fallback);
-  if (resolved.text == nullptr) return fallback;
-  let const source = resolved.text->view();
+  let const resolved_source = resolve_render_source(fallback);
+  if (resolved_source.text == nullptr) return fallback;
+  let const source = resolved_source.text->view();
 
   /* A windowed resolution means the text is the definition copy while the
      location is absolute, so the scan indexes through the rebase and the
      found location converts back, keeping every stored location absolute. */
   usize scan_start = fallback.position;
   usize absolute_shift = 0;
-  if (resolved.windowed) {
-    scan_start = fallback.position - resolved.body_start_position +
-                 resolved.header_length;
-    absolute_shift = resolved.body_start_position > resolved.header_length
-                         ? resolved.body_start_position - resolved.header_length
-                         : 0;
+  if (resolved_source.is_windowed) {
+    scan_start = fallback.position - resolved_source.body_start_position +
+                 resolved_source.header_length;
+    absolute_shift =
+        resolved_source.body_start_position > resolved_source.header_length
+            ? resolved_source.body_start_position -
+                  resolved_source.header_length
+            : 0;
   }
   if (scan_start >= source.length) return fallback;
 
@@ -433,7 +438,9 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
   usize i = scan_start;
   while (i < source.length) {
     const char byte = source[i];
-    if (byte == '\n' && (i == 0 || source[i - 1] != '\\')) break;
+    if (byte == '\n' && (i == 0 || source[i - 1] != '\\')) {
+      break;
+    }
     if (byte != '$' || i + 1 >= source.length) {
       i++;
       continue;
@@ -452,7 +459,9 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
       usize reference_end = name_start + name.length;
       if (is_braced && reference_end < source.length &&
           source[reference_end] == '}')
+      {
         reference_end++;
+      }
       return SourceLocation{i + absolute_shift, reference_end - i,
                             fallback.filename};
     }
@@ -464,12 +473,16 @@ pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
   usize k = scan_start;
   while (k + name.length <= source.length) {
     const char byte = source[k];
-    if (byte == '\n' && (k == 0 || source[k - 1] != '\\')) break;
+    if (byte == '\n' && (k == 0 || source[k - 1] != '\\')) {
+      break;
+    }
     if (source.substring_of_length(k, name.length) == name &&
         (k == 0 || !lexer::is_variable_name(source[k - 1])) &&
         (k + name.length == source.length ||
          !lexer::is_variable_name(source[k + name.length])))
+    {
       return SourceLocation{k + absolute_shift, name.length, fallback.filename};
+    }
     k++;
   }
   return fallback;
@@ -481,25 +494,29 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
      while an explicit set -u keeps the abort the script asked for. A lenient
      run without -W expands the name to empty in silence. */
   if (m_runtime.error_unset &&
-      (m_runtime.error_unset_explicit || !m_runtime.warnings_enabled))
+      (m_runtime.error_unset_explicit || !m_runtime.are_warnings_enabled))
+  {
     throw_script_fatal("Unable to expand '" + String{name} +
                        "' because the parameter is not set");
-  if (m_runtime.error_unset || m_runtime.warnings_enabled)
+  }
+  if (m_runtime.error_unset || m_runtime.are_warnings_enabled) {
     show_runtime_warning_at(locate_variable_reference(name),
                             "The variable '" + String{name} +
                                 "' is not set, it expands to empty, replace "
                                 "it with ${" +
                                 String{name} +
                                 "-} if empty expansion is desired");
+  }
 }
 
 fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
                               SourceLocation location,
                               StringView message) throws -> void
 {
-  if (fatal && (explicitly_requested || !m_runtime.warnings_enabled))
+  if (fatal && (explicitly_requested || !m_runtime.are_warnings_enabled)) {
     throw ErrorWithLocation{location, message};
-  if ((fatal || m_runtime.warnings_enabled) && !diagnostics_disabled() &&
+  }
+  if ((fatal || m_runtime.are_warnings_enabled) && !diagnostics_disabled() &&
       m_current_source != nullptr)
   {
     try {
@@ -665,15 +682,17 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
      empty, while the unset default reads back space-tab-newline. This makes the
      o=$IFS; IFS=:; ...; IFS=$o save and restore idiom round-trip. The first
      byte gates the compare so an ordinary name skips it. */
-  if (first_byte == 'I' && name == "IFS")
+  if (first_byte == 'I' && name == "IFS") {
     return String{heap_allocator(), m_field_separators.view()};
+  }
 
   /* The branch the \G prompt segment renders, the shell's own dynamic
      variable, so a script or a prompt command reads it without forking git.
      Empty outside a repository, the short hash on a detached HEAD. A stored
      value above wins the way the other dynamic names yield. */
-  if (first_byte == 'S' && name == "SHIT_GIT_BRANCH")
+  if (first_byte == 'S' && name == "SHIT_GIT_BRANCH") {
     return utils::current_git_branch();
+  }
 
   /* $LINENO reports the line of the command currently evaluating. It yields to
      a stored value above, so a script that assigns LINENO reads back what it
@@ -685,16 +704,18 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     /* A windowed resolution maps the absolute position onto the definition
        copy and adds the defining file's line offset back, so LINENO in a
        function body reports the file line. */
-    let const resolved = resolve_render_source(m_current_location);
+    let const resolved_source = resolve_render_source(m_current_location);
     usize line = 1;
-    if (resolved.text != nullptr) {
-      const usize render_position = resolved.windowed
-                                        ? m_current_location.position -
-                                              resolved.body_start_position +
-                                              resolved.header_length
-                                        : m_current_location.position;
-      line = utils::line_number_at(resolved.text->view(), render_position) +
-             (resolved.windowed ? resolved.line_offset : 0);
+    if (resolved_source.text != nullptr) {
+      const usize render_position =
+          resolved_source.is_windowed
+              ? m_current_location.position -
+                    resolved_source.body_start_position +
+                    resolved_source.header_length
+              : m_current_location.position;
+      line =
+          utils::line_number_at(resolved_source.text->view(), render_position) +
+          (resolved_source.is_windowed ? resolved_source.line_offset : 0);
     }
     return utils::uint_to_text(line);
   }
@@ -740,7 +761,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           {"xtrace",    &EvalContext::should_echo_expanded},
       };
       let joined = String{heap_allocator()};
-      for (const shellopts_row &row : SHELLOPTS_ROWS) {
+      for (let const &row : SHELLOPTS_ROWS) {
         if (!(this->*(row.get))()) continue;
         if (!joined.is_empty()) joined.push(':');
         joined.append(StringView{row.option_name});
@@ -871,9 +892,10 @@ fn EvalContext::funcname_frame_count() const wontthrow -> usize
 
 fn EvalContext::funcname_frame_at(usize index) const wontthrow -> StringView
 {
-  let const calls = m_function_call_names.count();
-  if (index < calls) return m_function_call_names[calls - 1 - index].view();
-  if (index < calls + m_sourced_file_frames) return StringView{"source"};
+  let const call_count = m_function_call_names.count();
+  if (index < call_count)
+    return m_function_call_names[call_count - 1 - index].view();
+  if (index < call_count + m_sourced_file_frames) return StringView{"source"};
   return StringView{"main"};
 }
 
@@ -886,7 +908,7 @@ fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
     -> bool
 {
   if (m_local_scopes.is_empty()) return false;
-  for (const local_binding &binding : m_local_scopes.back())
+  for (let const &binding : m_local_scopes.back())
     if (binding.name.view() == name) return true;
   return false;
 }
@@ -965,9 +987,11 @@ fn EvalContext::leave_subshell() wontthrow -> void
 fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
 {
   if (m_subshell_depth == 0) return;
-  for (const subshell_saved_descriptor &entry : m_subshell_saved_descriptors)
-    if (entry.depth == m_subshell_depth && entry.saved.shell_fd == shell_fd)
+  for (let const &entry : m_subshell_saved_descriptors) {
+    if (entry.depth == m_subshell_depth && entry.saved.shell_fd == shell_fd) {
       return;
+    }
+  }
   LOG(Debug,
       "backing up descriptor %d before a subshell exec moves it at depth %zu",
       shell_fd, m_subshell_depth);
@@ -1069,7 +1093,7 @@ pure fn EvalContext::current_origin() const wontthrow -> const String &
 fn EvalContext::print_source_backtrace() const throws -> void
 {
   for (usize i = m_source_frames.count(); i > 0; i--) {
-    const source_frame &frame = m_source_frames[i - 1];
+    let const &frame = m_source_frames[i - 1];
     if (frame.parent_source != nullptr) {
       /* A frame is context under the primary error, not an error of its own, so
          it prints with the Trace severity rather than Error. */
@@ -1356,9 +1380,9 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      stays inside it, the way dash runs the inner code in a forked child whose
      option flags die with the child. */
   m_error_exit = snapshot.error_exit;
-  m_enable_path_expansion = snapshot.enable_path_expansion;
-  m_enable_echo = snapshot.enable_echo;
-  m_enable_echo_expanded = snapshot.enable_echo_expanded;
+  m_enable_path_expansion = snapshot.is_path_expansion_enabled;
+  m_enable_echo = snapshot.is_echo_enabled;
+  m_enable_echo_expanded = snapshot.is_echo_expanded_enabled;
 
   /* A readonly or a declare -i inside the subshell or the command substitution
      stays inside it, so the parent's name sets come back whole and a later
@@ -1404,7 +1428,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   LOG(Debug, "rewinding %zu environment writes made inside the subshell",
       m_environment_undo_log.count() - snapshot.environment_undo_mark);
   while (m_environment_undo_log.count() > snapshot.environment_undo_mark) {
-    const environment_undo_entry &entry = m_environment_undo_log.back();
+    let const &entry = m_environment_undo_log.back();
     if (entry.previous_value)
       os::set_environment_variable(entry.name.view(),
                                    entry.previous_value->view());
@@ -1444,6 +1468,7 @@ fn EvalContext::option_flags_string() const throws -> String
   if (m_enable_echo) flags += 'v';
   if (m_enable_echo_expanded) flags += 'x';
   if (m_shell_is_interactive) flags += 'i';
+
   return flags;
 }
 
@@ -1520,10 +1545,12 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
   if (let const bracket = target_view.find_character('[');
       bracket.has_value() && !target_view.is_empty() &&
       target_view[target_view.length - 1] == ']')
+  {
     return apply_array_subscript(
         target_view.substring_of_length(0, *bracket),
         target_view.substring_of_length(*bracket + 1,
                                         target_view.length - *bracket - 2));
+  }
   if (!get_variable_value(target_view).has_value())
     report_unset_reference(*target);
   return expand_variable(target_view);
@@ -1531,7 +1558,7 @@ fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
 
 cold fn EvalContext::make_stats_string() const throws -> String
 {
-  let s = String{};
+  let stats_text = String{};
 
   /* Stats print before end_command runs the per-command rollup, so the live
      arena is sampled here and the current command is counted as one beyond the
@@ -1542,34 +1569,38 @@ cold fn EvalContext::make_stats_string() const throws -> String
       live_ast_arena_bytes > m_peak_ast_arena_bytes ? live_ast_arena_bytes
                                                     : m_peak_ast_arena_bytes;
 
-  s += "[Stats\n";
+  stats_text += "[Stats\n";
 
-  s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Commands evaluated: " + utils::uint_to_text(m_commands_evaluated + 1);
-  s += '\n';
-  s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Expansions: " + utils::uint_to_text(last_expansion_count());
-  s += '\n';
-  s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Nodes evaluated: " + utils::uint_to_text(last_expressions_executed());
-  s += '\n';
-  s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Total expansions: " + utils::uint_to_text(total_expansion_count());
-  s += '\n';
-  s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Total nodes evaluated: " +
-       utils::uint_to_text(total_expressions_executed());
-  s += '\n';
-  s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "AST arena bytes: " + utils::uint_to_text(live_ast_arena_bytes);
-  s += '\n';
-  s += EXPRESSION_DOUBLE_AST_INDENT;
-  s += "Peak AST arena bytes: " + utils::uint_to_text(peak_ast_arena_bytes);
-  s += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text +=
+      "Commands evaluated: " + utils::uint_to_text(m_commands_evaluated + 1);
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text += "Expansions: " + utils::uint_to_text(last_expansion_count());
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text +=
+      "Nodes evaluated: " + utils::uint_to_text(last_expressions_executed());
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text +=
+      "Total expansions: " + utils::uint_to_text(total_expansion_count());
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text += "Total nodes evaluated: " +
+                utils::uint_to_text(total_expressions_executed());
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text += "AST arena bytes: " + utils::uint_to_text(live_ast_arena_bytes);
+  stats_text += '\n';
+  stats_text += EXPRESSION_DOUBLE_AST_INDENT;
+  stats_text +=
+      "Peak AST arena bytes: " + utils::uint_to_text(peak_ast_arena_bytes);
+  stats_text += '\n';
 
-  s += "]";
+  stats_text += "]";
 
-  return s;
+  return stats_text;
 }
 
 pure fn EvalContext::should_echo() const wontthrow -> bool
@@ -1704,29 +1735,30 @@ fn ExecContext::make_from(SourceLocation location,
 
   let const &program = args[0];
 
-  Maybe<Builtin::Kind> bk;
-  Maybe<Path> p;
+  Maybe<Builtin::Kind> resolved_builtin;
+  Maybe<Path> resolved_program_path;
 
   if (!program.find_character('/').has_value()) {
-    bk = search_builtin(program.view());
+    resolved_builtin = search_builtin(program.view());
 
-    if (!bk) {
-      let ps = utils::search_program_path(program.view());
-      if (ps.count() > 0) p = steal(ps[0]);
+    if (!resolved_builtin) {
+      let program_search_paths = utils::search_program_path(program.view());
+      if (program_search_paths.count() > 0)
+        resolved_program_path = steal(program_search_paths[0]);
     }
   } else {
     /* canonicalize_path already tries the omitted suffixes, so a path-given
        program resolves its extension the way the PATH search does. */
-    p = utils::canonicalize_path(program.view());
+    resolved_program_path = utils::canonicalize_path(program.view());
   }
 
   /* Builtins take precedence over programs. */
   ResolvedCommand kind;
-  if (!bk) {
-    if (p.has_value()) {
+  if (!resolved_builtin) {
+    if (resolved_program_path.has_value()) {
       LOG(Debug, "resolved '%s' to the program '%s'", program.c_str(),
-          p->text().c_str());
-      kind = ResolvedCommand::from_program(steal(*p));
+          resolved_program_path->text().c_str());
+      kind = ResolvedCommand::from_program(steal(*resolved_program_path));
     } else {
       LOG(Debug, "no builtin or program matches '%s'", program.c_str());
       /* A close builtin or PATH program is offered as a did-you-mean hint, so a
@@ -1741,7 +1773,7 @@ fn ExecContext::make_from(SourceLocation location,
     }
   } else {
     LOG(Debug, "resolved '%s' to a builtin", program.c_str());
-    kind = ResolvedCommand::from_builtin(*bk);
+    kind = ResolvedCommand::from_builtin(*resolved_builtin);
   }
 
   return {location, steal(kind), steal(args)};
