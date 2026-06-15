@@ -109,8 +109,12 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      not executable. A name that resolves to None exited 127 above. */
   try {
     os::replace_process(steal(command));
-  } catch (const Error &error) {
-    show_message(error.to_string());
+  } catch (const ErrorBase &error) {
+    /* replace_process throws ErrorWithLocation for a found-but-unexecutable
+       file, a sibling of Error under ErrorBase, so the catch spans the base to
+       reach it rather than letting it propagate as a generic exit-1 command
+       error. */
+    show_message(error.message());
     utils::quit(126, true);
   }
 }

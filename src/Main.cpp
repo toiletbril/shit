@@ -825,13 +825,17 @@ fn main(int argc, char **argv) -> int
        reader sees which argument the parser rejected. */
     shit::show_message(
         e.to_string(shit::join_command_line(parse_argc, parse_argv)));
-    if (!shit::os::is_stdin_a_tty()) return 2;
+    if (!(shit::os::is_stdin_a_tty() || shit::os::is_stdout_a_tty())) {
+      return 2;
+    }
     enter_rescue();
   } catch (const shit::Error &e) {
     shit::show_message(e.to_string());
     /* A flag error is a usage error, so a non-interactive shell exits with the
        POSIX usage status rather than success, matching dash. */
-    if (!shit::os::is_stdin_a_tty()) return 2;
+    if (!(shit::os::is_stdin_a_tty() || shit::os::is_stdout_a_tty())) {
+      return 2;
+    }
     enter_rescue();
   }
 
