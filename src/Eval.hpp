@@ -287,10 +287,13 @@ enum class mimic_mood : u8
   Bash,
 };
 
+class EvalContext;
+
 /* A snapshot of the mood and the diagnostic and strictness toggles, captured
    and restored as a unit so a scope that runs a body under a different mood,
    such as a function call or a mimicked script, saves and puts back the whole
-   set with one call instead of a flag at a time. */
+   set with one call instead of a flag at a time. The capture and restore act on
+   a context, so the swap reads as one struct rather than a flag at a time. */
 struct runtime_state
 {
   mimic_mood mood{mimic_mood::Default};
@@ -305,6 +308,12 @@ struct runtime_state
   bool error_unset_explicit{false};
   bool pipefail_explicit{false};
   bool failglob_explicit{false};
+
+  /* Read the live mood and toggles off a context. */
+  mustuse static fn capture(const EvalContext &context) wontthrow
+      -> runtime_state;
+  /* Write this snapshot back into a context. */
+  fn restore(EvalContext &context) const wontthrow -> void;
 };
 
 /* A programmable-completion spec the complete builtin registers for a command.
@@ -964,46 +973,18 @@ public:
     if (!m_failglob_explicit) set_failglob(strict);
   }
 
-  /* Capture the mood and the diagnostic and strictness toggles, so a scope that
-     runs a body under a different mood saves the whole set with one call and
-     restore_runtime_state puts it all back, rather than threading a separate
-     local and defer for each flag. */
-  pure fn capture_runtime_state() const wontthrow -> runtime_state
+  /* Enter the mood and diagnostic state a function was defined in, deriving the
+     strictness from that mood, and return the previous runtime_state so a defer
+     restores it. The defining state arrives as one struct rather than a flag at
+     a time. runtime_state reads and writes the toggles, so it is a friend. */
+  friend struct runtime_state;
+  fn enter_definition_state(const function_definition_info &info) wontthrow
+      -> runtime_state
   {
-    return runtime_state{m_mood,
-                         m_warnings_enabled,
-                         m_diagnostics_disabled,
-                         m_error_unset,
-                         m_pipefail,
-                         m_failglob,
-                         m_error_unset_explicit,
-                         m_pipefail_explicit,
-                         m_failglob_explicit};
-  }
-  fn restore_runtime_state(const runtime_state &state) wontthrow -> void
-  {
-    m_mood = state.mood;
-    m_warnings_enabled = state.warnings_enabled;
-    m_diagnostics_disabled = state.diagnostics_disabled;
-    m_error_unset = state.error_unset;
-    m_pipefail = state.pipefail;
-    m_failglob = state.failglob;
-    m_error_unset_explicit = state.error_unset_explicit;
-    m_pipefail_explicit = state.pipefail_explicit;
-    m_failglob_explicit = state.failglob_explicit;
-  }
-
-  /* Switch into a mood and diagnostic state, deriving the strictness from the
-     mood, and return the previous runtime state so a defer restores it with
-     restore_runtime_state. This is the one entry a scope such as a function call
-     uses to enter its target state, rather than a set per flag. */
-  fn switch_runtime_state(mimic_mood mood, bool warnings_enabled,
-                          bool diagnostics_disabled) wontthrow -> runtime_state
-  {
-    let const previous = capture_runtime_state();
-    m_mood = mood;
-    m_warnings_enabled = warnings_enabled;
-    m_diagnostics_disabled = diagnostics_disabled;
+    let const previous = runtime_state::capture(*this);
+    m_mood = static_cast<mimic_mood>(info.defining_mood);
+    m_warnings_enabled = info.defining_warnings;
+    m_diagnostics_disabled = info.defining_diagnostics_disabled;
     apply_strictness_for_mood();
     return previous;
   }

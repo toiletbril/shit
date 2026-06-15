@@ -1734,14 +1734,11 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
              cxt.diagnostics_disabled());
     Maybe<runtime_state> saved_runtime_state = None;
     if (needs_state_swap)
-      saved_runtime_state = cxt.switch_runtime_state(
-          static_cast<mimic_mood>(definition_info->defining_mood),
-          definition_info->defining_warnings,
-          definition_info->defining_diagnostics_disabled);
+      saved_runtime_state = cxt.enter_definition_state(*definition_info);
     defer
     {
       if (saved_runtime_state.has_value())
-        cxt.restore_runtime_state(*saved_runtime_state);
+        saved_runtime_state->restore(cxt);
     };
 
     /* A located error thrown from the body carries an absolute position into

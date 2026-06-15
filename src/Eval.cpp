@@ -62,6 +62,32 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
     m_exported_names.add(name.view());
 }
 
+fn runtime_state::capture(const EvalContext &context) wontthrow -> runtime_state
+{
+  return runtime_state{context.m_mood,
+                       context.m_warnings_enabled,
+                       context.m_diagnostics_disabled,
+                       context.m_error_unset,
+                       context.m_pipefail,
+                       context.m_failglob,
+                       context.m_error_unset_explicit,
+                       context.m_pipefail_explicit,
+                       context.m_failglob_explicit};
+}
+
+fn runtime_state::restore(EvalContext &context) const wontthrow -> void
+{
+  context.m_mood = mood;
+  context.m_warnings_enabled = warnings_enabled;
+  context.m_diagnostics_disabled = diagnostics_disabled;
+  context.m_error_unset = error_unset;
+  context.m_pipefail = pipefail;
+  context.m_failglob = failglob;
+  context.m_error_unset_explicit = error_unset_explicit;
+  context.m_pipefail_explicit = pipefail_explicit;
+  context.m_failglob_explicit = failglob_explicit;
+}
+
 fn EvalContext::add_evaluated_expression() wontthrow -> void
 {
   /* The count feeds only the -S report, so skip the increment unless -S asked
