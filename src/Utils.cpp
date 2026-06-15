@@ -1456,6 +1456,33 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
   return dirs;
 }
 
+/* The split PATH cached against the value it was split from, so a cold command
+   resolution reuses the directory list rather than re-splitting and re-deduping
+   PATH on every miss. The cache rebuilds when PATH changes, which a value
+   comparison detects. */
+static String CACHED_SPLIT_PATH_VALUE{};
+static ArrayList<String> CACHED_PATH_DIRS{};
+static bool CACHED_PATH_DIRS_VALID = false;
+
+static fn path_dirs() throws -> const ArrayList<String> &
+{
+  if (!MAYBE_PATH) {
+    CACHED_PATH_DIRS = ArrayList<String>{};
+    CACHED_PATH_DIRS_VALID = false;
+    return CACHED_PATH_DIRS;
+  }
+
+  if (!CACHED_PATH_DIRS_VALID ||
+      CACHED_SPLIT_PATH_VALUE.view() != MAYBE_PATH->view())
+  {
+    CACHED_PATH_DIRS = split_path_dirs(*MAYBE_PATH);
+    CACHED_SPLIT_PATH_VALUE = String{MAYBE_PATH->view()};
+    CACHED_PATH_DIRS_VALID = true;
+  }
+
+  return CACHED_PATH_DIRS;
+}
+
 fn initialize_path_map() throws -> void
 {
   LOG(Info, "scanning every PATH directory to seed the program cache");
@@ -1490,7 +1517,7 @@ static fn resolve_along_path(StringView program_name, bool find_all) throws
   let key = String{program_name};
   os::erase_extension_and_get_its_index(key);
 
-  for (let const &dir_string : split_path_dirs(*MAYBE_PATH)) {
+  for (let const &dir_string : path_dirs()) {
     let const directory = Path{dir_string.view()};
 
     let full_path = directory.clone();
