@@ -1729,11 +1729,20 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
   if (trimmed[trimmed.length - 1] == ':')
     return ends_with_ignoring_case(StringView{"commands:"}) ||
            ends_with_ignoring_case(StringView{"subcommands:"});
+  /* A colon-less header is the all-caps man-page style, so it opens a section
+     only when the whole line is upper-case. A stray lowercase body line that
+     reads exactly "commands" then opens no section, while the mixed-case
+     "Commands" header is already covered by the colon branch above. */
+  let const is_all_uppercase = [&]() {
+    for (usize i = 0; i < trimmed.length; i++)
+      if (trimmed[i] >= 'a' && trimmed[i] <= 'z') return false;
+    return true;
+  };
   let const equals_ignoring_case = [&](StringView word) {
     return trimmed.length == word.length && ends_with_ignoring_case(word);
   };
-  return equals_ignoring_case(StringView{"commands"}) ||
-         equals_ignoring_case(StringView{"subcommands"});
+  return is_all_uppercase() && (equals_ignoring_case(StringView{"commands"}) ||
+                                equals_ignoring_case(StringView{"subcommands"}));
 }
 
 /* The subcommands a --help text lists under a commands section. cargo and other
