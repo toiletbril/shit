@@ -1,0 +1,213 @@
+.TH SHIT 1 "2026-06-15" "shit" "User Commands"
+.SH NAME
+shit \- a fast POSIX and bash compatible shell
+.SH SYNOPSIS
+.B shit
+.RI [ options ]
+.RI [ script
+.RI [ argument ...]]
+.br
+.B shit
+.B \-c
+.I command
+.RI [ argument ...]
+.SH DESCRIPTION
+.B shit
+is a fast POSIX and bash compatible shell. It runs an interactive prompt when
+standard input is a terminal and no script is given, runs a script file named on
+the command line, or runs a command string given with
+.BR \-c .
+Before a script runs, the default mood walks the parsed tree to fold constants,
+prune dead branches, and report shellcheck-style diagnostics, so a malformed
+construct is caught up front rather than half-run.
+.SH MOODS
+The shell runs under one of three moods that set how strict it is. The default
+.B shit
+mood is the strictest bash superset and it warns on the questionable constructs
+through the analysis stage. The
+.B bash
+mood runs the bash extensions with the analysis stage off. The
+.B sh
+mood behaves like dash. The mood drives the nounset, pipefail, and failglob
+strictness, the analysis stage, and the parser features.
+.PP
+A binary named or symlinked to
+.BR sh ", " dash ", or " bash
+picks the matching mood and turns diagnostics off. The
+.B set --mood
+builtin changes the mood at runtime, and a
+.B set --mood
+inside the rc sticks for the session. An explicit
+.BR "set -u" ", " "set -o pipefail" ", or " "set -o failglob"
+is the script's own ask and survives a later mood switch.
+.SH OPTIONS
+.SS Mood and startup
+.TP
+.BR \-M ", " \-\-mood =\fINAME\fR
+Select the runtime mood, one of
+.BR shit ", " bash ", or " sh .
+.TP
+.BR \-L ", " \-\-init\-moods =\fILIST\fR
+Source the startup files for each listed mood, in order, given comma separated or
+by repeating the flag. The
+.B shit
+flavor reads /etc/shitrc and ~/.shitrc, the
+.B bash
+flavor reads the bash rc and its completion, and the
+.B sh
+flavor reads the file named by ENV. Defaults to the value of
+.BR \-\-mood .
+.TP
+.BR \-I ", " \-\-mimicry
+Run a script whose shebang names a shell shit can emulate in-process in the
+matching mood rather than launching the real shell, for speed.
+.TP
+.B \-\-dumb
+Equivalent to
+.BR "\-\-mood sh \-T \-\-no\-diagnostics" .
+.TP
+.BR \-p ", " \-\-privileged
+Skip every startup config file, turned on automatically in the setuid or setgid
+case.
+.TP
+.BI \-\-rcfile= FILE
+Source FILE as the interactive rc instead of ~/.bashrc.
+.SS Diagnostics
+.TP
+.BR \-W ", " \-\-force\-warnings
+Keep the analysis stage but report every error as a warning and let the run
+proceed.
+.TP
+.B \-\-no\-diagnostics
+Skip the analysis stage so evaluation begins sooner.
+.TP
+.B \-\-no\-init\-diagnostics
+Suppress diagnostics and warnings only while the startup files source, then
+restore them for the prompt. Pairs with
+.BR \-W .
+.TP
+.B \-\-list\-diagnostics
+List the shellcheck-style checks the analysis stage reports, then exit.
+.TP
+.BR \-T ", " \-\-no\-completion
+Disable interactive tab completion and ghost-text.
+.SS POSIX
+.TP
+.BR \-c " \fICOMMAND\fR"
+Read commands from the string COMMAND.
+.TP
+.BR \-i ", " \-\-interactive
+Force interactive mode.
+.TP
+.BR \-s ", " \-\-stdin
+Read commands from standard input.
+.TP
+.BR \-e ", " \-\-error\-exit
+Exit on the first failing command.
+.TP
+.BR \-f ", " \-\-no\-glob
+Disable pathname expansion.
+.TP
+.BR \-u ", " \-\-no\-unset
+Treat an unset variable as an error.
+.TP
+.BR \-C ", " \-\-no\-clobber
+Refuse to overwrite an existing file through a plain redirection.
+.TP
+.BR \-n ", " \-\-no\-exec
+Parse the script without running it.
+.TP
+.BR \-x ", " \-\-xtrace
+Print each command after expansion.
+.TP
+.BR \-v ", " \-\-verbose
+Print each line as it is read.
+.TP
+.BR \-a ", " \-\-export\-all
+Mark every later assignment for the environment.
+.TP
+.BR \-l ", " \-\-login
+Run as a login shell.
+.SS Information
+.TP
+.B \-\-help
+Display the help message and exit.
+.TP
+.B \-\-version
+Display the version and notices and exit.
+.TP
+.BR \-V ", " \-\-short\-version
+Display the short version and exit.
+.SS Debugging
+.TP
+.BR \-A ", " \-\-show\-ast
+Print the syntax tree before executing each command.
+.TP
+.BR \-E ", " \-\-show\-exit\-code
+Print the exit code after each command.
+.TP
+.BR \-R ", " \-\-show\-lexed\-words
+Print the escape bitmap after each parsed command.
+.TP
+.B \-\-debug\-optimizer
+Trace the analysis prepass decisions to standard error.
+.TP
+.B \-\-show\-stats
+Print per-command statistics.
+.TP
+.B \-\-show\-memory
+Print a memory report at exit.
+.TP
+.BI \-X " LEVEL" "\fR, \fB\-\-debug\-logging=" LEVEL
+Enable internal logging at LEVEL, one of
+.BR info ", " debug ", or " all .
+Compiled in only in a debug build.
+.TP
+.BI \-\-debug\-logging\-file= FILE
+Append the debug log to FILE instead of standard error.
+.SH RESCUE
+When a flag in SHIT_FLAGS or in the argument list fails to parse and standard
+input is a terminal, the shell enters rescue rather than exiting, so a removed
+flag left in a config never locks the user out of a new pane. Rescue prints the
+error, prints
+.BR "shit: Entering rescue." ,
+resets to default flags, skips the rc chain, and drops to an interactive prompt.
+A non-interactive run keeps the usage exit.
+.SH ENVIRONMENT
+.TP
+.B SHIT_FLAGS
+Default flags applied before the command line, where a flag on the command line
+still wins. The recommended value is
+.BR "\-W \-I \-\-init\-moods=shit,bash" .
+.TP
+.B SHIT_HISTORY
+The command history file, ~/.shit_history by default.
+.TP
+.B SHIT_DIRECTORY_HISTORY
+The frecency store the z builtin ranks, ~/.shit_directory_history by default.
+.TP
+.B ENV
+The startup file the sh flavor sources.
+.TP
+.B NO_COLOR
+Turn color off in the prompt and the diagnostics when set.
+.SH FILES
+.TP
+.I /etc/shitrc
+The system rc the shit flavor sources.
+.TP
+.I ~/.shitrc
+The user rc the shit flavor sources.
+.TP
+.I ~/.shit_history
+The default command history file.
+.TP
+.I ~/.shit_directory_history
+The default frecency store for the z builtin.
+.SH EXIT STATUS
+The shell exits with the status of the last command it ran. A usage error such as
+an unknown flag in a non-interactive run exits with status 2.
+.SH SEE ALSO
+.BR bash (1),
+.BR dash (1),
+.BR sh (1)
