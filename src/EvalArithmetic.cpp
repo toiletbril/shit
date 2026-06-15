@@ -353,9 +353,10 @@ public:
     let const result = parse_comma();
     skip_spaces();
     if (pos != source.length)
+    {
       fail("unexpected '" + String{source.substring(pos)} +
-           "' after the expression, an operator such as + or * may be missing "
-           "between two values");
+           "' after the expression, missing an operator between two values");
+    }
     return result;
   }
 
@@ -1010,9 +1011,9 @@ public:
     if (toks.is_empty()) return 0;
     let const result = parse_binary(1);
     if (ti != toks.count())
-      throw Error{"Arithmetic: unexpected '" + String{toks[ti].text} +
-                  "' after the expression, an operator such as + or * may be "
-                  "missing between two values"};
+      throw Error{
+          "Arithmetic: unexpected '" + String{toks[ti].text} +
+          "' after the expression, operator is missing between two values"};
     return result;
   }
 };
@@ -1283,8 +1284,7 @@ public:
     skip_spaces();
     if (pos != source.length)
       fail("unexpected '" + String{source.substring(pos)} +
-           "' after the expression, an operator such as + or * may be missing "
-           "between two values");
+           "' after the expression, missing an operator between two values");
     return result;
   }
 
