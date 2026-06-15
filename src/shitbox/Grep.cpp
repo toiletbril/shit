@@ -37,16 +37,33 @@ static fn contains(StringView haystack, StringView needle,
   if (needle.length == 0) return true;
   if (needle.length > haystack.length) return false;
 
+  /* The case-sensitive path skips to each candidate start with a vectorized
+     first-byte search rather than testing every position, so a long line scans
+     close to linearly instead of O(line * pattern). */
+  if (!should_ignore_case) {
+    usize start = 0;
+    while (start + needle.length <= haystack.length) {
+      let const found = haystack.substring(start).find_character(needle[0]);
+      if (!found.has_value()) return false;
+      start += *found;
+      if (start + needle.length > haystack.length) return false;
+
+      bool is_matched = true;
+      for (usize k = 1; k < needle.length; k++)
+        if (haystack[start + k] != needle[k]) {
+          is_matched = false;
+          break;
+        }
+      if (is_matched) return true;
+      start++;
+    }
+    return false;
+  }
+
   for (usize start = 0; start + needle.length <= haystack.length; start++) {
     bool is_matched = true;
     for (usize k = 0; k < needle.length; k++) {
-      char haystack_char = haystack[start + k];
-      char needle_char = needle[k];
-      if (should_ignore_case) {
-        haystack_char = lower(haystack_char);
-        needle_char = lower(needle_char);
-      }
-      if (haystack_char != needle_char) {
+      if (lower(haystack[start + k]) != lower(needle[k])) {
         is_matched = false;
         break;
       }

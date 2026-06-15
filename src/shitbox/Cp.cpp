@@ -74,6 +74,10 @@ static fn copy_path(const ExecContext &ec, StringView source,
      falls through and copies the target contents instead. */
   if (source_path.is_symbolic_link()) {
     if (let const target = os::read_symlink(source)) {
+      /* An existing destination is removed first, since symlink creation fails
+         when the path is already present, so overwriting a stale link or a file
+         works the way coreutils replaces the destination. */
+      os::remove_file(destination);
       if (!os::create_symlink(target->view(), destination)) {
         throw Error{"cp: unable to create the symlink '" + String{destination} +
                     "' because " + os::last_system_error_message()};

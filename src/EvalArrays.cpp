@@ -70,11 +70,31 @@ static fn collect_sparse_array_entries(const StringMap<String> &sparse,
 
 fn EvalContext::clear_sparse_array(StringView name) throws -> void
 {
-  let const entries = collect_sparse_array_entries(m_sparse_array_values, name,
-                                                   scratch_allocator());
-  for (const sparse_array_entry &entry : entries)
+  /* Only the indices are collected, no value is copied and the list is not
+     sorted, since the entries are erased by key regardless of order. The erase
+     runs after the scan so the map is not mutated while it is walked. */
+  let indices = ArrayList<usize>{scratch_allocator()};
+  let const prefix = sparse_array_key(name, 0, scratch_allocator());
+  let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
+  m_sparse_array_values.for_each([&](StringView key,
+                                     const String &value) throws {
+    unused(value);
+    if (key.length <= name_prefix.length ||
+        key.substring_of_length(0, name_prefix.length) != name_prefix)
+    {
+      return;
+    }
+    if (let const parsed =
+            utils::parse_decimal_integer(key.substring(name_prefix.length));
+        !parsed.is_error() && parsed.value() >= 0)
+    {
+      indices.push(static_cast<usize>(parsed.value()));
+    }
+  });
+
+  for (const usize index : indices)
     m_sparse_array_values.erase(
-        sparse_array_key(name, entry.index, scratch_allocator()).view());
+        sparse_array_key(name, index, scratch_allocator()).view());
 }
 
 /* Whether an array-literal element is the explicit [index]=value form, and if
@@ -502,12 +522,26 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
   if (let const *array = m_indexed_arrays.find(name))
     base = static_cast<i64>(array->count());
 
-  for (const sparse_array_entry &entry : collect_sparse_array_entries(
-           m_sparse_array_values, name, scratch_allocator()))
-  {
-    let const past_index = static_cast<i64>(entry.index) + 1;
-    if (past_index > base) base = past_index;
-  }
+  /* The highest sparse index is read straight off the shared map, no value is
+     copied and no list is built, since only the maximum is wanted. */
+  let const prefix = sparse_array_key(name, 0, scratch_allocator());
+  let const name_prefix = prefix.view().substring_of_length(0, name.length + 1);
+  m_sparse_array_values.for_each([&](StringView key,
+                                     const String &value) throws {
+    unused(value);
+    if (key.length <= name_prefix.length ||
+        key.substring_of_length(0, name_prefix.length) != name_prefix)
+    {
+      return;
+    }
+    if (let const parsed =
+            utils::parse_decimal_integer(key.substring(name_prefix.length));
+        !parsed.is_error() && parsed.value() >= 0)
+    {
+      let const past_index = static_cast<i64>(parsed.value()) + 1;
+      if (past_index > base) base = past_index;
+    }
+  });
 
   return base;
 }
@@ -676,7 +710,11 @@ fn EvalContext::array_element_is_set(StringView name,
   const i64 index = evaluate_arithmetic(subscript);
   if (const ArrayList<String> *array = lookup_indexed_array(name)) {
     const i64 array_count = static_cast<i64>(array->count());
-    const i64 resolved = index < 0 ? index + array_count : index;
+    /* A negative index counts from the highest set index across the sparse
+       elements, the same base the read path uses, so [[ -v a[-1] ]] names the
+       element ${a[-1]} reads rather than a stale dense slot. */
+    const i64 resolved =
+        index < 0 ? index + array_negative_index_base(name) : index;
     if (resolved >= 0 && resolved < array_count) {
       return true;
     }

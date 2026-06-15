@@ -3149,10 +3149,12 @@ static fn color_path_argument(usize word_start, StringView word,
   /* The longest leading run of segments whose joined prefix exists on disk
      bounds the cyan span. The trailing slash rides with the prefix, so src/
      colors through the separator. The prefix is monotonic on the filesystem, a
-     deeper path cannot exist when a shallower one does not, so the last existing
-     boundary is the answer. */
+     deeper path cannot exist when a shallower one does not, so the boundaries
+     are walked from the longest down and the first that exists is the answer,
+     which is one stat for a path that fully resolves rather than one per
+     segment. */
   usize existing_end = 0;
-  for (usize scan = 1; scan <= word.length; scan++) {
+  for (usize scan = word.length; scan >= 1; scan--) {
     let const at_boundary = scan == word.length || word[scan] == '/';
     if (!at_boundary) continue;
 
@@ -3166,9 +3168,10 @@ static fn color_path_argument(usize word_start, StringView word,
       exists = Path{typed_prefix}.exists();
     }
 
-    if (exists)
-      existing_end =
-          scan < word.length && word[scan] == '/' ? scan + 1 : scan;
+    if (exists) {
+      existing_end = scan < word.length && word[scan] == '/' ? scan + 1 : scan;
+      break;
+    }
   }
 
   if (existing_end > 0)
