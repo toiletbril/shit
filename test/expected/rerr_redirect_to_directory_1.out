@@ -1,0 +1,16 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "hi"]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "hi"
+]
+[Word
+  Unquoted "/"
+]
+shit: 2:11: error: Could not open '/': File exists.
+     2 |  echo hi > /
+       |            ^~ here.
+[Code 2]

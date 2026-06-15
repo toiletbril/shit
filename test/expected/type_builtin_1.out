@@ -1,0 +1,33 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "echo"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "-a" "cd"]
+  [CompoundListCondition, None]
+    [SimpleCommand "type" "nope"]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "-a"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Unquoted "type"
+]
+[Word
+  Unquoted "nope"
+]
+echo is a shell builtin
+cd is a shell builtin
+cd is /usr/bin/cd
+nope: not found
+[Code 1]
