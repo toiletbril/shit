@@ -1415,7 +1415,10 @@ fn format_local_time(StringView format, i64 epoch) throws -> String
      while the bash -1 and -2 magic values track the clock. */
   const time_t when = epoch < 0 ? time(nullptr) : static_cast<time_t>(epoch);
   struct tm broken_down{};
-  localtime_r(&when, &broken_down);
+  /* localtime_r returns null and leaves the struct unspecified for an epoch
+     outside the representable range, so an unchecked struct would feed strftime
+     garbage. An out-of-range time renders as empty rather than a wrong date. */
+  if (localtime_r(&when, &broken_down) == nullptr) return String{};
   let const format_string = String{format};
   char buffer[512];
   let const written =
