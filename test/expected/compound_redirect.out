@@ -18,7 +18,7 @@
           [CompoundListCondition, None]
             [SimpleCommand "echo" "b"]
   [CompoundListCondition, None]
-    [SimpleCommand "wc" "-l"]
+    [SimpleCommand "awk" "END{print NR}" "/tmp/shit_compound_redir.txt"]
   [CompoundListCondition, None]
     [RedirectedCommand]
       [ForLoop "n"]
@@ -81,10 +81,10 @@
   Unquoted "/tmp/shit_compound_redir.txt"
 ]
 [Word
-  Unquoted "wc"
+  Unquoted "awk"
 ]
 [Word
-  Unquoted "-l"
+  Literal "END{print NR}"
 ]
 [Word
   Unquoted "/tmp/shit_compound_redir.txt"

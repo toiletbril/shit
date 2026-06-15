@@ -1,6 +1,6 @@
 [CompoundList]
   [CompoundListCondition, None]
-    [SimpleCommand "awk" "{print}" "/proc/self/fd/3"]
+    [SimpleCommand "awk" "{print}" "/dev/fd/3"]
 [Word
   Unquoted "awk"
 ]
@@ -8,7 +8,7 @@
   Literal "{print}"
 ]
 [Word
-  Unquoted "/proc/self/fd/3"
+  Unquoted "/dev/fd/3"
 ]
 [Word
   Unquoted "3"

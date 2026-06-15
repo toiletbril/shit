@@ -6,3 +6,4 @@ fallback_probe.txt
 fallback_probe.txt
 == the dash token keeps the spec options:
 --archive
+--backup

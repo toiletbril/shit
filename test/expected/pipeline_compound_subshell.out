@@ -14,7 +14,7 @@
             [SimpleCommand "echo" "a"]
           [CompoundListCondition, None]
             [SimpleCommand "echo" "b"]
-      [SimpleCommand "wc" "-l"]
+      [SimpleCommand "awk" "END{print NR}"]
 [Word
   Unquoted "echo"
 ]
@@ -37,10 +37,10 @@
   Unquoted "b"
 ]
 [Word
-  Unquoted "wc"
+  Unquoted "awk"
 ]
 [Word
-  Unquoted "-l"
+  Literal "END{print NR}"
 ]
 hi
 2

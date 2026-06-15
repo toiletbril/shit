@@ -3,5 +3,5 @@ unset SHIT_FLAGS
 # strictness warnings in two sections.
 "$BIN" --list-diagnostics | grep -c '^  SC'
 "$BIN" --list-diagnostics | grep -A 100 'STRICTNESS WARNINGS' | grep -c '^  '
-"$BIN" --list-diagnostics | grep -E 'nounset|failglob|posix-bashism' | wc -l
+"$BIN" --list-diagnostics | grep -Ec 'nounset|failglob|posix-bashism'
 echo "rc=$?"
