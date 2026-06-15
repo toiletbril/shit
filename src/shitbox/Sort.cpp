@@ -39,7 +39,13 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
     for (const String &operand : operands)
       sources.push(operand.view());
 
-  ArrayList<String> lines{};
+  /* Each file's bytes are kept alive in contents so the line views into them
+     stay valid, and the reserve keeps the elements from moving, which would
+     dangle a view into a small file held in a String's inline buffer. The lines
+     then sort as views with no per-line copy. */
+  ArrayList<String> contents{};
+  contents.reserve(sources.count());
+  ArrayList<StringView> lines{};
   i32 status = 0;
   for (const StringView &source : sources) {
     Maybe<String> content = read_named_or_stdin(ec, source);
@@ -53,25 +59,28 @@ fn Sort::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    for (const StringView &line : split_keep_newlines(content->view())) {
+    contents.push(steal(*content));
+    for (const StringView &line :
+         split_keep_newlines(contents.back().view()))
+    {
       let const body = !line.is_empty() && line[line.length - 1] == '\n'
                            ? line.substring_of_length(0, line.length - 1)
                            : line;
-      lines.push(String{body});
+      lines.push(body);
     }
   }
 
-  sort_string_list(lines);
+  sort_stringview_list(lines);
 
   let output = String{};
   if (FLAG_SORT_REVERSE.is_enabled())
     for (usize i = lines.count(); i > 0; i--) {
-      output += lines[i - 1].view();
+      output += lines[i - 1];
       output += '\n';
     }
   else
-    for (const String &line : lines) {
-      output += line.view();
+    for (const StringView &line : lines) {
+      output += line;
       output += '\n';
     }
 

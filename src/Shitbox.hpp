@@ -300,6 +300,9 @@ fn split_keep_newlines(StringView text) throws -> ArrayList<StringView>;
 /* Sort the strings in place by byte order, ascending, the order ls and sort
    print in. */
 fn sort_string_list(ArrayList<String> &items) wontthrow -> void;
+/* Sort the views in place by byte order, ascending, without copying each into
+   an owned String, for a caller that keeps the backing buffers alive. */
+fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void;
 
 /* A byte count in the human-readable form ls -h and du -h print, the largest
    1024-based unit whose value is below 1024, with one decimal below ten and a

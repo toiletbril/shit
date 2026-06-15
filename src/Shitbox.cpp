@@ -223,6 +223,20 @@ fn sort_string_list(ArrayList<String> &items) wontthrow -> void
             [](const String &a, const String &b) { return a < b; });
 }
 
+fn sort_stringview_list(ArrayList<StringView> &items) wontthrow -> void
+{
+  /* The bytes compare as unsigned the way a byte-order sort orders them, so the
+     views sort without copying each line into an owned String first. */
+  std::sort(items.begin(), items.end(), [](StringView a, StringView b) {
+    let const min_length = a.length < b.length ? a.length : b.length;
+    for (usize i = 0; i < min_length; i++)
+      if (a[i] != b[i])
+        return static_cast<unsigned char>(a[i]) <
+               static_cast<unsigned char>(b[i]);
+    return a.length < b.length;
+  });
+}
+
 fn format_human_size(u64 bytes) throws -> String
 {
   /* A value below 1024 prints as the plain byte count with no suffix, the way
