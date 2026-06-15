@@ -136,6 +136,13 @@ fn parse_hexadecimal_integer(StringView text) throws -> ErrorOr<i64>;
 
 fn canonicalize_path(StringView path) throws -> Maybe<Path>;
 
+/* The logical working directory honours $PWD when it still names the current
+   directory, the way dash and bash report a directory reached through a
+   symbolic link by the name the user typed rather than its physical target. A
+   PWD that is unset, relative, or stale falls back to the physical getcwd
+   path. */
+fn logical_working_directory(EvalContext &cxt) throws -> Path;
+
 /* The command name closest to name among the local names passed in, the
    builtins, and the PATH programs, within a couple of edits counting an
    adjacent transposition as one, for a did-you-mean hint on a command that was

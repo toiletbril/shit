@@ -703,6 +703,23 @@ fn canonicalize_path(StringView path) throws -> Maybe<Path>
   return candidate;
 }
 
+fn logical_working_directory(EvalContext &cxt) throws -> Path
+{
+  /* $PWD is trusted only when it is an absolute path that still names the
+     current directory, compared by device and inode so a value left over from a
+     parent shell or a since-moved directory does not mislead the result. When
+     it holds, the directory keeps the name reached through a symbolic link, the
+     way dash and bash track the working directory, rather than the
+     symlink-resolved path getcwd returns. */
+  let const physical = Path::current_directory();
+  let const pwd = cxt.get_variable_value("PWD");
+  if (pwd && !pwd->is_empty() && pwd->view().data[0] == '/') {
+    let const logical = Path{pwd->view()};
+    if (logical.is_same_file_as(physical)) return logical;
+  }
+  return physical;
+}
+
 /* Inspiration taken from https://github.com/tsoding/glob.h :3
  * This fragment is under MIT License (c) Alexey Kutepov <reximkut@gmail.com> */
 static pure fn is_glob_char_active(const ArrayList<bool> &glob_active,

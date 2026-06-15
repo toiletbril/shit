@@ -110,13 +110,24 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
   }
 
-  target = target.to_absolute().normalized();
+  /* A relative operand resolves against the logical working directory rather
+     than the symlink-resolved physical path, so cd .. climbs the path the user
+     sees and PWD keeps the name a symbolic link was reached by, the way dash and
+     bash track the directory. An absolute operand, including one a CDPATH entry
+     already resolved, only needs its dots and slashes collapsed. */
+  if (target.is_absolute())
+    target = target.normalized();
+  else
+    target = utils::logical_working_directory(cxt)
+                 .push_component(arg_path.view())
+                 .normalized();
 
   if (target.exists()) {
     /* Track the directory move in OLDPWD and PWD, as a POSIX shell does. An
        unreadable current directory yields an empty path, so OLDPWD stays as it
-       was. */
-    let const old_directory = Path::current_directory();
+       was. The previous directory is read logically so OLDPWD, and a later cd -,
+       carry the same symbolic-link-preserving name PWD does. */
+    let const old_directory = utils::logical_working_directory(cxt);
     /* A path that exists can still refuse the move, a regular file or a
        directory without execute permission among them. dash reports the
        failure, exits non-zero, and leaves PWD and OLDPWD untouched, so the
