@@ -63,9 +63,8 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     optind = parsed.is_error() ? 1 : parsed.value();
   }
 
-  LOG(Debug,
-      "getopts parsing into '%s' at OPTIND %lld of %zu operands", name.c_str(),
-      static_cast<long long>(optind), operands.count());
+  LOG(Debug, "getopts parsing into '%s' at OPTIND %lld of %zu operands",
+      name.c_str(), static_cast<long long>(optind), operands.count());
 
   /* A script that resets OPTIND starts a fresh scan, so the per-argument index
      returns to the first letter. */
@@ -162,8 +161,7 @@ fn Getopts::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   /* An option that takes no argument leaves OPTARG unset. */
-  LOG(All, "getopts advancing past option '%s'",
-      option_as_string.c_str());
+  LOG(All, "getopts advancing past option '%s'", option_as_string.c_str());
   advance_letter();
   cxt.unset_shell_variable("OPTARG");
   cxt.set_shell_variable(name, option_as_string);

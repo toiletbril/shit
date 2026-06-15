@@ -85,7 +85,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
         os::replace_process(steal(ec));
       } catch (const ExecFormatError &) {
         LOG(Debug, "swallowed an exec format error, running the "
-                              "file as a shell script in place");
+                   "file as a shell script in place");
         /* The file has no shebang and is not a binary, so it runs as a shell
            script in place, the POSIX fallback. replace_process already placed
            any redirections onto the standard descriptors and closed the
@@ -117,8 +117,8 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
        into the spawn. */
     let const command = is_async ? String{ec.program().view()} : String{};
 
-    LOG(Debug, "spawning the external command '%s'%s",
-        ec.program().c_str(), is_async ? " in the background" : "");
+    LOG(Debug, "spawning the external command '%s'%s", ec.program().c_str(),
+        is_async ? " in the background" : "");
 
     /* An interactive foreground command runs in its own process group and is
        handed the controlling terminal, so it dies on its own Ctrl-C and tmux
@@ -134,7 +134,7 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt, bool is_async) throws
                               /*new_process_group=*/is_foreground_job);
     } catch (const ExecFormatError &) {
       LOG(Debug, "swallowed an exec format error, running the "
-                            "file as a shell script in this process");
+                 "file as a shell script in this process");
       /* The file has no shebang and is not a binary, so a foreground command
          runs it as a shell script in this process instead of as a child, the
          POSIX fallback. */
@@ -684,8 +684,8 @@ fn find_pos_in_vec(const ArrayList<String> &suffixes,
 
 fn canonicalize_path(StringView path) throws -> Maybe<Path>
 {
-  LOG(Debug, "canonicalizing the path '%.*s'",
-      static_cast<int>(path.length), path.data);
+  LOG(Debug, "canonicalizing the path '%.*s'", static_cast<int>(path.length),
+      path.data);
 
   let candidate = Path{path};
 
@@ -1403,8 +1403,7 @@ static fn split_path_dirs(StringView path_var) throws -> ArrayList<String>
 
 fn initialize_path_map() throws -> void
 {
-  LOG(Info,
-      "scanning every PATH directory to seed the program cache");
+  LOG(Info, "scanning every PATH directory to seed the program cache");
   /* The interactive setup seeds the whole map once, so a later PATH change
      rebuilds it eagerly while reading only the directories the change adds. */
   PATH_MAP_IS_EAGER = true;
@@ -1627,8 +1626,8 @@ fn suggest_command(StringView name, const ArrayList<String> &local_names) throws
 
 fn read_entire_file(StringView path) throws -> Maybe<String>
 {
-  LOG(Debug, "reading the entire file '%.*s'",
-      static_cast<int>(path.length), path.data);
+  LOG(Debug, "reading the entire file '%.*s'", static_cast<int>(path.length),
+      path.data);
 
   let const file = os::open_file_descriptor(path, os::file_open_mode::Read);
   if (!file) return None;
@@ -1648,8 +1647,7 @@ fn read_entire_file(StringView path) throws -> Maybe<String>
 
 fn detect_mimic_shell(const Path &program) throws -> Maybe<mimic_mood>
 {
-  LOG(Debug, "probing '%s' for a shell shebang to mimic",
-      program.c_str());
+  LOG(Debug, "probing '%s' for a shell shebang to mimic", program.c_str());
 
   let const file =
       os::open_file_descriptor(program.text().view(), os::file_open_mode::Read);

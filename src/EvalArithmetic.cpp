@@ -1010,8 +1010,7 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 
   /* The expanded word owns the bytes the parser views, so it outlives the
      parser below. */
-  LOG(All,
-      "expanding parameters inside the arithmetic before the parse");
+  LOG(All, "expanding parameters inside the arithmetic before the parse");
   let const expanded_word = expand_modifier_word(expression);
   let parser = ArithmeticParser{this, expanded_word.view(), 0};
   return parser.parse();

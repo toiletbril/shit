@@ -31,14 +31,11 @@ FLAG(HELP, Bool, '\0', "help", "Display help message.");
 
 FLAG(INTERACTIVE, Bool, 'i', "interactive", Posix,
      "Specify that the shell is interactive.");
-FLAG(STDIN, Bool, 's', "stdin", Posix,
-     "Execute command from stdin and exit.");
+FLAG(STDIN, Bool, 's', "stdin", Posix, "Execute command from stdin and exit.");
 FLAG(COMMAND, ManyStrings, 'c', "command", Posix,
      "Execute specified command and exit. Can be used multiple times.");
-FLAG(ERROR_EXIT, Bool, 'e', "error-exit", Posix,
-     "Die on first error.");
-FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", Posix,
-     "Disable path expansion.");
+FLAG(ERROR_EXIT, Bool, 'e', "error-exit", Posix, "Die on first error.");
+FLAG(DISABLE_EXPANSION, Bool, 'f', "no-glob", Posix, "Disable path expansion.");
 FLAG(ONE_COMMAND, Bool, 't', "one-command", Posix,
      "Exit after executing one command.");
 FLAG(VERBOSE, Bool, 'v', "verbose", Posix,
@@ -55,10 +52,8 @@ FLAG(NOUNSET, Bool, 'u', "no-unset", Posix,
      "Treat an unset variable as an error.");
 FLAG(LOGIN, Bool, 'l', "login", Posix,
      "Act as a login shell and source the profiles.");
-FLAG(IGNORED1, Bool, 'h', "\0", Posix,
-     "Ignored, left for compatibility.");
-FLAG(IGNORED2, Bool, 'm', "\0", Posix,
-     "Ignored, left for compatibility.");
+FLAG(IGNORED1, Bool, 'h', "\0", Posix, "Ignored, left for compatibility.");
+FLAG(IGNORED2, Bool, 'm', "\0", Posix, "Ignored, left for compatibility.");
 
 FLAG(RCFILE, String, '\0', "rcfile", Bash,
      "Source FILE as the interactive rc instead of ~/.bashrc, the way bash "
@@ -84,9 +79,10 @@ FLAG(INIT_MOODS, ManyStrings, 'L', "init-moods", Compat,
      "~/.shitrc, 'bash' reads the bash rc and completion, and 'sh' reads the "
      "ENV file, with the login profiles added under -l. Defaults to the value "
      "of --mood.");
-FLAG(INIT_AS_BASH, Bool, '\0', "init-as-bash", Compat,
-     "Deprecated alias for --init-moods=bash. The SHIT_INIT_AS_BASH environment "
-     "variable enables it when set.");
+FLAG(
+    INIT_AS_BASH, Bool, '\0', "init-as-bash", Compat,
+    "Deprecated alias for --init-moods=bash. The SHIT_INIT_AS_BASH environment "
+    "variable enables it when set.");
 FLAG(
     MIMICRY, Bool, 'I', "mimicry", Compat,
     "Mimic the shell a script's shebang names, for speed. A program whose "
@@ -105,14 +101,14 @@ FLAG(WARNINGS, Bool, 'W', "force-warnings", Shit,
      "run proceed, instead of stopping on the first error.");
 FLAG(LIST_CHECKS, Bool, '\0', "list-diagnostics", Shit,
      "List the shellcheck-style checks the analysis stage reports, then exit.");
-FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics",
-     Shit,
+FLAG(SUPPRESS_DIAGNOSTICS, Bool, '\0', "no-diagnostics", Shit,
      "Skip the analysis stage, so no warnings or pre-run diagnostics are "
      "reported and evaluation begins sooner.");
-FLAG(SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
-     "Suppress diagnostics and warnings only while the startup profiles and rc "
-     "files source, then restore them for the prompt. Pairs with -W so a strict "
-     "shell loads a lax bash config quietly yet keeps its checks afterward.");
+FLAG(
+    SUPPRESS_INIT_DIAGNOSTICS, Bool, '\0', "no-init-diagnostics", Shit,
+    "Suppress diagnostics and warnings only while the startup profiles and rc "
+    "files source, then restore them for the prompt. Pairs with -W so a strict "
+    "shell loads a lax bash config quietly yet keeps its checks afterward.");
 FLAG(NO_COMPLETION, Bool, 'T', "no-completion", Shit,
      "Disable interactive tab completion and ghost-text.");
 
@@ -137,13 +133,11 @@ FLAG(MEMORY, Bool, '\0', "show-memory", Debug,
 FLAG(LOG, String, 'X', "debug-logging", Debug,
      "Enable internal logging at the given level, one of 'info', 'debug', or "
      "'all'. An unknown spelling is an error.");
-FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file",
-     Debug,
+FLAG(DEBUG_OUTPUT_FILE, String, '\0', "debug-logging-file", Debug,
      "Create the named file when missing and append the debug log to it "
      "instead of stderr, so an interactive session logs without painting "
      "over the prompt.");
-FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at",
-     Debug,
+FLAG(DEBUG_COMPLETE_AT, String, '\0', "debug-complete-at", Debug,
      "Print the completion candidates for the given line with the cursor at "
      "its end, one per line the way an explicit tab lists them, after every "
      "-c chunk has run, then exit. The completion test driver.");
@@ -353,8 +347,7 @@ static fn run_script_contents(const String &script_contents,
        it is reused across prompts rather than rebuilt each one. */
     Expression *ast = precompiled_ast;
     if (precompiled_ast == nullptr) {
-      LOG(Debug, "parsing a chunk of %zu bytes",
-          script_contents.count());
+      LOG(Debug, "parsing a chunk of %zu bytes", script_contents.count());
 
       let p = Parser{
           Lexer{String{script_contents.view()}, ast_arena,
@@ -522,8 +515,7 @@ static fn run_prompt_command(EvalContext &context, BumpArena &ast_arena) -> void
   Maybe<String> command = context.get_variable_value("PROMPT_COMMAND");
   if (!command.has_value() || command->is_empty()) return;
 
-  LOG(Info, "running the PROMPT_COMMAND hook, %zu bytes",
-      command->count());
+  LOG(Info, "running the PROMPT_COMMAND hook, %zu bytes", command->count());
 
   const i32 saved_exit_status = context.last_exit_status();
   const u64 saved_command_duration_ns = context.last_command_duration_ns();
@@ -562,22 +554,20 @@ static fn source_file(const Path &path, EvalContext &context,
 {
   Maybe<String> contents = utils::read_entire_file(path.text());
   if (!contents) {
-    LOG(Info,
-        "skipping '%s' because the file is missing or unreadable",
+    LOG(Info, "skipping '%s' because the file is missing or unreadable",
         path.c_str());
     return false;
   }
 
-  LOG(Info, "sourcing '%s', %zu bytes", path.c_str(),
-      contents->count());
+  LOG(Info, "sourcing '%s', %zu bytes", path.c_str(), contents->count());
 
   /* The file runs through run_source, the same path the dot builtin uses, so it
      parses into the active arena alongside the tree already being evaluated
      rather than resetting it. A set --init-moods inside a sourced rc reaches
-     here while that rc's own tree is live, so resetting the arena would free the
-     node mid-walk. run_source also bounds the nesting and retains the AST. The
-     path names the source, so a parse error in it and a backtrace caret carry
-     the file rather than a bare line:col. */
+     here while that rc's own tree is live, so resetting the arena would free
+     the node mid-walk. run_source also bounds the nesting and retains the AST.
+     The path names the source, so a parse error in it and a backtrace caret
+     carry the file rather than a bare line:col. */
   unused(ast_arena);
   context.run_source(*contents, path.text().view(), /*consume_return=*/true,
                      /*call_site=*/None, path.text().view());
@@ -648,12 +638,12 @@ static fn ensure_bash_completion_loaded(EvalContext &context,
 {
   if (context.default_completion_spec() != nullptr) {
     LOG(Info, "skipping the bash-completion bootstrap because a "
-                         "default completion spec is already registered");
+              "default completion spec is already registered");
     return;
   }
   if (context.get_variable_value("BASH_COMPLETION_VERSINFO").has_value()) {
     LOG(Info, "skipping the bash-completion bootstrap because the "
-                         "rc chain already loaded the script");
+              "rc chain already loaded the script");
     return;
   }
   LOG(Info, "sourcing the stock bash-completion script");
@@ -671,9 +661,9 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
   bool did_source_bash_rc = false;
   for (mimic_mood flavor : moods) {
     /* A flavor already on the sourcing stack is skipped, so a set --init-moods
-       inside the very ~/.shitrc this is sourcing cannot re-source it and recurse
-       until the stack overflows. The bit clears when the flavor finishes, even
-       on a throw. */
+       inside the very ~/.shitrc this is sourcing cannot re-source it and
+       recurse until the stack overflows. The bit clears when the flavor
+       finishes, even on a throw. */
     if (context.init_mood_sourcing(flavor)) {
       LOG(Info,
           "skipping the %s flavor, its startup files are already sourcing",
@@ -711,8 +701,8 @@ fn source_init_moods(EvalContext &context, BumpArena &ast_arena,
       break;
     case mimic_mood::Bash:
       /* The bash flavor reads the bash login order, then the system rc and the
-         user rc, the latter replaced by --rcfile. bash runs the system rc before
-         the user one even under --rcfile, so the order mirrors that. */
+         user rc, the latter replaced by --rcfile. bash runs the system rc
+         before the user one even under --rcfile, so the order mirrors that. */
       if (is_login_shell) source_bash_login_files(context, ast_arena);
       if (should_be_interactive) {
         did_source_bash_rc = true;
@@ -851,8 +841,9 @@ fn main(int argc, char **argv) -> int
      environment, so the prompt and the diagnostics stay plain on a dumb
      terminal. */
   if (FLAG_DUMB.is_enabled()) {
-    /* The sh mood is selected by resolve_session_mood when --dumb is set, so the
-       block only turns off completion and diagnostics and forces plain output. */
+    /* The sh mood is selected by resolve_session_mood when --dumb is set, so
+       the block only turns off completion and diagnostics and forces plain
+       output. */
     if (!FLAG_NO_COMPLETION.is_enabled()) FLAG_NO_COMPLETION.toggle();
     if (!FLAG_SUPPRESS_DIAGNOSTICS.is_enabled())
       FLAG_SUPPRESS_DIAGNOSTICS.toggle();
@@ -949,8 +940,7 @@ fn main(int argc, char **argv) -> int
   /* A dash-prefixed invocation name, -bash or a bare -, is the login spawn
      convention tmux and login use, the same mark the -l flag sets. */
   if (FLAG_LOGIN.is_enabled() || name_marks_login) is_login_shell = true;
-  LOG(Info, "the shell %s a login shell",
-      is_login_shell ? "is" : "is not");
+  LOG(Info, "the shell %s a login shell", is_login_shell ? "is" : "is not");
 
   /* The runtime mood and the startup-file moods. --mood selects the session
      mood the shell runs in, while --init-moods lists which moods' startup files
@@ -972,7 +962,8 @@ fn main(int argc, char **argv) -> int
     usize name_start = 0;
     for (usize j = 0; j <= entry.length; j++) {
       if (j != entry.length && entry[j] != ',') continue;
-      shit::StringView name = entry.substring_of_length(name_start, j - name_start);
+      shit::StringView name =
+          entry.substring_of_length(name_start, j - name_start);
       name_start = j + 1;
       if (name.is_empty()) continue;
       shit::Maybe<shit::mimic_mood> parsed = shit::parse_mood_name(name);
@@ -986,7 +977,8 @@ fn main(int argc, char **argv) -> int
   }
 
   /* init-as-bash is the deprecated alias that adds the bash startup files. The
-     SHIT_INIT_AS_BASH environment variable enables it when set and not empty. */
+     SHIT_INIT_AS_BASH environment variable enables it when set and not empty.
+   */
   bool init_as_bash = FLAG_INIT_AS_BASH.is_enabled();
   if (!init_as_bash) {
     if (shit::Maybe<shit::String> env =
@@ -1012,8 +1004,7 @@ fn main(int argc, char **argv) -> int
      default. */
   let const is_privileged =
       FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
-  LOG(Info, "privileged mode is %s",
-      is_privileged ? "on" : "off");
+  LOG(Info, "privileged mode is %s", is_privileged ? "on" : "off");
 
   /* Both stdin and interactive flags are enabled, but there will be only the
    * last man standing. */
@@ -1172,8 +1163,9 @@ fn main(int argc, char **argv) -> int
   /* Shell identity, so a script that probes for its host shell finds a known
      name and takes a working branch rather than a fragile fallback. The mimicry
      run seeds the same set for the shell it mimics, so the seeding is shared.
-     The shit version above stays present in every mood. A bash session or a bash
-     flavor in the init list advertises BASH_VERSION so a bash rc detects it. */
+     The shit version above stays present in every mood. A bash session or a
+     bash flavor in the init list advertises BASH_VERSION so a bash rc detects
+     it. */
   bool wants_bash_identity = session_mood == shit::mimic_mood::Bash;
   for (shit::mimic_mood listed : init_moods)
     if (listed == shit::mimic_mood::Bash) wants_bash_identity = true;
@@ -1272,9 +1264,9 @@ fn main(int argc, char **argv) -> int
   context.set_startup_finished();
 
   /* The startup config has loaded, so the session mood takes over and seeds its
-     strictness. A default-mood shell turns nounset, pipefail, and failglob on so
-     a typo or a failing pipeline stage fails loudly, while a compatibility mood
-     keeps the lax bash or dash defaults. An explicit set -u survives. The
+     strictness. A default-mood shell turns nounset, pipefail, and failglob on
+     so a typo or a failing pipeline stage fails loudly, while a compatibility
+     mood keeps the lax bash or dash defaults. An explicit set -u survives. The
      sourcing above swaps the mood per flavor, so the session mood is restored
      here, unless the rc itself picked a mood with set --mood, which wins over
      the startup default the way a command-line --mood would. */
@@ -1284,9 +1276,9 @@ fn main(int argc, char **argv) -> int
   /* The profiles and rc files sourced through run_source each retained a heap
      copy of their whole text and their parsed tree, held until the next
      top-level command clears them. With the startup chain finished, that text
-     is dropped now rather than carried through the idle prompt, since a function
-     a profile defined keeps its body in the function arena and its source in an
-     owned copy, so nothing live indexes the dropped buffers. */
+     is dropped now rather than carried through the idle prompt, since a
+     function a profile defined keeps its body in the function arena and its
+     source in an owned copy, so nothing live indexes the dropped buffers. */
   context.clear_retained_sources();
 
   /* A simple return cannot be used after this point, since we need a special
@@ -1314,8 +1306,7 @@ fn main(int argc, char **argv) -> int
           script_contents = shit::utils::read_entire_standard_input();
         } else {
           const shit::String &file_name = file_names[0];
-          LOG(Info, "reading the script file '%s'",
-              file_name.c_str());
+          LOG(Info, "reading the script file '%s'", file_name.c_str());
           shit::Maybe<shit::String> contents =
               shit::utils::read_entire_file(file_name.view());
           if (!contents) {
@@ -1349,14 +1340,12 @@ fn main(int argc, char **argv) -> int
       } else if (should_execute_commands) {
         shit::StringView command_view = FLAG_COMMAND.next();
         script_contents = shit::String{command_view};
-        LOG(Info,
-            "taking the next -c command string, %zu bytes",
+        LOG(Info, "taking the next -c command string, %zu bytes",
             script_contents.count());
         if (FLAG_COMMAND.at_end()) should_quit = true;
       } else if (should_be_interactive) {
         if (!toiletline::is_active()) {
-          LOG(Info,
-              "initializing the line editor and the path map");
+          LOG(Info, "initializing the line editor and the path map");
           shit::utils::initialize_path_map();
           toiletline::initialize();
           /* The set -b wake hook registers whenever the editor runs, even
@@ -1501,8 +1490,7 @@ fn main(int argc, char **argv) -> int
         exit_code = shit::run_debug_completion_driver(
             FLAG_DEBUG_COMPLETE_AT.value(), context);
 #endif
-      LOG(Info, "exiting after the final chunk with code %d",
-          exit_code);
+      LOG(Info, "exiting after the final chunk with code %d", exit_code);
       if (!shit::os::is_child_process()) context.run_exit_trap();
       shit::utils::quit(exit_code, FLAG_ERROR_EXIT.is_enabled());
     }

@@ -54,8 +54,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
 
   let const &name = args[1];
 
-  LOG(Debug, "command resolving '%s' past shell functions",
-      name.c_str());
+  LOG(Debug, "command resolving '%s' past shell functions", name.c_str());
 
   /* -v and -V resolve the name without running it, against a builtin and the
      PATH but not a function, the way command is meant to. */

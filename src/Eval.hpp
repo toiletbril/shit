@@ -234,9 +234,9 @@ struct function_definition_info
   const String *defining_instance{nullptr};
   /* The mood and the diagnostics state in effect when the function was defined,
      so the body runs in its defining mood and fires no checks if it was defined
-     while diagnostics or warnings were off, regardless of the mood active at the
-     call. The mood rides as its underlying byte so this struct does not need the
-     mimic_mood enum ordered before it. */
+     while diagnostics or warnings were off, regardless of the mood active at
+     the call. The mood rides as its underlying byte so this struct does not
+     need the mimic_mood enum ordered before it. */
   u8 defining_mood{0};
   bool defining_warnings{false};
   bool defining_diagnostics_disabled{false};
@@ -937,10 +937,11 @@ public:
   /* Bash mood enables the bash extensions that change the meaning of valid
      POSIX syntax, such as the (( )) arithmetic command and brace expansion. The
      evaluator reads it for brace expansion and the parser is handed it at
-     construction for the (( )) and C-style for syntax. The shell sits in exactly
-     one mood at a time, held in m_runtime, and the mood is selected through set_mood
-     by the --mood flag and the set --mood builtin. These predicates name the
-     active mood for the lexer, the completion, and the globbing. */
+     construction for the (( )) and C-style for syntax. The shell sits in
+     exactly one mood at a time, held in m_runtime, and the mood is selected
+     through set_mood by the --mood flag and the set --mood builtin. These
+     predicates name the active mood for the lexer, the completion, and the
+     globbing. */
   pure fn is_bash_compatible() const wontthrow -> bool
   {
     return m_runtime.mood == mimic_mood::Bash;
@@ -962,9 +963,9 @@ public:
 
   /* Seed the nounset, pipefail, and failglob strictness from the active mood,
      so the strict default mood runs strict and a compatibility mood runs lax,
-     the way the named shell does. An explicit set -u, set -o pipefail, or set -o
-     failglob is the script's own ask, so it survives the mood switch untouched.
-     The startup seam and the set --mood builtin both call this. */
+     the way the named shell does. An explicit set -u, set -o pipefail, or set
+     -o failglob is the script's own ask, so it survives the mood switch
+     untouched. The startup seam and the set --mood builtin both call this. */
   fn apply_strictness_for_mood() wontthrow -> void
   {
     let const strict = m_runtime.mood == mimic_mood::Default;

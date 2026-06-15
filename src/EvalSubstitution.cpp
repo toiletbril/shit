@@ -71,14 +71,12 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
 
   let const filename = expand_word_for_assignment(
       static_cast<const tokens::WordToken *>(name)->word());
-  LOG(Debug, "the substitution is a bare file read of '%s'",
-      filename.c_str());
+  LOG(Debug, "the substitution is a bare file read of '%s'", filename.c_str());
   let content = utils::read_entire_file(filename.view());
   /* An unreadable file yields an empty substitution, the way bash leaves
      COMPREPLY-style reads empty rather than aborting. */
   if (!content.has_value()) {
-    LOG(Debug,
-        "the file read substitution of '%s' failed, expanding to empty",
+    LOG(Debug, "the file read substitution of '%s' failed, expanding to empty",
         filename.c_str());
     return String{};
   }
@@ -91,8 +89,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
 fn EvalContext::capture_command_substitution(const String &source) throws
     -> String
 {
-  LOG(Debug, "capturing a command substitution of %zu bytes",
-      source.count());
+  LOG(Debug, "capturing a command substitution of %zu bytes", source.count());
   if (Maybe<String> file = read_redirect_substitution(source.view());
       file.has_value())
     return steal(*file);
@@ -121,8 +118,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
      inner command source the child runs. */
   const char direction = text[0];
   const bool command_writes_the_pipe = direction == '<';
-  LOG(Debug,
-      "setting up a process substitution where the command %s the pipe",
+  LOG(Debug, "setting up a process substitution where the command %s the pipe",
       command_writes_the_pipe ? "writes" : "reads");
 
 #if SHIT_PLATFORM_IS WIN32
@@ -201,8 +197,7 @@ fn EvalContext::setup_process_substitution(StringView text) throws -> String
 
   let path = String{"/dev/fd/"};
   path += utils::int_to_text(static_cast<i64>(shell_fd));
-  LOG(Debug, "the process substitution is reachable at '%s'",
-      path.c_str());
+  LOG(Debug, "the process substitution is reachable at '%s'", path.c_str());
   return path;
 #endif
 }
@@ -228,8 +223,7 @@ fn EvalContext::cleanup_process_substitutions(
     try {
       os::reap_process_quietly(sub.child);
     } catch (const Error &e) {
-      LOG(Debug,
-          "a process substitution reap failed and was swallowed: %s",
+      LOG(Debug, "a process substitution reap failed and was swallowed: %s",
           e.message().c_str());
       /* The child is reaped on a best-effort basis, so a wait failure is shown
          as a warning and swallowed rather than propagated out of this no-throw
@@ -246,14 +240,12 @@ fn EvalContext::cleanup_process_substitutions(
                            : WarningWithLocation{sub.location, text}.to_string(
                                  sub.source));
         } catch (...) {
-          LOG(Debug,
-              "showing the reap warning failed, the error is swallowed");
+          LOG(Debug, "showing the reap warning failed, the error is swallowed");
         }
       }
     } catch (...) {
-      LOG(Debug,
-          "a process substitution reap failed with an unknown error, "
-          "swallowed");
+      LOG(Debug, "a process substitution reap failed with an unknown error, "
+                 "swallowed");
       if (!is_bash_compatible()) {
         try {
           const StringView text =
@@ -263,9 +255,8 @@ fn EvalContext::cleanup_process_substitutions(
                            : WarningWithLocation{sub.location, text}.to_string(
                                  sub.source));
         } catch (...) {
-          LOG(Debug,
-              "showing the fallback reap warning failed, the error is "
-              "swallowed");
+          LOG(Debug, "showing the fallback reap warning failed, the error is "
+                     "swallowed");
         }
       }
     }

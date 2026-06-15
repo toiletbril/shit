@@ -71,8 +71,8 @@ fn EvalContext::forget_done_jobs() throws -> void
     if (job.state == job::State::Done) continue;
     kept.push(steal(job));
   }
-  LOG(Debug, "dropping finished jobs, keeping %zu of %zu",
-      kept.count(), m_jobs.count());
+  LOG(Debug, "dropping finished jobs, keeping %zu of %zu", kept.count(),
+      m_jobs.count());
   m_jobs = steal(kept);
 }
 
@@ -115,8 +115,7 @@ fn EvalContext::notify_done_jobs() throws -> void
 
 fn EvalContext::set_monitor(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the monitor option flips to %s",
-      enabled ? "on" : "off");
+  LOG(Info, "the monitor option flips to %s", enabled ? "on" : "off");
   m_monitor = enabled;
 }
 

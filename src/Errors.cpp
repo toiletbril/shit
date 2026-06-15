@@ -199,8 +199,7 @@ get_context_pointing_to(StringView source, usize byte_position,
                         usize unicode_position, Maybe<StringView> message,
                         const diagnostic_color &color) throws -> String
 {
-  LOG(Debug, "assembling the caret context for line %zu",
-      line_number + 1);
+  LOG(Debug, "assembling the caret context for line %zu", line_number + 1);
 
   usize start_offset = byte_position - last_newline_location;
 
@@ -491,8 +490,7 @@ cold fn ErrorWithLocationAndDetails::details_to_string(
      the end. */
   if (byte_position > source.count()) return String{};
 
-  LOG(Debug, "formatting the detail note at byte %zu",
-      byte_position);
+  LOG(Debug, "formatting the detail note at byte %zu", byte_position);
 
   if (byte_position > 0 && byte_position == source.count() &&
       source[byte_position - 1] == '\n')

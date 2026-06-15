@@ -125,7 +125,7 @@ fn propagated_test_operand_value(const Token *token,
 {
   if (is_split_eligible_variable_operand(token)) {
     LOG(All, "declining the test operand fold, the unquoted "
-                        "variable splits at run time");
+             "variable splits at run time");
     return None;
   }
   return propagated_literal_word_value(token, actx);
@@ -407,7 +407,7 @@ fn simple_command_static_verdict(const ArrayList<const Token *> &args,
       return constant_test_verdict(operands, actx);
     } catch (...) {
       LOG(All, "swallowed an error while judging the literal "
-                          "test, leaving it unfolded");
+               "test, leaving it unfolded");
       return None;
     }
   }
@@ -564,8 +564,7 @@ fn rule_dead_branch_elimination(const Expression *node,
   }
   /* Every condition failed, so the else body runs, or nothing when there is
      none. An index past the last branch names that outcome. */
-  LOG(All,
-      "every if condition is statically false, folding to the else body");
+  LOG(All, "every if condition is statically false, folding to the else body");
   clause->set_folded_branch(clause->branches().count());
   actx.optimizer_folded_branches++;
   if (actx.trace_optimizer)

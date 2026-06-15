@@ -182,9 +182,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
     return;
   }
   /* A write past the run's end leaves a gap, so it is held sparsely. */
-  LOG(All,
-      "holding element %zu of '%.*s' sparsely past the dense run of %zu", index,
-      static_cast<int>(name.length), name.data, count);
+  LOG(All, "holding element %zu of '%.*s' sparsely past the dense run of %zu",
+      index, static_cast<int>(name.length), name.data, count);
   m_sparse_array_values.set(
       sparse_array_key(name, index, scratch_allocator()).view(), value);
 }

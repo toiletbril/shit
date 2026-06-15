@@ -84,8 +84,7 @@ static fn trim_value_with_modifier(EvalContext &cxt, StringView value,
                                    StringView word, trim_end end,
                                    bool longest) throws -> String
 {
-  LOG(All,
-      "trimming a value of %zu bytes with the pattern word '%.*s'",
+  LOG(All, "trimming a value of %zu bytes with the pattern word '%.*s'",
       value.length, static_cast<int>(word.length), word.data);
   let active = ArrayList<bool>{cxt.scratch_allocator()};
   let const pattern = cxt.expand_modifier_word_masked(word, active);
@@ -880,8 +879,7 @@ fn EvalContext::apply_pattern_replacement(StringView name,
 fn EvalContext::pattern_replace_value(const String &value,
                                       StringView spec) throws -> String
 {
-  LOG(All,
-      "applying the pattern replacement '%.*s' to a value of %zu bytes",
+  LOG(All, "applying the pattern replacement '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.count());
   /* The spec opens with the slash operator. A doubled slash replaces every
      match, and a # or % after the first slash anchors the pattern to the start
@@ -996,8 +994,7 @@ fn EvalContext::apply_case_modification_to_value(StringView value,
                                                  StringView spec) throws
     -> String
 {
-  LOG(All,
-      "applying the case modification '%.*s' to a value of %zu bytes",
+  LOG(All, "applying the case modification '%.*s' to a value of %zu bytes",
       static_cast<int>(spec.length), spec.data, value.length);
   const char op = spec[0];
   /* A doubled operator touches every matching character, a single one only the

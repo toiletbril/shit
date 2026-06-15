@@ -255,8 +255,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
                                       is_shopt_enabled("globstar");
 
     if (is_globstar_component) {
-      LOG(All,
-          "expanding a globstar component across directory levels");
+      LOG(All, "expanding a globstar component across directory levels");
       let const prefix = text.substring_of_length(0, component_start);
       let base = Path{StringView{"."}};
       if (component_start == 1)
@@ -501,8 +500,8 @@ hot fn EvalContext::expand_path(glob_field field,
      from spending most of its time in the sort comparator. */
   utils::sort_ascending(values);
 
-  LOG(All, "the glob pattern '%s' matched %zu paths",
-      pattern.c_str(), values.count());
+  LOG(All, "the glob pattern '%s' matched %zu paths", pattern.c_str(),
+      values.count());
 
   /* A glob that matches no file is a hard error by default, the typo-catching
      behavior. With failglob off the shell takes the POSIX fallback and expands
@@ -547,8 +546,7 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
                          extglob_enabled())
            .has_value())
   {
-    LOG(Debug,
-        "compgen -G probe of '%.*s' has no glob, checking existence",
+    LOG(Debug, "compgen -G probe of '%.*s' has no glob, checking existence",
         static_cast<int>(pattern.length), pattern.data);
     if (Path{pattern}.exists()) values.push(String{scratch, pattern});
     return values;

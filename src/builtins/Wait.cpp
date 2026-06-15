@@ -51,8 +51,7 @@ i32 Wait::execute(ExecContext &ec, EvalContext &cxt) const throws
   i32 status = 0;
 
   if (args.count() == 1) {
-    LOG(Debug, "wait blocking on every job of %zu",
-        cxt.jobs().count());
+    LOG(Debug, "wait blocking on every job of %zu", cxt.jobs().count());
     for (job &job : cxt.jobs())
       status = wait_for_job(job);
     cxt.forget_done_jobs();

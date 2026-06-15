@@ -216,8 +216,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
       next_arg_is_value = false;
 
       ASSERT(prev_flag != nullptr);
-      LOG(All,
-          "attaching the next argument '%s' as the value of the flag '%s'",
+      LOG(All, "attaching the next argument '%s' as the value of the flag '%s'",
           argv[i], flag_name(prev_flag, prev_is_long).c_str());
       if (prev_flag->kind() == Flag::Kind::String)
         static_cast<FlagString *>(prev_flag)->set(argv[i]);
@@ -282,8 +281,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
 
           fb->toggle();
           fb->set_position(++position);
-          LOG(All, "toggled the flag '%s'",
-              flag_name(fb, is_long).c_str());
+          LOG(All, "toggled the flag '%s'", flag_name(fb, is_long).c_str());
 
           /* Check for combined flags, e.g -vAsn. */
           if (!is_long && *value_offset != '\0') {
@@ -298,8 +296,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
           if (*value_offset == '\0') {
             /* There is None after the flag. Expect next argument
              * to be the value. */
-            LOG(All,
-                "the flag '%s' expects the next argument as its value",
+            LOG(All, "the flag '%s' expects the next argument as its value",
                 flag_name(flag, is_long).c_str());
             next_arg_is_value = true;
           } else {
@@ -334,8 +331,7 @@ fn parse_flags(const ArrayList<Flag *> &flags, int argc,
                 static_cast<FlagManyStrings *>(flag)->append(value_offset);
 
               flag->set_position(++position);
-              LOG(All,
-                  "set the flag '%s' to the attached value '%s'",
+              LOG(All, "set the flag '%s' to the attached value '%s'",
                   flag_name(flag, is_long).c_str(), value_offset);
             } else {
               throw Error{"Long flags require a separator "

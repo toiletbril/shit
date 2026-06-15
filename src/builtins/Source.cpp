@@ -44,8 +44,7 @@ i32 Source::execute(ExecContext &ec, EvalContext &cxt) const throws
     throw Error{"Unable to source because a filename argument is required"};
 
   let const path = ec.args()[path_index].clone();
-  LOG(Info, "source running file '%s' in the current shell",
-      path.c_str());
+  LOG(Info, "source running file '%s' in the current shell", path.c_str());
   let const contents = utils::read_entire_file(path);
   if (!contents)
     throw Error{"Unable to source the file '" + path +

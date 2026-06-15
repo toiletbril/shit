@@ -121,8 +121,7 @@ fn BumpArena::release(Mark saved) wontthrow -> void
 
 cold fn BumpArena::reset() wontthrow -> void
 {
-  LOG(All,
-      "resetting the arena holding %zu blocks and %zu used bytes",
+  LOG(All, "resetting the arena holding %zu blocks and %zu used bytes",
       m_blocks.count(), bytes_used());
 
   run_destructors_down_to(0);

@@ -176,8 +176,8 @@ cold i32 Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 0;
   }
 
-  LOG(Debug, "ulimit changing the '%s' limit to '%s'",
-      resource.label, args[1].c_str());
+  LOG(Debug, "ulimit changing the '%s' limit to '%s'", resource.label,
+      args[1].c_str());
 
   let const &requested = args[1];
   rlim_t value = RLIM_INFINITY;

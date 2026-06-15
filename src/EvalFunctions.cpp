@@ -115,8 +115,8 @@ pure fn EvalContext::has_functions() const wontthrow -> bool
 
 fn EvalContext::unset_function(StringView name) throws -> void
 {
-  LOG(Info, "unsetting function '%.*s'",
-      static_cast<int>(name.length), name.data);
+  LOG(Info, "unsetting function '%.*s'", static_cast<int>(name.length),
+      name.data);
   m_functions.erase(name);
   m_function_sources.erase(name);
   m_function_definition_infos.erase(name);
@@ -172,8 +172,8 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
 
 fn EvalContext::remove_trap(StringView condition) throws -> void
 {
-  LOG(Info, "removing the trap for '%.*s'",
-      static_cast<int>(condition.length), condition.data);
+  LOG(Info, "removing the trap for '%.*s'", static_cast<int>(condition.length),
+      condition.data);
   m_traps.erase(condition);
   /* Removing a signal trap returns the signal to its default disposition, so a
      later arrival acts the way it would without any trap. */
@@ -184,8 +184,7 @@ fn EvalContext::remove_trap(StringView condition) throws -> void
 
 fn EvalContext::install_trap_dispositions() throws -> void
 {
-  LOG(Info, "reinstalling the dispositions of %zu traps",
-      m_traps.count());
+  LOG(Info, "reinstalling the dispositions of %zu traps", m_traps.count());
   m_traps.for_each([&](StringView condition, const String &action) {
     if (condition == "EXIT") return;
     if (let const number = os::signal_number_from_name(condition)) {
@@ -222,8 +221,7 @@ fn EvalContext::run_pending_traps() throws -> void
     if (!name.has_value()) continue;
     if (let const *action = m_traps.find(name->view()))
       if (action->count() > 0) {
-        LOG(Info, "running the trap action for signal '%s'",
-            name->c_str());
+        LOG(Info, "running the trap action for signal '%s'", name->c_str());
         run_source(action->view(), "the " + *name + " trap");
       }
   }
@@ -273,8 +271,7 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> void
      traps and variables. */
   if (let const *action = m_traps.find(StringView{"EXIT", 4}))
     if (action->count() > 0) {
-      LOG(Info,
-          "running the EXIT trap action the subshell set at its end");
+      LOG(Info, "running the EXIT trap action the subshell set at its end");
       run_source(action->view(), "the EXIT trap");
     }
 }

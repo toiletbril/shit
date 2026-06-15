@@ -45,8 +45,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      subshell each touched descriptor is backed up first, so the change stays
      contained at the subshell's end. */
   if (args.count() == 1) {
-    LOG(Debug,
-        "exec applying redirections to the shell's own descriptors");
+    LOG(Debug, "exec applying redirections to the shell's own descriptors");
     if (ec.in_fd.has_value()) cxt.snapshot_subshell_descriptor(0);
     if (ec.out_fd.has_value()) cxt.snapshot_subshell_descriptor(1);
     if (ec.err_fd.has_value()) cxt.snapshot_subshell_descriptor(2);
@@ -56,8 +55,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const &command_name = args[1];
 
-  LOG(Info, "exec replacing the shell with '%s'",
-      command_name.c_str());
+  LOG(Info, "exec replacing the shell with '%s'", command_name.c_str());
 
   /* Resolve to an executable file. A failure here ends the shell with 127, the
      status a command-not-found leaves. */
@@ -98,8 +96,7 @@ fn Exec::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
      program runs as a spawned child and its status ends the scope, the way
      bash's forked subshell or stage dies into its exec. */
   if (cxt.in_subshell() || cxt.is_in_pipeline_stage()) {
-    LOG(Info,
-        "exec runs '%s' as a child rather than replacing the shell",
+    LOG(Info, "exec runs '%s' as a child rather than replacing the shell",
         command_name.c_str());
     let const status = utils::execute_context(steal(command), cxt, false);
     if (cxt.in_subshell()) cxt.request_exit(status, ec.source_location());

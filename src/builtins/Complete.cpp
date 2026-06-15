@@ -187,16 +187,14 @@ fn Complete::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   };
 
   if (is_default_completion) {
-    LOG(Debug,
-        "complete registering the default spec with function '%s'",
+    LOG(Debug, "complete registering the default spec with function '%s'",
         function_name.c_str());
     cxt.register_default_completion_spec(make_spec());
     return 0;
   }
 
   for (const String &command : commands) {
-    LOG(Debug, "complete registering spec for '%s'",
-        command.c_str());
+    LOG(Debug, "complete registering spec for '%s'", command.c_str());
     cxt.register_completion_spec(command.view(), make_spec());
   }
   return 0;

@@ -219,8 +219,7 @@ fn Z::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     query.append(ec.args()[i]);
   }
 
-  LOG(Debug, "z ranking the frecency store against query '%s'",
-      query.c_str());
+  LOG(Debug, "z ranking the frecency store against query '%s'", query.c_str());
 
   let entries = read_frecency_store();
   let const now = now_epoch_seconds();

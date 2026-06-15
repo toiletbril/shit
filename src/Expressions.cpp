@@ -232,15 +232,14 @@ fn command_resolves(AnalysisContext &actx, const String &name) throws -> bool
   }
 
   if (const bool *cached = actx.command_resolution_cache.find(name.view())) {
-    LOG(Debug, "reusing the cached resolution of '%s'",
-        name.c_str());
+    LOG(Debug, "reusing the cached resolution of '%s'", name.c_str());
     return *cached;
   }
 
   const bool was_resolved =
       utils::search_program_path(name.view()).count() != 0;
-  LOG(Debug, "scanning PATH for '%s', the command was %s",
-      name.c_str(), was_resolved ? "found" : "not found");
+  LOG(Debug, "scanning PATH for '%s', the command was %s", name.c_str(),
+      was_resolved ? "found" : "not found");
   actx.command_resolution_cache.set(name.view(), was_resolved);
   return was_resolved;
 }
@@ -645,8 +644,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_assignment != nullptr);
 
-  LOG(All, "assigning the variable '%s'",
-      m_assignment->key().c_str());
+  LOG(All, "assigning the variable '%s'", m_assignment->key().c_str());
 
   /* Record where this assignment sits so a $LINENO in its value reports its
      line, since a script may read it as x=$LINENO. */
@@ -1721,8 +1719,8 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
        state returns when the call ends. */
     /* The common case is a function defined and called in the same mood, so the
        swap only happens when the defining state actually differs from the live
-       state. A matching call pays one map lookup and three comparisons and skips
-       the capture, the defer, and the four setters entirely. */
+       state. A matching call pays one map lookup and three comparisons and
+       skips the capture, the defer, and the four setters entirely. */
     let const *const definition_info =
         cxt.function_definition_info_of(program_name.view());
     let const needs_state_swap =
@@ -1737,8 +1735,7 @@ hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       saved_runtime_state = cxt.enter_definition_state(*definition_info);
     defer
     {
-      if (saved_runtime_state.has_value())
-        saved_runtime_state->restore(cxt);
+      if (saved_runtime_state.has_value()) saved_runtime_state->restore(cxt);
     };
 
     /* A located error thrown from the body carries an absolute position into
@@ -2020,8 +2017,7 @@ hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
         return n->evaluate(cxt);
       } catch (const ErrorBase &error) {
         if (!cxt.is_bash_compatible() || error.is_script_fatal()) throw;
-        LOG(Debug,
-            "bash mood converted the error to command status %lld: %s",
+        LOG(Debug, "bash mood converted the error to command status %lld: %s",
             static_cast<long long>(error.command_status()),
             error.message().c_str());
         const String *source = cxt.current_source();
@@ -2312,8 +2308,7 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           shit::show_message(e.to_string());
           stage_status = 1;
         } catch (...) {
-          LOG(Debug,
-              "swallowed an unknown error in the pipeline stage child");
+          LOG(Debug, "swallowed an unknown error in the pipeline stage child");
           stage_status = 1;
         }
         shit::flush();
@@ -2757,8 +2752,7 @@ fn resolve_loop_control(EvalContext &cxt) throws -> loop_disposition
      loop so the outer one consumes it. */
   if (control.value > 1) {
     control.value -= 1;
-    LOG(All,
-        "the loop jump targets an outer loop, %lld levels stay pending",
+    LOG(All, "the loop jump targets an outer loop, %lld levels stay pending",
         static_cast<long long>(control.value));
     return loop_disposition::StopLoop;
   }
@@ -2783,8 +2777,7 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
      replace the shell. */
   cxt.set_terminal_exec_allowed(false);
 
-  LOG(Debug, "entering the %s loop%s",
-      m_is_until ? "until" : "while",
+  LOG(Debug, "entering the %s loop%s", m_is_until ? "until" : "while",
       m_folded_to_skip ? ", folded to skip the body" : "");
 
   /* The analyze pass proved the body never runs, so the loop yields 0 without
@@ -2913,8 +2906,8 @@ fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       m_has_in_clause ? cxt.process_args(m_words) : cxt.positional_params();
   if (values.is_empty()) return 0;
 
-  LOG(Debug, "the select loop offers %zu choices for '%s'",
-      values.count(), m_variable_name.c_str());
+  LOG(Debug, "the select loop offers %zu choices for '%s'", values.count(),
+      m_variable_name.c_str());
 
   cxt.enter_loop();
   defer { cxt.leave_loop(); };
@@ -3038,8 +3031,8 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
     }
   };
 
-  LOG(Debug, "the for loop binds '%s' over %zu values",
-      m_variable_name.c_str(), values.count());
+  LOG(Debug, "the for loop binds '%s' over %zu values", m_variable_name.c_str(),
+      values.count());
 
   /* The body runs inside one more loop level, so a break or a continue clamps
      its level against the nesting that is actually live. */
@@ -3414,8 +3407,7 @@ static pure fn is_blank_clause(StringView text) wontthrow -> bool
 
 fn ArithmeticCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
-  LOG(Debug, "evaluating the arithmetic command '%s'",
-      m_expression.c_str());
+  LOG(Debug, "evaluating the arithmetic command '%s'", m_expression.c_str());
 
   /* The expression reads variables, so a runtime warning from it carets this
      (( )) rather than the statement before it. */
@@ -3525,8 +3517,8 @@ fn ArrayAssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* The elements expand the way command arguments do, with field splitting and
      globbing, so a=( $list *.txt ) builds the array bash would. */
   ArrayList<String> values = cxt.process_args(m_elements);
-  LOG(Debug, "assigning %zu elements to the array '%s'",
-      values.count(), m_name.c_str());
+  LOG(Debug, "assigning %zu elements to the array '%s'", values.count(),
+      m_name.c_str());
   cxt.assign_indexed_array_elements(m_name.view(), steal(values), m_is_append);
   cxt.set_last_exit_status(0);
   return 0;

@@ -281,8 +281,7 @@ cold fn Parser::construct_ast(ArrayList<String> &errors) throws -> Expression *
     } catch (const ErrorWithLocationAndDetails &e) {
       /* Render both parts here, since the detail note would be sliced off a
          base-class copy and its hint lost. */
-      LOG(Debug,
-          "recording a detailed parse error and recovering: %s",
+      LOG(Debug, "recording a detailed parse error and recovering: %s",
           e.message().c_str());
       errors.push(e.to_string(m_lexer.source()));
       errors.push(e.details_to_string(m_lexer.source()));
@@ -778,8 +777,7 @@ fn Parser::build_heredoc_redirection(
     delimiter = delimiter.substring(1);
   }
 
-  LOG(Debug,
-      "registering a heredoc redirection with delimiter '%.*s'",
+  LOG(Debug, "registering a heredoc redirection with delimiter '%.*s'",
       static_cast<int>(delimiter.length), delimiter.data);
 
   /* A quoted delimiter, such as <<'EOF', keeps the body literal. */
@@ -1255,8 +1253,8 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   ASSERT(keyword != nullptr);
   const let location = keyword->source_location();
 
-  LOG(Debug, "parsing a %s loop at byte %zu",
-      is_until ? "until" : "while", location.position);
+  LOG(Debug, "parsing a %s loop at byte %zu", is_until ? "until" : "while",
+      location.position);
 
   Expression *condition = parse_command_list({Token::Kind::Do});
   Token *do_token = m_lexer.next_shell_token();
@@ -1920,8 +1918,7 @@ hot fn Parser::parse_arithmetic_command(Token *open) throws -> Command *
 hot fn Parser::parse_c_style_for(SourceLocation location, Token *open) throws
     -> Command *
 {
-  LOG(Debug, "parsing a c-style for header at byte %zu",
-      location.position);
+  LOG(Debug, "parsing a c-style for header at byte %zu", location.position);
 
   const StringView header = capture_double_paren_body(open);
 
@@ -2158,8 +2155,7 @@ fn Parser::parse_keyword_function_definition() throws -> Command *
   const let location = name_token->source_location();
   const let name = name_token->raw_string();
 
-  LOG(Debug, "parsing a keyword function definition for '%s'",
-      name.c_str());
+  LOG(Debug, "parsing a keyword function definition for '%s'", name.c_str());
 
   /* An empty () pair may follow the name in the bash function form, where the
      POSIX form requires it. */

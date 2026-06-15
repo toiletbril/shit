@@ -207,8 +207,7 @@ fn EvalContext::seed_shell_identity_variables(bool bash_identity) throws -> void
   /* sh and dash advertise no version variable, so the bash identity is just
      cleared and nothing replaces it. The clear matters for a mimicked sh whose
      parent ran in bash mode, and is a no-op at startup where nothing is set. */
-  LOG(Info,
-      "clearing the bash identity variables for a non-bash mood");
+  LOG(Info, "clearing the bash identity variables for a non-bash mood");
   force_unset_shell_variable("BASH_VERSION");
   force_unset_shell_variable("BASH");
 }
@@ -248,8 +247,7 @@ fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
     for (usize i = frame.count(); i-- > 0;) {
       let &binding = frame[i];
       if (binding.name.view() != name) continue;
-      LOG(Debug,
-          "peeling the local binding of '%.*s' from caller frame %zu",
+      LOG(Debug, "peeling the local binding of '%.*s' from caller frame %zu",
           static_cast<int>(name.length), name.data, frame_index);
 
       /* The caller's saved state comes back right now, the same restore the
@@ -401,8 +399,7 @@ cold fn EvalContext::show_runtime_warning_at(SourceLocation location,
        warning in the typed line has no frames and stays a single report. */
     if (!m_source_frames.is_empty()) print_source_backtrace();
   } catch (...) {
-    LOG(Debug,
-        "formatting a runtime warning failed, the error is swallowed");
+    LOG(Debug, "formatting a runtime warning failed, the error is swallowed");
   }
 }
 
@@ -509,8 +506,7 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
       show_message(WarningWithLocation{location, message}.to_string(
           m_current_source->view()));
     } catch (...) {
-      LOG(Debug,
-          "showing a located warning failed, the error is swallowed");
+      LOG(Debug, "showing a located warning failed, the error is swallowed");
     }
   }
 }
@@ -520,8 +516,7 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
    key it stores, so the callers build this on the per-command scratch arena. */
 fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
-  LOG(All,
-      "removing variable '%.*s' from the store and the environment",
+  LOG(All, "removing variable '%.*s' from the store and the environment",
       static_cast<int>(name.length), name.data);
   m_shell_variables.erase(name);
   /* An exported variable also lives in the process environment, so it is
@@ -553,8 +548,8 @@ fn EvalContext::record_environment_change(StringView name) throws -> void
 
 fn EvalContext::mark_exported(StringView name) throws -> void
 {
-  LOG(All, "marking '%.*s' as exported",
-      static_cast<int>(name.length), name.data);
+  LOG(All, "marking '%.*s' as exported", static_cast<int>(name.length),
+      name.data);
   m_exported_names.add(name);
 }
 
@@ -906,8 +901,7 @@ fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 fn EvalContext::remove_alias(StringView name) throws -> bool
 {
   if (m_aliases.find(name) == nullptr) return false;
-  LOG(All, "removing alias '%.*s'", static_cast<int>(name.length),
-      name.data);
+  LOG(All, "removing alias '%.*s'", static_cast<int>(name.length), name.data);
   m_aliases.erase(name);
   return true;
 }
@@ -958,8 +952,7 @@ fn EvalContext::leave_subshell() wontthrow -> void
   while (!m_subshell_saved_descriptors.is_empty() &&
          m_subshell_saved_descriptors.back().depth == m_subshell_depth)
   {
-    LOG(Debug,
-        "restoring descriptor %d a subshell exec moved at depth %zu",
+    LOG(Debug, "restoring descriptor %d a subshell exec moved at depth %zu",
         m_subshell_saved_descriptors.back().saved.shell_fd, m_subshell_depth);
     os::restore_descriptor(m_subshell_saved_descriptors.back().saved);
     m_subshell_saved_descriptors.remove(m_subshell_saved_descriptors.count() -
@@ -997,8 +990,8 @@ fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
   }
   if (static_cast<usize>(level) > m_loop_depth)
     level = static_cast<i64>(m_loop_depth);
-  LOG(All, "break requested, level %lld of depth %zu",
-      (long long) level, m_loop_depth);
+  LOG(All, "break requested, level %lld of depth %zu", (long long) level,
+      m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Break, level, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -1014,8 +1007,8 @@ fn EvalContext::request_continue(i64 level, SourceLocation location) throws
   }
   if (static_cast<usize>(level) > m_loop_depth)
     level = static_cast<i64>(m_loop_depth);
-  LOG(All, "continue requested, level %lld of depth %zu",
-      (long long) level, m_loop_depth);
+  LOG(All, "continue requested, level %lld of depth %zu", (long long) level,
+      m_loop_depth);
   m_control_flow = control_flow{control_flow::Kind::Continue, level, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -1130,14 +1123,13 @@ fn EvalContext::leave_source() wontthrow -> void
 fn EvalContext::enter_function_call(SourceLocation location) throws -> void
 {
   if (m_function_call_depth >= MAX_FUNCTION_CALL_DEPTH) {
-    LOG(Debug, "function call depth %zu exceeds cap %zu",
-        m_function_call_depth, MAX_FUNCTION_CALL_DEPTH);
+    LOG(Debug, "function call depth %zu exceeds cap %zu", m_function_call_depth,
+        MAX_FUNCTION_CALL_DEPTH);
     throw ErrorWithLocation{location,
                             "Maximum source/recursion depth exceeded"};
   }
   m_function_call_depth++;
-  LOG(Debug, "entered function call depth %zu",
-      m_function_call_depth);
+  LOG(Debug, "entered function call depth %zu", m_function_call_depth);
 }
 
 fn EvalContext::leave_function_call() wontthrow -> void
@@ -1148,8 +1140,7 @@ fn EvalContext::leave_function_call() wontthrow -> void
 
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the errexit option flips to %s",
-      enabled ? "on" : "off");
+  LOG(Info, "the errexit option flips to %s", enabled ? "on" : "off");
   m_error_exit = enabled;
 }
 
@@ -1166,8 +1157,7 @@ fn EvalContext::set_echo_expanded(bool enabled) wontthrow -> void
 
 fn EvalContext::set_error_unset(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the nounset option flips to %s",
-      enabled ? "on" : "off");
+  LOG(Info, "the nounset option flips to %s", enabled ? "on" : "off");
   m_runtime.error_unset = enabled;
 }
 
@@ -1178,8 +1168,7 @@ pure fn EvalContext::error_unset() const wontthrow -> bool
 
 fn EvalContext::set_pipefail(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the pipefail option flips to %s",
-      enabled ? "on" : "off");
+  LOG(Info, "the pipefail option flips to %s", enabled ? "on" : "off");
   m_runtime.pipefail = enabled;
 }
 
@@ -1190,8 +1179,7 @@ pure fn EvalContext::pipefail() const wontthrow -> bool
 
 fn EvalContext::set_no_clobber(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the noclobber option flips to %s",
-      enabled ? "on" : "off");
+  LOG(Info, "the noclobber option flips to %s", enabled ? "on" : "off");
   m_no_clobber = enabled;
 }
 
@@ -1202,8 +1190,7 @@ pure fn EvalContext::no_clobber() const wontthrow -> bool
 
 fn EvalContext::set_export_all(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the allexport option flips to %s",
-      enabled ? "on" : "off");
+  LOG(Info, "the allexport option flips to %s", enabled ? "on" : "off");
   m_export_all = enabled;
 }
 
@@ -1243,8 +1230,7 @@ pure fn EvalContext::no_exec() const wontthrow -> bool { return m_no_exec; }
 
 fn EvalContext::set_failglob(bool enabled) wontthrow -> void
 {
-  LOG(Info, "the failglob option flips to %s",
-      enabled ? "on" : "off");
+  LOG(Info, "the failglob option flips to %s", enabled ? "on" : "off");
   m_runtime.failglob = enabled;
 }
 
@@ -1356,8 +1342,7 @@ fn EvalContext::snapshot_state() const throws -> eval_state_snapshot
 
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
-  LOG(Debug,
-      "restoring the evaluator state after a subshell or substitution");
+  LOG(Debug, "restoring the evaluator state after a subshell or substitution");
   m_shell_variables = steal(snapshot.shell_variables);
   m_functions = steal(snapshot.functions);
   m_function_sources = steal(snapshot.function_sources);
@@ -1416,8 +1401,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
      that wrote no exported name logged nothing, so the count already matches
      the mark and the loop does not run. The rewind precedes the PATH re-point
      below, so an exported PATH reads its restored value. */
-  LOG(Debug,
-      "rewinding %zu environment writes made inside the subshell",
+  LOG(Debug, "rewinding %zu environment writes made inside the subshell",
       m_environment_undo_log.count() - snapshot.environment_undo_mark);
   while (m_environment_undo_log.count() > snapshot.environment_undo_mark) {
     const environment_undo_entry &entry = m_environment_undo_log.back();
@@ -1740,12 +1724,11 @@ fn ExecContext::make_from(SourceLocation location,
   ResolvedCommand kind;
   if (!bk) {
     if (p.has_value()) {
-      LOG(Debug, "resolved '%s' to the program '%s'",
-          program.c_str(), p->text().c_str());
+      LOG(Debug, "resolved '%s' to the program '%s'", program.c_str(),
+          p->text().c_str());
       kind = ResolvedCommand::from_program(steal(*p));
     } else {
-      LOG(Debug, "no builtin or program matches '%s'",
-          program.c_str());
+      LOG(Debug, "no builtin or program matches '%s'", program.c_str());
       /* A close builtin or PATH program is offered as a did-you-mean hint, so a
          typo such as gti points at git. */
       String message = "Program '" + program + "' wasn't found";

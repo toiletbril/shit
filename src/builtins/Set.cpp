@@ -132,8 +132,8 @@ const SetOption SET_OPTIONS[] = {
 
 /* Parse a set --mood value, with 'shit' the strict default, 'bash' the bash
    extensions, and 'sh' or 'posix' the dash semantics. An unknown spelling
-   returns None so the caller reports the usage error the same way --mood does at
-   startup. */
+   returns None so the caller reports the usage error the same way --mood does
+   at startup. */
 Maybe<mimic_mood> parse_mood_name(StringView name) throws
 {
   if (name == "shit" || name == "default") return mimic_mood::Default;
@@ -385,7 +385,8 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
        pipefail, and failglob defaults are reseeded from the new mood. */
     if (arg == "--mood" || arg == "-M" ||
         arg.view().starts_with(StringView{"--mood="}) ||
-        arg.view().starts_with(StringView{"-M="})) {
+        arg.view().starts_with(StringView{"-M="}))
+    {
       StringView value{};
       bool have_value = false;
       if (let const eq = arg.view().find_character('='); eq.has_value()) {
@@ -414,7 +415,8 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
        bash rc or a shit rc reloads on demand. */
     if (arg == "--init-moods" || arg == "-L" ||
         arg.view().starts_with(StringView{"--init-moods="}) ||
-        arg.view().starts_with(StringView{"-L="})) {
+        arg.view().starts_with(StringView{"-L="}))
+    {
       StringView value{};
       bool have_value = false;
       if (let const eq = arg.view().find_character('='); eq.has_value()) {
@@ -429,7 +431,8 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
       if (!have_value) {
         let out = String{};
         for (mimic_mood listed :
-             {mimic_mood::Default, mimic_mood::Posix, mimic_mood::Bash}) {
+             {mimic_mood::Default, mimic_mood::Posix, mimic_mood::Bash})
+        {
           if (!cxt.mood_initialized(listed)) continue;
           if (!out.is_empty()) out += " ";
           out += mood_name(listed);
@@ -512,8 +515,7 @@ i32 Set::execute(ExecContext &ec, EvalContext &cxt) const throws
   }
 
   if (should_rebind) {
-    LOG(Debug, "set rebinding %zu positional parameters",
-        operands.count());
+    LOG(Debug, "set rebinding %zu positional parameters", operands.count());
     cxt.set_positional_params(steal(operands));
   }
 

@@ -490,8 +490,8 @@ hot fn execute_program(ExecContext &&ec, bool allow_script_fallback,
 {
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
-  LOG(Debug, "spawning '%s' with %zu arguments",
-      ec.program_path().c_str(), ec.args().count());
+  LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
+      ec.args().count());
 
   /* On the ENOEXEC fallback the context's descriptors are handed to the script
      run, which reapplies the command's redirections, so they are not closed
@@ -910,8 +910,7 @@ fn join_thread(thread t) wontthrow -> void { pthread_join(t.handle, nullptr); }
 fn open_file_descriptor(StringView path, file_open_mode mode) throws
     -> Maybe<descriptor>
 {
-  LOG(Debug, "opening '%.*s'", static_cast<int>(path.length),
-      path.data);
+  LOG(Debug, "opening '%.*s'", static_cast<int>(path.length), path.data);
 
   /* The descriptor is left inheritable rather than O_CLOEXEC, since a
      redirection such as exec 3>file keeps the descriptor open across an exec
@@ -942,8 +941,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
 
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>
 {
-  LOG(Debug, "writing %zu bytes into an anonymous temp file",
-      content.count());
+  LOG(Debug, "writing %zu bytes into an anonymous temp file", content.count());
 
   /* The temp directory is resolved at runtime rather than hardcoded to /tmp,
      so a cosmo binary running on Windows writes to the Windows temp directory
@@ -1049,8 +1047,7 @@ fn reap_process_quietly(process pid) throws -> i32
 {
   ASSERT(pid >= 0);
 
-  LOG(Debug, "quietly reaping process %lld",
-      static_cast<long long>(pid));
+  LOG(Debug, "quietly reaping process %lld", static_cast<long long>(pid));
 
   i32 status{};
   for (;;) {
@@ -1258,8 +1255,7 @@ static fn handle_interrupt(int s) wontthrow -> void
 
 fn set_default_signal_handlers() throws -> void
 {
-  LOG(Info,
-      "blocking the terminal signals and installing the shell handlers");
+  LOG(Info, "blocking the terminal signals and installing the shell handlers");
 
   /* The terminal-generated signals that would kill the shell stay blocked, but
      SIGINT gets a handler instead, so a Ctrl-C in a shell loop sets the flag
@@ -1292,8 +1288,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
 
-  LOG(Info, "installing the trap handler for signal %d",
-      signal_number);
+  LOG(Info, "installing the trap handler for signal %d", signal_number);
 
   /* A signal the startup blocked, such as SIGTERM, must be unblocked so the
      handler runs while the shell waits at the prompt or in a loop. */
@@ -1900,8 +1895,8 @@ fn execute_program(ExecContext &&ec, bool allow_script_fallback,
   unused(allow_script_fallback);
   unused(new_process_group);
 
-  LOG(Debug, "spawning '%s' with %zu arguments",
-      ec.program_path().c_str(), ec.args().count());
+  LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
+      ec.args().count());
 
   String command_line = make_os_args(ec.args());
 

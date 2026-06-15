@@ -155,8 +155,7 @@ fn EvalContext::run_completion_function(StringView function_name,
     for (const String &entry : *reply)
       result.push_managed(entry.view());
   }
-  LOG(Info,
-      "completion function '%.*s' returned %zu candidates with status %d",
+  LOG(Info, "completion function '%.*s' returned %zu candidates with status %d",
       static_cast<int>(function_name.length), function_name.data,
       result.count(),
       out_exit_status != nullptr ? *out_exit_status : last_exit_status());

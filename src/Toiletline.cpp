@@ -222,8 +222,7 @@ fn shit_completion_callback(const char *buffer, size_t cursor,
 
     return 1;
   } catch (shit::ErrorBase &error) {
-    LOG(Debug, "completion swallowed an error: %s",
-        error.message().c_str());
+    LOG(Debug, "completion swallowed an error: %s", error.message().c_str());
     return 0;
   } catch (...) {
     LOG(Debug, "completion swallowed an unknown throw");

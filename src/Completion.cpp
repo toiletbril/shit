@@ -468,8 +468,8 @@ static fn complete_filesystem(StringView token,
     candidates.push(steal(candidate));
   }
 
-  LOG(All, "%zu entries of '%s' match basename '%.*s'",
-      candidates.count(), listing_directory.text().c_str(),
+  LOG(All, "%zu entries of '%s' match basename '%.*s'", candidates.count(),
+      listing_directory.text().c_str(),
       static_cast<int>(parts.basename_part.length), parts.basename_part.data);
 
   return candidates;
@@ -578,8 +578,8 @@ static fn complete_variable(StringView token, EvalContext &context) throws
   for (const String &name : os::environment_names())
     add_name(name.view());
 
-  LOG(All, "%zu variable names match prefix '%.*s'",
-      candidates.count(), static_cast<int>(prefix.length), prefix.data);
+  LOG(All, "%zu variable names match prefix '%.*s'", candidates.count(),
+      static_cast<int>(prefix.length), prefix.data);
 
   return candidates;
 }
@@ -607,8 +607,8 @@ static fn complete_tilde_user(StringView token) throws -> ArrayList<String>
     candidate.push('/');
     candidates.push(steal(candidate));
   }
-  LOG(All, "%zu user names match tilde prefix '%.*s'",
-      candidates.count(), static_cast<int>(prefix.length), prefix.data);
+  LOG(All, "%zu user names match tilde prefix '%.*s'", candidates.count(),
+      static_cast<int>(prefix.length), prefix.data);
   return candidates;
 }
 
@@ -856,8 +856,7 @@ static fn build_man_subcommand_index() throws -> void
 {
   MAN_SUBCOMMAND_INDEX_IS_BUILT = true;
   for (const Path &directory : manpage_section1_directories()) {
-    LOG(Info, "scanning man1 directory '%s'",
-        directory.text().c_str());
+    LOG(Info, "scanning man1 directory '%s'", directory.text().c_str());
     let entries = Path::read_directory(directory);
     if (!entries.has_value()) {
       LOG(Debug, "directory '%s' is unreadable, skipping",
@@ -885,8 +884,7 @@ static fn build_man_subcommand_index() throws -> void
     MAN_SUBCOMMAND_INDEX.get_or_create(head, ArrayList<String>{})
         .push(String{tail});
   });
-  LOG(Info, "indexed %zu section-1 pages",
-      MAN_PAGE_FILE_PATHS.count());
+  LOG(Info, "indexed %zu section-1 pages", MAN_PAGE_FILE_PATHS.count());
 }
 
 /* The synopsis region of a man page source, located by its .SH heading or the
@@ -1089,8 +1087,8 @@ static fn complete_from_man_subcommands(StringView line, StringView token,
     if (subcommand.view().starts_with(token) &&
         man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
       matches.push(String{subcommand.view()});
-  LOG(Debug, "%zu subcommands of '%.*s' match token '%.*s'",
-      matches.count(), static_cast<int>(command.length), command.data,
+  LOG(Debug, "%zu subcommands of '%.*s' match token '%.*s'", matches.count(),
+      static_cast<int>(command.length), command.data,
       static_cast<int>(token.length), token.data);
   if (matches.is_empty()) return None;
   return matches;
@@ -1708,9 +1706,9 @@ static fn is_plausible_subcommand_name(StringView name) wontthrow -> bool
 /* Whether a header line opens a subcommand section, so any line that reads
    "Commands:", "Available Commands:", "Subcommands:", and the like, matched
    case-insensitively on the "commands:" or "subcommands:" tail. A bare all-caps
-   header with no colon, such as tailscale's "SUBCOMMANDS", also opens a section,
-   matched only when the whole line is the single word so a description that ends
-   in the word "commands" does not open one. */
+   header with no colon, such as tailscale's "SUBCOMMANDS", also opens a
+   section, matched only when the whole line is the single word so a description
+   that ends in the word "commands" does not open one. */
 static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
 {
   if (trimmed.is_empty()) return false;
@@ -1741,8 +1739,9 @@ static fn line_opens_subcommand_section(StringView trimmed) wontthrow -> bool
   let const equals_ignoring_case = [&](StringView word) {
     return trimmed.length == word.length && ends_with_ignoring_case(word);
   };
-  return is_all_uppercase() && (equals_ignoring_case(StringView{"commands"}) ||
-                                equals_ignoring_case(StringView{"subcommands"}));
+  return is_all_uppercase() &&
+         (equals_ignoring_case(StringView{"commands"}) ||
+          equals_ignoring_case(StringView{"subcommands"}));
 }
 
 /* The subcommands a --help text lists under a commands section. cargo and other
@@ -2394,11 +2393,11 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
     }
     /* set --mood and set --init-moods take mood names as their value, so the
        operand after either spelling completes the three mood names. */
-    if (previous == "--mood" || previous == "-M" || previous == "--init-moods" ||
-        previous == "-L")
+    if (previous == "--mood" || previous == "-M" ||
+        previous == "--init-moods" || previous == "-L")
     {
-      for (const StringView name : {StringView{"shit"}, StringView{"bash"},
-                                    StringView{"sh"}})
+      for (const StringView name :
+           {StringView{"shit"}, StringView{"bash"}, StringView{"sh"}})
         push_matching(name);
       if (!candidates.is_empty()) return candidates;
       return None;

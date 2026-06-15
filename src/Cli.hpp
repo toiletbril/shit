@@ -32,7 +32,7 @@
   T__FLAG6(var_name, kind, short_name, long_name, NoSection, description)
 #define T__FLAG6(var_name, kind, short_name, long_name, section, description)  \
   static shit::Flag##kind concat_literal(FLAG_, var_name){                     \
-      short_name, long_name, shit::flag_section::section, description};         \
+      short_name, long_name, shit::flag_section::section, description};        \
   static uchar concat_literal(t__flag_dummy_, __LINE__) =                      \
       (FLAG_LIST.push(&concat_literal(FLAG_, var_name)), 0)
 
