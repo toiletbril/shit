@@ -135,5 +135,5 @@ Is is exceptional?
 - [x] Most of shellcheck built-in as warnings.
 - [x] Own bells and whistles.
 - [ ] Arbitrary precision numeric expressions.
-- [ ] Cross-platform replacement for most common Unix programs which Windows
+- [x] Cross-platform replacement for most common Unix programs which Windows
       does not have.
