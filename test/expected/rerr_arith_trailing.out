@@ -7,6 +7,6 @@
 [Word
   ArithmeticExpansion "1 2"
 ]
-shit: 2:6: error: Arithmetic: unexpected trailing characters.
+shit: 2:6: error: Arithmetic: unexpected '2' after the expression, an operator such as + or * may be missing between two values.
      2 |  echo $((1 2))
        |       ^~~~~~~~ here.
