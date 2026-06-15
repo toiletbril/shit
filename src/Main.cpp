@@ -818,8 +818,13 @@ fn main(int argc, char **argv) -> int
     try {
       file_names = shit::parse_flags(FLAG_LIST, argc, argv);
     } catch (...) {
+      /* The real argv carried the bad flag too, so even the clean reparse
+         fails. The program name is kept as the sole operand the way the success
+         path keeps argv[0], so $0 and SHELL stay the real name rather than
+         degrading to the unknown-program placeholder. */
       shit::reset_flags(FLAG_LIST);
       file_names = shit::ArrayList<shit::String>{};
+      if (argc > 0) file_names.push(shit::String{argv[0]});
     }
   };
 
