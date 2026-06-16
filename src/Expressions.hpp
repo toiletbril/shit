@@ -160,7 +160,8 @@ public:
    * mainly for initialization before the actual evaluation. */
   fn evaluate(EvalContext &cxt) const throws -> i64;
 
-  /* Each expression should provide it's own way to copy it. */
+  /* Each expression provides its own way to copy, so the implicit copies and
+     moves are deleted. */
   Expression(const Expression &) = delete;
   Expression(Expression &&) noexcept = delete;
   Expression &operator=(const Expression &) = delete;

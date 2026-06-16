@@ -194,9 +194,10 @@ static pure fn find_token_end(StringView line, usize cursor) wontthrow -> usize
    non-space byte and reports command position when that byte ends a command or
    the token is the very first on the line. */
 /* The leading words that are transparent to command position, so a command
-   word can follow them: the ! and time keywords, the compound keywords whose
-   body opens with a command, if and while and their kin, and the wrapper
-   commands whose argument is itself a command, the way fish skips sudo. A
+   word can follow them. These are the ! and time keywords, the compound
+   keywords whose body opens with a command, if and while and their kin, and
+   the wrapper commands whose argument is itself a command, the way fish skips
+   sudo. A
    dash word is a wrapper's own option and an =-carrying word a leading
    assignment, so sudo -E ls and FOO=bar make both read the inner command.
    for and case stay opaque since a variable or a subject word follows them,

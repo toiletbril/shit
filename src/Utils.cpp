@@ -771,9 +771,9 @@ fn canonicalize_path(StringView path) throws -> Maybe<Path>
 
   candidate = candidate.normalized();
 
-  /* If there's no extension, we may have to add it ourselves. The ending dot is
-     stripped by the path normalization, so a name written with a trailing dot
-     is left as typed. */
+  /* A name with no extension may need one of the omitted suffixes added. The
+     ending dot is stripped by the path normalization, so a name written with a
+     trailing dot is left as typed. */
   const bool ends_with_dot =
       path.length > 0 && path.data[path.length - 1] == '.';
   if (candidate.extension().is_empty() && !ends_with_dot) {
@@ -982,7 +982,7 @@ fn extglob_full_match(StringView glob, StringView str,
            !(glob[span] == ']' && extglob_active(mask, mask_offset + span)))
       span++;
     if (span < glob.count()) {
-      span++; /* past the ] */
+      span++;
       const bool class_matched =
           glob_matches(glob.substring_of_length(0, span),
                        str.substring_of_length(0, 1), mask, mask_offset);
@@ -1164,7 +1164,7 @@ fn glob_matches(StringView glob, StringView str,
         break;
       }
 
-      g++; /* skip [ */
+      g++;
       if (g >= glob.count()) GLOB_GROUP_ERR();
 
       /* POSIX sh negates a class with a leading '!'. The '^' form is kept as a

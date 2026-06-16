@@ -353,13 +353,6 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
   return false;
 }
 
-/* Fold every constant arithmetic expansion in a word to its decimal result
-   once, so the evaluator reads the cached value instead of re-parsing the
-   arithmetic on every expansion. A segment that holds a parameter or a
-   substitution is left alone, since its value is only known at run time. The
-   fold now runs as the constant-arithmetic rule in the optimizer, reached
-   through optimize_node from each command's analyze. */
-
 } /* namespace */
 
 fn analyze_ast(const Expression *root, StringView source,
@@ -4284,7 +4277,7 @@ Divide::Divide(SourceLocation location, const Expression *lhs,
 
 cold fn Divide::to_string() const throws -> String { return "/"; }
 
-/* Custom evaluation, since we can't divide by zero. */
+/* Division checks the denominator first, since a divide by zero traps. */
 fn Divide::evaluate_impl(EvalContext &cxt) const throws -> i64
 {
   ASSERT(m_lhs != nullptr);

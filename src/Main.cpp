@@ -768,7 +768,7 @@ fn main(int argc, char **argv) -> int
   let file_names = shit::ArrayList<shit::String>{};
 
   /* SHIT_FLAGS supplies command line options through the environment, such as
-     SHIT_FLAGS='-ahmu --bash-compatible -I', so a user sets the shell's
+     SHIT_FLAGS='-ahmu --mood bash -I', so a user sets the shell's
      defaults once rather than on every invocation. The tokens are split on
      whitespace and spliced in right after the program name, before the real
      arguments, so a flag given on the command line still has the final say. The
@@ -1054,8 +1054,7 @@ fn main(int argc, char **argv) -> int
       FLAG_PRIVILEGED.is_enabled() || shit::os::is_running_setuid();
   LOG(Info, "privileged mode is %s", is_privileged ? "on" : "off");
 
-  /* Both stdin and interactive flags are enabled, but there will be only the
-   * last man standing. */
+  /* The stdin and interactive flags conflict, so only one survives. */
   if (FLAG_STDIN.is_enabled() && FLAG_INTERACTIVE.is_enabled()) {
     bool is_tty = shit::os::is_stdin_a_tty();
 
@@ -1073,9 +1072,9 @@ fn main(int argc, char **argv) -> int
   bool should_read_stdin = false, should_execute_commands = false,
        should_read_files = false, should_be_interactive = false;
 
-  /* Figure out what to do. Note that "-c" can be specified multiple times.
-   * Option precedence should behave as follows: "-s", then "-c", then files
-   * (arguments), then "-i" (or no arguments). */
+  /* The input source is chosen by flag precedence, "-s" first, then "-c", then
+   * a file operand, then "-i" or no arguments. "-c" can be given several times.
+   */
   if (FLAG_STDIN.is_enabled()) {
     /* Operands after -s are the positional parameters, so they are not
        incompatible. Only the command and interactive flags conflict with -s. */
@@ -1275,11 +1274,10 @@ fn main(int argc, char **argv) -> int
   bool should_quit = FLAG_ONE_COMMAND.is_enabled() ? true : false;
   i32 exit_code = EXIT_SUCCESS;
 
-  /* Clear and set up cache. Don't prematurely initialize the whole path map,
-   * since it's only really noticeable in interactive mode. This way,
-   * subsequent calls to the same program will still be cached in any mode,
-   * but we won't waste any milliseconds traversing directories for very
-   * simple scripts! */
+  /* The path map is reset rather than fully seeded here, since the eager scan
+   * pays off only in interactive mode. A subsequent call to the same program
+   * still caches in any mode, so a simple script never spends the milliseconds
+   * to traverse every PATH directory up front. */
   shit::utils::clear_path_map();
   shit::os::set_default_signal_handlers();
   LOG(Info, "installed the default signal handlers");
@@ -1343,8 +1341,8 @@ fn main(int argc, char **argv) -> int
      source in an owned copy, so nothing live indexes the dropped buffers. */
   context.clear_retained_sources();
 
-  /* A simple return cannot be used after this point, since we need a special
-   * cleanup for toiletline. utils::quit() should be used instead. */
+  /* A plain return must not be used past this point, since toiletline needs its
+   * own cleanup. utils::quit() runs it. */
   for (;;) {
     ASSERT(!shit::os::is_child_process());
 
@@ -1355,7 +1353,6 @@ fn main(int argc, char **argv) -> int
        line:col. */
     shit::Maybe<shit::StringView> source_filename = shit::None;
 
-    /* Figure out what to do and retrieve the code. */
     try {
       if (should_read_files || should_read_stdin) {
         /* The shell runs exactly one script, the first operand, with the rest
@@ -1430,8 +1427,7 @@ fn main(int argc, char **argv) -> int
               : should_init_as_bash                    ? "Bash me harder?"
                                                        : "Welcome :3");
         } else {
-          /* NOTE: avoid this branch if exit_raw_mode() wasn't called
-           * previosly! */
+          /* This branch is reached only after a prior exit_raw_mode() call. */
           toiletline::enter_raw_mode();
         }
 
@@ -1447,7 +1443,6 @@ fn main(int argc, char **argv) -> int
 
         shit::String prompt = toiletline::build_prompt(context);
 
-        /* Ask for input until we get one. */
         for (;;) {
           let[code, input] = toiletline::get_input(prompt);
 
@@ -1488,7 +1483,6 @@ fn main(int argc, char **argv) -> int
 
           toiletline::emit_newlines(input);
 
-          /* Execute the command without raw mode. */
           if (code == TL_PRESSED_ENTER && !input.is_empty()) {
             script_contents = steal(input);
             break;
@@ -1536,12 +1530,11 @@ fn main(int argc, char **argv) -> int
         should_quit && !context.shell_is_interactive() &&
         !context.has_exit_trap() && !should_print_post_run_trailer);
 
-    /* Execute the contents through the shared pipeline. */
     exit_code = run_script_contents(script_contents, context, ast_arena,
                                     source_filename);
 
-    /* We can get here from child process if they didn't exec()
-     * properly to print error. */
+    /* A child process reaches here when its exec() failed and it printed the
+     * error itself. */
     if (should_quit || shit::os::is_child_process() ||
         (FLAG_ERROR_EXIT.is_enabled() && exit_code != 0))
     {

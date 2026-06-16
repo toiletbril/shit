@@ -235,7 +235,6 @@ get_context_pointing_to(StringView source, usize byte_position,
   const usize gutter_width =
       line_number_padding_length + line_number_digit_count + BAR_SEPARATOR_WIDTH;
 
-  /* Add spacer before line number. */
   let msg = String{};
   for (usize i = 0; i < line_number_padding_length; i++) {
     msg += ' ';
@@ -243,7 +242,6 @@ get_context_pointing_to(StringView source, usize byte_position,
 
   msg += utils::uint_to_text(line_number + 1) + " |  ";
 
-  /* Line that caused the error. */
   let const context =
       source.substring_of_length(byte_position - start_offset, line_byte_count);
 
@@ -302,7 +300,6 @@ get_context_pointing_to(StringView source, usize byte_position,
       (unicode_position - unicode_start_offset_position) +
       tabs_before_error * (TAB_WIDTH - 1);
 
-  /* Remaining spaces to pad the underline. */
   for (usize i = 0; i < underline_padding_length; i++)
     msg += ' ';
 
