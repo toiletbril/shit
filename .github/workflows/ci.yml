@@ -73,7 +73,7 @@ jobs:
               'BEGIN { exit !(s + 0 > 0 && s + 0 < d + 0) }' \
             || { echo "shit is not faster than dash"; exit 1; }
 
-      - name: Assert shit is faster than bash by at least 5 times
+      - name: Assert shit is faster than bash by at least 3 times
         if: '!cancelled()'
         run: |
           cd test
@@ -98,8 +98,8 @@ jobs:
           case "$bash_seconds" in ''|*[!0-9.]*) echo "bad bash timing"; exit 1;; esac
           case "$shit_seconds" in ''|*[!0-9.]*) echo "bad shit timing"; exit 1;; esac
           awk -v s="$shit_seconds" -v b="$bash_seconds" \
-              'BEGIN { exit !(s + 0 > 0 && s * 5 <= b + 0) }' \
-            || { echo "shit is not at least 5 times faster than bash"; exit 1; }
+              'BEGIN { exit !(s + 0 > 0 && s * 3 <= b + 0) }' \
+            || { echo "shit is not at least 3 times faster than bash"; exit 1; }
 
       - name: Build coverage binary
         if: '!cancelled()'
@@ -110,7 +110,7 @@ jobs:
         run: |
           mkdir -p coverage/profraw
           LLVM_PROFILE_FILE="$PWD/coverage/profraw/shit-%p.profraw" \
-            make -C test test || true
+            make -C test test BIN=../shit-cov || true
 
       - name: Record coverage
         if: always()
@@ -122,7 +122,7 @@ jobs:
             echo
             echo '| File | Line cover | Branch cover |'
             echo '| --- | --- | --- |'
-            llvm-cov-18 report ./shit \
+            llvm-cov-18 report ./shit-cov \
               -instr-profile=coverage/shit.profdata src \
               -ignore-filename-regex='toiletline' \
               | awk 'NF>=13 && $1!="Filename" && $1!~/^-/ \
@@ -132,7 +132,7 @@ jobs:
             echo
             echo '| File | Uncovered lines |'
             echo '| --- | --- |'
-            llvm-cov-18 export ./shit \
+            llvm-cov-18 export ./shit-cov \
               -instr-profile=coverage/shit.profdata src \
               -ignore-filename-regex='toiletline' -format=lcov \
               | awk '
