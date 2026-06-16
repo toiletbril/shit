@@ -1,0 +1,5 @@
+== unset completes a variable name:
+completion_probe_var
+== unset -f completes a function name:
+completion_probe_fn
+== plain unset does not offer a function name:

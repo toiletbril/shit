@@ -185,18 +185,18 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
    cannot change the value a later straight-line read would see. An external
    coreutil and a read-only shitbox utility run in a child or write only their
    own standard output, so neither touches the parent shell's variables. The
-   shell builtins true, false, :, echo, printf, test, [, and pwd write no
-   variable. The env-mutating builtins export, unset, local, declare, typeset,
+   shell builtins true, false, :, echo, test, [, and pwd write no variable. The
+   env-mutating builtins export, unset, local, declare, typeset,
    readonly, set, eval, source, and . are deliberately absent, so a command that
    reaches one of them falls through to the conservative clear. read is absent
-   for the same reason, since it binds a name from input. The caller still
+   for the same reason, since it binds a name from input. printf is absent
+   because its -v form binds a variable. The caller still
    clears the table on a command substitution argument, on an unquoted IFS or
    array dependence already handled at the assignment, and on a name shadowed by
    a function or an alias, so the table here only lists the bare neutral names.
  */
 inline constexpr StaticStringMap<bool>::entry ENVIRONMENT_NEUTRAL_ENTRIES[] = {
     {SSK("echo"),     true},
-    {SSK("printf"),   true},
     {SSK("true"),     true},
     {SSK("false"),    true},
     {SSK(":"),        true},

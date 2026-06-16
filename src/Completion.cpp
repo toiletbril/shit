@@ -2618,19 +2618,47 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Unset &&
       (token.is_empty() || token[0] != '-'))
   {
+    /* unset -f removes a function, so its operand completes against the defined
+       function names. The plain and -v forms remove a variable, so they complete
+       the shell and environment names the way a $-prefixed reference would. The
+       flag is read from the words typed before this operand. */
+    let unsets_function = false;
+    let const prefix = line.substring_of_length(0, token_start);
+    usize scan_position = 0;
+    while (scan_position < prefix.length) {
+      while (scan_position < prefix.length &&
+             (prefix[scan_position] == ' ' || prefix[scan_position] == '\t'))
+        scan_position++;
+      let const word_begin = scan_position;
+      while (scan_position < prefix.length && prefix[scan_position] != ' ' &&
+             prefix[scan_position] != '\t')
+        scan_position++;
+
+      let const arg =
+          prefix.substring_of_length(word_begin, scan_position - word_begin);
+      if (arg.length >= 2 && arg[0] == '-' && arg[1] != '-' &&
+          arg.find_character('f').has_value())
+        unsets_function = true;
+    }
+
     let seen = HashSet{heap_allocator()};
-    let const do_add_variable_name = [&](StringView name) throws {
+    let const do_add_name = [&](StringView name) throws {
       if (!name.starts_with(token)) return;
       if (seen.contains(name)) return;
       seen.add(name);
       candidates.push(String{name});
     };
 
-    context.variable_names().for_each(
-        [&](StringView name) { do_add_variable_name(name); });
+    if (unsets_function) {
+      context.function_names().for_each(
+          [&](StringView name) { do_add_name(name); });
+    } else {
+      context.variable_names().for_each(
+          [&](StringView name) { do_add_name(name); });
 
-    for (let const &name : os::environment_names())
-      do_add_variable_name(name.view());
+      for (let const &name : os::environment_names())
+        do_add_name(name.view());
+    }
 
     if (!candidates.is_empty()) return candidates;
     return None;
@@ -3856,19 +3884,20 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (word.find_character('/').has_value()) {
         color_path_argument(word_start, word, spans);
       } else {
-        /* A command word the user has terminated with whitespace is a finished
-           word, so no further keystroke can grow it into a real command. It must
-           resolve fully or read as a dead end, where a still-typed trailing word
-           that only prefixes some command name stays blue since it could still
-           complete. */
-        let const is_word_whitespace_terminated =
+        /* A command word the user has finished, with whitespace or with a list
+           operator such as ';', '|', or '&', can no longer grow into a real
+           command. It must resolve fully or read as a dead end, where a
+           still-typed trailing word that only prefixes some command name stays
+           blue since it could still complete. */
+        let const is_word_terminated =
             word_end < end &&
             (line[word_end] == ' ' || line[word_end] == '\t' ||
-             line[word_end] == '\n');
+             line[word_end] == '\n' || line[word_end] == ';' ||
+             line[word_end] == '|' || line[word_end] == '&');
         let command_color = colors::ansi::RED;
         if (first_word_resolves(word, context)) {
           command_color = colors::ansi::BRIGHT_BLUE;
-        } else if (!is_word_whitespace_terminated &&
+        } else if (!is_word_terminated &&
                    command_word_prefixes_any(word, context))
         {
           command_color = colors::ansi::BLUE;

@@ -1,0 +1,56 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=5]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "-v" "x" "99"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x + 0))"]
+  [CompoundListCondition, None]
+    [Assign y=7]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "hello"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((y + 1))"]
+[Word
+  Unquoted "x=5"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "-v"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "99"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x + 0"
+]
+[Word
+  Unquoted "y=7"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "y + 1"
+]
+99
+hello
+8
+[Code 0]
