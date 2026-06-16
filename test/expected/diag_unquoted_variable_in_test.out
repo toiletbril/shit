@@ -37,9 +37,10 @@
 [Word
   Unquoted "after"
 ]
-shit: 3:3: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+shit: 3:3: warning: Unquoted variable in a test.
      3 |  [ $v = x ] && echo equal
        |    ^~ here.
+note: Quote it to avoid an empty or split argument.
 equal
 after
 [Code 0]

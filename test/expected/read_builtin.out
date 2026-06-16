@@ -115,15 +115,18 @@
 [Word
   Unquoted "}"
 ]
-shit: 2:22: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
+shit: 2:22: warning: A read without -r mangles a backslash in the input.
      2 |  printf 'a b c\n' | { read first rest; echo "first=$first rest=$rest"; }
        |                       ^~~~~~~~~~~~~~~ here.
-shit: 3:22: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
+note: Add -r to read the line literally.
+shit: 3:22: warning: A read without -r mangles a backslash in the input.
      3 |  printf '1 2 3\n' | { read -a arr; echo "n=${#arr[@]} a0=${arr[0]} a2=${arr[2]}"; }
        |                       ^~~~~~~~~~~ here.
-shit: 4:20: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
+note: Add -r to read the line literally.
+shit: 4:20: warning: A read without -r mangles a backslash in the input.
      4 |  printf 'noeol' | { read v; echo "rc=$? v=$v"; }
        |                     ^~~~~~ here.
+note: Add -r to read the line literally.
 first=a rest=b c
 n=3 a0=1 a2=3
 rc=1 v=noeol

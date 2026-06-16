@@ -159,38 +159,49 @@
 [Word
   Unquoted "done"
 ]
-shit: 5:3: warning: The egrep command is deprecated, use grep -E for the extended regular expression match.
+shit: 5:3: warning: The egrep command is deprecated.
      5 |    egrep pattern file
        |    ^~~~~ here.
-shit: 6:3: warning: The fgrep command is deprecated, use grep -F for the fixed string match.
+note: Use grep -E for the extended regular expression match.
+shit: 6:3: warning: The fgrep command is deprecated.
      6 |    fgrep word file
        |    ^~~~~ here.
-shit: 7:3: warning: An expr forks for arithmetic the shell does natively, use $((...)) for the calculation.
+note: Use grep -F for the fixed string match.
+shit: 7:3: warning: An expr forks for arithmetic the shell does natively.
      7 |    expr 1 + 2
        |    ^~~~ here.
-shit: 8:3: warning: A let runs arithmetic as a command, use the ((...)) compound so the operands need no quoting.
+note: Use $((...)) for the calculation.
+shit: 8:3: warning: A let runs arithmetic as a command.
      8 |    let counter=counter+1
        |    ^~~ here.
-shit: 9:3: warning: An echo of a command substitution prints what the command already prints, run the command on its own instead.
+note: Use the ((...)) compound so the operands need no quoting.
+shit: 9:3: warning: An echo of a command substitution prints what the command already prints.
      9 |    echo "$(date)"
        |    ^~~~ here.
-shit: 10:8: warning: Grepping the ps output races the process table and matches the grep itself, use pgrep to match a process by name.
+note: Run the command on its own instead.
+shit: 10:8: warning: Grepping the ps output races the process table and matches the grep itself.
     10 |    ps | grep init
        |         ^~~~ here.
-shit: 11:8: warning: Grepping the ls listing mangles a name with a space or a newline, match the names with a glob or with find instead.
+note: Use pgrep to match a process by name.
+shit: 11:8: warning: Grepping the ls listing mangles a name with a space or a newline.
     11 |    ls | grep conf
        |         ^~~~ here.
-shit: 12:3: warning: Counting grep output with wc -l runs an extra process, use grep -c to count the matching lines directly.
+note: Match the names with a glob or with find instead.
+shit: 12:3: warning: Counting grep output with wc -l runs an extra process.
     12 |    grep needle file | wc -l
        |    ^~~~ here.
-shit: 14:5: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+note: Use grep -c to count the matching lines directly.
+shit: 14:5: warning: Unquoted variable in a test.
     14 |    [ $? -eq 0 ] && echo ok
        |      ^~ here.
-shit: 14:5: warning: Testing $? checks the exit status indirectly, test the command directly with if or && so an intervening command cannot clobber the status.
+note: Quote it to avoid an empty or split argument.
+shit: 14:5: warning: Testing $? checks the exit status indirectly.
     14 |    [ $? -eq 0 ] && echo ok
        |      ^~ here.
-shit: 15:9: warning: Declaring and assigning from a command substitution in one command masks the command's exit status, split the declaration and the assignment so a failure is seen.
+note: Test the command directly with if or && so an intervening command cannot clobber the status.
+shit: 15:9: warning: Declaring and assigning from a command substitution in one command masks the command's exit status.
     15 |    local declared=$(date)
        |          ^~~~~~~~~~~~~~~~ here.
+note: Split the declaration and the assignment so a failure is seen.
 done
 [Code 0]

@@ -1,0 +1,72 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "false"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_if"]
+  [CompoundListCondition, None]
+    [ForLoop "item"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_for"]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "false"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_if"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "item"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_for"
+]
+after_if
+after_for
+[Code 0]

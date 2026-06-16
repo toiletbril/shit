@@ -1,0 +1,50 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign n=10]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "first"]
+  [CompoundListCondition, None]
+    [SimpleCommand "true"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((n + 5))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "basename" "/tmp/whatever"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((n * 2))"]
+[Word
+  Unquoted "n=10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "first"
+]
+[Word
+  Unquoted "true"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "n + 5"
+]
+[Word
+  Unquoted "basename"
+]
+[Word
+  Unquoted "/tmp/whatever"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "n * 2"
+]
+first
+15
+20
+[Code 0]

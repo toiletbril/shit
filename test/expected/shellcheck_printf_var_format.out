@@ -40,12 +40,14 @@
 [Word
   Variable "1"
 ]
-shit: 3:8: warning: The printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+shit: 3:8: warning: The printf format comes from a variable, the data can inject format directives.
      3 |  printf "$1"
        |         ^~~~ here.
-shit: 5:11: warning: The printf format comes from a variable, the data can inject format directives, use printf '%s' to print it.
+note: Use printf '%s' to print it.
+shit: 5:11: warning: The printf format comes from a variable, the data can inject format directives.
      5 |  printf -- "$1"
        |            ^~~~ here.
+note: Use printf '%s' to print it.
 fmt
 okfmt
 [Code 0]

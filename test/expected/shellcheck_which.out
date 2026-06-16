@@ -16,7 +16,8 @@
 [Word
   Unquoted "1"
 ]
-shit: 2:1: warning: The which command is non-standard, use command -v for a portable lookup.
+shit: 2:1: warning: The which command is non-standard.
      2 |  which sh >/dev/null 2>&1
        |  ^~~~~ here.
+note: Use command -v for a portable lookup.
 [Code 0]

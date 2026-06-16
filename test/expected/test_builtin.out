@@ -147,9 +147,10 @@
 shit: 4:6: warning: The numeric comparison -eq reads 'abc', which is not a number, so the test errors at run time.
      4 |  test abc -eq 5; echo $?
        |       ^~~ here.
-shit: 7:8: warning: A test with -a or -o is obsolescent, join two tests with && or || instead.
+shit: 7:8: warning: A test with -a or -o is obsolescent.
      7 |  test a -a b c; echo $?
        |         ^~ here.
+note: Join two tests with && or || instead.
 1
 0
 shit: 4:1: error: Builtin 'test': Unable to compare with '-eq' because 'abc' is not an integer.

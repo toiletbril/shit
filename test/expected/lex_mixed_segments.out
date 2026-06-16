@@ -26,9 +26,10 @@
   ArithmeticExpansion " 1 + 1 "
   DoubleQuoted "e"
 ]
-shit: 3:3: warning: An unquoted command substitution splits its output, quote it to keep one argument.
+shit: 3:3: warning: An unquoted command substitution splits its output.
      3 |  : "a$b"'c'$(:)"d$(( 1 + 1 ))e"
        |    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~ here.
+note: Quote it to keep one argument.
 shit: 2:3: error: Unable to expand 'x' because the parameter is not set.
      2 |  : pre"dq"'sq'$x${y}post
        |    ^~~~~~~~~~~~~~~~~~~~~ here.

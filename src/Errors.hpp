@@ -74,12 +74,26 @@ public:
   fn set_rendered() wontthrow -> void { m_was_rendered = true; }
   pure fn was_rendered() const wontthrow -> bool { return m_was_rendered; }
 
+  /* The suggestion that accompanies the diagnostic, rendered as a trailing note
+     line under the primary message rather than appended to it. The main message
+     states the problem, and the note carries the advice, so a reader sees the
+     fix on its own line. A relocation that rewraps an error carries it over. */
+  fn set_note(StringView note) throws -> void { m_note = note; }
+  pure fn has_note() const wontthrow -> bool { return !m_note.is_empty(); }
+  fn note() const throws -> String { return m_note; }
+
 protected:
+  /* The "note: <suggestion>." trailing line in the note severity hue, or an
+     empty string when no note is attached, so a caller appends it
+     unconditionally and emits nothing on the no-note path. */
+  fn note_to_string() const throws -> String;
+
   bool m_is_active{false};
   bool m_is_script_fatal{false};
   bool m_was_rendered{false};
   i64 m_command_status{1};
   String m_message;
+  String m_note;
 };
 
 class Error : public ErrorBase
@@ -200,6 +214,7 @@ inline fn relocate_error(const Error &error, SourceLocation location) throws
   let relocated = ErrorWithLocation{location, error.message().view()};
   if (error.is_script_fatal()) relocated.set_script_fatal();
   relocated.set_command_status(error.command_status());
+  if (error.has_note()) relocated.set_note(error.note().view());
   return relocated;
 }
 

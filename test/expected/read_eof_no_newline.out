@@ -76,12 +76,14 @@
 [Word
   Unquoted "/tmp/shit_read_eof.txt"
 ]
-shit: 3:1: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
+shit: 3:1: warning: A read without -r mangles a backslash in the input.
      3 |  read x < /tmp/shit_read_eof.txt
        |  ^~~~~~ here.
-shit: 6:1: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
+note: Add -r to read the line literally.
+shit: 6:1: warning: A read without -r mangles a backslash in the input.
      6 |  read y < /tmp/shit_read_eof.txt
        |  ^~~~~~ here.
+note: Add -r to read the line literally.
 no_newline=[abc] 1
 with_newline=[def] 0
 [Code 0]

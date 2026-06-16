@@ -1,0 +1,43 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign x=7]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x * 0))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((0 * x))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((x - x))"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "$((3 + 4 * 5))"]
+[Word
+  Unquoted "x=7"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x * 0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "0 * x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "x - x"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  ArithmeticExpansion "3 + 4 * 5"
+]
+0
+0
+0
+23
+[Code 0]

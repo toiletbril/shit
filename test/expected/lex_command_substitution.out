@@ -36,10 +36,12 @@
   CommandSubstitution ":"
   CommandSubstitution ":"
 ]
-shit: 3:3: warning: An unquoted command substitution splits its output, quote it to keep one argument.
+shit: 3:3: warning: An unquoted command substitution splits its output.
      3 |  : pre$(:)post
        |    ^~~~~~~~~~~ here.
-shit: 5:3: warning: An unquoted command substitution splits its output, quote it to keep one argument.
+note: Quote it to keep one argument.
+shit: 5:3: warning: An unquoted command substitution splits its output.
      5 |  : $(:)$(:)
        |    ^~~~~~~~ here.
+note: Quote it to keep one argument.
 [Code 0]

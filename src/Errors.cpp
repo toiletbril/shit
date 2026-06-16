@@ -221,10 +221,23 @@ get_context_pointing_to(StringView source, usize byte_position,
   ASSERT(byte_position - start_offset + line_byte_count == source.count() ||
          source[byte_position - start_offset + line_byte_count] == '\n');
 
+  /* The line number is padded to a minimum field so short numbers still align,
+     and a wider number widens the field rather than overflowing it. The bar and
+     its two trailing spaces follow, so the same width measures both the context
+     gutter here and the underline gutter below. */
+  static constexpr usize LINE_NUMBER_FIELD_WIDTH = 6;
+  /* The bar separator and its two trailing spaces, the " |  " literal printed
+     after the line number. */
+  static constexpr usize BAR_SEPARATOR_WIDTH = 4;
+  const usize line_number_digit_count = number_string_length(line_number + 1);
+  const usize line_number_padding_length =
+      sub_sat(LINE_NUMBER_FIELD_WIDTH, line_number_digit_count);
+  const usize gutter_width =
+      line_number_padding_length + line_number_digit_count + BAR_SEPARATOR_WIDTH;
+
   /* Add spacer before line number. */
   let msg = String{};
-  for (usize i = 0; i < sub_sat(6, number_string_length(line_number + 1)); i++)
-  {
+  for (usize i = 0; i < line_number_padding_length; i++) {
     msg += ' ';
   }
 
@@ -271,16 +284,23 @@ get_context_pointing_to(StringView source, usize byte_position,
                                        ? line_byte_count - start_offset
                                        : byte_count);
 
-  /* Add spaces before the underline. */
+  /* The underline gutter mirrors the context gutter so the two bars line up.
+     The bar sits one column before its two trailing spaces, so the spaces run up
+     to the bar, the bar prints, then the two trailing spaces close the gutter.
+   */
   msg += '\n';
-  msg += "       |  "; /* 10 chars */
+  for (usize i = 0; i + 3 < gutter_width; i++)
+    msg += ' ';
 
-  /* Starting amount of spaces before the error arrow beneath the context. */
-  const usize added_symbols = 10;
+  msg += "|  ";
 
+  /* The caret pads past the gutter by the token's column within the line, in
+     display columns. The code point distance from the line start gives the
+     count, and each tab before the caret adds the extra columns it renders
+     beyond the single column already counted. */
   const usize underline_padding_length =
       (unicode_position - unicode_start_offset_position) +
-      tabs_before_error * (TAB_WIDTH - 1) + added_symbols - 10;
+      tabs_before_error * (TAB_WIDTH - 1);
 
   /* Remaining spaces to pad the underline. */
   for (usize i = 0; i < underline_padding_length; i++)
@@ -320,6 +340,27 @@ ErrorBase::operator bool &() throws { return m_is_active; }
 
 cold fn ErrorBase::message() const throws -> String { return m_message; }
 
+cold fn ErrorBase::note_to_string() const throws -> String
+{
+  if (m_note.is_empty()) return String{};
+
+  /* The note rides on its own line under the primary message in the note hue,
+     the same shape an unlocated Note renders, so the suggestion reads as advice
+     rather than as part of the problem statement. */
+  /* The note reads as a standalone sentence, so its first letter is capitalized
+     whatever case the suggestion literal carried. */
+  String capitalized_note;
+  let first_byte = m_note[0];
+  if (first_byte >= 'a' && first_byte <= 'z')
+    first_byte = static_cast<char>(first_byte - 'a' + 'A');
+  capitalized_note.push(first_byte);
+  capitalized_note += m_note.substring(1);
+
+  let const color = diagnostic_colors_for(StringView{"note"});
+  return String{"\n"} + color.severity + "note" + color.reset + ": " +
+         color.message + capitalized_note + "." + color.reset;
+}
+
 cold fn ErrorBase::severity_word() const wontthrow -> String { return "error"; }
 
 Error::Error(StringView message) : ErrorBase(message) {}
@@ -329,14 +370,14 @@ cold fn ErrorBase::to_string(StringView source) const throws -> String
   unused(source);
   let const color = diagnostic_colors_for(severity_word());
   return color.severity + severity_word() + color.reset + ": " + color.message +
-         message() + "." + color.reset;
+         message() + "." + color.reset + note_to_string();
 }
 
 fn Error::to_string() const throws -> String
 {
   let const color = diagnostic_colors_for(severity_word());
   return color.severity + severity_word() + color.reset + ": " + color.message +
-         message() + "." + color.reset;
+         message() + "." + color.reset + note_to_string();
 }
 
 Error::operator String() const throws { return to_string(); }
@@ -446,6 +487,7 @@ cold fn ErrorWithLocation::to_string(StringView source) const throws -> String
   result += get_context_pointing_to(
       source, byte_position, byte_count, line_number, last_newline_location,
       has_preceding_newline, unicode_position, StringView{"here"}, color);
+  result += note_to_string();
   return result;
 }
 

@@ -67,17 +67,21 @@
 [Word
   Unquoted "done"
 ]
-shit: 3:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal, put the file redirect first as in '>file 2>&1'.
+shit: 3:18: warning: 2>&1 before the file redirect duplicates the terminal, so stderr stays on the terminal.
      3 |    command 2>&1 > out.log
        |                   ^~~~~~~ here.
-shit: 4:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read, write to a temporary and move it over.
+note: Put the file redirect first as in '>file 2>&1'.
+shit: 4:17: warning: The command reads and truncates 'data' at once, the truncation empties the input before it is read.
      4 |    sort < data > data
        |                  ^~~~ here.
-shit: 5:8: warning: A useless echo inside the command substitution, the text can be used directly without the subshell.
+note: Write to a temporary and move it over.
+shit: 5:8: warning: A useless echo inside the command substitution.
      5 |    echo "wrapped $(echo inner)"
        |         ^~~~~~~~~~~~~~~~~~~~~~~ here.
-shit: 6:15: warning: $@ inside a longer word concatenates the surrounding text onto the first and last argument, use $* for one joined string or a separate "$@" word.
+note: The text can be used directly without the subshell.
+shit: 6:15: warning: $@ inside a longer word concatenates the surrounding text onto the first and last argument.
      6 |    printf '%s' "a $@ b"
        |                ^~~~~~~~ here.
+note: Use $* for one joined string or a separate "$@" word.
 done
 [Code 0]

@@ -492,11 +492,13 @@ hot fn Parser::parse_command_list(
               after->source_location().position ==
                   last_pipe_token->source_location().position + 1)
           {
-            throw shit::ErrorWithLocation{
+            shit::ErrorWithLocation error{
                 last_pipe_token->source_location(),
                 "Unable to build the pipeline because no command follows "
                 "the pipe. The |& stderr pipe is a bashism that POSIX mode "
-                "does not read, use 2>&1 | instead"};
+                "does not read"};
+            error.set_note("use 2>&1 | instead");
+            throw error;
           }
           throw shit::ErrorWithLocation{
               last_pipe_token->source_location(),
@@ -750,10 +752,12 @@ fn Parser::build_heredoc_redirection(
        not read it. The hint names the dialect rather than leaving a bare
        delimiter complaint. */
     if (delimiter_token->kind() == Token::Kind::Less) {
-      throw ErrorWithLocation{
+      ErrorWithLocation error{
           delimiter_token->source_location(),
           "Expected a heredoc delimiter. The <<< here-string is a bashism "
-          "that POSIX mode does not read, use a heredoc instead"};
+          "that POSIX mode does not read"};
+      error.set_note("use a heredoc instead");
+      throw error;
     }
     throw ErrorWithLocation{delimiter_token->source_location(),
                             "Expected a heredoc delimiter"};
@@ -1390,11 +1394,12 @@ hot fn Parser::parse_for() throws -> Command *
        the dialect rather than leaving a bare name complaint. */
     if (m_lexer.is_posix_mode() && name_token->kind() == Token::Kind::LeftParen)
     {
-      throw ErrorWithLocation{
+      ErrorWithLocation error{
           name_token->source_location(),
           "Expected a variable name after 'for'. The for ((...)) C-style "
-          "loop is a bashism that POSIX mode does not read, use a while "
-          "loop instead"};
+          "loop is a bashism that POSIX mode does not read"};
+      error.set_note("use a while loop instead");
+      throw error;
     }
     throw ErrorWithLocation{name_token->source_location(),
                             "Expected a variable name after 'for'"};
@@ -1419,10 +1424,12 @@ hot fn Parser::parse_for() throws -> Command *
                       (name_text[i] >= '0' && name_text[i] <= '9');
   }
   if (!is_name_plain) {
-    throw ErrorWithLocation{
+    ErrorWithLocation error{
         name_token->source_location(),
         StringView{"Bad for loop variable, '"} + name_token->raw_string() +
-            "' is not a plain name, drop the '$' and any quotes"};
+            "' is not a plain name"};
+    error.set_note("drop the '$' and any quotes");
+    throw error;
   }
 
   const let variable_name = name_token->raw_string();

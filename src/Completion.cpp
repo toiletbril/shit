@@ -24,6 +24,103 @@ namespace completion {
    line editor has drained them into its own buffer. */
 static BumpArena HIGHLIGHT_ARENA{};
 
+/* The dead-end completion color, the inverse attribute folded onto red into one
+   SGR escape so a highlight span, which carries a single sequence, opens both at
+   once. A failed segment then reads as a solid red block rather than red text
+   alone. The constant lives here because a span's sgr points at stable storage,
+   so a concatenation of two color constants would dangle. */
+static const StringView DEAD_END_COLOR = "\x1b[7;31m";
+
+/* A small most-recently-used cache of directory listings, so the per-keystroke
+   highlighter and a TAB completion do not re-read the same directory through a
+   readdir on every stroke. A large directory such as /usr/bin costs one readdir
+   on the first stroke and a stat on every later one, where the stat detects an
+   outside change to the directory and forces a re-read. The cache is keyed by the
+   directory path the caller passed, so two spellings of the same directory take
+   two slots, an accepted cost for a four-slot ring. */
+struct directory_listing_cache_entry
+{
+  String directory_path{};
+  i64 modification_time{0};
+  bool is_valid{false};
+  ArrayList<String> entries{};
+};
+
+static constexpr usize DIRECTORY_LISTING_CACHE_SLOT_COUNT = 4;
+static directory_listing_cache_entry
+    DIRECTORY_LISTING_CACHE[DIRECTORY_LISTING_CACHE_SLOT_COUNT]{};
+
+/* The cached listing of a directory, read through the most-recently-used cache
+   above. A hit whose recorded modification time still matches the directory's
+   current one returns the stored entries, otherwise the directory is read fresh
+   and the listing replaces the least-recently-used slot. Returns nullptr when
+   the directory cannot be read or cannot be stat'd, the same failure the caller
+   sees from a bare read_directory. The returned pointer stays valid until the
+   next call, which the per-keystroke callers consume before they call again. */
+static fn read_directory_cached(const Path &directory) throws
+    -> const ArrayList<String> *
+{
+  let const path_view = directory.text().view();
+
+  /* A directory whose modification time cannot be read is not cached, since the
+     invalidation key is missing, so it falls through to a fresh read below. */
+  os::file_status status{};
+  let const has_status = os::stat_path(path_view, status);
+
+  for (usize slot = 0; slot < DIRECTORY_LISTING_CACHE_SLOT_COUNT; slot++) {
+    directory_listing_cache_entry &entry = DIRECTORY_LISTING_CACHE[slot];
+    if (!entry.is_valid) continue;
+    if (entry.directory_path.view() != path_view) continue;
+
+    if (has_status && entry.modification_time == status.modification_time) {
+      LOG(All, "directory listing cache hit for '%.*s'",
+          static_cast<int>(path_view.length), path_view.data);
+      /* Move the hit to the front so a steady working set of a few directories
+         never evicts itself. The shift is at most three entries. */
+      if (slot != 0) {
+        directory_listing_cache_entry hit = steal(entry);
+        for (usize back = slot; back > 0; back--) {
+          DIRECTORY_LISTING_CACHE[back] =
+              steal(DIRECTORY_LISTING_CACHE[back - 1]);
+        }
+        DIRECTORY_LISTING_CACHE[0] = steal(hit);
+        return &DIRECTORY_LISTING_CACHE[0].entries;
+      }
+      return &entry.entries;
+    }
+
+    /* The directory changed on disk, so the stale slot is dropped and a fresh
+       read fills the most-recently-used slot below. */
+    entry.is_valid = false;
+    break;
+  }
+
+  let listing = Path::read_directory(directory);
+  if (!listing.has_value()) return nullptr;
+
+  /* The least-recently-used slot is the last one, so the whole ring shifts down
+     by one and the fresh listing lands at the front. */
+  for (usize back = DIRECTORY_LISTING_CACHE_SLOT_COUNT - 1; back > 0; back--)
+    DIRECTORY_LISTING_CACHE[back] =
+        steal(DIRECTORY_LISTING_CACHE[back - 1]);
+
+  directory_listing_cache_entry fresh{};
+  fresh.directory_path = String{path_view};
+  fresh.modification_time = has_status ? status.modification_time : 0;
+  fresh.is_valid = has_status;
+  fresh.entries = steal(*listing);
+  DIRECTORY_LISTING_CACHE[0] = steal(fresh);
+
+  LOG(All, "directory listing cache miss for '%.*s', read %zu entries",
+      static_cast<int>(path_view.length), path_view.data,
+      DIRECTORY_LISTING_CACHE[0].entries.count());
+
+  /* A directory with no readable modification time is read but left invalid, so
+     a later keystroke re-reads it rather than trusting an unkeyed slot. The
+     listing is still returned for this call. */
+  return &DIRECTORY_LISTING_CACHE[0].entries;
+}
+
 /* True for a byte that separates one shell word from the next at the top level.
    The completion tokenizer is deliberately coarse, it does not parse quotes or
    operators, since a prefix completion only needs the run of bytes the cursor
@@ -454,8 +551,11 @@ static fn complete_filesystem(StringView token,
   let listing_directory =
       resolve_listing_directory(parts.directory_part, base_directory);
 
-  let entries = Path::read_directory(listing_directory);
-  if (!entries.has_value()) return candidates;
+  /* The listing is read through the directory cache, so a TAB on a path the
+     per-keystroke highlighter just scanned reuses the same readdir rather than
+     repeating it. */
+  let const entries = read_directory_cached(listing_directory);
+  if (entries == nullptr) return candidates;
 
   for (let const &entry : *entries) {
     if (!entry.view().starts_with(parts.basename_part)) continue;
@@ -1281,6 +1381,7 @@ static constexpr StaticStringMap<const char *>::entry HELP_ALLOWLIST_ENTRIES[] =
         {SSK("ffplay"),            "--help full"},
         {SSK("cargo"),             "--help"     },
         {SSK("tailscale"),         "--help"     },
+        {SSK("oo"),                "--help"     },
         {SSK("rustup"),            "--help"     },
         {SSK("rustc"),             "--help"     },
         {SSK("rustfmt"),           "--help"     },
@@ -2517,6 +2618,31 @@ static fn complete_from_builtin_flags(StringView line, StringView token,
     return None;
   }
 
+  /* A bare unset operand is a variable name with no leading $, so it completes
+     against the same shell and environment names complete_variable matches a
+     $-prefixed token against. The user names the variable to remove, so the
+     dollar form a reference would carry is absent here. */
+  if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Unset &&
+      (token.is_empty() || token[0] != '-'))
+  {
+    let seen = HashSet{heap_allocator()};
+    let const do_add_variable_name = [&](StringView name) throws {
+      if (!name.starts_with(token)) return;
+      if (seen.contains(name)) return;
+      seen.add(name);
+      candidates.push(String{name});
+    };
+
+    context.variable_names().for_each(
+        [&](StringView name) { do_add_variable_name(name); });
+
+    for (let const &name : os::environment_names())
+      do_add_variable_name(name.view());
+
+    if (!candidates.is_empty()) return candidates;
+    return None;
+  }
+
   /* Everything below is a flag, so the token must already start the dash. */
   if (token.is_empty() || token[0] != '-') return None;
 
@@ -3196,9 +3322,8 @@ static fn path_partial_prefixes_entry(StringView word, usize existing_end,
     directory = String{"."};
   }
 
-  Maybe<ArrayList<String>> entries =
-      Path::read_directory(Path{directory.view()});
-  if (!entries.has_value()) return false;
+  let const entries = read_directory_cached(Path{directory.view()});
+  if (entries == nullptr) return false;
 
   for (let const &entry : *entries)
     if (entry.count() >= partial.length &&
@@ -3288,12 +3413,12 @@ static fn color_path_argument(usize word_start, StringView word,
   let const tail_color =
       path_partial_prefixes_entry(word, existing_end, partial, has_tilde)
           ? colors::ansi::CYAN
-          : colors::ansi::RED;
+          : DEAD_END_COLOR;
   spans.push(highlight_span{word_start + existing_end, word_start + segment_end,
                             tail_color});
   if (segment_end < word.length)
     spans.push(highlight_span{word_start + segment_end,
-                              word_start + word.length, colors::ansi::RED});
+                              word_start + word.length, DEAD_END_COLOR});
 
   return true;
 }
@@ -3738,12 +3863,23 @@ static fn scan_highlight_range(StringView line, usize begin, usize end,
       if (word.find_character('/').has_value()) {
         color_path_argument(word_start, word, spans);
       } else {
-        let const command_color =
-            first_word_resolves(word, context)
-                ? colors::ansi::BRIGHT_BLUE
-                : (command_word_prefixes_any(word, context)
-                       ? colors::ansi::BLUE
-                       : colors::ansi::RED);
+        /* A command word the user has terminated with whitespace is a finished
+           word, so no further keystroke can grow it into a real command. It must
+           resolve fully or read as a dead end, where a still-typed trailing word
+           that only prefixes some command name stays blue since it could still
+           complete. */
+        let const is_word_whitespace_terminated =
+            word_end < end &&
+            (line[word_end] == ' ' || line[word_end] == '\t' ||
+             line[word_end] == '\n');
+        let command_color = colors::ansi::RED;
+        if (first_word_resolves(word, context)) {
+          command_color = colors::ansi::BRIGHT_BLUE;
+        } else if (!is_word_whitespace_terminated &&
+                   command_word_prefixes_any(word, context))
+        {
+          command_color = colors::ansi::BLUE;
+        }
         do_push(word_start, word_end, command_color);
       }
       command_position = false;

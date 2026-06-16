@@ -80,9 +80,10 @@
 [Word
   Unquoted "fi"
 ]
-shit: 4:6: warning: Unquoted variable in a test, quote it to avoid an empty or split argument.
+shit: 4:6: warning: Unquoted variable in a test.
      4 |  if [ $x = 5 ]; then echo unquoted_no_fold; fi
        |       ^~ here.
+note: Quote it to avoid an empty or split argument.
 quoted_folds
 unquoted_no_fold
 [Code 0]

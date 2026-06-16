@@ -83,12 +83,14 @@
 [Word
   Unquoted "}"
 ]
-shit: 2:7: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
+shit: 2:7: warning: A read without -r mangles a backslash in the input.
      2 |  IFS=- read a b c d <<IN
        |        ^~~~~~~~~~~~ here.
-shit: 5:47: warning: A read without -r mangles a backslash in the input, add -r to read the line literally.
+note: Add -r to read the line literally.
+shit: 5:47: warning: A read without -r mangles a backslash in the input.
      5 |  echo "[$a][$b][$c][$d]"; printf 'p q r\n' | { read m n o; echo "[$m][$n][$o]"; }
        |                                                ^~~~~~~~~~ here.
+note: Add -r to read the line literally.
 [w][x][y][z]
 [p][q][r]
 [Code 0]

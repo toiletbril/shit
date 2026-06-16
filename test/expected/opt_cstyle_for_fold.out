@@ -1,0 +1,97 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [CStyleForLoop "i = 0; 0; i++"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "echo" "never"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "after_zero"]
+  [CompoundListCondition, None]
+    [Assign sum=0]
+  [CompoundListCondition, None]
+    [CStyleForLoop "i = 1; i <= 4; i++"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign sum=$((sum + i))]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "sum=$sum"]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "i++"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "never"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "after_zero"
+]
+[Word
+  Unquoted "sum=0"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "i"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "i++"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "sum="
+  ArithmeticExpansion "sum + i"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "sum="
+  Variable "sum"
+]
+after_zero
+sum=10
+[Code 0]

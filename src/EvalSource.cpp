@@ -21,6 +21,27 @@ namespace shit {
    it cannot recurse without limit. */
 static constexpr usize MAX_MIMICRY_DEPTH = 400;
 
+/* A Ctrl-C inside a mimicked script arrives as Error{"Interrupted"} thrown from
+   the next AST node. The mimicked script runs in-process, so without this the
+   catch-all below would absorb the interrupt into a status and let the script
+   that invoked the mimic keep running. The interrupt is recognized here so the
+   caller can re-throw it past the mimic boundary the way a normal run stops. */
+static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
+    -> bool
+{
+  if (error == nullptr) return false;
+
+  try {
+    std::rethrow_exception(error);
+  } catch (const Error &caught) {
+    return caught.message() == "Interrupted";
+  } catch (...) {
+    return false;
+  }
+
+  return false;
+}
+
 fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
                                     bool isolated) throws -> i32
 {
@@ -169,6 +190,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     m_mimicry_depth--;
     restore_fds();
     if (error) {
+      if (mimicked_error_is_interrupt(error)) throw Error{"Interrupted"};
+
       render_error(error);
       return 1;
     }
@@ -216,6 +239,8 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_shell_name = steal(previous_shell_name);
 
   if (error) {
+    if (mimicked_error_is_interrupt(error)) throw Error{"Interrupted"};
+
     render_error(error);
     return 1;
   }

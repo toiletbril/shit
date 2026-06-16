@@ -1,0 +1,27 @@
+=== if with no reachable body is eliminated ===
+[optimizer] folded if to the else body
+[optimizer] eliminated if to a no-op
+[optimizer-state] 1:1: warning: Eliminated if with no reachable body.
+     1 |  if false; then echo a; fi; echo done
+       |  ^~ here.
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 1 branches folded, 0 loops folded, 1 compounds eliminated
+done
+=== for over an empty list is eliminated ===
+[optimizer] eliminated empty for loop
+[optimizer-state] 1:1: warning: Eliminated for over an empty list.
+     1 |  for x in; do echo a; done; echo done
+       |  ^~~ here.
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 1 compounds eliminated
+done
+=== c-style for whose condition is zero is eliminated ===
+[optimizer] folded c-style for condition: 0 = 0
+[optimizer] eliminated c-style for loop
+[optimizer-state] 1:1: warning: Eliminated c-style for whose condition is zero.
+     1 |  for ((i=0; 0; i++)); do echo a; done; echo done
+       |  ^~~ here.
+[optimizer] summary: 1 arithmetic folded, 0 constants recorded, 0 branches folded, 0 loops folded, 1 compounds eliminated
+done
+=== while false is eliminated ===
+[optimizer] folded while loop to a skip
+[optimizer] summary: 0 arithmetic folded, 0 constants recorded, 0 branches folded, 1 loops folded, 0 compounds eliminated
+done

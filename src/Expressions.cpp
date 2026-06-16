@@ -74,10 +74,11 @@ fn Expression::operator delete(void *pointer) wontthrow -> void
   ::operator delete(pointer);
 }
 
-cold fn AnalysisContext::warn(SourceLocation location,
-                              StringView message) throws -> void
+cold fn AnalysisContext::warn(SourceLocation location, StringView message,
+                              StringView suggestion) throws -> void
 {
-  const WarningWithLocation located{location, message};
+  WarningWithLocation located{location, message};
+  if (!suggestion.is_empty()) located.set_note(suggestion);
   show_message(located.to_string(source));
 }
 
@@ -90,16 +91,28 @@ cold fn AnalysisContext::trace_optimizer_line(StringView message) const throws
   print_error("\n");
 }
 
-cold fn AnalysisContext::fail(SourceLocation location,
-                              StringView message) throws -> void
+cold fn AnalysisContext::trace_eliminated_node(SourceLocation location,
+                                               StringView message) const throws
+    -> void
+{
+  if (!should_print_optimizer_state) return;
+  const WarningWithLocation located{location, message};
+  print_error("[optimizer-state] ");
+  print_error(located.to_string(source));
+  print_error("\n");
+}
+
+cold fn AnalysisContext::fail(SourceLocation location, StringView message,
+                              StringView suggestion) throws -> void
 {
   /* Under -W the analysis still runs but its errors are reported as warnings
      and the run proceeds, so the same call reports without stopping. */
   if (should_treat_errors_as_warnings) {
-    warn(location, message);
+    warn(location, message, suggestion);
     return;
   }
-  const ErrorWithLocation located{location, message};
+  ErrorWithLocation located{location, message};
+  if (!suggestion.is_empty()) located.set_note(suggestion);
   show_message(located.to_string(source));
   has_fatal = true;
 }
@@ -154,6 +167,17 @@ fn Expression::as_assign_command() const wontthrow
 
 fn Expression::as_simple_command() const wontthrow
     -> const expressions::SimpleCommand *
+{
+  return nullptr;
+}
+
+fn Expression::as_for_loop() const wontthrow -> const expressions::ForLoop *
+{
+  return nullptr;
+}
+
+fn Expression::as_cstyle_for_loop() const wontthrow
+    -> const expressions::CStyleForLoop *
 {
   return nullptr;
 }
@@ -341,8 +365,8 @@ fn word_has_malformed_glob_bracket(const Word &word) throws -> bool
 fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
                const EvalContext *eval_context, bool errors_are_warnings,
-               bool silence_unresolved_commands, bool trace_optimizer) throws
-    -> bool
+               bool silence_unresolved_commands,
+               bool show_optimizer_state) throws -> bool
 {
   ASSERT(root != nullptr);
 
@@ -350,7 +374,11 @@ fn analyze_ast(const Expression *root, StringView source,
   actx.should_treat_errors_as_warnings = errors_are_warnings;
   actx.should_silence_unresolved_commands = silence_unresolved_commands;
   actx.eval_context = eval_context;
-  actx.should_trace_optimizer = trace_optimizer;
+  /* One flag drives both the per-decision trace and the located eliminated-node
+     dump, so a folded node reports once through the trace path rather than
+     needing a second emitter. */
+  actx.should_print_optimizer_state = show_optimizer_state;
+  actx.should_trace_optimizer = show_optimizer_state;
 
   /* A leading shebang that names a POSIX shell gates the bashism lints. The
      first line is scanned for a contained 'dash', or for an 'sh' interpreter
@@ -403,7 +431,9 @@ fn analyze_ast(const Expression *root, StringView source,
     summary.append(utils::uint_to_text(actx.optimizer_folded_branches));
     summary.append(" branches folded, ");
     summary.append(utils::uint_to_text(actx.optimizer_folded_loops));
-    summary.append(" loops folded");
+    summary.append(" loops folded, ");
+    summary.append(utils::uint_to_text(actx.optimizer_eliminated_compounds));
+    summary.append(" compounds eliminated");
     actx.trace_optimizer_line(summary.view());
   }
 
@@ -607,8 +637,8 @@ cold fn AssignCommand::analyze(AnalysisContext &actx,
     actx.warn(source_location(),
               StringView{"This assignment to '"} + name +
                   "' in a function has no local, so the value leaks to the "
-                  "global scope, declare it with local to keep it inside the "
-                  "function");
+                  "global scope",
+              "declare it with local to keep it inside the function");
   }
 
   /* An unconditional top-level assignment records the name as an existing
@@ -2610,6 +2640,16 @@ fn CompoundCommand::redirect_to(usize d, String &f, bool duplicate) throws
                           "Redirection on a compound command is not supported"};
 }
 
+fn CompoundCommand::set_fully_eliminated() const wontthrow -> void
+{
+  m_is_fully_eliminated = true;
+}
+
+pure fn CompoundCommand::is_fully_eliminated() const wontthrow -> bool
+{
+  return m_is_fully_eliminated;
+}
+
 IfClause::IfClause(SourceLocation location, ArrayList<if_branch> &&branches,
                    const Expression *otherwise)
     : CompoundCommand(location), m_branches(steal(branches)),
@@ -2647,6 +2687,14 @@ hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
      shell, so the terminal exec stays confined to a top-level simple command.
    */
   cxt.set_terminal_exec_allowed(false);
+
+  /* The analyze pass proved every reachable branch body does nothing, so the if
+     yields 0 without testing a condition or running a body. */
+  if (m_is_fully_eliminated) {
+    LOG(Debug, "running the fully eliminated if as a no-op");
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
 
   /* The analyze pass proved which branch runs, so the conditions are skipped
      and the chosen body runs straight away. An index past the last branch means
@@ -2749,6 +2797,11 @@ pure fn IfClause::has_folded_branch() const wontthrow -> bool
   return m_folded_branch.has_value();
 }
 
+pure fn IfClause::folded_branch_index() const wontthrow -> usize
+{
+  return *m_folded_branch;
+}
+
 fn IfClause::as_if_clause() const wontthrow -> const IfClause * { return this; }
 
 WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
@@ -2836,8 +2889,10 @@ hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
       m_folded_to_skip ? ", folded to skip the body" : "");
 
   /* The analyze pass proved the body never runs, so the loop yields 0 without
-     evaluating the condition. A while false and an until true fold here. */
-  if (m_folded_to_skip) {
+     evaluating the condition. A while false and an until true fold here. The
+     body-elimination mark is the same outcome reached from a different proof,
+     so it folds to the skip too. */
+  if (m_folded_to_skip || m_is_fully_eliminated) {
     cxt.set_last_exit_status(0);
     return 0;
   }
@@ -3063,6 +3118,14 @@ hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A loop body runs repeatedly in the shell process, so no command in it may
      replace the shell. */
   cxt.set_terminal_exec_allowed(false);
+
+  /* The analyze pass proved the loop runs nothing observable, an empty word
+     list or a no-op body, so the for yields 0 without expanding the words. */
+  if (m_is_fully_eliminated) {
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
   /* The word list expands here, so a runtime warning from it carets this for
      rather than the statement before it. */
   cxt.set_current_location(source_location());
@@ -3132,15 +3195,20 @@ cold fn ForLoop::analyze(AnalysisContext &actx,
       if (trimmed.starts_with(StringView{"cat "}))
         actx.warn(t->source_location(),
                   "A for over the cat output iterates IFS-split words rather "
-                  "than lines, read the lines with 'while IFS= read -r line' "
-                  "instead");
+                  "than lines",
+                  "read the lines with 'while IFS= read -r line' instead");
       else if (trimmed.starts_with(StringView{"find "}) || trimmed == "find")
         actx.warn(t->source_location(),
                   "A for over the find output breaks a name with whitespace "
-                  "apart, use find -exec or a 'while read -r' loop over "
-                  "find -print0");
+                  "apart",
+                  "use find -exec or a 'while read -r' loop over find -print0");
     }
   }
+
+  /* The empty-list elimination rule reads the word list while it is still
+     unchanged, so the optimizer runs before the constant table is cleared for
+     the body. */
+  optimizer::optimize_node(this, actx);
 
   /* The body runs repeatedly over the loop list and may reassign a name, so a
      value recorded before the loop does not hold inside it. Clearing the
@@ -3158,6 +3226,18 @@ cold fn ForLoop::register_defined_functions(AnalysisContext &actx) const throws
   /* The loop body runs in the current shell, so a function it defines is
      registered before the ordered walk. */
   m_body->register_defined_functions(actx);
+}
+
+fn ForLoop::as_for_loop() const wontthrow -> const ForLoop * { return this; }
+
+pure fn ForLoop::has_in_clause() const wontthrow -> bool
+{
+  return m_has_in_clause;
+}
+
+pure fn ForLoop::words() const wontthrow -> const ArrayList<const Token *> &
+{
+  return m_words;
 }
 
 CaseClause::CaseClause(SourceLocation location, const Token *word,
@@ -3371,6 +3451,13 @@ fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
   /* A command inside a brace group forks rather than replacing the shell, so
      the terminal exec stays confined to a top-level simple command. */
   cxt.set_terminal_exec_allowed(false);
+
+  /* The analyze pass proved the body does nothing observable, so the group
+     yields 0 without running it. */
+  if (m_is_fully_eliminated) {
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
 
   return m_body->evaluate(cxt);
 }
@@ -3599,6 +3686,15 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
      replace the shell. */
   cxt.set_terminal_exec_allowed(false);
 
+  /* The analyze pass proved the body never runs, the condition folds to a
+     constant zero, so the loop yields 0 without evaluating the init or the
+     condition. */
+  if (m_is_fully_eliminated) {
+    LOG(Debug, "running the fully eliminated c-style for as a no-op");
+    cxt.set_last_exit_status(0);
+    return 0;
+  }
+
   /* The three arithmetic sections read variables, so a runtime warning from
      them carets this loop rather than the statement before it. */
   cxt.set_current_location(source_location());
@@ -3616,9 +3712,13 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
   defer { cxt.leave_loop(); };
 
   i64 ret = 0;
-  /* An empty condition is always true, the way for ((;;)) loops forever. */
+  /* An empty condition is always true, the way for ((;;)) loops forever. A
+     condition the folding rule proved constant reads its cached value rather
+     than re-parsing the clause on every pass. */
   while (is_blank_clause(m_condition.view()) ||
-         cxt.evaluate_arithmetic(m_condition.view()) != 0)
+         (m_folded_condition.has_value() ? (*m_folded_condition != 0)
+                                         : cxt.evaluate_arithmetic(
+                                               m_condition.view()) != 0))
   {
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
@@ -3635,6 +3735,12 @@ cold fn CStyleForLoop::analyze(AnalysisContext &actx,
 {
   ASSERT(m_body != nullptr);
   unused(is_unconditional);
+
+  /* The C-style-for folding rule reads the three clauses while they are still
+     unchanged, so the optimizer runs before the constant table is cleared for
+     the body. */
+  optimizer::optimize_node(this, actx);
+
   /* The header and body reassign the counter on every iteration, so a constant
      recorded before the loop does not hold inside or after it, the same reason
      ForLoop clears the constant table before analyzing its body. */
@@ -3647,6 +3753,26 @@ cold fn CStyleForLoop::register_defined_functions(
 {
   ASSERT(m_body != nullptr);
   m_body->register_defined_functions(actx);
+}
+
+pure fn CStyleForLoop::condition_clause() const wontthrow -> StringView
+{
+  return m_condition.view();
+}
+
+fn CStyleForLoop::set_folded_condition(i64 value) const wontthrow -> void
+{
+  m_folded_condition = value;
+}
+
+pure fn CStyleForLoop::has_folded_condition() const wontthrow -> bool
+{
+  return m_folded_condition.has_value();
+}
+
+fn CStyleForLoop::as_cstyle_for_loop() const wontthrow -> const CStyleForLoop *
+{
+  return this;
 }
 
 Subshell::Subshell(SourceLocation location, const Expression *body)
@@ -4479,10 +4605,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         if (segment.kind == WordSegment::Kind::VariableReference &&
             segment.is_split_eligible())
         {
-          actx.warn(
-              m_args[i]->source_location(),
-              "Unquoted variable in a test, quote it to avoid an empty or "
-              "split argument");
+          actx.warn(m_args[i]->source_location(),
+                    "Unquoted variable in a test",
+                    "quote it to avoid an empty or split argument");
           break;
         }
       }
@@ -4498,9 +4623,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       !args_have_short_flag(m_args, 'r'))
   {
     actx.warn(source_location(),
-              "A read without -r mangles a backslash in the input, add -r "
-              "to "
-              "read the line literally");
+              "A read without -r mangles a backslash in the input",
+              "add -r to read the line literally");
   }
 
   /* The bashism lints, each fired only when the shebang names a POSIX shell so
@@ -4523,22 +4647,25 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         actx.warn(m_args[1]->source_location(),
                   "An echo " + view +
                       " relies on a bash builtin, the POSIX echo prints the "
-                      "flag as text, use printf instead under a sh shebang");
+                      "flag as text",
+                  "use printf instead under a sh shebang");
       }
     }
     if (command_literal == "declare" || command_literal == "typeset")
       actx.warn(m_args[0]->source_location(),
                 StringView{"The "} + command_literal.view() +
-                    " builtin is not in POSIX, assign the variable plainly "
-                    "under a sh shebang, or switch the shebang to bash");
+                    " builtin is not in POSIX",
+                "assign the variable plainly under a sh shebang, or switch the "
+                "shebang to bash");
     if (command_literal == "source")
       actx.warn(m_args[0]->source_location(),
                 "The name source is the bash spelling, the POSIX dot command "
-                "is '.', use '.' under a sh shebang");
+                "is '.'",
+                "use '.' under a sh shebang");
     if (command_literal == "local")
       actx.warn(m_args[0]->source_location(),
-                "The local builtin is not in POSIX sh, the value stays "
-                "global, rework the function or switch the shebang to bash");
+                "The local builtin is not in POSIX sh, the value stays global",
+                "rework the function or switch the shebang to bash");
     if (command_literal == "printf" && m_args.count() >= 2 &&
         m_args[1]->kind() == Token::Kind::Word &&
         static_cast<const tokens::WordToken *>(m_args[1])
@@ -4548,8 +4675,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     {
       actx.warn(m_args[1]->source_location(),
                 "The printf -v form is a bash extension, the POSIX printf "
-                "has no -v, capture the output with a command substitution "
-                "under a sh shebang");
+                "has no -v",
+                "capture the output with a command substitution under a sh "
+                "shebang");
     }
     /* mapfile and its readarray alias are bash array builtins with no POSIX
        counterpart. This is shellcheck SC3030, read the input with a while
@@ -4557,9 +4685,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     if (command_literal == "mapfile" || command_literal == "readarray")
       actx.warn(m_args[0]->source_location(),
                 command_literal.view() +
-                    " is a bash array builtin absent from POSIX sh, read the "
-                    "input with a while read loop or switch the shebang to "
-                    "bash");
+                    " is a bash array builtin absent from POSIX sh",
+                "read the input with a while read loop or switch the shebang "
+                "to bash");
   }
 
   /* The deprecated-tool and native-form lints. egrep and fgrep are deprecated
@@ -4572,27 +4700,24 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
   if (!command_is_shadowed) {
     if (command_literal == "egrep")
       actx.warn(m_args[0]->source_location(),
-                "The egrep command is deprecated, use grep -E for the "
-                "extended regular "
-                "expression match");
+                "The egrep command is deprecated",
+                "use grep -E for the extended regular expression match");
     else if (command_literal == "fgrep")
       actx.warn(m_args[0]->source_location(),
-                "The fgrep command is deprecated, use grep -F for the fixed "
-                "string match");
+                "The fgrep command is deprecated",
+                "use grep -F for the fixed string match");
     else if (command_literal == "expr")
       actx.warn(m_args[0]->source_location(),
-                "An expr forks for arithmetic the shell does natively, use "
-                "$((...)) for the calculation");
+                "An expr forks for arithmetic the shell does natively",
+                "use $((...)) for the calculation");
     else if (command_literal == "let")
       actx.warn(m_args[0]->source_location(),
-                "A let runs arithmetic as a command, use the ((...)) "
-                "compound so "
-                "the operands need no quoting");
+                "A let runs arithmetic as a command",
+                "use the ((...)) compound so the operands need no quoting");
     else if (command_literal == "local" && actx.function_scope_depth == 0)
       actx.warn(m_args[0]->source_location(),
-                "A local outside a function has no scope to bind, declare "
-                "the "
-                "variable plainly or move it into a function");
+                "A local outside a function has no scope to bind",
+                "declare the variable plainly or move it into a function");
   }
 
   if (command_literal == "echo" && !command_is_shadowed &&
@@ -4604,7 +4729,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
     {
       actx.warn(m_args[0]->source_location(),
                 "An echo of a command substitution prints what the command "
-                "already prints, run the command on its own instead");
+                "already prints",
+                "run the command on its own instead");
     }
   }
 
@@ -4629,10 +4755,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       }
     if (action_expands_now)
       actx.warn(m_args[1]->source_location(),
-                "The double-quoted trap action expands now, when the trap "
-                "is "
-                "set, not when it fires, single-quote it so it expands as the "
-                "signal arrives");
+                "The double-quoted trap action expands now, when the trap is "
+                "set, not when it fires",
+                "single-quote it so it expands as the signal arrives");
   }
 
   /* printf reads its format argument as the template, so a variable or a
@@ -4682,8 +4807,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (format_has_expansion)
         actx.warn(m_args[format_index]->source_location(),
                   "The printf format comes from a variable, the data can "
-                  "inject "
-                  "format directives, use printf '%s' to print it");
+                  "inject format directives",
+                  "use printf '%s' to print it");
     }
   }
 
@@ -4692,8 +4817,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
      or alias named which is the user's own, so the lint is off for it. */
   if (command_literal == "which" && !command_is_shadowed) {
     actx.warn(m_args[0]->source_location(),
-              "The which command is non-standard, use command -v for a "
-              "portable lookup");
+              "The which command is non-standard",
+              "use command -v for a portable lookup");
   }
 
   /* An unquoted command substitution splits its captured output on IFS and
@@ -4725,8 +4850,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       if (!value_has_substitution) continue;
       actx.warn(m_args[i]->source_location(),
                 "Declaring and assigning from a command substitution in one "
-                "command masks the command's exit status, split the "
-                "declaration and the assignment so a failure is seen");
+                "command masks the command's exit status",
+                "split the declaration and the assignment so a failure is "
+                "seen");
       break;
     }
 
@@ -4753,8 +4879,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       continue;
     }
     actx.warn(m_args[i]->source_location(),
-              "An unquoted command substitution splits its output, quote "
-              "it to keep one argument");
+              "An unquoted command substitution splits its output",
+              "quote it to keep one argument");
   }
 
   /* rm -r with a "$var/" operand deletes / outright when the variable is
@@ -4775,8 +4901,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       {
         actx.warn(m_args[i]->source_location(),
                   "A rm -r on \"$" + word.segments[0].text.view() +
-                      "/\" deletes '/' when the variable is empty, write ${" +
-                      word.segments[0].text.view() +
+                      "/\" deletes '/' when the variable is empty",
+                  StringView{"write ${"} + word.segments[0].text.view() +
                       ":?} so an empty value aborts the command instead");
       }
       if (word_is_fully_literal(word)) {
@@ -4784,7 +4910,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         if (SYSTEM_DIRECTORIES.find(literal.view()).has_value())
           actx.warn(m_args[i]->source_location(),
                     "A rm -r aimed at the system directory '" + literal.view() +
-                        "', double-check the path before running this");
+                        "'",
+                    "double-check the path before running this");
       }
     }
   }
@@ -4810,9 +4937,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           word.segments[0].has_glob_metacharacter())
       {
         actx.warn(m_args[i]->source_location(),
-                  "The unquoted grep pattern can glob against the local "
-                  "files "
-                  "before grep sees it, quote the pattern");
+                  "The unquoted grep pattern can glob against the local files "
+                  "before grep sees it",
+                  "quote the pattern");
       } else if (!view.is_empty() && view[0] == '*') {
         actx.warn(m_args[i]->source_location(),
                   "A grep reads a regular expression, where a leading * has "
@@ -4874,14 +5001,13 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       }
       if (word.segments.count() == 1 && !segment.is_in_double_quotes) {
         actx.warn(m_args[i]->source_location(),
-                  "An unquoted $@ word-splits and globs each argument, "
-                  "quote "
-                  "it as \"$@\" to pass the arguments through unchanged");
+                  "An unquoted $@ word-splits and globs each argument",
+                  "quote it as \"$@\" to pass the arguments through unchanged");
       } else if (word.segments.count() > 1) {
         actx.warn(m_args[i]->source_location(),
                   "$@ inside a longer word concatenates the surrounding text "
-                  "onto the first and last argument, use $* for one joined "
-                  "string or a separate \"$@\" word");
+                  "onto the first and last argument",
+                  "use $* for one joined string or a separate \"$@\" word");
       }
       break;
     }
@@ -4913,8 +5039,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         }
       if (!body_runs_more_than_echo)
         actx.warn(m_args[i]->source_location(),
-                  "A useless echo inside the command substitution, the text "
-                  "can be used directly without the subshell");
+                  "A useless echo inside the command substitution",
+                  "the text can be used directly without the subshell");
     }
   }
 
@@ -4945,8 +5071,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
       {
         actx.warn(redirection.target->source_location(),
                   "2>&1 before the file redirect duplicates the terminal, so "
-                  "stderr stays on the terminal, put the file redirect first "
-                  "as in '>file 2>&1'");
+                  "stderr stays on the terminal",
+                  "put the file redirect first as in '>file 2>&1'");
       }
       if (redirection.kind == Redirection::Kind::ReadInput &&
           redirection.target != nullptr &&
@@ -4971,7 +5097,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           actx.warn(redirection.target->source_location(),
                     "The command reads and truncates '" + read_target.view() +
                         "' at once, the truncation empties the input before "
-                        "it is read, write to a temporary and move it over");
+                        "it is read",
+                    "write to a temporary and move it over");
         }
       }
     }
@@ -5031,14 +5158,13 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           !is_test_binary_operator_word(previous_literal.view()))
       {
         actx.warn(m_args[i]->source_location(),
-                  "== is undefined in POSIX test, use = for string equality");
+                  "== is undefined in POSIX test", "use = for string equality");
       }
       let const previous_is_bang = previous_literal.view() == "!";
       if (i >= 2 && !previous_is_bang && (view == "-a" || view == "-o")) {
         actx.warn(m_args[i]->source_location(),
-                  "A test with -a or -o is obsolescent, join two tests with && "
-                  "or "
-                  "|| instead");
+                  "A test with -a or -o is obsolescent",
+                  "join two tests with && or || instead");
       } else if (view == "!" && i + 1 < m_args.count() &&
                  m_args[i + 1]->kind() == Token::Kind::Word)
       {
@@ -5046,11 +5172,11 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                              ->word()
                              .to_literal_string();
         if (next.view() == "-z") {
-          actx.warn(m_args[i]->source_location(),
-                    "A negated -z is just -n, test with -n instead");
+          actx.warn(m_args[i]->source_location(), "A negated -z is just -n",
+                    "test with -n instead");
         } else if (next.view() == "-n") {
-          actx.warn(m_args[i]->source_location(),
-                    "A negated -n is just -z, test with -z instead");
+          actx.warn(m_args[i]->source_location(), "A negated -n is just -z",
+                    "test with -z instead");
         } else if (i + 2 < m_args.count() &&
                    m_args[i + 2]->kind() == Token::Kind::Word)
         {
@@ -5064,8 +5190,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           if (inverse.has_value()) {
             actx.warn(m_args[i]->source_location(),
                       StringView{"A negated "} + op + " is just " +
-                          inverse.value() + ", drop the ! and use " +
-                          inverse.value());
+                          inverse.value(),
+                      StringView{"drop the ! and use "} + inverse.value());
           }
         }
       }
@@ -5101,8 +5227,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
                               .to_literal_string();
       if (!(operand.view().length >= 1 && operand.view()[0] == '-')) {
         actx.warn(m_args[1]->source_location(),
-                  "A one-operand test is the nonempty-string test, write it "
-                  "with -n to read clearer");
+                  "A one-operand test is the nonempty-string test",
+                  "write it with -n to read clearer");
       }
     }
 
@@ -5128,8 +5254,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
         if (word_is_fully_literal(next))
           actx.warn(m_args[i + 1]->source_location(),
                     "The operand is a literal, so this " + view +
-                        " test is constant, test a variable or drop the "
-                        "check");
+                        " test is constant",
+                    "test a variable or drop the check");
       }
 
       if (is_test_numeric_operator_word(view)) {
@@ -5161,8 +5287,8 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           {
             actx.warn(m_args[i + 1]->source_location(),
                       "[ and test compare strings byte for byte and never "
-                      "glob-match, use a case or the [[ ]] form for the "
-                      "pattern");
+                      "glob-match",
+                      "use a case or the [[ ]] form for the pattern");
           }
         }
       }
@@ -5173,10 +5299,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
             !view_contains(segment.text.view(), StringView{"grep -c"}))
         {
           actx.warn(m_args[i]->source_location(),
-                    "The test buffers the whole grep output only to check "
-                    "it "
-                    "is nonempty, run grep -q directly and test its exit "
-                    "status");
+                    "The test buffers the whole grep output only to check it "
+                    "is nonempty",
+                    "run grep -q directly and test its exit status");
           break;
         }
       }
@@ -5189,9 +5314,9 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           word.segments[0].text.view() == "?")
       {
         actx.warn(m_args[i]->source_location(),
-                  "Testing $? checks the exit status indirectly, test the "
-                  "command directly with if or && so an intervening command "
-                  "cannot clobber the status");
+                  "Testing $? checks the exit status indirectly",
+                  "test the command directly with if or && so an intervening "
+                  "command cannot clobber the status");
       }
     }
   }
@@ -5231,19 +5356,21 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
           StringView{name->data(), name->count()}) &&
       !actx.known_aliases.contains(StringView{name->data(), name->count()}))
   {
-    let message = StringView{"Command '"} + StringView{*name} +
-                  StringView{"' was not found"};
+    let const message = StringView{"Command '"} + StringView{*name} +
+                        StringView{"' was not found"};
     /* A close function, alias, builtin, or PATH program is offered as a
-       did-you-mean hint, so a typo points at the command it resembles. */
+       did-you-mean hint on a trailing note, so a typo points at the command it
+       resembles without crowding the problem line. */
     let local_names = ArrayList<String>{};
     actx.defined_functions.for_each(
         [&](StringView n) throws { local_names.push(String{n}); });
     actx.known_aliases.for_each([&](StringView n)
                                     throws { local_names.push(String{n}); });
+    let suggestion_note = String{};
     if (Maybe<String> suggestion =
             utils::suggest_command(StringView{*name}, local_names))
     {
-      message += ", did you mean '" + *suggestion + "'?";
+      suggestion_note = "did you mean '" + *suggestion + "'?";
     }
     /* Point at the command word, not at the whole command. With an assignment
        prefix the command location is the assignment, not the program name. A
@@ -5254,22 +5381,20 @@ cold fn SimpleCommand::analyze(AnalysisContext &actx,
        POSIX mode skips the analysis, so the file runs and the runtime
        resolution sets 127 per command the way dash does. */
     if (actx.has_seen_runtime_definer)
-      actx.warn(m_args[0]->source_location(), message);
+      actx.warn(m_args[0]->source_location(), message, suggestion_note.view());
     else
-      actx.fail(m_args[0]->source_location(), message);
+      actx.fail(m_args[0]->source_location(), message, suggestion_note.view());
   }
 
   /* A command may change a variable out of the prepass's static view, so a
      constant recorded for a later straight-line reference is no longer proven.
-     A small set of builtins never writes a shell variable and never runs code
-     the prepass cannot see, so a constant survives across them. Every other
-     command, including a function call, an unset, an export, or a command
-     substitution argument, forgets the whole table. */
+     A set of read-only builtins and read-only coreutils in a static packed
+     table never writes a shell variable and never runs code the prepass cannot
+     see, so a constant survives across them. Every other command, including a
+     function call, an unset, an export, or a command substitution argument,
+     forgets the whole table. */
   let const is_variable_neutral_builtin =
-      command_literal == "echo" || command_literal == "printf" ||
-      command_literal == "true" || command_literal == "false" ||
-      command_literal == ":" || command_literal == "test" ||
-      command_literal == "[" || command_literal == "pwd";
+      optimizer::command_is_environment_neutral(command_literal.view());
 
   bool clears_constants = !is_variable_neutral_builtin;
   if (!clears_constants) {
@@ -5355,9 +5480,9 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
             !actx.defined_functions.contains(name->view()) &&
             !actx.known_aliases.contains(name->view()) && file_is_plain_operand)
         {
-          actx.warn(cat_args[0]->source_location(),
-                    "A useless cat, give the file to the next command "
-                    "directly instead of piping cat");
+          actx.warn(cat_args[0]->source_location(), "A useless cat",
+                    "give the file to the next command directly instead of "
+                    "piping cat");
         }
       }
     }
@@ -5393,7 +5518,7 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
       }
       if (!has_null_flag)
         actx.warn(next->args()[0]->source_location(),
-                  "An xargs splits the find output on whitespace and quotes, "
+                  "An xargs splits the find output on whitespace and quotes",
                   "pair find -print0 with xargs -0 or use find -exec");
     }
 
@@ -5418,14 +5543,16 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
     if (stage_name->view() == "ps" && !stage_is_user && next_is_grep)
       actx.warn(next->args()[0]->source_location(),
                 "Grepping the ps output races the process table and matches "
-                "the grep itself, use pgrep to match a process by name");
+                "the grep itself",
+                "use pgrep to match a process by name");
 
     /* ls piped into grep parses the formatted listing, which mangles a name
        with a space or a newline, shellcheck SC2010, use a glob or find. */
     if (stage_name->view() == "ls" && !stage_is_user && next_is_grep)
       actx.warn(next->args()[0]->source_location(),
                 "Grepping the ls listing mangles a name with a space or a "
-                "newline, match the names with a glob or with find instead");
+                "newline",
+                "match the names with a glob or with find instead");
 
     /* grep whose output only feeds wc -l counts matches with a second
        process, shellcheck SC2126, use grep -c. */
@@ -5435,8 +5562,8 @@ cold fn Pipeline::analyze(AnalysisContext &actx,
         next->args()[1]->raw_string().view() == "-l")
     {
       actx.warn(stage->args()[0]->source_location(),
-                "Counting grep output with wc -l runs an extra process, use "
-                "grep -c to count the matching lines directly");
+                "Counting grep output with wc -l runs an extra process",
+                "use grep -c to count the matching lines directly");
     }
   }
 

@@ -45,12 +45,14 @@
 [Word
   Unquoted "f"
 ]
-shit: 2:6: warning: An echo of a command substitution prints what the command already prints, run the command on its own instead.
+shit: 2:6: warning: An echo of a command substitution prints what the command already prints.
      2 |  f(){ echo "$(echo hi)"; }
        |       ^~~~ here.
-shit: 2:11: warning: A useless echo inside the command substitution, the text can be used directly without the subshell.
+note: Run the command on its own instead.
+shit: 2:11: warning: A useless echo inside the command substitution.
      2 |  f(){ echo "$(echo hi)"; }
        |            ^~~~~~~~~~~~ here.
+note: The text can be used directly without the subshell.
 hi
 hi
 hi

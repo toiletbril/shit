@@ -176,7 +176,58 @@ fn constant_test_verdict(const ArrayList<const Token *> &operands,
   return None;
 }
 
+/* The names of commands proven not to mutate the shell environment, stored as a
+   packed-key table the dispatch reads as data rather than a name chain. A
+   command outside this table is assumed to write a variable or run code the
+   prepass cannot see, so the constant table is forgotten across it.
+
+   The safety reasoning is that a recorded constant only survives a command that
+   cannot change the value a later straight-line read would see. An external
+   coreutil and a read-only shitbox utility run in a child or write only their
+   own standard output, so neither touches the parent shell's variables. The
+   shell builtins true, false, :, echo, printf, test, [, and pwd write no
+   variable. The env-mutating builtins export, unset, local, declare, typeset,
+   readonly, set, eval, source, and . are deliberately absent, so a command that
+   reaches one of them falls through to the conservative clear. read is absent
+   for the same reason, since it binds a name from input. The caller still
+   clears the table on a command substitution argument, on an unquoted IFS or
+   array dependence already handled at the assignment, and on a name shadowed by
+   a function or an alias, so the table here only lists the bare neutral names.
+ */
+inline constexpr StaticStringMap<bool>::entry ENVIRONMENT_NEUTRAL_ENTRIES[] = {
+    {SSK("echo"),     true},
+    {SSK("printf"),   true},
+    {SSK("true"),     true},
+    {SSK("false"),    true},
+    {SSK(":"),        true},
+    {SSK("test"),     true},
+    {SSK("["),        true},
+    {SSK("pwd"),      true},
+    {SSK("which"),    true},
+    {SSK("whoami"),   true},
+    {SSK("basename"), true},
+    {SSK("dirname"),  true},
+    {SSK("seq"),      true},
+    {SSK("expr"),     true},
+    {SSK("id"),       true},
+    {SSK("hostname"), true},
+    {SSK("uname"),    true},
+    {SSK("date"),     true},
+    {SSK("arch"),     true},
+    {SSK("tty"),      true},
+};
+
+inline constexpr StaticStringMap<bool> ENVIRONMENT_NEUTRAL_NAMES{
+    ENVIRONMENT_NEUTRAL_ENTRIES,
+    sizeof(ENVIRONMENT_NEUTRAL_ENTRIES) /
+        sizeof(ENVIRONMENT_NEUTRAL_ENTRIES[0])};
+
 } /* namespace */
+
+fn command_is_environment_neutral(StringView name) throws -> bool
+{
+  return ENVIRONMENT_NEUTRAL_NAMES.find(name).has_value();
+}
 
 fn literal_word_value(const Word &word) throws -> Maybe<String>
 {
@@ -358,6 +409,125 @@ fn try_fold_arithmetic_with_constants(StringView expression,
   }
 }
 
+/* Strip the leading and trailing arithmetic whitespace from a span, so a
+   pattern match reads the operand bytes without a blank prefix or suffix. The
+   span is returned narrowed, never widened. */
+pure fn trim_arithmetic_whitespace(StringView text) wontthrow -> StringView
+{
+  usize start_position = 0;
+  while (start_position < text.length &&
+         (text[start_position] == ' ' || text[start_position] == '\t'))
+    start_position++;
+  usize end_position = text.length;
+  while (end_position > start_position &&
+         (text[end_position - 1] == ' ' || text[end_position - 1] == '\t'))
+    end_position--;
+  return text.substring(start_position).substring_of_length(0, end_position -
+                                                                   start_position);
+}
+
+/* The constant result of an algebraic identity on a single binary operator, the
+   cases that collapse to a constant even when one operand is a run-time
+   variable. The folding rule caches an integer, so only an identity whose
+   result is a literal qualifies, which is x*0, 0*x, and x-x. The companion
+   identities x+0, 0+x, x*1, and 1*x reduce to the other operand rather than a
+   constant, so they cannot be cached in the integer slot and are left to the
+   evaluator. The split at the first top-level operator only fires on an
+   expression with no parenthesis, so a nested term cannot hide a different
+   operator that changes the value. None when no identity applies.
+
+   A bare variable operand is folded only when nounset is provably off, since
+   reading an unset name under set -u is an error this fold would swallow. The
+   nounset state is read from the live shell. With no live shell, or with
+   nounset on, a variable operand is declined and only an all-literal operand
+   pair folds. */
+fn try_algebraic_simplify(StringView expression,
+                          const AnalysisContext &actx) wontthrow -> Maybe<i64>
+{
+  let const expr = trim_arithmetic_whitespace(expression);
+  if (expr.length == 0) return None;
+
+  /* A parenthesis or a second operator means the operands are not the two plain
+     terms this matcher assumes, so it declines rather than guess the grouping.
+   */
+  usize operator_position = 0;
+  usize operator_count = 0;
+  bool has_grouping = false;
+  for (usize i = 0; i < expr.length; i++) {
+    const char byte = expr[i];
+    if (byte == '(' || byte == ')') {
+      has_grouping = true;
+      break;
+    }
+    /* A leading sign on the whole expression is a unary minus, not the binary
+       operator this matcher splits on, so the scan starts past position zero. */
+    if (i > 0 && (byte == '*' || byte == '-')) {
+      operator_position = i;
+      operator_count++;
+    }
+  }
+
+  if (has_grouping || operator_count != 1) return None;
+
+  const char op = expr[operator_position];
+  let const lhs = trim_arithmetic_whitespace(
+      expr.substring_of_length(0, operator_position));
+  let const rhs = trim_arithmetic_whitespace(expr.substring(operator_position +
+                                                            1));
+  if (lhs.length == 0 || rhs.length == 0) return None;
+
+  /* Each operand must read as a plain name or a plain integer, no increment, no
+     assignment, and no further operator. A side-effecting operand such as x++
+     would make x - x non-zero, so it is declined here. */
+  let const operand_is_plain = [](StringView operand) wontthrow -> bool {
+    for (usize i = 0; i < operand.length; i++) {
+      if (!is_identifier_continuation(operand[i])) return false;
+    }
+    return true;
+  };
+  if (!operand_is_plain(lhs) || !operand_is_plain(rhs)) return None;
+
+  /* A variable operand reads a name, and under nounset an unset name is an
+     error this fold would hide. The fold proceeds only when a live shell proves
+     nounset off, otherwise an operand that is not a plain integer literal
+     declines. */
+  let const nounset_is_off =
+      actx.eval_context != nullptr && !actx.eval_context->error_unset();
+  let const operand_reads_variable = [](StringView operand) wontthrow -> bool {
+    return operand.length > 0 && is_identifier_start(operand[0]);
+  };
+  if (!nounset_is_off &&
+      (operand_reads_variable(lhs) || operand_reads_variable(rhs)))
+  {
+    LOG(All, "the algebraic simplify declines a variable operand, nounset may "
+             "be on");
+    return None;
+  }
+
+  if (op == '*') {
+    /* A multiply by a literal zero on either side is zero, whatever the other
+       operand reads, since the shell's arithmetic has no NaN. */
+    if (lhs == StringView{"0"} || rhs == StringView{"0"}) {
+      LOG(All, "algebraic simplify '%.*s' to 0 through a zero multiply",
+          static_cast<int>(expr.length), expr.data);
+      return Maybe<i64>{0};
+    }
+    return None;
+  }
+
+  /* A subtraction of a term from the same term is zero. The two sides match
+     byte for byte after the whitespace trim, so a plain repeated name or a
+     repeated literal folds, while a different spelling of the same value is
+     left alone. */
+  if (op == '-' && lhs == rhs) {
+    LOG(All, "algebraic simplify '%.*s' to 0 through x - x",
+        static_cast<int>(expr.length), expr.data);
+    return Maybe<i64>{0};
+  }
+
+  return None;
+}
+
 fn simple_command_static_verdict(const ArrayList<const Token *> &args,
                                  const AnalysisContext &actx) throws
     -> Maybe<bool>
@@ -493,6 +663,11 @@ fn fold_constant_arithmetic_in_word(const Word &word,
     let result = try_fold_constant_arithmetic(segment.text.view());
     if (!result.has_value())
       result = try_fold_arithmetic_with_constants(segment.text.view(), actx);
+    /* An identity such as x*0 or x-x folds to a constant even when the operand
+       reads a run-time variable, so the algebraic pass runs after the numeric
+       folds decline. */
+    if (!result.has_value())
+      result = try_algebraic_simplify(segment.text.view(), actx);
     if (result.has_value()) {
       LOG(All, "folded the constant arithmetic '%.*s' to %lld",
           static_cast<int>(segment.text.view().length),
@@ -624,15 +799,129 @@ fn rule_loop_elimination(const Expression *node, AnalysisContext &actx) throws
   return true;
 }
 
+/* RULE compound-body elimination. An if every reachable path of which does
+   nothing observable folds to a no-op the evaluator skips whole. The rule fires
+   only on the outcome the dead-branch rule already proved, an if folded to the
+   else body when there is no else body, so the if is known to run nothing. The
+   mark is honored at the top of IfClause::evaluate_impl. */
+fn rule_eliminate_compound_body(const Expression *node,
+                                AnalysisContext &actx) throws -> bool
+{
+  const expressions::IfClause *clause = node->as_if_clause();
+  if (clause == nullptr) return false;
+  if (clause->is_fully_eliminated()) return false;
+  if (!clause->has_folded_branch()) return false;
+
+  /* The dead-branch rule recorded the branch this if takes. An index at the
+     branch count names the else body, and a null else body means the chosen
+     path runs nothing, so the whole if is a proven no-op. A folded path into a
+     real body still runs that body and is left alone. */
+  if (clause->folded_branch_index() != clause->branches().count()) return false;
+  if (clause->otherwise() != nullptr) return false;
+
+  LOG(All, "compound-body elimination folded an if with no taken branch to a "
+           "no-op");
+  clause->set_fully_eliminated();
+  actx.optimizer_eliminated_compounds++;
+  if (actx.should_trace_optimizer)
+    actx.trace_optimizer_line(String{"eliminated if to a no-op"});
+  actx.trace_eliminated_node(node->source_location(),
+                             "Eliminated if with no reachable body");
+  return true;
+}
+
+/* RULE empty for-loop elimination. A for with an explicit in clause and no
+   words never iterates, so the whole loop is a no-op whatever the body holds.
+   The mark is honored at the top of ForLoop::evaluate_impl. */
+fn rule_eliminate_empty_for(const Expression *node, AnalysisContext &actx) throws
+    -> bool
+{
+  const expressions::ForLoop *loop = node->as_for_loop();
+  if (loop == nullptr) return false;
+  if (loop->is_fully_eliminated()) return false;
+
+  /* A for without an in clause walks the positional parameters, whose count is
+     only known at run time, so an empty static word list there proves nothing.
+     An explicit empty in clause iterates zero times whatever the arguments are.
+   */
+  if (!loop->has_in_clause()) return false;
+  if (!loop->words().is_empty()) return false;
+
+  LOG(All, "empty for-loop elimination folded a for with an empty in clause to "
+           "a no-op");
+  loop->set_fully_eliminated();
+  actx.optimizer_eliminated_compounds++;
+  if (actx.should_trace_optimizer)
+    actx.trace_optimizer_line(String{"eliminated empty for loop"});
+  actx.trace_eliminated_node(node->source_location(),
+                             "Eliminated for over an empty list");
+  return true;
+}
+
+/* RULE C-style for folding. A constant condition clause with no run-time
+   variable is folded to its value. A constant non-zero condition is left to run
+   as an infinite loop the way bash reads it, while a constant zero condition
+   never lets the body run, so the whole loop folds to a no-op. The evaluator
+   reads the cached condition value instead of re-parsing the clause. */
+fn rule_fold_cstyle_for(const Expression *node, AnalysisContext &actx) throws
+    -> bool
+{
+  const expressions::CStyleForLoop *loop = node->as_cstyle_for_loop();
+  if (loop == nullptr) return false;
+  if (loop->has_folded_condition()) return false;
+
+  /* A blank condition is the for ((;;)) infinite form, which has no value to
+     fold and must keep running. */
+  let const condition = loop->condition_clause();
+  let const trimmed = trim_arithmetic_whitespace(condition);
+  if (trimmed.length == 0) return false;
+
+  /* Only a condition with no identifier is folded. The counter the header
+     mutates is read in the condition, so a recorded constant must not be
+     inlined there, which would freeze the loop at its first verdict. A pure
+     literal condition such as for ((;0;)) carries no counter and folds. */
+  for (usize i = 0; i < trimmed.length; i++) {
+    if (is_identifier_start(trimmed[i])) {
+      LOG(All, "the c-style-for fold declines, the condition reads a variable");
+      return false;
+    }
+  }
+
+  let const value = try_fold_constant_arithmetic(trimmed);
+  if (!value.has_value()) return false;
+
+  loop->set_folded_condition(*value);
+  LOG(All, "folded the c-style for condition '%.*s' to %lld",
+      static_cast<int>(trimmed.length), trimmed.data,
+      static_cast<long long>(*value));
+  actx.optimizer_folded_arithmetic++;
+  if (actx.should_trace_optimizer)
+    actx.trace_optimizer_line(String{"folded c-style for condition: "} +
+                              String{trimmed} + " = " +
+                              utils::int_to_text(*value));
+
+  /* A constant zero condition means the body never runs, so the whole loop is a
+     proven no-op the body-elimination path skips. */
+  if (*value == 0) {
+    loop->set_fully_eliminated();
+    actx.optimizer_eliminated_compounds++;
+    if (actx.should_trace_optimizer)
+      actx.trace_optimizer_line(String{"eliminated c-style for loop"});
+    actx.trace_eliminated_node(node->source_location(),
+                               "Eliminated c-style for whose condition is zero");
+  }
+  return true;
+}
+
 /* The transformation rules, applied to each node in order on every pass. A rule
    matches its own node kind and does nothing on a node it does not own, so the
    driver runs the whole list against every node. */
 using OptimizationRule = fn(const Expression *, AnalysisContext &) throws->bool;
 
 OptimizationRule *const OPTIMIZATION_RULES[] = {
-    rule_fold_constant_arithmetic,
-    rule_dead_branch_elimination,
-    rule_loop_elimination,
+    rule_fold_constant_arithmetic, rule_dead_branch_elimination,
+    rule_loop_elimination,         rule_eliminate_compound_body,
+    rule_eliminate_empty_for,      rule_fold_cstyle_for,
 };
 
 /* The pass cap that bounds the fixpoint loop. A correct rule set reaches a

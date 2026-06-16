@@ -354,8 +354,13 @@ public:
     skip_spaces();
     if (pos != source.length)
     {
-      fail("unexpected '" + String{source.substring(pos)} +
-           "' after the expression, missing an operator between two values");
+      /* The leftover text after a complete expression usually means an operator
+         is missing, so the cause rides a trailing note rather than the message.
+       */
+      Error error{"Arithmetic: unexpected '" + String{source.substring(pos)} +
+                  "' after the expression"};
+      error.set_note("an operator is missing between two values");
+      throw error;
     }
     return result;
   }
@@ -1010,10 +1015,15 @@ public:
   {
     if (toks.is_empty()) return 0;
     let const result = parse_binary(1);
-    if (ti != toks.count())
-      throw Error{
-          "Arithmetic: unexpected '" + String{toks[ti].text} +
-          "' after the expression, operator is missing between two values"};
+    if (ti != toks.count()) {
+      /* The leftover token after a complete expression usually means an
+         operator is missing, so the cause rides a trailing note rather than the
+         message. */
+      Error error{"Arithmetic: unexpected '" + String{toks[ti].text} +
+                  "' after the expression"};
+      error.set_note("an operator is missing between two values");
+      throw error;
+    }
     return result;
   }
 };
@@ -1282,9 +1292,15 @@ public:
     if (pos == source.length) return 0;
     let const result = parse_comma();
     skip_spaces();
-    if (pos != source.length)
-      fail("unexpected '" + String{source.substring(pos)} +
-           "' after the expression, missing an operator between two values");
+    if (pos != source.length) {
+      /* The leftover text after a complete expression usually means an operator
+         is missing, so the cause rides a trailing note rather than the message.
+       */
+      Error error{"Arithmetic: unexpected '" + String{source.substring(pos)} +
+                  "' after the expression"};
+      error.set_note("an operator is missing between two values");
+      throw error;
+    }
     return result;
   }
 

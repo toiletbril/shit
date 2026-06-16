@@ -118,8 +118,10 @@ FLAG(ENABLE_SHITBOX, Bool, '\0', "enable-shitbox", Shit,
 
 FLAG(AST, Bool, 'A', "show-ast", Debug,
      "Print AST before executing each command.");
-FLAG(DEBUG_OPTIMIZER, Bool, '\0', "debug-optimizer", Debug,
-     "Trace the optimizer prepass decisions to standard error.");
+FLAG(SHOW_OPTIMIZER_STATE, Bool, '\0', "show-optimizer-state", Debug,
+     "Trace the optimizer prepass decisions and print a located line for every "
+     "node the analysis stage eliminated to standard error, then a final "
+     "summary.");
 FLAG(EXIT_CODE, Bool, 'E', "show-exit-code", Debug,
      "Print exit code after each executed command.");
 FLAG(ESCAPE_MAP, Bool, 'R', "show-lexed-words", Debug,
@@ -404,12 +406,12 @@ static fn run_script_contents(const String &script_contents,
        startup, so a non-snapping run behaves exactly as before. */
     /* The skip reads the context's diagnostics flag rather than only the
        static one, so set -o no-diagnostics flips the stage at runtime. */
-    /* --debug-optimizer forces the prepass to run whatever the mood, since its
-       whole purpose is to trace the prepass, so an interactive session that
+    /* --show-optimizer-state forces the prepass to run whatever the mood, since
+       its whole purpose is to trace the prepass, so an interactive session that
        settled into bash mood through its rc still shows the optimizer trace. */
     let const run_analysis =
         precompiled_ast == nullptr &&
-        (FLAG_DEBUG_OPTIMIZER.is_enabled() ||
+        (FLAG_SHOW_OPTIMIZER_STATE.is_enabled() ||
          ((!(context.is_bash_compatible() || context.is_posix_mode()) ||
            FLAG_WARNINGS.is_enabled()) &&
           !context.diagnostics_disabled()));
@@ -428,7 +430,7 @@ static fn run_script_contents(const String &script_contents,
             ast, script_contents, context.function_names(),
             context.alias_names(), &context, FLAG_WARNINGS.is_enabled(),
             FLAG_WARNINGS.is_enabled() && context.shell_is_interactive(),
-            FLAG_DEBUG_OPTIMIZER.is_enabled());
+            FLAG_SHOW_OPTIMIZER_STATE.is_enabled());
     /* A freshly parsed tree that parses and analyzes clean is handed back so a
        caller that wants to reuse it, the PROMPT_COMMAND hook, caches it. */
     if (!analysis_failed && out_ast != nullptr) {

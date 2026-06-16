@@ -15,6 +15,8 @@ class IfClause;
 class WhileLoop;
 class AssignCommand;
 class SimpleCommand;
+class ForLoop;
+class CStyleForLoop;
 } /* namespace expressions */
 
 /* The prepass walks the whole tree once before any command runs. It carries the
@@ -90,22 +92,44 @@ public:
      keeps the check, since it lints branches the run may never reach. */
   bool should_silence_unresolved_commands{false};
 
-  /* The optimizer trace, set by --debug-optimizer. The prepass counts what it
-     folds and records, and prints a stable line per decision plus a summary, so
-     the optimizer golden tests can assert the behavior of each pass. */
+  /* The optimizer trace, set by --show-optimizer-state. The prepass counts what
+     it folds and records, and prints a stable line per decision plus a summary,
+     so the optimizer golden tests can assert the behavior of each pass. */
   bool should_trace_optimizer{false};
   usize optimizer_folded_arithmetic{0};
   usize optimizer_recorded_constants{0};
   usize optimizer_folded_branches{0};
   usize optimizer_folded_loops{0};
+  /* The count of compound commands the body-elimination rule reduced to a
+     no-op, a loop or an if whose header and body were both proven to do
+     nothing. */
+  usize optimizer_eliminated_compounds{0};
+
+  /* The optimizer-state dump, also set by --show-optimizer-state. It prints a
+     located line for every node the stage eliminated and a final state summary,
+     so an operator sees exactly which source the optimizer removed. The one flag
+     drives both this and the trace, so a folded node prints once. */
+  bool should_print_optimizer_state{false};
 
   explicit AnalysisContext(StringView source_view) : source(source_view) {}
 
-  fn warn(SourceLocation location, StringView message) throws -> void;
-  fn fail(SourceLocation location, StringView message) throws -> void;
+  /* The message states the problem, and the suggestion, when present, renders as
+     a trailing note line under the caret rather than appended to the message, so
+     the advice reads on its own. */
+  fn warn(SourceLocation location, StringView message,
+          StringView suggestion = {}) throws -> void;
+  /* The message states the problem, and the suggestion, when present, renders as
+     a trailing note line, the way warn does, so the advice reads on its own. */
+  fn fail(SourceLocation location, StringView message,
+          StringView suggestion = {}) throws -> void;
   /* Prints one optimizer trace line to standard error when the trace is on, so
      a golden test sees exactly what a pass folded. A no-op otherwise. */
   fn trace_optimizer_line(StringView message) const throws -> void;
+  /* Prints one located optimizer-state line to standard error when the state
+     dump is on, the message followed by the source caret at the given location,
+     so the -Z dump names where each eliminated node lives. A no-op otherwise. */
+  fn trace_eliminated_node(SourceLocation location, StringView message) const
+      throws -> void;
 };
 
 /* Walk the tree and report. Returns true when execution may proceed, false when
@@ -114,7 +138,7 @@ fn analyze_ast(const Expression *root, StringView source,
                const HashSet &known_functions, const HashSet &known_aliases,
                const EvalContext *eval_context, bool errors_are_warnings,
                bool silence_unresolved_commands,
-               bool trace_optimizer = false) throws -> bool;
+               bool show_optimizer_state = false) throws -> bool;
 
 class Expression
 {
@@ -158,6 +182,9 @@ public:
       -> const expressions::AssignCommand *;
   virtual fn as_simple_command() const wontthrow
       -> const expressions::SimpleCommand *;
+  virtual fn as_for_loop() const wontthrow -> const expressions::ForLoop *;
+  virtual fn as_cstyle_for_loop() const wontthrow
+      -> const expressions::CStyleForLoop *;
 
   /* A node lives in the parse arena, so its storage is reclaimed in bulk. This
      no-ops for arena storage and frees an ordinary heap node otherwise. The
@@ -520,6 +547,21 @@ public:
 
   fn append_to(usize d, String &f, bool duplicate) throws -> void override;
   fn redirect_to(usize d, String &f, bool duplicate) throws -> void override;
+
+  /* Record that the body-elimination rule proved this whole compound command
+     does nothing, so the evaluator yields 0 without running its header or its
+     body. A loop whose body collapses to a no-op and whose condition never
+     lets the body run, or an if every one of whose reachable branches is a
+     no-op, folds to this. Each compound node honors the mark at the top of its
+     evaluate_impl. */
+  fn set_fully_eliminated() const wontthrow -> void;
+  pure fn is_fully_eliminated() const wontthrow -> bool;
+
+protected:
+  /* Set by the body-elimination rule once it proves the whole compound runs
+     nothing observable. The mark lives on the base so every compound node
+     shares one flag and one pair of accessors. */
+  mutable bool m_is_fully_eliminated{false};
 };
 
 /* One branch of an if clause, the condition list and the body to run when it
@@ -558,6 +600,10 @@ public:
    */
   fn set_folded_branch(usize index) const wontthrow -> void;
   pure fn has_folded_branch() const wontthrow -> bool;
+  /* The branch index the dead-branch rule recorded, read by the compound-body
+     elimination rule. An index at the branch count names the else body. Valid
+     only when has_folded_branch is true. */
+  pure fn folded_branch_index() const wontthrow -> usize;
 
   fn as_if_clause() const wontthrow -> const IfClause * override;
 
@@ -629,6 +675,14 @@ public:
       -> void override;
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
+
+  fn as_for_loop() const wontthrow -> const ForLoop * override;
+
+  /* The word list and the in-clause flag, read by the empty-list elimination
+     rule. A for with an explicit empty in-clause never iterates, so the whole
+     loop is a no-op whatever the body holds. */
+  pure fn has_in_clause() const wontthrow -> bool;
+  pure fn words() const wontthrow -> const ArrayList<const Token *> &;
 
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
@@ -774,6 +828,16 @@ public:
   fn register_defined_functions(AnalysisContext &actx) const throws
       -> void override;
 
+  /* The condition clause, read by the C-style-for folding rule. The rule proves
+     the clause constant and records its value, so the evaluator reads the
+     cached integer instead of re-parsing the clause on every iteration. */
+  pure fn condition_clause() const wontthrow -> StringView;
+
+  fn set_folded_condition(i64 value) const wontthrow -> void;
+  pure fn has_folded_condition() const wontthrow -> bool;
+
+  fn as_cstyle_for_loop() const wontthrow -> const CStyleForLoop * override;
+
 protected:
   fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
 
@@ -781,6 +845,13 @@ protected:
   String m_condition;
   String m_step;
   const Expression *m_body;
+
+  /* The constant value of the condition clause once the folding rule proves it
+     does not read a run-time variable. A constant non-zero condition means the
+     loop is infinite and stays unfolded, while a constant zero condition means
+     the body never runs and the body-elimination rule folds the whole loop. The
+     evaluator reads this instead of re-parsing the clause each pass. */
+  mutable Maybe<i64> m_folded_condition{};
 };
 
 /* The bash select loop, select name in words; do BODY; done. It prints a

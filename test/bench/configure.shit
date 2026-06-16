@@ -44,6 +44,19 @@ while [ "$i" -lt "$limit" ]; do
   while false; do SUM=$((SUM + 6)); done
   until true; do SUM=$((SUM + 7)); done
 
+  # A C-style for whose condition folds to a constant zero never iterates, so
+  # the optimizer removes the whole loop while bash evaluates the header.
+  for ((d = 0; 0; d++)); do SUM=$((SUM + 8)); done
+
+  # An if whose only branch is constant-false and which has no else body is a
+  # proven no-op the optimizer eliminates whole.
+  if false; then SUM=$((SUM + 9)); fi
+
+  # Algebraic identities that fold to a constant, a zero multiply and a name
+  # minus itself, so the addition contributes nothing on every pass.
+  SUM=$((SUM + i * 0))
+  SUM=$((SUM + i - i))
+
   # The live tail, a constant fold and one real increment. shit folds the
   # constant arithmetic at parse, bash recomputes it every pass.
   SUM=$((SUM + 2 * 3 + 4 - 1))

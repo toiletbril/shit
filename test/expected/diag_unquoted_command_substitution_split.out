@@ -18,12 +18,14 @@
 [Word
   Unquoted "after"
 ]
-shit: 2:13: warning: An unquoted command substitution splits its output, quote it to keep one argument.
+shit: 2:13: warning: An unquoted command substitution splits its output.
      2 |  echo before $(echo one two)
        |              ^~~~~~~~~~~~~~~ here.
-shit: 2:13: warning: A useless echo inside the command substitution, the text can be used directly without the subshell.
+note: Quote it to keep one argument.
+shit: 2:13: warning: A useless echo inside the command substitution.
      2 |  echo before $(echo one two)
        |              ^~~~~~~~~~~~~~~ here.
+note: The text can be used directly without the subshell.
 before one two
 after
 [Code 0]

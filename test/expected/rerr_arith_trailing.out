@@ -7,6 +7,7 @@
 [Word
   ArithmeticExpansion "1 2"
 ]
-shit: 2:6: error: Arithmetic: unexpected '2' after the expression, operator is missing between two values.
+shit: 2:6: error: Arithmetic: unexpected '2' after the expression.
      2 |  echo $((1 2))
        |       ^~~~~~~~ here.
+note: An operator is missing between two values.

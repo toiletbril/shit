@@ -143,12 +143,14 @@
   DoubleQuoted "gt="
   Variable "?"
 ]
-shit: 5:6: warning: The operand is a literal, so this -z test is constant, test a variable or drop the check.
+shit: 5:6: warning: The operand is a literal, so this -z test is constant.
      5 |  [ -z "" ]; echo "empty=$?"
        |       ^~ here.
-shit: 6:6: warning: The operand is a literal, so this -n test is constant, test a variable or drop the check.
+note: Test a variable or drop the check.
+shit: 6:6: warning: The operand is a literal, so this -n test is constant.
      6 |  [ -n "x" ]; echo "nonempty=$?"
        |       ^~~ here.
+note: Test a variable or drop the check.
 eq=0
 ne=0
 streq=0
