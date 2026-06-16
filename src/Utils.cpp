@@ -642,15 +642,24 @@ fn parse_decimal_integer(StringView text) throws -> ErrorOr<i64>
   u64 magnitude = 0;
   bool has_digits = false;
   bool has_overflowed = false;
+  /* A u64 holds up to nineteen decimal digits with no overflow, so the first
+     nineteen accumulate without the per-digit overflow division, which the hot
+     arithmetic read path runs millions of times on small numbers. The division
+     guard runs only once a twentieth digit can push past the type's range. */
+  usize digit_count = 0;
   while (offset < text.length && text.data[offset] >= '0' &&
          text.data[offset] <= '9')
   {
     const u64 digit = static_cast<u64>(text.data[offset] - '0');
     has_digits = true;
-    if (magnitude > (UINT64_MAX - digit) / 10)
-      has_overflowed = true;
-    else
+    digit_count++;
+    if (digit_count <= 19) {
       magnitude = magnitude * 10 + digit;
+    } else if (magnitude > (UINT64_MAX - digit) / 10) {
+      has_overflowed = true;
+    } else {
+      magnitude = magnitude * 10 + digit;
+    }
     offset++;
   }
 

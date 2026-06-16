@@ -22,8 +22,12 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]", "[-OPTIONS] -",
+/* clang-format off */
+HELP_SYNOPSIS_DECL("[-OPTIONS] [--] <file1> [file2, ...]",
+                   "[-OPTIONS] -c <script1> [-c <script2> ...]",
+                   "[-OPTIONS] -",
                    "[-OPTIONS]");
+/* clang-format on */
 
 FLAG(VERSION, Bool, '\0', "version", "Display program version and notices.");
 FLAG(SHORT_VERSION, Bool, 'V', "short-version",

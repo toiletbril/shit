@@ -852,6 +852,19 @@ protected:
      the body never runs and the body-elimination rule folds the whole loop. The
      evaluator reads this instead of re-parsing the clause each pass. */
   mutable Maybe<i64> m_folded_condition{};
+
+  /* The condition and step clauses are immutable text re-evaluated every
+     iteration, so each clause lexes its tokens once into its own store and the
+     evaluator re-runs from them rather than re-scanning the bytes. A simple
+     clause such as m <= hi runs the token fast path, while a complex clause such
+     as the m += p step falls back to the char parser, decided once when the
+     tokens are filled. */
+  mutable ArrayList<arith_token> m_condition_tokens{heap_allocator()};
+  mutable ArrayList<arith_token> m_step_tokens{heap_allocator()};
+  mutable bool m_condition_tokenized{false};
+  mutable bool m_step_tokenized{false};
+  mutable bool m_condition_simple{false};
+  mutable bool m_step_simple{false};
 };
 
 /* The bash select loop, select name in words; do BODY; done. It prints a

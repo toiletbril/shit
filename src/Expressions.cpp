@@ -3716,15 +3716,20 @@ fn CStyleForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
      condition the folding rule proved constant reads its cached value rather
      than re-parsing the clause on every pass. */
   while (is_blank_clause(m_condition.view()) ||
-         (m_folded_condition.has_value() ? (*m_folded_condition != 0)
-                                         : cxt.evaluate_arithmetic(
-                                               m_condition.view()) != 0))
+         (m_folded_condition.has_value()
+              ? (*m_folded_condition != 0)
+              : cxt.evaluate_arithmetic_cached_clause(
+                    m_condition.view(), m_condition_tokens,
+                    m_condition_tokenized, m_condition_simple) != 0))
   {
     ret = m_body->evaluate(cxt);
     if (resolve_loop_control(cxt) == loop_disposition::StopLoop) break;
     /* The step runs after the body on every iteration, including one ended by a
        continue, the way bash advances the counter. */
-    if (!is_blank_clause(m_step.view())) cxt.evaluate_arithmetic(m_step.view());
+    if (!is_blank_clause(m_step.view())) {
+      cxt.evaluate_arithmetic_cached_clause(m_step.view(), m_step_tokens,
+                                            m_step_tokenized, m_step_simple);
+    }
   }
   cxt.set_last_exit_status(static_cast<i32>(ret));
   return ret;

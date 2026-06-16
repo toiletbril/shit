@@ -1064,38 +1064,47 @@ fn EvalContext::evaluate_arithmetic(StringView expression) throws -> i64
 fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
     -> i64
 {
-  let const expr = segment.text.view();
+  return evaluate_arithmetic_cached_clause(
+      segment.text.view(), segment.cached_arith_tokens, segment.arith_tokenized,
+      segment.arith_simple);
+}
+
+fn EvalContext::evaluate_arithmetic_cached_clause(StringView expression,
+                                                  ArrayList<arith_token> &tokens,
+                                                  bool &is_tokenized,
+                                                  bool &is_simple) throws -> i64
+{
   /* A parameter or command substitution inside the arithmetic needs the full
      expansion path, so only a substitution-free expression, the hot loop case
      such as d=$((d+1)), takes the cached token path. */
-  if (expr.find_character('$').has_value() ||
-      expr.find_character('`').has_value())
+  if (expression.find_character('$').has_value() ||
+      expression.find_character('`').has_value())
   {
-    return evaluate_arithmetic(expr);
+    return evaluate_arithmetic(expression);
   }
 
-  if (!segment.arith_tokenized) {
-    segment.cached_arith_tokens.clear();
+  if (!is_tokenized) {
+    tokens.clear();
     try {
-      tokenize_arithmetic(expr, segment.cached_arith_tokens);
+      tokenize_arithmetic(expression, tokens);
     } catch (...) {
-      /* A lexing failure leaves the token path off for this segment, so the
+      /* A lexing failure leaves the token path off for this clause, so the
          char parser reports the same error and the cache never adds one. */
-      segment.cached_arith_tokens.clear();
-      segment.arith_tokenized = true;
-      segment.arith_simple = false;
-      return evaluate_arithmetic(expr);
+      tokens.clear();
+      is_tokenized = true;
+      is_simple = false;
+      return evaluate_arithmetic(expression);
     }
-    segment.arith_tokenized = true;
-    segment.arith_simple = arith_tokens_are_simple(segment.cached_arith_tokens);
+    is_tokenized = true;
+    is_simple = arith_tokens_are_simple(tokens);
   }
 
   /* A complex expression, an assignment, a ternary, a comma, a short-circuit,
      an increment, or an array element, runs through the full char parser, which
      keeps the side-effect ordering the fast path does not. */
-  if (!segment.arith_simple) return evaluate_arithmetic(expr);
+  if (!is_simple) return evaluate_arithmetic(expression);
 
-  ArithmeticTokenEvaluator evaluator{this, segment.cached_arith_tokens};
+  ArithmeticTokenEvaluator evaluator{this, tokens};
   return evaluator.run();
 }
 

@@ -320,8 +320,15 @@ fn EvalContext::declare_associative_array(StringView name) throws -> void
 fn EvalContext::set_associative_element(StringView name, StringView key,
                                         StringView value) throws -> void
 {
-  m_associative_names.add(name);
-  m_shell_variables.erase(name);
+  /* Registering the name and clearing a same-named scalar matters only the
+     first time, since the name stays associative until an unset removes it. The
+     hot comp[$m]=1 loop sets thousands of elements under one already-registered
+     name, so the repeated set probes neither the name set nor the variable
+     store. */
+  if (!is_associative_array(name)) {
+    m_associative_names.add(name);
+    m_shell_variables.erase(name);
+  }
   m_associative_values.set(
       associative_composite_key(name, key, scratch_allocator()).view(), value);
 }
