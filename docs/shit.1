@@ -155,8 +155,9 @@ Print the exit code after each command.
 .BR \-R ", " \-\-show\-lexed\-words
 Print the escape bitmap after each parsed command.
 .TP
-.B \-\-debug\-optimizer
-Trace the analysis prepass decisions to standard error.
+.B \-\-show\-optimizer\-state
+Trace the analysis prepass decisions and print a located line for every node the
+analysis stage eliminated to standard error, then a final summary.
 .TP
 .B \-\-show\-stats
 Print per-command statistics.

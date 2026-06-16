@@ -40,7 +40,7 @@ _shit_complete()
 --init-moods --mimicry --dumb --force-warnings --list-diagnostics \
 --no-diagnostics --no-init-diagnostics --no-completion --enable-shitbox \
 --show-ast \
---debug-optimizer --show-exit-code --show-lexed-words --show-stats --show-memory \
+--show-optimizer-state --show-exit-code --show-lexed-words --show-stats --show-memory \
 --debug-logging --debug-logging-file"
 
     local short_flags="-V -i -s -c -e -f -t -v -x -a -C -n -u -l -p -M -L -I -W \
