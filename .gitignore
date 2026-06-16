@@ -26,6 +26,7 @@ test/.test_history
 test/.test_directory_history
 
 /shit
+/shit-*
 /shit.aarch64.elf
 /shit.com.dbg
 

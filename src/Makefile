@@ -34,13 +34,17 @@ OBJ_DIR := o/$(TARGET)/$(MODE)
 OBJECTS := $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 DEPS := $(OBJECTS:.o=.d)
 
-# Linker target file.
+# Linker target file. MODE=rel keeps the canonical name, every other mode adds a
+# -MODE suffix so a debug, coverage, or profiling binary never overwrites the
+# release one. A mode switch then needs no relink-time cleanup, since the two
+# artifacts coexist.
+MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
 ifeq ($(MODE), cosmo)
-OUT := ../shit.com
+OUT := ../shit$(MODE_SUFFIX).com
 else ifeq ($(TARGET), Windows_NT)
-OUT := ../shit.exe
+OUT := ../shit$(MODE_SUFFIX).exe
 else
-OUT := ../shit
+OUT := ../shit$(MODE_SUFFIX)
 endif
 
 # /dev/null
@@ -277,9 +281,9 @@ fmt:
 	$(CLANG_FORMAT) -i $(SOURCES) $(HEADERS)
 
 clean:
-	rm -rf ./o ../shit ../shit.exe
+	rm -rf ./o ../shit ../shit-$(MODE) ../shit.exe ../shit-$(MODE).exe
 	rm -rf ../*.ilk ../*.pdb ../*.lib # Windows
-	rm -rf ../shit.com.dbg ../shit.aarch64.elf # Cosmopolitan
+	rm -rf ../shit.com ../shit.com.dbg ../shit.aarch64.elf # Cosmopolitan
 	rm -rf ../perf*
 	rm -rf ../*.profraw ../*.profdata ../coverage # Coverage
 

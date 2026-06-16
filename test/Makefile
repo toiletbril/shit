@@ -1,10 +1,26 @@
 DIFF_FLAGS := -u
 
+# The golden, cli, and completion suites need the debug binary, since the
+# completion driver behind --debug-complete-at is gated behind NDEBUG, so the
+# mode defaults to dbg. BIN names the artifact the build writes for this MODE and
+# TARGET the same way src/Makefile does, rel with no suffix and every other mode
+# with a -MODE suffix, plus the platform extension. The bench target overrides
+# BIN to the optimized build below.
+MODE ?= dbg
 ifeq ($(OS), Windows_NT)
-BIN ?= ../shit.exe
+TARGET ?= Windows_NT
+else
+TARGET ?= $(shell uname -s)
+endif
+
+MODE_SUFFIX := $(if $(filter rel,$(MODE)),,-$(MODE))
+ifeq ($(MODE), cosmo)
+BIN ?= ../shit$(MODE_SUFFIX).com
+else ifeq ($(TARGET), Windows_NT)
+BIN ?= ../shit$(MODE_SUFFIX).exe
 DIFF_FLAGS += -w # CRLF on Windows SMH
 else
-BIN ?= ../shit
+BIN ?= ../shit$(MODE_SUFFIX)
 endif
 
 BIN_FLAGS := -AER
@@ -250,6 +266,9 @@ SCALE ?= 100
 # The POSIX script is checked against dash and the bash script against bash. cmp
 # runs without -s so a mismatch names the first differing byte and line, then a
 # diff shows the differing lines.
+# The benchmark measures the optimized build, so BIN points at the rel artifact
+# here whatever mode the rest of the suite ran under.
+bench: BIN := ../shit
 bench:
 	@$(BASH) -c 'export TIMEFORMAT="  %R"; scale="$(SCALE)"; \
 		d=/tmp/shit_bench_d; b=/tmp/shit_bench_b; z=/tmp/shit_bench_z; \

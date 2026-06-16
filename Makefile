@@ -4,6 +4,17 @@ endif
 
 MAKE := $(MAKE) -j$(shell nproc)
 
+MODE ?= dbg
+
+ifeq ($(OS), Windows_NT)
+TARGET ?= Windows_NT
+else
+TARGET ?= $(shell uname -s)
+endif
+
+export MODE
+export TARGET
+
 all: shit test
 
 shit:
